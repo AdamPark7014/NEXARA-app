@@ -1,0 +1,453 @@
+/* Footer base */
+.footer {
+  width: 100%;
+  margin-top: 32px;
+  border-top: 1px solid var(--gray-alpha-200);
+  background: var(--background);
+  position: relative;
+  overflow: hidden;
+}
+
+.topAccent {
+  position: absolute;
+  top: -1px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary), var(--secondary));
+  opacity: 0.8;
+}
+
+.footerInner {
+  padding: 12px 0 0 0;
+}
+
+/* Newsletter arriba centrado */
+.newsletter {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 0 24px 12px 24px;
+  text-align: center;
+}
+
+.newsTitle {
+  font-size: clamp(1rem, 1.15vw, 1.15rem);
+  font-weight: 700;
+  margin-bottom: 4px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.newsSubtitle { color: var(--foreground); opacity: 0.7; font-size: 0.8rem; margin-bottom: 8px; }
+.newsForm { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; max-width: 100%; margin-top: 12px; }
+.newsInput { border: 1px solid var(--gray-alpha-200); border-radius: 999px; padding: 7px 12px; background: var(--background); color: var(--foreground); font-size: 0.82rem; transition: box-shadow 0.25s ease, border-color 0.25s ease; }
+.newsInput:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent); }
+.newsButton { border: none; border-radius: 999px; height: 32px; padding: 0 15px; font-size: 0.82rem; color: #fff; background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); box-shadow: 0 4px 12px var(--shadow); transition: transform 0.2s ease, box-shadow 0.25s ease; cursor: pointer; }
+.newsButton:hover { transform: translateY(-1px); box-shadow: 0 8px 20px var(--shadow); }
+.newsButton:active { transform: translateY(0); }
+
+/* Layout principal: 3 columnas (izquierda, centro con mapa, derecha) */
+.mainLayout {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 8px 24px;
+  display: grid;
+  grid-template-columns: 0.9fr 2fr 1.1fr;
+  gap: 32px;
+  align-items: start;
+}
+
+.leftColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mapCenter {
+  width: 100%;
+  height: 100%;
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rightColumn {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.content { 
+  max-width: 1100px; 
+  margin: -12px auto 0 auto; 
+  padding: 0px 24px 12px; 
+  display: grid; 
+  grid-template-columns: 1.2fr 1fr; 
+  gap: 40px; 
+}
+
+.rightColumns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.contentWide { max-width: 1100px; margin: 0 auto; padding: 6px 24px 12px 24px; }
+.colTitle { font-size: 0.8rem; font-weight: 700; color: var(--foreground); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.9; }
+.list { list-style: none; padding: 0; margin: 0; display: grid; gap: 3px; }
+.list a { color: var(--foreground); opacity: 0.7; font-size: 0.8rem; transition: color 0.2s ease, opacity 0.2s ease; }
+.list a:hover { color: var(--primary); opacity: 1; text-decoration: underline; text-underline-offset: 2px; }
+
+.brandName { font-size: clamp(0.95rem, 1vw, 1.1rem); font-weight: 800; letter-spacing: 0.08em; color: var(--foreground); }
+.brandTagline { color: var(--foreground); opacity: 0.65; margin-top: 2px; font-size: 0.75rem; }
+.socials { display: flex; gap: 7px; margin-top: 8px; }
+.social { width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: var(--primary); background: var(--surface); border: 1px solid var(--gray-alpha-200); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; position: relative; overflow: hidden; }
+.social::before { content: ''; position: absolute; inset: 0; border-radius: 50%; background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); opacity: 0; transition: opacity 0.3s ease; }
+.social:hover { transform: translateY(-3px) scale(1.05); border-color: transparent; box-shadow: 0 8px 20px color-mix(in srgb, var(--primary) 30%, transparent); }
+.social:hover::before { opacity: 1; }
+.social svg { width: 16px; height: 16px; position: relative; z-index: 1; transition: all 0.3s ease; }
+.social:hover svg { color: #ffffff; transform: scale(1.1); filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+
+.contactCard { border: 1px solid var(--gray-alpha-200); border-radius: 12px; background: var(--surface); padding: 12px; display: grid; gap: 8px; }
+.contactRow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+.phoneButton,
+.emailButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: all 0.25s ease;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--gray-alpha-300);
+  background: var(--background);
+  color: var(--foreground);
+  box-shadow: none;
+}
+
+.phoneButton {
+  border-color: var(--gray-alpha-300);
+}
+
+.phoneButton::before { content: none; }
+
+.phoneButton:hover {
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+  box-shadow: 0 2px 8px var(--shadow);
+  border-color: var(--primary);
+}
+
+.phoneButton:hover::before { content: none; }
+
+.phoneButton:hover { color: var(--foreground); }
+
+.emailButton {
+  border-color: var(--gray-alpha-300);
+}
+
+.emailButton::before { content: none; }
+
+.emailButton:hover {
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+  box-shadow: 0 2px 8px var(--shadow);
+  border-color: var(--primary);
+}
+
+.emailButton:hover::before { content: none; }
+
+.emailButton:hover { color: var(--foreground); }
+
+.phoneButton svg,
+.emailButton svg {
+  width: 14px;
+  height: 14px;
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  color: var(--primary);
+}
+
+.phoneButton span,
+.emailButton span {
+  position: relative;
+  z-index: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.whatsappButton { 
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  gap: 6px; 
+  padding: 6px 12px; 
+  border-radius: 999px; 
+  border: 1px solid color-mix(in srgb, var(--whatsapp-color) 50%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--whatsapp-color) 85%, #ffffff) 0%, var(--whatsapp-color-dark) 100%);
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--whatsapp-color) 25%, transparent);
+  transition: all 0.25s ease;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+.whatsappButton::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--whatsapp-color-dark) 0%, color-mix(in srgb, var(--whatsapp-color-dark) 70%, #000000) 100%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.whatsappButton:hover {
+  transform: translateY(-1px) scale(1.01);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--whatsapp-color) 32%, transparent);
+}
+.whatsappButton:hover::before {
+  opacity: 1;
+}
+.whatsappButton svg {
+  width: 16px;
+  height: 16px;
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));
+}
+.whatsappButton span {
+  position: relative;
+  z-index: 1;
+}
+
+.chip { display: inline-block; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--gray-alpha-200); background: var(--surface); color: color-mix(in srgb, var(--foreground) 85%, transparent); font-size: 0.65rem; font-weight: 600; letter-spacing: 0.03em; }
+
+.divider { height: 1px; background: linear-gradient(90deg, rgba(0,0,0,0), var(--gray-alpha-200), rgba(0,0,0,0)); margin: 2px 0; }
+
+/* Bottom bar */
+.bottomBar { border-top: 1px solid var(--gray-alpha-200); max-width: 1100px; margin: 0 auto; padding: 10px 24px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; }
+.legalLeft { color: var(--foreground); opacity: 0.6; font-size: 0.75rem; }
+.legalRight { display: flex; gap: 10px; }
+.legalRight a { color: var(--foreground); opacity: 0.7; font-size: 0.75rem; transition: color 0.2s ease, opacity 0.2s ease; }
+.legalRight a:hover { color: var(--primary); opacity: 1; }
+
+.backTop { position: fixed; right: 16px; bottom: 16px; z-index: 200; border: none; border-radius: 999px; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.1rem; background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); box-shadow: 0 6px 16px var(--shadow); cursor: pointer; transition: transform 0.2s ease, box-shadow 0.25s ease; }
+.backTop:hover { transform: translateY(-2px); box-shadow: 0 10px 24px var(--shadow); }
+
+/* Theme variants */
+:global(body.light) .footer { 
+  border-top-color: color-mix(in srgb, var(--primary) 25%, transparent);
+  background: linear-gradient(180deg, var(--background) 0%, var(--surface-light) 100%);
+}
+
+:global(body.light) .topAccent {
+  opacity: 0.9;
+}
+
+:global(body.light) .newsletter {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+}
+
+:global(body.light) .newsInput {
+  background: var(--background);
+  border-color: color-mix(in srgb, var(--primary) 20%, transparent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+:global(body.light) .newsInput:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent), 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+:global(body.light) .newsButton {
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
+:global(body.light) .newsButton:hover {
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--primary) 40%, transparent);
+}
+
+:global(body.light) .brandName {
+  color: var(--text-tertiary);
+}
+
+:global(body.light) .brandTagline {
+  color: var(--text-secondary);
+  opacity: 0.85;
+}
+
+:global(body.light) .colTitle {
+  color: var(--text-tertiary);
+}
+
+:global(body.light) .list a {
+  color: var(--text-secondary);
+  opacity: 0.85;
+}
+
+:global(body.light) .list a:hover {
+  color: var(--primary);
+  opacity: 1;
+}
+
+:global(body.light) .social { 
+  background: var(--background);
+  border-color: color-mix(in srgb, var(--primary) 20%, transparent);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+:global(body.light) .social:hover {
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+:global(body.light) .contactCard { 
+  background: var(--background);
+  border-color: color-mix(in srgb, var(--primary) 20%, transparent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+
+:global(body.light) .phoneButton {
+  background: var(--background);
+  border-color: color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+:global(body.light) .phoneButton:hover {
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+:global(body.light) .emailButton {
+  background: var(--background);
+  border-color: color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+:global(body.light) .emailButton:hover {
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+:global(body.light) .whatsappButton {
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--whatsapp-color) 35%, transparent);
+}
+
+:global(body.light) .whatsappButton:hover {
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--whatsapp-color) 40%, transparent);
+}
+
+:global(body.light) .chip {
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 20%, transparent);
+  color: var(--primary-light);
+}
+
+:global(body.light) .divider {
+  background: linear-gradient(90deg, rgba(0,0,0,0), color-mix(in srgb, var(--primary) 15%, transparent), rgba(0,0,0,0));
+}
+
+:global(body.light) .bottomBar {
+  border-top-color: color-mix(in srgb, var(--primary) 15%, transparent);
+  background: color-mix(in srgb, var(--surface-light) 80%, transparent);
+}
+
+:global(body.light) .legalLeft {
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
+:global(body.light) .legalRight a {
+  color: var(--text-secondary);
+  opacity: 0.85;
+}
+
+:global(body.light) .legalRight a:hover {
+  color: var(--primary);
+  opacity: 1;
+}
+
+:global(body.light) .backTop {
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
+:global(body.light) .backTop:hover {
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--primary) 40%, transparent);
+}
+
+:global(body.dark) .footer { border-top-color: var(--gray-alpha-200); }
+
+:global(body.dark) .social { background: var(--surface-dark); border-color: var(--gray-alpha-200); }
+
+:global(body.dark) .contactCard { background: var(--surface-dark); }
+
+/* Responsive */
+@media (max-width: 1000px) {
+  .mainLayout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .mapCenter {
+    min-height: 280px;
+  }
+  
+  .rightColumn {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+}
+
+@media (max-width: 600px) {
+  .newsletter {
+    padding: 0 16px 12px 16px;
+  }
+  
+  .newsTitle { font-size: 0.95rem; }
+  .newsSubtitle { font-size: 0.75rem; }
+  .newsForm { grid-template-columns: 1fr; }
+  
+  .mainLayout {
+    padding: 12px 16px;
+  }
+  
+  .mapCenter {
+    min-height: 220px;
+  }
+  
+  .rightColumn {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  
+  .contactRow { 
+    gap: 4px; 
+    flex-direction: column; 
+  }
+  
+  .phoneButton, .emailButton { 
+    width: 100%; 
+    justify-content: center; 
+  }
+  
+  .legalRight { 
+    justify-content: center; 
+  }
+  
+  .bottomBar { 
+    grid-template-columns: 1fr; 
+    text-align: center; 
+    padding: 8px 16px; 
+  }
+}

@@ -1,0 +1,105 @@
+.consoleLayout {
+  display: flex;
+  min-height: 100vh;
+  background: #181a20;
+}
+
+.sidebar {
+  width: 240px;
+  background: linear-gradient(180deg, #23243a 0%, #181a20 100%);
+  color: #fff;
+  padding: 32px 0 0 0;
+  box-shadow: 2px 0 12px rgba(0,0,0,0.08);
+  position: relative;
+}
+
+.sidebarLogo {
+  font-size: 2rem;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 32px;
+  color: var(--primary);
+}
+
+.sidebarMenu {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebarMenu li {
+  margin: 0;
+}
+
+.sidebarMenu a {
+  display: block;
+  padding: 14px 32px;
+  color: #fff;
+  text-decoration: none;
+  font-size: 1.1rem;
+  border-left: 4px solid transparent;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.sidebarMenu a.active,
+.sidebarMenu a:hover {
+  background: #23243a;
+  border-left: 4px solid var(--primary);
+  color: var(--primary);
+}
+
+.consoleMain {
+  flex: 1;
+  padding: 40px 48px;
+  background: #20222b;
+  min-width: 0;
+  /* min-height: 100vh; */
+}
+
+.consoleTitle {
+  font-size: 2.2rem;
+  color: var(--primary);
+  margin-bottom: 32px;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .consoleLayout {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100%;
+    min-height: 60px;
+    padding: 0;
+    box-shadow: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .sidebarLogo {
+    margin: 0 16px;
+    font-size: 1.5rem;
+  }
+  .sidebarMenu {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    margin: 0 16px;
+  }
+  .sidebarMenu a {
+    padding: 10px 16px;
+    font-size: 1rem;
+    border-left: none;
+    border-bottom: 2px solid transparent;
+  }
+  .sidebarMenu a.active,
+  .sidebarMenu a:hover {
+    border-bottom: 2px solid var(--primary);
+    background: #23243a;
+    color: var(--primary);
+  }
+  .consoleMain {
+    width: 100%;
+    padding: 24px 8px;
+  }
+}

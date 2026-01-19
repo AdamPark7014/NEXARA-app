@@ -1,0 +1,382 @@
+/* Strict dark mode fix for description and inputs */
+body.dark .descriptionBetter,
+body.dark .descriptionBetter *,
+body.dark .descriptionBetter input,
+body.dark .descriptionBetter textarea {
+  background: var(--surface-dark, #23272f) !important;
+  color: var(--foreground, #ededed) !important;
+  border-color: #222 !important;
+}
+body.dark .descriptionBetter input:disabled,
+body.dark .descriptionBetter textarea:disabled {
+  background: var(--surface-dark, #23272f) !important;
+  color: var(--foreground, #ededed) !important;
+  opacity: 0.7;
+}
+.descriptionBetter, .descriptionBetter * {
+  color: var(--foreground) !important;
+}
+body.dark .descriptionBetter, body.dark .descriptionBetter * {
+  color: #ededed !important;
+}
+/* Aggressive dark mode fix: override any white or light backgrounds */
+body.dark .heroBetter *,
+body.dark .section *,
+body.dark .descriptionBetter *,
+body.dark .specsTable *,
+body.dark .imageBox *,
+body.dark .priceRow *,
+body.dark .actionsRow * {
+  background: var(--surface-dark, #23272f) !important;
+  color: #f3f3f3 !important;
+}
+/* Fix: Ensure all backgrounds use variables and override for dark mode */
+body.dark .descriptionBetter,
+body.dark .section,
+body.dark .specsTable,
+body.dark .actionsRow,
+body.dark .priceRow {
+  background: var(--surface-dark, #23272f) !important;
+  color: #f3f3f3 !important;
+}
+body.dark .descriptionBetter {
+  box-shadow: 0 2px 8px 0 var(--shadow);
+}
+
+/* --- Product Detail Super Robust Styles --- */
+
+.page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--background);
+  transition: background 0.3s;
+}
+
+.heroBetter {
+  display: flex;
+  gap: 2.5rem;
+  align-items: flex-start;
+  background: var(--surface);
+  border-radius: 18px;
+  box-shadow: 0 2px 16px 0 var(--shadow);
+  padding: 2rem 2rem 1.5rem 2rem;
+  margin-bottom: 2rem;
+  transition: box-shadow 0.3s, background 0.3s;
+}
+
+@media (max-width: 900px) {
+  .heroBetter {
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 1.2rem 0.7rem;
+  }
+  .imageBox {
+    min-width: 100%;
+    max-width: 100%;
+    min-height: 220px;
+  }
+  .imageBetter {
+    width: 100% !important;
+    height: 220px !important;
+  }
+}
+
+.imageBox {
+  flex: 0 0 370px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-light, #eef3fb);
+  border-radius: 12px;
+  min-height: 370px;
+  min-width: 370px;
+  max-width: 370px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px 0 var(--shadow);
+  transition: box-shadow 0.3s, background 0.3s;
+}
+.imageBetter {
+  object-fit: contain;
+  width: 350px !important;
+  height: 350px !important;
+  border-radius: 8px;
+  background: var(--surface);
+  transition: box-shadow 0.3s, background 0.3s;
+}
+.imageBetter:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.dataBox {
+  flex: 1 1 0%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+.titleBetter {
+  font-size: 2.1rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem 0;
+  color: var(--foreground);
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+}
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7em;
+  margin-bottom: 0.2em;
+}
+.chip, .chipIcecat {
+  border-radius: 16px;
+  padding: 0.25em 0.9em;
+  font-size: 1rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+  transition: background 0.2s, color 0.2s;
+}
+.chip {
+  background: var(--muted);
+  color: var(--foreground);
+}
+.chipIcecat {
+  background: var(--info);
+  color: var(--primary);
+  font-weight: 600;
+}
+.chip:focus, .chipIcecat:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.chip:hover {
+  background: var(--primary-light);
+  color: #fff;
+}
+.chipIcecat:hover {
+  background: var(--primary);
+  color: #fff;
+}
+
+.priceRow {
+  display: flex;
+  align-items: center;
+  gap: 2em;
+  margin: 0.5em 0 0.5em 0;
+}
+.priceBetter {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--secondary);
+  background: var(--surface-light, #eafbe7);
+  border-radius: 8px;
+  padding: 0.3em 1em;
+  box-shadow: 0 1px 4px 0 var(--shadow);
+  transition: background 0.2s, color 0.2s;
+}
+.priceBetter:focus {
+  outline: 2px solid var(--secondary);
+  outline-offset: 2px;
+}
+.supplierName {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  font-weight: 400;
+}
+.stockBetter {
+  font-size: 1.1rem;
+  color: var(--primary);
+  background: var(--muted);
+  border-radius: 8px;
+  padding: 0.2em 0.8em;
+  font-weight: 600;
+  transition: background 0.2s, color 0.2s;
+}
+.stockBetter.low {
+  background: var(--danger);
+  color: #fff;
+}
+.stockBetter.high {
+  background: var(--secondary);
+  color: #fff;
+}
+.actionsRow {
+  margin-top: 1.2em;
+  display: flex;
+  gap: 1.5em;
+  flex-wrap: wrap;
+}
+.actionBtn {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.7em 1.5em;
+  font-size: 1.08rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 4px 0 var(--shadow);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.actionBtn:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.actionBtn:hover {
+  background: var(--secondary);
+  box-shadow: 0 2px 8px 0 var(--shadow);
+}
+
+.descriptionBetter {
+  font-size: 1.15rem;
+  color: var(--foreground);
+  background: var(--surface-light, #eef3fb);
+  border-radius: 10px;
+  padding: 1.2em 1.5em;
+  margin-bottom: 2em;
+  margin-top: 0.5em;
+  font-weight: 500;
+  box-shadow: 0 2px 8px 0 var(--shadow);
+  transition: background 0.3s, color 0.3s;
+}
+.descriptionBetter strong {
+  color: var(--primary);
+}
+
+.breadcrumb {
+  display: inline-block;
+  margin-bottom: 1.5rem;
+  color: var(--link);
+  text-decoration: none;
+  font-size: 0.95rem;
+  transition: color 0.2s;
+}
+.breadcrumb:focus {
+  outline: 2px solid var(--info);
+  outline-offset: 2px;
+}
+.breadcrumb:hover {
+  text-decoration: underline;
+  color: var(--primary);
+}
+
+.specsTable {
+  width: 100%;
+  margin-top: 1em;
+  border: none;
+  background: none;
+  border-collapse: separate;
+  border-spacing: 0 0.5em;
+}
+.specLabel {
+  font-weight: 600;
+  color: var(--foreground);
+  padding: 0.3em 1.2em 0.3em 0;
+  vertical-align: top;
+  font-size: 1.08rem;
+  letter-spacing: 0.01em;
+}
+.specValue {
+  color: var(--foreground);
+  padding: 0.3em 0 0.3em 0.5em;
+  font-size: 1.08rem;
+}
+.sectionTitle {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--foreground);
+  margin-bottom: 1em;
+}
+.section {
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 1.5em 2em;
+  margin-bottom: 2em;
+  box-shadow: 0 1px 8px 0 var(--shadow);
+  transition: background 0.3s;
+}
+
+/* Utility classes */
+.flex {
+  display: flex;
+}
+.flex-col {
+  flex-direction: column;
+}
+.flex-row {
+  flex-direction: row;
+}
+.gap-xs { gap: 0.5em; }
+.gap-sm { gap: 1em; }
+.gap-md { gap: 2em; }
+.gap-lg { gap: 3em; }
+.mt-xs { margin-top: 0.5em; }
+.mt-sm { margin-top: 1em; }
+.mt-md { margin-top: 2em; }
+.mb-xs { margin-bottom: 0.5em; }
+.mb-sm { margin-bottom: 1em; }
+.mb-md { margin-bottom: 2em; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.text-bold { font-weight: 700; }
+.text-muted { color: var(--text-secondary); }
+
+/* Animations */
+.fadeIn {
+  animation: fadeIn 0.7s ease;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Dark mode overrides */
+body.dark .heroBetter,
+body.dark .imageBox,
+body.dark .imageBetter,
+body.dark .dataBox,
+body.dark .descriptionBetter,
+body.dark .chip,
+body.dark .chipIcecat,
+body.dark .priceBetter,
+body.dark .stockBetter,
+body.dark .section,
+body.dark .specLabel,
+body.dark .specValue,
+body.dark .breadcrumb,
+body.dark .titleBetter {
+  background: var(--surface-dark, #23272f) !important;
+  color: #f3f3f3 !important;
+  border-color: #222 !important;
+}
+body.dark .section {
+  background: #222 !important;
+}
+body.dark .specLabel, body.dark .specValue {
+  color: #f3f3f3 !important;
+}
+body.dark .priceBetter {
+  background: #1a3c1a !important;
+  color: #b6f7c1 !important;
+}
+body.dark .stockBetter {
+  background: #232a3d !important;
+  color: #b6c7f7 !important;
+}
+body.dark .chip {
+  background: #222 !important;
+  color: #f3f3f3 !important;
+}
+body.dark .chipIcecat {
+  background: #1a2c2c !important;
+  color: #7be3e3 !important;
+}
+body.dark .breadcrumb {
+  color: #7be3e3 !important;
+}
+
+

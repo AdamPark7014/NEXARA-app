@@ -1,12 +1,120 @@
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Light mode defaults - oscila entre azul rey y verde */
+  --background: #f7f9fc;
+  --foreground: #0b1220;
+  --primary: #0f6ad6; /* azul rey */
+  --primary-light: #3a8efb;
+  --secondary: #16a96e; /* verde limpio */
+  --accent: #20b981;
+  --purple: #6f6ee8;
+  --danger: #d64545;
+  --info: #1f8df2;
+  --surface: #ffffff;
+  --muted: #e1e7f1;
+  --link: #0f6ad6;
+  --shadow: rgba(21, 106, 214, 0.14);
+  /* Extra blues for light mode */
+  --blue-1: #0f6ad6;
+  --blue-2: #1e88f5;
+  --blue-3: #9dd5ff;
+  /* Footer specific colors */
+  --gray-alpha-200: rgba(11, 18, 32, 0.08);
+  --phone-color: #3b82f6;
+  --phone-color-dark: #2563eb;
+  --email-color: #ef4444;
+  --email-color-dark: #dc2626;
+  --whatsapp-color: #25D366;
+  --whatsapp-color-dark: #128C7E;
+  --text-secondary: #23324a;
+  --text-tertiary: #344560;
 }
 
+/* Light mode explicit (manual override - sol ☀️) */
+body.light {
+  --background: #f7f9fc;
+  --foreground: #0b1220;
+  --primary: #0f6ad6;
+  --primary-light: #3a8efb;
+  --secondary: #16a96e;
+  --accent: #20b981;
+  --purple: #6f6ee8;
+  --danger: #d64545;
+  --info: #1f8df2;
+  --surface: #ffffff;
+  --muted: #e1e7f1;
+  --link: #0f6ad6;
+  --shadow: rgba(21, 106, 214, 0.14);
+  /* Extra blues for light mode */
+  --blue-1: #0f6ad6;
+  --blue-2: #1e88f5;
+  --blue-3: #9dd5ff;
+  /* Footer specific colors */
+  --gray-alpha-200: rgba(11, 18, 32, 0.08);
+  --phone-color: #3b82f6;
+  --phone-color-dark: #2563eb;
+  --email-color: #ef4444;
+  --email-color-dark: #dc2626;
+  --whatsapp-color: #25D366;
+  --whatsapp-color-dark: #128C7E;
+  --text-secondary: #23324a;
+  --text-tertiary: #344560;
+  --surface-light: #eef3fb;
+}
+
+/* Dark mode explicit (manual override - luna 🌙) */
+body.dark {
+  --background: #151518;
+  --foreground: #ededed;
+  --primary: #1789FC;
+  --primary-light: #3EC6E0;
+  --secondary: #F18B1F;
+  --accent: #FBC51F;
+  --purple: #AA539A;
+  --danger: #5C1917;
+  --info: #6FC6D9;
+  --surface: #23272f;
+  --muted: #23272f;
+  --link: #6FC6D9;
+  --shadow: rgba(23, 137, 252, 0.12);
+  /* Extra blues for dark mode */
+  --blue-1: #0A4D68;
+  --blue-2: #1789FC;
+  --blue-3: #14A285;
+  /* Footer specific colors */
+  --gray-alpha-200: rgba(23, 137, 252, 0.16);
+  --phone-color: #3b82f6;
+  --phone-color-dark: #2563eb;
+  --email-color: #ef4444;
+  --email-color-dark: #dc2626;
+  --whatsapp-color: #25D366;
+  --whatsapp-color-dark: #128C7E;
+  --text-secondary: #a0aec0;
+  --text-tertiary: #cbd5e0;
+  --surface-dark: rgba(35, 39, 47, 0.85);
+  --surface-light: #23272f;
+}
+
+
+/* Dark mode via system preference */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
+  body {
+    --background: #151518;
     --foreground: #ededed;
+    --primary: #1789FC;
+    --primary-light: #3EC6E0;
+    --secondary: #F18B1F;
+    --accent: #FBC51F;
+    --purple: #AA539A;
+    --danger: #5C1917;
+    --info: #6FC6D9;
+    --surface: #23272f;
+    --muted: #23272f;
+    --link: #6FC6D9;
+    --shadow: rgba(23, 137, 252, 0.12);
+    /* Extra blues for dark mode */
+    --blue-1: #0A4D68;
+    --blue-2: #1789FC;
+    --blue-3: #14A285;
   }
 }
 
@@ -18,7 +126,8 @@ body {
 
 body {
   color: var(--foreground);
-  background: var(--background);
+  background: var(--background) !important;
+  padding-top: 95px;
 }
 
 * {
@@ -32,10 +141,25 @@ a {
   text-decoration: none;
 }
 
+/* Images for light mode */
+.imgLight {
+  display: unset;
+}
+
 .imgDark {
   display: none;
 }
 
+/* Light mode explicit (switch manual - sol ☀️) */
+body.light .imgLight {
+  display: unset;
+}
+
+body.light .imgDark {
+  display: none;
+}
+
+/* Dark mode via system preference */
 @media (prefers-color-scheme: dark) {
   html {
     color-scheme: dark;
@@ -44,7 +168,25 @@ a {
   .imgLight {
     display: none;
   }
+  
   .imgDark {
     display: unset;
   }
+}
+
+/* Dark mode explicit (switch manual - luna 🌙) */
+body.dark .imgLight {
+  display: none;
+}
+
+body.dark .imgDark {
+  display: unset;
+}
+
+body.dark html {
+  color-scheme: dark;
+}
+
+body.light html {
+  color-scheme: light;
 }

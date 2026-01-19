@@ -1,0 +1,620 @@
+/* Light theme overrides: friendlier, softer look */
+:global(body.light) .hero {
+  border-color: color-mix(in srgb, var(--gray-alpha-200) 70%, transparent);
+  background:
+    radial-gradient(1000px 380px at 10% -15%, color-mix(in srgb, var(--secondary) 14%, transparent), transparent),
+    color-mix(in srgb, var(--surface) 92%, white 8%);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--shadow) 70%, transparent);
+  padding: 30px;
+}
+
+:global(body.light) .heroTitle {
+  letter-spacing: 0.005em;
+}
+
+:global(body.light) .heroSubtitle {
+  opacity: 0.9;
+}
+
+:global(body.light) .heroCtas .secondaryCta {
+  background: color-mix(in srgb, var(--surface) 96%, white 4%);
+  border-color: color-mix(in srgb, var(--gray-alpha-200) 80%, transparent);
+}
+
+:global(body.light) .highlightsStrip .highlightBadge {
+  border: 1px solid color-mix(in srgb, var(--gray-alpha-200) 70%, transparent);
+  background: color-mix(in srgb, var(--surface) 96%, white 4%);
+}
+
+:global(body.light) .badgesGrid .badgeSolid {
+  background: color-mix(in srgb, var(--secondary) 8%, var(--surface));
+  border-color: color-mix(in srgb, var(--gray-alpha-200) 70%, transparent);
+}
+
+:global(body.light) .card,
+:global(body.light) .cardAccent,
+:global(body.light) .methodStep,
+:global(body.light) .metricCard {
+  border-color: color-mix(in srgb, var(--gray-alpha-200) 70%, transparent);
+  background: color-mix(in srgb, var(--surface) 96%, white 4%);
+}
+
+:global(body.light) .card:hover {
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--shadow) 70%, transparent);
+}
+
+:global(body.light) .methodIndex {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 85%, white), color-mix(in srgb, var(--secondary) 85%, white));
+}
+
+:global(body.light) .metricCard h3 {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 70%, white), color-mix(in srgb, var(--secondary) 70%, white));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  display: inline-block;
+}
+
+:global(body.light) .slaNote {
+  opacity: 0.8;
+}
+:global(body.light) .mapCard,
+:global(body.light) .mapImage {
+  border-color: color-mix(in srgb, var(--gray-alpha-200) 70%, transparent);
+  background: color-mix(in srgb, var(--surface) 96%, white 4%);
+}
+
+:global(body.light) .solutionsHighlight {
+  background: color-mix(in srgb, var(--primary) 6%, white);
+  border-color: color-mix(in srgb, var(--gray-alpha-200) 70%, transparent);
+}
+
+:global(body.light) .solutionCard {
+  border-color: color-mix(in srgb, var(--gray-alpha-200) 70%, transparent);
+  background: color-mix(in srgb, var(--surface) 96%, white 4%);
+}
+
+:global(body.light) .solutionCard:hover {
+  border-color: color-mix(in srgb, var(--primary) 50%, var(--gray-alpha-200));
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--shadow) 70%, transparent);
+}
+
+:global(body.light) .solutionIcon {
+  background: color-mix(in srgb, var(--primary) 10%, white);
+}
+
+:global(body.light) .leasingSection {
+  background: linear-gradient(135deg, 
+    color-mix(in srgb, var(--primary) 10%, white) 0%, 
+    color-mix(in srgb, var(--secondary) 8%, white) 100%
+  );
+  border-color: color-mix(in srgb, var(--gray-alpha-200) 70%, transparent);
+}
+
+:global(body.light) .leasingCta {
+  background: color-mix(in srgb, var(--surface) 80%, white);
+}
+
+:global(body.light) .consultingBanner {
+  border-color: color-mix(in srgb, var(--gray-alpha-200) 70%, transparent);
+  background: color-mix(in srgb, var(--surface) 96%, white 4%);
+}
+
+/* Contenedor general */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 28px 24px;
+}
+
+/* Hero */
+.hero {
+  position: relative;
+  border: 1px solid var(--gray-alpha-200);
+  background:
+    radial-gradient(1200px 400px at 10% -10%, color-mix(in srgb, var(--primary) 12%, transparent), transparent),
+    radial-gradient(800px 400px at 90% -20%, color-mix(in srgb, var(--secondary) 10%, transparent), transparent),
+    color-mix(in srgb, var(--surface) 80%, transparent);
+  border-radius: 18px;
+  padding: 28px;
+  box-shadow: 0 10px 24px var(--shadow);
+  overflow: hidden;
+}
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--primary) 4%, transparent) 0%,
+    transparent 30%
+  );
+  pointer-events: none;
+}
+.heroContent {
+  position: relative;
+  z-index: 1;
+}
+.heroTitle {
+  font-size: clamp(1.8rem, 3.6vw, 2.6rem);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.heroSubtitle {
+  color: var(--foreground);
+  opacity: 0.85;
+  margin-top: 8px;
+  font-size: clamp(0.95rem, 1.5vw, 1.05rem);
+}
+.heroCtas {
+  margin-top: 14px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.primaryCta {
+  display: inline-block;
+  padding: 12px 18px;
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  box-shadow: 0 6px 16px var(--shadow);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  transition: transform 200ms ease, box-shadow 200ms ease, filter 200ms ease;
+}
+.primaryCta:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+  box-shadow: 0 10px 22px var(--shadow);
+}
+.secondaryCta {
+  display: inline-block;
+  padding: 12px 18px;
+  border-radius: 999px;
+  color: var(--primary);
+  background: var(--surface);
+  border: 1px solid var(--gray-alpha-200);
+  font-weight: 600;
+  transition: border-color 200ms ease, background 200ms ease, box-shadow 200ms ease;
+}
+.secondaryCta:hover {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--gray-alpha-200));
+  background: color-mix(in srgb, var(--surface) 94%, var(--primary));
+  box-shadow: 0 6px 14px var(--shadow);
+}
+.primaryCta:focus-visible,
+.secondaryCta:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary) 60%, var(--secondary));
+  outline-offset: 2px;
+}
+
+/* Highlights */
+.highlightsStrip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+.highlightBadge {
+  border: 1px dashed var(--gray-alpha-200);
+  border-radius: 999px;
+  padding: 10px 14px;
+  text-align: center;
+  font-size: 0.9rem;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+}
+
+/* Badges (diferenciadores) */
+.badgesGrid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.badgeSolid {
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+  text-align: center;
+  font-weight: 650;
+}
+
+/* Secciones */
+.section {
+  margin-top: 22px;
+}
+.sectionTitle { 
+  font-size: clamp(1.1rem, 2.2vw, 1.6rem); 
+  font-weight: 700; 
+  color: var(--foreground);
+}
+.lead {
+  color: var(--foreground);
+  opacity: 0.82;
+  margin-top: 6px;
+  max-width: 70ch;
+}
+.gridCols2 {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.card, .cardAccent {
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 14px;
+  padding: 14px;
+  background: var(--surface);
+  transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+.card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px var(--shadow);
+  border-color: color-mix(in srgb, var(--primary) 25%, var(--gray-alpha-200));
+}
+.cardAccent { 
+  background: color-mix(in srgb, var(--primary) 7%, var(--surface));
+}
+.cardTitle { 
+  font-size: 1rem; 
+  font-weight: 700; 
+}
+.list { 
+  margin-top: 8px;
+  padding-left: 18px;
+}
+.list li { 
+  margin: 4px 0;
+}
+
+/* Valores */
+.valuesGrid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.valueCard { 
+  border: 1px solid var(--gray-alpha-200); 
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--surface);
+}
+.valueCard h3 { 
+  font-size: 1rem;
+  font-weight: 700; 
+}
+.valueCard p { 
+  font-size: 0.9rem;
+  opacity: 0.82;
+}
+
+/* Metodología */
+.methodGrid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.methodStep {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 14px;
+  padding: 12px;
+  background: var(--surface);
+}
+.methodIndex {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+}
+
+/* Métricas */
+.metricsGrid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.metricCard {
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 14px;
+  padding: 18px 16px;
+  background: color-mix(in srgb, var(--surface) 92%, var(--primary) 4%);
+  text-align: center;
+  box-shadow: 0 6px 14px var(--shadow);
+}
+.metricCard h3 {
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  display: inline-block;
+  line-height: 1.1;
+}
+.metricLabel {
+  margin-top: 4px;
+  opacity: 0.75;
+}
+.slaNote {
+  margin-top: 8px;
+  font-size: 0.9rem;
+  opacity: 0.75;
+}
+
+/* Cobertura (mapa) */
+.mapCard {
+  margin-top: 12px;
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 14px;
+  padding: 14px;
+  background: color-mix(in srgb, var(--surface) 95%, var(--primary) 3%);
+  display: grid;
+  gap: 10px;
+  box-shadow: 0 8px 18px var(--shadow);
+}
+.mapImage {
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid var(--gray-alpha-200);
+  box-shadow: 0 6px 14px var(--shadow);
+}
+.mapLegend {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.legendBadge,
+.legendBadgeSecondary {
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}
+.legendBadge {
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+  color: var(--foreground);
+}
+.legendBadgeSecondary {
+  background: color-mix(in srgb, var(--secondary) 10%, var(--surface));
+  color: var(--foreground);
+}
+
+/* Soluciones */
+.solutionsHighlight {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  padding: 24px;
+  background: color-mix(in srgb, var(--primary) 5%, var(--surface));
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 16px;
+  margin-top: 24px;
+  margin-bottom: 32px;
+}
+
+.solutionsIcon {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  color: #fff;
+  border-radius: 16px;
+  box-shadow: 0 6px 18px var(--shadow);
+}
+
+.solutionsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+  margin-top: 24px;
+}
+
+.solutionCard {
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 14px;
+  transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+
+.solutionCard:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--gray-alpha-200));
+  box-shadow: 0 8px 24px var(--shadow);
+}
+
+.solutionIcon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+  color: var(--primary);
+  border-radius: 12px;
+  margin-bottom: 14px;
+}
+
+.solutionCard h3 {
+  margin-bottom: 10px;
+}
+
+.solutionCard p {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  opacity: 0.85;
+}
+
+/* Arrendamiento */
+.leasingSection {
+  margin-top: 32px;
+  padding: 32px;
+  background: linear-gradient(135deg, 
+    color-mix(in srgb, var(--primary) 8%, var(--surface)) 0%, 
+    color-mix(in srgb, var(--secondary) 6%, var(--surface)) 100%
+  );
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 18px;
+  box-shadow: 0 10px 30px var(--shadow);
+}
+
+.leasingContent {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 28px;
+  align-items: flex-start;
+}
+
+.leasingIcon {
+  flex-shrink: 0;
+  width: 80px;
+  height: 80px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  color: #fff;
+  border-radius: 20px;
+  box-shadow: 0 8px 24px var(--shadow);
+}
+
+.leasingText h3 {
+  font-size: 1.4rem;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.leasingText p {
+  margin-bottom: 14px;
+  line-height: 1.7;
+}
+
+.leasingText strong {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.leasingBenefits {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.leasingBenefits li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
+}
+
+.leasingBenefits svg {
+  flex-shrink: 0;
+  color: var(--primary);
+}
+
+.leasingCta {
+  margin-top: 16px;
+  padding: 16px;
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  border-left: 3px solid var(--primary);
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+/* Consultoría banner */
+.consultingBanner {
+  margin-top: 32px;
+  padding: 28px;
+  background: var(--surface);
+  border: 1px solid var(--gray-alpha-200);
+  border-left: 4px solid var(--primary);
+  border-radius: 12px;
+  box-shadow: 0 6px 18px var(--shadow);
+}
+
+.consultingBanner h3 {
+  font-size: 1.25rem;
+  margin-bottom: 12px;
+  color: var(--primary);
+}
+
+.consultingBanner p {
+  line-height: 1.7;
+  opacity: 0.9;
+}
+
+.consultingBanner strong {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+/* CTA final */
+.finalCta {
+  margin-top: 26px;
+  border-top: 1px solid var(--gray-alpha-200);
+  padding-top: 16px;
+  text-align: center;
+}
+.finalCta h2 { 
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+.finalCta p { 
+  margin-top: 6px;
+  opacity: 0.8;
+}
+.finalCta .heroCtas {
+  justify-content: center;
+  margin-top: 14px;
+}
+
+/* Responsive */
+@media (max-width: 1000px) {
+  .highlightsStrip { grid-template-columns: repeat(2, 1fr); }
+  .badgesGrid { grid-template-columns: repeat(2, 1fr); }
+  .solutionsGrid { grid-template-columns: 1fr; }
+}
+@media (max-width: 900px) {
+  .gridCols2 { grid-template-columns: 1fr; }
+  .valuesGrid { grid-template-columns: repeat(2, 1fr); }
+  .methodGrid { grid-template-columns: 1fr; }
+  .metricsGrid { grid-template-columns: repeat(2, 1fr); }
+  .leasingContent { grid-template-columns: 1fr; gap: 20px; }
+  .leasingIcon { width: 64px; height: 64px; margin: 0 auto; }
+}
+@media (max-width: 600px) {
+  .valuesGrid { grid-template-columns: 1fr; }
+  .badgesGrid { grid-template-columns: 1fr; }
+  .metricsGrid { grid-template-columns: 1fr; }
+  .solutionsHighlight { flex-direction: column; text-align: center; }
+  .solutionsIcon { margin: 0 auto; }
+  .leasingSection { padding: 24px 20px; }
+  .consultingBanner { padding: 20px; }
+}

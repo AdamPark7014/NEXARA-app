@@ -1,0 +1,130 @@
+.card {
+  background: var(--surface);
+  color: var(--foreground);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px var(--shadow);
+  border: 1px solid var(--muted);
+  padding: 16px;
+}
+
+.button-primary {
+  background: var(--primary);
+  color: #fff;
+  border-radius: 8px;
+  border: none;
+  padding: 8px 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.button-primary:hover {
+  background: var(--primary-light);
+}
+
+.button-secondary {
+  background: var(--secondary);
+  color: #fff;
+  border-radius: 8px;
+  border: none;
+  padding: 8px 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.button-secondary:hover {
+  background: var(--accent);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+}
+.table th {
+  background: var(--muted);
+  color: var(--text-secondary);
+  font-weight: 600;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--muted);
+}
+.table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--muted);
+}
+.table tr:nth-child(even) {
+  background: var(--surface-light);
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.85em;
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 2px 10px;
+  margin-right: 4px;
+}
+.badge.approved {
+  background: var(--accent);
+  color: #fff;
+}
+.badge.pending {
+  background: var(--info);
+  color: #fff;
+}
+.badge.rejected {
+  background: var(--danger);
+  color: #fff;
+}
+
+.input, input, select, textarea {
+  background: var(--surface-light);
+  color: var(--foreground);
+  border: 1px solid var(--muted);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 1em;
+  transition: box-shadow 0.2s, border 0.2s;
+}
+.input:focus, input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-light);
+}
+
+.sidebar {
+  background: var(--surface);
+  color: var(--text-secondary);
+  border-right: 1px solid var(--muted);
+  min-width: 220px;
+  padding: 24px 0;
+}
+.sidebar .menu-item {
+  padding: 12px 24px;
+  color: var(--text-secondary);
+  border-left: 4px solid transparent;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+.sidebar .menu-item.active {
+  background: var(--muted);
+  color: var(--primary);
+  border-left: 4px solid var(--primary);
+}
+
+@media (max-width: 700px) {
+  .sidebar {
+    min-width: 0;
+    width: 100vw;
+    border-right: none;
+    border-bottom: 1px solid var(--muted);
+    padding: 0;
+  }
+}
+
+/* Utilidad para gráficos (Recharts) */
+.recharts-bar-rectangle {
+  fill: var(--primary) !important;
+}
+.recharts-pie-sector {
+  stroke: var(--surface) !important;
+}

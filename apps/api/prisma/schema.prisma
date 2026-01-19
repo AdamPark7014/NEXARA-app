@@ -1,0 +1,304 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Product {
+  id              Int             @id @default(autoincrement())
+  sku             String          @unique
+  name            String
+  description     String?
+  specifications  Json?
+  imageUrl        String?
+  category        String?
+  subcategory     String?
+  price           Float?
+  currency        String?
+  icecatId        String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  brandId         Int?
+  ean             String?
+  icecatDatasheet String?
+  thumbnailUrl    String?
+  upc             String?
+  activo          Boolean?        @default(true)
+  existencia      Json?
+  promociones     Json?
+  protegido       Boolean?        @default(false)
+  sustituto       String?
+  tipoCambio      Float?
+  brand           Brand?          @relation(fields: [brandId], references: [id])
+  sources         ProductSource[]
+}
+
+model ProductSource {
+  id          Int      @id @default(autoincrement())
+  productId   Int
+  supplier    String
+  externalSku String?
+  rawData     Json
+  price       Float?
+  currency    String?
+  stock       Json?
+  createdAt   DateTime @default(now())
+  product     Product  @relation(fields: [productId], references: [id])
+
+  @@unique([productId, supplier])
+}
+
+model Client {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(255)
+  description String?
+  imageUrl    String?  @db.VarChar(500)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("clients")
+}
+
+model ProductCT {
+  id                Int               @id @default(autoincrement())
+  idProducto        Int?
+  clave             String?           @db.VarChar(100)
+  numParte          String?           @db.VarChar(100)
+  nombre            String?           @db.VarChar(500)
+  modelo            String?           @db.VarChar(100)
+  idMarca           Int?
+  marca             String?           @db.VarChar(200)
+  idSubCategoria    Int?
+  subcategoria      String?           @db.VarChar(200)
+  idCategoria       Int?
+  categoria         String?           @db.VarChar(200)
+  descripcion_corta String?
+  ean               String?           @db.VarChar(100)
+  upc               String?           @db.VarChar(100)
+  sustituto         String?           @db.VarChar(100)
+  activo            Boolean           @default(true)
+  protegido         Boolean           @default(false)
+  existencia        Json?
+  precio            Float?
+  moneda            String?           @db.VarChar(10)
+  tipoCambio        Float?
+  especificaciones  Json?
+  promociones       Json?
+  imagen            String?           @db.VarChar(500)
+  brandId           Int?
+  name              String?           @db.VarChar(500)
+  description       String?
+  imageUrl          String?           @db.VarChar(500)
+  thumbnailUrl      String?           @db.VarChar(500)
+  icecatId          String?           @db.VarChar(100)
+  icecatDatasheet   String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  orderItems        OrderItem[]
+  brand             Brand?            @relation(fields: [brandId], references: [id])
+  supplierProducts  SupplierProduct[]
+
+  @@index([numParte, idMarca])
+  @@map("productos_ct")
+}
+
+model Brand {
+  id         Int         @id @default(autoincrement())
+  name       String      @unique @db.VarChar(200)
+  normalized String      @unique @db.VarChar(200)
+  createdAt  DateTime    @default(now())
+  products   Product[]
+  productCTs ProductCT[]
+
+  @@map("brands")
+}
+
+model Supplier {
+  id               Int               @id @default(autoincrement())
+  name             String            @unique @db.VarChar(255)
+  apiUrl           String?           @db.VarChar(500)
+  description      String?
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  orderItems       OrderItem[]
+  supplierProducts SupplierProduct[]
+
+  @@map("suppliers")
+}
+
+model SupplierProduct {
+  id          Int       @id @default(autoincrement())
+  supplierId  Int
+  productId   Int
+  supplierSku String    @db.VarChar(150)
+  price       Decimal   @db.Decimal(10, 2)
+  stock       Int       @default(0)
+  active      Boolean   @default(true)
+  leadTime    Int?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  currency    String    @db.VarChar(10)
+  product     ProductCT @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplier    Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@unique([supplierId, productId])
+  @@index([supplierId])
+  @@index([productId])
+  @@map("supplier_products")
+}
+
+model Order {
+  id        Int         @id @default(autoincrement())
+  userId    Int?
+  email     String      @db.VarChar(255)
+  total     Decimal     @db.Decimal(10, 2)
+  status    OrderStatus @default(PENDING)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  items     OrderItem[]
+}
+
+model OrderItem {
+  id         Int       @id @default(autoincrement())
+  orderId    Int
+  productId  Int
+  supplierId Int
+  quantity   Int
+  price      Decimal   @db.Decimal(10, 2)
+  order      Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product    ProductCT @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplier   Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+}
+
+model Role {
+  id             Int    @id @default(autoincrement())
+  nombre         String @unique @db.VarChar(50)
+  nivelAutoridad Int
+  users          User[]
+}
+
+model Department {
+  id     Int    @id @default(autoincrement())
+  nombre String @unique @db.VarChar(100)
+  users  User[]
+}
+
+model User {
+  id                   Int                @id @default(autoincrement())
+  nombre               String             @db.VarChar(100)
+  email                String             @unique @db.VarChar(150)
+  passwordHash         String
+  roleId               Int
+  departmentId         Int
+  fechaCreacion        DateTime           @default(now())
+  avatarUrl            String?            @db.VarChar(500)
+  actividadesCreadas   Activity[]         @relation("CreadorActividades")
+  actividadesAsignadas Activity[]         @relation("ResponsableActividades")
+  evidencias           Evidence[]
+  expenses             Expense[]
+  locations            LocationTracking[]
+  department           Department         @relation(fields: [departmentId], references: [id])
+  role                 Role               @relation(fields: [roleId], references: [id])
+  vehicleControls      VehicleControl[]   @relation("SolicitanteVehiculo")
+  Viatico              Viatico[]
+}
+
+model Activity {
+  id                   Int                @id @default(autoincrement())
+  anNumber             String             @unique @db.VarChar(20)
+  titulo               String             @db.VarChar(200)
+  descripcion          String?
+  estatus              String             @default("Pendiente") @db.VarChar(50)
+  prioridad            String?            @db.VarChar(20)
+  creadoPorId          Int
+  responsableId        Int
+  eficienciaScore      Int?
+  comentariosFeedback  String?
+  fechaAsignacion      DateTime           @default(now())
+  fechaEntregaEsperada DateTime?
+  fechaFinalizacion    DateTime?
+  creador              User               @relation("CreadorActividades", fields: [creadoPorId], references: [id])
+  responsable          User               @relation("ResponsableActividades", fields: [responsableId], references: [id])
+  evidencias           Evidence[]
+  expenses             Expense[]
+  locations            LocationTracking[]
+  vehicleControls      VehicleControl[]
+  Viatico              Viatico[]
+}
+
+model Evidence {
+  id            Int      @id @default(autoincrement())
+  actividadId   Int
+  tipoEvidencia String   @db.VarChar(50)
+  archivoUrl    String
+  aprobada      Boolean  @default(false)
+  subidoEn      DateTime @default(now())
+  userId        Int?
+  actividad     Activity @relation(fields: [actividadId], references: [id], onDelete: Cascade)
+  user          User?    @relation(fields: [userId], references: [id])
+}
+
+model VehicleControl {
+  id                     Int       @id @default(autoincrement())
+  actividadId            Int
+  solicitanteId          Int
+  placasVehiculo         String?   @db.VarChar(20)
+  motivoUso              String?
+  estatusAprobacion      String    @default("Pendiente") @db.VarChar(30)
+  evidenciaEntregaUrl    String?
+  evidenciaDevolucionUrl String?
+  fechaInicio            DateTime?
+  fechaFin               DateTime?
+  actividad              Activity  @relation(fields: [actividadId], references: [id])
+  solicitante            User      @relation("SolicitanteVehiculo", fields: [solicitanteId], references: [id])
+}
+
+model Expense {
+  id                 Int      @id @default(autoincrement())
+  actividadId        Int
+  usuarioId          Int
+  montoSolicitado    Decimal  @db.Decimal(10, 2)
+  razonGasto         String?
+  ticketEvidenciaUrl String?
+  estatusPago        String   @default("Pendiente") @db.VarChar(30)
+  fechaSolicitud     DateTime @default(now())
+  actividad          Activity @relation(fields: [actividadId], references: [id])
+  usuario            User     @relation(fields: [usuarioId], references: [id])
+}
+
+model LocationTracking {
+  id                  Int       @id @default(autoincrement())
+  usuarioId           Int
+  actividadId         Int?
+  latitud             Decimal   @db.Decimal(10, 8)
+  longitud            Decimal   @db.Decimal(11, 8)
+  velocidadKmh        Decimal?  @db.Decimal(5, 2)
+  estaActivo          Boolean   @default(true)
+  ultimaActualizacion DateTime  @default(now())
+  actividad           Activity? @relation(fields: [actividadId], references: [id])
+  usuario             User      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+}
+
+model Viatico {
+  id                 Int       @id @default(autoincrement())
+  usuarioId          Int
+  actividadId        Int?
+  montoSolicitado    Decimal   @db.Decimal(10, 2)
+  motivo             String?   @db.VarChar(255)
+  ticketEvidenciaUrl String?
+  estatus            String    @default("Pendiente") @db.VarChar(30)
+  fechaSolicitud     DateTime  @default(now())
+  Activity           Activity? @relation(fields: [actividadId], references: [id])
+  User               User      @relation(fields: [usuarioId], references: [id])
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
