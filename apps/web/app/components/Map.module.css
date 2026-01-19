@@ -1,0 +1,124 @@
+/* Map container styled as a card, theme-aware */
+.mapContainer {
+  max-width: 100%;
+  width: 100%;
+  margin: 0 auto;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+  background: var(--surface);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--gray-alpha-200, rgba(0,0,0,0.18)) 100%, transparent);
+}
+
+/* The map wrapper uses aspect-ratio for better responsiveness */
+.mapWrapper {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 320px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.mapError {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 170px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  text-align: center;
+  color: color-mix(in srgb, var(--primary) 55%, #ef4444);
+  background: color-mix(in srgb, var(--primary) 7%, var(--surface));
+  border: 1px solid color-mix(in srgb, #ef4444 30%, transparent);
+  box-shadow: 0 6px 16px color-mix(in srgb, #ef4444 22%, transparent);
+  font-size: 0.92rem;
+}
+
+/* InfoWindow custom content - global classes to work inside Google Maps */
+:global(.map-info-window) {
+  width: 200px;
+  padding: 6px 8px 8px 8px;
+  margin-top: -4px;
+  box-sizing: border-box;
+  text-align: center;
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+:global(.map-info-logo) {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto 4px auto;
+}
+
+:global(.map-info-title) {
+  margin: 0 0 6px 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+:global(.map-info-button) {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 6px;
+  text-decoration: none;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+:global(.map-info-button:hover) {
+  filter: brightness(1.05);
+}
+
+/* Theme variants */
+:global(body.light) .mapContainer {
+  background: var(--surface-light, #ffffff);
+  border-color: color-mix(in srgb, var(--text) 12%, transparent);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--gray-alpha-200, rgba(0,0,0,0.18)) 100%, transparent);
+}
+
+:global(body.dark) .mapContainer {
+  background: var(--surface-dark, #111315);
+  border-color: color-mix(in srgb, var(--gray-alpha-200, rgba(255,255,255,0.14)) 100%, transparent);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--gray-alpha-200, rgba(0,0,0,0.35)) 100%, transparent);
+}
+
+:global(body.light) .map-info-window {
+  background: var(--surface-light, #ffffff);
+}
+
+:global(body.dark) .map-info-window {
+  background: var(--surface-dark, #111315);
+}
+
+@media (max-width: 900px) {
+  .mapWrapper,
+  .mapError {
+    min-height: 150px;
+  }
+}
+
+@media (max-width: 600px) {
+  .mapWrapper,
+  .mapError {
+    min-height: 140px;
+  }
+  .mapError {
+    padding: 14px;
+  }
+}

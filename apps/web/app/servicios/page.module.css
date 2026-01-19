@@ -1,0 +1,581 @@
+/* Light theme overrides */
+:global(body.light) .hero {
+  border-color: color-mix(in srgb, var(--gray-alpha-200) 70%, transparent);
+  background:
+    radial-gradient(1000px 380px at 50% -10%, color-mix(in srgb, var(--primary) 16%, transparent), transparent),
+    radial-gradient(800px 350px at 100% 100%, color-mix(in srgb, var(--secondary) 12%, transparent), transparent),
+    color-mix(in srgb, var(--surface) 92%, white 8%);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--shadow) 70%, transparent);
+}
+
+:global(body.light) .sectorCard,
+:global(body.light) .serviceCard {
+  border-color: color-mix(in srgb, var(--gray-alpha-200) 70%, transparent);
+  background: color-mix(in srgb, var(--surface) 96%, white 4%);
+}
+
+:global(body.light) .sectorCard:hover,
+:global(body.light) .serviceCard:hover {
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--shadow) 70%, transparent);
+}
+
+:global(body.light) .sectorIcon,
+:global(body.light) .serviceIcon {
+  background: color-mix(in srgb, var(--primary) 10%, white);
+}
+
+:global(body.light) .whyUsSection {
+  background: color-mix(in srgb, var(--primary) 5%, white);
+  border-color: color-mix(in srgb, var(--gray-alpha-200) 70%, transparent);
+}
+
+:global(body.light) .statsCard {
+  background: color-mix(in srgb, var(--surface) 98%, white);
+  border-color: color-mix(in srgb, var(--gray-alpha-200) 70%, transparent);
+}
+
+/* Container */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+/* Hero */
+.hero {
+  position: relative;
+  border: 1px solid var(--gray-alpha-200);
+  background:
+    radial-gradient(1200px 400px at 50% -10%, color-mix(in srgb, var(--primary) 14%, transparent), transparent),
+    radial-gradient(900px 380px at 100% 100%, color-mix(in srgb, var(--secondary) 10%, transparent), transparent),
+    color-mix(in srgb, var(--surface) 80%, transparent);
+  border-radius: 20px;
+  padding: 56px 40px;
+  box-shadow: 0 12px 28px var(--shadow);
+  overflow: hidden;
+  margin-bottom: 48px;
+  text-align: center;
+}
+
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--primary) 5%, transparent) 0%,
+    transparent 35%
+  );
+  pointer-events: none;
+}
+
+.heroContent {
+  position: relative;
+  z-index: 1;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.heroBadge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  padding: 8px 20px;
+  border-radius: 20px;
+  margin-bottom: 20px;
+  border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+.heroTitle {
+  font-size: clamp(2.2rem, 5vw, 3.2rem);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin-bottom: 18px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.heroSubtitle {
+  font-size: clamp(1.05rem, 1.6vw, 1.2rem);
+  line-height: 1.7;
+  color: var(--foreground);
+  opacity: 0.85;
+  margin-bottom: 28px;
+}
+
+.heroCtas {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.primaryCta {
+  padding: 15px 32px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  color: #fff;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 1rem;
+  box-shadow: 0 8px 20px var(--shadow);
+  transition: transform 200ms ease, box-shadow 200ms ease;
+  text-decoration: none;
+}
+
+.primaryCta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px var(--shadow);
+}
+
+.secondaryCta {
+  padding: 15px 32px;
+  background: var(--surface);
+  color: var(--foreground);
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 1rem;
+  transition: border-color 200ms ease, background 200ms ease, transform 200ms ease;
+  text-decoration: none;
+}
+
+.secondaryCta:hover {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 5%, var(--surface));
+  transform: translateY(-1px);
+}
+
+/* Section */
+.section {
+  margin-top: 64px;
+}
+
+.sectionHeader {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.sectionTitle {
+  font-size: clamp(1.8rem, 3.5vw, 2.5rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  margin-bottom: 16px;
+  color: var(--foreground);
+}
+
+.sectionLead {
+  font-size: clamp(1rem, 1.5vw, 1.1rem);
+  line-height: 1.7;
+  color: var(--foreground);
+  opacity: 0.8;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+/* Sectors Grid */
+.sectorsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+}
+
+.sectorCard {
+  padding: 32px;
+  background: var(--surface);
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 16px;
+  transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.sectorCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+  transform: scaleX(0);
+  transition: transform 300ms ease;
+}
+
+.sectorCard:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px var(--shadow);
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--gray-alpha-200));
+}
+
+.sectorCard:hover::before {
+  transform: scaleX(1);
+}
+
+.sectorIcon {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+  color: var(--primary);
+  border-radius: 14px;
+  margin-bottom: 20px;
+}
+
+.sectorCard h3 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: var(--foreground);
+}
+
+.sectorCard p {
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--foreground);
+  opacity: 0.85;
+}
+
+/* Services Grid */
+.servicesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 32px;
+}
+
+.serviceCard {
+  padding: 36px;
+  background: var(--surface);
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 18px;
+  transition: transform 200ms ease, box-shadow 200ms ease;
+  position: relative;
+}
+
+.serviceCard:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 16px 40px var(--shadow);
+}
+
+.serviceNumber {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  font-size: 3rem;
+  font-weight: 900;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  opacity: 0.15;
+  line-height: 1;
+}
+
+.serviceIcon {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+  color: var(--primary);
+  border-radius: 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 15%, transparent);
+}
+
+.serviceContent h3 {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin-bottom: 14px;
+  color: var(--foreground);
+}
+
+.serviceContent > p {
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--foreground);
+  opacity: 0.85;
+  margin-bottom: 20px;
+}
+
+.serviceFeatures {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.serviceFeatures li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.9rem;
+  color: var(--foreground);
+  opacity: 0.8;
+  padding-left: 20px;
+  position: relative;
+}
+
+.serviceFeatures li::before {
+  content: '→';
+  position: absolute;
+  left: 0;
+  color: var(--primary);
+  font-weight: 700;
+}
+
+/* Why Us Section */
+.whyUsSection {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  align-items: center;
+  padding: 48px;
+  background: color-mix(in srgb, var(--primary) 5%, var(--surface));
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 20px;
+}
+
+.whyUsContent h2 {
+  margin-bottom: 16px;
+}
+
+.whyUsLead {
+  font-size: 1.1rem;
+  line-height: 1.7;
+  color: var(--foreground);
+  opacity: 0.85;
+  margin-bottom: 32px;
+}
+
+.benefitsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.benefitItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.95rem;
+  color: var(--foreground);
+  padding: 12px;
+  background: color-mix(in srgb, var(--surface) 50%, transparent);
+  border-radius: 10px;
+  transition: background 200ms ease;
+}
+
+.benefitItem:hover {
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+}
+
+.benefitItem svg {
+  flex-shrink: 0;
+  color: var(--primary);
+}
+
+.whyUsImage {
+  display: grid;
+  place-items: center;
+}
+
+.statsCard {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  padding: 32px;
+  background: var(--surface);
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 16px;
+  box-shadow: 0 12px 32px var(--shadow);
+}
+
+.statItem {
+  text-align: center;
+  padding: 20px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--primary) 5%, transparent);
+  transition: transform 200ms ease;
+}
+
+.statItem:hover {
+  transform: scale(1.05);
+}
+
+.statItem h3 {
+  font-size: 2.5rem;
+  font-weight: 900;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 8px;
+}
+
+.statItem p {
+  font-size: 0.85rem;
+  color: var(--foreground);
+  opacity: 0.75;
+}
+
+/* Final CTA */
+.finalCta {
+  margin-top: 64px;
+  padding: 56px 40px;
+  background: linear-gradient(135deg, 
+    color-mix(in srgb, var(--primary) 8%, var(--surface)) 0%, 
+    color-mix(in srgb, var(--secondary) 6%, var(--surface)) 100%
+  );
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 20px;
+  text-align: center;
+}
+
+.ctaContent h2 {
+  font-size: clamp(1.8rem, 3.5vw, 2.5rem);
+  font-weight: 800;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.ctaContent p {
+  font-size: 1.1rem;
+  line-height: 1.65;
+  color: var(--foreground);
+  opacity: 0.85;
+  margin-bottom: 28px;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .servicesGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .whyUsSection {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .sectorsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .benefitsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .statsCard {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .container {
+    padding: 24px 16px;
+  }
+
+  .hero {
+    padding: 40px 24px;
+  }
+
+  .heroCtas {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .primaryCta,
+  .secondaryCta {
+    width: 100%;
+    text-align: center;
+  }
+
+  .section {
+    margin-top: 48px;
+  }
+
+  .sectorCard,
+  .serviceCard {
+    padding: 24px;
+  }
+
+  .whyUsSection {
+    padding: 32px 24px;
+  }
+
+  .finalCta {
+    padding: 40px 24px;
+  }
+}
+
+/* Media gallery (auto from /public/servicios) */
+.mediaSection {
+  margin-top: 48px;
+}
+
+.mediaRect {
+  margin: 0 auto 24px auto;
+  max-width: 900px;
+}
+
+.mediaRectInner {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--gray-alpha-200);
+  box-shadow: 0 8px 24px var(--shadow);
+}
+
+.mediaSquares {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  max-width: 840px;
+  margin: 0 auto;
+}
+
+.squareItem {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--gray-alpha-200);
+  background: var(--surface);
+}
+
+.mediaPlaceholder,
+.squarePlaceholder {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--foreground);
+  opacity: 0.7;
+  background: radial-gradient(600px 240px at 50% 0%, color-mix(in srgb, var(--primary) 8%, transparent), transparent);
+}
+
+@media (max-width: 600px) {
+  .mediaRect { max-width: 100%; }
+  .mediaSquares { grid-template-columns: 1fr; max-width: 100%; }
+}
