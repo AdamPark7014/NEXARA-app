@@ -275,6 +275,7 @@ export default function UserForm({
           accesoConsoleAdmin: false,
           accesoGestionTienda: false,
           accesoGestionWeb: false,
+          accesoPanelVentas: false,
           accesoContabilidad: false,
           accesoCotizaciones: false,
         });
