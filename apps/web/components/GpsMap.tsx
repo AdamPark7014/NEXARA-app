@@ -4,12 +4,6 @@ import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 
-declare global {
-  interface Window {
-    google?: any;
-  }
-}
-
 type GpsUser = {
   id: number;
   nombre: string;
