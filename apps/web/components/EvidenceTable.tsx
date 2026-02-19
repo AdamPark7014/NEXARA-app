@@ -77,7 +77,7 @@ const EvidenceTable: React.FC<{ mode?: 'admin' | 'user' }> = ({ mode = 'admin' }
   const updateReviewDraft = (id: number, changes: Partial<{ calificacion: string; observaciones: string }>) => {
     setReviewDrafts((prev) => ({
       ...prev,
-      [id]: { calificacion: '', observaciones: '', ...prev[id], ...changes },
+      [id]: { ...prev[id], calificacion: '', observaciones: '', ...changes },
     }));
   };
 
