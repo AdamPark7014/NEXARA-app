@@ -39,28 +39,49 @@ export class VehiclesService {
     return this.prisma['vehicleControl'].create({ data: createVehicleDto });
   }
 
+  createAsset(data: any) {
+    return this.prisma['vehicleAsset'].create({ data });
+  }
+
+  updateAsset(id: number, data: any) {
+    return this.prisma['vehicleAsset'].update({ where: { id }, data });
+  }
+
+  removeAsset(id: number) {
+    return this.prisma['vehicleAsset'].delete({ where: { id } });
+  }
+
+  listAssets() {
+    return this.prisma['vehicleAsset'].findMany({ orderBy: { createdAt: 'desc' } });
+  }
+
   findAll() {
-    return this.prisma['vehicleControl'].findMany({ include: { actividad: true, solicitante: true } });
+    return this.prisma['vehicleControl'].findMany({
+      include: { actividad: true, solicitante: true, vehiculo: true, entregaRevisadoPor: true },
+      orderBy: { fechaSolicitud: 'desc' },
+    });
   }
 
   findByDepartment(departmentId: number) {
     return this.prisma['vehicleControl'].findMany({
       where: { solicitante: { departmentId } },
-      include: { actividad: true, solicitante: true },
+      include: { actividad: true, solicitante: true, vehiculo: true, entregaRevisadoPor: true },
+      orderBy: { fechaSolicitud: 'desc' },
     });
   }
 
   findByResponsible(userId: number) {
     return this.prisma['vehicleControl'].findMany({
       where: { solicitanteId: userId },
-      include: { actividad: true, solicitante: true },
+      include: { actividad: true, solicitante: true, vehiculo: true, entregaRevisadoPor: true },
+      orderBy: { fechaSolicitud: 'desc' },
     });
   }
 
   findOne(id: number) {
     return this.prisma['vehicleControl'].findUnique({
       where: { id },
-      include: { actividad: true, solicitante: true },
+      include: { actividad: true, solicitante: true, vehiculo: true, entregaRevisadoPor: true },
     });
   }
 

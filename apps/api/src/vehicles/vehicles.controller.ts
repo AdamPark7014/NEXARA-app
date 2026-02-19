@@ -3,18 +3,25 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
+  Delete,
+  Body,
   Param,
   UseGuards,
   Res,
   UploadedFile,
+  UploadedFiles,
   UseInterceptors,
   HttpStatus,
+  BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { Response } from 'express';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { VehiclesService } from './vehicles.service.js';
+import { PERMISSIONS } from '../common/permissions.js';
 
 @Controller('vehicles')
 export class VehiclesController {
@@ -23,29 +30,214 @@ export class VehiclesController {
   // Endpoint para obtener todos los vehículos
   @Get()
   @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.VEHICLES_VIEW] })
   async findAll(@CurrentUser() user: any) {
-    if (user.nivelAutoridad === 100) {
+    if (user.isSuperAdmin) {
       return this.vehiclesService.findAll();
-    } else if (user.nivelAutoridad === 50) {
+    } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
       return this.vehiclesService.findByDepartment(user.departmentId);
     } else {
       return this.vehiclesService.findByResponsible(user.id);
     }
   }
 
+  @Post()
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.VEHICLES_REQUEST] })
+  async createRequest(@CurrentUser() user: any, @Body() body: any) {
+    const actividadId = Number(body.actividadId);
+    if (!actividadId || Number.isNaN(actividadId)) {
+      throw new BadRequestException('actividadId invalido');
+    }
+
+    const fechaInicioSolicitada = body.fechaInicioSolicitada ? new Date(body.fechaInicioSolicitada) : null;
+    const fechaFinSolicitada = body.fechaFinSolicitada ? new Date(body.fechaFinSolicitada) : null;
+
+    if (fechaInicioSolicitada && fechaFinSolicitada && fechaFinSolicitada < fechaInicioSolicitada) {
+      throw new BadRequestException('La fecha fin debe ser mayor a la fecha inicio');
+    }
+
+    return this.vehiclesService.create({
+      actividadId,
+      solicitanteId: user.id,
+      vehicleId: body.vehicleId ? Number(body.vehicleId) : null,
+      nombreVehiculo: body.nombreVehiculo || null,
+      placasVehiculo: body.placasVehiculo || null,
+      motivoUso: body.motivoUso || null,
+      estatusAprobacion: 'Pendiente',
+      fechaSolicitud: new Date(),
+      fechaInicioSolicitada: fechaInicioSolicitada || null,
+      fechaFinSolicitada: fechaFinSolicitada || null,
+    });
+  }
+
+  @Patch(':id')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.VEHICLES_REVIEW] })
+  async updateRequest(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() body: any,
+  ) {
+    const updateData: any = {
+      estatusAprobacion: body.estatusAprobacion,
+      fechaInicioAprobada: body.fechaInicioAprobada ? new Date(body.fechaInicioAprobada) : undefined,
+      fechaFinAprobada: body.fechaFinAprobada ? new Date(body.fechaFinAprobada) : undefined,
+      penalizacionMonto: body.penalizacionMonto !== undefined && body.penalizacionMonto !== null
+        ? Number(body.penalizacionMonto)
+        : undefined,
+      penalizacionNotas: body.penalizacionNotas !== undefined ? body.penalizacionNotas : undefined,
+    };
+
+    if (body.estatusAprobacion && body.estatusAprobacion === 'Aprobado') {
+      updateData.fechaInicio = updateData.fechaInicioAprobada || undefined;
+      updateData.fechaFin = updateData.fechaFinAprobada || undefined;
+    }
+
+    return this.vehiclesService.update(+id, updateData);
+  }
+
+  @Post(':id/delivery-evidence')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.VEHICLES_REQUEST] })
+  @UseInterceptors(FilesInterceptor('files', 15, { dest: 'apps/api/uploads/vehicles' }))
+  async submitDeliveryEvidence(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @UploadedFiles() files: any[],
+  ) {
+    if (!files || files.length === 0) {
+      throw new BadRequestException('Archivos requeridos');
+    }
+    if (files.length < 5) {
+      throw new BadRequestException('Debes subir minimo 5 fotos de entrega');
+    }
+
+    const record = await this.vehiclesService.findOne(+id);
+    if (!record) throw new BadRequestException('Solicitud no encontrada');
+    if (!user.isSuperAdmin && !user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) && record.solicitanteId !== user.id) {
+      throw new ForbiddenException('No puedes modificar esta solicitud');
+    }
+
+    const urls = files.map((file) => `/uploads/vehicles/${file.filename}`);
+    const entregaFotos = Array.isArray(record.entregaFotos) ? [...record.entregaFotos, ...urls] : urls;
+
+    return this.vehiclesService.update(+id, {
+      entregaFotos,
+      entregaEstatus: 'En revision',
+    });
+  }
+
+  @Patch(':id/delivery-review')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.VEHICLES_REVIEW] })
+  async reviewDelivery(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() body: any,
+  ) {
+    const approved = Boolean(body.entregaAprobada);
+    return this.vehiclesService.update(+id, {
+      entregaAprobada: approved,
+      entregaEstatus: approved ? 'Aprobada' : 'Rechazada',
+      entregaObservaciones: body.entregaObservaciones || null,
+      entregaRevisadoPorId: user.id,
+      entregaRevisadoEn: new Date(),
+    });
+  }
+
+  @Post(':id/renewal')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.VEHICLES_REQUEST] })
+  async requestRenewal(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() body: any,
+  ) {
+    const record = await this.vehiclesService.findOne(+id);
+    if (!record) throw new BadRequestException('Solicitud no encontrada');
+    if (!user.isSuperAdmin && !user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) && record.solicitanteId !== user.id) {
+      throw new ForbiddenException('No puedes modificar esta solicitud');
+    }
+
+    const start = body.renovacionSolicitadaInicio ? new Date(body.renovacionSolicitadaInicio) : null;
+    const end = body.renovacionSolicitadaFin ? new Date(body.renovacionSolicitadaFin) : null;
+    if (start && end && end < start) {
+      throw new BadRequestException('La fecha fin debe ser mayor a la fecha inicio');
+    }
+
+    return this.vehiclesService.update(+id, {
+      renovacionSolicitadaInicio: start,
+      renovacionSolicitadaFin: end,
+      renovacionEstatus: 'Pendiente',
+    });
+  }
+
+  @Patch(':id/renewal-review')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.VEHICLES_REVIEW] })
+  async reviewRenewal(
+    @Param('id') id: string,
+    @Body() body: any,
+  ) {
+    const approved = Boolean(body.renovacionAprobada);
+    return this.vehiclesService.update(+id, {
+      renovacionEstatus: approved ? 'Aprobada' : 'Rechazada',
+      fechaFinAprobada: approved && body.fechaFinAprobada ? new Date(body.fechaFinAprobada) : undefined,
+      fechaFin: approved && body.fechaFinAprobada ? new Date(body.fechaFinAprobada) : undefined,
+    });
+  }
+
+  @Get('inventory')
+  @UseGuards(RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.VEHICLES_VIEW, PERMISSIONS.VEHICLES_REQUEST, PERMISSIONS.VEHICLES_INVENTORY] })
+  listInventory() {
+    return this.vehiclesService.listAssets();
+  }
+
+  @Post('inventory')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.VEHICLES_INVENTORY] })
+  createInventory(@Body() body: any) {
+    if (!body.nombre) {
+      throw new BadRequestException('Nombre requerido');
+    }
+    return this.vehiclesService.createAsset({
+      nombre: body.nombre,
+      placas: body.placas || null,
+      estatus: body.estatus || 'Disponible',
+      activo: body.activo !== false,
+      notas: body.notas || null,
+    });
+  }
+
+  @Patch('inventory/:id')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.VEHICLES_INVENTORY] })
+  updateInventory(@Param('id') id: string, @Body() body: any) {
+    return this.vehiclesService.updateAsset(+id, body);
+  }
+
+  @Delete('inventory/:id')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.VEHICLES_INVENTORY] })
+  removeInventory(@Param('id') id: string) {
+    return this.vehiclesService.removeAsset(+id);
+  }
+
   // Exportar vehículos (CSV o JSON)
   @Get('export/:format')
   @UseGuards(RbacGuard)
-  @RBAC({ minLevel: 50 })
+  @RBAC({ permissions: [PERMISSIONS.VEHICLES_EXPORT] })
   async export(
     @CurrentUser() user: any,
     @Param('format') format: string,
     @Res() res: Response,
   ) {
     let data;
-    if (user.nivelAutoridad === 100) {
+    if (user.isSuperAdmin) {
       data = await this.vehiclesService.findAll();
-    } else if (user.nivelAutoridad === 50) {
+    } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
       data = await this.vehiclesService.findByDepartment(user.departmentId);
     } else {
       data = await this.vehiclesService.findByResponsible(user.id);
@@ -65,7 +257,7 @@ export class VehiclesController {
   // Importar vehículos desde archivo JSON
   @Post('import')
   @UseGuards(RbacGuard)
-  @RBAC({ minLevel: 100 })
+  @RBAC({ permissions: [PERMISSIONS.VEHICLES_IMPORT] })
   @UseInterceptors(FileInterceptor('file'))
   async import(
     @UploadedFile() file: any,

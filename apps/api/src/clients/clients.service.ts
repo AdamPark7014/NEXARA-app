@@ -73,7 +73,12 @@ export class ClientsService {
       throw new NotFoundException(`Client with ID ${id} not found`);
     }
 
-    if (existingClient.imageUrl) {
+    const { removeImage, ...rest } = updateClientDto as UpdateClientDto & {
+      removeImage?: string;
+    };
+    const shouldRemoveImage = removeImage === 'true';
+
+    if ((shouldRemoveImage || imageFile) && existingClient.imageUrl) {
       await this.deleteImage(existingClient.imageUrl);
     }
 
@@ -83,8 +88,12 @@ export class ClientsService {
     }
 
     const updateData: Record<string, any> = {
-      ...updateClientDto,
+      ...rest,
     };
+
+    if (shouldRemoveImage) {
+      updateData['imageUrl'] = null;
+    }
 
     if (imageUrl) {
       updateData['imageUrl'] = imageUrl;

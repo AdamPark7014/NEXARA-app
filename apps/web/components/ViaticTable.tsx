@@ -1,6 +1,8 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
+import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
+import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 
 interface Viatic {
   id: number;
@@ -27,15 +29,39 @@ const ViaticTable = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
+  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
+  const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, '');
+
   // Fetch viatics
   useEffect(() => {
     if (!user) return;
-    fetch(process.env.NEXT_PUBLIC_API_URL + '/api/viatics', {
+    fetch(buildApiUrl('viatics'), {
       headers: { Authorization: `Bearer ${user.token}` },
     })
       .then(res => res.json())
       .then(data => Array.isArray(data) ? setViatics(data) : setViatics([]));
   }, [user]);
+
+  useEffect(() => {
+    if (!user?.token) return;
+    const socketUrl = getSocketBaseUrl();
+    const socket: Socket = io(socketUrl, { transports: ['websocket'] });
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (payload?.model === 'Viatico') {
+        fetch(buildApiUrl('viatics'), {
+          headers: { Authorization: `Bearer ${user.token}` },
+        })
+          .then(res => res.json())
+          .then(data => Array.isArray(data) ? setViatics(data) : setViatics([]));
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [user?.token]);
 
   // Filtering
   useEffect(() => {
@@ -55,7 +81,7 @@ const ViaticTable = () => {
     if (!file || !user) return;
     const formData = new FormData();
     formData.append('file', file);
-    const res = await fetch(process.env.NEXT_PUBLIC_API_URL + '/api/viatics/import', {
+    const res = await fetch(buildApiUrl('viatics/import'), {
       method: 'POST',
       headers: { Authorization: `Bearer ${user.token}` },
       body: formData,
@@ -67,7 +93,7 @@ const ViaticTable = () => {
     const data = await res.json();
     setImportMsg(data.message + (data.count ? ` (${data.count})` : ''));
     // Opcional: recargar viáticos
-    fetch(process.env.NEXT_PUBLIC_API_URL + '/api/viatics', {
+    fetch(buildApiUrl('viatics'), {
       headers: { Authorization: `Bearer ${user.token}` },
     })
       .then(res => res.json())
@@ -81,7 +107,7 @@ const ViaticTable = () => {
     setError(null);
     setSuccess(null);
     try {
-      const res = await fetch(process.env.NEXT_PUBLIC_API_URL + `/api/viatics/${id}`, {
+      const res = await fetch(buildApiUrl(`viatics/${id}`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -96,7 +122,7 @@ const ViaticTable = () => {
       setSuccess('Viático actualizado');
       // Refrescar viáticos
       if (!user) return;
-      const updated = await fetch(process.env.NEXT_PUBLIC_API_URL + '/api/viatics', {
+      const updated = await fetch(buildApiUrl('viatics'), {
         headers: { Authorization: `Bearer ${user.token}` },
       }).then(r => r.json());
       setViatics(updated);
@@ -115,75 +141,67 @@ const ViaticTable = () => {
   if (!user) return null;
 
   return (
-    <div className="page" style={{ background: 'var(--surface)', color: 'var(--foreground)' }}>
-      <h2 style={{ color: 'var(--primary)', marginBottom: 20 }}>Viáticos</h2>
-      <div style={{ marginBottom: 18 }}>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-          <select className="select" style={{ background: 'var(--surface-light)', color: 'var(--foreground)', border: '1px solid var(--muted)' }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-            <option value="">Todos los estatus</option>
-            <option value="Pendiente">Pendiente</option>
-            <option value="Aprobado">Aprobado</option>
-            <option value="Rechazado">Rechazado</option>
-          </select>
-          <input
-            className="input"
-            style={{ background: 'var(--surface-light)', color: 'var(--foreground)', border: '1px solid var(--muted)' }}
-            placeholder="Filtrar por usuario"
-            value={filterUsuario}
-            onChange={e => setFilterUsuario(e.target.value)}
-          />
-          <input
-            className="input"
-            style={{ background: 'var(--surface-light)', color: 'var(--foreground)', border: '1px solid var(--muted)' }}
-            placeholder="Filtrar por razón"
-            value={filterRazon}
-            onChange={e => setFilterRazon(e.target.value)}
-          />
-          <select className="select" style={{ background: 'var(--surface-light)', color: 'var(--foreground)', border: '1px solid var(--muted)' }} value={pageSize} onChange={e => setPageSize(Number(e.target.value))}>
-            {[10, 20, 50].map(size => (
-              <option key={size} value={size}>{size} por página</option>
-            ))}
-          </select>
-          {/* Botones de exportar/importar solo para supervisor o CEO */}
-          {user.nivelAutoridad >= 50 && (
-            <>
-              <button
-                className="buyBtn"
-                style={{ background: 'var(--primary)', color: '#fff', border: 'none' }}
-                onClick={async () => {
-                  const res = await fetch('/api/export/viatic');
-                  if (!res.ok) return alert('Error al exportar');
-                  const blob = await res.blob();
-                  const url = window.URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = 'viaticos.xlsx';
-                  document.body.appendChild(a);
-                  a.click();
-                  a.remove();
-                  window.URL.revokeObjectURL(url);
-                }}
-              >
-                Exportar Excel
-              </button>
-              <button className="buyBtn" style={{ background: 'var(--primary)', color: '#fff', border: 'none' }} onClick={() => fileInputRef.current?.click()}>Importar Excel</button>
-              <input
-                type="file"
-                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                ref={fileInputRef}
-                style={{ display: 'none' }}
-                onChange={handleImport}
-              />
-            </>
-          )}
-        </div>
+    <div className="card">
+      <h2 style={{ color: 'var(--primary)', marginBottom: 12 }}>Viáticos</h2>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        <select className="input" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+          <option value="">Todos los estatus</option>
+          <option value="Pendiente">Pendiente</option>
+          <option value="Aprobado">Aprobado</option>
+          <option value="Rechazado">Rechazado</option>
+        </select>
+        <input
+          className="input"
+          placeholder="Filtrar por usuario"
+          value={filterUsuario}
+          onChange={e => setFilterUsuario(e.target.value)}
+        />
+        <input
+          className="input"
+          placeholder="Filtrar por razón"
+          value={filterRazon}
+          onChange={e => setFilterRazon(e.target.value)}
+        />
+        <select className="input" value={pageSize} onChange={e => setPageSize(Number(e.target.value))}>
+          {[10, 20, 50].map(size => (
+            <option key={size} value={size}>{size} por página</option>
+          ))}
+        </select>
+        {hasPermission(user, PERMISSIONS.VIATICS_EXPORT) && (
+          <>
+            <button
+              className="button-primary"
+              onClick={async () => {
+                const res = await fetch(buildApiUrl('export/viatic'));
+                if (!res.ok) return alert('Error al exportar');
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'viaticos.xlsx';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+              }}
+            >
+              Exportar Excel
+            </button>
+            <button className="button-primary" onClick={() => fileInputRef.current?.click()}>Importar Excel</button>
+            <input
+              type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              ref={fileInputRef}
+              style={{ display: 'none' }}
+              onChange={handleImport}
+            />
+          </>
+        )}
       </div>
       {importMsg && (
-        <div style={{ color: importMsg.startsWith('Error') ? 'var(--danger)' : 'var(--secondary)', marginBottom: 8 }}>
-          {importMsg}
-        </div>
+        <div style={{ color: importMsg.startsWith('Error') ? 'var(--danger)' : 'var(--accent)' }}>{importMsg}</div>
       )}
-      <table>
+      <table className="table">
         <thead>
           <tr>
             <th>Actividad</th>
@@ -192,7 +210,7 @@ const ViaticTable = () => {
             <th>Ticket</th>
             <th>Estatus</th>
             <th>Usuario</th>
-            {user.nivelAutoridad >= 50 && <th>Acciones</th>}
+            {hasPermission(user, PERMISSIONS.VIATICS_MANAGE) && <th>Acciones</th>}
           </tr>
         </thead>
         <tbody>
@@ -201,17 +219,19 @@ const ViaticTable = () => {
               <td>{v.actividad?.anNumber}</td>
               <td>${v.montoSolicitado}</td>
               <td>{v.razonGasto}</td>
-              <td><a href={v.ticketEvidenciaUrl} target="_blank" rel="noopener noreferrer">Ver</a></td>
-              <td>{v.estatusPago}</td>
+              <td>{v.ticketEvidenciaUrl ? <a className="link" href={v.ticketEvidenciaUrl} target="_blank" rel="noopener noreferrer">Ver</a> : '-'}</td>
+              <td>
+                <span className={`badge ${v.estatusPago === 'Aprobado' ? 'approved' : v.estatusPago === 'Pendiente' ? 'pending' : v.estatusPago === 'Rechazado' ? 'rejected' : ''}`}>{v.estatusPago}</span>
+              </td>
               <td>{v.usuario?.nombre}</td>
-              {user.nivelAutoridad >= 50 && (
+              {hasPermission(user, PERMISSIONS.VIATICS_MANAGE) && (
                 <td>
                   {v.estatusPago === 'Pendiente' && (
                     <>
-                      <button onClick={() => handleApprove(v.id, 'Aprobado')} disabled={actionLoading === v.id}>
+                      <button className="button-primary" onClick={() => handleApprove(v.id, 'Aprobado')} disabled={actionLoading === v.id}>
                         {actionLoading === v.id ? 'Aprobando...' : 'Aprobar'}
                       </button>
-                      <button onClick={() => handleApprove(v.id, 'Rechazado')} disabled={actionLoading === v.id}>
+                      <button className="button-secondary" onClick={() => handleApprove(v.id, 'Rechazado')} disabled={actionLoading === v.id}>
                         {actionLoading === v.id ? 'Rechazando...' : 'Rechazar'}
                       </button>
                     </>
@@ -222,13 +242,13 @@ const ViaticTable = () => {
           ))}
         </tbody>
       </table>
-      <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <button onClick={() => setPage((p: number) => Math.max(1, p - 1))} disabled={page === 1}>Anterior</button>
+      <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+        <button className="button-secondary" onClick={() => setPage((p: number) => Math.max(1, p - 1))} disabled={page === 1}>Anterior</button>
         <span>Página {page} de {totalPages || 1}</span>
-        <button onClick={() => setPage((p: number) => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0}>Siguiente</button>
+        <button className="button-secondary" onClick={() => setPage((p: number) => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0}>Siguiente</button>
       </div>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      {success && <p style={{ color: 'green' }}>{success}</p>}
+      {error && <p style={{ color: 'var(--danger)' }}>{error}</p>}
+      {success && <p style={{ color: 'var(--accent)' }}>{success}</p>}
     </div>
   );
 };

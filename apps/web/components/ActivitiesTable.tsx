@@ -1,11 +1,15 @@
 "use client";
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
+import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 
 const ActivitiesTable: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const clientLogoInputRef = useRef<HTMLInputElement>(null);
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const { user } = useUser();
+  const [loading, setLoading] = useState(true);
 
   // Filtros y paginación
   const [estatus, setEstatus] = useState<string>('');
@@ -23,10 +27,141 @@ const ActivitiesTable: React.FC = () => {
     titulo: string;
     estatus: string;
     prioridad: string;
+    ticketType?: string;
+    client?: { id: number; name: string; logoUrl?: string | null } | null;
+    branchName?: string;
+    branchNumber?: string;
+    branchCity?: string;
+    branchState?: string;
+    descripcion?: string;
+    indicaciones?: string;
+    tiempoEstimadoMin?: number;
+    tiempoMaximoMin?: number;
+    fechaAsignacion?: string;
+    fechaInicio?: string;
+    fechaMaxima?: string;
+    fechaEntregaEsperada?: string;
     responsable?: { nombre: string };
     // Agrega más campos según tu modelo real
   }
-  const [activities] = useState<Activity[]>([]);
+  interface ClientTicketRequest {
+    id: number;
+    description: string;
+    urgency: string;
+    status: string;
+    dueAt?: string | null;
+    branchName?: string | null;
+    branchNumber?: string | null;
+    address?: string | null;
+    city?: string | null;
+    state?: string | null;
+    client?: { id: number; name: string } | null;
+    latitud?: number | null;
+    longitud?: number | null;
+    activityId?: number | null;
+  }
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [ticketRequests, setTicketRequests] = useState<ClientTicketRequest[]>([]);
+  const [pendingRequestId, setPendingRequestId] = useState<number | null>(null);
+
+  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
+  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
+  const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, '');
+
+  const fetchActivities = () => {
+    if (!user?.token) return;
+    setLoading(true);
+    fetch(buildApiUrl('activities'), {
+      headers: { Authorization: `Bearer ${user.token}` },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error('No autorizado');
+        return res.json();
+      })
+      .then((data) => setActivities(Array.isArray(data) ? data : []))
+      .catch(() => setActivities([]))
+      .finally(() => setLoading(false));
+  };
+
+  const [assignableUsers, setAssignableUsers] = useState<{ id: number; nombre: string; role?: { nombre: string } }[]>([]);
+  const [clients, setClients] = useState<{ id: number; name: string; logoUrl?: string | null }[]>([]);
+  const [clientFormMessage, setClientFormMessage] = useState<string | null>(null);
+  const [clientLogo, setClientLogo] = useState<File | null>(null);
+  const [clientLogoPreview, setClientLogoPreview] = useState<string | null>(null);
+  const [clientLogoDragging, setClientLogoDragging] = useState(false);
+  const [showClientPassword, setShowClientPassword] = useState(false);
+  const [createdClientCredentials, setCreatedClientCredentials] = useState<{ email?: string | null; password?: string | null } | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formSuccess, setFormSuccess] = useState<string | null>(null);
+  const [nextAn, setNextAn] = useState<string>('');
+  const [newActivity, setNewActivity] = useState({
+    titulo: '',
+    descripcion: '',
+    indicaciones: '',
+    prioridad: 'Media',
+    estatus: 'Pendiente',
+    responsableId: '',
+    tiempoEstimadoMin: '',
+    tiempoMaximoMin: '',
+    fechaInicio: '',
+    fechaMaxima: '',
+    fechaEntregaEsperada: '',
+    clientId: '',
+    ticketType: 'PREVENTIVO',
+    branchName: '',
+    branchNumber: '',
+    branchCity: '',
+    branchState: '',
+    branchAddress: '',
+  });
+  const [newClient, setNewClient] = useState({
+    name: '',
+    contactName: '',
+    contactEmail: '',
+    contactPhone: '',
+    portalEmail: '',
+    portalPassword: '',
+  });
+
+  const fetchAssignableUsers = () => {
+    if (!user?.token || !hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE)) return;
+    fetch(buildApiUrl('users/assignable'), {
+      headers: { Authorization: `Bearer ${user.token}` },
+    })
+      .then((res) => res.ok ? res.json() : [])
+      .then((data) => setAssignableUsers(Array.isArray(data) ? data : []))
+      .catch(() => setAssignableUsers([]));
+  };
+
+  const fetchClients = () => {
+    if (!user?.token) return;
+    fetch(buildApiUrl('service-clients'), {
+      headers: { Authorization: `Bearer ${user.token}` },
+    })
+      .then((res) => res.ok ? res.json() : [])
+      .then((data) => setClients(Array.isArray(data) ? data : []))
+      .catch(() => setClients([]));
+  };
+
+  const fetchTicketRequests = () => {
+    if (!user?.token || !hasPermission(user, PERMISSIONS.CONSOLE_ADMIN)) return;
+    fetch(buildApiUrl('client-ticket-requests?status=APPROVED'), {
+      headers: { Authorization: `Bearer ${user.token}` },
+    })
+      .then((res) => res.ok ? res.json() : [])
+      .then((data) => setTicketRequests(Array.isArray(data) ? data : []))
+      .catch(() => setTicketRequests([]));
+  };
+
+  const fetchNextAn = () => {
+    if (!user?.token || !hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE)) return;
+    fetch(buildApiUrl('activities/next-an'), {
+      headers: { Authorization: `Bearer ${user.token}` },
+    })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => setNextAn(data?.next || ''))
+      .catch(() => setNextAn(''));
+  };
 
   // Filtrado
   const filtered = activities.filter(a =>
@@ -45,7 +180,7 @@ const ActivitiesTable: React.FC = () => {
     if (!file || !user) return;
     const formData = new FormData();
     formData.append('file', file);
-    const res = await fetch('/api/activities/import', {
+    const res = await fetch(buildApiUrl('activities/import'), {
       method: 'POST',
       headers: { Authorization: `Bearer ${user.token}` },
       body: formData,
@@ -56,92 +191,693 @@ const ActivitiesTable: React.FC = () => {
     }
     const data = await res.json();
     setImportMsg(data.message + (data.count ? ` (${data.count})` : ''));
-    // Opcional: recargar actividades aquí si es necesario
+    fetchActivities();
   };
 
-  return (
-    <div className="card">
-      <h2 style={{ color: 'var(--primary)', marginBottom: 12 }}>Actividades</h2>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-        <select className="input" value={estatus} onChange={e => setEstatus(e.target.value)}>
-          <option value="">Todos los estatus</option>
-          {estatusList.map((e: string) => <option key={e} value={e}>{e}</option>)}
-        </select>
-        <input
-          className="input"
-          placeholder="Responsable"
-          value={responsable}
-          onChange={e => setResponsable(e.target.value)}
-        />
-        <select className="input" value={prioridad} onChange={e => setPrioridad(e.target.value)}>
-          <option value="">Todas las prioridades</option>
-          {prioridadList.map((p: string) => <option key={p} value={p}>{p}</option>)}
-        </select>
-        {user && user.nivelAutoridad >= 50 && (
-          <>
-            <button
-              className="button-primary"
-              onClick={async () => {
-                const res = await fetch('/api/export/activity');
-                if (!res.ok) return alert('Error al exportar');
-                const blob = await res.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'actividades.xlsx';
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                window.URL.revokeObjectURL(url);
-              }}
-            >
-              Exportar Excel
-            </button>
-            <button className="button-primary" onClick={() => fileInputRef.current?.click()}>Importar Excel</button>
-            <input
-              type="file"
-              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              ref={fileInputRef}
-              style={{ display: 'none' }}
-              onChange={handleImport}
-            />
-          </>
-        )}
+  useEffect(() => {
+    if (!user?.token) return;
+    fetchActivities();
+    fetchNextAn();
+    fetchClients();
+    fetchTicketRequests();
+  }, [user?.token]);
+
+  useEffect(() => {
+    fetchAssignableUsers();
+    fetchNextAn();
+    fetchClients();
+    fetchTicketRequests();
+  }, [user?.token]);
+
+  useEffect(() => {
+    if (!user?.token) return;
+    const socketUrl = getSocketBaseUrl();
+    const socket: Socket = io(socketUrl, { transports: ['websocket'] });
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (payload?.model === 'Activity') {
+        fetchActivities();
+        fetchNextAn();
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [user?.token]);
+
+  useEffect(() => {
+    if (!clientLogo) {
+      setClientLogoPreview(null);
+      return undefined;
+    }
+    const url = URL.createObjectURL(clientLogo);
+    setClientLogoPreview(url);
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [clientLogo]);
+
+  const formatDateTime = (value?: string) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return date.toLocaleString('es-MX', {
+      timeZone: 'America/Mexico_City',
+      year: '2-digit',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const getMapsUrl = (lat?: number | null, lng?: number | null) => {
+    if (!lat || !lng) return '';
+    return `https://www.google.com/maps?q=${lat},${lng}`;
+  };
+
+  const prefillFromRequest = (request: ClientTicketRequest) => {
+    setPendingRequestId(request.id);
+    setNewActivity((prev) => ({
+      ...prev,
+      titulo: request.branchName ? `Ticket ${request.branchName}` : 'Ticket cliente',
+      descripcion: request.description || prev.descripcion,
+      prioridad: request.urgency === 'HIGH' ? 'Alta' : request.urgency === 'LOW' ? 'Baja' : 'Media',
+      clientId: request.client?.id ? String(request.client.id) : prev.clientId,
+      branchName: request.branchName || prev.branchName,
+      branchNumber: request.branchNumber || prev.branchNumber,
+      branchCity: request.city || prev.branchCity,
+      branchState: request.state || prev.branchState,
+      branchAddress: request.address || prev.branchAddress,
+      ticketType: 'CORRECTIVO',
+    }));
+    setFormSuccess('Solicitud precargada en el formulario');
+  };
+
+  const handleCloseRequest = async (id: number) => {
+    if (!user?.token) return;
+    await fetch(buildApiUrl(`client-ticket-requests/${id}/status`), {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${user.token}`,
+      },
+      body: JSON.stringify({ status: 'CLOSED' }),
+    }).catch(() => null);
+    fetchTicketRequests();
+  };
+
+  const handleAssign = async () => {
+    if (!user?.token) return;
+    setFormError(null);
+    setFormSuccess(null);
+
+    if (!newActivity.titulo || !newActivity.responsableId) {
+      setFormError('Titulo y responsable son obligatorios');
+      return;
+    }
+
+    const payload: any = {
+      titulo: newActivity.titulo,
+      descripcion: newActivity.descripcion || undefined,
+      indicaciones: newActivity.indicaciones || undefined,
+      prioridad: newActivity.prioridad,
+      estatus: newActivity.estatus,
+      ticketType: newActivity.ticketType,
+      clientId: newActivity.clientId ? Number(newActivity.clientId) : undefined,
+      branchName: newActivity.branchName || undefined,
+      branchNumber: newActivity.branchNumber || undefined,
+      branchCity: newActivity.branchCity || undefined,
+      branchState: newActivity.branchState || undefined,
+      branchAddress: newActivity.branchAddress || undefined,
+      creadoPorId: user.id,
+      responsableId: Number(newActivity.responsableId),
+      tiempoEstimadoMin: newActivity.tiempoEstimadoMin ? Number(newActivity.tiempoEstimadoMin) : undefined,
+      tiempoMaximoMin: newActivity.tiempoMaximoMin ? Number(newActivity.tiempoMaximoMin) : undefined,
+      fechaInicio: newActivity.fechaInicio ? new Date(newActivity.fechaInicio).toISOString() : undefined,
+      fechaMaxima: newActivity.fechaMaxima ? new Date(newActivity.fechaMaxima).toISOString() : undefined,
+      fechaEntregaEsperada: newActivity.fechaEntregaEsperada ? new Date(newActivity.fechaEntregaEsperada).toISOString() : undefined,
+    };
+
+    const res = await fetch(buildApiUrl('activities'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${user.token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setFormError(data.message || 'Error al asignar actividad');
+      return;
+    }
+
+    if (pendingRequestId && data?.id) {
+      await fetch(buildApiUrl(`client-ticket-requests/${pendingRequestId}/assign`), {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${user.token}`,
+        },
+        body: JSON.stringify({ activityId: data.id }),
+      }).catch(() => null);
+      setPendingRequestId(null);
+      fetchTicketRequests();
+    }
+
+    setFormSuccess('Actividad asignada');
+    setNewActivity({
+      titulo: '',
+      descripcion: '',
+      indicaciones: '',
+      prioridad: 'Media',
+      estatus: 'Pendiente',
+      responsableId: '',
+      tiempoEstimadoMin: '',
+      tiempoMaximoMin: '',
+      fechaInicio: '',
+      fechaMaxima: '',
+      fechaEntregaEsperada: '',
+      clientId: '',
+      ticketType: 'PREVENTIVO',
+      branchName: '',
+      branchNumber: '',
+      branchCity: '',
+      branchState: '',
+      branchAddress: '',
+    });
+    fetchActivities();
+    fetchNextAn();
+  };
+
+  const handleLogoSelect = (file?: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return;
+    setClientLogo(file);
+  };
+
+  const handleLogoDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setClientLogoDragging(false);
+    const file = event.dataTransfer.files?.[0];
+    handleLogoSelect(file);
+  };
+
+  const handleCreateClient = async () => {
+    if (!user?.token) return;
+    setClientFormMessage(null);
+    setCreatedClientCredentials(null);
+    if (!newClient.name) {
+      setClientFormMessage('Nombre del cliente es requerido');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('name', newClient.name);
+    if (newClient.contactName) formData.append('contactName', newClient.contactName);
+    if (newClient.contactEmail) formData.append('contactEmail', newClient.contactEmail);
+    if (newClient.contactPhone) formData.append('contactPhone', newClient.contactPhone);
+    if (newClient.portalEmail) formData.append('portalEmail', newClient.portalEmail);
+    if (newClient.portalPassword) formData.append('portalPassword', newClient.portalPassword);
+    if (clientLogo) formData.append('logo', clientLogo);
+
+    const res = await fetch(buildApiUrl('service-clients'), {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${user.token}` },
+      body: formData,
+    });
+
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      setClientFormMessage(data?.message || 'No se pudo crear el cliente');
+      return;
+    }
+
+    const credentials = data?.credentials;
+    setCreatedClientCredentials(credentials || null);
+    if (credentials?.email || credentials?.password) {
+      const parts = [
+        credentials.email ? `Email: ${credentials.email}` : null,
+        credentials.password ? `Password: ${credentials.password}` : null,
+      ].filter(Boolean);
+      setClientFormMessage(`Cliente creado. ${parts.join(' | ')}`);
+    } else {
+      setClientFormMessage('Cliente creado');
+    }
+    setNewClient({
+      name: '',
+      contactName: '',
+      contactEmail: '',
+      contactPhone: '',
+      portalEmail: '',
+      portalPassword: '',
+    });
+    setClientLogo(null);
+    setClientLogoPreview(null);
+    setShowClientPassword(false);
+    fetchClients();
+  };
+
+  const shellStyle: React.CSSProperties = {
+    display: 'grid',
+    gap: 16,
+  };
+
+  const heroStyle: React.CSSProperties = {
+    display: 'grid',
+    gap: 8,
+    background: 'linear-gradient(135deg, rgba(15,106,214,0.12) 0%, rgba(22,169,110,0.1) 100%)',
+    border: '1px solid rgba(15,106,214,0.18)',
+    boxShadow: '0 12px 26px rgba(15,106,214,0.12)',
+  };
+
+  const mainCardStyle: React.CSSProperties = {
+    display: 'grid',
+    gap: 16,
+  };
+
+  const formCardStyle: React.CSSProperties = {
+    background: 'linear-gradient(140deg, rgba(31,137,252,0.22), rgba(20,162,133,0.18)), var(--surface)',
+    border: '1px solid rgba(31,137,252,0.22)',
+    borderRadius: 16,
+    padding: 18,
+    display: 'grid',
+    gap: 12,
+    boxShadow: '0 14px 24px rgba(15,106,214,0.16)',
+  };
+
+  const helperTextStyle: React.CSSProperties = {
+    color: 'var(--text-secondary)',
+    fontSize: 12,
+  };
+
+  const formGridStyle: React.CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: 12,
+  };
+
+  const formFooterStyle: React.CSSProperties = {
+    display: 'flex',
+    gap: 12,
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  };
+
+  const toolbarStyle: React.CSSProperties = {
+    display: 'grid',
+    gap: 12,
+  };
+
+  const filtersRowStyle: React.CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
+    gap: 12,
+  };
+
+  const actionRowStyle: React.CSSProperties = {
+    display: 'flex',
+    gap: 10,
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  };
+
+  const tableWrapStyle: React.CSSProperties = {
+    borderRadius: 16,
+    border: '1px solid var(--muted)',
+    overflow: 'auto',
+    background: 'var(--surface)',
+  };
+
+  const paginationStyle: React.CSSProperties = {
+    display: 'flex',
+    gap: 10,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+  };
+
+  if (loading) {
+    return (
+      <div className="card" style={heroStyle}>
+        <h2 style={{ color: 'var(--primary)', marginBottom: 4 }}>Actividades</h2>
+        <div style={helperTextStyle}>Cargando actividades...</div>
       </div>
-      {importMsg && <div style={{ color: importMsg.startsWith('Error') ? 'var(--danger)' : 'var(--accent)' }}>{importMsg}</div>}
-      <table className="table">
-        <thead>
-          <tr>
-            <th>AN</th>
-            <th>Título</th>
-            <th>Estatus</th>
-            <th>Responsable</th>
-            <th>Prioridad</th>
-            {user && user.nivelAutoridad >= 50 && <th>Acciones</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {paginated.map((a: Activity) => (
-            <tr key={a.id}>
-              <td>{a.anNumber}</td>
-              <td>{a.titulo}</td>
-              <td><span className={`badge ${a.estatus === 'Aprobada' ? 'approved' : a.estatus === 'Pendiente' ? 'pending' : ''}`}>{a.estatus}</span></td>
-              <td>{a.responsable?.nombre}</td>
-              <td>{a.prioridad}</td>
-              {user && user.nivelAutoridad >= 50 && (
-                <td>
-                  <button className="button-secondary">Editar</button>
-                  <button className="button-primary">Borrar</button>
-                </td>
+    );
+  }
+
+  return (
+    <div style={shellStyle}>
+      <div className="card" style={heroStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div>
+            <h2 style={{ color: 'var(--primary)', marginBottom: 4 }}>Actividades</h2>
+            <div style={helperTextStyle}>Gestiona actividades, prioridades y asignaciones del equipo.</div>
+          </div>
+          <div style={helperTextStyle}>Total visibles: {filtered.length}</div>
+        </div>
+      </div>
+
+      <div className="card" style={mainCardStyle}>
+        {hasPermission(user, PERMISSIONS.CONSOLE_ADMIN) && (
+          <div className="card" style={{ display: 'grid', gap: 12, border: '1px solid rgba(31,107,186,0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ marginBottom: 4 }}>Tickets levantados por clientes</h3>
+                <div style={helperTextStyle}>Solicitudes nuevas para asignar al equipo.</div>
+              </div>
+              <div style={helperTextStyle}>Pendientes: {ticketRequests.filter((req) => req.status === 'NEW').length}</div>
+            </div>
+            {ticketRequests.length === 0 && (
+              <div style={helperTextStyle}>No hay solicitudes por el momento.</div>
+            )}
+            <div style={{ display: 'grid', gap: 10 }}>
+              {ticketRequests.map((request) => (
+                <div key={request.id} style={{ display: 'grid', gap: 10, padding: 12, borderRadius: 12, border: '1px solid rgba(15,106,214,0.12)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                    <div style={{ fontWeight: 600 }}>
+                      {request.client?.name || 'Cliente'} · {request.branchName || 'Sucursal'}
+                    </div>
+                    <span className="badge">{request.status}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{request.description}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                    Urgencia: {request.urgency} · Limite: {formatDateTime(request.dueAt || undefined)}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                    {request.address || '-'} {request.city || ''} {request.state || ''}
+                  </div>
+                  {request.latitud && request.longitud && (
+                    <iframe
+                      title={`map-${request.id}`}
+                      src={`https://maps.google.com/maps?q=${request.latitud},${request.longitud}&z=15&output=embed`}
+                      width="100%"
+                      height="160"
+                      style={{ border: 0, borderRadius: 12 }}
+                      loading="lazy"
+                    />
+                  )}
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {request.latitud && request.longitud && (
+                      <a className="button-secondary" href={getMapsUrl(request.latitud, request.longitud)} target="_blank" rel="noreferrer">Ver mapa</a>
+                    )}
+                    <button className="button-primary" type="button" onClick={() => prefillFromRequest(request)}>Precargar en actividad</button>
+                    {request.status !== 'CLOSED' && (
+                      <button className="button-secondary" type="button" onClick={() => handleCloseRequest(request.id)}>Cerrar solicitud</button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && (
+          <div style={formCardStyle}>
+            <div style={{ display: 'grid', gap: 12, padding: 12, borderRadius: 12, background: 'rgba(15, 106, 214, 0.08)', border: '1px dashed rgba(15, 106, 214, 0.3)' }}>
+              <div>
+                <h3 style={{ marginBottom: 4 }}>Agregar cliente</h3>
+                <div style={helperTextStyle}>Crea el cliente y su acceso al portal.</div>
+              </div>
+              <div style={formGridStyle}>
+                <input className="input" placeholder="Nombre del cliente" value={newClient.name} onChange={(e) => setNewClient({ ...newClient, name: e.target.value })} />
+                <input className="input" placeholder="Contacto" value={newClient.contactName} onChange={(e) => setNewClient({ ...newClient, contactName: e.target.value })} />
+                <input className="input" placeholder="Email contacto" value={newClient.contactEmail} onChange={(e) => setNewClient({ ...newClient, contactEmail: e.target.value })} />
+                <input className="input" placeholder="Telefono" value={newClient.contactPhone} onChange={(e) => setNewClient({ ...newClient, contactPhone: e.target.value })} />
+                <input className="input" placeholder="Email portal" value={newClient.portalEmail} onChange={(e) => setNewClient({ ...newClient, portalEmail: e.target.value })} />
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    className="input"
+                    type={showClientPassword ? 'text' : 'password'}
+                    placeholder="Password portal"
+                    value={newClient.portalPassword}
+                    onChange={(e) => setNewClient({ ...newClient, portalPassword: e.target.value })}
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    className="button-secondary"
+                    type="button"
+                    onClick={() => setShowClientPassword((prev) => !prev)}
+                  >
+                    {showClientPassword ? 'Ocultar' : 'Ver'}
+                  </button>
+                </div>
+                <div
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setClientLogoDragging(true);
+                  }}
+                  onDragLeave={() => setClientLogoDragging(false)}
+                  onDrop={handleLogoDrop}
+                  style={{
+                    gridColumn: '1 / -1',
+                    borderRadius: 16,
+                    padding: 16,
+                    border: `2px dashed ${clientLogoDragging ? 'rgba(31,107,186,0.8)' : 'rgba(31,107,186,0.4)'}`,
+                    background: clientLogoDragging
+                      ? 'linear-gradient(135deg, rgba(31,107,186,0.2), rgba(18,133,98,0.18))'
+                      : 'linear-gradient(135deg, rgba(31,107,186,0.12), rgba(18,133,98,0.12))',
+                    display: 'grid',
+                    gap: 10,
+                    alignItems: 'center',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Logo del cliente</div>
+                      <div style={helperTextStyle}>Arrastra la imagen aqui o subela manualmente.</div>
+                    </div>
+                    <button
+                      className="button-secondary"
+                      type="button"
+                      onClick={() => clientLogoInputRef.current?.click()}
+                    >
+                      Seleccionar imagen
+                    </button>
+                  </div>
+                  <input
+                    ref={clientLogoInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleLogoSelect(e.target.files?.[0] || null)}
+                    style={{ display: 'none' }}
+                  />
+                  {clientLogoPreview ? (
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                      <img
+                        src={clientLogoPreview}
+                        alt="Preview logo"
+                        style={{ width: 72, height: 72, borderRadius: 14, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.4)' }}
+                      />
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{clientLogo?.name}</div>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>No hay logo seleccionado.</div>
+                  )}
+                </div>
+              </div>
+              {createdClientCredentials && (createdClientCredentials.email || createdClientCredentials.password) && (
+                <div style={{
+                  marginTop: 8,
+                  padding: 12,
+                  borderRadius: 12,
+                  border: '1px solid rgba(31,107,186,0.25)',
+                  background: 'rgba(31,107,186,0.08)',
+                  display: 'grid',
+                  gap: 6,
+                }}>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Credenciales del portal</div>
+                  {createdClientCredentials.email && (
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Usuario: {createdClientCredentials.email}</div>
+                  )}
+                  {createdClientCredentials.password && (
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Password: {createdClientCredentials.password}</div>
+                  )}
+                </div>
               )}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
-        <button className="button-secondary" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Anterior</button>
-        <span>Página {page} de {totalPages || 1}</span>
-        <button className="button-secondary" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0}>Siguiente</button>
+              <div style={formFooterStyle}>
+                <button className="button-secondary" onClick={handleCreateClient}>Crear cliente</button>
+                {clientFormMessage && <span style={{ color: clientFormMessage.startsWith('No') ? 'var(--danger)' : 'var(--accent)' }}>{clientFormMessage}</span>}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ marginBottom: 4 }}>Asignar actividad</h3>
+                <div style={helperTextStyle}>Completa los campos clave para crear la actividad.</div>
+              </div>
+              <div style={helperTextStyle}>AN sugerido: {nextAn || 'Calculando...'}</div>
+            </div>
+            <div style={formGridStyle}>
+              <input className="input" placeholder="AN (auto)" value={nextAn || 'Calculando...'} disabled />
+              <input className="input" placeholder="Titulo" value={newActivity.titulo} onChange={(e) => setNewActivity({ ...newActivity, titulo: e.target.value })} />
+              <select className="input" value={newActivity.ticketType} onChange={(e) => setNewActivity({ ...newActivity, ticketType: e.target.value })}>
+                <option value="PREVENTIVO">Preventivo</option>
+                <option value="CORRECTIVO">Correctivo</option>
+                <option value="EMERGENCIA">Emergencia</option>
+                <option value="INSTALACION">Instalacion</option>
+                <option value="OTRO">Otro</option>
+              </select>
+              <select className="input" value={newActivity.responsableId} onChange={(e) => setNewActivity({ ...newActivity, responsableId: e.target.value })}>
+                <option value="">Responsable</option>
+                {assignableUsers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.nombre} {u.role?.nombre ? `(${u.role?.nombre})` : ''}
+                  </option>
+                ))}
+              </select>
+              <select className="input" value={newActivity.clientId} onChange={(e) => setNewActivity({ ...newActivity, clientId: e.target.value })}>
+                <option value="">Actividad interna (sin cliente)</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>{client.name}</option>
+                ))}
+              </select>
+              <select className="input" value={newActivity.prioridad} onChange={(e) => setNewActivity({ ...newActivity, prioridad: e.target.value })}>
+                {prioridadList.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+              <select className="input" value={newActivity.estatus} onChange={(e) => setNewActivity({ ...newActivity, estatus: e.target.value })}>
+                {estatusList.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <input className="input" placeholder="Sucursal" value={newActivity.branchName} onChange={(e) => setNewActivity({ ...newActivity, branchName: e.target.value })} />
+              <input className="input" placeholder="Numero sucursal" value={newActivity.branchNumber} onChange={(e) => setNewActivity({ ...newActivity, branchNumber: e.target.value })} />
+              <input className="input" placeholder="Ciudad" value={newActivity.branchCity} onChange={(e) => setNewActivity({ ...newActivity, branchCity: e.target.value })} />
+              <input className="input" placeholder="Estado" value={newActivity.branchState} onChange={(e) => setNewActivity({ ...newActivity, branchState: e.target.value })} />
+              <input className="input" placeholder="Direccion sucursal" value={newActivity.branchAddress} onChange={(e) => setNewActivity({ ...newActivity, branchAddress: e.target.value })} />
+              <input className="input" type="number" placeholder="Tiempo estimado (min)" value={newActivity.tiempoEstimadoMin} onChange={(e) => setNewActivity({ ...newActivity, tiempoEstimadoMin: e.target.value })} />
+              <input className="input" type="number" placeholder="Tiempo maximo (min)" value={newActivity.tiempoMaximoMin} onChange={(e) => setNewActivity({ ...newActivity, tiempoMaximoMin: e.target.value })} />
+              <div>
+                <label style={{ display: 'block', marginBottom: 6, fontSize: 12, color: 'var(--text-tertiary)' }}>Fecha inicio</label>
+                <input className="input" type="datetime-local" value={newActivity.fechaInicio} onChange={(e) => setNewActivity({ ...newActivity, fechaInicio: e.target.value })} />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: 6, fontSize: 12, color: 'var(--text-tertiary)' }}>Fecha maxima</label>
+                <input className="input" type="datetime-local" value={newActivity.fechaMaxima} onChange={(e) => setNewActivity({ ...newActivity, fechaMaxima: e.target.value })} />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: 6, fontSize: 12, color: 'var(--text-tertiary)' }}>Entrega esperada</label>
+                <input className="input" type="datetime-local" value={newActivity.fechaEntregaEsperada} onChange={(e) => setNewActivity({ ...newActivity, fechaEntregaEsperada: e.target.value })} />
+              </div>
+              <input className="input" placeholder="Descripcion" value={newActivity.descripcion} onChange={(e) => setNewActivity({ ...newActivity, descripcion: e.target.value })} />
+              <input className="input" placeholder="Indicaciones" value={newActivity.indicaciones} onChange={(e) => setNewActivity({ ...newActivity, indicaciones: e.target.value })} />
+            </div>
+            <div style={formFooterStyle}>
+              <button className="button-primary" onClick={handleAssign}>Asignar</button>
+              {formError && <span style={{ color: 'var(--danger)' }}>{formError}</span>}
+              {formSuccess && <span style={{ color: 'var(--accent)' }}>{formSuccess}</span>}
+            </div>
+          </div>
+        )}
+
+        <div style={toolbarStyle}>
+          <div style={filtersRowStyle}>
+            <select className="input" value={estatus} onChange={e => setEstatus(e.target.value)}>
+              <option value="">Todos los estatus</option>
+              {estatusList.map((e: string) => <option key={e} value={e}>{e}</option>)}
+            </select>
+            <input
+              className="input"
+              placeholder="Responsable"
+              value={responsable}
+              onChange={e => setResponsable(e.target.value)}
+            />
+            <select className="input" value={prioridad} onChange={e => setPrioridad(e.target.value)}>
+              <option value="">Todas las prioridades</option>
+              {prioridadList.map((p: string) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+          <div style={actionRowStyle}>
+            <div style={helperTextStyle}>{importMsg && <span style={{ color: importMsg.startsWith('Error') ? 'var(--danger)' : 'var(--accent)' }}>{importMsg}</span>}</div>
+            {hasPermission(user, PERMISSIONS.ACTIVITIES_EXPORT) && (
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button
+                  className="button-secondary"
+                  onClick={async () => {
+                    const res = await fetch(buildApiUrl('export/activity'));
+                    if (!res.ok) return alert('Error al exportar');
+                    const blob = await res.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'actividades.xlsx';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    window.URL.revokeObjectURL(url);
+                  }}
+                >
+                  Exportar Excel
+                </button>
+                <button className="button-primary" onClick={() => fileInputRef.current?.click()}>Importar Excel</button>
+                <input
+                  type="file"
+                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  ref={fileInputRef}
+                  style={{ display: 'none' }}
+                  onChange={handleImport}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div style={tableWrapStyle}>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>AN</th>
+                <th>Título</th>
+                <th>Cliente</th>
+                <th>Sucursal</th>
+                <th>Tipo</th>
+                <th>Estatus</th>
+                <th>Responsable</th>
+                <th>Prioridad</th>
+                <th>Inicio</th>
+                <th>Entrega</th>
+                <th>Estimado/Max</th>
+                <th>Indicaciones</th>
+                {hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && <th>Acciones</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.map((a: Activity) => (
+                <tr key={a.id}>
+                  <td>{a.anNumber}</td>
+                  <td>{a.titulo}</td>
+                  <td>{a.client?.name || 'Interna'}</td>
+                  <td>{a.branchName || '-'}</td>
+                  <td>{a.ticketType || '-'}</td>
+                  <td><span className={`badge ${a.estatus === 'Aprobada' ? 'approved' : a.estatus === 'Pendiente' ? 'pending' : ''}`}>{a.estatus}</span></td>
+                  <td>{a.responsable?.nombre}</td>
+                  <td>{a.prioridad}</td>
+                  <td>{formatDateTime(a.fechaInicio)}</td>
+                  <td>{formatDateTime(a.fechaEntregaEsperada)}</td>
+                  <td>{a.tiempoEstimadoMin || 0}/{a.tiempoMaximoMin || 0}</td>
+                  <td>{a.indicaciones || '-'}</td>
+                  {hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && (
+                    <td>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <button className="button-secondary">Editar</button>
+                        <button className="button-primary">Borrar</button>
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={paginationStyle}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="button-secondary" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Anterior</button>
+            <button className="button-secondary" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0}>Siguiente</button>
+          </div>
+          <span style={helperTextStyle}>Página {page} de {totalPages || 1}</span>
+        </div>
       </div>
     </div>
   );

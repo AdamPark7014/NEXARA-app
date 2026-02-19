@@ -4,12 +4,14 @@ import {
   IsString,
   IsInt,
   IsDateString,
+  IsEnum,
 } from 'class-validator';
+import { TicketType } from '@prisma/client';
 
 export class CreateActivityDto {
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  anNumber!: string;
+  anNumber?: string;
 
   @IsNotEmpty()
   @IsString()
@@ -21,11 +23,51 @@ export class CreateActivityDto {
 
   @IsOptional()
   @IsString()
+  indicaciones?: string;
+
+  @IsOptional()
+  @IsString()
   estatus?: string;
 
   @IsOptional()
   @IsString()
   prioridad?: string;
+
+  @IsOptional()
+  @IsEnum(TicketType)
+  ticketType?: TicketType;
+
+  @IsOptional()
+  @IsInt()
+  clientId?: number;
+
+  @IsOptional()
+  @IsString()
+  branchName?: string;
+
+  @IsOptional()
+  @IsString()
+  branchNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  branchCity?: string;
+
+  @IsOptional()
+  @IsString()
+  branchState?: string;
+
+  @IsOptional()
+  @IsString()
+  branchAddress?: string;
+
+  @IsOptional()
+  @IsInt()
+  tiempoEstimadoMin?: number;
+
+  @IsOptional()
+  @IsInt()
+  tiempoMaximoMin?: number;
 
   @IsNotEmpty()
   @IsInt()
@@ -46,6 +88,14 @@ export class CreateActivityDto {
   @IsOptional()
   @IsDateString()
   fechaAsignacion?: string;
+
+  @IsOptional()
+  @IsDateString()
+  fechaInicio?: string;
+
+  @IsOptional()
+  @IsDateString()
+  fechaMaxima?: string;
 
   @IsOptional()
   @IsDateString()

@@ -1,38 +1,42 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { Injectable, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-
-export enum RoleLevel {
-  CEO = 100,
-  SUPERVISOR = 50,
-  STAFF = 10,
-}
+import { AuthGuard } from '@nestjs/passport';
 
 export interface RbacOptions {
-  minLevel?: number;
-  maxLevel?: number;
+  permissions?: string[];
+  anyPermissions?: string[];
   sameDepartment?: boolean;
 }
 
 @Injectable()
-export class RbacGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+export class RbacGuard extends AuthGuard('jwt') {
+  constructor(private reflector: Reflector) {
+    super();
+  }
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const authenticated = (await super.canActivate(context)) as boolean;
+    if (!authenticated) return false;
     const request = context.switchToHttp().getRequest();
     const rbac: RbacOptions = this.reflector.get<RbacOptions>('rbac', context.getHandler()) || {};
     const user = request.user;
     if (!user) throw new ForbiddenException('No user in request');
-    // Check minLevel
-    if (rbac.minLevel && user.nivelAutoridad < rbac.minLevel) {
-      throw new ForbiddenException('No tienes permisos para esta acción');
+    if (user.isSuperAdmin) return true;
+
+    const permissions: string[] = user.permissions || [];
+
+    if (rbac.permissions && rbac.permissions.length > 0) {
+      const hasAll = rbac.permissions.every((permission) => permissions.includes(permission));
+      if (!hasAll) throw new ForbiddenException('No tienes permisos para esta acción');
     }
-    // Check maxLevel
-    if (rbac.maxLevel && user.nivelAutoridad > rbac.maxLevel) {
-      throw new ForbiddenException('No tienes permisos para esta acción');
+
+    if (rbac.anyPermissions && rbac.anyPermissions.length > 0) {
+      const hasAny = rbac.anyPermissions.some((permission) => permissions.includes(permission));
+      if (!hasAny) throw new ForbiddenException('No tienes permisos para esta acción');
     }
     // Check sameDepartment
     if (rbac.sameDepartment && request.body && request.body.departamentoId) {
-      if (user.departamentoId !== request.body.departamentoId) {
+      if (user.departmentId !== request.body.departamentoId) {
         throw new ForbiddenException('Solo puedes gestionar tu propio departamento');
       }
     }

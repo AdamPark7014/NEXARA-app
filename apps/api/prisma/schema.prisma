@@ -4,8 +4,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
-
 model Product {
   id              Int             @id @default(autoincrement())
   sku             String          @unique
@@ -59,6 +59,88 @@ model Client {
   updatedAt   DateTime @updatedAt
 
   @@map("clients")
+}
+
+model Project {
+  id         Int      @id @default(autoincrement())
+  slug       String   @unique @db.VarChar(120)
+  title      String   @db.VarChar(220)
+  sector     String   @db.VarChar(180)
+  summary    String?
+  impact     String?  @db.VarChar(255)
+  services   String[]
+  tags       String[]
+  highlights String[]
+  mainImage  String?  @db.VarChar(500)
+  gallery    String[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("projects")
+}
+
+enum WorkProjectStatus {
+  IN_PROGRESS
+  AT_RISK
+  ON_HOLD
+  COMPLETED
+}
+
+model WorkProject {
+  id            Int                @id @default(autoincrement())
+  title         String             @db.VarChar(220)
+  clientName    String?            @db.VarChar(180)
+  managerName   String?            @db.VarChar(180)
+  status        WorkProjectStatus  @default(IN_PROGRESS)
+  startDate     DateTime?
+  endDate       DateTime?
+  budgetTotal   Decimal?           @db.Decimal(12, 2)
+  budgetUsed    Decimal?           @db.Decimal(12, 2)
+  progress      Int?               @default(0)
+  description   String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  expenses      WorkProjectExpense[]
+  payroll       WorkProjectPayroll[]
+  logs          WorkProjectLog[]
+
+  @@map("work_projects")
+}
+
+model WorkProjectExpense {
+  id          Int        @id @default(autoincrement())
+  projectId   Int
+  category    String     @db.VarChar(120)
+  amount      Decimal    @db.Decimal(12, 2)
+  incurredAt  DateTime   @default(now())
+  note        String?
+  project     WorkProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("work_project_expenses")
+}
+
+model WorkProjectPayroll {
+  id          Int        @id @default(autoincrement())
+  projectId   Int
+  employee    String     @db.VarChar(160)
+  amount      Decimal    @db.Decimal(12, 2)
+  paidAt      DateTime   @default(now())
+  note        String?
+  project     WorkProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("work_project_payroll")
+}
+
+model WorkProjectLog {
+  id          Int        @id @default(autoincrement())
+  projectId   Int
+  label       String     @db.VarChar(160)
+  progress    Int?       @default(0)
+  note        String?
+  createdAt   DateTime   @default(now())
+  project     WorkProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("work_project_logs")
 }
 
 model ProductCT {
@@ -176,7 +258,21 @@ model OrderItem {
 model Role {
   id             Int    @id @default(autoincrement())
   nombre         String @unique @db.VarChar(50)
-  nivelAutoridad Int
+  nivelAutoridad Int    @default(0)
+  accesoConsole          Boolean @default(false)
+  accesoConsoleAdmin     Boolean @default(false)
+  accesoActividades      Boolean @default(false)
+  accesoEvidencias       Boolean @default(false)
+  accesoViaticos         Boolean @default(false)
+  accesoVehiculos        Boolean @default(false)
+  accesoAsistencia       Boolean @default(false)
+  accesoGps              Boolean @default(false)
+  accesoGestionUsuarios  Boolean @default(false)
+  accesoGestionTienda    Boolean @default(false)
+  accesoGestionWeb       Boolean @default(false)
+  accesoPanelVentas      Boolean @default(false)
+  accesoContabilidad     Boolean @default(false)
+  accesoCotizaciones     Boolean @default(false)
   users          User[]
 }
 
@@ -195,15 +291,79 @@ model User {
   departmentId         Int
   fechaCreacion        DateTime           @default(now())
   avatarUrl            String?            @db.VarChar(500)
+  locationConsent      Boolean            @default(false)
+  perfil               UserProfile?
+  documentos           UserDocument[]
+  documentosRevisados   UserDocument[]     @relation("UserDocumentReviewer")
+  perfilesRevisados     UserProfile[]      @relation("UserProfileReviewer")
   actividadesCreadas   Activity[]         @relation("CreadorActividades")
   actividadesAsignadas Activity[]         @relation("ResponsableActividades")
   evidencias           Evidence[]
+  evidenciasAprobadas   Evidence[]         @relation("EvidenceApprover")
+  vehiculosRevisados    VehicleControl[]   @relation("VehicleDeliveryReviewer")
   expenses             Expense[]
   locations            LocationTracking[]
   department           Department         @relation(fields: [departmentId], references: [id])
   role                 Role               @relation(fields: [roleId], references: [id])
   vehicleControls      VehicleControl[]   @relation("SolicitanteVehiculo")
   Viatico              Viatico[]
+  attendances          Attendance[]
+  attendanceDays       AttendanceDay[]
+  employeePayments     EmployeePayment[]
+  employeePaymentsCreated EmployeePayment[] @relation("EmployeePaymentCreator")
+  cotizaciones         Cotizacion[]
+  salesClientsManaged  SalesClient[]       @relation("SalesClientOwner")
+  salesClientDocuments SalesClientDocument[] @relation("SalesClientDocumentUploader")
+  salesLeadsCreated    SalesLead[]          @relation("SalesLeadCreator")
+  salesLeadsOwned      SalesLead[]          @relation("SalesLeadOwner")
+  salesOpportunitiesOwned SalesOpportunity[] @relation("SalesOpportunityOwner")
+  salesOpportunityNotes SalesOpportunityNote[] @relation("SalesOpportunityNoteCreator")
+  salesOpportunityEvidences SalesOpportunityEvidence[] @relation("SalesOpportunityEvidenceCreator")
+  salesOpportunityQuotes SalesOpportunityQuote[] @relation("SalesOpportunityQuoteCreator")
+  salesProjectOrdersCreated SalesProjectOrder[] @relation("SalesProjectOrderCreator")
+  orderTemplates   OrderTemplate[]             @relation("OrderTemplateCreator")
+  notifications    Notification[]
+}
+
+model UserProfile {
+  id                Int      @id @default(autoincrement())
+  userId            Int      @unique
+  telefono          String?  @db.VarChar(30)
+  fechaNacimiento   DateTime?
+  direccion         String?
+  colonia           String?
+  ciudad            String?
+  estado            String?
+  codigoPostal      String?  @db.VarChar(10)
+  pais              String?  @db.VarChar(50)
+  curp              String?  @db.VarChar(30)
+  rfc               String?  @db.VarChar(20)
+  ineNumero         String?  @db.VarChar(30)
+  nss               String?  @db.VarChar(30)
+  contactoEmergenciaNombre   String?
+  contactoEmergenciaTelefono String? @db.VarChar(30)
+  estatus           String   @default("Pendiente") @db.VarChar(30)
+  observaciones     String?
+  aprobadoPorId     Int?
+  revisadoEn        DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  aprobadoPor       User?    @relation("UserProfileReviewer", fields: [aprobadoPorId], references: [id])
+}
+
+model UserDocument {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  tipo          String   @db.VarChar(50)
+  archivoUrl    String
+  estatus       String   @default("Pendiente") @db.VarChar(30)
+  observaciones String?
+  aprobadoPorId Int?
+  revisadoEn    DateTime?
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  aprobadoPor   User?    @relation("UserDocumentReviewer", fields: [aprobadoPorId], references: [id])
 }
 
 model Activity {
@@ -211,22 +371,182 @@ model Activity {
   anNumber             String             @unique @db.VarChar(20)
   titulo               String             @db.VarChar(200)
   descripcion          String?
+  indicaciones         String?
   estatus              String             @default("Pendiente") @db.VarChar(50)
   prioridad            String?            @db.VarChar(20)
+  ticketType           TicketType?        @default(PREVENTIVO)
+  clientId             Int?
+  branchName           String?            @db.VarChar(160)
+  branchNumber         String?            @db.VarChar(60)
+  branchCity           String?            @db.VarChar(120)
+  branchState          String?            @db.VarChar(120)
+  branchAddress        String?            @db.VarChar(220)
+  slaAlertedAt         DateTime?
+  tiempoEstimadoMin    Int?
+  tiempoMaximoMin      Int?
   creadoPorId          Int
   responsableId        Int
   eficienciaScore      Int?
   comentariosFeedback  String?
   fechaAsignacion      DateTime           @default(now())
+  fechaInicio          DateTime?
+  fechaMaxima          DateTime?
   fechaEntregaEsperada DateTime?
   fechaFinalizacion    DateTime?
+  clientSurveyRequestedAt DateTime?
+  clientSurveyCompletedAt DateTime?
+  ticketReportUrl      String?            @db.VarChar(500)
+  ticketReportGeneratedAt DateTime?
   creador              User               @relation("CreadorActividades", fields: [creadoPorId], references: [id])
   responsable          User               @relation("ResponsableActividades", fields: [responsableId], references: [id])
+  client               ServiceClient?     @relation(fields: [clientId], references: [id])
+  serviceSheet         ServiceSheet?
   evidencias           Evidence[]
+  clientTicketRequest  ClientTicketRequest?
+  clientFeedback       ClientActivityFeedback?
   expenses             Expense[]
   locations            LocationTracking[]
   vehicleControls      VehicleControl[]
   Viatico              Viatico[]
+}
+
+enum TicketType {
+  PREVENTIVO
+  CORRECTIVO
+  EMERGENCIA
+  INSTALACION
+  OTRO
+}
+
+model ServiceClient {
+  id                 Int        @id @default(autoincrement())
+  name               String     @db.VarChar(200)
+  logoUrl            String?    @db.VarChar(500)
+  contactName        String?    @db.VarChar(160)
+  contactEmail       String?    @db.VarChar(200)
+  contactPhone       String?    @db.VarChar(60)
+  address            String?    @db.VarChar(220)
+  city               String?    @db.VarChar(120)
+  state              String?    @db.VarChar(120)
+  country            String?    @db.VarChar(80)
+  accountCode        String?    @db.VarChar(80)
+  portalEmail        String?    @unique @db.VarChar(200)
+  portalPasswordHash String?
+  reportUrl          String?    @db.VarChar(500)
+  reportGeneratedAt  DateTime?
+  isActive           Boolean    @default(true)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  activities         Activity[]
+  branches           ServiceClientBranch[]
+  ticketRequests     ClientTicketRequest[]
+  feedbacks          ClientActivityFeedback[]
+  salesClients       SalesClient[]
+
+  @@map("service_clients")
+}
+
+enum ClientTicketUrgency {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ClientTicketStatus {
+  NEW
+  ASSIGNED
+  CLOSED
+  APPROVED
+  REJECTED
+}
+
+model ServiceClientBranch {
+  id           Int       @id @default(autoincrement())
+  clientId     Int
+  branchNumber String?   @db.VarChar(60)
+  name         String    @db.VarChar(180)
+  address      String?   @db.VarChar(220)
+  city         String?   @db.VarChar(120)
+  state        String?   @db.VarChar(120)
+  country      String?   @db.VarChar(80)
+  placeId      String?   @db.VarChar(180)
+  latitud      Decimal?  @db.Decimal(10, 8)
+  longitud     Decimal?  @db.Decimal(11, 8)
+  portalEmail  String?   @unique @db.VarChar(200)
+  portalPasswordHash String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  client       ServiceClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  ticketRequests ClientTicketRequest[]
+
+  @@unique([clientId, branchNumber])
+  @@map("service_client_branches")
+}
+
+model ClientTicketRequest {
+  id            Int       @id @default(autoincrement())
+  clientId      Int
+  branchId      Int?
+  branchName    String?   @db.VarChar(180)
+  branchNumber  String?   @db.VarChar(60)
+  address       String?   @db.VarChar(220)
+  city          String?   @db.VarChar(120)
+  state         String?   @db.VarChar(120)
+  country       String?   @db.VarChar(80)
+  description   String    @db.Text
+  urgency       ClientTicketUrgency @default(MEDIUM)
+  dueAt         DateTime?
+  status        ClientTicketStatus @default(NEW)
+  placeId       String?   @db.VarChar(180)
+  latitud       Decimal?  @db.Decimal(10, 8)
+  longitud      Decimal?  @db.Decimal(11, 8)
+  evidenceUrls  String[]  @default([])
+  activityId    Int?     @unique
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  client        ServiceClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  branch        ServiceClientBranch? @relation(fields: [branchId], references: [id])
+  activity      Activity? @relation(fields: [activityId], references: [id])
+
+  @@index([clientId])
+  @@index([status])
+  @@map("client_ticket_requests")
+}
+
+model ClientActivityFeedback {
+  id          Int      @id @default(autoincrement())
+  activityId  Int      @unique
+  clientId    Int
+  rating      Int?
+  wasOnTime   Boolean?
+  wasFriendly Boolean?
+  wasSolved   Boolean?
+  comments    String?  @db.Text
+  createdAt   DateTime @default(now())
+  activity    Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  client      ServiceClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@map("client_activity_feedback")
+}
+
+model ServiceSheet {
+  id             Int      @id @default(autoincrement())
+  activityId     Int      @unique
+  managerName    String?  @db.VarChar(160)
+  managerRole    String?  @db.VarChar(160)
+  workSummary    String?
+  equipmentList  Json?
+  observations   String?
+  signedName     String?  @db.VarChar(160)
+  pdfUrl         String?  @db.VarChar(500)
+  survey         Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  activity       Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@map("service_sheets")
 }
 
 model Evidence {
@@ -235,25 +555,66 @@ model Evidence {
   tipoEvidencia String   @db.VarChar(50)
   archivoUrl    String
   aprobada      Boolean  @default(false)
+  estatus       String   @default("Pendiente") @db.VarChar(50)
+  comentarios   String?  @db.Text
+  observacionesRevision String? @db.Text
+  calificacionEficiencia String? @db.VarChar(20)
+  latitud       Decimal? @db.Decimal(10, 8)
+  longitud      Decimal? @db.Decimal(11, 8)
+  aprobadoPorId Int?
+  revisadoEn    DateTime?
   subidoEn      DateTime @default(now())
   userId        Int?
   actividad     Activity @relation(fields: [actividadId], references: [id], onDelete: Cascade)
   user          User?    @relation(fields: [userId], references: [id])
+  aprobadoPor   User?    @relation("EvidenceApprover", fields: [aprobadoPorId], references: [id])
 }
 
 model VehicleControl {
   id                     Int       @id @default(autoincrement())
   actividadId            Int
+  vehicleId              Int?
   solicitanteId          Int
+  nombreVehiculo         String?   @db.VarChar(100)
   placasVehiculo         String?   @db.VarChar(20)
   motivoUso              String?
   estatusAprobacion      String    @default("Pendiente") @db.VarChar(30)
   evidenciaEntregaUrl    String?
   evidenciaDevolucionUrl String?
+  entregaFotos           Json?
+  entregaEstatus         String    @default("Pendiente") @db.VarChar(30)
+  entregaObservaciones   String?
+  entregaAprobada        Boolean   @default(false)
+  entregaRevisadoPorId   Int?
+  entregaRevisadoEn      DateTime?
+  fechaSolicitud         DateTime  @default(now())
+  fechaInicioSolicitada  DateTime?
+  fechaFinSolicitada     DateTime?
+  fechaInicioAprobada    DateTime?
+  fechaFinAprobada       DateTime?
+  renovacionSolicitadaInicio DateTime?
+  renovacionSolicitadaFin DateTime?
+  renovacionEstatus      String?   @db.VarChar(30)
+  penalizacionMonto      Decimal?  @db.Decimal(10, 2)
+  penalizacionNotas      String?
   fechaInicio            DateTime?
   fechaFin               DateTime?
   actividad              Activity  @relation(fields: [actividadId], references: [id])
   solicitante            User      @relation("SolicitanteVehiculo", fields: [solicitanteId], references: [id])
+  vehiculo               VehicleAsset? @relation(fields: [vehicleId], references: [id])
+  entregaRevisadoPor     User?     @relation("VehicleDeliveryReviewer", fields: [entregaRevisadoPorId], references: [id])
+}
+
+model VehicleAsset {
+  id            Int      @id @default(autoincrement())
+  nombre        String   @db.VarChar(100)
+  placas        String?  @db.VarChar(20)
+  estatus       String   @default("Disponible") @db.VarChar(30)
+  activo        Boolean  @default(true)
+  notas         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  controles     VehicleControl[]
 }
 
 model Expense {
@@ -286,6 +647,7 @@ model Viatico {
   id                 Int       @id @default(autoincrement())
   usuarioId          Int
   actividadId        Int?
+  projectId          Int?
   montoSolicitado    Decimal   @db.Decimal(10, 2)
   motivo             String?   @db.VarChar(255)
   ticketEvidenciaUrl String?
@@ -293,6 +655,9 @@ model Viatico {
   fechaSolicitud     DateTime  @default(now())
   Activity           Activity? @relation(fields: [actividadId], references: [id])
   User               User      @relation(fields: [usuarioId], references: [id])
+  project            SalesProject? @relation(fields: [projectId], references: [id])
+
+  @@map("viaticos")
 }
 
 enum OrderStatus {
@@ -302,3 +667,432 @@ enum OrderStatus {
   DELIVERED
   CANCELLED
 }
+
+model Attendance {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  type      String   // 'entrada' o 'salida'
+  timestamp DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model AttendanceDay {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  date        DateTime  @db.Date
+  totalMinutes Int      @default(0)
+  lastEntryAt DateTime?
+  isOpen      Boolean   @default(false)
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date])
+}
+
+model EmployeePayment {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  periodFrom   DateTime @db.Date
+  periodTo     DateTime @db.Date
+  totalMinutes Int      @default(0)
+  amount       Decimal  @db.Decimal(12, 2)
+  note         String?
+  evidenceUrls String[] @default([])
+  createdAt    DateTime @default(now())
+  createdById  Int?
+  user         User     @relation(fields: [userId], references: [id])
+  createdBy    User?    @relation("EmployeePaymentCreator", fields: [createdById], references: [id])
+
+  @@map("employee_payments")
+}
+
+enum ContactStatus {
+  NEW
+  IN_PROGRESS
+  RESPONDED
+  CLOSED
+}
+
+model ContactMessage {
+  id              Int           @id @default(autoincrement())
+  name            String        @db.VarChar(150)
+  email           String        @db.VarChar(200)
+  phone           String?       @db.VarChar(50)
+  company         String?       @db.VarChar(200)
+  subject         String?       @db.VarChar(150)
+  message         String        @db.Text
+  newsletter      Boolean       @default(false)
+  source          String?       @db.VarChar(120)
+  pageUrl         String?       @db.VarChar(500)
+  status          ContactStatus @default(NEW)
+  responseMessage String?       @db.Text
+  respondedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("contact_messages")
+}
+
+model NewsletterSubscriber {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique @db.VarChar(255)
+  name         String?  @db.VarChar(255)
+  source       String?  @db.VarChar(120)
+  pageUrl      String?  @db.VarChar(500)
+  subscribedAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("newsletter_subscribers")
+}
+
+enum NewsStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model NewsPost {
+  id            Int        @id @default(autoincrement())
+  title         String     @db.VarChar(220)
+  slug          String     @unique @db.VarChar(220)
+  summary       String?    @db.VarChar(500)
+  content       String     @db.Text
+  coverImageUrl String?    @db.VarChar(500)
+  galleryUrls   String[]   @default([])
+  status        NewsStatus @default(DRAFT)
+  tags          String[]   @default([])
+  publishedAt   DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@map("news_posts")
+}
+
+enum CotizacionStatus {
+  DRAFT
+  SENT
+  APPROVED
+}
+
+model Cotizacion {
+  id             Int              @id @default(autoincrement())
+  quoteNumber    String           @unique @db.VarChar(40)
+  issueDate      DateTime
+  validUntil     DateTime?
+  status         CotizacionStatus @default(DRAFT)
+  clientName     String?          @db.VarChar(180)
+  clientCompany  String?          @db.VarChar(200)
+  clientEmail    String?          @db.VarChar(200)
+  clientPhone    String?          @db.VarChar(60)
+  clientAddress  String?
+  projectName    String?          @db.VarChar(200)
+  scope          String?          @db.Text
+  paymentTerms   String?          @db.VarChar(200)
+  deliveryTime   String?          @db.VarChar(120)
+  preparedBy     String?          @db.VarChar(120)
+  preparedRole   String?          @db.VarChar(120)
+  currency       String           @default("MXN") @db.VarChar(10)
+  depositPercent Int              @default(0)
+  note           String?          @db.Text
+  subtotal       Decimal          @default(0) @db.Decimal(12, 2)
+  discountTotal  Decimal          @default(0) @db.Decimal(12, 2)
+  taxTotal       Decimal          @default(0) @db.Decimal(12, 2)
+  iepsTotal      Decimal          @default(0) @db.Decimal(12, 2)
+  retentionTotal Decimal          @default(0) @db.Decimal(12, 2)
+  total          Decimal          @default(0) @db.Decimal(12, 2)
+  publicToken    String?          @unique @db.VarChar(80)
+  sentToEmail    String?          @db.VarChar(200)
+  sentAt         DateTime?
+  signedByName   String?          @db.VarChar(180)
+  signedByEmail  String?          @db.VarChar(200)
+  signedAt       DateTime?
+  createdById    Int?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  items          CotizacionItem[]
+  createdBy      User?            @relation(fields: [createdById], references: [id])
+  salesQuotes    SalesOpportunityQuote[]
+
+  @@map("cotizaciones")
+}
+
+model CotizacionItem {
+  id            Int         @id @default(autoincrement())
+  cotizacionId  Int
+  category      String?     @db.VarChar(120)
+  name          String      @db.VarChar(200)
+  description   String?
+  scope         String?
+  brand         String?     @db.VarChar(120)
+  model         String?     @db.VarChar(120)
+  sku           String?     @db.VarChar(120)
+  partNumber    String?     @db.VarChar(120)
+  batchReference String?    @db.VarChar(120)
+  unit          String?     @db.VarChar(40)
+  qty           Int         @default(1)
+  unitPrice     Decimal     @default(0) @db.Decimal(12, 2)
+  discount      Int         @default(0)
+  tax           Int         @default(0)
+  ieps          Int         @default(0)
+  retention     Int         @default(0)
+  laborHours    Decimal     @default(0) @db.Decimal(10, 2)
+  laborRate     Decimal     @default(0) @db.Decimal(12, 2)
+  warrantyMonths Int        @default(0)
+  deliveryTime  String?     @db.VarChar(120)
+  countryOrigin String?     @db.VarChar(80)
+  notes         String?
+  lineTotal     Decimal     @default(0) @db.Decimal(12, 2)
+  createdAt     DateTime    @default(now())
+  cotizacion    Cotizacion  @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+
+  @@map("cotizacion_items")
+}
+
+enum SalesLeadStatus {
+  NEW
+  QUALIFIED
+  NURTURING
+  LOST
+  CONVERTED
+}
+
+enum SalesOpportunityStage {
+  DISCOVERY
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum SalesProjectStatus {
+  PLANNED
+  IN_PROGRESS
+  CLOSED
+  ON_HOLD
+}
+
+model SalesClient {
+  id             Int       @id @default(autoincrement())
+  name           String    @db.VarChar(200)
+  legalName      String?   @db.VarChar(220)
+  taxId          String?   @db.VarChar(40)
+  fiscalAddress  String?
+  billingEmail   String?   @db.VarChar(200)
+  billingPhone   String?   @db.VarChar(60)
+  industry       String?   @db.VarChar(160)
+  website        String?   @db.VarChar(200)
+  status         String?   @db.VarChar(80)
+  notes          String?   @db.Text
+  ownerId        Int?
+  serviceClientId Int?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  documents      SalesClientDocument[]
+  leads          SalesLead[]
+  opportunities  SalesOpportunity[]
+  owner          User?     @relation("SalesClientOwner", fields: [ownerId], references: [id])
+  serviceClient  ServiceClient? @relation(fields: [serviceClientId], references: [id])
+
+  @@map("sales_clients")
+}
+
+model SalesClientDocument {
+  id           Int      @id @default(autoincrement())
+  clientId     Int
+  type         String   @db.VarChar(120)
+  fileUrl      String   @db.VarChar(500)
+  fileName     String?  @db.VarChar(220)
+  version      Int      @default(1)
+  uploadedById Int?
+  createdAt    DateTime @default(now())
+  client       SalesClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  uploadedBy   User?    @relation("SalesClientDocumentUploader", fields: [uploadedById], references: [id])
+
+  @@map("sales_client_documents")
+}
+
+model SalesLead {
+  id             Int             @id @default(autoincrement())
+  name           String?         @db.VarChar(180)
+  company        String?         @db.VarChar(200)
+  email          String?         @db.VarChar(200)
+  phone          String?         @db.VarChar(60)
+  source         String?         @db.VarChar(160)
+  status         SalesLeadStatus @default(NEW)
+  score          Int             @default(0)
+  notes          String?         @db.Text
+  clientId       Int?
+  createdById    Int?
+  ownerId        Int?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  client         SalesClient?    @relation(fields: [clientId], references: [id])
+  opportunities  SalesOpportunity[]
+  createdBy      User?           @relation("SalesLeadCreator", fields: [createdById], references: [id])
+  owner          User?           @relation("SalesLeadOwner", fields: [ownerId], references: [id])
+
+  @@map("sales_leads")
+}
+
+model SalesOpportunity {
+  id                Int                   @id @default(autoincrement())
+  title             String                @db.VarChar(220)
+  description       String?               @db.Text
+  stage             SalesOpportunityStage @default(DISCOVERY)
+  value             Decimal               @default(0) @db.Decimal(14, 2)
+  probability       Int                   @default(0)
+  expectedCloseDate DateTime?
+  closedAt          DateTime?
+  clientId          Int?
+  leadId            Int?
+  ownerId           Int?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  client            SalesClient?          @relation(fields: [clientId], references: [id])
+  lead              SalesLead?            @relation(fields: [leadId], references: [id])
+  owner             User?                 @relation("SalesOpportunityOwner", fields: [ownerId], references: [id])
+  notes             SalesOpportunityNote[]
+  evidences         SalesOpportunityEvidence[]
+  quotes            SalesOpportunityQuote[]
+  projects          SalesProject[]
+
+  @@map("sales_opportunities")
+}
+
+model SalesOpportunityNote {
+  id             Int      @id @default(autoincrement())
+  opportunityId  Int
+  message        String   @db.Text
+  createdById    Int?
+  createdAt      DateTime @default(now())
+  opportunity    SalesOpportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  createdBy      User?    @relation("SalesOpportunityNoteCreator", fields: [createdById], references: [id])
+
+  @@map("sales_opportunity_notes")
+}
+
+model SalesOpportunityEvidence {
+  id             Int      @id @default(autoincrement())
+  opportunityId  Int
+  fileUrl        String   @db.VarChar(500)
+  fileName       String?  @db.VarChar(220)
+  kind           String?  @db.VarChar(40)
+  createdById    Int?
+  createdAt      DateTime @default(now())
+  opportunity    SalesOpportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  createdBy      User?    @relation("SalesOpportunityEvidenceCreator", fields: [createdById], references: [id])
+
+  @@map("sales_opportunity_evidences")
+}
+
+model SalesOpportunityQuote {
+  id             Int      @id @default(autoincrement())
+  opportunityId  Int
+  cotizacionId   Int?
+  versionLabel   String?  @db.VarChar(80)
+  pdfUrl         String?  @db.VarChar(500)
+  createdById    Int?
+  createdAt      DateTime @default(now())
+  opportunity    SalesOpportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  cotizacion     Cotizacion? @relation(fields: [cotizacionId], references: [id])
+  createdBy      User?    @relation("SalesOpportunityQuoteCreator", fields: [createdById], references: [id])
+  projectOrders  SalesProjectOrder[]
+
+  @@map("sales_opportunity_quotes")
+}
+
+model SalesProject {
+  id              Int                @id @default(autoincrement())
+  opportunityId   Int
+  name            String             @db.VarChar(220)
+  budget          Decimal            @default(0) @db.Decimal(14, 2)
+  costProducts    Decimal            @default(0) @db.Decimal(14, 2)
+  costViaticos    Decimal            @default(0) @db.Decimal(14, 2)
+  costOperativo   Decimal            @default(0) @db.Decimal(14, 2)
+  margin          Decimal            @default(0) @db.Decimal(14, 2)
+  status          SalesProjectStatus @default(PLANNED)
+  startDate       DateTime?
+  endDate         DateTime?
+  closureOrderId  Int?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  opportunity     SalesOpportunity   @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  closureOrder    SalesProjectOrder? @relation("ProjectOrder")
+  viaticos        Viatico[]
+
+  @@map("sales_projects")
+}
+
+model SalesProjectOrder {
+  id              Int            @id @default(autoincrement())
+  projectId       Int            @unique
+  orderId         String         @db.VarChar(40)
+  quoteId         Int?
+  orderPdfUrl     String?        @db.VarChar(500)
+  status          String         @default("OPEN") @db.VarChar(40)
+  templateId      Int?
+  createdById     Int?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  project         SalesProject   @relation("ProjectOrder", fields: [projectId], references: [id], onDelete: Cascade)
+  quote           SalesOpportunityQuote? @relation(fields: [quoteId], references: [id])
+  template        OrderTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  createdBy       User?          @relation("SalesProjectOrderCreator", fields: [createdById], references: [id])
+
+  @@map("sales_project_orders")
+}
+
+model OrderTemplate {
+  id                Int                  @id @default(autoincrement())
+  name              String               @db.VarChar(200)
+  description       String?
+  isDefault         Boolean              @default(false)
+  headerLogo        String?              @db.VarChar(500)
+  headerText        String?              @db.VarChar(500)
+  companyName       String?              @db.VarChar(200)
+  companyEmail      String?              @db.VarChar(150)
+  companyPhone      String?              @db.VarChar(60)
+  footerText        String?              @db.Text
+  footerAlignment   String               @default("center") @db.VarChar(20)
+  primaryColor      String               @default("#0f6ad6") @db.VarChar(20)
+  secondaryColor    String               @default("#f5f5f5") @db.VarChar(20)
+  textColor         String               @default("#000000") @db.VarChar(20)
+  sections          Json?
+  customCss         String?              @db.Text
+  createdById       Int?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  orders            SalesProjectOrder[]
+  createdBy         User?                @relation("OrderTemplateCreator", fields: [createdById], references: [id])
+
+  @@map("order_templates")
+}
+
+enum NotificationType {
+  QUOTE_EXPIRING
+  QUOTE_EXPIRED
+  QUOTE_SIGNED
+  ORDER_CREATED
+  PROJECT_COMPLETED
+  VIATICO_APPROVED
+  VIATICO_REJECTED
+}
+
+model Notification {
+  id              Int                @id @default(autoincrement())
+  userId          Int
+  type            NotificationType
+  title           String             @db.VarChar(200)
+  message         String             @db.Text
+  relatedEntityId Int?
+  entityType      String?            @db.VarChar(50)
+  relatedUrl      String?            @db.VarChar(500)
+  isRead          Boolean            @default(false)
+  readAt          DateTime?
+  createdAt       DateTime           @default(now())
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@map("notifications")
+}
+

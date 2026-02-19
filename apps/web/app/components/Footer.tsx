@@ -45,11 +45,42 @@ const Icon = {
 export default function Footer() {
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(
+    /[\/.]+$/,
+    ""
+  );
+  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
 
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    // Aquí podrías integrar tu backend o servicio de newsletter
-    setSubmitted(true);
+    if (!email.trim()) return;
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(buildApiUrl("newsletter/subscribe"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          source: "newsletter-footer",
+          pageUrl: typeof window !== "undefined" ? window.location.pathname : "/",
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("No se pudo registrar el correo");
+      }
+
+      setSubmitted(true);
+      setEmail("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error desconocido");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -71,11 +102,17 @@ export default function Footer() {
             className={styles.newsInput}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            disabled={loading}
           />
           <button type="submit" className={styles.newsButton}>
-            Suscribirme
+            {loading ? "Enviando..." : "Suscribirme"}
           </button>
         </form>
+        {error && (
+          <p className={styles.brandTagline} style={{ marginTop: 10, color: "#ffb3b3" }}>
+            {error}
+          </p>
+        )}
         {submitted && (
           <p className={styles.brandTagline} style={{ marginTop: 10 }}>
             ¡Gracias! Te hemos registrado, pronto recibirás noticias.
@@ -155,7 +192,6 @@ export default function Footer() {
               <li><Link href="/nexara">Sobre Nexara</Link></li>
               <li><Link href="/proyectos">Proyectos</Link></li>
               <li><Link href="/contacto">Contacto</Link></li>
-              <li><Link href="/tienda">Tienda</Link></li>
             </ul>
           </div>
         </div>

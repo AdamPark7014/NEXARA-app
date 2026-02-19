@@ -1,5 +1,5 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
-// import { Reflector } from '@nestjs/core'; // Removed unused import
+import { PERMISSIONS } from './permissions.js';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -9,10 +9,9 @@ export class RolesGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
     if (!user) throw new ForbiddenException('No user in request');
-    // Example: Only allow CEO and Supervisor
-    if (user.nivelAutoridad < 50) {
-      throw new ForbiddenException('No tienes permisos para esta acción');
-    }
+    const isSuperAdmin = Boolean(user.isSuperAdmin);
+    const canAdmin = isSuperAdmin || user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN);
+    if (!canAdmin) throw new ForbiddenException('No tienes permisos para esta acción');
     return true;
   }
 }

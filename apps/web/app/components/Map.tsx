@@ -73,12 +73,10 @@ export default function Map() {
 
         const infoWindow = new window.google.maps.InfoWindow({
           content: `
-            <div class="map-info-window" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-              <img class="map-info-logo" src="/logo-nexara.png" alt="NEXARA" />
-              <h3 class="map-info-title">NEXARA</h3>
-              <a class="map-info-button" href="https://maps.app.goo.gl/34XSHPwUSeMAB7x69" target="_blank" rel="noopener">
-                🗺️ Cómo llegar
-              </a>
+            <div style="font-family: Arial, sans-serif; text-align: center; padding: 10px; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); max-width: 220px;">
+              <img src="/logo-nexara.png" alt="NEXARA" style="width:32px;height:32px;object-fit:contain;margin-bottom:8px;" />
+              <h3 style="margin:0 0 8px 0; font-size:15px; font-weight:700; color:#1e293b;">NEXARA</h3>
+              <a href="https://maps.app.goo.gl/34XSHPwUSeMAB7x69" target="_blank" rel="noopener" style="display:inline-block;padding:7px 14px;border-radius:6px;text-decoration:none;color:#fff;font-size:13px;font-weight:600;background:#2563eb;box-shadow:0 1px 4px rgba(37,99,235,0.18);margin-top:6px;">🗺️ Cómo llegar</a>
             </div>
           `,
         });
@@ -105,15 +103,23 @@ export default function Map() {
       return;
     }
 
-    window.initMap = initMapCallback;
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDOJ7TFUE5F1vD_qVh9ofKOSS5gd2mbnyE&callback=initMap`;
-    script.async = true;
-    script.defer = true;
-    script.onerror = () => {
-      setError("Error al cargar Google Maps API");
-    };
-    document.head.appendChild(script);
+    // Evita cargar el script de Google Maps más de una vez
+    if (!document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]')) {
+      const script = document.createElement("script");
+      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDOJ7TFUE5F1vD_qVh9ofKOSS5gd2mbnyE`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        initMapCallback();
+      };
+      script.onerror = () => {
+        setError("Error al cargar Google Maps API");
+      };
+      document.head.appendChild(script);
+    } else if (window.google?.maps) {
+      // Si el script ya está cargado, inicializa el mapa directamente
+      initMapCallback();
+    }
 
     return () => {
       delete window.initMap;

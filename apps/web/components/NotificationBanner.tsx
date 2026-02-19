@@ -1,12 +1,18 @@
 "use client";
-"use client";
 import { useState } from 'react';
 import { useNotifications } from '../lib/useNotifications';
+import { useUser } from './UserContext';
+import { hasPermission, PERMISSIONS } from '../lib/permissions';
 
 export function NotificationBanner() {
   const [message, setMessage] = useState<string | null>(null);
+  const { user } = useUser();
 
   useNotifications((payload) => {
+    if (payload && typeof payload === 'object' && (payload as any).adminOnly) {
+      if (!hasPermission(user, PERMISSIONS.CONSOLE_ADMIN)) return;
+    }
+
     if (payload && typeof payload === 'object' && 'message' in payload) {
       setMessage((payload as { message?: string }).message || 'Nueva notificación');
     } else {
