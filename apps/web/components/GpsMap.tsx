@@ -262,6 +262,7 @@ const GpsMap = () => {
       myMapInstance.current = new window.google.maps.Map(myMapRef.current, {
         center: { lat: 19.4326, lng: -99.1332 },
         zoom: 14,
+        zoomControl: false,
         mapTypeControl: false,
         fullscreenControl: false,
         streetViewControl: false,
@@ -271,6 +272,7 @@ const GpsMap = () => {
       teamMapInstance.current = new window.google.maps.Map(teamMapRef.current, {
         center: { lat: 19.4326, lng: -99.1332 },
         zoom: 12,
+        zoomControl: false,
         mapTypeControl: false,
         fullscreenControl: false,
         streetViewControl: false,
