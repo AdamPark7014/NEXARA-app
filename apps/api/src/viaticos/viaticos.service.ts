@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service.js';
 
 @Injectable()
 export class ViaticosService {
-  // constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   // Exportar a CSV
   toCSV(viatics: any[]): string {
@@ -33,27 +34,64 @@ export class ViaticosService {
     throw new Error('Modelo viatico no existe en Prisma.');
   }
 
-  create(_dto: any) {
-    throw new Error('Modelo viatico no existe en Prisma.');
+  create(dto: any) {
+    return this.prisma['viatico'].create({
+      data: dto,
+    });
   }
 
-  findAll() {
-    throw new Error('Modelo viatico no existe en Prisma.');
+  async findAll() {
+    const data = await this.prisma['viatico'].findMany({
+      include: { Activity: true, User: true },
+    });
+    return data.map((row: any) => ({
+      ...row,
+      actividad: row.Activity,
+      usuario: row.User,
+    }));
   }
 
-  findByDepartment(_departmentId: number) {
-    throw new Error('Modelo viatico no existe en Prisma.');
+  async findByDepartment(departmentId: number) {
+    const data = await this.prisma['viatico'].findMany({
+      where: { User: { departmentId } },
+      include: { Activity: true, User: true },
+    });
+    return data.map((row: any) => ({
+      ...row,
+      actividad: row.Activity,
+      usuario: row.User,
+    }));
   }
 
-  findOne(_id: number) {
-    throw new Error('Modelo viatico no existe en Prisma.');
+  async findByUser(userId: number) {
+    const data = await this.prisma['viatico'].findMany({
+      where: { usuarioId: userId },
+      include: { Activity: true, User: true },
+    });
+    return data.map((row: any) => ({
+      ...row,
+      actividad: row.Activity,
+      usuario: row.User,
+    }));
   }
 
-  update(_id: number, _dto: any) {
-    throw new Error('Modelo viatico no existe en Prisma.');
+  findOne(id: number) {
+    return this.prisma['viatico'].findUnique({
+      where: { id },
+      include: { Activity: true, User: true },
+    });
   }
 
-  remove(_id: number) {
-    throw new Error('Modelo viatico no existe en Prisma.');
+  update(id: number, dto: any) {
+    return this.prisma['viatico'].update({
+      where: { id },
+      data: dto,
+    });
+  }
+
+  remove(id: number) {
+    return this.prisma['viatico'].delete({
+      where: { id },
+    });
   }
 }

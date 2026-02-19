@@ -1,0 +1,140 @@
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  font-family: 'Sora', 'Segoe UI', sans-serif;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.3rem;
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  margin: 0 0 8px;
+}
+
+.title {
+  font-size: 2.4rem;
+  margin: 0 0 8px;
+}
+
+.subtitle {
+  max-width: 520px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.headerActions {
+  display: flex;
+  gap: 12px;
+}
+
+.primaryButton {
+  background: linear-gradient(135deg, #0f6ad6, #16a96e);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 12px 18px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 12px 24px rgba(15, 106, 214, 0.2);
+}
+
+.ghostButton {
+  background: transparent;
+  border: 1px solid rgba(15, 106, 214, 0.3);
+  color: var(--foreground);
+  border-radius: 999px;
+  padding: 12px 18px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.metricCard {
+  background: rgba(255, 255, 255, 0.75);
+  border-radius: 20px;
+  padding: 18px;
+  border: 1px solid rgba(15, 106, 214, 0.12);
+  box-shadow: 0 10px 22px rgba(11, 32, 68, 0.12);
+}
+
+:global(body.dark) .metricCard {
+  background: rgba(15, 22, 36, 0.7);
+  border-color: rgba(255, 198, 61, 0.12);
+}
+
+.metricCard h2 {
+  margin: 10px 0 6px;
+  font-size: 1.7rem;
+}
+
+.metricCard span {
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+}
+
+.boardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.boardCard {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 20px;
+  padding: 18px;
+  border: 1px solid rgba(15, 106, 214, 0.12);
+  box-shadow: 0 12px 24px rgba(11, 32, 68, 0.12);
+}
+
+:global(body.dark) .boardCard {
+  background: rgba(15, 22, 36, 0.75);
+  border-color: rgba(255, 198, 61, 0.12);
+}
+
+.boardCard h3 {
+  margin: 0 0 12px;
+}
+
+.boardCard ul {
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+
+.boardCard li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.92rem;
+}
+
+.tag {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 198, 61, 0.2);
+  color: #865b00;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .headerActions {
+    width: 100%;
+  }
+}

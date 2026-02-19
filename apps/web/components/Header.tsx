@@ -1,11 +1,12 @@
 "use client";
 import React, { useRef, useState } from 'react';
 import { useUser } from './UserContext';
+import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 function BackupRestorePanel() {
   const { user } = useUser();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState<string | null>(null);
-  if (!user || user.nivelAutoridad < 50) return null;
+  if (!user || !hasPermission(user, PERMISSIONS.CONSOLE_ADMIN)) return null;
 
   // Exportar backup general
   const handleExport = async () => {
@@ -79,9 +80,10 @@ import { useTheme } from './ThemeContext';
 export default function Header() {
   const { darkMode, toggleDarkMode } = useTheme();
   const pathname = usePathname();
+  const isConsole = Boolean(pathname && pathname.startsWith('/panel/console'));
 
   return (
-    <header className={styles.header}>
+    <header className={`${styles.header} ${isConsole ? styles.consoleHeader : ''}`}>
       <div className={styles.logoSection}>
         <Link href="/">
           <Image src="/logo-nexara.png" alt="Nexara Logo" className={styles.logo} width={120} height={40} priority />
@@ -95,9 +97,6 @@ export default function Header() {
         ))}
       </nav>
       <div className={styles.rightSection}>
-        <Link href="/tienda" className={styles.tiendaBtn}>
-          Tienda
-        </Link>
         {(pathname && pathname.startsWith('/console')) && <BackupRestorePanel />}
         <button
           className={styles.switch}

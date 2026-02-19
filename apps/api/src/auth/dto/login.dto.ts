@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, MinLength } from 'class-validator';
+import { IsEmail, IsIn, IsNotEmpty, IsOptional, MinLength } from 'class-validator';
 
 export class LoginDto {
   @IsNotEmpty()
@@ -8,4 +8,8 @@ export class LoginDto {
   @IsNotEmpty()
   @MinLength(6)
   password!: string;
+
+  @IsOptional()
+  @IsIn(['ventas'])
+  panel?: 'ventas';
 }

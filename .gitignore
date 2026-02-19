@@ -3,9 +3,12 @@ node_modules/
 
 # Build outputs
 /dist/
+dist/
 /.next/
+.next/
 /.expo/
 /build/
+.turbo/
 
 # Environment files
 .env

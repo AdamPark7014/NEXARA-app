@@ -3,6 +3,7 @@ import { APP_FILTER } from '@nestjs/core';
 import { AllExceptionsFilter } from './common/errors/all-exception.filter';
 import { appLogger } from './common/errors/logger';
 import { Reflector } from '@nestjs/core';
+import { CoreModule } from './common/core.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -12,7 +13,7 @@ import { ExcelImportController } from './common/excel-import.controller';
 import { ProductsModule } from './products/products.module';
 import { ClientsModule } from './clients/clients.module';
 import { OrdersModule } from './orders/orders.module';
-import { PrismaService } from './prisma/prisma.service';
+import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { ActivitiesModule } from './activities/activities.module';
@@ -20,11 +21,29 @@ import { EvidencesModule } from './evidences/evidences.module';
 import { VehiclesModule } from './vehicles/vehicles.module';
 import { ExpensesModule } from './expenses/expenses.module';
 import { GpsModule } from './gps/gps.module';
-import { NotificationsModule } from './notifications.module';
+import { NotificationsModule } from './notifications/notifications.module.js';
 import { ViaticosModule } from './viaticos/viaticos.module';
+import { AttendanceModule } from './attendance/attendance.module';
+import { ProjectsModule } from './projects/projects.module';
+import { ContactMessagesModule } from './contact-messages/contact-messages.module';
+import { NewsletterModule } from './newsletter/newsletter.module';
+import { NewsModule } from './news/news.module';
+import { WorkProjectsModule } from './work-projects/work-projects.module';
+import { EmployeePaymentsModule } from './employee-payments/employee-payments.module';
+import { CotizacionesModule } from './cotizaciones/cotizaciones.module';
+import { ServiceClientsModule } from './service-clients/service-clients.module';
+import { ClientAuthModule } from './client-auth/client-auth.module';
+import { ClientPortalModule } from './client-portal/client-portal.module';
+import { ServiceSheetsModule } from './service-sheets/service-sheets.module';
+import { ClientTicketRequestsModule } from './client-ticket-requests/client-ticket-requests.module';
+import { BranchAuthModule } from './branch-auth/branch-auth.module';
+import { BranchPortalModule } from './branch-portal/branch-portal.module';
+import { VentasModule } from './ventas/ventas.module';
 
 @Module({
   imports: [
+    CoreModule,
+    PrismaModule,
     ProductsModule,
     ClientsModule,
     OrdersModule,
@@ -38,18 +57,31 @@ import { ViaticosModule } from './viaticos/viaticos.module';
     ScheduleModule.forRoot(),
     NotificationsModule,
     ViaticosModule,
+    AttendanceModule,
+    ProjectsModule,
+    ContactMessagesModule,
+    NewsletterModule,
+    NewsModule,
+    WorkProjectsModule,
+    EmployeePaymentsModule,
+    CotizacionesModule,
+    ServiceClientsModule,
+    ClientAuthModule,
+    ClientPortalModule,
+    ServiceSheetsModule,
+    ClientTicketRequestsModule,
+    BranchAuthModule,
+    BranchPortalModule,
+    VentasModule,
   ],
   controllers: [AppController, ExcelExportController, ExcelImportController],
   providers: [
     AppService,
-    PrismaService,
-    Reflector,
     ExcelExportService,
     {
       provide: APP_FILTER,
       useFactory: () => new AllExceptionsFilter(appLogger),
     },
   ],
-  exports: [Reflector]
 })
 export class AppModule {}

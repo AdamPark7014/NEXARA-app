@@ -16,6 +16,18 @@ interface Client {
   imageUrl?: string;
 }
 
+interface NewsPost {
+  id: number;
+  title: string;
+  slug: string;
+  summary?: string | null;
+  content: string;
+  coverImageUrl?: string | null;
+  galleryUrls: string[];
+  publishedAt?: string | null;
+  createdAt: string;
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 // Función para normalizar URLs de imágenes
@@ -37,12 +49,61 @@ const normalizeImageUrl = (imageUrl?: string): string | undefined => {
   return `${API_URL}/clients/image/${imageUrl}`;
 };
 
+const normalizeNewsImageUrl = (imageUrl?: string): string | undefined => {
+  if (!imageUrl || imageUrl.trim() === "") return undefined;
+  if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+    return imageUrl;
+  }
+  if (imageUrl.startsWith("/")) {
+    return `${API_URL}${imageUrl}`;
+  }
+  return `${API_URL}/${imageUrl}`;
+};
+
+const formatNewsDate = (value?: string | null) =>
+  value ? new Date(value).toLocaleDateString() : "";
+
 export default function Home() {
   const [clients, setClients] = useState<Client[]>([]);
+  const [news, setNews] = useState<NewsPost[]>([]);
+  const [activeNews, setActiveNews] = useState(0);
+  const [selectedNews, setSelectedNews] = useState<NewsPost | null>(null);
+  const [selectedImage, setSelectedImage] = useState(0);
 
   useEffect(() => {
     fetchClients();
+    fetchNews();
   }, []);
+
+  useEffect(() => {
+    if (news.length <= 1) return undefined;
+    const timer = window.setInterval(() => {
+      setActiveNews((prev) => (prev + 1) % news.length);
+    }, 7000);
+    return () => window.clearInterval(timer);
+  }, [news.length]);
+
+  useEffect(() => {
+    if (selectedNews) {
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = "";
+      };
+    }
+    document.body.style.overflow = "";
+    return undefined;
+  }, [selectedNews]);
+
+  const fetchNews = async () => {
+    try {
+      const response = await fetch(`${API_URL}/news?status=PUBLISHED`);
+      if (!response.ok) return;
+      const data = (await response.json()) as NewsPost[];
+      setNews(data);
+    } catch (err) {
+      console.error("Error al cargar noticias:", err);
+    }
+  };
 
   const fetchClients = async () => {
     try {
@@ -99,6 +160,26 @@ export default function Home() {
     return `/${file}`;
   };
 
+  const activeNewsItem = news[activeNews];
+  const openNewsModal = (item: NewsPost) => {
+    setSelectedNews(item);
+    setSelectedImage(0);
+  };
+
+  const closeNewsModal = () => {
+    setSelectedNews(null);
+    setSelectedImage(0);
+  };
+
+  const renderParagraphs = (text: string) =>
+    text
+      .split(/\n{2,}/)
+      .map((chunk, index) => (
+        <p key={index} className={styles.newsModalParagraph}>
+          {chunk.trim()}
+        </p>
+      ));
+
   // Fondo del hero (usa una imagen pública si existe)
   const heroBgSrc = versionedPublicSrc("hero-bg.jpg");
   return (
@@ -134,6 +215,81 @@ export default function Home() {
             </div>
           </section>
         </div>
+
+        <section className={styles.newsSection}>
+          <div className={styles.newsHeader}>
+            <span className={styles.newsBadge}>NEXARA NEWS</span>
+            <div>
+              <h2 className={styles.newsTitle}>Noticias que impulsan tu tecnologia</h2>
+              <p className={styles.newsSubtitle}>
+                Descubre alianzas, casos de exito y lanzamientos que te mantienen un paso adelante.
+              </p>
+            </div>
+          </div>
+
+          {activeNewsItem ? (
+            <div className={styles.newsCarousel}>
+              <button
+                className={styles.newsNav}
+                onClick={() => setActiveNews((prev) => (prev - 1 + news.length) % news.length)}
+                aria-label="Noticia anterior"
+              >
+                ‹
+              </button>
+              <div key={activeNewsItem.id} className={styles.newsSlide}>
+                <div className={styles.newsImageWrap}>
+                  <img
+                    src={
+                      normalizeNewsImageUrl(activeNewsItem.coverImageUrl) ||
+                      "/soluciones/rect-a.jpg"
+                    }
+                    alt={activeNewsItem.title}
+                  />
+                </div>
+                <div className={styles.newsContent}>
+                  <div className={styles.newsMetaLine}>
+                    <span>Actualizacion</span>
+                    <span>{formatNewsDate(activeNewsItem.publishedAt || activeNewsItem.createdAt)}</span>
+                  </div>
+                  <h3>{activeNewsItem.title}</h3>
+                  <p>{activeNewsItem.summary || "Nueva noticia disponible."}</p>
+                  <div className={styles.newsActions}>
+                    <button
+                      type="button"
+                      className={styles.newsButton}
+                      onClick={() => openNewsModal(activeNewsItem)}
+                    >
+                      Ver mas
+                    </button>
+                    <div className={styles.newsDots}>
+                      {news.map((item, index) => (
+                        <button
+                          key={item.id}
+                          className={
+                            index === activeNews
+                              ? styles.newsDotActive
+                              : styles.newsDot
+                          }
+                          onClick={() => setActiveNews(index)}
+                          aria-label={`Ir a noticia ${index + 1}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <button
+                className={styles.newsNav}
+                onClick={() => setActiveNews((prev) => (prev + 1) % news.length)}
+                aria-label="Siguiente noticia"
+              >
+                ›
+              </button>
+            </div>
+          ) : (
+            <div className={styles.newsEmpty}>Aun no hay noticias publicadas.</div>
+          )}
+        </section>
 
         <section className={styles.whyNexara}>
           <div className={styles.whyBadge}>CONFIANZA Y EXPERIENCIA</div>
@@ -252,6 +408,59 @@ export default function Home() {
         <FAQ />
       </main>
       <FloatingContactForm />
+
+      {selectedNews && (
+        <div className={styles.newsModalOverlay} onClick={closeNewsModal}>
+          <div className={styles.newsModal} onClick={(event) => event.stopPropagation()}>
+            <button className={styles.newsClose} onClick={closeNewsModal} aria-label="Cerrar">
+              ✕
+            </button>
+            <div className={styles.newsModalContent}>
+              <div className={styles.newsModalText}>
+                <span className={styles.newsModalBadge}>Noticia</span>
+                <h3>{selectedNews.title}</h3>
+                <p className={styles.newsModalSummary}>
+                  {selectedNews.summary || "Actualizacion destacada de Nexara."}
+                </p>
+                <div className={styles.newsModalBody}>
+                  {renderParagraphs(selectedNews.content)}
+                </div>
+              </div>
+              <div className={styles.newsModalMedia}>
+                <div className={styles.newsModalHero}>
+                  <img
+                    src={
+                      normalizeNewsImageUrl(
+                        selectedNews.galleryUrls[selectedImage] || selectedNews.coverImageUrl,
+                      ) || "/soluciones/rect-b.jpg"
+                    }
+                    alt={selectedNews.title}
+                  />
+                </div>
+                <div className={styles.newsModalGallery}>
+                  {[selectedNews.coverImageUrl, ...selectedNews.galleryUrls]
+                    .filter(Boolean)
+                    .slice(0, 8)
+                    .map((image, index) => (
+                      <button
+                        key={`${selectedNews.id}-${index}`}
+                        className={
+                          index === selectedImage
+                            ? styles.newsGalleryActive
+                            : styles.newsGalleryItem
+                        }
+                        onClick={() => setSelectedImage(index)}
+                        aria-label={`Ver imagen ${index + 1}`}
+                      >
+                        <img src={normalizeNewsImageUrl(image) || "/soluciones/rect-c.jpg"} alt="" />
+                      </button>
+                    ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

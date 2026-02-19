@@ -8,91 +8,54 @@ export const metadata = {
     "Casos recientes de Nexara con imágenes y resultados destacados para retail, industria y servicios.",
 };
 
-const projects = [
-  {
-    slug: "retail-wifi6",
-    title: "Refresh de red y WiFi 6 para 120 tiendas retail",
-    sector: "Retail omnicanal",
-    summary:
-      "Modernizamos la conectividad de una cadena nacional, habilitando experiencias sin fricción en piso de venta y cajas autónomas.",
-    mainImage: "/soluciones/rect-a.jpg",
-    impact: "99.95% de disponibilidad y 35% menos tickets de red",
-    services: ["Diseño LAN/WAN", "SD-WAN", "Soporte NOC"],
-    tags: ["WiFi 6", "SD-WAN", "Zero Trust", "Observabilidad"],
-    highlights: [
-      "Cobertura WiFi 6 optimizada para inventarios en tiempo real",
-      "Backbone SD-WAN con priorización de apps críticas",
-      "Visibilidad unificada con alertamiento proactivo 24/7",
-      "Plan de cambio nocturno sin afectar operación",
-    ],
-    gallery: [
-      "/servicios/rect-1.jpg",
-      "/servicios/rect-2.jpg",
-      "/servicios/square-1.jpg",
-      "/servicios/square-2.jpg",
-      "/soluciones/rect-a.jpg",
-      "/soluciones/rect-b.jpg",
-      "/soluciones/square-a.jpg",
-      "/soluciones/square-b.jpg",
-    ],
-  },
-  {
-    slug: "nube-hibrida",
-    title: "Migración a nube híbrida para aseguradora",
-    sector: "Servicios financieros",
-    summary:
-      "Extendimos el datacenter a la nube con landing zones seguras y automatizadas, acelerando el time-to-market de nuevos productos.",
-    mainImage: "/soluciones/rect-b.jpg",
-    impact: "Lanzamientos 3x más rápidos y 28% menos costo operativo",
-    services: ["Cloud landing zone", "Infra as Code", "Monitoreo"],
-    tags: ["Azure", "Kubernetes", "GitOps", "FinOps"],
-    highlights: [
-      "Plantillas IaC repetibles con controles de seguridad",
-      "Plataforma de microservicios con CI/CD y observabilidad",
-      "Canal seguro sitio-nube con alta disponibilidad",
-      "Gobernanza de costos y alertas preventivas",
-    ],
-    gallery: [
-      "/servicios/square-1.jpg",
-      "/servicios/square-2.jpg",
-      "/soluciones/rect-a.jpg",
-      "/soluciones/rect-b.jpg",
-      "/soluciones/square-a.jpg",
-      "/soluciones/square-b.jpg",
-      "/servicios/rect-1.jpg",
-      "/servicios/rect-2.jpg",
-    ],
-  },
-  {
-    slug: "datacenter-modular",
-    title: "Centro de datos modular para fintech",
-    sector: "Fintech & pagos",
-    summary:
-      "Diseñamos e implementamos un core de misión crítica con redundancia completa y monitoreo continuo orientado a SLA.",
-    mainImage: "/servicios/rect-1.jpg",
-    impact: "SLA 99.98% y soporte con respuesta <4h",
-    services: ["Cómputo y energía", "Virtualización", "Soporte 24/7"],
-    tags: ["VMware", "DRP", "Alta disponibilidad", "SLA"],
-    highlights: [
-      "Arquitectura modular con crecimiento por demanda",
-      "Segmentación y hardening para zonas de pago",
-      "Plan de recuperación probado con simulacros trimestrales",
-      "Mesa de ayuda con métricas y reportes ejecutivos",
-    ],
-    gallery: [
-      "/soluciones/rect-b.jpg",
-      "/soluciones/rect-a.jpg",
-      "/soluciones/square-a.jpg",
-      "/soluciones/square-b.jpg",
-      "/servicios/rect-1.jpg",
-      "/servicios/rect-2.jpg",
-      "/servicios/square-1.jpg",
-      "/servicios/square-2.jpg",
-    ],
-  },
-];
+export const dynamic = "force-dynamic";
 
-export default function ProjectsPage() {
+type Project = {
+  id: number;
+  slug: string;
+  title: string;
+  sector: string;
+  summary: string;
+  impact: string;
+  services: string[];
+  tags: string[];
+  highlights: string[];
+  mainImage?: string | null;
+  gallery: string[];
+};
+
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(
+  /[\/.]+$/,
+  ""
+);
+const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
+
+const normalizeImageUrl = (imageUrl?: string | null) => {
+  if (!imageUrl) return undefined;
+  if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+    return imageUrl;
+  }
+  if (imageUrl.startsWith("/")) {
+    if (imageUrl.startsWith("/projects/image/")) {
+      return `${API_URL}${imageUrl}`;
+    }
+    return imageUrl;
+  }
+  return `${API_URL}/projects/image/${imageUrl}`;
+};
+
+const getProjects = async (): Promise<Project[]> => {
+  try {
+    const response = await fetch(buildApiUrl("projects"), { cache: "no-store" });
+    if (!response.ok) return [];
+    return (await response.json()) as Project[];
+  } catch {
+    return [];
+  }
+};
+
+export default async function ProjectsPage() {
+  const projects = await getProjects();
   return (
     <main className={styles.container}>
       <section className={styles.hero}>
@@ -155,7 +118,7 @@ export default function ProjectsPage() {
             <div className={styles.mediaGrid}>
               <div className={styles.mainImage}>
                 <Image
-                  src={project.mainImage}
+                  src={normalizeImageUrl(project.mainImage) || "/soluciones/rect-a.jpg"}
                   alt={`Proyecto ${project.title}`}
                   fill
                   sizes="(max-width: 900px) 100vw, 55vw"
@@ -164,10 +127,10 @@ export default function ProjectsPage() {
                 />
               </div>
               <div className={styles.gallery}>
-                {project.gallery.map((image, index) => (
+                {(project.gallery || []).map((image, index) => (
                   <div key={`${project.slug}-gallery-${index}`} className={styles.galleryItem}>
                     <Image
-                      src={image}
+                      src={normalizeImageUrl(image) || "/servicios/square-1.jpg"}
                       alt={`${project.title} imagen ${index + 1}`}
                       fill
                       sizes="(max-width: 900px) 50vw, 18vw"
@@ -187,6 +150,14 @@ export default function ProjectsPage() {
             </div>
           </article>
         ))}
+        {!projects.length && (
+          <div className={styles.projectCard}>
+            <h2 className={styles.projectTitle}>Sin proyectos publicados</h2>
+            <p className={styles.projectSubtitle}>
+              Agrega proyectos desde el panel web para mostrar resultados aqui.
+            </p>
+          </div>
+        )}
       </section>
 
       <section className={styles.ctaStrip}>

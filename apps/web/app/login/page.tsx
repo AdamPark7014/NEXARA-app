@@ -13,15 +13,24 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    let API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+    API_URL = API_URL.replace(/[\/.]+$/, '');
+    function buildApiUrl(path: string) {
+      path = path.replace(/^\/+/, '');
+      return `${API_URL}/${path}`;
+    }
     try {
-      const res = await fetch(process.env.NEXT_PUBLIC_API_URL + "/api/auth/login", {
+      const res = await fetch(buildApiUrl('auth/login'), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Login fallido");
-      setUser(data.user);
+      setUser({
+        ...data.user,
+        token: data.access_token,
+      });
       router.push("/dashboard");
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message);

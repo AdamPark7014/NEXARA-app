@@ -1,20 +1,45 @@
 import type { Response } from 'express';
-import { Controller, Get, Post, Param, Res, UploadedFile, UseInterceptors, HttpStatus } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Param,
+  Patch,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+  HttpStatus,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-// import { ViaticosService } from './viaticos.service';
+import { RBAC, RbacGuard } from '../common/rbac.guard.js';
+import { CurrentUser } from '../common/current-user.decorator.js';
+import { ViaticosService } from './viaticos.service.js';
+import { PERMISSIONS } from '../common/permissions.js';
 
 @Controller('viatics')
 export class ViaticosController {
-  // constructor(private readonly viaticosService: ViaticosService) {}
+  constructor(private readonly viaticosService: ViaticosService) {}
 
   // Endpoint para obtener todos los viáticos
   @Get()
-  async findAll() {
-    return [];
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.VIATICS_VIEW] })
+  async findAll(@CurrentUser() user: any) {
+    if (user.isSuperAdmin) {
+      return this.viaticosService.findAll();
+    }
+    if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
+      return this.viaticosService.findByDepartment(user.departmentId);
+    }
+    return this.viaticosService.findByUser(user.id);
   }
 
   // Exportar viáticos (CSV o JSON)
   @Get('export/:format')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.VIATICS_EXPORT] })
   async export(@Param('format') format: string, @Res() res: Response) {
     const data: any[] = [];
     if (format === 'csv') {
@@ -30,6 +55,8 @@ export class ViaticosController {
 
   // Importar viáticos desde archivo JSON
   @Post('import')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.VIATICS_IMPORT] })
   @UseInterceptors(FileInterceptor('file'))
   async import(@UploadedFile() file: any, @Res() res: Response) {
     if (!file) {
@@ -46,6 +73,13 @@ export class ViaticosController {
         .status(HttpStatus.BAD_REQUEST)
         .json({ message: 'Archivo inválido o error de importación' });
     }
+  }
+
+  @Patch(':id')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.VIATICS_MANAGE] })
+  update(@Param('id') id: string, @Body() body: any) {
+    return this.viaticosService.update(+id, body);
   }
 }
 

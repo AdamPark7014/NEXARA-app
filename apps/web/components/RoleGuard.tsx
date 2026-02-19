@@ -1,16 +1,22 @@
 "use client";
 import React from 'react';
 import { useUser } from './UserContext';
+import { hasAnyPermission, hasPermission } from '../lib/permissions';
 
 interface RoleGuardProps {
-  minLevel?: number;
-  maxLevel?: number;
+  permissions?: string[];
+  anyPermissions?: string[];
   children: React.ReactNode;
 }
 
-export const RoleGuard = ({ minLevel = 10, maxLevel = 100, children }: RoleGuardProps) => {
+export const RoleGuard = ({ permissions, anyPermissions, children }: RoleGuardProps) => {
   const { user } = useUser();
   if (!user) return null;
-  if (user.nivelAutoridad < minLevel || user.nivelAutoridad > maxLevel) return null;
+  if (permissions && permissions.length > 0 && !permissions.every((permission) => hasPermission(user, permission))) {
+    return null;
+  }
+  if (anyPermissions && anyPermissions.length > 0 && !hasAnyPermission(user, anyPermissions)) {
+    return null;
+  }
   return <>{children}</>;
 };

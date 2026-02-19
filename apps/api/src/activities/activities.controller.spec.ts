@@ -5,6 +5,8 @@ import { ActivitiesService } from './activities.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { PERMISSIONS } from '../common/permissions.js';
+import { TicketType } from '@prisma/client';
 type UserPrismaMock = {
   id: number;
   nombre: string;
@@ -13,7 +15,9 @@ type UserPrismaMock = {
   passwordHash: string;
   roleId: number;
   departmentId: number;
+  avatarUrl: string | null;
   fechaCreacion: Date;
+  locationConsent: boolean;
 };
 
 describe('ActivitiesController', () => {
@@ -44,7 +48,7 @@ describe('ActivitiesController', () => {
   });
 
   it('should return activities for CEO', async () => {
-    const user = { nivelAutoridad: 100 };
+    const user = { isSuperAdmin: true };
     const responsable: UserPrismaMock = {
       id: 2,
       nombre: 'Juan',
@@ -53,7 +57,9 @@ describe('ActivitiesController', () => {
       passwordHash: '',
       roleId: 1,
       departmentId: 1,
+      avatarUrl: null,
       fechaCreacion: new Date(),
+      locationConsent: false,
     };
     const creador: UserPrismaMock = {
       id: 1,
@@ -63,24 +69,45 @@ describe('ActivitiesController', () => {
       passwordHash: '',
       roleId: 1,
       departmentId: 1,
+      avatarUrl: null,
       fechaCreacion: new Date(),
+      locationConsent: false,
     };
     const activity = {
       id: 1,
       anNumber: 'A-001',
       titulo: 'Actividad CEO',
       descripcion: null,
+      indicaciones: null,
       estatus: 'Pendiente',
       prioridad: null,
+      ticketType: TicketType.PREVENTIVO,
+      clientId: null,
+      branchName: null,
+      branchNumber: null,
+      branchCity: null,
+      branchState: null,
+      branchAddress: null,
+      slaAlertedAt: null,
+      tiempoEstimadoMin: null,
+      tiempoMaximoMin: null,
       creadoPorId: creador.id,
       responsableId: responsable.id,
       eficienciaScore: null,
       comentariosFeedback: null,
       fechaAsignacion: new Date(),
+      fechaInicio: null,
+      fechaMaxima: null,
       fechaEntregaEsperada: null,
       fechaFinalizacion: null,
+      clientSurveyRequestedAt: null,
+      clientSurveyCompletedAt: null,
+      ticketReportUrl: null,
+      ticketReportGeneratedAt: null,
       creador,
       responsable,
+      client: null,
+      serviceSheet: null,
       evidencias: [],
       vehicleControls: [],
       expenses: [],
@@ -93,7 +120,7 @@ describe('ActivitiesController', () => {
   });
 
   it('should return activities for supervisor', async () => {
-    const user = { nivelAutoridad: 50, departmentId: 2 };
+    const user = { permissions: [PERMISSIONS.CONSOLE_ADMIN], departmentId: 2 };
     const responsable: UserPrismaMock = {
       id: 3,
       nombre: 'Ana',
@@ -102,7 +129,9 @@ describe('ActivitiesController', () => {
       passwordHash: '',
       roleId: 2,
       departmentId: 2,
+      avatarUrl: null,
       fechaCreacion: new Date(),
+      locationConsent: false,
     };
     const creador: UserPrismaMock = {
       id: 1,
@@ -112,24 +141,45 @@ describe('ActivitiesController', () => {
       passwordHash: '',
       roleId: 1,
       departmentId: 1,
+      avatarUrl: null,
       fechaCreacion: new Date(),
+      locationConsent: false,
     };
     const activity = {
       id: 2,
       anNumber: 'A-002',
       titulo: 'Actividad Supervisor',
       descripcion: null,
+      indicaciones: null,
       estatus: 'Pendiente',
       prioridad: null,
+      ticketType: TicketType.PREVENTIVO,
+      clientId: null,
+      branchName: null,
+      branchNumber: null,
+      branchCity: null,
+      branchState: null,
+      branchAddress: null,
+      slaAlertedAt: null,
+      tiempoEstimadoMin: null,
+      tiempoMaximoMin: null,
       creadoPorId: creador.id,
       responsableId: responsable.id,
       eficienciaScore: null,
       comentariosFeedback: null,
       fechaAsignacion: new Date(),
+      fechaInicio: null,
+      fechaMaxima: null,
       fechaEntregaEsperada: null,
       fechaFinalizacion: null,
+      clientSurveyRequestedAt: null,
+      clientSurveyCompletedAt: null,
+      ticketReportUrl: null,
+      ticketReportGeneratedAt: null,
       creador,
       responsable,
+      client: null,
+      serviceSheet: null,
       evidencias: [],
       vehicleControls: [],
       expenses: [],
@@ -142,7 +192,7 @@ describe('ActivitiesController', () => {
   });
 
   it('should return activities for staff', async () => {
-    const user = { nivelAutoridad: 10, id: 3 };
+    const user = { permissions: [PERMISSIONS.ACTIVITIES_VIEW], id: 3 };
     const responsable: UserPrismaMock = {
       id: 3,
       nombre: 'Ana',
@@ -151,7 +201,9 @@ describe('ActivitiesController', () => {
       passwordHash: '',
       roleId: 2,
       departmentId: 2,
+      avatarUrl: null,
       fechaCreacion: new Date(),
+      locationConsent: false,
     };
     const creador: UserPrismaMock = {
       id: 1,
@@ -161,24 +213,45 @@ describe('ActivitiesController', () => {
       passwordHash: '',
       roleId: 1,
       departmentId: 1,
+      avatarUrl: null,
       fechaCreacion: new Date(),
+      locationConsent: false,
     };
     const activity = {
       id: 3,
       anNumber: 'A-003',
       titulo: 'Actividad Staff',
       descripcion: null,
+      indicaciones: null,
       estatus: 'Pendiente',
       prioridad: null,
+      ticketType: TicketType.PREVENTIVO,
+      clientId: null,
+      branchName: null,
+      branchNumber: null,
+      branchCity: null,
+      branchState: null,
+      branchAddress: null,
+      slaAlertedAt: null,
+      tiempoEstimadoMin: null,
+      tiempoMaximoMin: null,
       creadoPorId: creador.id,
       responsableId: responsable.id,
       eficienciaScore: null,
       comentariosFeedback: null,
       fechaAsignacion: new Date(),
+      fechaInicio: null,
+      fechaMaxima: null,
       fechaEntregaEsperada: null,
       fechaFinalizacion: null,
+      clientSurveyRequestedAt: null,
+      clientSurveyCompletedAt: null,
+      ticketReportUrl: null,
+      ticketReportGeneratedAt: null,
       creador,
       responsable,
+      client: null,
+      serviceSheet: null,
       evidencias: [],
       vehicleControls: [],
       expenses: [],

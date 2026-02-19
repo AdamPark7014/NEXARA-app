@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useUser } from './UserContext';
+import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 
 const SidebarMenu = () => {
   const { user } = useUser();
@@ -10,34 +11,42 @@ const SidebarMenu = () => {
     <aside className="sidebar">
       <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
         <li className="menu-item"><Link href="/Panel-Admin">Dashboard</Link></li>
-        {(user.nivelAutoridad >= 50) && (
+        {hasPermission(user, PERMISSIONS.USERS_MANAGE) && (
           <li className="menu-item"><Link href="/console/users">Gestión de Usuarios</Link></li>
         )}
-        {(user.nivelAutoridad >= 50) && (
+        {hasPermission(user, PERMISSIONS.ACTIVITIES_VIEW) && (
           <li className="menu-item"><Link href="/console/activities">Actividades</Link></li>
         )}
-        {(user.nivelAutoridad >= 50) && (
+        {hasPermission(user, PERMISSIONS.EVIDENCES_VIEW) && (
           <li className="menu-item"><Link href="/console/evidences">Evidencias</Link></li>
         )}
-        {(user.nivelAutoridad >= 50) && (
+        {hasPermission(user, PERMISSIONS.ATTENDANCE_VIEW) && (
+          <li className="menu-item"><Link href="/console/attendance">Entradas/Salidas</Link></li>
+        )}
+        {hasPermission(user, PERMISSIONS.VEHICLES_VIEW) && (
           <li className="menu-item"><Link href="/console/vehicles">Vehículos</Link></li>
         )}
-        {(user.nivelAutoridad >= 50) && (
+        {hasPermission(user, PERMISSIONS.VIATICS_VIEW) && (
           <li className="menu-item"><Link href="/console/viatics">Viáticos</Link></li>
         )}
-        {(user.nivelAutoridad === 100) && (
+        {hasPermission(user, PERMISSIONS.CONTABILIDAD_VIEW) && (
           <li className="menu-item"><Link href="/console/reports">Reportes</Link></li>
         )}
-        {(user.nivelAutoridad === 10) && (
-          <>
-            <li className="menu-item"><Link href="/console/my-activities">Mis Actividades</Link></li>
-            <li className="menu-item"><Link href="/console/my-evidences">Mis Evidencias</Link></li>
-            <li className="menu-item"><Link href="/console/my-viatics">Mis Viáticos</Link></li>
-            <li className="menu-item"><Link href="/console/my-vehicles">Mis Vehículos</Link></li>
-            <li className="menu-item"><Link href="/console/attendance">Entradas/Salidas</Link></li>
-          </>
+        {hasPermission(user, PERMISSIONS.ACTIVITIES_VIEW) && (
+          <li className="menu-item"><Link href="/console/my-activities">Mis Actividades</Link></li>
         )}
-        <li className="menu-item"><Link href="/console/gps">Mapa GPS</Link></li>
+        {hasPermission(user, PERMISSIONS.EVIDENCES_VIEW) && (
+          <li className="menu-item"><Link href="/console/my-evidences">Mis Evidencias</Link></li>
+        )}
+        {hasPermission(user, PERMISSIONS.VIATICS_VIEW) && (
+          <li className="menu-item"><Link href="/console/my-viatics">Mis Viaticos</Link></li>
+        )}
+        {hasPermission(user, PERMISSIONS.VEHICLES_VIEW) && (
+          <li className="menu-item"><Link href="/console/my-vehicles">Mis Vehiculos</Link></li>
+        )}
+        {hasPermission(user, PERMISSIONS.GPS_VIEW) && (
+          <li className="menu-item"><Link href="/console/gps">Mapa GPS</Link></li>
+        )}
       </ul>
     </aside>
   );

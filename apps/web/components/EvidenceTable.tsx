@@ -1,23 +1,38 @@
 "use client";
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
+import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 
 interface Evidence {
   id: number;
+  userId?: number;
   tipoEvidencia: string;
   archivoUrl: string;
   aprobada: boolean;
-  actividad: { anNumber: string; titulo?: string };
-  responsable?: { nombre: string };
   estatus?: string;
-  archivo?: string;
-  usuario?: { nombre: string };
+  comentarios?: string | null;
+  observacionesRevision?: string | null;
+  calificacionEficiencia?: string | null;
+  revisadoEn?: string | null;
+  latitud?: number | null;
+  longitud?: number | null;
+  actividad: {
+    anNumber: string;
+    titulo?: string;
+    indicaciones?: string | null;
+    creador?: { nombre: string } | null;
+    responsable?: { nombre: string } | null;
+  };
+  user?: { nombre: string } | null;
+  aprobadoPor?: { nombre: string } | null;
 }
 
-const EvidenceTable: React.FC = () => {
+const EvidenceTable: React.FC<{ mode?: 'admin' | 'user' }> = ({ mode = 'admin' }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const { user } = useUser();
+  const [loading, setLoading] = useState(true);
 
   // Filtros y paginación
   const [estatus, setEstatus] = useState<string>('');
@@ -25,19 +40,77 @@ const EvidenceTable: React.FC = () => {
   const [responsable, setResponsable] = useState<string>('');
   const [page, setPage] = useState<number>(1);
   const [pageSize] = useState<number>(10);
-  const estatusList = ['Pendiente', 'Aprobada'];
+  const estatusList = ['Pendiente', 'Aprobada', 'Rechazada'];
+  const calificacionOptions = ['Alta', 'Media', 'Baja'];
+  const [reviewDrafts, setReviewDrafts] = useState<Record<number, { calificacion: string; observaciones: string }>>({});
 
   // Simulación de datos de evidencias (reemplazar con fetch real)
-  const [evidences] = useState<Evidence[]>([]);
+  const [evidences, setEvidences] = useState<Evidence[]>([]);
+
+  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
+  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
+  const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, '');
+  const getAssetUrl = (url?: string | null) => {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    const base = API_URL.replace(/\/+api\/?$/, '');
+    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+  };
+  const getMapsUrl = (lat?: number | null, lng?: number | null) => {
+    if (!lat || !lng) return '';
+    return `https://www.google.com/maps?q=${lat},${lng}`;
+  };
 
   // Filtrado
   const filtered = evidences.filter(evi =>
     (estatus ? evi.estatus === estatus : true) &&
     (actividad ? evi.actividad?.anNumber?.toLowerCase().includes(actividad.toLowerCase()) : true) &&
-    (responsable ? evi.responsable?.nombre?.toLowerCase().includes(responsable.toLowerCase()) : true)
+    (responsable
+      ? (evi.user?.nombre || evi.actividad?.responsable?.nombre || '')
+        .toLowerCase()
+        .includes(responsable.toLowerCase())
+      : true)
   );
   const totalPages = Math.ceil(filtered.length / pageSize) || 1;
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
+
+  const updateReviewDraft = (id: number, changes: Partial<{ calificacion: string; observaciones: string }>) => {
+    setReviewDrafts((prev) => ({
+      ...prev,
+      [id]: { calificacion: '', observaciones: '', ...prev[id], ...changes },
+    }));
+  };
+
+  const handleReview = async (id: number, approved: boolean) => {
+    if (!user?.token) return;
+    const draft = reviewDrafts[id] || { calificacion: '', observaciones: '' };
+    const payload = {
+      aprobada: approved,
+      estatus: approved ? 'Aprobada' : 'Rechazada',
+      calificacionEficiencia: draft.calificacion || null,
+      observacionesRevision: draft.observaciones || null,
+    };
+    const res = await fetch(buildApiUrl(`evidences/${id}`), {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${user.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      fetchEvidences();
+    }
+  };
+
+  const handleRemoveOwn = async (id: number) => {
+    if (!user?.token) return;
+    const res = await fetch(buildApiUrl(`evidences/self/${id}`), {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${user.token}` },
+    });
+    if (res.ok) fetchEvidences();
+  };
 
 
   // Importar evidencias
@@ -47,7 +120,7 @@ const EvidenceTable: React.FC = () => {
     if (!file || !user) return;
     const formData = new FormData();
     formData.append('file', file);
-    const res = await fetch('/api/evidences/import', {
+    const res = await fetch(buildApiUrl('evidences/import'), {
       method: 'POST',
       headers: { Authorization: `Bearer ${user.token}` },
       body: formData,
@@ -58,8 +131,60 @@ const EvidenceTable: React.FC = () => {
     }
     const data = await res.json();
     setImportMsg(data.message + (data.count ? ` (${data.count})` : ''));
-    // Opcional: recargar evidencias aquí si es necesario
+    fetchEvidences();
   };
+
+  const fetchEvidences = () => {
+    if (!user?.token) return;
+    setLoading(true);
+    fetch(buildApiUrl('evidences'), {
+      headers: { Authorization: `Bearer ${user.token}` },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error('No autorizado');
+        return res.json();
+      })
+      .then((data) => setEvidences(Array.isArray(data) ? data : []))
+      .catch(() => setEvidences([]))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    if (!user?.token) return;
+    fetchEvidences();
+  }, [user?.token]);
+
+  useEffect(() => {
+    if (!user?.token) return;
+    const socketUrl = getSocketBaseUrl();
+    const socket: Socket = io(socketUrl, { transports: ['websocket'] });
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (payload?.model === 'Evidence') {
+        fetchEvidences();
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [user?.token]);
+
+  const formatDateTime = (value?: string | null) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return date.toLocaleString('es-MX', {
+      timeZone: 'America/Mexico_City',
+      year: '2-digit',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  if (loading) return <div>Cargando evidencias...</div>;
 
   return (
     <div className="card">
@@ -81,12 +206,12 @@ const EvidenceTable: React.FC = () => {
           value={responsable}
           onChange={e => setResponsable(e.target.value)}
         />
-        {user && user.nivelAutoridad >= 50 && (
+        {hasPermission(user, PERMISSIONS.EVIDENCES_EXPORT) && (
           <>
             <button
               className="button-primary"
               onClick={async () => {
-                const res = await fetch('/api/export/evidence');
+                const res = await fetch(buildApiUrl('export/evidence'));
                 if (!res.ok) return alert('Error al exportar');
                 const blob = await res.blob();
                 const url = window.URL.createObjectURL(blob);
@@ -121,21 +246,129 @@ const EvidenceTable: React.FC = () => {
             <th>Estatus</th>
             <th>Responsable</th>
             <th>Archivo</th>
-            {user && user.nivelAutoridad >= 50 && <th>Acciones</th>}
+            <th>Comentarios</th>
+            <th>Ubicacion</th>
+            <th>Revision</th>
+            {hasPermission(user, PERMISSIONS.EVIDENCES_REVIEW) && <th>Acciones</th>}
+            {mode === 'user' && <th>Gestion</th>}
           </tr>
         </thead>
         <tbody>
           {paginated.map((evi: Evidence) => (
             <tr key={evi.id}>
               <td>{evi.id}</td>
-              <td>{evi.actividad?.titulo || evi.actividad?.anNumber}</td>
-              <td><span className={`badge ${evi.estatus === 'Aprobada' ? 'approved' : evi.estatus === 'Pendiente' ? 'pending' : ''}`}>{evi.estatus}</span></td>
-              <td>{evi.responsable?.nombre}</td>
-              <td>{evi.archivo ? <a className="link" href={evi.archivo} target="_blank" rel="noopener noreferrer">Ver archivo</a> : '-'}</td>
-              {user && user.nivelAutoridad >= 50 && (
+              <td>
+                <div>{evi.actividad?.titulo || evi.actividad?.anNumber}</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{evi.actividad?.anNumber}</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{evi.actividad?.indicaciones || '-'}</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                  {evi.actividad?.creador?.nombre ? `Asignado por ${evi.actividad?.creador?.nombre}` : 'Asignado por -'}
+                </div>
+              </td>
+              <td>
+                <span
+                  className={`badge ${
+                    evi.estatus === 'Aprobada'
+                      ? 'approved'
+                      : evi.estatus === 'Pendiente'
+                        ? 'pending'
+                        : evi.estatus === 'Rechazada'
+                          ? 'rejected'
+                          : ''
+                  }`}
+                >
+                  {evi.estatus}
+                </span>
+              </td>
+              <td>{evi.user?.nombre || evi.actividad?.responsable?.nombre || '-'}</td>
+              <td>
+                {evi.archivoUrl ? (
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    {evi.archivoUrl.toLowerCase().endsWith('.pdf') ? (
+                      <div
+                        style={{
+                          width: 64,
+                          height: 64,
+                          borderRadius: 10,
+                          border: '1px solid rgba(255,255,255,0.12)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'var(--text-secondary)',
+                          fontWeight: 700,
+                        }}
+                      >
+                        PDF
+                      </div>
+                    ) : (
+                      <img
+                        src={getAssetUrl(evi.archivoUrl)}
+                        alt="Evidencia"
+                        style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 10 }}
+                      />
+                    )}
+                    <a className="link" href={getAssetUrl(evi.archivoUrl)} target="_blank" rel="noopener noreferrer">Ver archivo</a>
+                  </div>
+                ) : (
+                  '-'
+                )}
+              </td>
+              <td>
+                <div>{evi.comentarios || '-'}</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{evi.tipoEvidencia}</div>
+              </td>
+              <td>
+                {getMapsUrl(evi.latitud, evi.longitud) ? (
+                  <a className="link" href={getMapsUrl(evi.latitud, evi.longitud)} target="_blank" rel="noopener noreferrer">Ver mapa</a>
+                ) : (
+                  '-'
+                )}
+              </td>
+              <td>
+                <div>{evi.calificacionEficiencia || '-'}</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{evi.observacionesRevision || '-'}</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{evi.aprobadoPor?.nombre ? `Reviso ${evi.aprobadoPor?.nombre}` : ''}</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{formatDateTime(evi.revisadoEn)}</div>
+              </td>
+              {hasPermission(user, PERMISSIONS.EVIDENCES_REVIEW) && (
                 <td>
-                  <button className="button-secondary">Editar</button>
-                  <button className="button-primary">Borrar</button>
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    <select
+                      className="input"
+                      value={reviewDrafts[evi.id]?.calificacion || ''}
+                      onChange={(event) => updateReviewDraft(evi.id, { calificacion: event.target.value })}
+                    >
+                      <option value="">Calificacion</option>
+                      {calificacionOptions.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                    <textarea
+                      className="input"
+                      rows={2}
+                      placeholder="Observaciones"
+                      value={reviewDrafts[evi.id]?.observaciones || ''}
+                      onChange={(event) => updateReviewDraft(evi.id, { observaciones: event.target.value })}
+                    />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button className="button-primary" onClick={() => handleReview(evi.id, true)}>Aprobar</button>
+                      <button className="button-secondary" onClick={() => handleReview(evi.id, false)}>Rechazar</button>
+                    </div>
+                  </div>
+                </td>
+              )}
+              {mode === 'user' && (
+                <td>
+                  {evi.estatus === 'Pendiente' ? (
+                    <button
+                      className="button-secondary"
+                      onClick={() => handleRemoveOwn(evi.id)}
+                    >
+                      Quitar
+                    </button>
+                  ) : (
+                    <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Bloqueado</span>
+                  )}
                 </td>
               )}
             </tr>

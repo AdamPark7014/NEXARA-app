@@ -1,5 +1,5 @@
 export class CreateGpsDto {
-  usuarioId!: number;
+  usuarioId?: number;
   actividadId?: number;
   latitud!: number;
   longitud!: number;

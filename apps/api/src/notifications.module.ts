@@ -8,8 +8,7 @@ import {
 import { Server } from 'socket.io';
 
 @WebSocketGateway({ cors: { origin: '*', credentials: true } })
-export class NotificationsGateway
-{
+export class NotificationsGateway {
   @WebSocketServer()
     server!: Server;
 

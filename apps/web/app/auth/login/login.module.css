@@ -1,0 +1,133 @@
+:root {
+  --card-radius: 14px;
+}
+
+.page {
+  min-height: calc(100vh - 95px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.6), transparent 40%);
+}
+
+.card {
+  width: 980px;
+  max-width: 96vw;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--surface);
+  border-radius: var(--card-radius);
+  box-shadow: 0 10px 30px var(--shadow);
+  overflow: hidden;
+}
+
+.brand {
+  padding: 48px 36px;
+  background: linear-gradient(180deg, var(--primary), var(--primary-light));
+  color: white;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  justify-content: center;
+}
+
+.logo {
+  font-weight: 700;
+  font-size: 28px;
+  letter-spacing: 0.6px;
+}
+
+.tag {
+  margin-top: 6px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.lead {
+  margin-top: 12px;
+  color: rgba(255,255,255,0.92);
+  line-height: 1.4;
+}
+
+.brandFooter {
+  margin-top: 18px;
+  font-size: 13px;
+  opacity: 0.95;
+}
+
+.formWrap {
+  padding: 40px 36px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.title {
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.input {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--muted);
+  background: var(--surface);
+  outline: none;
+  transition: box-shadow .12s ease, border-color .12s ease;
+}
+
+.input:focus {
+  box-shadow: 0 6px 18px rgba(15,106,214,0.08);
+  border-color: var(--primary);
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.remember input { margin-right: 8px }
+
+.forgot { font-size: 13px; color: var(--link) }
+
+.error { color: var(--danger); font-size: 13px }
+
+.submit {
+  margin-top: 6px;
+  padding: 12px 14px;
+  background: linear-gradient(90deg, var(--primary), var(--primary-light));
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.submit:disabled { opacity: 0.7; cursor: default }
+
+.or { margin-top: 14px; color: var(--text-tertiary); font-size: 13px }
+
+.socials { display:flex; gap:10px; margin-top:10px }
+.social { padding: 8px 12px; border-radius:8px; background: var(--muted); color: var(--foreground); text-decoration:none }
+
+@media (max-width: 880px) {
+  .card { grid-template-columns: 1fr; }
+  .brand { padding: 28px; }
+  .formWrap { padding: 28px }
+}

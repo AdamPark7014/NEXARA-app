@@ -14,6 +14,7 @@ import { CreateExpenseDto } from './dto/create-expense.dto.js';
 import { UpdateExpenseDto } from './dto/update-expense.dto.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
+import { PERMISSIONS } from '../common/permissions.js';
 
 @Controller('expenses')
 export class ExpensesController {
@@ -21,10 +22,9 @@ export class ExpensesController {
 
   @Post()
   @UseGuards(RbacGuard)
-  @RBAC({ minLevel: 10 })
+  @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
   create(@CurrentUser() user: any, @Body() createExpenseDto: CreateExpenseDto) {
-    // Staff solo puede crear gastos propios
-    if (user.nivelAutoridad === 10 && createExpenseDto.usuarioId !== user.id) {
+    if (!user.isSuperAdmin && createExpenseDto.usuarioId !== user.id) {
       throw new ForbiddenException('Solo puedes crear tus propios gastos');
     }
     return this.expensesService.create(createExpenseDto);
@@ -32,10 +32,9 @@ export class ExpensesController {
 
   @Get()
   @UseGuards(RbacGuard)
-  @RBAC({ minLevel: 50 })
+  @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
   findAll(@CurrentUser() user: any) {
-    // CEO ve todos, supervisor ve su departamento
-    if (user.nivelAutoridad === 100) {
+    if (user.isSuperAdmin) {
       return this.expensesService.findAll();
     } else {
       return this.expensesService.findByDepartment(user.departmentId);
@@ -44,14 +43,14 @@ export class ExpensesController {
 
   @Get(':id')
   @UseGuards(RbacGuard)
-  @RBAC({ minLevel: 10 })
+  @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
   findOne(@CurrentUser() _user: any, @Param('id') id: string) {
     return this.expensesService.findOne(+id);
   }
 
   @Patch(':id')
   @UseGuards(RbacGuard)
-  @RBAC({ minLevel: 50 })
+  @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
   update(
     @CurrentUser() _user: any,
     @Param('id') id: string,
@@ -62,7 +61,7 @@ export class ExpensesController {
 
   @Delete(':id')
   @UseGuards(RbacGuard)
-  @RBAC({ minLevel: 100 })
+  @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
   remove(@CurrentUser() _user: any, @Param('id') id: string) {
     return this.expensesService.remove(+id);
   }
