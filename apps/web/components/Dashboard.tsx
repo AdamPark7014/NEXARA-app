@@ -216,7 +216,7 @@ export default function Dashboard() {
         setActivities(Array.isArray(activitiesData) ? activitiesData : []);
 
         if (canManageAttendance && attendancePayload) {
-          setAttendance(attendancePayload);
+          setAttendance(attendancePayload as AttendanceRange);
         } else if (attendancePayload && user?.id) {
           const normalizedUserId = Number(user.id);
           setAttendance({
