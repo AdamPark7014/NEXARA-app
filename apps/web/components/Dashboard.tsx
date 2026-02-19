@@ -219,18 +219,19 @@ export default function Dashboard() {
           setAttendance(attendancePayload as AttendanceRange);
         } else if (attendancePayload && user?.id) {
           const normalizedUserId = Number(user.id);
+          const payload = attendancePayload as { totalMinutes?: number; days?: any[]; attendances?: any[] };
           setAttendance({
             rangeStart: weekRange.from,
             rangeEnd: weekRange.to,
-            totalMinutesAll: attendancePayload.totalMinutes || 0,
+            totalMinutesAll: payload.totalMinutes || 0,
             totalUsers: 1,
             users: [
               {
                 userId: normalizedUserId,
                 userName: user.nombre,
-                totalMinutes: attendancePayload.totalMinutes || 0,
-                days: attendancePayload.days || [],
-                attendances: attendancePayload.attendances || [],
+                totalMinutes: payload.totalMinutes || 0,
+                days: payload.days || [],
+                attendances: payload.attendances || [],
               },
             ],
           });
