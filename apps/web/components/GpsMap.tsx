@@ -282,7 +282,7 @@ const GpsMap = () => {
 
   useEffect(() => {
     if (!myMapInstance.current || !myLocation || !window.google?.maps) return;
-    const mapsLib = window.google.maps;
+    const mapsLib = window.google.maps as any;
     const lat = toNumber(myLocation.latitud);
     const lng = toNumber(myLocation.longitud);
     if (lat === null || lng === null) return;
@@ -290,10 +290,10 @@ const GpsMap = () => {
     const marker = myMarkersRef.current.get(markerKey);
     if (!marker) {
       const nextMarker = new mapsLib.Marker({
-        map: myMapInstance.current,
+        map: myMapInstance.current as unknown,
         position: { lat, lng },
         label: 'Yo',
-      });
+      } as any);
       myMarkersRef.current.set(markerKey, nextMarker);
     } else {
       marker.setPosition({ lat, lng });
@@ -303,7 +303,7 @@ const GpsMap = () => {
 
   useEffect(() => {
     if (!teamMapInstance.current || !window.google?.maps) return;
-    const mapsLib = window.google.maps;
+    const mapsLib = window.google.maps as any;
     const activeKeys = new Set<string>();
     teamLocations.forEach((location) => {
       const lat = toNumber(location.latitud);
@@ -317,7 +317,7 @@ const GpsMap = () => {
           map: teamMapInstance.current,
           position: { lat, lng },
           label: getInitials(location.usuario?.nombre),
-        });
+        } as any);
         teamMarkersRef.current.set(key, marker);
       } else {
         existing.setPosition({ lat, lng });
