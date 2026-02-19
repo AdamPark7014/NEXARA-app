@@ -14,16 +14,34 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
       pathname.startsWith("/panel/contabilidad") ||
       pathname.startsWith("/panel/tickets"))
   ) {
-    return <main style={{ flex: 1, background: "var(--background)", color: "var(--foreground)", padding: 0 }}>{children}</main>;
+    return (
+      <main
+        style={{
+          flex: 1,
+          background: "var(--background)",
+          color: "var(--foreground)",
+          padding: 0,
+        }}
+      >
+        {children}
+      </main>
+    );
   }
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
+    <div
+      style={{
+        display: "flex",
+        minHeight: "100vh",
+        gap: "var(--panel-gap)",
+        padding: "var(--panel-padding-y) var(--panel-padding-x)",
+      }}
+    >
       <aside
         style={{
-          width: 220,
+          width: "var(--panel-sidebar-width)",
           background: "var(--surface)",
           color: "var(--foreground)",
-          padding: 24,
+          padding: "var(--panel-padding-y)",
           boxShadow: "2px 0 8px var(--shadow)",
           borderRight: "1px solid var(--muted)",
         }}
@@ -46,7 +64,16 @@ export default function PanelLayout({ children }: { children: React.ReactNode })
           <Link href="/panel/contactos" style={{ color: "var(--foreground)", textDecoration: "none", fontWeight: 500 }}>Contactos</Link>
         </nav>
       </aside>
-      <main style={{ flex: 1, background: "var(--background)", color: "var(--foreground)", padding: 24 }}>{children}</main>
+      <main
+        style={{
+          flex: 1,
+          background: "var(--background)",
+          color: "var(--foreground)",
+          padding: "var(--panel-padding-y) var(--panel-padding-x)",
+        }}
+      >
+        {children}
+      </main>
     </div>
   );
 }

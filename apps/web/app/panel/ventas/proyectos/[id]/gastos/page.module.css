@@ -1,7 +1,7 @@
 .container {
-  max-width: 1200px;
+  max-width: var(--content-max);
   margin: 0 auto;
-  padding: 2rem;
+  padding: var(--panel-padding-y) var(--panel-padding-x);
 }
 
 .header {

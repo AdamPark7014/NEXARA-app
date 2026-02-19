@@ -4,6 +4,7 @@
   display: grid;
   gap: 20px;
   font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+  padding: var(--panel-padding-y) var(--panel-padding-x);
 }
 
 .header {

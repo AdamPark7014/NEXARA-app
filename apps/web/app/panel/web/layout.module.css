@@ -4,7 +4,8 @@
   min-height: 100vh;
   display: flex;
   background: var(--background);
-  margin-top: -8px;
+  gap: var(--panel-gap);
+  padding: var(--panel-padding-y) var(--panel-padding-x);
 }
 
 :global(body.light) .webPanelRoot {
@@ -18,9 +19,9 @@
 }
 
 .webPanelSidebar {
-  width: 280px;
+  width: var(--panel-sidebar-width);
   padding: 20px 18px 18px;
-  margin: 16px 0 16px 16px;
+  margin: 0;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -263,7 +264,7 @@
   flex: 1;
   background: var(--background);
   color: var(--foreground);
-  padding: 24px;
+  padding: var(--panel-padding-y) var(--panel-padding-x);
 }
 
 @keyframes navIn {
@@ -286,7 +287,7 @@
     width: 100%;
     min-height: auto;
     position: relative;
-    margin: 12px 12px 0;
+    margin: 0;
   }
 
   .webPanelNav {
@@ -298,5 +299,9 @@
 
   .webPanelFooter {
     margin-top: 8px;
+  }
+
+  .webPanelMain {
+    padding: var(--panel-padding-y) var(--panel-padding-x);
   }
 }

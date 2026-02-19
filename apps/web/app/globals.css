@@ -1,6 +1,14 @@
 :root {
   /* Light mode defaults - oscila entre azul rey y verde */
-  --header-offset: 96px;
+  --header-offset: clamp(76px, 10vw, 112px);
+  --content-max: 1200px;
+  --page-padding-x: clamp(16px, 4vw, 80px);
+  --page-padding-y: clamp(16px, 3vw, 28px);
+  --page-padding-bottom: clamp(48px, 8vw, 96px);
+  --panel-gap: clamp(12px, 2vw, 24px);
+  --panel-padding-x: clamp(16px, 3vw, 32px);
+  --panel-padding-y: clamp(16px, 3vw, 32px);
+  --panel-sidebar-width: clamp(240px, 22vw, 300px);
   --background: #f7f9fc;
   --foreground: #0b1220;
   --primary: #0f6ad6; /* azul rey */
@@ -129,18 +137,6 @@ body {
   color: var(--foreground);
   background: var(--background) !important;
   padding-top: var(--header-offset);
-}
-
-@media (max-width: 900px) {
-  :root {
-    --header-offset: 120px;
-  }
-}
-
-@media (max-width: 700px) {
-  :root {
-    --header-offset: 140px;
-  }
 }
 
 * {

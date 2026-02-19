@@ -6,8 +6,8 @@
   display: flex;
   background: var(--background);
   color: var(--foreground);
-  margin-top: -8px;
-  gap: 24px;
+  gap: var(--panel-gap);
+  padding: var(--panel-padding-y) var(--panel-padding-x);
   position: relative;
 }
 
@@ -23,7 +23,7 @@
 /* === MAIN CONTENT === */
 .salesMain {
   flex: 1;
-  padding: 28px 32px 40px;
+  padding: var(--panel-padding-y) var(--panel-padding-x);
   color: var(--foreground);
   overflow-y: auto;
   min-width: 0;
@@ -67,17 +67,17 @@
 @media (max-width: 960px) {
   .salesRoot {
     flex-direction: column;
-    gap: 0;
+    gap: var(--panel-gap);
   }
 
   .salesMain {
-    padding: 22px 18px 32px;
+    padding: var(--panel-padding-y) var(--panel-padding-x);
   }
 }
 
 @media (max-width: 480px) {
   .salesMain {
-    padding: 16px;
+    padding: var(--panel-padding-y) var(--panel-padding-x);
   }
 
   .lockedCard {
