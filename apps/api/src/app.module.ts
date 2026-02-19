@@ -10,9 +10,7 @@ import { AppService } from './app.service';
 import { ExcelExportController } from './common/excel-export.controller';
 import { ExcelExportService } from './common/excel-export.service';
 import { ExcelImportController } from './common/excel-import.controller';
-import { ProductsModule } from './products/products.module';
 import { ClientsModule } from './clients/clients.module';
-import { OrdersModule } from './orders/orders.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
@@ -44,9 +42,7 @@ import { VentasModule } from './ventas/ventas.module';
   imports: [
     CoreModule,
     PrismaModule,
-    ProductsModule,
     ClientsModule,
-    OrdersModule,
     UsersModule,
     AuthModule,
     ActivitiesModule,
