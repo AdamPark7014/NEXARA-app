@@ -1,3 +1,5 @@
+'use client';
+
 import { useEffect } from "react";
 import { useUser } from "@/components/UserContext";
 import { hasAnyPermission, hasPermission, PERMISSIONS } from "@/lib/permissions";
