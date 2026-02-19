@@ -281,7 +281,7 @@ const GpsMap = () => {
   }, [mapsReady]);
 
   useEffect(() => {
-    if (!myMapInstance.current || !myLocation) return;
+    if (!myMapInstance.current || !myLocation || !window.google?.maps) return;
     const lat = toNumber(myLocation.latitud);
     const lng = toNumber(myLocation.longitud);
     if (lat === null || lng === null) return;
@@ -301,7 +301,7 @@ const GpsMap = () => {
   }, [myLocation]);
 
   useEffect(() => {
-    if (!teamMapInstance.current) return;
+    if (!teamMapInstance.current || !window.google?.maps) return;
     const activeKeys = new Set<string>();
     teamLocations.forEach((location) => {
       const lat = toNumber(location.latitud);
