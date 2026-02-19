@@ -25,9 +25,21 @@ mkdir -p /var/www
 git clone https://github.com/AdamPark7014/NEXARA-app.git nexara-app
 cd nexara-app
 
-# Si el proyecto ya existe
-cd nexara-app
-git pull origin main
+# Si el proyecto ya existe, actualizar desde GitHub
+cd /var/www/nexara-app
+
+# Limpiar cambios locales no deseados y sincronizar con GitHub
+git fetch origin main
+git reset --hard origin/main
+git clean -fd
+
+# Instalar dependencias del frontend
+cd apps/web
+rm -rf node_modules .next package-lock.json
+npm install --legacy-peer-deps
+
+# Compilar frontend
+npm run build
 ```
 
 ### 4. Instalar dependencias del backend (NestJS)
