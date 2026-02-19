@@ -1,5 +1,6 @@
 :root {
   /* Light mode defaults - oscila entre azul rey y verde */
+  --header-offset: 96px;
   --background: #f7f9fc;
   --foreground: #0b1220;
   --primary: #0f6ad6; /* azul rey */
@@ -127,7 +128,19 @@ body {
 body {
   color: var(--foreground);
   background: var(--background) !important;
-  padding-top: 95px;
+  padding-top: var(--header-offset);
+}
+
+@media (max-width: 900px) {
+  :root {
+    --header-offset: 120px;
+  }
+}
+
+@media (max-width: 700px) {
+  :root {
+    --header-offset: 140px;
+  }
 }
 
 * {
