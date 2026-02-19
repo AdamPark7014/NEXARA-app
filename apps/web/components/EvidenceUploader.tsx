@@ -100,7 +100,7 @@ const EvidenceUploader = ({ actividadId }: { actividadId?: number }) => {
     const next = selected.filter(isSupportedFile).map((file) => ({
       file,
       url: URL.createObjectURL(file),
-      kind: file.type === 'application/pdf' ? 'pdf' : 'image',
+      kind: (file.type === 'application/pdf' ? 'pdf' : 'image') as const,
     }));
     if (next.length === 0) return;
     setFiles((prev) => [...prev, ...next]);
