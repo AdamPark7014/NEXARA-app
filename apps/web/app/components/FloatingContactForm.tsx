@@ -7,6 +7,11 @@ export default function FloatingContactForm() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(
+    /[\/.]+$/,
+    ""
+  );
+  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
 
   useEffect(() => {
     return () => {
@@ -20,13 +25,35 @@ export default function FloatingContactForm() {
     e.preventDefault();
     setLoading(true);
     const form = e.currentTarget;
-    const data = Object.fromEntries(new FormData(form));
-    
-    // TODO: Integrate with API endpoint or email service
-    console.log("Contacto flotante:", data);
-    
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const formData = new FormData(form);
+    const entries: [string, FormDataEntryValue][] = [];
+    formData.forEach((value, key) => {
+      entries.push([key, value]);
+    });
+    const data = Object.fromEntries(entries) as Record<string, FormDataEntryValue>;
+
+    const payload = {
+      name: String(data.name || ""),
+      email: String(data.email || ""),
+      phone: data.phone ? String(data.phone) : undefined,
+      company: data.company ? String(data.company) : undefined,
+      subject: data.subject ? String(data.subject) : undefined,
+      message: String(data.message || ""),
+      newsletter: Boolean(data.newsletter),
+      source: "contacto-floating",
+      pageUrl: typeof window !== "undefined" ? window.location.pathname : undefined,
+    };
+
+    const response = await fetch(buildApiUrl("contact-messages"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      setLoading(false);
+      return;
+    }
     
     setLoading(false);
     setSubmitted(true);
@@ -152,6 +179,13 @@ export default function FloatingContactForm() {
                     placeholder="¿En qué podemos ayudarte?"
                     disabled={loading}
                   />
+                </div>
+
+                <div className={styles.formField}>
+                  <label className={styles.checkboxLabel}>
+                    <input type="checkbox" name="newsletter" disabled={loading} />
+                    <span>Quiero recibir noticias y promociones</span>
+                  </label>
                 </div>
 
                 <button
