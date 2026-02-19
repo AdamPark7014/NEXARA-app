@@ -38,7 +38,8 @@
 }
 
 /* InfoWindow custom content - global classes to work inside Google Maps */
-:global(.map-info-window) {
+
+.mapInfoWindow :global(.map-info-window) {
   width: 200px;
   padding: 6px 8px 8px 8px;
   margin-top: -4px;
@@ -48,7 +49,8 @@
   background: var(--surface);
 }
 
-:global(.map-info-logo) {
+
+.mapInfoLogo :global(.map-info-logo) {
   width: 24px;
   height: 24px;
   object-fit: contain;
@@ -56,7 +58,8 @@
   margin: 0 auto 4px auto;
 }
 
-:global(.map-info-title) {
+
+.mapInfoTitle :global(.map-info-title) {
   margin: 0 0 6px 0;
   font-size: 13px;
   font-weight: 700;
@@ -67,7 +70,8 @@
   -webkit-text-fill-color: transparent;
 }
 
-:global(.map-info-button) {
+
+.mapInfoButton :global(.map-info-button) {
   display: block;
   width: 100%;
   padding: 6px 10px;
@@ -81,28 +85,33 @@
   box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 30%, transparent);
 }
 
-:global(.map-info-button:hover) {
+
+.mapInfoButton :global(.map-info-button:hover) {
   filter: brightness(1.05);
 }
 
 /* Theme variants */
-:global(body.light) .mapContainer {
+
+.light .mapContainer {
   background: var(--surface-light, #ffffff);
   border-color: color-mix(in srgb, var(--text) 12%, transparent);
   box-shadow: 0 10px 26px color-mix(in srgb, var(--gray-alpha-200, rgba(0,0,0,0.18)) 100%, transparent);
 }
 
-:global(body.dark) .mapContainer {
+
+.dark .mapContainer {
   background: var(--surface-dark, #111315);
   border-color: color-mix(in srgb, var(--gray-alpha-200, rgba(255,255,255,0.14)) 100%, transparent);
   box-shadow: 0 10px 28px color-mix(in srgb, var(--gray-alpha-200, rgba(0,0,0,0.35)) 100%, transparent);
 }
 
-:global(body.light) .map-info-window {
+
+.light .mapInfoWindow :global(.map-info-window) {
   background: var(--surface-light, #ffffff);
 }
 
-:global(body.dark) .map-info-window {
+
+.dark .mapInfoWindow :global(.map-info-window) {
   background: var(--surface-dark, #111315);
 }
 
