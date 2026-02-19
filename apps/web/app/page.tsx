@@ -240,7 +240,7 @@ export default function Home() {
                 <div className={styles.newsImageWrap}>
                   <img
                     src={
-                      normalizeNewsImageUrl(activeNewsItem.coverImageUrl) ||
+                      normalizeNewsImageUrl(activeNewsItem.coverImageUrl || undefined) ||
                       "/soluciones/rect-a.jpg"
                     }
                     alt={activeNewsItem.title}
@@ -431,7 +431,7 @@ export default function Home() {
                   <img
                     src={
                       normalizeNewsImageUrl(
-                        selectedNews.galleryUrls[selectedImage] || selectedNews.coverImageUrl,
+                        selectedNews.galleryUrls[selectedImage] || selectedNews.coverImageUrl || undefined,
                       ) || "/soluciones/rect-b.jpg"
                     }
                     alt={selectedNews.title}
@@ -452,7 +452,7 @@ export default function Home() {
                         onClick={() => setSelectedImage(index)}
                         aria-label={`Ver imagen ${index + 1}`}
                       >
-                        <img src={normalizeNewsImageUrl(image) || "/soluciones/rect-c.jpg"} alt="" />
+                        <img src={normalizeNewsImageUrl(image || undefined) || "/soluciones/rect-c.jpg"} alt="" />
                       </button>
                     ))}
                 </div>
