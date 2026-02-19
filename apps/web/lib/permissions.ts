@@ -19,6 +19,7 @@ export const PERMISSIONS = {
   VEHICLES_REQUEST: 'vehicles.request',
   VEHICLES_REVIEW: 'vehicles.review',
   VEHICLES_INVENTORY: 'vehicles.inventory',
+  VEHICLES_EXPORT: 'vehicles.export',
   ATTENDANCE_VIEW: 'attendance.view',
   ATTENDANCE_MANAGE: 'attendance.manage',
   GPS_VIEW: 'gps.view',
