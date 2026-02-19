@@ -9,6 +9,7 @@ export const PERMISSIONS = {
   EVIDENCES_VIEW: 'evidences.view',
   EVIDENCES_CREATE: 'evidences.create',
   EVIDENCES_REVIEW: 'evidences.review',
+  EVIDENCES_EXPORT: 'evidences.export',
   VIATICS_VIEW: 'viatics.view',
   VIATICS_CREATE: 'viatics.create',
   VIATICS_MANAGE: 'viatics.manage',
