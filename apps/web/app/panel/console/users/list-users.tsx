@@ -340,7 +340,7 @@ export default function ListUsers() {
                   )}
                 </td>
                 <td>
-                  {hasPermission(user, PERMISSIONS.USERS_MANAGE) && (!user.isSuperAdmin && u.department?.id ? user.departmentId === u.department.id : true) && (
+                  {user && hasPermission(user, PERMISSIONS.USERS_MANAGE) && (!user.isSuperAdmin && u.department?.id ? user.departmentId === u.department.id : true) && (
                     <>
                       <button
                         onClick={() => handleEdit(u)}
