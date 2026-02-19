@@ -20,7 +20,12 @@ export default function ContactFormToggle() {
   const onSubmit: React.FormEventHandler<HTMLFormElement> = (e) => {
     e.preventDefault();
     const form = e.currentTarget;
-    const data = Object.fromEntries(new FormData(form));
+    const formData = new FormData(form);
+    const entries: [string, FormDataEntryValue][] = [];
+    formData.forEach((value, key) => {
+      entries.push([key, value]);
+    });
+    const data = Object.fromEntries(entries);
     // TODO: Integrate with API endpoint or email service
     console.log("Contacto:", data);
     setSubmitted(true);
