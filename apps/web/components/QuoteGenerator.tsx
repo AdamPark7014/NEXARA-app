@@ -40,7 +40,8 @@ interface QuoteGeneratorProps {
 }
 
 export default function QuoteGenerator({ onQuoteGenerated }: QuoteGeneratorProps) {
-  const { user, token } = useUser();
+  const { user } = useUser();
+  const token = user?.token;
   const [step, setStep] = useState(1); // 1: select, 2: preview, 3: success
   const [opportunityQuoteId, setOpportunityQuoteId] = useState<number | null>(null);
   const [clientId, setClientId] = useState<number | null>(null);
