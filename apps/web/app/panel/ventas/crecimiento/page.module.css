@@ -3,6 +3,7 @@
   flex-direction: column;
   gap: 22px;
   font-family: 'Sora', 'Segoe UI', sans-serif;
+  padding: var(--panel-padding-y) var(--panel-padding-x);
 }
 
 .hero {

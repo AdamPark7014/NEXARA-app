@@ -4,8 +4,8 @@
   display: flex;
   min-height: 100vh;
   background: var(--background);
-  margin-top: -8px;
-  gap: 24px;
+  gap: var(--panel-gap);
+  padding: var(--panel-padding-y) var(--panel-padding-x);
 }
 
 :global(body.dark) .consoleLayout {
@@ -18,10 +18,10 @@
 }
 
 .sidebar {
-  width: 280px;
+  width: var(--panel-sidebar-width);
   color: var(--foreground);
   padding: 20px 18px 18px;
-  margin: 16px 0 16px 16px;
+  margin: 0;
   border-radius: 24px;
   position: relative;
   overflow: hidden;
@@ -277,7 +277,7 @@
 
 .consoleMain {
   flex: 1;
-  padding: 24px 32px;
+  padding: var(--panel-padding-y) var(--panel-padding-x);
   background: var(--background);
   min-width: 0;
   /* min-height: 100vh; */
@@ -362,9 +362,9 @@
     gap: 16px;
   }
   .sidebar {
-    width: calc(100% - 32px);
+    width: 100%;
     min-height: unset;
-    margin: 12px 16px 0;
+    margin: 0;
     padding: 16px;
     display: block;
   }
@@ -385,6 +385,6 @@
   }
   .consoleMain {
     width: 100%;
-    padding: 24px 8px;
+    padding: var(--panel-padding-y) var(--panel-padding-x);
   }
 }

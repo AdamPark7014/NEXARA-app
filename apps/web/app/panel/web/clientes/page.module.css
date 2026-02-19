@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 .page {
-  padding: 32px 32px 40px;
+  padding: var(--panel-padding-y) var(--panel-padding-x);
   color: var(--foreground);
   font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
 }

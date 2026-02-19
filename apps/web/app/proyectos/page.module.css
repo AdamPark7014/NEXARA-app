@@ -1,8 +1,8 @@
 /* Contenedor general */
 .container {
-  max-width: 1200px;
+  max-width: var(--content-max);
   margin: 0 auto;
-  padding: 32px 24px 56px;
+  padding: var(--page-padding-y) var(--page-padding-x) var(--page-padding-bottom);
   display: flex;
   flex-direction: column;
   gap: 24px;

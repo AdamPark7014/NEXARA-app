@@ -1,6 +1,7 @@
 .page {
   display: grid;
   gap: 16px;
+  padding: var(--panel-padding-y) var(--panel-padding-x);
 }
 
 .loading {

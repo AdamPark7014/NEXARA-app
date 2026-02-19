@@ -4,7 +4,7 @@
   display: flex;
   flex-direction: column;
   gap: 26px;
-  padding: 26px 20px 48px;
+  padding: var(--panel-padding-y) var(--panel-padding-x);
   font-family: "Space Grotesk", "Segoe UI", sans-serif;
   color: var(--foreground);
 }

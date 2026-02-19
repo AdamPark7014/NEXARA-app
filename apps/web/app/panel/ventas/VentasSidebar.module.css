@@ -2,10 +2,10 @@
 
 /* === VENTAS SIDEBAR === */
 .ventasSidebar {
-  width: 280px;
+  width: var(--panel-sidebar-width);
   color: var(--foreground);
   padding: 20px 18px 18px;
-  margin: 16px 0 16px 16px;
+  margin: 0;
   border-radius: 24px;
   position: relative;
   overflow: hidden;
@@ -56,7 +56,7 @@
 
 /* === SIDEBAR STATES === */
 .sidebarOpen {
-  width: 280px;
+  width: var(--panel-sidebar-width);
 }
 
 .sidebarCollapsed {
@@ -407,7 +407,7 @@
 @media (max-width: 768px) {
   .ventasSidebar {
     width: 100% !important;
-    height: auto;
+    margin: 0;
     margin: 0;
     border-radius: 0;
     border-right: none;

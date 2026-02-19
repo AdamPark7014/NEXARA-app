@@ -4,7 +4,8 @@
   min-height: 100vh;
   display: flex;
   background: var(--background);
-  margin-top: -8px;
+  gap: var(--panel-gap);
+  padding: var(--panel-padding-y) var(--panel-padding-x);
 }
 
 :global(body.dark) .contaRoot {
@@ -15,8 +16,8 @@
 }
 
 .contaSidebar {
-  width: 292px;
-  margin: 16px 0 16px 16px;
+  width: var(--panel-sidebar-width);
+  margin: 0;
   padding: 22px 18px;
   display: flex;
   flex-direction: column;
@@ -163,7 +164,7 @@
 
 .contaMain {
   flex: 1;
-  padding: 28px 32px 40px;
+  padding: var(--panel-padding-y) var(--panel-padding-x);
   color: var(--foreground);
 }
 
@@ -219,10 +220,10 @@
 
   .contaSidebar {
     width: auto;
-    margin: 12px;
+    margin: 0;
   }
 
   .contaMain {
-    padding: 24px 18px 32px;
+    padding: var(--panel-padding-y) var(--panel-padding-x);
   }
 }

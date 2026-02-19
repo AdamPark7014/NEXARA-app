@@ -12,7 +12,8 @@
   align-items: start;
   justify-items: center;
   min-height: 100svh;
-  padding: 20px 80px 80px 80px;
+  width: 100%;
+  padding: var(--page-padding-y) var(--page-padding-x) var(--page-padding-bottom);
   gap: 0;
   font-synthesis: none;
   background:
@@ -28,6 +29,8 @@
 /* Clientes satisfechos */
 .clientsSection {
   width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
   padding: 48px 24px;
   border-top: 1px solid var(--gray-alpha-100);
 }
@@ -216,7 +219,8 @@
 /* Noticias carousel */
 .newsSection {
   width: 100%;
-  margin: 24px 0 10px;
+  max-width: var(--content-max);
+  margin: 24px auto 10px;
   padding: 0 24px 40px;
   position: relative;
 }
@@ -1115,9 +1119,12 @@
 .main {
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: clamp(24px, 4vw, 40px);
   grid-row-start: 2;
   width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  align-items: stretch;
 }
 
 .heroWrapper {
@@ -1125,15 +1132,16 @@
   width: 100%;
   display: flex;
   justify-content: center;
-  min-height: 600px;
+  min-height: clamp(420px, 60vh, 640px);
   align-items: center;
 }
 
 .hero {
   text-align: center;
-  max-width: 700px;
+  width: 100%;
+  max-width: 720px;
   margin: 0 auto;
-  padding: 56px 48px;
+  padding: clamp(28px, 5vw, 56px) clamp(20px, 4vw, 48px);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(231, 246, 247, 0.95), rgba(237, 249, 245, 0.94));
   border: 1px solid rgba(14, 165, 114, 0.18);
   border-radius: 28px;
@@ -1145,7 +1153,7 @@
 }
 
 .heroTitle {
-  font-size: 2.8rem;
+  font-size: clamp(1.9rem, 3.2vw, 2.9rem);
   font-weight: 800;
   margin-bottom: 16px;
   color: var(--foreground); /* Light: #151518, Dark: #ededed */
@@ -1155,7 +1163,7 @@
 }
 
 .heroSubtitle {
-  font-size: 1.3rem;
+  font-size: clamp(1rem, 1.8vw, 1.3rem);
   color: var(--foreground); /* Light: #151518, Dark: #ededed */
   margin-bottom: 32px;
   opacity: 0.92;
@@ -1402,15 +1410,6 @@ button.secondary {
 }
 
 @media (max-width: 600px) {
-  .page {
-    padding: 32px;
-    padding-bottom: 80px;
-  }
-
-  .main {
-    align-items: center;
-  }
-
   .main ol {
     text-align: center;
   }
@@ -1438,14 +1437,8 @@ button.secondary {
 
 /* Responsive optimizado para mÃ³viles */
 @media (max-width: 768px) {
-  .page {
-    padding: 24px 16px;
-    gap: 32px;
-  }
-  
   .heroWrapper {
-    padding: 0 8px;
-    min-height: 550px;
+    min-height: clamp(380px, 70vh, 520px);
   }
   
   .hero {
@@ -1476,12 +1469,8 @@ button.secondary {
 }
 
 @media (max-width: 480px) {
-  .page {
-    padding: 16px 12px;
-  }
-  
   .heroWrapper {
-    min-height: 480px;
+    min-height: clamp(340px, 70vh, 460px);
   }
   
   .hero {
@@ -1557,7 +1546,7 @@ button.secondary {
 /* Why Nexara Section */
 .whyNexara {
   width: 100%;
-  max-width: 1200px;
+  max-width: var(--content-max);
   /* Acerca la sección al hero en light mode */
   margin: 48px auto 0;
   padding: 80px 24px;
@@ -1892,7 +1881,7 @@ button.secondary {
 /* Services Section */
 .servicesSection {
   width: 100%;
-  max-width: 1200px;
+  max-width: var(--content-max);
   margin: 80px auto 0;
   padding: 0 24px;
   display: grid;

@@ -84,27 +84,29 @@ export default function Header() {
 
   return (
     <header className={`${styles.header} ${isConsole ? styles.consoleHeader : ''}`}>
-      <div className={styles.logoSection}>
-        <Link href="/">
-          <Image src="/logo-nexara.png" alt="Nexara Logo" className={styles.logo} width={120} height={40} priority />
-        </Link>
-      </div>
-      <nav className={styles.navLinks}>
-        {navLinks.map((link) => (
-          <Link key={link.name} href={link.href} className={styles.link}>
-            {link.name}
+      <div className={styles.headerInner}>
+        <div className={styles.logoSection}>
+          <Link href="/">
+            <Image src="/logo-nexara.png" alt="Nexara Logo" className={styles.logo} width={120} height={40} priority />
           </Link>
-        ))}
-      </nav>
-      <div className={styles.rightSection}>
-        {(pathname && pathname.startsWith('/console')) && <BackupRestorePanel />}
-        <button
-          className={styles.switch}
-          onClick={toggleDarkMode}
-          aria-label={darkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-        >
-          {darkMode ? '🌙' : '☀️'}
-        </button>
+        </div>
+        <nav className={styles.navLinks}>
+          {navLinks.map((link) => (
+            <Link key={link.name} href={link.href} className={styles.link}>
+              {link.name}
+            </Link>
+          ))}
+        </nav>
+        <div className={styles.rightSection}>
+          {(pathname && pathname.startsWith('/console')) && <BackupRestorePanel />}
+          <button
+            className={styles.switch}
+            onClick={toggleDarkMode}
+            aria-label={darkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+          >
+            {darkMode ? '🌙' : '☀️'}
+          </button>
+        </div>
       </div>
     </header>
   );
