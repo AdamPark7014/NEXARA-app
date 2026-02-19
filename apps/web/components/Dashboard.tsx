@@ -133,8 +133,10 @@ const buildMinutesFromAttendances = (
     }
   });
 
-  if (openEntryTime && openEntryTime instanceof Date) {
-    const minutes = Math.max(0, Math.floor((rangeEnd.getTime() - openEntryTime.getTime()) / 60000));
+  // Close any open entry at the range end
+  if (openEntryTime !== null) {
+    const entryTime = openEntryTime as Date;
+    const minutes = Math.max(0, Math.floor((rangeEnd.getTime() - entryTime.getTime()) / 60000));
     totalMinutes += minutes;
     const dayKey = openEntryDate || toLocalDateKey(rangeEnd.toISOString());
     if (dayKey) {
