@@ -133,7 +133,7 @@ const buildMinutesFromAttendances = (
     }
   });
 
-  if (openEntryTime) {
+  if (openEntryTime && openEntryTime instanceof Date) {
     const minutes = Math.max(0, Math.floor((rangeEnd.getTime() - openEntryTime.getTime()) / 60000));
     totalMinutes += minutes;
     const dayKey = openEntryDate || toLocalDateKey(rangeEnd.toISOString());
