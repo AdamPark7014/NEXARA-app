@@ -26,7 +26,8 @@ export default function ProjectCostTracker({
   budget,
   onCostsUpdated,
 }: ProjectCostTrackerProps) {
-  const { token } = useUser();
+  const { user } = useUser();
+  const token = user?.token;
   const [costs, setCosts] = useState<ProjectCosts | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editValues, setEditValues] = useState({
