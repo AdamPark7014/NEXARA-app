@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useUser } from '@/app/components/UserContext';
+import { useUser } from '@/components/UserContext';
 import styles from './page.module.css';
 
 interface Notification {
