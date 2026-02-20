@@ -1528,7 +1528,7 @@
 .main {
   display: flex;
   flex-direction: column;
-  gap: clamp(24px, 4vw, 40px);
+  gap: 0;
   grid-row-start: 2;
   width: 100%;
   max-width: var(--content-max);
@@ -1539,14 +1539,14 @@
 
 @media (max-width: 768px) {
   .main {
-    gap: clamp(20px, 3vw, 32px);
+    gap: 0;
     padding: 0;
   }
 }
 
 @media (max-width: 480px) {
   .main {
-    gap: clamp(16px, 2.5vw, 24px);
+    gap: 0;
     padding: 0;
   }
 }
