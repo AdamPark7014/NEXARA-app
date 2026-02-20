@@ -3206,9 +3206,10 @@ button.secondary {
   }
   
   .carouselSlide {
-    flex: 0 0 calc(50% - 8px);
-    min-width: calc(50% - 8px);
-    min-height: 180px;
+    flex: 0 0 160px;
+    min-width: 160px;
+    height: 110px;
+    min-height: auto;
     padding: 16px;
   }
   
@@ -3249,9 +3250,10 @@ button.secondary {
   }
   
   .carouselSlide {
-    flex: 0 0 calc(100% - 0px);
-    min-width: calc(100% - 0px);
-    min-height: 160px;
+    flex: 0 0 140px;
+    min-width: 140px;
+    height: 100px;
+    min-height: auto;
     padding: 12px;
   }
   
