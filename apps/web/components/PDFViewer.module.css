@@ -136,10 +136,10 @@
   min-height: 500px;
   background: #f5f5f5;
   position: relative;
+}
 
-  :global(.rpv-core__viewer) {
-    height: 100%;
-  }
+.viewer :global(.rpv-core__viewer) {
+  height: 100%;
 }
 
 .hiddenInput {
