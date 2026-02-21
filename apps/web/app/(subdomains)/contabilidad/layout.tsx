@@ -1,25 +1,16 @@
 ﻿"use client";
 
 import Link from "next/link";
-import React, { useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import { useUser } from "@/components/UserContext";
+import React from "react";
+import { usePathname } from "next/navigation";
 import { useTheme } from "@/components/ThemeContext";
-import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import styles from "./layout.module.css";
 
 export default function ContabilidadLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const { user } = useUser();
   const { darkMode, toggleDarkMode } = useTheme();
-  const [hydrated, setHydrated] = useState(false);
 
   const currentPath = pathname ? pathname.replace(/\/+$/, "") : "";
-  // Detectar si estamos en el subdominio de contabilidad o en /panel/contabilidad
-  const isPanelRoute = Boolean(pathname && (pathname.startsWith("/panel/contabilidad") || pathname.startsWith("/contabilidad")));
-  const isLoginRoute = Boolean(pathname && pathname.includes("/login"));
-  const canAccess = Boolean(user && (user.isSuperAdmin || hasPermission(user, PERMISSIONS.CONTABILIDAD_VIEW)));
 
   const navItems = [
     { label: "Dashboard", href: "/dashboard" },
@@ -31,42 +22,9 @@ export default function ContabilidadLayout({ children }: { children: React.React
     { label: "Capital", href: "/capital" },
   ];
 
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated || !isPanelRoute) return;
-    if (!user && !isLoginRoute) {
-      router.replace("/login");
-      return;
-    }
-    if (user && isLoginRoute) {
-      router.replace("/dashboard");
-    }
-  }, [hydrated, isPanelRoute, isLoginRoute, user, router]);
-
-  if (!pathname || !(pathname.startsWith("/panel/contabilidad") || pathname.startsWith("/contabilidad"))) {
+  // Si estamos en login, no renderizar el sidebar
+  if (pathname && pathname.includes("/login")) {
     return <main className={styles.contaMain}>{children}</main>;
-  }
-
-  if (isLoginRoute) {
-    return <main className={styles.contaMain}>{children}</main>;
-  }
-
-  if (user && !canAccess) {
-    return (
-      <main className={styles.contaMain}>
-        <section className={styles.lockedCard}>
-          <p className={styles.lockedKicker}>Acceso restringido</p>
-          <h1 className={styles.lockedTitle}>Panel de Contabilidad</h1>
-          <p className={styles.lockedText}>
-            Tu perfil no tiene habilitado el acceso a contabilidad. Solicita a un super admin que
-            active el permiso.
-          </p>
-        </section>
-      </main>
-    );
   }
 
   return (
