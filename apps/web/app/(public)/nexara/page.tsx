@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import FloatingContactForm from "../components/FloatingContactForm";
+import FloatingContactForm from "../../components/FloatingContactForm";
 import styles from "./page.module.css";
 
 export const metadata = {
