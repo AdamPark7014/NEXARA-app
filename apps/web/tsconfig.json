@@ -13,9 +13,9 @@
     ],
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/components/*": ["./components/*"],
+      "@/app/*": ["./app/*"],
+      "@/*": ["./*"]
     },
     "outDir": "./build",
     "rootDir": ".",

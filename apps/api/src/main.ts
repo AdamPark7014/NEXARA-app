@@ -11,8 +11,46 @@ async function bootstrap() {
   const corsOrigins = corsEnv
     ? corsEnv.split(',').map((origin) => origin.trim()).filter(Boolean)
     : ['http://localhost:3000', 'http://127.0.0.1:3000'];
+  
+  // Lista explícita de subdominios permitidos
+  const allowedSubdomains = [
+    'consola',
+    'ventas', 
+    'web',
+    'contabilidad',
+    'tickets'
+  ];
+  
   app.enableCors({
-    origin: corsOrigins,
+    origin: (origin, callback) => {
+      // Permitir requests sin origin (como Postman)
+      if (!origin) {
+        return callback(null, true);
+      }
+      
+      // Permitir orígenes configurados
+      if (corsOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      
+      // Permitir subdominios específicos de localhost:3000
+      const subdomainPattern = new RegExp(
+        `^http:\\/\\/(${allowedSubdomains.join('|')})\\.localhost:3000$`
+      );
+      if (origin.match(subdomainPattern)) {
+        console.log(`✓ CORS: Permitido ${origin}`);
+        return callback(null, true);
+      }
+      
+      // Permitir cualquier otro subdominio de localhost (desarrollo)
+      if (origin.match(/^http:\/\/[a-z0-9-]+\.localhost:\d+$/)) {
+        console.log(`⚠ CORS: Permitido (wildcard) ${origin}`);
+        return callback(null, true);
+      }
+      
+      console.error(`✗ CORS: Rechazado ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
   });
 

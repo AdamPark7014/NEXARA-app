@@ -1,0 +1,603 @@
+.container {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--panel-padding-y) var(--panel-padding-x);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 2rem;
+  gap: 2rem;
+}
+
+.header h1 {
+  font-size: 2rem;
+  color: var(--text-dark, #000);
+  margin: 0;
+}
+
+.status {
+  font-size: 0.9rem;
+  color: var(--text-secondary, #666);
+  margin: 0.5rem 0 0;
+}
+
+.backBtn {
+  padding: 0.5rem 1rem;
+  background: var(--bg-light, #f5f5f5);
+  border: 1px solid var(--border, #ddd);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.backBtn:hover {
+  background: var(--bg-secondary, #e8e8e8);
+  border-color: var(--text-secondary, #999);
+}
+
+.loading,
+.error {
+  padding: 2rem;
+  text-align: center;
+  font-size: 1.1rem;
+  color: var(--text-secondary, #666);
+}
+
+.error {
+  color: #ef5350;
+}
+
+/* Budget Overview */
+.budgetOverview {
+  background: var(--bg-light, #f9f9f9);
+  border: 1px solid var(--border, #ddd);
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+.budgetTotal {
+  margin-bottom: 1.5rem;
+}
+
+.budgetTotal h2 {
+  font-size: 1rem;
+  color: var(--text-secondary, #666);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 0.5rem;
+}
+
+.amount {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #0f6ad6;
+  margin: 0;
+}
+
+.barContainer {
+  display: flex;
+  height: 32px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f0f0f0;
+  gap: 0;
+}
+
+.barSegment {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: white;
+  font-weight: 600;
+  transition: all 0.3s;
+  min-width: 0;
+}
+
+.barSegment.products {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.barSegment.viaticos {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+}
+
+.barSegment.operativo {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.barSegment.remaining {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+
+/* Costs Grid */
+.costsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.costCard {
+  background: white;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: all 0.3s;
+}
+
+.costCard:hover {
+  box-shadow: 0 4px 12px rgba(15, 106, 214, 0.15);
+  border-color: #0f6ad6;
+  transform: translateY(-2px);
+}
+
+.costCard.highlight {
+  background: linear-gradient(135deg, rgba(15, 106, 214, 0.05), rgba(15, 106, 214, 0.02));
+  border: 2px solid rgba(15, 106, 214, 0.2);
+}
+
+.costHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.costIcon {
+  font-size: 1.5rem;
+}
+
+.costHeader h3 {
+  font-size: 1rem;
+  color: var(--text-dark, #000);
+  margin: 0;
+}
+
+.costAmount {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #0f6ad6;
+  margin: 0.5rem 0;
+}
+
+.costAmount.positive {
+  color: #10b981;
+}
+
+.costAmount.negative {
+  color: #ef5350;
+}
+
+.costPercent {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #666);
+  margin-top: 0.5rem;
+}
+
+.viaticsBadge {
+  display: inline-block;
+  background: rgba(15, 106, 214, 0.1);
+  color: #0f6ad6;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-top: 0.75rem;
+}
+
+/* Viaticos Section */
+.viaticosSection {
+  background: white;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 12px;
+  padding: 2rem;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
+}
+
+.sectionHeader h2 {
+  font-size: 1.25rem;
+  color: var(--text-dark, #000);
+  margin: 0;
+}
+
+.addBtn {
+  padding: 0.6rem 1.2rem;
+  background: #0f6ad6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.addBtn:hover {
+  background: #0856b3;
+  box-shadow: 0 4px 12px rgba(15, 106, 214, 0.3);
+  transform: translateY(-1px);
+}
+
+.empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-secondary, #666);
+  background: var(--bg-light, #f9f9f9);
+  border-radius: 8px;
+}
+
+.viaticsList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.viaticItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--bg-light, #f9f9f9);
+  border: 1px solid var(--border, #ddd);
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.viaticItem:hover {
+  background: white;
+  border-color: #0f6ad6;
+  box-shadow: 0 2px 8px rgba(15, 106, 214, 0.1);
+}
+
+.viaticInfo {
+  flex: 1;
+  min-width: 200px;
+}
+
+.viaticUser {
+  font-weight: 600;
+  color: var(--text-dark, #000);
+  margin-bottom: 0.25rem;
+}
+
+.viaticDetail {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.motivo {
+  color: var(--text-secondary, #666);
+}
+
+.date {
+  color: #999;
+}
+
+.viaticAmount {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f6ad6;
+  min-width: 120px;
+  text-align: right;
+}
+
+.viaticStatus {
+  min-width: 100px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statusPendiente {
+  background: rgba(245, 158, 11, 0.15);
+  color: #d97706;
+}
+
+.statusAprobado {
+  background: rgba(34, 197, 94, 0.15);
+  color: #059669;
+}
+
+.statusRechazado {
+  background: rgba(239, 83, 80, 0.15);
+  color: #b71c1c;
+}
+
+.removeBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(239, 83, 80, 0.1);
+  color: #ef5350;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.removeBtn:hover {
+  background: rgba(239, 83, 80, 0.2);
+  transform: scale(1.1);
+}
+
+/* Modal */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modalContent {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border, #ddd);
+}
+
+.modalHeader h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--text-dark, #000);
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--text-secondary, #666);
+  padding: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.closeBtn:hover {
+  color: var(--text-dark, #000);
+  background: var(--bg-light, #f5f5f5);
+  border-radius: 6px;
+}
+
+.modalBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+}
+
+.noData {
+  text-align: center;
+  color: var(--text-secondary, #666);
+  padding: 2rem 0;
+}
+
+.checkboxList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.checkboxItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.checkboxItem:hover {
+  background: var(--bg-light, #f5f5f5);
+}
+
+.checkboxItem input {
+  margin-top: 3px;
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+}
+
+.checkboxLabel {
+  flex: 1;
+  font-size: 0.95rem;
+  color: var(--text-dark, #000);
+  line-height: 1.4;
+}
+
+.checkboxLabel strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.checkboxLabel em {
+  color: var(--text-secondary, #666);
+  font-style: normal;
+  font-size: 0.85rem;
+}
+
+.modalFooter {
+  display: flex;
+  gap: 1rem;
+  padding: 1.5rem;
+  border-top: 1px solid var(--border, #ddd);
+}
+
+.cancelBtn,
+.confirmBtn {
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancelBtn {
+  flex: 1;
+  background: var(--bg-light, #f5f5f5);
+  color: var(--text-dark, #000);
+  border: 1px solid var(--border, #ddd);
+}
+
+.cancelBtn:hover {
+  background: var(--bg-secondary, #e8e8e8);
+}
+
+.confirmBtn {
+  flex: 1;
+  background: #0f6ad6;
+  color: white;
+}
+
+.confirmBtn:hover:not(:disabled) {
+  background: #0856b3;
+  box-shadow: 0 4px 12px rgba(15, 106, 214, 0.3);
+  transform: translateY(-1px);
+}
+
+.confirmBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Dark Mode Support */
+:global(body.dark) .header h1 {
+  color: #fff;
+}
+
+:global(body.dark) .costCard {
+  background: #1e1e1e;
+  border-color: #333;
+}
+
+:global(body.dark) .costCard:hover {
+  border-color: #0f6ad6;
+}
+
+:global(body.dark) .viaticItem {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: #333;
+}
+
+:global(body.dark) .viaticItem:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #0f6ad6;
+}
+
+:global(body.dark) .viaticUser {
+  color: #fff;
+}
+
+:global(body.dark) .costHeader h3,
+:global(body.dark) .sectionHeader h2,
+:global(body.dark) .modalHeader h3 {
+  color: #fff;
+}
+
+:global(body.dark) .modalContent {
+  background: #1e1e1e;
+}
+
+:global(body.dark) .modalHeader {
+  border-bottom-color: #333;
+}
+
+:global(body.dark) .modalFooter {
+  border-top-color: #333;
+}
+
+:global(body.dark) .checkboxItem:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+:global(body.dark) .checkboxLabel {
+  color: #fff;
+}
+
+:global(body.dark) .cancelBtn {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #333;
+  color: #fff;
+}
+
+:global(body.dark) .cancelBtn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+:global(body.dark) .budgetOverview {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: #333;
+}
+
+:global(body.dark) .viaticosSection {
+  background: #1e1e1e;
+  border-color: #333;
+}

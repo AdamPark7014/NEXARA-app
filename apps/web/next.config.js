@@ -7,6 +7,16 @@ const nextConfig = {
   // Habilitar SWC para compilación más rápida
   swcMinify: true,
   
+  // Permitir subdominios en desarrollo
+  allowedDevOrigins: [
+    'consola.localhost:3000',
+    'ventas.localhost:3000',
+    'web.localhost:3000',
+    'contabilidad.localhost:3000',
+    'tickets.localhost:3000',
+    'ingenieros.localhost:3000',
+  ],
+  
   // Configuración experimental para mejor performance
   experimental: {
     optimizePackageImports: ['@mui/material', '@mui/icons-material'],
@@ -57,6 +67,9 @@ const nextConfig = {
     return config;
   },
   
+  // Support para subdominios
+  // El middleware se encarga de la reescritura de URLs
+  
   async rewrites() {
     return {
       fallback: [
@@ -66,6 +79,19 @@ const nextConfig = {
         },
       ],
     };
+  },
+
+  // Opcional: Redirects para mantener compatibilidad con URLs antiguas
+  async redirects() {
+    return [
+      // Redirige rutas antiguas de /panel a subdominios (si es necesario)
+      // Comentado por ahora - activa solo si necesitas mantener URLs antiguas
+      // {
+      //   source: '/panel/console/:path*',
+      //   destination: '/:path*',
+      //   permanent: false,
+      // },
+    ];
   },
 };
 

@@ -1,13 +1,14 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import CertificationsCarousel from "./components/CertificationsCarousel";
-import BrandsCarousel from "./components/BrandsCarousel";
-import ContactFormToggle from "./components/ContactFormToggle";
-import FloatingContactForm from "./components/FloatingContactForm";
-import FAQ from "./components/FAQ";
-import styles from "./page.module.css";
+import dynamic from "next/dynamic";
+const CertificationsCarousel = dynamic(() => import("../components/CertificationsCarousel"), { ssr: false });
+const BrandsCarousel = dynamic(() => import("../components/BrandsCarousel"), { ssr: false });
+const ContactFormToggle = dynamic(() => import("../components/ContactFormToggle"), { ssr: false });
+const FloatingContactForm = dynamic(() => import("../components/FloatingContactForm"), { ssr: false });
+const FAQ = dynamic(() => import("../components/FAQ"), { ssr: false });
+import styles from "../page.module.css";
 
 interface Client {
   id: number;
@@ -464,4 +465,3 @@ export default function Home() {
     </div>
   );
 }
-

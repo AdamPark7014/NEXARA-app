@@ -83,7 +83,9 @@
 }
 
 .logoIcon {
-  font-size: 1.8rem;
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
   flex-shrink: 0;
 }
 
@@ -403,35 +405,429 @@
   }
 }
 
-/* === RESPONSIVE === */
+/* === TABLET RESPONSIVE === */
+@media (max-width: 1024px) {
+  .ventasSidebar {
+    width: 280px;
+  }
+  
+  .logoText {
+    font-size: 1.4rem;
+  }
+  
+  .navLink {
+    padding: 9px 11px;
+    font-size: 0.93rem;
+  }
+  
+  .navIcon {
+    font-size: 1.2rem;
+  }
+}
+
+/* === MOBILE SUPER DYNAMIC === */
 @media (max-width: 768px) {
   .ventasSidebar {
     width: 100% !important;
+    max-height: 100vh;
     margin: 0;
-    margin: 0;
-    border-radius: 0;
+    border-radius: 0 0 32px 32px;
     border-right: none;
-    border-bottom: 1px solid rgba(15, 106, 214, 0.2);
-    padding: 12px 16px;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
+    border-bottom: 2px solid rgba(15, 106, 214, 0.25);
+    padding: 16px 20px;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    z-index: 999;
+    backdrop-filter: blur(24px);
+    box-shadow: 0 8px 40px rgba(15, 32, 64, 0.28), 0 4px 12px rgba(15, 32, 64, 0.15);
+    animation: mobileSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .sidebarOpen,
   .sidebarCollapsed {
-    width: 100%;
+    width: 100% !important;
   }
 
-  .navContainer {
-    display: none;
+  .sidebarHeader {
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+    border-bottom: 2px solid rgba(15, 106, 214, 0.2);
+  }
+
+  .logoContainer {
+    gap: 12px;
+  }
+
+  .logoIcon {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+    animation: logoSpin 3s ease-in-out infinite;
+  }
+
+  .logoText {
+    font-size: 1.6rem;
+  }
+
+  .toggleBtn {
+    width: 40px;
+    height: 40px;
+    font-size: 1.2rem;
+    border-radius: 12px;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .toggleBtn:active {
+    transform: scale(0.9) rotate(90deg);
   }
 
   .userCard {
-    display: none;
+    padding: 16px 18px;
+    border-radius: 18px;
+    margin-bottom: 18px;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 6px 18px rgba(15, 106, 214, 0.18);
+  }
+
+  .userCard:active {
+    transform: scale(0.98);
+    box-shadow: inset 0 3px 10px rgba(15, 106, 214, 0.15);
+  }
+
+  .userAvatar {
+    width: 52px;
+    height: 52px;
+    font-size: 1.4rem;
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .userCard:hover .userAvatar {
+    transform: rotate(10deg) scale(1.08);
+  }
+
+  .userName {
+    font-size: 1rem;
+  }
+
+  .userRole {
+    font-size: 0.85rem;
+  }
+
+  .navContainer {
+    display: block;
+    max-height: calc(100vh - 380px);
+    overflow-y: auto;
+    padding-right: 8px;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+
+  .navContainer::-webkit-scrollbar {
+    width: 5px;
+  }
+
+  .navContainer::-webkit-scrollbar-track {
+    background: rgba(15, 106, 214, 0.08);
+    border-radius: 10px;
+  }
+
+  .navContainer::-webkit-scrollbar-thumb {
+    background: rgba(15, 106, 214, 0.4);
+    border-radius: 10px;
+    transition: background 0.3s ease;
+  }
+
+  .navContainer::-webkit-scrollbar-thumb:hover {
+    background: rgba(15, 106, 214, 0.6);
+  }
+
+  .navSection {
+    margin-bottom: 16px;
+    animation: fadeInRight 0.4s ease-out both;
+  }
+
+  .navSection:nth-child(1) { animation-delay: 0.1s; }
+  .navSection:nth-child(2) { animation-delay: 0.2s; }
+  .navSection:nth-child(3) { animation-delay: 0.3s; }
+
+  .sectionTitle {
+    font-size: 0.75rem;
+    letter-spacing: 0.35rem;
+    margin: 12px 10px 10px;
+    padding-left: 10px;
+    border-left: 4px solid var(--primary);
+    animation: slideRight 0.5s ease-out both;
+  }
+
+  .navList {
+    gap: 8px;
+  }
+
+  .navLink {
+    padding: 13px 15px;
+    border-radius: 16px;
+    border-left-width: 3px;
+    font-size: 0.96rem;
+    gap: 14px;
+    transform: translateX(0);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 3px 10px rgba(15, 106, 214, 0.08);
+  }
+
+  .navLink:active {
+    transform: translateX(8px) scale(0.98);
+    box-shadow: 0 2px 8px rgba(15, 106, 214, 0.15);
+  }
+
+  .navLink:hover {
+    transform: translateX(6px);
+    box-shadow: 0 6px 18px rgba(15, 106, 214, 0.2);
+  }
+
+  .navLinkActive {
+    transform: translateX(4px);
+    box-shadow: 0 8px 24px rgba(37, 99, 235, 0.25);
+    animation: activePulse 2s ease-in-out infinite;
+  }
+
+  .navIcon {
+    font-size: 1.4rem;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .navLink:hover .navIcon {
+    transform: scale(1.15) rotate(5deg);
+  }
+
+  .navLinkActive .navIcon {
+    animation: iconBounce 1s ease-in-out infinite;
+  }
+
+  .navLabel {
+    font-size: 0.96rem;
+    font-weight: 600;
+  }
+
+  .navDescription {
+    font-size: 0.78rem;
+  }
+
+  .navIndicator {
+    width: 8px;
+    height: 8px;
+    animation: indicatorPulse 1.5s ease-in-out infinite;
   }
 
   .sidebarFooter {
-    display: none;
+    display: flex;
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 2px solid rgba(15, 106, 214, 0.2);
+    gap: 10px;
+    font-size: 0.92rem;
+    animation: fadeInUp 0.5s ease-out 0.4s both;
+  }
+
+  .statusIndicator {
+    width: 12px;
+    height: 12px;
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
+  }
+
+  .statusIndicatorSmall {
+    width: 10px;
+    height: 10px;
+  }
+
+  .statusText {
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+}
+
+/* === EXTRA SMALL MOBILE === */
+@media (max-width: 480px) {
+  .ventasSidebar {
+    padding: 14px 16px;
+    border-radius: 0 0 28px 28px;
+  }
+
+  .sidebarHeader {
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+  }
+
+  .logoIcon {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+  }
+
+  .logoText {
+    font-size: 1.4rem;
+  }
+
+  .toggleBtn {
+    width: 38px;
+    height: 38px;
+    font-size: 1.1rem;
+  }
+
+  .userCard {
+    padding: 14px 16px;
+    margin-bottom: 16px;
+  }
+
+  .userAvatar {
+    width: 48px;
+    height: 48px;
+    font-size: 1.3rem;
+  }
+
+  .userName {
+    font-size: 0.95rem;
+  }
+
+  .userRole {
+    font-size: 0.8rem;
+  }
+
+  .badgeAdmin {
+    font-size: 0.65rem;
+    padding: 3px 7px;
+  }
+
+  .navContainer {
+    max-height: calc(100vh - 360px);
+  }
+
+  .sectionTitle {
+    font-size: 0.7rem;
+    letter-spacing: 0.3rem;
+    margin: 10px 8px 8px;
+    padding-left: 8px;
+  }
+
+  .navList {
+    gap: 6px;
+  }
+
+  .navLink {
+    padding: 11px 13px;
+    font-size: 0.9rem;
+    gap: 12px;
+  }
+
+  .navIcon {
+    font-size: 1.3rem;
+  }
+
+  .navLabel {
+    font-size: 0.9rem;
+  }
+
+  .navDescription {
+    font-size: 0.75rem;
+  }
+
+  .sidebarFooter {
+    margin-top: 16px;
+    padding-top: 14px;
+    font-size: 0.88rem;
+  }
+
+  .statusIndicator {
+    width: 10px;
+    height: 10px;
+  }
+
+  .statusText {
+    font-size: 0.85rem;
+  }
+}
+
+/* === ANIMATIONS === */
+@keyframes mobileSlideIn {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInRight {
+  from {
+    transform: translateX(-30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideRight {
+  from {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes logoSpin {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes iconBounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes activePulse {
+  0%, 100% {
+    box-shadow: 0 8px 24px rgba(37, 99, 235, 0.25);
+  }
+  50% {
+    box-shadow: 0 12px 32px rgba(37, 99, 235, 0.4);
+  }
+}
+
+@keyframes indicatorPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.2);
   }
 }

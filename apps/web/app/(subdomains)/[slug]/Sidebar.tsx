@@ -1,0 +1,104 @@
+"use client";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import styles from "./console.module.css";
+import { useUser } from '@/components/UserContext';
+import { useTheme } from '@/components/ThemeContext';
+import Image from "next/image";
+import { hasAnyPermission, hasPermission, PERMISSIONS } from '@/lib/permissions';
+
+export default function Sidebar() {
+  const pathname = usePathname();
+  const { user } = useUser();
+  const { darkMode, toggleDarkMode } = useTheme();
+  console.log("[SIDEBAR] Usuario en contexto:", user);
+  if (!user) return null;
+
+  // Menú por permisos
+  const menu = [
+    { label: "Dashboard", href: "/panel/console/dashboard", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Actividades", href: "/panel/console/activities", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Evidencias", href: "/panel/console/evidences", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Viáticos", href: "/panel/console/viatics", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Vehículos", href: "/panel/console/vehicles", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Clientes", href: "/panel/console/clients", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Tickets clientes", href: "/panel/console/client-tickets", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Usuarios", href: "/panel/console/users", permissions: [PERMISSIONS.USERS_MANAGE] },
+    { label: "Mis Actividades", href: "/panel/console/my-activities", permissions: [PERMISSIONS.CONSOLE_ACCESS], hideForAdmins: true },
+    { label: "Mi Perfil", href: "/panel/console/my-profile", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Mis Evidencias", href: "/panel/console/my-evidences", permissions: [PERMISSIONS.CONSOLE_ACCESS], hideForAdmins: true },
+    { label: "Mis Viáticos", href: "/panel/console/my-viatics", permissions: [PERMISSIONS.CONSOLE_ACCESS], hideForAdmins: true },
+    { label: "Mis Vehículos", href: "/panel/console/my-vehicles", permissions: [PERMISSIONS.CONSOLE_ACCESS], hideForAdmins: true },
+    { label: "Entradas/Salidas", href: "/panel/console/attendance", permissions: [PERMISSIONS.ATTENDANCE_VIEW] },
+    { label: "Mapa GPS", href: "/panel/console/gps", permissions: [PERMISSIONS.GPS_VIEW] },
+    { label: "Cotizaciones", href: "/panel/console/cotizaciones", permissions: [PERMISSIONS.COTIZACIONES_ACCESS] },
+  ];
+
+  // Avatar: usa user.avatarUrl si existe, si no, usa un avatar generado por ui-avatars.com
+  const avatarUrl = user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nombre)}&background=0D8ABC&color=fff&size=96`;
+
+  return (
+    <aside className={styles.sidebar}>
+      <div className={styles.sidebarLogo}>
+        <span className={styles.brandMark}>NEXARA</span>
+        <span className={styles.brandSub}>Console</span>
+      </div>
+      <div className={styles.sidebarUser}>
+        <div className={styles.sidebarAvatar}>
+          <Image className={styles.avatarImage} src={avatarUrl} alt={user.nombre} width={64} height={64} />
+        </div>
+        <div className={styles.sidebarName}>{user.nombre}</div>
+        <div className={styles.sidebarEmail}>{user.email}</div>
+        <div className={styles.sidebarMeta}>
+          <span className={styles.rolePill}>{user.role}</span>
+          {user.isSuperAdmin && <span className={styles.levelPill}>Superadmin</span>}
+        </div>
+      </div>
+      <div className={styles.menuTitle}>Menu principal</div>
+      <ul className={styles.sidebarMenu}>
+        {menu.filter(item => {
+          if (item.hideForAdmins && user.isSuperAdmin) return false;
+          if (item.permissions && !item.permissions.every((permission) => hasPermission(user, permission))) {
+            return false;
+          }
+          if (item.anyPermissions && !hasAnyPermission(user, item.anyPermissions)) {
+            return false;
+          }
+          return true;
+        }).map((item) => (
+          <li key={item.href} className={styles.sidebarMenuItem}>
+            <Link
+              href={item.href}
+              className={
+                pathname && pathname === item.href
+                  ? `${styles.menuLink} ${styles.active}`
+                  : styles.menuLink
+              }
+            >
+              {item.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+      <div style={{ padding: '1rem', marginTop: 'auto', borderTop: '1px solid var(--border-color)' }}>
+        <button
+          onClick={toggleDarkMode}
+          style={{
+            width: '100%',
+            padding: '0.75rem',
+            borderRadius: '8px',
+            border: 'none',
+            background: 'var(--card-bg)',
+            color: 'var(--text-color)',
+            cursor: 'pointer',
+            fontSize: '1.5rem',
+            transition: 'all 0.2s ease',
+          }}
+          aria-label={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+        >
+          {darkMode ? '🌙' : '☀️'}
+        </button>
+      </div>
+    </aside>
+  );
+}

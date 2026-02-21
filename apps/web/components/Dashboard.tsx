@@ -248,8 +248,8 @@ export default function Dashboard() {
     fetchAll();
   }, [user, weekRange.from, weekRange.to]);
 
-  if (loading) return <div className="card">Cargando dashboard...</div>;
-  if (error) return <div className="card" style={{ color: 'var(--danger)' }}>{error}</div>;
+  if (loading) return <div className="loadingCard">Cargando dashboard...</div>;
+  if (error) return <div className="errorCard">{error}</div>;
   if (!user) return null;
 
   const activeUserId = selectedUserId ?? Number(user.id);
@@ -576,6 +576,27 @@ export default function Dashboard() {
       </div>
 
       <style jsx>{`
+        .loadingCard,
+        .errorCard {
+          padding: 24px;
+          border-radius: 16px;
+          background: var(--surface);
+          border: 1px solid rgba(15, 106, 214, 0.16);
+          color: var(--foreground);
+          text-align: center;
+          font-size: 16px;
+        }
+
+        :global(body.dark) .loadingCard,
+        :global(body.dark) .errorCard {
+          border-color: rgba(23, 137, 252, 0.2);
+        }
+
+        .errorCard {
+          color: var(--danger);
+          border-color: var(--danger);
+        }
+
         .dashboardRoot {
           display: grid;
           gap: 18px;
@@ -595,8 +616,18 @@ export default function Dashboard() {
           border-radius: 20px;
           border: 1px solid rgba(15, 106, 214, 0.16);
           background: var(--surface);
-          box-shadow: 0 16px 32px rgba(11, 32, 68, 0.12);
+          box-shadow: 0 16px 32px var(--shadow);
           overflow: hidden;
+        }
+
+        :global(body.light) .heroCard {
+          border: 1px solid rgba(15, 106, 214, 0.16);
+          box-shadow: 0 16px 32px rgba(11, 32, 68, 0.12);
+        }
+
+        :global(body.dark) .heroCard {
+          border: 1px solid rgba(23, 137, 252, 0.2);
+          box-shadow: 0 16px 32px rgba(0, 0, 0, 0.3);
         }
 
         .heroCard::after {
@@ -658,7 +689,13 @@ export default function Dashboard() {
           font-size: 11px;
           padding: 4px 10px;
           border-radius: 999px;
-          background: rgba(255, 255, 255, 0.08);
+          background: rgba(15, 106, 214, 0.12);
+          color: var(--text-secondary);
+        }
+
+        :global(body.dark) .heroLevel {
+          background: rgba(23, 137, 252, 0.15);
+          color: var(--text-tertiary);
         }
 
         .chip {
@@ -670,9 +707,18 @@ export default function Dashboard() {
           border: 1px solid rgba(15, 106, 214, 0.18);
         }
 
+        :global(body.dark) .chip {
+          background: rgba(23, 137, 252, 0.14);
+          border-color: rgba(23, 137, 252, 0.2);
+        }
+
         .chipLive {
           color: var(--primary);
           background: rgba(15, 106, 214, 0.18);
+        }
+
+        :global(body.dark) .chipLive {
+          background: rgba(23, 137, 252, 0.2);
         }
 
         .filtersRow {
@@ -694,6 +740,20 @@ export default function Dashboard() {
           color: var(--text-tertiary);
         }
 
+        .input {
+          padding: 8px 12px;
+          border-radius: 8px;
+          border: 1px solid rgba(15, 106, 214, 0.2);
+          background: var(--surface);
+          color: var(--foreground);
+          font-size: 14px;
+        }
+
+        :global(body.dark) .input {
+          border-color: rgba(23, 137, 252, 0.3);
+          background: rgba(35, 39, 47, 0.8);
+        }
+
         .kpiGrid {
           position: relative;
           z-index: 1;
@@ -706,15 +766,20 @@ export default function Dashboard() {
           padding: 18px;
           border-radius: 18px;
           border: 1px solid rgba(15, 106, 214, 0.14);
-          background: linear-gradient(150deg, rgba(255, 255, 255, 0.86), rgba(235, 243, 255, 0.9));
-          box-shadow: 0 14px 26px rgba(15, 106, 214, 0.14);
+          background: var(--surface);
+          box-shadow: 0 14px 26px var(--shadow);
           display: grid;
           gap: 10px;
           animation: floatUp 0.4s ease both;
         }
 
+        :global(body.light) .kpiCard {
+          background: linear-gradient(150deg, rgba(255, 255, 255, 0.86), rgba(235, 243, 255, 0.9));
+          border: 1px solid rgba(15, 106, 214, 0.14);
+        }
+
         :global(body.dark) .kpiCard {
-          background: linear-gradient(150deg, rgba(12, 20, 34, 0.96), rgba(8, 12, 20, 0.98));
+          background: linear-gradient(150deg, rgba(35, 39, 47, 0.96), rgba(21, 21, 24, 0.98));
           border-color: rgba(23, 137, 252, 0.2);
         }
 
@@ -739,9 +804,18 @@ export default function Dashboard() {
           color: var(--text-secondary);
         }
 
+        :global(body.dark) .kpiPill {
+          background: rgba(23, 137, 252, 0.14);
+          color: var(--text-tertiary);
+        }
+
         .pillAccent {
           background: rgba(22, 169, 110, 0.2);
           color: var(--accent);
+        }
+
+        :global(body.dark) .pillAccent {
+          background: rgba(251, 197, 31, 0.2);
         }
 
         .kpiValue {
@@ -767,14 +841,19 @@ export default function Dashboard() {
           padding: 20px;
           border-radius: 20px;
           border: 1px solid rgba(15, 106, 214, 0.16);
-          background: linear-gradient(155deg, rgba(255, 255, 255, 0.88), rgba(232, 241, 255, 0.94));
-          box-shadow: 0 16px 34px rgba(11, 32, 68, 0.14);
+          background: var(--surface);
+          box-shadow: 0 16px 34px var(--shadow);
           display: grid;
           gap: 16px;
         }
 
+        :global(body.light) .analysisCard {
+          background: linear-gradient(155deg, rgba(255, 255, 255, 0.88), rgba(232, 241, 255, 0.94));
+          border: 1px solid rgba(15, 106, 214, 0.16);
+        }
+
         :global(body.dark) .analysisCard {
-          background: linear-gradient(155deg, rgba(12, 20, 34, 0.98), rgba(8, 12, 20, 0.98));
+          background: linear-gradient(155deg, rgba(35, 39, 47, 0.98), rgba(21, 21, 24, 0.98));
           border-color: rgba(23, 137, 252, 0.2);
         }
 
@@ -807,6 +886,11 @@ export default function Dashboard() {
           white-space: nowrap;
         }
 
+        :global(body.dark) .analysisPill {
+          background: rgba(23, 137, 252, 0.14);
+          color: var(--text-tertiary);
+        }
+
         .userHoursList {
           display: grid;
           gap: 10px;
@@ -820,6 +904,16 @@ export default function Dashboard() {
           border-radius: 12px;
           background: rgba(15, 106, 214, 0.08);
           border: 1px solid rgba(15, 106, 214, 0.14);
+        }
+
+        :global(body.light) .userHoursRow {
+          background: rgba(15, 106, 214, 0.08);
+          border: 1px solid rgba(15, 106, 214, 0.14);
+        }
+
+        :global(body.dark) .userHoursRow {
+          background: rgba(23, 137, 252, 0.1);
+          border: 1px solid rgba(23, 137, 252, 0.2);
         }
 
         .userHoursName {
@@ -838,7 +932,7 @@ export default function Dashboard() {
           padding: 8px;
           border-radius: 16px;
           border: 1px solid rgba(23, 137, 252, 0.2);
-          background: linear-gradient(160deg, rgba(12, 32, 58, 0.6), rgba(12, 20, 34, 0.9));
+          background: rgba(35, 39, 47, 0.6);
         }
 
         :global(body.light) .chartWrap {
@@ -846,9 +940,14 @@ export default function Dashboard() {
           border-color: rgba(15, 106, 214, 0.18);
         }
 
+        :global(body.dark) .chartWrap {
+          background: linear-gradient(160deg, rgba(35, 39, 47, 0.6), rgba(21, 21, 24, 0.9));
+          border-color: rgba(23, 137, 252, 0.2);
+        }
+
         .chartTooltip {
-          background: rgba(11, 20, 36, 0.95);
-          color: #fff;
+          background: rgba(35, 39, 47, 0.95);
+          color: #ededed;
           padding: 10px 12px;
           border-radius: 12px;
           font-size: 12px;
@@ -862,6 +961,12 @@ export default function Dashboard() {
           color: var(--foreground);
           border-color: rgba(15, 106, 214, 0.2);
           box-shadow: 0 12px 26px rgba(15, 106, 214, 0.18);
+        }
+
+        :global(body.dark) .chartTooltip {
+          background: rgba(35, 39, 47, 0.95);
+          color: #ededed;
+          border: 1px solid rgba(23, 137, 252, 0.35);
         }
 
         .chartTooltipTitle {
