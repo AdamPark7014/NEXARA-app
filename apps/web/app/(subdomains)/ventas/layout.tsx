@@ -13,8 +13,9 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
   const { user } = useUser();
   const [hydrated, setHydrated] = useState(false);
 
-  const isPanelRoute = Boolean(pathname && pathname.startsWith("/panel/ventas"));
-  const isLoginRoute = Boolean(pathname && pathname.startsWith("/login"));
+  // Detectar si estamos en el subdominio de ventas o en /panel/ventas
+  const isPanelRoute = Boolean(pathname && (pathname.startsWith("/panel/ventas") || pathname.startsWith("/ventas")));
+  const isLoginRoute = Boolean(pathname && pathname.includes("/login"));
   const canAccess = Boolean(user && (user.isSuperAdmin || hasPermission(user, PERMISSIONS.PANEL_VENTAS)));
 
   useEffect(() => {
@@ -32,7 +33,7 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
     }
   }, [hydrated, isPanelRoute, isLoginRoute, user, router]);
 
-  if (!pathname || !pathname.startsWith("/panel/ventas")) {
+  if (!pathname || !(pathname.startsWith("/panel/ventas") || pathname.startsWith("/ventas"))) {
     return <main className={styles.salesMain}>{children}</main>;
   }
 

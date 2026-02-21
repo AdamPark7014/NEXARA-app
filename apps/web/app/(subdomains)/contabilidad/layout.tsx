@@ -16,8 +16,9 @@ export default function ContabilidadLayout({ children }: { children: React.React
   const [hydrated, setHydrated] = useState(false);
 
   const currentPath = pathname ? pathname.replace(/\/+$/, "") : "";
-  const isPanelRoute = Boolean(pathname && pathname.startsWith("/panel/contabilidad"));
-  const isLoginRoute = Boolean(pathname && pathname.startsWith("/login"));
+  // Detectar si estamos en el subdominio de contabilidad o en /panel/contabilidad
+  const isPanelRoute = Boolean(pathname && (pathname.startsWith("/panel/contabilidad") || pathname.startsWith("/contabilidad")));
+  const isLoginRoute = Boolean(pathname && pathname.includes("/login"));
   const canAccess = Boolean(user && (user.isSuperAdmin || hasPermission(user, PERMISSIONS.CONTABILIDAD_VIEW)));
 
   const navItems = [
@@ -45,7 +46,7 @@ export default function ContabilidadLayout({ children }: { children: React.React
     }
   }, [hydrated, isPanelRoute, isLoginRoute, user, router]);
 
-  if (!pathname || !pathname.startsWith("/panel/contabilidad")) {
+  if (!pathname || !(pathname.startsWith("/panel/contabilidad") || pathname.startsWith("/contabilidad"))) {
     return <main className={styles.contaMain}>{children}</main>;
   }
 
