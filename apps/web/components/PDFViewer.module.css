@@ -164,6 +164,13 @@
   font-size: 14px;
 }
 
+.noData {
+  padding: 40px 20px;
+  text-align: center;
+  color: #999;
+  font-size: 16px;
+}
+
 @media (max-width: 768px) {
   .header {
     flex-direction: column;

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useUser } from './UserContext';
+import PDFViewer from './PDFViewer';
 import styles from './SalesReportsDashboard.module.css';
 
 interface SalesMetrics {
@@ -42,6 +43,8 @@ export default function SalesReportsDashboard({
   const [error, setError] = useState<string | null>(null);
   const [currentPeriod, setCurrentPeriod] = useState<'week' | 'month' | 'year'>(period);
   const [generatePdfLoading, setGeneratePdfLoading] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [showPdfViewer, setShowPdfViewer] = useState(false);
 
   const fetchMetrics = async () => {
     if (!user?.token) return;
@@ -102,18 +105,23 @@ export default function SalesReportsDashboard({
 
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `reporte-ventas-${currentPeriod}-${new Date().toISOString().slice(0, 10)}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      setPdfUrl(url);
+      setShowPdfViewer(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al generar PDF');
     } finally {
       setGeneratePdfLoading(false);
     }
+  };
+
+  const handleDownloadPdf = () => {
+    if (!pdfUrl) return;
+    const a = document.createElement('a');
+    a.href = pdfUrl;
+    a.download = `reporte-ventas-${currentPeriod}-${new Date().toISOString().slice(0, 10)}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   const formatMoney = (value: number) =>
@@ -287,6 +295,32 @@ export default function SalesReportsDashboard({
             </div>
           </div>
         </>
+      )}
+
+      {/* PDF Viewer Modal */}
+      {showPdfViewer && pdfUrl && (
+        <div className={styles.pdfModal} onClick={() => setShowPdfViewer(false)}>
+          <div className={styles.pdfModalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.pdfModalHeader}>
+              <h3>Reporte de Ventas - {getPeriodLabel()}</h3>
+              <div className={styles.pdfModalActions}>
+                <button className={styles.pdfDownloadBtn} onClick={handleDownloadPdf}>
+                  📥 Descargar
+                </button>
+                <button className={styles.pdfCloseBtn} onClick={() => setShowPdfViewer(false)}>
+                  ✕ Cerrar
+                </button>
+              </div>
+            </div>
+            <div className={styles.pdfViewerContainer}>
+              <PDFViewer 
+                pdfUrl={pdfUrl} 
+                fileName={`reporte-ventas-${currentPeriod}.pdf`}
+                height="70vh"
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
