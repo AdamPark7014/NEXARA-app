@@ -4,11 +4,8 @@ import localFont from "next/font/local";
 
 import "./globals.css";
 import "./utilities.css";
-import Header from "../components/Header";
 import { ThemeProvider } from "../components/ThemeContext";
 import ClientLayout from "./ClientLayout";
-import Footer from "./components/Footer";
-import { NotificationBanner } from "../components/NotificationBanner";
 import { UserProvider } from "../components/UserContext";
 
 const geistSans = localFont({
@@ -32,10 +29,7 @@ export default function RootLayout({
         <UserProvider>
           <ThemeProvider>
             <ClientLayout>
-              <NotificationBanner />
-              <Header />
               {children}
-              <Footer />
             </ClientLayout>
           </ThemeProvider>
         </UserProvider>

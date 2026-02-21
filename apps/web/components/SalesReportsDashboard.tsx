@@ -82,6 +82,9 @@ export default function SalesReportsDashboard({
     if (!user?.token || !metrics) return;
     setGeneratePdfLoading(true);
     try {
+      // Build logo URL with nexara.com.mx domain
+      const logoUrl = 'https://nexara.com.mx/logo-nexara.png';
+
       const res = await fetch(`${apiUrl}/ventas/reportes/generar-pdf`, {
         method: 'POST',
         headers: {
@@ -91,6 +94,7 @@ export default function SalesReportsDashboard({
         body: JSON.stringify({
           period: currentPeriod,
           includeVendorStats: true,
+          logoUrl,
         }),
       });
 

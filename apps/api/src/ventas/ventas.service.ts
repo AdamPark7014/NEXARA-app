@@ -1299,7 +1299,7 @@ export class VentasService {
     return vendorStats.sort((a, b) => b.revenue - a.revenue);
   }
 
-  async generateDynamicReportPdf(period: 'week' | 'month' | 'year', user?: any, includeVendorStats = false) {
+  async generateDynamicReportPdf(period: 'week' | 'month' | 'year', user?: any, includeVendorStats = false, logoUrl?: string) {
     const metrics = await this.getMetricsByPeriod(period, user);
 
     // Build summary for PDF payload
@@ -1324,6 +1324,7 @@ export class VentasService {
       byLeadSource: [],
       marginByStatus: [],
       topOpportunities: [],
+      logoUrl,
     });
 
     return pdfBuffer;

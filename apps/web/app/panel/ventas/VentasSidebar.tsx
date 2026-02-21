@@ -69,8 +69,8 @@ export default function VentasSidebar() {
       {/* Header con Logo */}
       <div className={styles.sidebarHeader}>
         <div className={styles.logoContainer}>
-          <div className={styles.logoIcon}>📊</div>
-          {sidebarOpen && <h2 className={styles.logoText}>Ventas Pro</h2>}
+          <img src="/logo-nexara.png" alt="NEXARA Logo" className={styles.logoIcon} />
+          {sidebarOpen && <h2 className={styles.logoText}>NEXARA</h2>}
         </div>
         <button
           className={styles.toggleBtn}

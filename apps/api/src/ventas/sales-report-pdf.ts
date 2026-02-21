@@ -1,5 +1,16 @@
 import PDFDocument from 'pdfkit';
 
+const fetchImageBuffer = async (url: string): Promise<Buffer | null> => {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch {
+    return null;
+  }
+};
+
 export type SalesReportTotals = {
   leads: number;
   opportunities: number;
@@ -21,6 +32,7 @@ export type SalesReportPayload = {
   byLeadSource: Array<{ source: string; count: number }>;
   marginByStatus: Array<{ status: string; margin: number }>;
   topOpportunities: Array<{ title: string; value: number; stage: string; probability: number; clientName?: string | null }>;
+  logoUrl?: string;
 };
 
 const formatMoney = (value: number) =>
@@ -42,7 +54,13 @@ const formatDateTime = (value?: Date | null) => {
   });
 };
 
-export const generateSalesReportPdf = (payload: SalesReportPayload): Promise<Buffer> => {
+export const generateSalesReportPdf = async (payload: SalesReportPayload): Promise<Buffer> => {
+  // Fetch logo if provided
+  let logoBuffer: Buffer | null = null;
+  if (payload.logoUrl) {
+    logoBuffer = await fetchImageBuffer(payload.logoUrl);
+  }
+
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 40 });
     const chunks: Buffer[] = [];
@@ -71,10 +89,19 @@ export const generateSalesReportPdf = (payload: SalesReportPayload): Promise<Buf
       doc.rect(0, 0, pageWidth, 6).fill(colors.blue);
       doc.restore();
 
-      doc.fillColor(colors.navy).fontSize(20).font('Helvetica-Bold').text('Reporte Comercial', margin, 28, {
-        width: 280,
+      // Draw logo if available
+      if (logoBuffer) {
+        try {
+          doc.image(logoBuffer, margin, 18, { width: 40, height: 40 });
+        } catch {
+          // Silently fail if logo cannot be rendered
+        }
+      }
+
+      doc.fillColor(colors.navy).fontSize(20).font('Helvetica-Bold').text('Reporte Comercial', logoBuffer ? margin + 50 : margin, 28, {
+        width: logoBuffer ? 230 : 280,
       });
-      doc.fontSize(10).font('Helvetica').fillColor(colors.muted).text('Indicadores de ventas y crecimiento', margin, 56);
+      doc.fontSize(10).font('Helvetica').fillColor(colors.muted).text('Indicadores de ventas y crecimiento', logoBuffer ? margin + 50 : margin, 56);
 
       doc.fillColor(colors.text).fontSize(9);
       doc.text(`Rango: ${payload.rangeLabel}`, margin + 300, 32, { width: 220, align: 'right' });

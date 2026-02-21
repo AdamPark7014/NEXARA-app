@@ -50,11 +50,11 @@ export class VentasReportesController {
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.PANEL_VENTAS] })
   async generatePdf(
-    @Body() dto: { period: 'week' | 'month' | 'year'; includeVendorStats?: boolean },
+    @Body() dto: { period: 'week' | 'month' | 'year'; includeVendorStats?: boolean; logoUrl?: string },
     @CurrentUser() user: any,
     @Res() res: Response,
   ) {
-    const pdfBuffer = await this.ventasService.generateDynamicReportPdf(dto.period, user, dto.includeVendorStats);
+    const pdfBuffer = await this.ventasService.generateDynamicReportPdf(dto.period, user, dto.includeVendorStats, dto.logoUrl);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=reporte-ventas-${dto.period}-${new Date().toISOString().slice(0, 10)}.pdf`);
     res.send(pdfBuffer);
