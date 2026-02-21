@@ -33,11 +33,26 @@ async function bootstrap() {
         return callback(null, true);
       }
       
-      // Permitir subdominios específicos de localhost:3000
+      // Permitir subdominios específicos de localhost:3000 (desarrollo)
       const subdomainPattern = new RegExp(
         `^http:\\/\\/(${allowedSubdomains.join('|')})\\.localhost:3000$`
       );
       if (origin.match(subdomainPattern)) {
+        console.log(`✓ CORS: Permitido ${origin}`);
+        return callback(null, true);
+      }
+      
+      // Permitir subdominios específicos de nexara.com.mx (producción)
+      const prodSubdomainPattern = new RegExp(
+        `^https:\\/\\/(${allowedSubdomains.join('|')})\\.nexara\\.com\\.mx$`
+      );
+      if (origin.match(prodSubdomainPattern)) {
+        console.log(`✓ CORS: Permitido ${origin}`);
+        return callback(null, true);
+      }
+      
+      // Permitir dominio principal de producción
+      if (origin === 'https://nexara.com.mx' || origin === 'https://www.nexara.com.mx') {
         console.log(`✓ CORS: Permitido ${origin}`);
         return callback(null, true);
       }
