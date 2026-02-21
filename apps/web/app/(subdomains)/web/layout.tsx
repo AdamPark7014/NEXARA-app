@@ -1,33 +1,15 @@
 ﻿"use client";
 import Link from "next/link";
-import React, { useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import { useUser } from "@/components/UserContext";
+import React from "react";
+import { usePathname } from "next/navigation";
 import { useTheme } from "@/components/ThemeContext";
 import styles from "./layout.module.css";
 
 export default function WebPanelLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const { user } = useUser();  const { darkMode, toggleDarkMode } = useTheme();  const [hydrated, setHydrated] = useState(false);
+  const { darkMode, toggleDarkMode } = useTheme();
   const currentPath = pathname ? pathname.replace(/\/+$/, "") : "";
-  const isWebPanelRoute = Boolean(pathname && pathname.startsWith("/panel/web"));
-  const isLoginRoute = Boolean(pathname && pathname.startsWith("/login"));
 
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated || !isWebPanelRoute) return;
-    if (!user && !isLoginRoute) {
-      router.replace("/login");
-      return;
-    }
-    if (user && isLoginRoute) {
-      router.replace("/dashboard");
-    }
-  }, [hydrated, isWebPanelRoute, isLoginRoute, user, router]);
   const navItems = [
     { label: "Dashboard", href: "/dashboard" },
     { label: "Clientes", href: "/clientes" },
@@ -35,11 +17,9 @@ export default function WebPanelLayout({ children }: { children: React.ReactNode
     { label: "Contactos", href: "/contactos" },
     { label: "Noticias", href: "/noticias" },
   ];
-  // Solo mostrar el sidebar en rutas /*
-  if (!pathname || !pathname.startsWith("/panel/web")) {
-    return <main className={styles.webPanelMain}>{children}</main>;
-  }
-  if (isLoginRoute) {
+
+  // Si estamos en login, no renderizar el sidebar
+  if (pathname && pathname.includes("/login")) {
     return <main className={styles.webPanelMain}>{children}</main>;
   }
   return (
