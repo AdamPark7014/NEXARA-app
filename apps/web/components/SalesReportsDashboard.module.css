@@ -400,3 +400,85 @@
     flex-direction: column;
   }
 }
+/* PDF Modal Styles */
+.pdfModal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  padding: 20px;
+}
+
+.pdfModalContent {
+  background: white;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 1200px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.pdfModalHeader {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8f9fa;
+}
+
+.pdfModalHeader h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+}
+
+.pdfModalActions {
+  display: flex;
+  gap: 12px;
+}
+
+.pdfDownloadBtn,
+.pdfCloseBtn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.pdfDownloadBtn {
+  background: #0d6efd;
+  color: white;
+}
+
+.pdfDownloadBtn:hover {
+  background: #0b5ed7;
+}
+
+.pdfCloseBtn {
+  background: #6c757d;
+  color: white;
+}
+
+.pdfCloseBtn:hover {
+  background: #5c636a;
+}
+
+.pdfViewerContainer {
+  flex: 1;
+  overflow: hidden;
+  background: #f8f9fa;
+}

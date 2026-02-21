@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useUser } from './UserContext';
+import PDFViewer from './PDFViewer';
 import styles from './QuoteGenerator.module.css';
 
 interface Quote {
@@ -252,13 +253,11 @@ export default function QuoteGenerator({ onQuoteGenerated }: QuoteGeneratorProps
             <div className={styles.previewContainer}>
               <h3>Vista Previa del PDF</h3>
               {generatedPdf ? (
-                <div className={styles.pdfViewer}>
-                  <iframe
-                    src={generatedPdf.pdfUrl}
-                    title="PDF Preview"
-                    className={styles.iframe}
-                  />
-                </div>
+                <PDFViewer 
+                  pdfUrl={generatedPdf.pdfUrl} 
+                  fileName={generatedPdf.fileName}
+                  height="700px"
+                />
               ) : (
                 <div className={styles.noPreview}>
                   <p>Genera un PDF para ver la vista previa</p>
@@ -266,7 +265,7 @@ export default function QuoteGenerator({ onQuoteGenerated }: QuoteGeneratorProps
               )}
             </div>
             <div className={styles.actions}>
-              <button onClick={() => setStep(1)} className={styles.secondaryButton}>
+              <button onClick={() => setStep(1)} className={styles.secondaryCta}>
                 ← Atrás
               </button>
             </div>
@@ -283,10 +282,10 @@ export default function QuoteGenerator({ onQuoteGenerated }: QuoteGeneratorProps
             </div>
 
             <div className={styles.pdfPreview}>
-              <iframe
-                src={generatedPdf.pdfUrl}
-                title="Generated PDF"
-                className={styles.iframeSmall}
+              <PDFViewer 
+                pdfUrl={generatedPdf.pdfUrl} 
+                fileName={generatedPdf.fileName}
+                height="500px"
               />
             </div>
 
