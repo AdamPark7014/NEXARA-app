@@ -3,6 +3,7 @@ import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
+import { useTheme } from "@/components/ThemeContext";
 import styles from "./layout.module.css";
 
 export default function WebPanelLayout({ children }: { children: React.ReactNode }) {
