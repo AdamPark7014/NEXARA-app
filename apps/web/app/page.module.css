@@ -4442,9 +4442,3 @@ button.secondary {
     overflow-x: hidden;
   }
 }
-
-/* Asegurar que el body no tenga scroll horizontal */
-:global(body) {
-  overflow-x: hidden;
-  max-width: 100vw;
-}
