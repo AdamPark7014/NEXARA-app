@@ -8,20 +8,23 @@ import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 export default function AttendancePage() {
   const { user } = useUser();
   const isAdmin = hasPermission(user, PERMISSIONS.ATTENDANCE_MANAGE);
+  const isSuperAdmin = user?.email && ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'].includes(user.email.toLowerCase());
 
   return (
     <RoleGuard permissions={[PERMISSIONS.ATTENDANCE_VIEW]}>
       <div style={{ display: 'grid', gap: 24 }}>
-        {/* Todo usuario ve su formulario de entradas/salidas */}
-        <div>
-          <h2 style={{ marginBottom: 16 }}>Mi Asistencia</h2>
-          <AttendanceForm />
-        </div>
+        {/* Usuario normal y admin ven su formulario */}
+        {!isSuperAdmin && (
+          <div>
+            <h2 style={{ marginBottom: 16 }}>Mi Asistencia</h2>
+            <AttendanceForm />
+          </div>
+        )}
 
-        {/* Solo admins ven tabla de otros usuarios */}
+        {/* Solo admins y superadmins ven tabla de otros usuarios */}
         {isAdmin && (
           <div>
-            <h2 style={{ marginBottom: 16 }}>Asistencia de Equipo</h2>
+            <h2 style={{ marginBottom: 16 }}>{isSuperAdmin ? 'Asistencia de Todos' : 'Asistencia de Equipo'}</h2>
             <ConsoleAttendanceTable />
           </div>
         )}
