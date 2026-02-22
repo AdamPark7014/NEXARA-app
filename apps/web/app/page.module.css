@@ -1966,7 +1966,7 @@
   margin: 0 auto;
   align-items: stretch;
   overflow-x: visible;
-  padding-top: var(--header-offset);
+  padding-top: 0;
 }
 
 .main section {
