@@ -41,6 +41,11 @@ const Icon = {
       <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
     </svg>
   ),
+  TikTok: () => (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.1 1.72 2.9 2.9 0 0 1 2.31-4.64 2.84 2.84 0 0 1 .88.13V9.4a6.26 6.26 0 0 0-5.03 6.51A6.27 6.27 0 0 0 9.01 22a6.27 6.27 0 0 0 5.91-4.82.6.6 0 0 0 .09-.25v-5.21a7.67 7.67 0 0 0 4.99 1.95v-3.4a4.7 4.7 0 0 1-.42-.04z"/>
+    </svg>
+  ),
 };
 
 export default function Footer() {
@@ -124,10 +129,10 @@ export default function Footer() {
           <div className={styles.brandName}>NEXARA</div>
           <div className={styles.brandTagline}>Tecnología que impulsa tu negocio</div>
           <div className={styles.socials}>
-            <Link className={styles.social} href="#" aria-label="Facebook"><Icon.Facebook /></Link>
-            <Link className={styles.social} href="#" aria-label="X"><Icon.X /></Link>
-            <Link className={styles.social} href="#" aria-label="LinkedIn"><Icon.LinkedIn /></Link>
-            <Link className={styles.social} href="#" aria-label="Instagram"><Icon.Instagram /></Link>
+            <Link className={styles.social} href="#" aria-label="Facebook" title="Facebook (próximamente)"><Icon.Facebook /></Link>
+            <Link className={styles.social} href="https://www.tiktok.com/@nexara_mx?_r=1&_t=ZS-948WJNIEdeu" target="_blank" rel="noopener noreferrer" aria-label="TikTok"><Icon.TikTok /></Link>
+            <Link className={styles.social} href="https://www.linkedin.com/in/nexara-mx-413717359/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn"><Icon.LinkedIn /></Link>
+            <Link className={styles.social} href="https://www.instagram.com/nexara_mx/" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><Icon.Instagram /></Link>
           </div>
           <div className={styles.divider} />
           <div className={styles.contactCard}>
