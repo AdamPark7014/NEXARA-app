@@ -133,18 +133,19 @@ body {
   overflow-x: hidden;
 }
 
-body {
+/* Padding-top solo para el sitio público, no para subdominios */
+body:not(.subdomain-layout) {
   padding-top: var(--header-offset);
 }
 
 @media (max-width: 768px) {
-  body {
+  body:not(.subdomain-layout) {
     padding-top: calc(var(--header-offset) + 12px);
   }
 }
 
 @media (max-width: 480px) {
-  body {
+  body:not(.subdomain-layout) {
     padding-top: calc(var(--header-offset) + 12px);
   }
 }
