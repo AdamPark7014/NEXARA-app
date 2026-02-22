@@ -4121,3 +4121,90 @@ button.secondary {
   }
 }
 
+/* Mobile-only layout fixes to avoid clipping and overflow */
+@media (max-width: 768px) {
+  .heroWrapper {
+    width: 100%;
+    left: 0;
+    right: 0;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 0;
+    min-height: auto;
+    padding: calc(var(--header-offset) + 12px) 0 20px;
+  }
+
+  .heroBg {
+    border-radius: 0 0 28px 28px;
+  }
+
+  .heroBgImage {
+    object-position: center;
+  }
+
+  .hero {
+    max-width: 100%;
+    margin: 0 12px;
+    padding: 28px 16px;
+  }
+
+  .newsCarousel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .newsSlide {
+    grid-template-columns: 1fr;
+  }
+
+  .newsNav {
+    order: 2;
+    align-self: center;
+  }
+
+  .newsActions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .newsDots {
+    justify-content: center;
+  }
+
+  .servicesSection {
+    padding: 0 12px;
+  }
+
+  .serviceCard {
+    padding: 28px 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .heroWrapper {
+    padding: calc(var(--header-offset) + 8px) 0 16px;
+  }
+
+  .hero {
+    margin: 0 8px;
+    padding: 24px 14px;
+    border-radius: 18px;
+  }
+
+  .newsCarousel {
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .newsNav {
+    width: 36px;
+    height: 36px;
+  }
+
+  .serviceImageWrapper {
+    width: 140px;
+    height: 140px;
+  }
+}
+
