@@ -6,7 +6,7 @@ import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import styles from "./ConsoleAttendanceTable.module.css";
 
-type AttendanceEvent = { type: string; timestamp: string };
+type AttendanceEvent = { type: string; timestamp: string; photoUrl?: string };
 
 type Activity = {
   id: number;
@@ -153,7 +153,11 @@ const groupDailyDetails = (
 ) => {
   const dailyMap = new Map<
     string,
-    { entries: string[]; exits: string[]; activities: Activity[] }
+    { 
+      entries: { time: string; photoUrl?: string }[]; 
+      exits: { time: string; photoUrl?: string }[]; 
+      activities: Activity[] 
+    }
   >();
 
   attendances.forEach((item) => {
@@ -164,8 +168,9 @@ const groupDailyDetails = (
     if (timestamp < rangeStart || timestamp > rangeEnd) return;
     const entry = dailyMap.get(dateKey) || { entries: [], exits: [], activities: [] };
     const timeLabel = formatTimeOnly(item.timestamp);
-    if (item.type === "entrada") entry.entries.push(timeLabel);
-    if (item.type === "salida") entry.exits.push(timeLabel);
+    const entryObj = { time: timeLabel, photoUrl: item.photoUrl };
+    if (item.type === "entrada") entry.entries.push(entryObj);
+    if (item.type === "salida") entry.exits.push(entryObj);
     dailyMap.set(dateKey, entry);
   });
 
@@ -513,8 +518,60 @@ const ConsoleAttendanceTable = () => {
                                     {dailyRows.map((row) => (
                                       <tr key={row.date}>
                                         <td>{formatDateLabel(row.date)}</td>
-                                        <td>{row.entries.length ? row.entries.join(", ") : "-"}</td>
-                                        <td>{row.exits.length ? row.exits.join(", ") : "-"}</td>
+                                        <td>
+                                          {row.entries.length ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                              {row.entries.map((entry, idx) => (
+                                                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                  <span>{entry.time}</span>
+                                                  {entry.photoUrl && (
+                                                    <img 
+                                                      src={entry.photoUrl} 
+                                                      alt="foto entrada" 
+                                                      style={{ 
+                                                        width: 40, 
+                                                        height: 40, 
+                                                        borderRadius: 4, 
+                                                        objectFit: 'cover',
+                                                        cursor: 'pointer'
+                                                      }}
+                                                      title="Foto de entrada"
+                                                    />
+                                                  )}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            "-"
+                                          )}
+                                        </td>
+                                        <td>
+                                          {row.exits.length ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                              {row.exits.map((exit, idx) => (
+                                                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                  <span>{exit.time}</span>
+                                                  {exit.photoUrl && (
+                                                    <img 
+                                                      src={exit.photoUrl} 
+                                                      alt="foto salida" 
+                                                      style={{ 
+                                                        width: 40, 
+                                                        height: 40, 
+                                                        borderRadius: 4, 
+                                                        objectFit: 'cover',
+                                                        cursor: 'pointer'
+                                                      }}
+                                                      title="Foto de salida"
+                                                    />
+                                                  )}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            "-"
+                                          )}
+                                        </td>
                                         <td>
                                           {row.activities.length ? (
                                             <div className={styles.activityList}>
