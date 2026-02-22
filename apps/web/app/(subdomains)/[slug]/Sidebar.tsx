@@ -11,7 +11,6 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { user } = useUser();
   const { darkMode, toggleDarkMode } = useTheme();
-  console.log("[SIDEBAR] Usuario en contexto:", user);
   if (!user) return null;
 
   // Menú por permisos
