@@ -194,6 +194,7 @@ export class AttendanceService {
         userId,
         type: dto.type,
         timestamp: now,
+        photoUrl: dto.photoBase64 || null, // Guardar foto en base64 o null si no hay
       },
     });
 

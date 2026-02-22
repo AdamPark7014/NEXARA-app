@@ -673,6 +673,7 @@ model Attendance {
   userId    Int
   type      String   // 'entrada' o 'salida'
   timestamp DateTime @default(now())
+  photoUrl  String?  // URL de la foto capturada desde la cámara
   user      User     @relation(fields: [userId], references: [id])
 }
 
