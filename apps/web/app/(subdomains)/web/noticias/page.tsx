@@ -2,6 +2,7 @@
 
 import React, { useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
+import { buildApiUrl, getApiBase } from "@/lib/api-base";
 
 type NewsletterSubscriber = {
   id: number;
@@ -35,11 +36,7 @@ type NewsFormState = {
   publishedAt: string;
 };
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(
-  /[\/.]+$/,
-  ""
-);
-const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
+const API_URL = getApiBase();
 const MAX_GALLERY_IMAGES = 8;
 
 const INITIAL_FORM: NewsFormState = {

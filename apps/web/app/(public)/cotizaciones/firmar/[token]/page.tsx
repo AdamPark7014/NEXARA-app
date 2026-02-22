@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { buildApiUrl } from "@/lib/api-base";
 
 type PublicQuote = {
   quoteNumber: string;
@@ -37,9 +38,6 @@ export default function FirmarCotizacionPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [signed, setSigned] = useState(false);
-
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
 
   useEffect(() => {
     if (!token) return;

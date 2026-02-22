@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import styles from "./page.module.css";
+import { buildApiUrl, getApiBase } from "@/lib/api-base";
 
 type Client = {
   id: number;
@@ -17,11 +18,7 @@ type ClientForm = {
   description: string;
 };
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(
-  /[\/.]+$/,
-  ""
-);
-const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
+const API_URL = getApiBase();
 
 const emptyForm: ClientForm = {
   name: "",
