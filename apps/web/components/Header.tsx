@@ -81,15 +81,26 @@ export default function Header() {
   const { darkMode, toggleDarkMode } = useTheme();
   const pathname = usePathname();
   const isConsole = Boolean(pathname && pathname.startsWith('/console'));
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const toggleMobileMenu = () => {
+    setMobileMenuOpen(!mobileMenuOpen);
+  };
+
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false);
+  };
 
   return (
     <header className={`${styles.header} ${isConsole ? styles.consoleHeader : ''}`}>
       <div className={styles.headerInner}>
         <div className={styles.logoSection}>
-          <Link href="/">
+          <Link href="/" onClick={closeMobileMenu}>
             <Image src="/logo-nexara.png" alt="Nexara Logo" className={styles.logo} width={120} height={40} priority />
           </Link>
         </div>
+        
+        {/* Desktop Navigation */}
         <nav className={styles.navLinks}>
           {navLinks.map((link) => (
             <Link key={link.name} href={link.href} className={styles.link}>
@@ -97,6 +108,7 @@ export default function Header() {
             </Link>
           ))}
         </nav>
+
         <div className={styles.rightSection}>
           {(pathname && pathname.startsWith('/console')) && <BackupRestorePanel />}
           <button
@@ -106,8 +118,46 @@ export default function Header() {
           >
             {darkMode ? '🌙' : '☀️'}
           </button>
+          
+          {/* Mobile Menu Button */}
+          <button 
+            className={styles.mobileMenuButton}
+            onClick={toggleMobileMenu}
+            aria-label="Menú"
+          >
+            {mobileMenuOpen ? (
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            ) : (
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            )}
+          </button>
         </div>
       </div>
+
+      {/* Mobile Menu Overlay */}
+      {mobileMenuOpen && (
+        <div className={styles.mobileMenuOverlay} onClick={closeMobileMenu}>
+          <nav className={styles.mobileMenu} onClick={(e) => e.stopPropagation()}>
+            {navLinks.map((link) => (
+              <Link 
+                key={link.name} 
+                href={link.href} 
+                className={styles.mobileLink}
+                onClick={closeMobileMenu}
+              >
+                {link.name}
+              </Link>
+            ))}
+          </nav>
+        </div>
+      )}
     </header>
   );
 }
