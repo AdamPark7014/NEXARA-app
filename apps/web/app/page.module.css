@@ -1965,8 +1965,12 @@
   max-width: var(--content-max);
   margin: 0 auto;
   align-items: stretch;
-  overflow-x: hidden;
+  overflow-x: visible;
   padding-top: var(--header-offset);
+}
+
+.main section {
+  scroll-margin-top: calc(var(--header-offset) + 12px);
 }
 
 @media (max-width: 768px) {
