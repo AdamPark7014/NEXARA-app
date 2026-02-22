@@ -133,6 +133,23 @@ body {
   overflow-x: hidden;
 }
 
+/* Padding-top solo para el sitio público */
+body.public-layout {
+  padding-top: var(--header-offset);
+}
+
+@media (max-width: 768px) {
+  body.public-layout {
+    padding-top: calc(var(--header-offset) + 12px);
+  }
+}
+
+@media (max-width: 480px) {
+  body.public-layout {
+    padding-top: calc(var(--header-offset) + 12px);
+  }
+}
+
 main section,
 main [id] {
   scroll-margin-top: calc(var(--header-offset) + 12px);
