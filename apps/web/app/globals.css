@@ -134,18 +134,18 @@ body {
 }
 
 /* Padding-top solo para el sitio público */
-body.public-layout {
+.public-layout-wrapper {
   padding-top: var(--header-offset);
 }
 
 @media (max-width: 768px) {
-  body.public-layout {
+  .public-layout-wrapper {
     padding-top: calc(var(--header-offset) + 12px);
   }
 }
 
 @media (max-width: 480px) {
-  body.public-layout {
+  .public-layout-wrapper {
     padding-top: calc(var(--header-offset) + 12px);
   }
 }
