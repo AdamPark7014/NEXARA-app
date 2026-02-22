@@ -17,24 +17,24 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   // PRINCIPAL
-  { label: "Dashboard", icon: "📊", href: "/panel/ventas/dashboard", section: "Principal", description: "Visión general de ventas" },
+  { label: "Dashboard", icon: "📊", href: "/dashboard", section: "Principal", description: "Visión general de ventas" },
 
   // PETICIONES
-  { label: "Leads", icon: "🎯", href: "/panel/ventas/leads", section: "Peticiones", description: "Gestiona leads potenciales" },
-  { label: "Oportunidades", icon: "💼", href: "/panel/ventas/oportunidades", section: "Peticiones", description: "Oportunidades comerciales" },
+  { label: "Leads", icon: "🎯", href: "/leads", section: "Peticiones", description: "Gestiona leads potenciales" },
+  { label: "Oportunidades", icon: "💼", href: "/oportunidades", section: "Peticiones", description: "Oportunidades comerciales" },
 
   // GESTIÓN
-  { label: "Clientes", icon: "👥", href: "/panel/ventas/clientes", section: "Gestión", description: "Base de datos de clientes" },
-  { label: "Proyectos", icon: "📁", href: "/panel/ventas/proyectos", section: "Gestión", description: "Proyectos en desarrollo" },
-  { label: "Cotizaciones", icon: "📄", href: "/panel/ventas/cotizaciones", section: "Gestión", description: "Gestiona cotizaciones" },
+  { label: "Clientes", icon: "👥", href: "/clientes", section: "Gestión", description: "Base de datos de clientes" },
+  { label: "Proyectos", icon: "📁", href: "/proyectos", section: "Gestión", description: "Proyectos en desarrollo" },
+  { label: "Cotizaciones", icon: "📄", href: "/cotizaciones", section: "Gestión", description: "Gestiona cotizaciones" },
 
   // OPERACIONES (Nuevos features)
-  { label: "Plantillas", icon: "🎨", href: "/panel/ventas/plantillas", section: "Operaciones", description: "Plantillas de órdenes PDF" },
-  { label: "Notificaciones", icon: "🔔", href: "/panel/ventas/notificaciones", section: "Operaciones", description: "Centro de notificaciones" },
+  { label: "Plantillas", icon: "🎨", href: "/plantillas", section: "Operaciones", description: "Plantillas de órdenes PDF" },
+  { label: "Notificaciones", icon: "🔔", href: "/notificaciones", section: "Operaciones", description: "Centro de notificaciones" },
 
   // ANÁLISIS
-  { label: "Reportes", icon: "📈", href: "/panel/ventas/reportes", section: "Análisis", description: "Reportes detallados" },
-  { label: "Crecimiento", icon: "📶", href: "/panel/ventas/crecimiento", section: "Análisis", description: "Análisis de crecimiento" },
+  { label: "Reportes", icon: "📈", href: "/reportes", section: "Análisis", description: "Reportes detallados" },
+  { label: "Crecimiento", icon: "📶", href: "/crecimiento", section: "Análisis", description: "Análisis de crecimiento" },
 ];
 
 export default function VentasSidebar() {
@@ -45,9 +45,6 @@ export default function VentasSidebar() {
 
   const isActive = (href: string) => {
     if (!pathname) return false;
-    if (href === "/panel/ventas") {
-      return pathname === "/panel/ventas" || (pathname.startsWith("/panel/ventas") && pathname.split("/").length === 3);
-    }
     return pathname.startsWith(href);
   };
 

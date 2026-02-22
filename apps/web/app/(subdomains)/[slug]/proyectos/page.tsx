@@ -235,7 +235,7 @@ export default function VentasProyectosPage() {
               </button>
               <button
                 className={styles.secondaryButton}
-                onClick={() => router.push(`/panel/ventas/proyectos/${project.id}/gastos`)}
+                onClick={() => router.push(`/proyectos/${project.id}/gastos`)}
               >
                 Ver gastos
               </button>

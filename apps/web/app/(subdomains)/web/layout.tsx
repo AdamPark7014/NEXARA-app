@@ -35,9 +35,7 @@ export default function WebPanelLayout({ children }: { children: React.ReactNode
           <nav className={styles.webPanelNav}>
             {navItems.map((item, index) => {
               const itemPath = item.href.replace(/\/+$/, "");
-              const isActive =
-                itemPath === currentPath ||
-                (itemPath === "/dashboard" && currentPath === "/panel/web");
+              const isActive = itemPath === currentPath;
               return (
                 <Link
                   key={item.href}

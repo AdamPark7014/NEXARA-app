@@ -45,9 +45,6 @@ export default function VentasSidebar() {
 
   const isActive = (href: string) => {
     if (!pathname) return false;
-    if (href === "/panel/ventas") {
-      return pathname === "/panel/ventas" || (pathname.startsWith("/panel/ventas") && pathname.split("/").length === 3);
-    }
     return pathname.startsWith(href);
   };
 

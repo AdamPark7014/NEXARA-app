@@ -292,10 +292,10 @@ export default function ContabilidadDashboard() {
           </p>
         </div>
         <div className={styles.actions}>
-          <Link className={styles.primaryButton} href="/panel/contabilidad/viaticos">
+          <Link className={styles.primaryButton} href="/viaticos">
             Revisar viaticos
           </Link>
-          <Link className={styles.secondaryButton} href="/panel/contabilidad/capital">
+          <Link className={styles.secondaryButton} href="/capital">
             Ajustar capital
           </Link>
         </div>

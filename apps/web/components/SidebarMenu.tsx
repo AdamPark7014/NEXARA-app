@@ -10,7 +10,7 @@ const SidebarMenu = () => {
   return (
     <aside className="sidebar">
       <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-        <li className="menu-item"><Link href="/Panel-Admin">Dashboard</Link></li>
+        <li className="menu-item"><Link href="/dashboard">Dashboard</Link></li>
         {hasPermission(user, PERMISSIONS.USERS_MANAGE) && (
           <li className="menu-item"><Link href="/console/users">Gestión de Usuarios</Link></li>
         )}

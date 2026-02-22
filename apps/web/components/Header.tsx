@@ -80,7 +80,7 @@ import { useTheme } from './ThemeContext';
 export default function Header() {
   const { darkMode, toggleDarkMode } = useTheme();
   const pathname = usePathname();
-  const isConsole = Boolean(pathname && pathname.startsWith('/panel/console'));
+  const isConsole = Boolean(pathname && pathname.startsWith('/console'));
 
   return (
     <header className={`${styles.header} ${isConsole ? styles.consoleHeader : ''}`}>

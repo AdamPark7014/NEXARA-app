@@ -6,7 +6,7 @@ import { PERMISSIONS } from "@/lib/permissions";
 export default function ContabilidadLoginPage() {
   return (
     <PanelLogin
-      redirectTo="/panel/contabilidad/dashboard"
+      redirectTo="/dashboard"
       requiredPermission={PERMISSIONS.CONTABILIDAD_VIEW}
     />
   );

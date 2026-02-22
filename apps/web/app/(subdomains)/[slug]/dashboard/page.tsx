@@ -12,7 +12,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user) {
       console.log("[DASHBOARD] Usuario no presente, redirigiendo a login");
-      router.replace("/panel/console/dashboard/login");
+      router.replace("/dashboard/login");
     } else {
       console.log("[DASHBOARD] Usuario presente:", user);
     }
