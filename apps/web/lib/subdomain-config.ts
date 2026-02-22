@@ -8,50 +8,50 @@ export const SUBDOMAIN_CONFIG: Record<
   {
     name: string;
     publicDomain: string;
-    panelPath: string;
+    rootPath: string;
     description: string;
   }
 > = {
   console: {
     name: 'Consola',
     publicDomain: 'consola.nexara.com.mx',
-    panelPath: '/panel/console',
+    rootPath: '/',
     description: 'Panel de administración general',
   },
   ventas: {
     name: 'Ventas',
     publicDomain: 'ventas.nexara.com.mx',
-    panelPath: '/panel/ventas',
+    rootPath: '/',
     description: 'Panel de gestión de ventas',
   },
   web: {
     name: 'Web',
     publicDomain: 'web.nexara.com.mx',
-    panelPath: '/panel/web',
+    rootPath: '/',
     description: 'Panel de contenido web',
   },
   contabilidad: {
     name: 'Contabilidad',
     publicDomain: 'contabilidad.nexara.com.mx',
-    panelPath: '/panel/contabilidad',
+    rootPath: '/',
     description: 'Panel contable',
   },
   tickets: {
     name: 'Tickets',
     publicDomain: 'tickets.nexara.com.mx',
-    panelPath: '/panel/tickets',
+    rootPath: '/',
     description: 'Panel de soporte de tickets',
   },
   ingenieros: {
     name: 'Ingenieros',
     publicDomain: 'ingenieros.nexara.com.mx',
-    panelPath: '/panel/ingenieros',
+    rootPath: '/',
     description: 'Panel para ingenieros',
   },
   dashboard: {
     name: 'Dashboard',
     publicDomain: 'dashboard.nexara.com.mx',
-    panelPath: '/panel/dashboard',
+    rootPath: '/',
     description: 'Dashboard principal',
   },
 };

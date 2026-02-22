@@ -16,22 +16,22 @@ export default function Sidebar() {
 
   // Menú por permisos
   const menu = [
-    { label: "Dashboard", href: "/panel/console/dashboard", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Actividades", href: "/panel/console/activities", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Evidencias", href: "/panel/console/evidences", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Viáticos", href: "/panel/console/viatics", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Vehículos", href: "/panel/console/vehicles", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Clientes", href: "/panel/console/clients", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Tickets clientes", href: "/panel/console/client-tickets", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Usuarios", href: "/panel/console/users", permissions: [PERMISSIONS.USERS_MANAGE] },
-    { label: "Mis Actividades", href: "/panel/console/my-activities", permissions: [PERMISSIONS.CONSOLE_ACCESS], hideForAdmins: true },
-    { label: "Mi Perfil", href: "/panel/console/my-profile", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Mis Evidencias", href: "/panel/console/my-evidences", permissions: [PERMISSIONS.CONSOLE_ACCESS], hideForAdmins: true },
-    { label: "Mis Viáticos", href: "/panel/console/my-viatics", permissions: [PERMISSIONS.CONSOLE_ACCESS], hideForAdmins: true },
-    { label: "Mis Vehículos", href: "/panel/console/my-vehicles", permissions: [PERMISSIONS.CONSOLE_ACCESS], hideForAdmins: true },
-    { label: "Entradas/Salidas", href: "/panel/console/attendance", permissions: [PERMISSIONS.ATTENDANCE_VIEW] },
-    { label: "Mapa GPS", href: "/panel/console/gps", permissions: [PERMISSIONS.GPS_VIEW] },
-    { label: "Cotizaciones", href: "/panel/console/cotizaciones", permissions: [PERMISSIONS.COTIZACIONES_ACCESS] },
+    { label: "Dashboard", href: "/dashboard", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Actividades", href: "/activities", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Evidencias", href: "/evidences", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Viáticos", href: "/viatics", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Vehículos", href: "/vehicles", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Clientes", href: "/clients", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Tickets clientes", href: "/client-tickets", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Usuarios", href: "/users", permissions: [PERMISSIONS.USERS_MANAGE] },
+    { label: "Mis Actividades", href: "/my-activities", permissions: [PERMISSIONS.CONSOLE_ACCESS], hideForAdmins: true },
+    { label: "Mi Perfil", href: "/my-profile", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Mis Evidencias", href: "/my-evidences", permissions: [PERMISSIONS.CONSOLE_ACCESS], hideForAdmins: true },
+    { label: "Mis Viáticos", href: "/my-viatics", permissions: [PERMISSIONS.CONSOLE_ACCESS], hideForAdmins: true },
+    { label: "Mis Vehículos", href: "/my-vehicles", permissions: [PERMISSIONS.CONSOLE_ACCESS], hideForAdmins: true },
+    { label: "Entradas/Salidas", href: "/attendance", permissions: [PERMISSIONS.ATTENDANCE_VIEW] },
+    { label: "Mapa GPS", href: "/gps", permissions: [PERMISSIONS.GPS_VIEW] },
+    { label: "Cotizaciones", href: "/cotizaciones", permissions: [PERMISSIONS.COTIZACIONES_ACCESS] },
   ];
 
   // Avatar: usa user.avatarUrl si existe, si no, usa un avatar generado por ui-avatars.com

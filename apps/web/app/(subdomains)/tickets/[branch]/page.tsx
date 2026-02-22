@@ -188,7 +188,7 @@ export default function BranchTicketsPage() {
     return (
       <PanelLogin
         mode="branch"
-        redirectTo={pathname || "/panel/tickets"}
+        redirectTo={pathname || "/"}
         onBranchLogin={handleBranchLogin}
         title="Portal de sucursal"
         subtitle="Acceso para levantar tickets de tu tienda"

@@ -621,7 +621,7 @@ export default function ClientTicketsPage() {
         {loginMode === "client" ? (
           <PanelLogin
             mode="client"
-            redirectTo="/panel/tickets"
+            redirectTo="/"
             onClientLogin={handleClientLogin}
             title="Portal de Tickets"
             subtitle="Ingresa con tu cuenta de cliente"
@@ -629,7 +629,7 @@ export default function ClientTicketsPage() {
         ) : (
           <PanelLogin
             mode="branch"
-            redirectTo="/panel/tickets"
+            redirectTo="/"
             onBranchLogin={handleBranchLogin}
             title="Portal de sucursal"
             subtitle="Acceso para levantar tickets de tu tienda"
@@ -1076,7 +1076,7 @@ export default function ClientTicketsPage() {
               <div className="card" style={{ display: "grid", gap: 12 }}>
                 <div style={{ fontWeight: 700 }}>Perfil de sucursal</div>
                 <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                  Crea usuarios internos para cada sucursal. Usaran estas credenciales en /panel/tickets.
+                  Crea usuarios internos para cada sucursal. Usaran estas credenciales en tickets.nexara.com.mx.
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
                   <input className="input" placeholder="Nombre" value={branchDraft.name} onChange={(e) => setBranchDraft((prev) => ({ ...prev, name: e.target.value }))} />

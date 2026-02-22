@@ -26,8 +26,8 @@ export default function LoginPage() {
         setLoading(false)
         return
       }
-      // redirect to panel on success
-      window.location.href = '/panel'
+      // redirect to console dashboard on success
+      window.location.href = '/dashboard'
     } catch (err) {
       setError('Error de red, intente de nuevo')
       setLoading(false)

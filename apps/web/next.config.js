@@ -89,18 +89,7 @@ const nextConfig = {
     };
   },
 
-  // Opcional: Redirects para mantener compatibilidad con URLs antiguas
-  async redirects() {
-    return [
-      // Redirige rutas antiguas de /panel a subdominios (si es necesario)
-      // Comentado por ahora - activa solo si necesitas mantener URLs antiguas
-      // {
-      //   source: '/panel/console/:path*',
-      //   destination: '/:path*',
-      //   permanent: false,
-      // },
-    ];
-  },
+
 };
 
 module.exports = nextConfig;
