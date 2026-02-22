@@ -43,6 +43,14 @@ const nextConfig = {
         hostname: 'static.ctonline.mx',
       },
       {
+        protocol: 'https',
+        hostname: 'nexara.com.mx',
+      },
+      {
+        protocol: 'https',
+        hostname: 'web.nexara.com.mx',
+      },
+      {
         protocol: 'http',
         hostname: 'localhost',
       },
