@@ -3,6 +3,7 @@ import React, { FormEvent, useState } from "react";
 import Link from "next/link";
 import styles from "./Footer.module.css";
 import Map from "./Map";
+import { buildApiUrl } from "@/lib/api-base";
 
 const Icon = {
   Facebook: () => (
@@ -47,12 +48,6 @@ export default function Footer() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(
-    /[\/.]+$/,
-    ""
-  );
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
-
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;

@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
+import { buildApiUrl } from "@/lib/api-base";
 
 type Client = {
   id: number;
@@ -41,12 +42,6 @@ type Highlight = {
   meta: string;
   href: string;
 };
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(
-  /[\/.]+$/,
-  ""
-);
-const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
 
 const formatDate = (value?: string | null) =>
   value ? new Date(value).toLocaleString() : "Sin fecha";

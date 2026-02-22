@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import styles from "./page.module.css";
+import { buildApiUrl, getApiBase } from "@/lib/api-base";
 
 export const metadata = {
   title: "Nexara | Proyectos",
@@ -24,11 +25,7 @@ type Project = {
   gallery: string[];
 };
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(
-  /[\/.]+$/,
-  ""
-);
-const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
+const API_URL = getApiBase();
 
 const normalizeImageUrl = (imageUrl?: string | null) => {
   if (!imageUrl) return undefined;

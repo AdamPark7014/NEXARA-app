@@ -2,17 +2,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import styles from "./page.module.css";
+import { buildApiUrl } from "@/lib/api-base";
 
 export default function ContactoPage() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(
-    /[\/.]+$/,
-    ""
-  );
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
-
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {

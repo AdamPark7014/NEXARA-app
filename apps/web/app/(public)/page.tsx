@@ -9,6 +9,7 @@ const ContactFormToggle = dynamic(() => import("../components/ContactFormToggle"
 const FloatingContactForm = dynamic(() => import("../components/FloatingContactForm"), { ssr: false });
 const FAQ = dynamic(() => import("../components/FAQ"), { ssr: false });
 import styles from "../page.module.css";
+import { buildApiUrl, getApiBase } from "@/lib/api-base";
 
 interface Client {
   id: number;
@@ -29,7 +30,7 @@ interface NewsPost {
   createdAt: string;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = getApiBase();
 
 // Función para normalizar URLs de imágenes
 // Convierte filenames y rutas relativas a URLs completas del API
@@ -97,7 +98,7 @@ export default function Home() {
 
   const fetchNews = async () => {
     try {
-      const response = await fetch(`${API_URL}/news?status=PUBLISHED`);
+      const response = await fetch(buildApiUrl("news?status=PUBLISHED"));
       if (!response.ok) return;
       const data = (await response.json()) as NewsPost[];
       setNews(data);
@@ -108,7 +109,7 @@ export default function Home() {
 
   const fetchClients = async () => {
     try {
-      const response = await fetch(`${API_URL}/clients`);
+      const response = await fetch(buildApiUrl("clients"));
       if (response.ok) {
         const data = await response.json();
         setClients(data);
