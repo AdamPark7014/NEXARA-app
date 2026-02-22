@@ -377,6 +377,32 @@ export default function ServiciosPage() {
             <div className={styles.serviceNumber}>05</div>
             <div className={styles.serviceIcon}>
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+              </svg>
+            </div>
+            <div className={styles.serviceContent}>
+              <h3>Soporte Técnico Empresarial</h3>
+              <p>
+                Servicio integral de resolución técnica para operaciones empresariales.
+                Nuestro equipo de ingenieros certificados se asigna exclusivamente a tu
+                organización para resolver incidencias en equipos y sistemas de múltiples
+                sucursales, garantizando continuidad operacional.
+              </p>
+              <ul className={styles.serviceFeatures}>
+                <li>Resolución de incidencias en equipos de punto de venta (cajas registradoras, scanners)</li>
+                <li>Soporte en múltiples sucursales y ubicaciones geográficas</li>
+                <li>Ingenieros especializados asignados a tu cuenta</li>
+                <li>Cobertura de gastos de traslado y viáticos para soporte en sitio</li>
+                <li>Prioridad en atención con RTAs reducidos (menor a 4 horas hábiles)</li>
+                <li>Seguimiento integral desde apertura hasta cierre de cada ticket técnico</li>
+              </ul>
+            </div>
+          </article>
+
+          <article className={styles.serviceCard}>
+            <div className={styles.serviceNumber}>06</div>
+            <div className={styles.serviceIcon}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
               </svg>
             </div>
@@ -399,7 +425,7 @@ export default function ServiciosPage() {
           </article>
 
           <article className={styles.serviceCard}>
-            <div className={styles.serviceNumber}>06</div>
+            <div className={styles.serviceNumber}>07</div>
             <div className={styles.serviceIcon}>
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
