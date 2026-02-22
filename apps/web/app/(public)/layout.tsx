@@ -14,7 +14,11 @@ export default function PublicLayout({
     <>
       <NotificationBanner />
       <Header />
-      {children}
+      <div style={{ 
+        paddingTop: 'var(--header-offset)',
+      }}>
+        {children}
+      </div>
       <Footer />
     </>
   );
