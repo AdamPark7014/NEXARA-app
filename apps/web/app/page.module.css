@@ -1996,6 +1996,7 @@
 .heroWrapper {
   position: relative;
   width: 100vw;
+  max-width: 100vw;
   left: 50%;
   right: 50%;
   margin-left: -50vw;
@@ -2009,6 +2010,8 @@
   padding-top: var(--header-offset);
   z-index: 1;
   overflow: hidden;
+  justify-self: stretch;
+  align-self: stretch;
 }
 
 @media (max-width: 768px) {

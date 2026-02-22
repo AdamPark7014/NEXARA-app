@@ -133,6 +133,22 @@ body {
   overflow-x: hidden;
 }
 
+main {
+  padding-top: var(--header-offset);
+}
+
+@media (max-width: 768px) {
+  main {
+    padding-top: calc(var(--header-offset) + 12px);
+  }
+}
+
+@media (max-width: 480px) {
+  main {
+    padding-top: calc(var(--header-offset) + 12px);
+  }
+}
+
 main section,
 main [id] {
   scroll-margin-top: calc(var(--header-offset) + 12px);
