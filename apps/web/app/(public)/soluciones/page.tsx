@@ -349,6 +349,49 @@ export default function SolucionesPage() {
       {/* Consultoría y acompañamiento */}
       <section className={styles.section}>
         <div className={styles.consultingBanner}>
+          <h3>Soporte Técnico Empresarial Integral</h3>
+          <p>
+            Entendemos que las operaciones modernas dependen de la continuidad y confiabilidad de tu infraestructura tecnológica.
+            <strong> Nuestro servicio de Soporte Técnico Empresarial</strong> está diseñado específicamente para empresas con
+            múltiples sucursales que requieren cobertura garantizada en equipos críticos de punto de venta, sistemas operativos
+            y infraestructura tecnológica.
+          </p>
+          <div className={styles.supportFeatures}>
+            <div className={styles.supportFeature}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
+                <polyline points="16 8 12 12 8 10" />
+              </svg>
+              <span><strong>Cobertura geográfica amplia</strong><br/>Soporte en todas tus sucursales, sin importar la ubicación</span>
+            </div>
+            <div className={styles.supportFeature}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
+                <polyline points="16 8 12 12 8 10" />
+              </svg>
+              <span><strong>Equipo dedicado</strong><br/>Ingenieros certificados asignados a tu cuenta</span>
+            </div>
+            <div className={styles.supportFeature}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
+                <polyline points="16 8 12 12 8 10" />
+              </svg>
+              <span><strong>RTA garantizado</strong><br/>Respuesta menor a 4 horas en horario laboral</span>
+            </div>
+            <div className={styles.supportFeature}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
+                <polyline points="16 8 12 12 8 10" />
+              </svg>
+              <span><strong>Traslado incluido</strong><br/>Cubrimos viaticos y gastos de desplazamiento</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Consultoría y acompañamiento */}
+      <section className={styles.section}>
+        <div className={styles.consultingBanner}>
           <h3>Consultoría integral y acompañamiento continuo</h3>
           <p>
             Más que proveedores, somos <strong>socios estratégicos en tu transformación digital</strong>.
