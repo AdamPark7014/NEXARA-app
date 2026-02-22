@@ -133,18 +133,18 @@ body {
   overflow-x: hidden;
 }
 
-main {
+body {
   padding-top: var(--header-offset);
 }
 
 @media (max-width: 768px) {
-  main {
+  body {
     padding-top: calc(var(--header-offset) + 12px);
   }
 }
 
 @media (max-width: 480px) {
-  main {
+  body {
     padding-top: calc(var(--header-offset) + 12px);
   }
 }
