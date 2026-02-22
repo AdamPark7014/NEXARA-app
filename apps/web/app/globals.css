@@ -133,6 +133,18 @@ body {
   overflow-x: hidden;
 }
 
+main section,
+main [id] {
+  scroll-margin-top: calc(var(--header-offset) + 12px);
+}
+
+@media (max-width: 768px) {
+  main section,
+  main [id] {
+    scroll-margin-top: calc(var(--header-offset) + 24px);
+  }
+}
+
 body {
   color: var(--foreground);
   background: var(--background) !important;
