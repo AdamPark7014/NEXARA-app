@@ -75,22 +75,47 @@ async function bootstrap() {
 
   // Servir archivos estáticos desde uploads (en raíz del proyecto)
   const fs = require('fs');
-  // __dirname es /var/www/nexara-app/apps/api/dist en producción
-  // Necesitamos subir a /var/www/nexara-app (3 niveles: dist -> api -> apps)
-  const uploadsPath = path.join(__dirname, '../../..', 'uploads');
   
-  // Asegurar que el directorio uploads existe
-  if (!fs.existsSync(uploadsPath)) {
-    fs.mkdirSync(uploadsPath, { recursive: true });
-    console.log(`📁 Created uploads directory: ${uploadsPath}`);
-  }
-  if (!fs.existsSync(path.join(uploadsPath, 'clients'))) {
-    fs.mkdirSync(path.join(uploadsPath, 'clients'), { recursive: true });
-    console.log(`📁 Created uploads/clients directory: ${path.join(uploadsPath, 'clients')}`);
+  // Log __dirname para debugging
+  console.error(`[DEBUG] __dirname: ${__dirname}`);
+  
+  // En desarrollo: /workspace/apps/api/dist
+  // En producción: /var/www/nexara-app/apps/api/dist
+  // Necesitamos subir a la raíz del proyecto (3 niveles arriba)
+  const uploadsPath = path.join(__dirname, '../../..', 'uploads');
+  const clientsPath = path.join(uploadsPath, 'clients');
+  
+  console.error(`[DEBUG] Calculated uploads path: ${uploadsPath}`);
+  console.error(`[DEBUG] Calculated clients path: ${clientsPath}`);
+  
+  try {
+    // Asegurar que el directorio uploads existe
+    if (!fs.existsSync(uploadsPath)) {
+      fs.mkdirSync(uploadsPath, { recursive: true });
+      console.error(`✅ Created uploads directory: ${uploadsPath}`);
+    } else {
+      console.error(`✅ Uploads directory exists: ${uploadsPath}`);
+    }
+    
+    // Asegurar que el subdirectorio clients existe
+    if (!fs.existsSync(clientsPath)) {
+      fs.mkdirSync(clientsPath, { recursive: true });
+      console.error(`✅ Created clients directory: ${clientsPath}`);
+    } else {
+      console.error(`✅ Clients directory exists: ${clientsPath}`);
+    }
+    
+    // Verificar que realmente existe antes de servir
+    const stats = fs.statSync(uploadsPath);
+    console.error(`✅ Uploads directory is accessible (isDirectory: ${stats.isDirectory()})`);
+    
+  } catch (err) {
+    console.error(`❌ ERROR setting up uploads directory: ${err.message}`);
+    console.error(err);
   }
   
   app.use('/uploads', express.static(uploadsPath));
-  console.log(`📁 Serving static files from: ${uploadsPath}`);
+  console.error(`✅ Express static middleware registered for /uploads -> ${uploadsPath}`);
 
   // Prefijo global '/api' para todas las rutas
   app.setGlobalPrefix('api');
