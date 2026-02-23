@@ -118,8 +118,10 @@ async function bootstrap() {
   app.use('/uploads', express.static(uploadsPath));
   console.error(`✅ Express static middleware registered for /uploads -> ${uploadsPath}`);
 
-  // Prefijo global '/api' para todas las rutas
-  app.setGlobalPrefix('api');
+  // Prefijo global '/api' para todas las rutas, pero excluir la ruta de uploads
+  app.setGlobalPrefix('api', {
+    exclude: ['/uploads', '/uploads/(.*)']
+  });
 
   app.useWebSocketAdapter(new IoAdapter(app));
   const port = process.env['PORT'] || 3001;
