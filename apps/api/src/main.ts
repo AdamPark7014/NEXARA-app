@@ -75,7 +75,9 @@ async function bootstrap() {
 
   // Servir archivos estáticos desde uploads (en raíz del proyecto)
   const fs = require('fs');
-  const uploadsPath = path.join(process.cwd(), 'uploads');
+  // __dirname es /var/www/nexara-app/apps/api/dist en producción
+  // Necesitamos subir a /var/www/nexara-app (3 niveles: dist -> api -> apps)
+  const uploadsPath = path.join(__dirname, '../../..', 'uploads');
   
   // Asegurar que el directorio uploads existe
   if (!fs.existsSync(uploadsPath)) {
