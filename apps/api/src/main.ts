@@ -6,6 +6,10 @@ import * as path from 'path';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Aumentar límite de payload para fotos base64
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
   // Configurar CORS
   const corsEnv = process.env['CORS_ORIGIN'];
   const corsOrigins = corsEnv
