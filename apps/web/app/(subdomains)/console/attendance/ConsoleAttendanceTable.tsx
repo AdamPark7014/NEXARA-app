@@ -236,6 +236,7 @@ const ConsoleAttendanceTable = () => {
   const [rangeTo, setRangeTo] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [expandedUsers, setExpandedUsers] = useState<Set<number>>(new Set());
   const [detailFilters, setDetailFilters] = useState<Record<number, DetailFilter>>({});
+  const [mapModal, setMapModal] = useState<{ lat: number; lng: number } | null>(null);
 
   const fetchStats = async () => {
     if (!user?.token) return;
@@ -593,7 +594,7 @@ const ConsoleAttendanceTable = () => {
                                                         textDecoration: 'underline'
                                                       }}
                                                       title={`${entry.latitude.toFixed(6)}, ${entry.longitude.toFixed(6)}`}
-                                                      onClick={() => window.open(`https://maps.google.com/?q=${entry.latitude},${entry.longitude}`, '_blank')}
+                                                      onClick={() => setMapModal({ lat: entry.latitude!, lng: entry.longitude! })}
                                                     >
                                                       🌍 GPS
                                                     </span>
@@ -640,7 +641,7 @@ const ConsoleAttendanceTable = () => {
                                                         textDecoration: 'underline'
                                                       }}
                                                       title={`${exit.latitude.toFixed(6)}, ${exit.longitude.toFixed(6)}`}
-                                                      onClick={() => window.open(`https://maps.google.com/?q=${exit.latitude},${exit.longitude}`, '_blank')}
+                                                      onClick={() => setMapModal({ lat: exit.latitude!, lng: exit.longitude! })}
                                                     >
                                                       🌍 GPS
                                                     </span>
@@ -688,6 +689,71 @@ const ConsoleAttendanceTable = () => {
         return email !== 'gerencia@nexara.com.mx' && email !== 'developer@nexara.com.mx';
       }).length === 0 && (
         <div className={styles.emptyState}>No hay usuarios visibles en este rango.</div>
+      )}
+
+      {/* Modal de Mapa GPS Embebido */}
+      {mapModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+          padding: 20,
+        }}>
+          <div style={{
+            backgroundColor: 'var(--bg)',
+            borderRadius: 12,
+            padding: 20,
+            maxWidth: 800,
+            width: '100%',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 16,
+            }}>
+              <h3 style={{ margin: 0, color: 'var(--text)' }}>
+                📍 Ubicación: {mapModal.lat.toFixed(6)}, {mapModal.lng.toFixed(6)}
+              </h3>
+              <button
+                onClick={() => setMapModal(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: 24,
+                  cursor: 'pointer',
+                  color: 'var(--muted)',
+                  padding: 0,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <iframe
+              src={`https://maps.google.com/maps?q=${mapModal.lat},${mapModal.lng}&z=15&output=embed`}
+              width="100%"
+              height="500"
+              style={{
+                border: 'none',
+                borderRadius: 8,
+              }}
+              allowFullScreen
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+          </div>
+        </div>
       )}
     </section>
   );
