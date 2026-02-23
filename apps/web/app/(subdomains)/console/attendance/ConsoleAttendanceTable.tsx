@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { io, Socket } from "socket.io-client";
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
@@ -690,73 +691,74 @@ const ConsoleAttendanceTable = () => {
       }).length === 0 && (
         <div className={styles.emptyState}>No hay usuarios visibles en este rango.</div>
       )}
+    </section>
 
-      {/* Modal de Mapa GPS Embebido */}
-      {mapModal && (
+    {/* Modal de Mapa GPS Embebido - Renderizado con createPortal */}
+    {mapModal && typeof window !== 'undefined' && createPortal(
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 99999,
+        padding: 20,
+      }}>
         <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.7)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 9999,
+          backgroundColor: 'var(--bg)',
+          borderRadius: 12,
           padding: 20,
+          maxWidth: 800,
+          width: '100%',
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
         }}>
           <div style={{
-            backgroundColor: 'var(--bg)',
-            borderRadius: 12,
-            padding: 20,
-            maxWidth: 800,
-            width: '100%',
-            maxHeight: '90vh',
             display: 'flex',
-            flexDirection: 'column',
-            boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 16,
           }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: 16,
-            }}>
-              <h3 style={{ margin: 0, color: 'var(--text)' }}>
-                📍 Ubicación: {mapModal.lat.toFixed(6)}, {mapModal.lng.toFixed(6)}
-              </h3>
-              <button
-                onClick={() => setMapModal(null)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: 24,
-                  cursor: 'pointer',
-                  color: 'var(--muted)',
-                  padding: 0,
-                }}
-              >
-                ✕
-              </button>
-            </div>
-            <iframe
-              src={`https://maps.google.com/maps?q=${mapModal.lat},${mapModal.lng}&z=15&output=embed`}
-              width="100%"
-              height="500"
+            <h3 style={{ margin: 0, color: 'var(--text)' }}>
+              📍 Ubicación: {mapModal.lat.toFixed(6)}, {mapModal.lng.toFixed(6)}
+            </h3>
+            <button
+              onClick={() => setMapModal(null)}
               style={{
+                background: 'none',
                 border: 'none',
-                borderRadius: 8,
+                fontSize: 24,
+                cursor: 'pointer',
+                color: 'var(--muted)',
+                padding: 0,
               }}
-              allowFullScreen
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-            />
+            >
+              ✕
+            </button>
           </div>
+          <iframe
+            src={`https://maps.google.com/maps?q=${mapModal.lat},${mapModal.lng}&z=15&output=embed`}
+            width="100%"
+            height="500"
+            style={{
+              border: 'none',
+              borderRadius: 8,
+            }}
+            allowFullScreen
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
         </div>
-      )}
-    </section>
+      </div>,
+      document.body
+    )}
   );
 };
 
-export default ConsoleAttendanceTable;
+export default ConsoleAttendanceTable;export default ConsoleAttendanceTable;
