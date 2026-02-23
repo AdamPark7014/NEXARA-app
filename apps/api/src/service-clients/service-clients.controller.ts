@@ -37,7 +37,7 @@ export class ServiceClientsController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
   @Post()
-  @UseInterceptors(FileInterceptor('logo', { dest: 'apps/api/uploads/clients' }))
+  @UseInterceptors(FileInterceptor('logo', { dest: 'uploads/clients' }))
   async create(@UploadedFile() file: any, @Body() body: CreateServiceClientDto) {
     if (!body?.name) throw new BadRequestException('Nombre requerido');
     const isActive = this.normalizeBoolean(body.isActive);
@@ -73,7 +73,7 @@ export class ServiceClientsController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
   @Put(':id')
-  @UseInterceptors(FileInterceptor('logo', { dest: 'apps/api/uploads/clients' }))
+  @UseInterceptors(FileInterceptor('logo', { dest: 'uploads/clients' }))
   update(
     @Param('id', ParseIntPipe) id: number,
     @UploadedFile() file: any,
