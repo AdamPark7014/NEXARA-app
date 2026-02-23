@@ -192,6 +192,22 @@ export class AttendanceService {
     // Determinar si es entrada o salida para guardar coordenadas correctas
     const isEntry = dto.type === 'entrada';
     
+    // Validar que no exista ya una entrada/salida del mismo tipo hoy
+    const existingAttendance = await this.prisma.attendance.findFirst({
+      where: {
+        userId,
+        type: dto.type,
+        timestamp: {
+          gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
+          lt: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1),
+        },
+      },
+    });
+
+    if (existingAttendance) {
+      throw new BadRequestException(`Ya existe una ${dto.type} registrada para hoy`);
+    }
+    
     const attendance = await this.prisma.attendance.create({
       data: {
         userId,
