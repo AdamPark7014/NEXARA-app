@@ -24,12 +24,24 @@ import { ServiceClientsService } from './service-clients.service.js';
 export class ServiceClientsController {
   constructor(private readonly serviceClientsService: ServiceClientsService) {}
 
+  private normalizeBoolean(value: unknown) {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'true' || normalized === '1') return true;
+      if (normalized === 'false' || normalized === '0') return false;
+    }
+    return undefined;
+  }
+
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
   @Post()
   @UseInterceptors(FileInterceptor('logo', { dest: 'apps/api/uploads/clients' }))
   async create(@UploadedFile() file: any, @Body() body: CreateServiceClientDto) {
     if (!body?.name) throw new BadRequestException('Nombre requerido');
+    const isActive = this.normalizeBoolean(body.isActive);
+    if (isActive !== undefined) body.isActive = isActive;
     const logoUrl = file ? `/uploads/clients/${file.filename}` : undefined;
     return this.serviceClientsService.create(body, logoUrl);
   }
@@ -67,6 +79,8 @@ export class ServiceClientsController {
     @UploadedFile() file: any,
     @Body() body: UpdateServiceClientDto,
   ) {
+    const isActive = this.normalizeBoolean(body.isActive);
+    if (isActive !== undefined) body.isActive = isActive;
     const logoUrl = file ? `/uploads/clients/${file.filename}` : undefined;
     return this.serviceClientsService.update(id, body, logoUrl);
   }
