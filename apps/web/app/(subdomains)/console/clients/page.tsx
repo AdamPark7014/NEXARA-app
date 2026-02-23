@@ -41,8 +41,11 @@ export default function ClientsPage() {
     if (logoPath.startsWith('http://') || logoPath.startsWith('https://')) {
       return logoPath;
     }
-    // Construir URL completa del API para el logo
-    return `${API_URL.replace(/\/api\/?$/, '')}${logoPath}`;
+    // Construir URL completa - el logo está en /uploads/clients que se sirve desde la raíz
+    const baseUrl = API_URL.replace(/\/api\/?$/, '');
+    // Asegurar que logoPath comience con /
+    const normalizedPath = logoPath.startsWith('/') ? logoPath : `/${logoPath}`;
+    return `${baseUrl}${normalizedPath}`;
   };
 
   const fetchClients = () => {
@@ -270,11 +273,16 @@ export default function ClientsPage() {
                 />
                 {(editLogoPreview || editForm.logoUrl) ? (
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                    <img
-                      src={editLogoPreview || (getLogoUrl(editForm.logoUrl) || '')}
-                      alt="Preview logo"
-                      style={{ width: 72, height: 72, borderRadius: 14, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.4)' }}
-                    />
+                    <div style={{ position: 'relative', width: 72, height: 72 }}>
+                      <img
+                        src={editLogoPreview || (getLogoUrl(editForm.logoUrl) || '')}
+                        alt="Preview logo"
+                        style={{ width: '100%', height: '100%', borderRadius: 14, objectFit: 'contain', border: '1px solid rgba(255,255,255,0.4)', background: 'rgba(0,0,0,0.1)' }}
+                        onError={(e) => {
+                          console.error('Logo non-load error:', (e.target as HTMLImageElement).src);
+                        }}
+                      />
+                    </div>
                     <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{editLogo?.name || 'Logo actual'}</div>
                   </div>
                 ) : (
@@ -326,21 +334,45 @@ export default function ClientsPage() {
                     <tr key={client.id}>
                       <td>
                         {logoUrl ? (
-                          <img 
-                            src={logoUrl} 
-                            alt={`Logo ${client.name}`}
-                            style={{ 
-                              width: 40, 
-                              height: 40, 
-                              objectFit: 'contain',
-                              borderRadius: 8,
-                              border: '1px solid rgba(0,0,0,0.1)'
-                            }}
-                            onError={(e) => {
-                              // Si falla cargar la imagen, mostrar placeholder
-                              (e.target as HTMLImageElement).style.display = 'none';
-                            }}
-                          />
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40 }}>
+                            <img 
+                              src={logoUrl} 
+                              alt={`Logo ${client.name}`}
+                              style={{ 
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'contain',
+                                borderRadius: 8,
+                                border: '1px solid rgba(0,0,0,0.1)',
+                                padding: '2px',
+                                background: 'rgba(255,255,255,0.5)'
+                              }}
+                              onError={(e) => {
+                                console.error(`Failed to load logo for client ${client.name} from:`, logoUrl);
+                                // Mostrar placeholder en caso de error
+                                const img = e.target as HTMLImageElement;
+                                img.style.display = 'none';
+                                const parent = img.parentElement;
+                                if (parent) {
+                                  const placeholder = document.createElement('div');
+                                  placeholder.style.cssText = `
+                                    width: 40px;
+                                    height: 40px;
+                                    borderRadius: 8px;
+                                    background: var(--surface-variant);
+                                    display: flex;
+                                    alignItems: center;
+                                    justifyContent: center;
+                                    fontSize: 12px;
+                                    color: var(--text-secondary);
+                                    border: 1px solid rgba(0,0,0,0.1);
+                                  `;
+                                  placeholder.textContent = '❌';
+                                  parent.appendChild(placeholder);
+                                }
+                              }}
+                            />
+                          </div>
                         ) : (
                           <div style={{ 
                             width: 40, 
@@ -351,7 +383,8 @@ export default function ClientsPage() {
                             alignItems: 'center',
                             justifyContent: 'center',
                             fontSize: 12,
-                            color: 'var(--text-secondary)'
+                            color: 'var(--text-secondary)',
+                            border: '1px solid rgba(0,0,0,0.1)'
                           }}>
                             -
                           </div>
