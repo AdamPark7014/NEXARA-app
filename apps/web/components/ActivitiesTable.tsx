@@ -6,7 +6,6 @@ import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 
 const ActivitiesTable: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const clientLogoInputRef = useRef<HTMLInputElement>(null);
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const { user } = useUser();
   const [loading, setLoading] = useState(true);
@@ -94,12 +93,6 @@ const ActivitiesTable: React.FC = () => {
 
   const [assignableUsers, setAssignableUsers] = useState<{ id: number; nombre: string; role?: { nombre: string } }[]>([]);
   const [clients, setClients] = useState<{ id: number; name: string; logoUrl?: string | null }[]>([]);
-  const [clientFormMessage, setClientFormMessage] = useState<string | null>(null);
-  const [clientLogo, setClientLogo] = useState<File | null>(null);
-  const [clientLogoPreview, setClientLogoPreview] = useState<string | null>(null);
-  const [clientLogoDragging, setClientLogoDragging] = useState(false);
-  const [showClientPassword, setShowClientPassword] = useState(false);
-  const [createdClientCredentials, setCreatedClientCredentials] = useState<{ email?: string | null; password?: string | null } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const [nextAn, setNextAn] = useState<string>('');
@@ -122,14 +115,6 @@ const ActivitiesTable: React.FC = () => {
     branchCity: '',
     branchState: '',
     branchAddress: '',
-  });
-  const [newClient, setNewClient] = useState({
-    name: '',
-    contactName: '',
-    contactEmail: '',
-    contactPhone: '',
-    portalEmail: '',
-    portalPassword: '',
   });
 
   const fetchAssignableUsers = () => {
@@ -234,18 +219,6 @@ const ActivitiesTable: React.FC = () => {
       socket.disconnect();
     };
   }, [user?.token]);
-
-  useEffect(() => {
-    if (!clientLogo) {
-      setClientLogoPreview(null);
-      return undefined;
-    }
-    const url = URL.createObjectURL(clientLogo);
-    setClientLogoPreview(url);
-    return () => {
-      URL.revokeObjectURL(url);
-    };
-  }, [clientLogo]);
 
   const formatDateTime = (value?: string) => {
     if (!value) return '-';
@@ -380,74 +353,6 @@ const ActivitiesTable: React.FC = () => {
     });
     fetchActivities();
     fetchNextAn();
-  };
-
-  const handleLogoSelect = (file?: File | null) => {
-    if (!file) return;
-    if (!file.type.startsWith('image/')) return;
-    setClientLogo(file);
-  };
-
-  const handleLogoDrop = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    setClientLogoDragging(false);
-    const file = event.dataTransfer.files?.[0];
-    handleLogoSelect(file);
-  };
-
-  const handleCreateClient = async () => {
-    if (!user?.token) return;
-    setClientFormMessage(null);
-    setCreatedClientCredentials(null);
-    if (!newClient.name) {
-      setClientFormMessage('Nombre del cliente es requerido');
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append('name', newClient.name);
-    if (newClient.contactName) formData.append('contactName', newClient.contactName);
-    if (newClient.contactEmail) formData.append('contactEmail', newClient.contactEmail);
-    if (newClient.contactPhone) formData.append('contactPhone', newClient.contactPhone);
-    if (newClient.portalEmail) formData.append('portalEmail', newClient.portalEmail);
-    if (newClient.portalPassword) formData.append('portalPassword', newClient.portalPassword);
-    if (clientLogo) formData.append('logo', clientLogo);
-
-    const res = await fetch(buildApiUrl('service-clients'), {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${user.token}` },
-      body: formData,
-    });
-
-    const data = await res.json().catch(() => null);
-    if (!res.ok) {
-      setClientFormMessage(data?.message || 'No se pudo crear el cliente');
-      return;
-    }
-
-    const credentials = data?.credentials;
-    setCreatedClientCredentials(credentials || null);
-    if (credentials?.email || credentials?.password) {
-      const parts = [
-        credentials.email ? `Email: ${credentials.email}` : null,
-        credentials.password ? `Password: ${credentials.password}` : null,
-      ].filter(Boolean);
-      setClientFormMessage(`Cliente creado. ${parts.join(' | ')}`);
-    } else {
-      setClientFormMessage('Cliente creado');
-    }
-    setNewClient({
-      name: '',
-      contactName: '',
-      contactEmail: '',
-      contactPhone: '',
-      portalEmail: '',
-      portalPassword: '',
-    });
-    setClientLogo(null);
-    setClientLogoPreview(null);
-    setShowClientPassword(false);
-    fetchClients();
   };
 
   const shellStyle: React.CSSProperties = {
@@ -606,113 +511,6 @@ const ActivitiesTable: React.FC = () => {
         )}
         {hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && (
           <div style={formCardStyle}>
-            <div style={{ display: 'grid', gap: 12, padding: 12, borderRadius: 12, background: 'rgba(15, 106, 214, 0.08)', border: '1px dashed rgba(15, 106, 214, 0.3)' }}>
-              <div>
-                <h3 style={{ marginBottom: 4 }}>Agregar cliente</h3>
-                <div style={helperTextStyle}>Crea el cliente y su acceso al portal.</div>
-              </div>
-              <div style={formGridStyle}>
-                <input className="input" placeholder="Nombre del cliente" value={newClient.name} onChange={(e) => setNewClient({ ...newClient, name: e.target.value })} />
-                <input className="input" placeholder="Contacto" value={newClient.contactName} onChange={(e) => setNewClient({ ...newClient, contactName: e.target.value })} />
-                <input className="input" placeholder="Email contacto" value={newClient.contactEmail} onChange={(e) => setNewClient({ ...newClient, contactEmail: e.target.value })} />
-                <input className="input" placeholder="Telefono" value={newClient.contactPhone} onChange={(e) => setNewClient({ ...newClient, contactPhone: e.target.value })} />
-                <input className="input" placeholder="Email portal" value={newClient.portalEmail} onChange={(e) => setNewClient({ ...newClient, portalEmail: e.target.value })} />
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input
-                    className="input"
-                    type={showClientPassword ? 'text' : 'password'}
-                    placeholder="Password portal"
-                    value={newClient.portalPassword}
-                    onChange={(e) => setNewClient({ ...newClient, portalPassword: e.target.value })}
-                    style={{ flex: 1 }}
-                  />
-                  <button
-                    className="button-secondary"
-                    type="button"
-                    onClick={() => setShowClientPassword((prev) => !prev)}
-                  >
-                    {showClientPassword ? 'Ocultar' : 'Ver'}
-                  </button>
-                </div>
-                <div
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    setClientLogoDragging(true);
-                  }}
-                  onDragLeave={() => setClientLogoDragging(false)}
-                  onDrop={handleLogoDrop}
-                  style={{
-                    gridColumn: '1 / -1',
-                    borderRadius: 16,
-                    padding: 16,
-                    border: `2px dashed ${clientLogoDragging ? 'rgba(31,107,186,0.8)' : 'rgba(31,107,186,0.4)'}`,
-                    background: clientLogoDragging
-                      ? 'linear-gradient(135deg, rgba(31,107,186,0.2), rgba(18,133,98,0.18))'
-                      : 'linear-gradient(135deg, rgba(31,107,186,0.12), rgba(18,133,98,0.12))',
-                    display: 'grid',
-                    gap: 10,
-                    alignItems: 'center',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Logo del cliente</div>
-                      <div style={helperTextStyle}>Arrastra la imagen aqui o subela manualmente.</div>
-                    </div>
-                    <button
-                      className="button-secondary"
-                      type="button"
-                      onClick={() => clientLogoInputRef.current?.click()}
-                    >
-                      Seleccionar imagen
-                    </button>
-                  </div>
-                  <input
-                    ref={clientLogoInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleLogoSelect(e.target.files?.[0] || null)}
-                    style={{ display: 'none' }}
-                  />
-                  {clientLogoPreview ? (
-                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                      <img
-                        src={clientLogoPreview}
-                        alt="Preview logo"
-                        style={{ width: 72, height: 72, borderRadius: 14, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.4)' }}
-                      />
-                      <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{clientLogo?.name}</div>
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>No hay logo seleccionado.</div>
-                  )}
-                </div>
-              </div>
-              {createdClientCredentials && (createdClientCredentials.email || createdClientCredentials.password) && (
-                <div style={{
-                  marginTop: 8,
-                  padding: 12,
-                  borderRadius: 12,
-                  border: '1px solid rgba(31,107,186,0.25)',
-                  background: 'rgba(31,107,186,0.08)',
-                  display: 'grid',
-                  gap: 6,
-                }}>
-                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Credenciales del portal</div>
-                  {createdClientCredentials.email && (
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Usuario: {createdClientCredentials.email}</div>
-                  )}
-                  {createdClientCredentials.password && (
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Password: {createdClientCredentials.password}</div>
-                  )}
-                </div>
-              )}
-              <div style={formFooterStyle}>
-                <button className="button-secondary" onClick={handleCreateClient}>Crear cliente</button>
-                {clientFormMessage && <span style={{ color: clientFormMessage.startsWith('No') ? 'var(--danger)' : 'var(--accent)' }}>{clientFormMessage}</span>}
-              </div>
-            </div>
-
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
               <div>
                 <h3 style={{ marginBottom: 4 }}>Asignar actividad</h3>
