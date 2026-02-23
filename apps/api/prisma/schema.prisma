@@ -669,12 +669,16 @@ enum OrderStatus {
 }
 
 model Attendance {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  type      String   // 'entrada' o 'salida'
-  timestamp DateTime @default(now())
-  photoUrl  String?  // URL de la foto capturada desde la cámara
-  user      User     @relation(fields: [userId], references: [id])
+  id               Int      @id @default(autoincrement())
+  userId           Int
+  type             String   // 'entrada' o 'salida'
+  timestamp        DateTime @default(now())
+  photoUrl         String?  // URL de la foto capturada desde la cámara
+  entryLatitude    Float?   // Ubicación GPS al registrar entrada
+  entryLongitude   Float?  // Ubicación GPS al registrar entrada
+  exitLatitude     Float?   // Ubicación GPS al registrar salida
+  exitLongitude    Float?   // Ubicación GPS al registrar salida
+  user             User     @relation(fields: [userId], references: [id])
 }
 
 model AttendanceDay {
@@ -1077,6 +1081,7 @@ enum NotificationType {
   PROJECT_COMPLETED
   VIATICO_APPROVED
   VIATICO_REJECTED
+  ATTENDANCE_UPDATE
 }
 
 model Notification {
