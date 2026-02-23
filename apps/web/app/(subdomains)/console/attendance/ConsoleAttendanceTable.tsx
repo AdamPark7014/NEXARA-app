@@ -601,27 +601,29 @@ const ConsoleAttendanceTable = () => {
                                                     />
                                                   )}
                                                   {entry.latitude && entry.longitude && (
-                                                    <iframe
-                                                      src={`https://maps.google.com/maps?q=${entry.latitude},${entry.longitude}&z=13&output=embed`}
-                                                      width="50"
-                                                      height="50"
-                                                      style={{
-                                                        border: '1px solid var(--muted)',
-                                                        borderRadius: 4,
-                                                        cursor: 'pointer',
-                                                        transition: 'all 0.2s',
-                                                      }}
-                                                      title={`${entry.latitude.toFixed(6)}, ${entry.longitude.toFixed(6)}`}
+                                                    <div
                                                       onClick={() => setMapModal({ lat: entry.latitude!, lng: entry.longitude! })}
+                                                      style={{
+                                                        width: 50,
+                                                        height: 50,
+                                                        borderRadius: 4,
+                                                        border: '2px solid var(--primary)',
+                                                        cursor: 'pointer',
+                                                        backgroundImage: `url('https://maps.googleapis.com/maps/api/staticmap?center=${entry.latitude},${entry.longitude}&zoom=13&size=50x50&style=feature:all|element:labels|visibility:off&markers=color:red|${entry.latitude},${entry.longitude}')`,
+                                                        backgroundSize: 'cover',
+                                                        backgroundPosition: 'center',
+                                                        transition: 'all 0.2s ease',
+                                                        boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                                                      }}
+                                                      title={`📍 ${entry.latitude.toFixed(6)}, ${entry.longitude.toFixed(6)}`}
                                                       onMouseEnter={(e) => {
-                                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+                                                        e.currentTarget.style.transform = 'scale(1.1)';
+                                                        e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.25)';
                                                       }}
                                                       onMouseLeave={(e) => {
-                                                        e.currentTarget.style.boxShadow = 'none';
+                                                        e.currentTarget.style.transform = 'scale(1)';
+                                                        e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.15)';
                                                       }}
-                                                      allowFullScreen
-                                                      loading="lazy"
-                                                      referrerPolicy="no-referrer-when-downgrade"
                                                     />
                                                   )}
                                                 </div>
@@ -658,27 +660,29 @@ const ConsoleAttendanceTable = () => {
                                                     />
                                                   )}
                                                   {exit.latitude && exit.longitude && (
-                                                    <iframe
-                                                      src={`https://maps.google.com/maps?q=${exit.latitude},${exit.longitude}&z=13&output=embed`}
-                                                      width="50"
-                                                      height="50"
-                                                      style={{
-                                                        border: '1px solid var(--muted)',
-                                                        borderRadius: 4,
-                                                        cursor: 'pointer',
-                                                        transition: 'all 0.2s',
-                                                      }}
-                                                      title={`${exit.latitude.toFixed(6)}, ${exit.longitude.toFixed(6)}`}
+                                                    <div
                                                       onClick={() => setMapModal({ lat: exit.latitude!, lng: exit.longitude! })}
+                                                      style={{
+                                                        width: 50,
+                                                        height: 50,
+                                                        borderRadius: 4,
+                                                        border: '2px solid var(--primary)',
+                                                        cursor: 'pointer',
+                                                        backgroundImage: `url('https://maps.googleapis.com/maps/api/staticmap?center=${exit.latitude},${exit.longitude}&zoom=13&size=50x50&style=feature:all|element:labels|visibility:off&markers=color:red|${exit.latitude},${exit.longitude}')`,
+                                                        backgroundSize: 'cover',
+                                                        backgroundPosition: 'center',
+                                                        transition: 'all 0.2s ease',
+                                                        boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                                                      }}
+                                                      title={`📍 ${exit.latitude.toFixed(6)}, ${exit.longitude.toFixed(6)}`}
                                                       onMouseEnter={(e) => {
-                                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+                                                        e.currentTarget.style.transform = 'scale(1.1)';
+                                                        e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.25)';
                                                       }}
                                                       onMouseLeave={(e) => {
-                                                        e.currentTarget.style.boxShadow = 'none';
+                                                        e.currentTarget.style.transform = 'scale(1)';
+                                                        e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.15)';
                                                       }}
-                                                      allowFullScreen
-                                                      loading="lazy"
-                                                      referrerPolicy="no-referrer-when-downgrade"
                                                     />
                                                   )}
                                                 </div>
