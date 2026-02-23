@@ -238,6 +238,7 @@ const ConsoleAttendanceTable = () => {
   const [expandedUsers, setExpandedUsers] = useState<Set<number>>(new Set());
   const [detailFilters, setDetailFilters] = useState<Record<number, DetailFilter>>({});
   const [mapModal, setMapModal] = useState<{ lat: number; lng: number } | null>(null);
+  const [photoModal, setPhotoModal] = useState<string | null>(null);
 
   const fetchStats = async () => {
     if (!user?.token) return;
@@ -292,16 +293,17 @@ const ConsoleAttendanceTable = () => {
     };
   }, [rangeFrom, rangeTo, user]);
 
-  // Cerrar modal con tecla ESC
+  // Cerrar modales con tecla ESC
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && mapModal) {
-        setMapModal(null);
+      if (e.key === 'Escape') {
+        if (mapModal) setMapModal(null);
+        if (photoModal) setPhotoModal(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mapModal]);
+  }, [mapModal, photoModal]);
 
   const summary = useMemo(() => {
     if (!data) return { totalUsers: 0, totalMinutesAll: 0, avgMinutesPerUser: 0 };
@@ -591,7 +593,7 @@ const ConsoleAttendanceTable = () => {
                                                         border: '1px solid var(--muted)'
                                                       }}
                                                       title="Click para ver en grande"
-                                                      onClick={() => window.open(entry.photoUrl, '_blank')}
+                                                      onClick={() => setPhotoModal(entry.photoUrl)}
                                                       onError={(e) => {
                                                         console.error('Error al cargar foto de entrada:', entry.photoUrl);
                                                         e.currentTarget.style.display = 'none';
@@ -638,7 +640,7 @@ const ConsoleAttendanceTable = () => {
                                                         border: '1px solid var(--muted)'
                                                       }}
                                                       title="Click para ver en grande"
-                                                      onClick={() => window.open(exit.photoUrl, '_blank')}
+                                                      onClick={() => setPhotoModal(exit.photoUrl)}
                                                       onError={(e) => {
                                                         console.error('Error al cargar foto de salida:', exit.photoUrl);
                                                         e.currentTarget.style.display = 'none';
@@ -800,6 +802,95 @@ const ConsoleAttendanceTable = () => {
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
           />
+        </div>
+      </div>,
+      document.body
+    )}
+    {photoModal && createPortal(
+      <div 
+        onClick={() => setPhotoModal(null)}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 99999,
+          animation: 'fadeIn 0.2s ease-in-out',
+        }}
+      >
+        <div 
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'relative',
+            backgroundColor: 'white',
+            borderRadius: 12,
+            padding: 20,
+            maxWidth: '90vw',
+            maxHeight: '90vh',
+            boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 16,
+          }}
+        >
+          <button
+            onClick={() => setPhotoModal(null)}
+            style={{
+              position: 'absolute',
+              top: -50,
+              right: 0,
+              background: 'linear-gradient(135deg, var(--primary), var(--accent))',
+              border: 'none',
+              borderRadius: '50%',
+              width: 40,
+              height: 40,
+              fontSize: 24,
+              cursor: 'pointer',
+              color: 'white',
+              padding: 0,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.1)';
+              e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+            }}
+          >
+            ✕
+          </button>
+          <img 
+            src={photoModal} 
+            alt="foto ampliada" 
+            style={{
+              maxWidth: '100%',
+              maxHeight: 'calc(90vh - 80px)',
+              objectFit: 'contain',
+              borderRadius: 8,
+            }}
+            onError={(e) => {
+              console.error('Error al cargar foto:', photoModal);
+              setPhotoModal(null);
+            }}
+          />
+          <p style={{ 
+            margin: 0, 
+            fontSize: 12, 
+            color: 'var(--muted)',
+            textAlign: 'center',
+            width: '100%'
+          }}>
+            Click fuera de la imagen o presiona ESC para cerrar
+          </p>
         </div>
       </div>,
       document.body
