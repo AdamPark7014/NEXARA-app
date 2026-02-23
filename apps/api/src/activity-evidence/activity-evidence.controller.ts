@@ -90,4 +90,37 @@ export class ActivityEvidenceController {
   ) {
     return this.service.removeEvidencePhoto(parseInt(activityId, 10), parseInt(index, 10));
   }
+
+  @Post(':activityId/approve')
+  async approveEvidence(
+    @Param('activityId') activityId: string,
+    @Body() body: { reviewerId: number; notes?: string },
+  ) {
+    return this.service.approveEvidence(
+      parseInt(activityId, 10),
+      body.reviewerId,
+      body.notes,
+    );
+  }
+
+  @Post(':activityId/reject')
+  async rejectEvidence(
+    @Param('activityId') activityId: string,
+    @Body() body: { reviewerId: number; rejectedStep: string; notes: string },
+  ) {
+    return this.service.rejectEvidence(
+      parseInt(activityId, 10),
+      body.reviewerId,
+      body.rejectedStep,
+      body.notes,
+    );
+  }
+
+  @Post(':activityId/resubmit')
+  async resubmitStep(
+    @Param('activityId') activityId: string,
+    @Body() body: { step: string; data: any },
+  ) {
+    return this.service.resubmitStep(parseInt(activityId, 10), body.step, body.data);
+  }
 }

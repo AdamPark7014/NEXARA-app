@@ -11,6 +11,9 @@ interface ActivityOption {
 interface EvidenceFlowData {
   activityId: number;
   step: 'ENTRY_PHOTO' | 'EVIDENCE_PHOTOS' | 'SERVICE_SHEET_PDF' | 'SERVICE_SHEET_DATA' | 'EXIT_PHOTO' | 'COMPLETED';
+  reviewStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  rejectedStep?: string;
+  reviewNotes?: string;
   entryPhotoUrl?: string;
   entryLatitude?: number;
   entryLongitude?: number;
@@ -34,6 +37,8 @@ const ActivityEvidenceFlow = () => {
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/\.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
+
+  const isCorrection = flowData?.reviewStatus === 'REJECTED';
 
   // Cargar actividades
   useEffect(() => {
@@ -63,6 +68,9 @@ const ActivityEvidenceFlow = () => {
         setFlowData({
           activityId,
           step: data.status,
+          reviewStatus: data.reviewStatus,
+          rejectedStep: data.rejectedStep,
+          reviewNotes: data.reviewNotes,
           entryPhotoUrl: data.entryPhotoUrl,
           entryLatitude: data.entryLatitude,
           entryLongitude: data.entryLongitude,
@@ -139,13 +147,21 @@ const ActivityEvidenceFlow = () => {
       const photoUrl = await capturePhoto();
       const { latitude, longitude } = await getGeolocation();
 
-      const res = await fetch(buildApiUrl(`activity-evidence/${flowData.activityId}/entry-photo`), {
+      const endpoint = isCorrection 
+        ? `activity-evidence/${flowData.activityId}/resubmit`
+        : `activity-evidence/${flowData.activityId}/entry-photo`;
+
+      const body = isCorrection
+        ? { step: 'ENTRY_PHOTO', data: { photoUrl, latitude, longitude } }
+        : { photoUrl, latitude, longitude };
+
+      const res = await fetch(buildApiUrl(endpoint), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${user!.token}`,
         },
-        body: JSON.stringify({ photoUrl, latitude, longitude }),
+        body: JSON.stringify(body),
       });
 
       if (res.ok) {
@@ -156,8 +172,12 @@ const ActivityEvidenceFlow = () => {
           entryPhotoUrl: photoUrl,
           entryLatitude: latitude,
           entryLongitude: longitude,
+          reviewStatus: isCorrection ? 'PENDING' : flowData.reviewStatus,
+          rejectedStep: undefined,
         });
-        setSuccessMsg('✅ Foto de entrada guardada. Siguiente: Tomar evidencias (4-8 fotos)');
+        setSuccessMsg(isCorrection 
+          ? '✅ Corrección enviada. Siguiente: Tomar evidencias (4-8 fotos)' 
+          : '✅ Foto de entrada guardada. Siguiente: Tomar evidencias (4-8 fotos)');
         setCameraActive(false);
       } else {
         const errorData = await res.json();
@@ -212,18 +232,33 @@ const ActivityEvidenceFlow = () => {
     setError(null);
 
     try {
-      const res = await fetch(buildApiUrl(`activity-evidence/${flowData.activityId}/evidence-photos`), {
+      const endpoint = isCorrection
+        ? `activity-evidence/${flowData.activityId}/resubmit`
+        : `activity-evidence/${flowData.activityId}/evidence-photos`;
+
+      const body = isCorrection
+        ? { step: 'EVIDENCE_PHOTOS', data: { photoUrls: flowData.evidencePhotos } }
+        : { photoUrls: flowData.evidencePhotos };
+
+      const res = await fetch(buildApiUrl(endpoint), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${user!.token}`,
         },
-        body: JSON.stringify({ photoUrls: flowData.evidencePhotos }),
+        body: JSON.stringify(body),
       });
 
       if (res.ok) {
-        setFlowData({ ...flowData, step: 'SERVICE_SHEET_PDF' });
-        setSuccessMsg('✅ Evidencias guardadas. Siguiente: Carga hoja de servicio PDF');
+        setFlowData({ 
+          ...flowData, 
+          step: 'SERVICE_SHEET_PDF',
+          reviewStatus: isCorrection ? 'PENDING' : flowData.reviewStatus,
+          rejectedStep: undefined,
+        });
+        setSuccessMsg(isCorrection 
+          ? '✅ Corrección enviada. Siguiente: Carga hoja de servicio PDF' 
+          : '✅ Evidencias guardadas. Siguiente: Carga hoja de servicio PDF');
       } else {
         const errorData = await res.json();
         setError(errorData.message || 'Error al guardar evidencias');
@@ -249,18 +284,34 @@ const ActivityEvidenceFlow = () => {
       reader.onload = async () => {
         const pdfUrl = reader.result as string;
 
-        const res = await fetch(buildApiUrl(`activity-evidence/${flowData.activityId}/service-sheet-pdf`), {
+        const endpoint = isCorrection
+          ? `activity-evidence/${flowData.activityId}/resubmit`
+          : `activity-evidence/${flowData.activityId}/service-sheet-pdf`;
+
+        const body = isCorrection
+          ? { step: 'SERVICE_SHEET_PDF', data: { pdfUrl } }
+          : { pdfUrl };
+
+        const res = await fetch(buildApiUrl(endpoint), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${user!.token}`,
           },
-          body: JSON.stringify({ pdfUrl }),
+          body: JSON.stringify(body),
         });
 
         if (res.ok) {
-          setFlowData({ ...flowData, step: 'SERVICE_SHEET_DATA', serviceSheetPdfUrl: pdfUrl });
-          setSuccessMsg('✅ PDF guardado. Siguiente: Completa la plantilla interna');
+          setFlowData({ 
+            ...flowData, 
+            step: 'SERVICE_SHEET_DATA', 
+            serviceSheetPdfUrl: pdfUrl,
+            reviewStatus: isCorrection ? 'PENDING' : flowData.reviewStatus,
+            rejectedStep: undefined,
+          });
+          setSuccessMsg(isCorrection 
+            ? '✅ Corrección enviada. Siguiente: Completa la plantilla interna' 
+            : '✅ PDF guardado. Siguiente: Completa la plantilla interna');
         } else {
           const errorData = await res.json();
           setError(errorData.message || 'Error al cargar PDF');
@@ -281,18 +332,34 @@ const ActivityEvidenceFlow = () => {
     setError(null);
 
     try {
-      const res = await fetch(buildApiUrl(`activity-evidence/${flowData.activityId}/service-sheet-data`), {
+      const endpoint = isCorrection
+        ? `activity-evidence/${flowData.activityId}/resubmit`
+        : `activity-evidence/${flowData.activityId}/service-sheet-data`;
+
+      const body = isCorrection
+        ? { step: 'SERVICE_SHEET_DATA', data: { formData: data } }
+        : data;
+
+      const res = await fetch(buildApiUrl(endpoint), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${user!.token}`,
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(body),
       });
 
       if (res.ok) {
-        setFlowData({ ...flowData, step: 'EXIT_PHOTO', serviceSheetData: data });
-        setSuccessMsg('✅ Plantilla completada. Siguiente: Toma foto de salida');
+        setFlowData({ 
+          ...flowData, 
+          step: 'EXIT_PHOTO', 
+          serviceSheetData: data,
+          reviewStatus: isCorrection ? 'PENDING' : flowData.reviewStatus,
+          rejectedStep: undefined,
+        });
+        setSuccessMsg(isCorrection 
+          ? '✅ Corrección enviada. Siguiente: Toma foto de salida' 
+          : '✅ Plantilla completada. Siguiente: Toma foto de salida');
       } else {
         const errorData = await res.json();
         setError(errorData.message || 'Error al guardar plantilla');
@@ -314,13 +381,21 @@ const ActivityEvidenceFlow = () => {
       const photoUrl = await capturePhoto();
       const { latitude, longitude } = await getGeolocation();
 
-      const res = await fetch(buildApiUrl(`activity-evidence/${flowData.activityId}/exit-photo`), {
+      const endpoint = isCorrection
+        ? `activity-evidence/${flowData.activityId}/resubmit`
+        : `activity-evidence/${flowData.activityId}/exit-photo`;
+
+      const body = isCorrection
+        ? { step: 'EXIT_PHOTO', data: { photoUrl, latitude, longitude } }
+        : { photoUrl, latitude, longitude };
+
+      const res = await fetch(buildApiUrl(endpoint), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${user!.token}`,
         },
-        body: JSON.stringify({ photoUrl, latitude, longitude }),
+        body: JSON.stringify(body),
       });
 
       if (res.ok) {
@@ -330,8 +405,12 @@ const ActivityEvidenceFlow = () => {
           exitPhotoUrl: photoUrl,
           exitLatitude: latitude,
           exitLongitude: longitude,
+          reviewStatus: isCorrection ? 'PENDING' : flowData.reviewStatus,
+          rejectedStep: undefined,
         });
-        setSuccessMsg('🎉 ¡Asignación completada exitosamente!');
+        setSuccessMsg(isCorrection 
+          ? '🎉 ¡Corrección enviada exitosamente! Tu evidencia será revisada nuevamente.' 
+          : '🎉 ¡Asignación completada exitosamente!');
         setCameraActive(false);
       } else {
         const errorData = await res.json();
@@ -392,6 +471,60 @@ const ActivityEvidenceFlow = () => {
       {successMsg && (
         <div style={{ padding: 12, backgroundColor: '#efe', color: '#060', borderRadius: 4, marginBottom: 12 }}>
           {successMsg}
+        </div>
+      )}
+
+      {/* Banner de Rechazo */}
+      {flowData.reviewStatus === 'REJECTED' && flowData.rejectedStep && flowData.reviewNotes && (
+        <div
+          style={{
+            padding: 20,
+            backgroundColor: '#fee2e2',
+            border: '3px solid #ef4444',
+            borderRadius: 8,
+            marginBottom: 20,
+          }}
+        >
+          <h3 style={{ margin: '0 0 12px 0', color: '#dc2626', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 24 }}>⚠️</span>
+            Tu evidencia fue rechazada
+          </h3>
+          <div style={{ marginBottom: 12 }}>
+            <strong style={{ color: '#dc2626' }}>Paso rechazado:</strong>{' '}
+            <span style={{ color: '#991b1b' }}>
+              {flowData.rejectedStep === 'ENTRY_PHOTO' && '📸 Paso 1: Foto de Entrada'}
+              {flowData.rejectedStep === 'EVIDENCE_PHOTOS' && '📷 Paso 2: Fotos de Evidencia'}
+              {flowData.rejectedStep === 'SERVICE_SHEET_PDF' && '📄 Paso 3: PDF Hoja de Servicio'}
+              {flowData.rejectedStep === 'SERVICE_SHEET_DATA' && '📝 Paso 4: Plantilla Interna'}
+              {flowData.rejectedStep === 'EXIT_PHOTO' && '🚪 Paso 5: Foto de Salida'}
+            </span>
+          </div>
+          <div>
+            <strong style={{ color: '#dc2626' }}>Observaciones del revisor:</strong>
+            <p
+              style={{
+                margin: '8px 0 0 0',
+                padding: 12,
+                backgroundColor: 'rgba(255,255,255,0.7)',
+                borderRadius: 4,
+                color: '#374151',
+              }}
+            >
+              {flowData.reviewNotes}
+            </p>
+          </div>
+          <div
+            style={{
+              marginTop: 16,
+              padding: 12,
+              backgroundColor: 'rgba(254, 243, 199, 0.5)',
+              borderRadius: 4,
+              fontSize: 14,
+              color: '#92400e',
+            }}
+          >
+            💡 <strong>Instrucciones:</strong> Completa nuevamente el paso rechazado para enviar la corrección.
+          </div>
         </div>
       )}
 

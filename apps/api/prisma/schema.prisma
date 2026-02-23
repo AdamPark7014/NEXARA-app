@@ -323,6 +323,7 @@ model User {
   salesProjectOrdersCreated SalesProjectOrder[] @relation("SalesProjectOrderCreator")
   orderTemplates   OrderTemplate[]             @relation("OrderTemplateCreator")
   notifications    Notification[]
+  reviewedEvidences ActivityEvidence[]  // Evidencias revisadas por este usuario
 }
 
 model UserProfile {
@@ -606,7 +607,16 @@ model ActivityEvidence {
   createdAt                 DateTime  @default(now())
   updatedAt                 DateTime  @updatedAt
   
+  // Sistema de Revisión y Aprobación
+  reviewStatus              String    @default("PENDING") @db.VarChar(20)  // PENDING, APPROVED, REJECTED
+  rejectedStep              String?   @db.VarChar(50)  // Cual paso fue rechazado: ENTRY_PHOTO, EVIDENCE_PHOTOS, etc.
+  reviewNotes               String?   @db.Text  // Observaciones del revisor
+  reviewedAt                DateTime?  // Fecha de revisión
+  reviewedById              Int?       // Usuario que revisó
+  correctionSubmittedAt     DateTime?  // Fecha de corrección del usuario
+  
   activity                  Activity  @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  reviewedBy                User?     @relation(fields: [reviewedById], references: [id], onDelete: SetNull)
   
   @@map("activity_evidences")
 }
