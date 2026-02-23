@@ -232,6 +232,18 @@ export class ServiceClientsService {
     const existing = await this.db.serviceClient.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Cliente no encontrado');
 
+    const normalizeBoolean = (value: unknown) => {
+      if (typeof value === 'boolean') return value;
+      if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === 'true' || normalized === '1') return true;
+        if (normalized === 'false' || normalized === '0') return false;
+      }
+      return undefined;
+    };
+
+    const normalizedIsActive = normalizeBoolean(dto.isActive);
+
     const portalPasswordHash = dto.portalPassword
       ? await bcrypt.hash(dto.portalPassword, 10)
       : undefined;
@@ -251,7 +263,7 @@ export class ServiceClientsService {
         accountCode: dto.accountCode?.trim(),
         portalEmail: dto.portalEmail?.trim(),
         portalPasswordHash,
-        isActive: dto.isActive,
+        isActive: normalizedIsActive,
       },
     });
   }
