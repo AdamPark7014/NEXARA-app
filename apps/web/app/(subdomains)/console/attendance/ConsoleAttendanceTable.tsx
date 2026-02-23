@@ -292,6 +292,17 @@ const ConsoleAttendanceTable = () => {
     };
   }, [rangeFrom, rangeTo, user]);
 
+  // Cerrar modal con tecla ESC
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && mapModal) {
+        setMapModal(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mapModal]);
+
   const summary = useMemo(() => {
     if (!data) return { totalUsers: 0, totalMinutesAll: 0, avgMinutesPerUser: 0 };
     return {
@@ -696,35 +707,42 @@ const ConsoleAttendanceTable = () => {
 
     {/* Modal de Mapa GPS Embebido - Renderizado con createPortal */}
     {mapModal && typeof window !== 'undefined' && createPortal(
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.7)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 99999,
-        padding: 20,
-      }}>
-        <div style={{
-          backgroundColor: 'var(--bg)',
-          borderRadius: 12,
-          padding: 20,
-          maxWidth: 800,
-          width: '100%',
-          maxHeight: '90vh',
+      <div 
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.7)',
           display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
-        }}>
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 99999,
+          padding: 20,
+        }}
+        onClick={() => setMapModal(null)}
+      >
+        <div 
+          style={{
+            backgroundColor: 'var(--bg)',
+            borderRadius: 12,
+            padding: 20,
+            maxWidth: 800,
+            width: '100%',
+            maxHeight: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             marginBottom: 16,
+            position: 'relative',
           }}>
             <h3 style={{ margin: 0, color: 'var(--text)' }}>
               📍 Ubicación: {mapModal.lat.toFixed(6)}, {mapModal.lng.toFixed(6)}
@@ -732,17 +750,44 @@ const ConsoleAttendanceTable = () => {
             <button
               onClick={() => setMapModal(null)}
               style={{
-                background: 'none',
+                position: 'absolute',
+                top: -50,
+                right: 0,
+                background: 'linear-gradient(135deg, var(--primary), var(--accent))',
                 border: 'none',
+                borderRadius: '50%',
+                width: 40,
+                height: 40,
                 fontSize: 24,
                 cursor: 'pointer',
-                color: 'var(--muted)',
+                color: 'white',
                 padding: 0,
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.1)';
+                e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
               }}
             >
               ✕
             </button>
           </div>
+          <p style={{ 
+            margin: '0 0 12px 0', 
+            fontSize: 12, 
+            color: 'var(--muted)',
+            textAlign: 'center'
+          }}>
+            Click fuera del mapa o presiona ESC para cerrar
+          </p>
           <iframe
             src={`https://maps.google.com/maps?q=${mapModal.lat},${mapModal.lng}&z=15&output=embed`}
             width="100%"
