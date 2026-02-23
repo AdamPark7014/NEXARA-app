@@ -226,14 +226,60 @@ export default function ClientsPage() {
                     {showEditPassword ? 'Ocultar' : 'Ver'}
                   </button>
                 </div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={editForm.isActive}
-                    onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })}
-                  />
-                  Cliente activo
-                </label>
+              </div>
+
+              {/* Cliente activo toggle */}
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 16, 
+                padding: '16px 20px', 
+                borderRadius: 12, 
+                background: 'linear-gradient(135deg, rgba(31,107,186,0.08), rgba(18,133,98,0.08))',
+                border: '1px solid rgba(31,107,186,0.2)',
+                transition: 'all 0.3s ease'
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}>Estado del cliente</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 12, marginTop: 4 }}>
+                    {editForm.isActive ? '✓ Cliente activo - Puede acceder a servicios' : '○ Cliente inactivo - Sin acceso a servicios'}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditForm({ ...editForm, isActive: !editForm.isActive })}
+                  style={{
+                    padding: '8px 20px',
+                    borderRadius: 8,
+                    border: 'none',
+                    fontWeight: 600,
+                    fontSize: 14,
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    background: editForm.isActive 
+                      ? 'linear-gradient(135deg, #1f6bba 0%, #128562 100%)'
+                      : 'rgba(255,255,255,0.1)',
+                    color: editForm.isActive ? '#fff' : 'var(--text-secondary)',
+                    transform: 'translateZ(0)',
+                    boxShadow: editForm.isActive
+                      ? '0 4px 12px rgba(31,107,186,0.3)'
+                      : 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (editForm.isActive) {
+                      (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 6px 16px rgba(31,107,186,0.4)';
+                      (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px) translateZ(0)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (editForm.isActive) {
+                      (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(31,107,186,0.3)';
+                      (e.currentTarget as HTMLButtonElement).style.transform = 'translateZ(0)';
+                    }
+                  }}
+                >
+                  {editForm.isActive ? '✓ Activo' : '○ Inactivo'}
+                </button>
               </div>
 
               <div
