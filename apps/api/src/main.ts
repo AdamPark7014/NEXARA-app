@@ -73,13 +73,13 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // Prefijo global '/api' para todas las rutas
-  app.setGlobalPrefix('api');
-
-  // Servir archivos estáticos desde apps/api/uploads (cwd ya es apps/api)
+  // Servir archivos estáticos desde apps/api/uploads (ANTES del prefijo global)
   const uploadsPath = path.join(process.cwd(), 'uploads');
   app.use('/uploads', express.static(uploadsPath));
   console.log(`📁 Serving static files from: ${uploadsPath}`);
+
+  // Prefijo global '/api' para todas las rutas
+  app.setGlobalPrefix('api');
 
   app.useWebSocketAdapter(new IoAdapter(app));
   const port = process.env['PORT'] || 3001;
