@@ -23,20 +23,19 @@ import { CreateServiceClientDto } from './dto/create-service-client.dto.js';
 import { UpdateServiceClientDto } from './dto/update-service-client.dto.js';
 import { ServiceClientsService } from './service-clients.service.js';
 
+// Resuelve la ruta absoluta a /uploads/clients en la raíz del proyecto y asegura su existencia
+const ensureUploadsDir = () => {
+  const baseUploads = path.join(__dirname, '../../..', 'uploads');
+  const dir = path.join(baseUploads, 'clients');
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return dir;
+};
+
 @Controller('service-clients')
 export class ServiceClientsController {
   constructor(private readonly serviceClientsService: ServiceClientsService) {}
-
-  private getUploadDir() {
-    // En dist, __dirname apunta a .../apps/api/dist/service-clients
-    // Subimos 3 niveles para llegar a la raíz del proyecto y luego a /uploads/clients
-    const baseUploads = path.join(__dirname, '../../..', 'uploads');
-    const dir = path.join(baseUploads, 'clients');
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    return dir;
-  }
 
   private getFileInterceptor() {
     const uploadDir = this.getUploadDir();
@@ -75,8 +74,7 @@ export class ServiceClientsController {
   @UseInterceptors(FileInterceptor('logo', {
     storage: diskStorage({
       destination: (req, file, cb) => {
-        const dir = this.getUploadDir();
-        cb(null, dir);
+        cb(null, ensureUploadsDir());
       },
       filename: (req, file, cb) => {
         const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${file.originalname}`;
@@ -122,8 +120,7 @@ export class ServiceClientsController {
   @UseInterceptors(FileInterceptor('logo', {
     storage: diskStorage({
       destination: (req, file, cb) => {
-        const dir = this.getUploadDir();
-        cb(null, dir);
+        cb(null, ensureUploadsDir());
       },
       filename: (req, file, cb) => {
         const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${file.originalname}`;
