@@ -8,6 +8,7 @@ import {
   Post,
   Put,
   Res,
+  Req,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -22,6 +23,7 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { CreateServiceClientDto } from './dto/create-service-client.dto.js';
 import { UpdateServiceClientDto } from './dto/update-service-client.dto.js';
 import { ServiceClientsService } from './service-clients.service.js';
+import { Request } from 'express';
 
 // Resuelve la ruta absoluta a /uploads/clients en la raíz del proyecto y asegura su existencia
 const ensureUploadsDir = () => {
@@ -62,7 +64,8 @@ export class ServiceClientsController {
       },
     }),
   }))
-  async create(@UploadedFile() file: any, @Body() body: CreateServiceClientDto) {
+  async create(@UploadedFile() file: any, @Body() body: CreateServiceClientDto, @Req() req: Request) {
+    console.error(`[uploads] create request content-type: ${req.headers['content-type'] || ''}`);
     if (!body?.name) throw new BadRequestException('Nombre requerido');
     const isActive = this.normalizeBoolean(body.isActive);
     if (isActive !== undefined) body.isActive = isActive;
@@ -117,7 +120,9 @@ export class ServiceClientsController {
     @Param('id', ParseIntPipe) id: number,
     @UploadedFile() file: any,
     @Body() body: UpdateServiceClientDto,
+    @Req() req: Request,
   ) {
+    console.error(`[uploads] update request content-type: ${req.headers['content-type'] || ''}`);
     const isActive = this.normalizeBoolean(body.isActive);
     if (isActive !== undefined) body.isActive = isActive;
     if (file) {
