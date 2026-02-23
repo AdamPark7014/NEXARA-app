@@ -74,7 +74,19 @@ async function bootstrap() {
   });
 
   // Servir archivos estáticos desde apps/api/uploads (ANTES del prefijo global)
-  const uploadsPath = path.join(process.cwd(), 'uploads');
+  const uploadsPath = path.join(__dirname, '..', 'uploads');
+  
+  // Asegurar que el directorio uploads existe
+  const fs = require('fs');
+  if (!fs.existsSync(uploadsPath)) {
+    fs.mkdirSync(uploadsPath, { recursive: true });
+    console.log(`📁 Created uploads directory: ${uploadsPath}`);
+  }
+  if (!fs.existsSync(path.join(uploadsPath, 'clients'))) {
+    fs.mkdirSync(path.join(uploadsPath, 'clients'), { recursive: true });
+    console.log(`📁 Created uploads/clients directory: ${path.join(uploadsPath, 'clients')}`);
+  }
+  
   app.use('/uploads', express.static(uploadsPath));
   console.log(`📁 Serving static files from: ${uploadsPath}`);
 

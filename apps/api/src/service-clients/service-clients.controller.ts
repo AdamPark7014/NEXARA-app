@@ -13,6 +13,9 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import * as path from 'path';
+import * as fs from 'fs';
 import { Response } from 'express';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
@@ -23,6 +26,35 @@ import { ServiceClientsService } from './service-clients.service.js';
 @Controller('service-clients')
 export class ServiceClientsController {
   constructor(private readonly serviceClientsService: ServiceClientsService) {}
+
+  private getUploadDir() {
+    const dir = path.join(__dirname, '..', '..', 'uploads', 'clients');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    return dir;
+  }
+
+  private getFileInterceptor() {
+    const uploadDir = this.getUploadDir();
+    return FileInterceptor('logo', {
+      storage: diskStorage({
+        destination: (req, file, cb) => {
+          cb(null, uploadDir);
+        },
+        filename: (req, file, cb) => {
+          const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${file.originalname}`;
+          cb(null, uniqueName);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) {
+          return cb(new BadRequestException('Solo se aceptan imágenes'), false);
+        }
+        cb(null, true);
+      },
+    });
+  }
 
   private normalizeBoolean(value: unknown) {
     if (typeof value === 'boolean') return value;
@@ -37,7 +69,21 @@ export class ServiceClientsController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
   @Post()
-  @UseInterceptors(FileInterceptor('logo', { dest: 'uploads/clients' }))
+  @UseInterceptors(FileInterceptor('logo', {
+    storage: diskStorage({
+      destination: (req, file, cb) => {
+        const dir = path.join(__dirname, '..', '..', 'uploads', 'clients');
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        cb(null, dir);
+      },
+      filename: (req, file, cb) => {
+        const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${file.originalname}`;
+        cb(null, uniqueName);
+      },
+    }),
+  }))
   async create(@UploadedFile() file: any, @Body() body: CreateServiceClientDto) {
     if (!body?.name) throw new BadRequestException('Nombre requerido');
     const isActive = this.normalizeBoolean(body.isActive);
@@ -73,7 +119,21 @@ export class ServiceClientsController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
   @Put(':id')
-  @UseInterceptors(FileInterceptor('logo', { dest: 'uploads/clients' }))
+  @UseInterceptors(FileInterceptor('logo', {
+    storage: diskStorage({
+      destination: (req, file, cb) => {
+        const dir = path.join(__dirname, '..', '..', 'uploads', 'clients');
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        cb(null, dir);
+      },
+      filename: (req, file, cb) => {
+        const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${file.originalname}`;
+        cb(null, uniqueName);
+      },
+    }),
+  }))
   update(
     @Param('id', ParseIntPipe) id: number,
     @UploadedFile() file: any,
