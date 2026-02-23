@@ -29,6 +29,7 @@ const ensureUploadsDir = () => {
   const dir = path.join(baseUploads, 'clients');
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
+    console.error(`[uploads] created dir ${dir}`);
   }
   return dir;
 };
@@ -65,6 +66,11 @@ export class ServiceClientsController {
     if (!body?.name) throw new BadRequestException('Nombre requerido');
     const isActive = this.normalizeBoolean(body.isActive);
     if (isActive !== undefined) body.isActive = isActive;
+    if (file) {
+      console.error(`[uploads] create file saved -> ${file.filename} (${file.path || ''})`);
+    } else {
+      console.error('[uploads] create without file');
+    }
     const logoUrl = file ? `/uploads/clients/${file.filename}` : undefined;
     return this.serviceClientsService.create(body, logoUrl);
   }
@@ -114,6 +120,11 @@ export class ServiceClientsController {
   ) {
     const isActive = this.normalizeBoolean(body.isActive);
     if (isActive !== undefined) body.isActive = isActive;
+    if (file) {
+      console.error(`[uploads] update file saved -> ${file.filename} (${file.path || ''})`);
+    } else {
+      console.error('[uploads] update without file');
+    }
     const logoUrl = file ? `/uploads/clients/${file.filename}` : undefined;
     return this.serviceClientsService.update(id, body, logoUrl);
   }
