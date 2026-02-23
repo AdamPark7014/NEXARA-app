@@ -231,7 +231,7 @@ export class ActivityEvidenceService {
       throw new BadRequestException('Mínimo 4 fotos de evidencia son requeridas');
     }
 
-    const updatedPhotos = evidence.evidencePhotos.filter((_, i) => i !== index);
+    const updatedPhotos = evidence.evidencePhotos.filter((_: string, i: number) => i !== index);
 
     return this.prisma.activityEvidence.update({
       where: { activityId },
