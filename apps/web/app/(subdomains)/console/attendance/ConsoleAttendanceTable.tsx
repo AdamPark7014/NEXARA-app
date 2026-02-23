@@ -327,6 +327,7 @@ const ConsoleAttendanceTable = () => {
   }
 
   return (
+    <>
     <section className={styles.card}>
       <header className={styles.hero}>
         <div>
@@ -758,7 +759,8 @@ const ConsoleAttendanceTable = () => {
       </div>,
       document.body
     )}
+    </>
   );
 };
 
-export default ConsoleAttendanceTable;export default ConsoleAttendanceTable;
+export default ConsoleAttendanceTable;
