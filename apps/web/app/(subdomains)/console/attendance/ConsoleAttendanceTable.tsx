@@ -593,7 +593,7 @@ const ConsoleAttendanceTable = () => {
                                                         border: '1px solid var(--muted)'
                                                       }}
                                                       title="Click para ver en grande"
-                                                      onClick={() => setPhotoModal(entry.photoUrl)}
+                                                      onClick={() => entry.photoUrl && setPhotoModal(entry.photoUrl)}
                                                       onError={(e) => {
                                                         console.error('Error al cargar foto de entrada:', entry.photoUrl);
                                                         e.currentTarget.style.display = 'none';
@@ -601,18 +601,28 @@ const ConsoleAttendanceTable = () => {
                                                     />
                                                   )}
                                                   {entry.latitude && entry.longitude && (
-                                                    <span 
-                                                      style={{ 
-                                                        fontSize: 11, 
-                                                        color: 'var(--muted)',
+                                                    <iframe
+                                                      src={`https://maps.google.com/maps?q=${entry.latitude},${entry.longitude}&z=13&output=embed`}
+                                                      width="50"
+                                                      height="50"
+                                                      style={{
+                                                        border: '1px solid var(--muted)',
+                                                        borderRadius: 4,
                                                         cursor: 'pointer',
-                                                        textDecoration: 'underline'
+                                                        transition: 'all 0.2s',
                                                       }}
                                                       title={`${entry.latitude.toFixed(6)}, ${entry.longitude.toFixed(6)}`}
                                                       onClick={() => setMapModal({ lat: entry.latitude!, lng: entry.longitude! })}
-                                                    >
-                                                      🌍 GPS
-                                                    </span>
+                                                      onMouseEnter={(e) => {
+                                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+                                                      }}
+                                                      onMouseLeave={(e) => {
+                                                        e.currentTarget.style.boxShadow = 'none';
+                                                      }}
+                                                      allowFullScreen
+                                                      loading="lazy"
+                                                      referrerPolicy="no-referrer-when-downgrade"
+                                                    />
                                                   )}
                                                 </div>
                                               ))}
@@ -640,7 +650,7 @@ const ConsoleAttendanceTable = () => {
                                                         border: '1px solid var(--muted)'
                                                       }}
                                                       title="Click para ver en grande"
-                                                      onClick={() => setPhotoModal(exit.photoUrl)}
+                                                      onClick={() => exit.photoUrl && setPhotoModal(exit.photoUrl)}
                                                       onError={(e) => {
                                                         console.error('Error al cargar foto de salida:', exit.photoUrl);
                                                         e.currentTarget.style.display = 'none';
@@ -648,18 +658,28 @@ const ConsoleAttendanceTable = () => {
                                                     />
                                                   )}
                                                   {exit.latitude && exit.longitude && (
-                                                    <span 
-                                                      style={{ 
-                                                        fontSize: 11, 
-                                                        color: 'var(--muted)',
+                                                    <iframe
+                                                      src={`https://maps.google.com/maps?q=${exit.latitude},${exit.longitude}&z=13&output=embed`}
+                                                      width="50"
+                                                      height="50"
+                                                      style={{
+                                                        border: '1px solid var(--muted)',
+                                                        borderRadius: 4,
                                                         cursor: 'pointer',
-                                                        textDecoration: 'underline'
+                                                        transition: 'all 0.2s',
                                                       }}
                                                       title={`${exit.latitude.toFixed(6)}, ${exit.longitude.toFixed(6)}`}
                                                       onClick={() => setMapModal({ lat: exit.latitude!, lng: exit.longitude! })}
-                                                    >
-                                                      🌍 GPS
-                                                    </span>
+                                                      onMouseEnter={(e) => {
+                                                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+                                                      }}
+                                                      onMouseLeave={(e) => {
+                                                        e.currentTarget.style.boxShadow = 'none';
+                                                      }}
+                                                      allowFullScreen
+                                                      loading="lazy"
+                                                      referrerPolicy="no-referrer-when-downgrade"
+                                                    />
                                                   )}
                                                 </div>
                                               ))}
