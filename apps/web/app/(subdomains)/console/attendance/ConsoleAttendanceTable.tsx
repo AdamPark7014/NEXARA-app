@@ -6,7 +6,15 @@ import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import styles from "./ConsoleAttendanceTable.module.css";
 
-type AttendanceEvent = { type: string; timestamp: string; photoUrl?: string };
+type AttendanceEvent = { 
+  type: string; 
+  timestamp: string; 
+  photoUrl?: string;
+  entryLatitude?: number;
+  entryLongitude?: number;
+  exitLatitude?: number;
+  exitLongitude?: number;
+};
 
 type Activity = {
   id: number;
@@ -154,8 +162,8 @@ const groupDailyDetails = (
   const dailyMap = new Map<
     string,
     { 
-      entries: { time: string; photoUrl?: string }[]; 
-      exits: { time: string; photoUrl?: string }[]; 
+      entries: { time: string; photoUrl?: string; latitude?: number; longitude?: number }[]; 
+      exits: { time: string; photoUrl?: string; latitude?: number; longitude?: number }[]; 
       activities: Activity[] 
     }
   >();
@@ -168,9 +176,23 @@ const groupDailyDetails = (
     if (timestamp < rangeStart || timestamp > rangeEnd) return;
     const entry = dailyMap.get(dateKey) || { entries: [], exits: [], activities: [] };
     const timeLabel = formatTimeOnly(item.timestamp);
-    const entryObj = { time: timeLabel, photoUrl: item.photoUrl };
-    if (item.type === "entrada") entry.entries.push(entryObj);
-    if (item.type === "salida") entry.exits.push(entryObj);
+    
+    if (item.type === "entrada") {
+      entry.entries.push({ 
+        time: timeLabel, 
+        photoUrl: item.photoUrl,
+        latitude: item.entryLatitude,
+        longitude: item.entryLongitude,
+      });
+    }
+    if (item.type === "salida") {
+      entry.exits.push({ 
+        time: timeLabel, 
+        photoUrl: item.photoUrl,
+        latitude: item.exitLatitude,
+        longitude: item.exitLongitude,
+      });
+    }
     dailyMap.set(dateKey, entry);
   });
 
@@ -522,7 +544,7 @@ const ConsoleAttendanceTable = () => {
                                           {row.entries.length ? (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                               {row.entries.map((entry, idx) => (
-                                                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                                                   <span>{entry.time}</span>
                                                   {entry.photoUrl && (
                                                     <img 
@@ -538,6 +560,20 @@ const ConsoleAttendanceTable = () => {
                                                       title="Foto de entrada"
                                                     />
                                                   )}
+                                                  {entry.latitude && entry.longitude && (
+                                                    <span 
+                                                      style={{ 
+                                                        fontSize: 11, 
+                                                        color: 'var(--muted)',
+                                                        cursor: 'pointer',
+                                                        textDecoration: 'underline'
+                                                      }}
+                                                      title={`${entry.latitude.toFixed(6)}, ${entry.longitude.toFixed(6)}`}
+                                                      onClick={() => window.open(`https://maps.google.com/?q=${entry.latitude},${entry.longitude}`, '_blank')}
+                                                    >
+                                                      🌍 GPS
+                                                    </span>
+                                                  )}
                                                 </div>
                                               ))}
                                             </div>
@@ -549,7 +585,7 @@ const ConsoleAttendanceTable = () => {
                                           {row.exits.length ? (
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                               {row.exits.map((exit, idx) => (
-                                                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                                                   <span>{exit.time}</span>
                                                   {exit.photoUrl && (
                                                     <img 
@@ -564,6 +600,20 @@ const ConsoleAttendanceTable = () => {
                                                       }}
                                                       title="Foto de salida"
                                                     />
+                                                  )}
+                                                  {exit.latitude && exit.longitude && (
+                                                    <span 
+                                                      style={{ 
+                                                        fontSize: 11, 
+                                                        color: 'var(--muted)',
+                                                        cursor: 'pointer',
+                                                        textDecoration: 'underline'
+                                                      }}
+                                                      title={`${exit.latitude.toFixed(6)}, ${exit.longitude.toFixed(6)}`}
+                                                      onClick={() => window.open(`https://maps.google.com/?q=${exit.latitude},${exit.longitude}`, '_blank')}
+                                                    >
+                                                      🌍 GPS
+                                                    </span>
                                                   )}
                                                 </div>
                                               ))}
