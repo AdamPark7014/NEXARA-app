@@ -85,14 +85,24 @@ const AttendanceForm = () => {
     try {
       setCameraType(tipo);
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
       setCameraOpen(true);
+      
+      // Esperar a que React actualice el DOM antes de asignar el stream
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          console.log('✅ Stream de cámara asignado al video element');
+        }
+      }, 100);
     } catch (err) {
+      console.error('❌ Error al acceder a la cámara:', err);
       setError('No se pudo acceder a la cámara. Verifica los permisos.');
       setCameraOpen(false);
     }
@@ -416,31 +426,37 @@ const AttendanceForm = () => {
           justifyContent: 'center',
           alignItems: 'center',
           zIndex: 99999,
-          padding: 20,
+          padding: 0,
+          overflow: 'hidden',
         }}>
-          <div style={{ textAlign: 'center', marginBottom: 20 }}>
+          <div style={{ textAlign: 'center', marginBottom: 20, zIndex: 100000, position: 'relative' }}>
             <p style={{ color: 'white', fontSize: 20, marginBottom: 10, fontWeight: 'bold' }}>
               Toma foto de tu {cameraType === 'entrada' ? 'entrada' : 'salida'}
             </p>
           </div>
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            style={{
-              width: '100%',
-              maxWidth: 600,
-              height: 'auto',
-              minHeight: 400,
-              maxHeight: '60vh',
-              borderRadius: 12,
-              backgroundColor: '#000',
-              objectFit: 'cover',
-            }}
-          />
+          <div style={{ 
+            position: 'relative', 
+            width: '100%', 
+            height: '80%', 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center',
+            backgroundColor: '#000',
+          }}>
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+              }}
+            />
+          </div>
           <canvas ref={canvasRef} style={{ display: 'none' }} />
-          <div style={{ display: 'flex', gap: 16, marginTop: 24 }}>
+          <div style={{ display: 'flex', gap: 16, marginTop: 20, zIndex: 100000, position: 'relative' }}>
             <button
               className="button-primary"
               onClick={capturePhoto}
