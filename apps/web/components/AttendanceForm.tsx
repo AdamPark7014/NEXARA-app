@@ -52,7 +52,53 @@ const AttendanceForm = () => {
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
+  const STORAGE_KEY = 'nexara_attendance_timer';
 
+  // Cargar timer persistente al montar y recuperar de localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try {
+        const { startTimeStr, date } = JSON.parse(stored);
+        const today = toLocalDateKey(new Date());
+        
+        // Solo restaurar si el timer es del día de hoy
+        if (date === today || !date) {
+          const recoveredStartTime = new Date(startTimeStr);
+          if (!Number.isNaN(recoveredStartTime.getTime())) {
+            setStartTime(recoveredStartTime);
+            console.log('⏱️ Timer recuperado de localStorage:', startTimeStr);
+          }
+        } else {
+          // Si el timer es de otro día, limpiar localStorage
+          localStorage.removeItem(STORAGE_KEY);
+          console.log('🧹 Timer de otro día detectado y limpiado');
+        }
+      } catch (err) {
+        console.error('Error recuperando timer:', err);
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+  }, []);
+
+  // Actualizar contador cada segundo si hay entrada activa
+  useEffect(() => {
+    if (!startTime) {
+      setElapsed(0);
+      return;
+    }
+
+    const updateElapsed = () => {
+      const now = new Date();
+      const diff = now.getTime() - startTime.getTime();
+      setElapsed(Math.max(0, diff));
+    };
+
+    updateElapsed(); // Actualizar inmediatamente
+    const interval = setInterval(updateElapsed, 1000);
+
+    return () => clearInterval(interval);
+  }, [startTime]);
   // Formato HH:mm:ss
   const formatElapsed = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
@@ -249,6 +295,13 @@ const AttendanceForm = () => {
 
   useEffect(() => {
     if (!user) return;
+    
+    // Si cambio a un día que no es hoy, limpiar el timer
+    if (!isToday(selectedDate)) {
+      setStartTime(null);
+      localStorage.removeItem(STORAGE_KEY);
+    }
+    
     const fetchDaySummary = async () => {
       try {
         const res = await fetch(buildApiUrl(`attendance/day?date=${selectedDate}`), {
@@ -258,7 +311,7 @@ const AttendanceForm = () => {
         const day = await res.json();
         if (!day) {
           setTotalMinutes(0);
-          setStartTime(null);
+          if (!isToday(selectedDate)) setStartTime(null);
           return;
         }
         setTotalMinutes(day.totalMinutes || 0);
@@ -305,19 +358,7 @@ const AttendanceForm = () => {
     fetchRange();
   }, [user, rangeFrom, rangeTo]);
 
-  useEffect(() => {
-    if (startTime && isToday(selectedDate)) {
-      setElapsed(Date.now() - startTime.getTime());
-      intervalRef.current = setInterval(() => {
-        setElapsed(Date.now() - startTime.getTime());
-      }, 1000);
-    } else {
-      setElapsed(0);
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    }
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [startTime, selectedDate]);
-
+  // Cleanup GPS tracking en desmontaje
   useEffect(() => () => stopGpsTracking(), []);
 
   const handleRegister = async (tipo: 'entrada' | 'salida', photoBase64?: string) => {
@@ -401,14 +442,32 @@ const AttendanceForm = () => {
       if (data.day) {
         setTotalMinutes(data.day.totalMinutes || 0);
         if (isToday(selectedDate) && data.day.isOpen && data.day.lastEntryAt) {
-          setStartTime(new Date(data.day.lastEntryAt));
+          const newStartTime = new Date(data.day.lastEntryAt);
+          setStartTime(newStartTime);
+          // Guardar en localStorage para persistencia
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            startTimeStr: newStartTime.toISOString(),
+            date: selectedDate,
+          }));
+          console.log('💾 Timer guardado en localStorage:', newStartTime.toISOString());
         } else {
           setStartTime(null);
+          localStorage.removeItem(STORAGE_KEY);
+          console.log('🧹 Timer limpiado de localStorage');
         }
       } else if (tipo === 'entrada' && isToday(selectedDate)) {
-        setStartTime(new Date());
+        const newStartTime = new Date();
+        setStartTime(newStartTime);
+        // Guardar en localStorage para persistencia
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          startTimeStr: newStartTime.toISOString(),
+          date: selectedDate,
+        }));
+        console.log('💾 Timer guardado en localStorage:', newStartTime.toISOString());
       } else if (tipo === 'salida') {
         setStartTime(null);
+        localStorage.removeItem(STORAGE_KEY);
+        console.log('🧹 Timer limpiado de localStorage (salida registrada)');
       }
 
       // Refrescar historial
@@ -507,23 +566,43 @@ const AttendanceForm = () => {
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--muted)' }}
+            disabled={isToday(selectedDate)}
+            max={toLocalDateInput(new Date())}
+            style={{ 
+              width: '100%', 
+              padding: '8px 10px', 
+              borderRadius: 8, 
+              border: '1px solid var(--muted)',
+              opacity: isToday(selectedDate) ? 0.6 : 1,
+              cursor: isToday(selectedDate) ? 'not-allowed' : 'pointer',
+            }}
+            title={isToday(selectedDate) ? 'No puedes cambiar la fecha de hoy' : ''}
           />
         </div>
         <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+          {/* Botón entrada - deshabilitado si ya hay entrada o si no es hoy */}
           <button 
             className="button-secondary" 
             onClick={() => openCamera('entrada')} 
-            disabled={loading || !!startTime || !isToday(selectedDate)}
-            style={{ flex: 1 }}
+            disabled={loading || !!startTime || !isToday(selectedDate) || history.some(h => h.type === 'entrada')}
+            style={{ 
+              flex: 1,
+              opacity: (loading || !!startTime || !isToday(selectedDate) || history.some(h => h.type === 'entrada')) ? 0.5 : 1,
+            }}
+            title={history.some(h => h.type === 'entrada') ? 'Ya has registrado entrada hoy' : ''}
           >
             Registrar Entrada del Día
           </button>
+          {/* Botón salida - deshabilitado si no hay entrada o si ya hay salida */}
           <button 
             className="button-primary" 
             onClick={() => openCamera('salida')} 
-            disabled={loading || !startTime || !isToday(selectedDate)}
-            style={{ flex: 1 }}
+            disabled={loading || !startTime || !isToday(selectedDate) || history.some(h => h.type === 'salida')}
+            style={{ 
+              flex: 1,
+              opacity: (loading || !startTime || !isToday(selectedDate) || history.some(h => h.type === 'salida')) ? 0.5 : 1,
+            }}
+            title={!startTime ? 'Debes registrar entrada primero' : (history.some(h => h.type === 'salida') ? 'Ya has registrado salida hoy' : '')}
           >
             Registrar Salida del Día
           </button>
@@ -531,6 +610,16 @@ const AttendanceForm = () => {
         {startTime && (
           <div style={{ marginBottom: 12, color: 'var(--primary)' }}>
             <strong>Tiempo transcurrido:</strong> {formatElapsed(elapsed)}
+          </div>
+        )}
+        {isToday(selectedDate) && history.some(h => h.type === 'entrada') && !history.some(h => h.type === 'salida') && (
+          <div style={{ marginBottom: 12, padding: 8, backgroundColor: 'rgba(var(--primary-rgb), 0.1)', borderRadius: 6, color: 'var(--primary)' }}>
+            ✓ <strong>Entrada registrada.</strong> Estás dentro. Solo puedes registrar salida.
+          </div>
+        )}
+        {isToday(selectedDate) && history.some(h => h.type === 'entrada') && history.some(h => h.type === 'salida') && (
+          <div style={{ marginBottom: 12, padding: 8, backgroundColor: 'rgba(var(--accent-rgb), 0.1)', borderRadius: 6, color: 'var(--accent)' }}>
+            ✓ <strong>Jornada completada.</strong> Entrada y salida registradas. No puedes registrar más.
           </div>
         )}
         {(totalMinutes > 0 || startTime) && (
