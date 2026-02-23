@@ -37,6 +37,7 @@ import { ClientTicketRequestsModule } from './client-ticket-requests/client-tick
 import { BranchAuthModule } from './branch-auth/branch-auth.module';
 import { BranchPortalModule } from './branch-portal/branch-portal.module';
 import { VentasModule } from './ventas/ventas.module';
+import { ActivityEvidenceModule } from './activity-evidence/activity-evidence.module';
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { VentasModule } from './ventas/ventas.module';
     BranchAuthModule,
     BranchPortalModule,
     VentasModule,
+    ActivityEvidenceModule,
   ],
   controllers: [AppController, ExcelExportController, ExcelImportController],
   providers: [
