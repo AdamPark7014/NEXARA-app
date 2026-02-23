@@ -118,11 +118,17 @@ const AttendanceForm = () => {
       context.drawImage(videoRef.current, 0, 0);
 
       const photoBase64 = canvasRef.current.toDataURL('image/jpeg', 0.8);
+      console.log('📸 Foto capturada:', {
+        type: cameraType,
+        size: photoBase64.length,
+        preview: photoBase64.substring(0, 50) + '...'
+      });
       closeCamera();
 
       // Registrar con foto
       await handleRegister(cameraType, photoBase64);
     } catch (err) {
+      console.error('❌ Error al capturar foto:', err);
       setError('No se pudo capturar la foto');
     }
   };
@@ -304,24 +310,37 @@ const AttendanceForm = () => {
           });
           latitude = position.coords.latitude;
           longitude = position.coords.longitude;
+          console.log('📍 GPS obtenido:', { latitude, longitude });
         } catch (gpsErr) {
           // Si no puede obtener GPS, continúa sin él
-          console.warn('No se pudo obtener ubicación GPS:', gpsErr);
+          console.warn('⚠️ No se pudo obtener ubicación GPS:', gpsErr);
         }
       }
+
+      const payload = { 
+        type: tipo, 
+        timestamp: new Date().toISOString(),
+        photoBase64: photoBase64 || undefined,
+        latitude,
+        longitude,
+      };
+
+      console.log('📤 Enviando registro de asistencia:', {
+        type: tipo,
+        hasPhoto: !!photoBase64,
+        photoSize: photoBase64?.length || 0,
+        hasGPS: !!(latitude && longitude),
+      });
 
       const res = await fetch(buildApiUrl('attendance'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${user.token}` },
-        body: JSON.stringify({ 
-          type: tipo, 
-          timestamp: new Date().toISOString(),
-          photoBase64: photoBase64 || undefined,
-          latitude,
-          longitude,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
+      
+      console.log('📥 Respuesta del servidor:', data);
+      
       if (!res.ok) {
         throw new Error(data.message || 'Error al registrar asistencia');
       }
@@ -381,22 +400,25 @@ const AttendanceForm = () => {
   return (
     <div>
       {/* Modal de Cámara */}
-      {cameraOpen && (
+      {cameraOpen && typeof window !== 'undefined' && createPortal(
         <div style={{
           position: 'fixed',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.9)',
+          width: '100vw',
+          height: '100vh',
+          backgroundColor: 'rgba(0,0,0,0.95)',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
           alignItems: 'center',
-          zIndex: 9999,
+          zIndex: 99999,
+          padding: 20,
         }}>
           <div style={{ textAlign: 'center', marginBottom: 20 }}>
-            <p style={{ color: 'white', fontSize: 18, marginBottom: 10 }}>
+            <p style={{ color: 'white', fontSize: 20, marginBottom: 10, fontWeight: 'bold' }}>
               Toma foto de tu {cameraType === 'entrada' ? 'entrada' : 'salida'}
             </p>
           </div>
@@ -404,31 +426,37 @@ const AttendanceForm = () => {
             ref={videoRef}
             autoPlay
             playsInline
+            muted
             style={{
               width: '100%',
-              maxWidth: 500,
-              maxHeight: 500,
-              borderRadius: 8,
+              maxWidth: 600,
+              height: 'auto',
+              minHeight: 400,
+              maxHeight: '60vh',
+              borderRadius: 12,
+              backgroundColor: '#000',
+              objectFit: 'cover',
             }}
           />
           <canvas ref={canvasRef} style={{ display: 'none' }} />
-          <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
+          <div style={{ display: 'flex', gap: 16, marginTop: 24 }}>
             <button
               className="button-primary"
               onClick={capturePhoto}
-              style={{ padding: '12px 24px', fontSize: 16 }}
+              style={{ padding: '14px 28px', fontSize: 16, fontWeight: 'bold' }}
             >
-              Capturar foto
+              📸 Capturar foto
             </button>
             <button
               className="button-secondary"
               onClick={closeCamera}
-              style={{ padding: '12px 24px', fontSize: 16 }}
+              style={{ padding: '14px 28px', fontSize: 16, fontWeight: 'bold' }}
             >
-              Cancelar
+              ✕ Cancelar
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Formulario Principal */}

@@ -159,6 +159,11 @@ const groupDailyDetails = (
   rangeStart: Date,
   rangeEnd: Date
 ) => {
+  console.log('🔄 Agrupando detalles diarios:', {
+    attendancesCount: attendances.length,
+    firstAttendance: attendances[0],
+  });
+  
   const dailyMap = new Map<
     string,
     { 
@@ -178,20 +183,24 @@ const groupDailyDetails = (
     const timeLabel = formatTimeOnly(item.timestamp);
     
     if (item.type === "entrada") {
-      entry.entries.push({ 
+      const entryData = { 
         time: timeLabel, 
         photoUrl: item.photoUrl,
         latitude: item.entryLatitude,
         longitude: item.entryLongitude,
-      });
+      };
+      console.log('⬆️ Entrada:', entryData);
+      entry.entries.push(entryData);
     }
     if (item.type === "salida") {
-      entry.exits.push({ 
+      const exitData = { 
         time: timeLabel, 
         photoUrl: item.photoUrl,
         latitude: item.exitLatitude,
         longitude: item.exitLongitude,
-      });
+      };
+      console.log('⬇️ Salida:', exitData);
+      entry.exits.push(exitData);
     }
     dailyMap.set(dateKey, entry);
   });
@@ -242,6 +251,15 @@ const ConsoleAttendanceTable = () => {
         throw new Error(text || "Error al cargar estadisticas");
       }
       const payload = await res.json();
+      console.log('📊 Datos de asistencia recibidos:', {
+        totalUsers: payload.users?.length || 0,
+        users: payload.users?.map((u: any) => ({
+          id: u.userId,
+          name: u.userName,
+          attendancesCount: u.attendances?.length || 0,
+          firstAttendance: u.attendances?.[0],
+        }))
+      });
       setData(payload);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error desconocido");
@@ -555,9 +573,15 @@ const ConsoleAttendanceTable = () => {
                                                         height: 40, 
                                                         borderRadius: 4, 
                                                         objectFit: 'cover',
-                                                        cursor: 'pointer'
+                                                        cursor: 'pointer',
+                                                        border: '1px solid var(--muted)'
                                                       }}
-                                                      title="Foto de entrada"
+                                                      title="Click para ver en grande"
+                                                      onClick={() => window.open(entry.photoUrl, '_blank')}
+                                                      onError={(e) => {
+                                                        console.error('Error al cargar foto de entrada:', entry.photoUrl);
+                                                        e.currentTarget.style.display = 'none';
+                                                      }}
                                                     />
                                                   )}
                                                   {entry.latitude && entry.longitude && (
@@ -596,9 +620,15 @@ const ConsoleAttendanceTable = () => {
                                                         height: 40, 
                                                         borderRadius: 4, 
                                                         objectFit: 'cover',
-                                                        cursor: 'pointer'
+                                                        cursor: 'pointer',
+                                                        border: '1px solid var(--muted)'
                                                       }}
-                                                      title="Foto de salida"
+                                                      title="Click para ver en grande"
+                                                      onClick={() => window.open(exit.photoUrl, '_blank')}
+                                                      onError={(e) => {
+                                                        console.error('Error al cargar foto de salida:', exit.photoUrl);
+                                                        e.currentTarget.style.display = 'none';
+                                                      }}
                                                     />
                                                   )}
                                                   {exit.latitude && exit.longitude && (
