@@ -28,7 +28,10 @@ export class ServiceClientsController {
   constructor(private readonly serviceClientsService: ServiceClientsService) {}
 
   private getUploadDir() {
-    const dir = path.join(__dirname, '..', '..', 'uploads', 'clients');
+    // En dist, __dirname apunta a .../apps/api/dist/service-clients
+    // Subimos 3 niveles para llegar a la raíz del proyecto y luego a /uploads/clients
+    const baseUploads = path.join(__dirname, '../../..', 'uploads');
+    const dir = path.join(baseUploads, 'clients');
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
@@ -72,10 +75,7 @@ export class ServiceClientsController {
   @UseInterceptors(FileInterceptor('logo', {
     storage: diskStorage({
       destination: (req, file, cb) => {
-        const dir = path.join(__dirname, '..', '..', 'uploads', 'clients');
-        if (!fs.existsSync(dir)) {
-          fs.mkdirSync(dir, { recursive: true });
-        }
+        const dir = this.getUploadDir();
         cb(null, dir);
       },
       filename: (req, file, cb) => {
@@ -122,10 +122,7 @@ export class ServiceClientsController {
   @UseInterceptors(FileInterceptor('logo', {
     storage: diskStorage({
       destination: (req, file, cb) => {
-        const dir = path.join(__dirname, '..', '..', 'uploads', 'clients');
-        if (!fs.existsSync(dir)) {
-          fs.mkdirSync(dir, { recursive: true });
-        }
+        const dir = this.getUploadDir();
         cb(null, dir);
       },
       filename: (req, file, cb) => {
