@@ -10,15 +10,16 @@ export default function LoginPage() {
   const { setUser } = useUser();
   const router = useRouter();
 
+  const buildApiUrl = (path: string) => {
+    const envBase = process.env.NEXT_PUBLIC_API_URL?.trim();
+    const fallback = typeof window !== 'undefined' ? `${window.location.origin}/api` : 'http://localhost:3001/api';
+    const base = (envBase && envBase.length > 0 ? envBase : fallback).replace(/\/+$/, '');
+    return `${base}/${path.replace(/^\/+/, '')}`;
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    let API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-    API_URL = API_URL.replace(/[\/.]+$/, '');
-    function buildApiUrl(path: string) {
-      path = path.replace(/^\/+/, '');
-      return `${API_URL}/${path}`;
-    }
     try {
       const res = await fetch(buildApiUrl('auth/login'), {
         method: "POST",
