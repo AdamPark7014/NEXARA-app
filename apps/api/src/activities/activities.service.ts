@@ -60,7 +60,7 @@ export class ActivitiesService {
 
   async findAll() {
     return this.prisma['activity'].findMany({
-      include: { creador: true, responsable: true, client: true, serviceSheet: true },
+      include: { creador: true, responsable: true, client: true, serviceSheet: true, activityEvidence: true },
     });
   }
 
@@ -73,6 +73,7 @@ export class ActivitiesService {
         serviceSheet: true,
         evidencias: true,
         clientFeedback: true,
+        activityEvidence: true,
       },
       orderBy: { fechaAsignacion: 'desc' },
     });
@@ -82,21 +83,21 @@ export class ActivitiesService {
     // Busca actividades donde el responsable es de ese departamento
     return this.prisma['activity'].findMany({
       where: { responsable: { departmentId } },
-      include: { creador: true, responsable: true, client: true, serviceSheet: true },
+      include: { creador: true, responsable: true, client: true, serviceSheet: true, activityEvidence: true },
     });
   }
 
   async findByResponsible(userId: number) {
     return this.prisma['activity'].findMany({
       where: { responsableId: userId },
-      include: { creador: true, responsable: true, client: true, serviceSheet: true },
+      include: { creador: true, responsable: true, client: true, serviceSheet: true, activityEvidence: true },
     });
   }
 
   async findOne(id: number) {
     return this.prisma['activity'].findUnique({
       where: { id },
-      include: { creador: true, responsable: true, client: true, serviceSheet: true },
+      include: { creador: true, responsable: true, client: true, serviceSheet: true, activityEvidence: true },
     });
   }
 

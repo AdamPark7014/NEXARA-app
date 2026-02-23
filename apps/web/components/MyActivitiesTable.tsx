@@ -9,12 +9,12 @@ interface Activity {
   titulo: string;
   estatus: string;
   prioridad: string;
-    ticketType?: string;
-    client?: { id: number; name: string } | null;
-    branchName?: string;
-    branchCity?: string;
-    branchState?: string;
-    branchAddress?: string;
+  ticketType?: string;
+  client?: { id: number; name: string } | null;
+  branchName?: string;
+  branchCity?: string;
+  branchState?: string;
+  branchAddress?: string;
   descripcion?: string;
   indicaciones?: string;
   tiempoEstimadoMin?: number;
@@ -24,6 +24,15 @@ interface Activity {
   fechaMaxima?: string;
   fechaEntregaEsperada?: string;
   creador?: { nombre: string };
+  activityEvidence?: {
+    id: number;
+    status: string;
+    entryPhotoUrl?: string;
+    evidencePhotos: string[];
+    serviceSheetPdfUrl?: string;
+    exitPhotoUrl?: string;
+    completedAt?: string;
+  } | null;
 }
 
 const MyActivitiesTable: React.FC = () => {
@@ -87,6 +96,20 @@ const MyActivitiesTable: React.FC = () => {
     return `https://www.google.com/maps?q=${encodeURIComponent(query)}`;
   };
 
+  const getEvidenceStatus = (activity: Activity) => {
+    if (!activity.activityEvidence) return 'Sin iniciar';
+    const status = activity.activityEvidence.status;
+    const statusMap: Record<string, string> = {
+      'ENTRY_PHOTO': '📸 Entrada',
+      'EVIDENCE_PHOTOS': '📷 Evidencias',
+      'SERVICE_SHEET_PDF': '📄 PDF',
+      'SERVICE_SHEET_DATA': '📝 Plantilla',
+      'EXIT_PHOTO': '🚪 Salida',
+      'COMPLETED': '✅ Completado',
+    };
+    return statusMap[status] || status;
+  };
+
   if (loading) return <div>Cargando actividades...</div>;
 
   return (
@@ -102,7 +125,7 @@ const MyActivitiesTable: React.FC = () => {
             <th>Tipo</th>
             <th>Estatus</th>
             <th>Prioridad</th>
-            <th>Asignado Por</th>
+            <th>Evidencias</th>
             <th>Inicio</th>
             <th>Entrega</th>
             <th>Estimado/Max</th>
@@ -120,7 +143,19 @@ const MyActivitiesTable: React.FC = () => {
               <td>{a.ticketType || '-'}</td>
               <td><span className={`badge ${a.estatus === 'Aprobada' ? 'approved' : a.estatus === 'Pendiente' ? 'pending' : ''}`}>{a.estatus}</span></td>
               <td>{a.prioridad}</td>
-              <td>{a.creador?.nombre || '-'}</td>
+              <td>
+                <span style={{
+                  display: 'inline-block',
+                  padding: '4px 8px',
+                  borderRadius: 4,
+                  backgroundColor: a.activityEvidence?.status === 'COMPLETED' ? '#efe' : '#fef',
+                  color: a.activityEvidence?.status === 'COMPLETED' ? '#060' : '#f90',
+                  fontSize: 12,
+                  fontWeight: 500,
+                }}>
+                  {getEvidenceStatus(a)}
+                </span>
+              </td>
               <td>{formatDateTime(a.fechaInicio)}</td>
               <td>{formatDateTime(a.fechaEntregaEsperada)}</td>
               <td>{a.tiempoEstimadoMin || 0}/{a.tiempoMaximoMin || 0}</td>

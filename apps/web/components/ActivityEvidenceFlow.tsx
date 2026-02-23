@@ -1,7 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { useUser } from './UserContext';
-import { createPortal } from 'react-dom';
 
 interface ActivityOption {
   id: number;
@@ -32,8 +31,6 @@ const ActivityEvidenceFlow = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
-  const [videoRef, setVideoRef] = useState<HTMLVideoElement | null>(null);
-  const [canvasRef, setCanvasRef] = useState<HTMLCanvasElement | null>(null);
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/\.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
@@ -54,6 +51,7 @@ const ActivityEvidenceFlow = () => {
     setSelectedActivityId(activityId);
     setLoading(true);
     setError(null);
+    setSuccessMsg(null);
 
     try {
       const res = await fetch(buildApiUrl(`activity-evidence/${activityId}`), {
@@ -90,29 +88,64 @@ const ActivityEvidenceFlow = () => {
     }
   };
 
+  // Capturar foto desde cámara
+  const capturePhoto = async (): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      navigator.mediaDevices
+        .getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } } })
+        .then((stream) => {
+          const video = document.createElement('video');
+          video.srcObject = stream;
+          video.onloadedmetadata = () => {
+            video.play();
+            setTimeout(() => {
+              const canvas = document.createElement('canvas');
+              canvas.width = Math.min(video.videoWidth, 640);
+              canvas.height = Math.min(video.videoHeight, 480);
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const photoUrl = canvas.toDataURL('image/jpeg', 0.4);
+                stream.getTracks().forEach((track) => track.stop());
+                resolve(photoUrl);
+              } else {
+                reject('Error al capturar foto');
+              }
+            }, 100);
+          };
+        })
+        .catch(() => reject('Error al acceder a cámara'));
+    });
+  };
+
+  // Obtener ubicación
+  const getGeolocation = (): Promise<{ latitude: number; longitude: number }> => {
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+        () => reject('Error al obtener ubicación'),
+        { enableHighAccuracy: true, timeout: 5000 },
+      );
+    });
+  };
+
   // Paso 1: Foto de entrada
   const handleEntryPhoto = async () => {
-    if (!flowData || !cameraActive) return;
+    if (!flowData) return;
+    setLoading(true);
+    setError(null);
 
     try {
-      // Capturar foto
       const photoUrl = await capturePhoto();
-
-      // Obtener geolocalización
       const { latitude, longitude } = await getGeolocation();
 
-      // Guardar en backend
       const res = await fetch(buildApiUrl(`activity-evidence/${flowData.activityId}/entry-photo`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${user!.token}`,
         },
-        body: JSON.stringify({
-          photoUrl,
-          latitude,
-          longitude,
-        }),
+        body: JSON.stringify({ photoUrl, latitude, longitude }),
       });
 
       if (res.ok) {
@@ -124,45 +157,59 @@ const ActivityEvidenceFlow = () => {
           entryLatitude: latitude,
           entryLongitude: longitude,
         });
-        setSuccessMsg('✅ Foto de entrada guardada. Siguiente: Evidencias (4-8 fotos)');
+        setSuccessMsg('✅ Foto de entrada guardada. Siguiente: Tomar evidencias (4-8 fotos)');
         setCameraActive(false);
       } else {
         const errorData = await res.json();
-        setError(errorData.message || 'Error al guardar foto de entrada');
+        setError(errorData.message || 'Error al guardar foto');
       }
     } catch (err) {
-      setError('Error al capturar foto');
+      setError(err instanceof Error ? err.message : 'Error al capturar foto');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Paso 2: Fotos de evidencia
+  // Paso 2: Agregar foto de evidencia
   const handleAddEvidencePhoto = async () => {
     if (!flowData) return;
+    setLoading(true);
+    setError(null);
 
     try {
       const photoUrl = await capturePhoto();
-
-      const updatedPhotos = [...(flowData.evidencePhotos || []), photoUrl];
-
-      if (updatedPhotos.length >= 4 && updatedPhotos.length <= 8) {
-        setFlowData({ ...flowData, evidencePhotos: updatedPhotos });
+      const updatedPhotos = [...flowData.evidencePhotos, photoUrl];
+      setFlowData({ ...flowData, evidencePhotos: updatedPhotos });
+      
+      if (updatedPhotos.length === 1) {
+        setSuccessMsg(`📷 Foto agregada (1/${updatedPhotos.length})`);
+      } else {
+        setSuccessMsg(`📷 Foto agregada (${updatedPhotos.length} de 4-8)`);
       }
     } catch (err) {
-      setError('Error al capturar foto de evidencia');
+      setError(err instanceof Error ? err.message : 'Error al capturar foto');
+    } finally {
+      setLoading(false);
     }
   };
 
+  // Remover foto de evidencia
   const handleRemoveEvidencePhoto = (index: number) => {
     if (!flowData) return;
     const updatedPhotos = flowData.evidencePhotos.filter((_, i) => i !== index);
     setFlowData({ ...flowData, evidencePhotos: updatedPhotos });
+    setError(null);
   };
 
+  // Guardar todas las fotos de evidencia y avanzar
   const handleSaveEvidencePhotos = async () => {
     if (!flowData || flowData.evidencePhotos.length < 4) {
-      setError('Mínimo 4 fotos de evidencia requeridas');
+      setError(`Mínimo 4 fotos requeridas (tienes ${flowData?.evidencePhotos.length || 0})`);
       return;
     }
+
+    setLoading(true);
+    setError(null);
 
     try {
       const res = await fetch(buildApiUrl(`activity-evidence/${flowData.activityId}/evidence-photos`), {
@@ -175,51 +222,63 @@ const ActivityEvidenceFlow = () => {
       });
 
       if (res.ok) {
-        const updated = await res.json();
         setFlowData({ ...flowData, step: 'SERVICE_SHEET_PDF' });
-        setSuccessMsg('✅ Evidencias guardadas. Siguiente: Hoja de servicio PDF');
+        setSuccessMsg('✅ Evidencias guardadas. Siguiente: Carga hoja de servicio PDF');
       } else {
         const errorData = await res.json();
         setError(errorData.message || 'Error al guardar evidencias');
       }
     } catch (err) {
-      setError('Error al guardar evidencias');
+      setError(err instanceof Error ? err.message : 'Error al guardar');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Paso 3: Hoja de servicio PDF
+  // Paso 3: Cargar PDF
   const handleServiceSheetPdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !flowData) return;
 
+    setLoading(true);
+    setError(null);
+
     try {
-      // En producción, subir a storage y obtener URL
-      const pdfUrl = await uploadFileToStorage(file);
+      // Convertir PDF a base64
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const pdfUrl = reader.result as string;
 
-      const res = await fetch(buildApiUrl(`activity-evidence/${flowData.activityId}/service-sheet-pdf`), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${user!.token}`,
-        },
-        body: JSON.stringify({ pdfUrl }),
-      });
+        const res = await fetch(buildApiUrl(`activity-evidence/${flowData.activityId}/service-sheet-pdf`), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${user!.token}`,
+          },
+          body: JSON.stringify({ pdfUrl }),
+        });
 
-      if (res.ok) {
-        setFlowData({ ...flowData, step: 'SERVICE_SHEET_DATA', serviceSheetPdfUrl: pdfUrl });
-        setSuccessMsg('✅ PDF guardado. Siguiente: Completa la plantilla interna');
-      } else {
-        const errorData = await res.json();
-        setError(errorData.message || 'Error al guardar PDF');
-      }
+        if (res.ok) {
+          setFlowData({ ...flowData, step: 'SERVICE_SHEET_DATA', serviceSheetPdfUrl: pdfUrl });
+          setSuccessMsg('✅ PDF guardado. Siguiente: Completa la plantilla interna');
+        } else {
+          const errorData = await res.json();
+          setError(errorData.message || 'Error al cargar PDF');
+        }
+        setLoading(false);
+      };
+      reader.readAsDataURL(file);
     } catch (err) {
-      setError('Error al cargar PDF');
+      setError(err instanceof Error ? err.message : 'Error al procesar PDF');
+      setLoading(false);
     }
   };
 
-  // Paso 4: Plantilla de hoja de servicio
-  const handleServiceSheetDataSubmit = async (data: any) => {
+  // Paso 4: Guardar plantilla interna
+  const handleServiceSheetFormSubmit = async (data: any) => {
     if (!flowData) return;
+    setLoading(true);
+    setError(null);
 
     try {
       const res = await fetch(buildApiUrl(`activity-evidence/${flowData.activityId}/service-sheet-data`), {
@@ -233,19 +292,23 @@ const ActivityEvidenceFlow = () => {
 
       if (res.ok) {
         setFlowData({ ...flowData, step: 'EXIT_PHOTO', serviceSheetData: data });
-        setSuccessMsg('✅ Plantilla completada. Siguiente: Foto de salida');
+        setSuccessMsg('✅ Plantilla completada. Siguiente: Toma foto de salida');
       } else {
         const errorData = await res.json();
         setError(errorData.message || 'Error al guardar plantilla');
       }
     } catch (err) {
-      setError('Error al guardar plantilla');
+      setError(err instanceof Error ? err.message : 'Error al guardar');
+    } finally {
+      setLoading(false);
     }
   };
 
   // Paso 5: Foto de salida
   const handleExitPhoto = async () => {
-    if (!flowData || !cameraActive) return;
+    if (!flowData) return;
+    setLoading(true);
+    setError(null);
 
     try {
       const photoUrl = await capturePhoto();
@@ -272,72 +335,54 @@ const ActivityEvidenceFlow = () => {
         setCameraActive(false);
       } else {
         const errorData = await res.json();
-        setError(errorData.message || 'Error al guardar foto de salida');
+        setError(errorData.message || 'Error al guardar foto');
       }
     } catch (err) {
-      setError('Error al capturar foto de salida');
+      setError(err instanceof Error ? err.message : 'Error al capturar foto');
+    } finally {
+      setLoading(false);
     }
-  };
-
-  // Utilidades
-  const capturePhoto = async (): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      navigator.mediaDevices
-        .getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } } })
-        .then((stream) => {
-          const video = document.createElement('video');
-          video.srcObject = stream;
-          video.onloadedmetadata = () => {
-            video.play();
-            const canvas = document.createElement('canvas');
-            canvas.width = Math.min(video.videoWidth, 640);
-            canvas.height = Math.min(video.videoHeight, 480);
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-              const photoUrl = canvas.toDataURL('image/jpeg', 0.4);
-              stream.getTracks().forEach((track) => track.stop());
-              resolve(photoUrl);
-            } else {
-              reject('Error al capturar foto');
-            }
-          };
-        })
-        .catch(() => reject('Error al acceder a cámara'));
-    });
-  };
-
-  const getGeolocation = (): Promise<{ latitude: number; longitude: number }> => {
-    return new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-        () => reject('Error al obtener ubicación'),
-        { enableHighAccuracy: true, timeout: 5000 },
-      );
-    });
-  };
-
-  const uploadFileToStorage = async (file: File): Promise<string> => {
-    // Implementar carga a storage (S3, Cloudinary, etc)
-    // Por ahora, retornar un placeholder
-    return `data:application/pdf;base64,${await fileToBase64(file)}`;
-  };
-
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve((reader.result as string).split(',')[1]);
-      reader.onerror = () => reject('Error al leer archivo');
-      reader.readAsDataURL(file);
-    });
   };
 
   if (!user) return <div>Cargando...</div>;
 
+  // Si no ha seleccionado actividad, mostrar selector
+  if (!flowData) {
+    return (
+      <div className="card" style={{ marginBottom: 24 }}>
+        <h2 style={{ color: 'var(--primary)', marginBottom: 12 }}>Selecciona una Actividad</h2>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
+          Elige la actividad para comenzar el flujo de evidencias.
+        </p>
+        <select
+          value={selectedActivityId}
+          onChange={(e) => handleActivitySelect(parseInt(e.target.value))}
+          disabled={loading}
+          style={{
+            width: '100%',
+            padding: 12,
+            borderRadius: 4,
+            border: '2px solid var(--primary)',
+            backgroundColor: 'var(--bg-secondary)',
+            color: 'var(--text-primary)',
+            fontSize: 16,
+            cursor: loading ? 'wait' : 'pointer',
+          }}
+        >
+          <option value="">-- Selecciona una actividad --</option>
+          {actividades.map((act) => (
+            <option key={act.id} value={act.id}>
+              {act.anNumber} - {act.titulo}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  }
+
+  // Mostrar paso actual
   return (
     <div className="card" style={{ marginBottom: 24 }}>
-      <h2 style={{ color: 'var(--primary)', marginBottom: 12 }}>Flujo de Evidencias - 5 Pasos</h2>
-
       {error && (
         <div style={{ padding: 12, backgroundColor: '#fee', color: '#c00', borderRadius: 4, marginBottom: 12 }}>
           ❌ {error}
@@ -350,294 +395,281 @@ const ActivityEvidenceFlow = () => {
         </div>
       )}
 
-      {/* Selector de actividad */}
-      {!flowData && (
-        <div style={{ marginBottom: 20 }}>
-          <label style={{ display: 'block', marginBottom: 8, color: 'var(--text-primary)' }}>
-            Selecciona una actividad:
-          </label>
-          <select
-            value={selectedActivityId}
-            onChange={(e) => handleActivitySelect(parseInt(e.target.value))}
+      {/* Barra de progreso */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
+          Actividad: <strong>{actividades.find((a) => a.id === flowData.activityId)?.anNumber}</strong>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <ProgressStep step={1} active={flowData.step === 'ENTRY_PHOTO'} completed={flowData.entryPhotoUrl ? true : false} label="Entrada" />
+          <div style={{ flex: 1, height: 2, backgroundColor: 'var(--border)' }} />
+          <ProgressStep step={2} active={flowData.step === 'EVIDENCE_PHOTOS'} completed={flowData.evidencePhotos.length > 0} label="Evidencias" />
+          <div style={{ flex: 1, height: 2, backgroundColor: 'var(--border)' }} />
+          <ProgressStep step={3} active={flowData.step === 'SERVICE_SHEET_PDF'} completed={flowData.serviceSheetPdfUrl ? true : false} label="PDF" />
+          <div style={{ flex: 1, height: 2, backgroundColor: 'var(--border)' }} />
+          <ProgressStep step={4} active={flowData.step === 'SERVICE_SHEET_DATA'} completed={flowData.serviceSheetData ? true : false} label="Plantilla" />
+          <div style={{ flex: 1, height: 2, backgroundColor: 'var(--border)' }} />
+          <ProgressStep step={5} active={flowData.step === 'EXIT_PHOTO'} completed={flowData.exitPhotoUrl ? true : false} label="Salida" />
+        </div>
+      </div>
+
+      {/* PASO 1: Foto de Entrada */}
+      {flowData.step === 'ENTRY_PHOTO' && (
+        <div style={{ padding: 20, border: '2px solid var(--primary)', borderRadius: 8 }}>
+          <h3 style={{ marginBottom: 12, color: 'var(--primary)' }}>📸 Paso 1: Foto de Entrada</h3>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
+            Toma una foto de entrada. Se guardará automáticamente con tu ubicación.
+          </p>
+          <button
+            onClick={handleEntryPhoto}
+            disabled={loading || cameraActive}
             style={{
-              width: '100%',
-              padding: 10,
+              padding: '12px 24px',
+              backgroundColor: 'var(--primary)',
+              color: 'white',
+              border: 'none',
               borderRadius: 4,
-              border: '1px solid var(--border)',
-              backgroundColor: 'var(--bg-secondary)',
-              color: 'var(--text-primary)',
+              cursor: loading ? 'wait' : 'pointer',
+              fontSize: 16,
+              fontWeight: 'bold',
             }}
           >
-            <option value="">-- Selecciona una actividad --</option>
-            {actividades.map((act) => (
-              <option key={act.id} value={act.id}>
-                {act.anNumber} - {act.titulo}
-              </option>
-            ))}
-          </select>
+            {loading ? '⏳ Capturando...' : '📷 Capturar Foto de Entrada'}
+          </button>
         </div>
       )}
 
-      {flowData && (
-        <div>
-          <div style={{ marginBottom: 20, padding: 12, backgroundColor: 'var(--bg-secondary)', borderRadius: 4 }}>
-            <strong>Actividad:</strong> {actividades.find((a) => a.id === flowData.activityId)?.anNumber}
-          </div>
+      {/* PASO 2: Fotos de Evidencia */}
+      {flowData.step === 'EVIDENCE_PHOTOS' && (
+        <div style={{ padding: 20, border: '2px solid var(--accent)', borderRadius: 8 }}>
+          <h3 style={{ marginBottom: 12, color: 'var(--accent)' }}>📷 Paso 2: Evidencias ({flowData.evidencePhotos.length}/4-8)</h3>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
+            Toma fotos de evidencia. Mínimo 4, máximo 8 fotos.
+          </p>
 
-          {/* Paso 1: Foto de entrada */}
-          {flowData.step === 'ENTRY_PHOTO' && (
-            <div style={{ padding: 16, border: '2px solid var(--primary)', borderRadius: 4, marginBottom: 16 }}>
-              <h3>Paso 1: Foto de Entrada</h3>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>
-                Toma una foto de entrada con tu cámara. Se guardará automáticamente con tu ubicación.
-              </p>
-              <button
-                onClick={() => setCameraActive(!cameraActive)}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: cameraActive ? '#f00' : 'var(--primary)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 4,
-                  cursor: 'pointer',
-                  marginRight: 10,
-                  marginBottom: 10,
-                }}
-              >
-                {cameraActive ? '🔴 Detener Cámara' : '📷 Abrir Cámara'}
-              </button>
-              {cameraActive && (
-                <button
-                  onClick={handleEntryPhoto}
-                  style={{
-                    padding: '10px 20px',
-                    backgroundColor: 'var(--accent)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: 4,
-                    cursor: 'pointer',
-                    marginBottom: 10,
-                  }}
-                >
-                  ✓ Guardar Foto de Entrada
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Paso 2: Fotos de evidencia */}
-          {flowData.step === 'EVIDENCE_PHOTOS' && (
-            <div style={{ padding: 16, border: '2px solid var(--accent)', borderRadius: 4, marginBottom: 16 }}>
-              <h3>Paso 2: Evidencias (4-8 fotos)</h3>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>
-                Toma fotos de evidencia. Mínimo 4, máximo 8.
-              </p>
-              <button
-                onClick={() => setCameraActive(!cameraActive)}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: cameraActive ? '#f00' : 'var(--primary)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 4,
-                  cursor: 'pointer',
-                  marginRight: 10,
-                  marginBottom: 10,
-                }}
-              >
-                {cameraActive ? '🔴 Detener' : '📷 Capturar'}
-              </button>
-              {cameraActive && (
-                <button
-                  onClick={handleAddEvidencePhoto}
-                  style={{
-                    padding: '10px 20px',
-                    backgroundColor: 'var(--accent)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: 4,
-                    cursor: 'pointer',
-                    marginRight: 10,
-                    marginBottom: 10,
-                  }}
-                >
-                  ✓ Agregar Foto
-                </button>
-              )}
-              <div style={{ marginBottom: 12 }}>
-                <strong>Fotos ({flowData.evidencePhotos.length}/8):</strong>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 8 }}>
-                  {flowData.evidencePhotos.map((photo, idx) => (
-                    <div
-                      key={idx}
+          {/* Grid de fotos */}
+          {flowData.evidencePhotos.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                {flowData.evidencePhotos.map((photo, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      position: 'relative',
+                      width: '100%',
+                      paddingBottom: '100%',
+                      borderRadius: 4,
+                      overflow: 'hidden',
+                      border: '2px solid var(--border)',
+                    }}
+                  >
+                    <img
+                      src={photo}
+                      alt={`evidencia ${idx + 1}`}
                       style={{
-                        position: 'relative',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
                         width: '100%',
-                        paddingBottom: '100%',
-                        borderRadius: 4,
-                        overflow: 'hidden',
+                        height: '100%',
+                        objectFit: 'cover',
+                      }}
+                    />
+                    <button
+                      onClick={() => handleRemoveEvidencePhoto(idx)}
+                      style={{
+                        position: 'absolute',
+                        top: 4,
+                        right: 4,
+                        width: 28,
+                        height: 28,
+                        padding: 0,
+                        backgroundColor: 'rgba(255,0,0,0.8)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '50%',
+                        cursor: 'pointer',
+                        fontSize: 16,
+                        fontWeight: 'bold',
                       }}
                     >
-                      <img
-                        src={photo}
-                        alt={`evidencia ${idx + 1}`}
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                        }}
-                      />
-                      <button
-                        onClick={() => handleRemoveEvidencePhoto(idx)}
-                        style={{
-                          position: 'absolute',
-                          top: 4,
-                          right: 4,
-                          width: 24,
-                          height: 24,
-                          padding: 0,
-                          backgroundColor: 'rgba(0,0,0,0.7)',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '50%',
-                          cursor: 'pointer',
-                          fontSize: 14,
-                        }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                      ✕
+                    </button>
+                  </div>
+                ))}
               </div>
-              {flowData.evidencePhotos.length >= 4 && (
-                <button
-                  onClick={handleSaveEvidencePhotos}
-                  style={{
-                    padding: '10px 20px',
-                    backgroundColor: 'var(--success)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: 4,
-                    cursor: 'pointer',
-                  }}
-                >
-                  ✓ Guardar Evidencias →
-                </button>
-              )}
             </div>
           )}
 
-          {/* Paso 3: Hoja de servicio PDF */}
-          {flowData.step === 'SERVICE_SHEET_PDF' && (
-            <div style={{ padding: 16, border: '2px solid #f90', borderRadius: 4, marginBottom: 16 }}>
-              <h3>Paso 3: Hoja de Servicio (PDF)</h3>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>
-                Sube el PDF de la hoja de servicio. Este es obligatorio.
-              </p>
-              <input
-                type="file"
-                accept=".pdf"
-                onChange={handleServiceSheetPdfUpload}
-                style={{
-                  display: 'block',
-                  marginBottom: 10,
-                  padding: '8px 0',
-                }}
-              />
-              {flowData.serviceSheetPdfUrl && (
-                <a
-                  href={flowData.serviceSheetPdfUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: 'var(--primary)', textDecoration: 'underline' }}
-                >
-                  📄 Ver PDF
-                </a>
-              )}
-            </div>
-          )}
-
-          {/* Paso 4: Plantilla de hoja de servicio */}
-          {flowData.step === 'SERVICE_SHEET_DATA' && (
-            <div style={{ padding: 16, border: '2px solid #060', borderRadius: 4, marginBottom: 16 }}>
-              <h3>Paso 4: Plantilla Interna</h3>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>
-                Completa los datos de la plantilla interna de hoja de servicio.
-              </p>
-              <ServiceSheetInternalForm
-                onSubmit={handleServiceSheetDataSubmit}
-              />
-            </div>
-          )}
-
-          {/* Paso 5: Foto de salida */}
-          {flowData.step === 'EXIT_PHOTO' && (
-            <div style={{ padding: 16, border: '2px solid #c00', borderRadius: 4, marginBottom: 16 }}>
-              <h3>Paso 5: Foto de Salida</h3>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>
-                Toma la foto de salida. Debe ser capturada en el momento.
-              </p>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+            <button
+              onClick={handleAddEvidencePhoto}
+              disabled={loading || flowData.evidencePhotos.length >= 8}
+              style={{
+                padding: '12px 24px',
+                backgroundColor: 'var(--accent)',
+                color: 'white',
+                border: 'none',
+                borderRadius: 4,
+                cursor: loading || flowData.evidencePhotos.length >= 8 ? 'not-allowed' : 'pointer',
+                fontSize: 16,
+                fontWeight: 'bold',
+                opacity: loading || flowData.evidencePhotos.length >= 8 ? 0.5 : 1,
+              }}
+            >
+              {loading ? '⏳ Capturando...' : '📷 Agregar Foto'}
+            </button>
+            {flowData.evidencePhotos.length >= 4 && (
               <button
-                onClick={() => setCameraActive(!cameraActive)}
+                onClick={handleSaveEvidencePhotos}
+                disabled={loading}
                 style={{
-                  padding: '10px 20px',
-                  backgroundColor: cameraActive ? '#f00' : 'var(--primary)',
+                  padding: '12px 24px',
+                  backgroundColor: 'var(--success)',
                   color: 'white',
                   border: 'none',
                   borderRadius: 4,
-                  cursor: 'pointer',
-                  marginRight: 10,
-                  marginBottom: 10,
+                  cursor: loading ? 'wait' : 'pointer',
+                  fontSize: 16,
+                  fontWeight: 'bold',
                 }}
               >
-                {cameraActive ? '🔴 Detener Cámara' : '📷 Abrir Cámara'}
+                {loading ? '⏳ Guardando...' : '✓ Siguiente Paso →'}
               </button>
-              {cameraActive && (
-                <button
-                  onClick={handleExitPhoto}
-                  style={{
-                    padding: '10px 20px',
-                    backgroundColor: 'var(--success)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: 4,
-                    cursor: 'pointer',
-                  }}
-                >
-                  ✓ Guardar Foto de Salida
-                </button>
-              )}
-            </div>
-          )}
+            )}
+          </div>
+        </div>
+      )}
 
-          {/* Completado */}
-          {flowData.step === 'COMPLETED' && (
-            <div
-              style={{
-                padding: 20,
-                backgroundColor: '#efe',
-                border: '2px solid #060',
-                borderRadius: 4,
-                textAlign: 'center',
-              }}
-            >
-              <h3 style={{ color: '#060', marginBottom: 12 }}>🎉 ¡Asignación Completada Exitosamente!</h3>
-              <p>Todos los pasos han sido completados correctamente.</p>
+      {/* PASO 3: PDF */}
+      {flowData.step === 'SERVICE_SHEET_PDF' && (
+        <div style={{ padding: 20, border: '2px solid #f90', borderRadius: 8 }}>
+          <h3 style={{ marginBottom: 12, color: '#f90' }}>📄 Paso 3: Hoja de Servicio (PDF)</h3>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
+            Carga el PDF de la hoja de servicio. Este campo es obligatorio.
+          </p>
+          <input
+            type="file"
+            accept=".pdf"
+            onChange={handleServiceSheetPdfUpload}
+            disabled={loading}
+            style={{
+              display: 'block',
+              marginBottom: 16,
+              cursor: loading ? 'wait' : 'pointer',
+            }}
+          />
+          {flowData.serviceSheetPdfUrl && (
+            <div style={{ padding: 12, backgroundColor: 'var(--bg-secondary)', borderRadius: 4, marginBottom: 16 }}>
+              ✅ PDF cargado correctamente
             </div>
           )}
+        </div>
+      )}
+
+      {/* PASO 4: Plantilla Interna */}
+      {flowData.step === 'SERVICE_SHEET_DATA' && (
+        <div style={{ padding: 20, border: '2px solid #060', borderRadius: 8 }}>
+          <h3 style={{ marginBottom: 12, color: '#060' }}>📝 Paso 4: Plantilla Interna</h3>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
+            Completa los datos requeridos de la hoja de servicio.
+          </p>
+          <ServiceSheetForm onSubmit={handleServiceSheetFormSubmit} loading={loading} />
+        </div>
+      )}
+
+      {/* PASO 5: Foto de Salida */}
+      {flowData.step === 'EXIT_PHOTO' && (
+        <div style={{ padding: 20, border: '2px solid #c00', borderRadius: 8 }}>
+          <h3 style={{ marginBottom: 12, color: '#c00' }}>🚪 Paso 5: Foto de Salida</h3>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
+            Toma la foto de salida. Debe ser capturada en el momento actual.
+          </p>
+          <button
+            onClick={handleExitPhoto}
+            disabled={loading}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: '#c00',
+              color: 'white',
+              border: 'none',
+              borderRadius: 4,
+              cursor: loading ? 'wait' : 'pointer',
+              fontSize: 16,
+              fontWeight: 'bold',
+            }}
+          >
+            {loading ? '⏳ Capturando...' : '📷 Capturar Foto de Salida'}
+          </button>
+        </div>
+      )}
+
+      {/* COMPLETADO */}
+      {flowData.step === 'COMPLETED' && (
+        <div
+          style={{
+            padding: 24,
+            backgroundColor: '#efe',
+            border: '3px solid #060',
+            borderRadius: 8,
+            textAlign: 'center',
+          }}
+        >
+          <h2 style={{ color: '#060', marginBottom: 12 }}>🎉 ¡Asignación Completada Exitosamente!</h2>
+          <p style={{ color: '#060', marginBottom: 20 }}>
+            Todos los pasos han sido completados correctamente. Los 5 pasos se encuentran guardados en el sistema.
+          </p>
+          <button
+            onClick={() => {
+              setFlowData(null);
+              setSelectedActivityId('');
+              setSuccessMsg(null);
+            }}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: '#060',
+              color: 'white',
+              border: 'none',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontSize: 16,
+              fontWeight: 'bold',
+            }}
+          >
+            ↻ Seleccionar Otra Actividad
+          </button>
         </div>
       )}
     </div>
   );
 };
 
-// Componente para la plantilla interna
-const ServiceSheetInternalForm = ({ onSubmit }: { onSubmit: (data: any) => void }) => {
-  const [formData, setFormData] = useState({
+// Componente para paso de progreso
+const ProgressStep = ({ step, active, completed, label }: { step: number; active: boolean; completed: boolean; label: string }) => (
+  <div style={{ textAlign: 'center' }}>
+    <div
+      style={{
+        width: 36,
+        height: 36,
+        borderRadius: '50%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: active ? 'var(--primary)' : completed ? 'var(--success)' : 'var(--border)',
+        color: 'white',
+        fontWeight: 'bold',
+        margin: '0 auto 4px',
+      }}
+    >
+      {completed ? '✓' : step}
+    </div>
+    <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{label}</div>
+  </div>
+);
+
+// Formulario de plantilla interna
+const ServiceSheetForm = ({ onSubmit, loading }: { onSubmit: (data: any) => void; loading: boolean }) => {
+  const [data, setData] = useState({
     managerName: '',
     managerRole: '',
     workSummary: '',
@@ -646,7 +678,7 @@ const ServiceSheetInternalForm = ({ onSubmit }: { onSubmit: (data: any) => void 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    onSubmit(data);
   };
 
   return (
@@ -654,33 +686,41 @@ const ServiceSheetInternalForm = ({ onSubmit }: { onSubmit: (data: any) => void 
       <input
         type="text"
         placeholder="Nombre del Gerente"
-        value={formData.managerName}
-        onChange={(e) => setFormData({ ...formData, managerName: e.target.value })}
+        value={data.managerName}
+        onChange={(e) => setData({ ...data, managerName: e.target.value })}
+        required
+        disabled={loading}
         style={{
           padding: 10,
           borderRadius: 4,
           border: '1px solid var(--border)',
           backgroundColor: 'var(--bg-secondary)',
           color: 'var(--text-primary)',
+          cursor: loading ? 'wait' : 'text',
         }}
       />
       <input
         type="text"
-        placeholder="Cargo"
-        value={formData.managerRole}
-        onChange={(e) => setFormData({ ...formData, managerRole: e.target.value })}
+        placeholder="Cargo del Gerente"
+        value={data.managerRole}
+        onChange={(e) => setData({ ...data, managerRole: e.target.value })}
+        required
+        disabled={loading}
         style={{
           padding: 10,
           borderRadius: 4,
           border: '1px solid var(--border)',
           backgroundColor: 'var(--bg-secondary)',
           color: 'var(--text-primary)',
+          cursor: loading ? 'wait' : 'text',
         }}
       />
       <textarea
         placeholder="Resumen del trabajo realizado"
-        value={formData.workSummary}
-        onChange={(e) => setFormData({ ...formData, workSummary: e.target.value })}
+        value={data.workSummary}
+        onChange={(e) => setData({ ...data, workSummary: e.target.value })}
+        required
+        disabled={loading}
         style={{
           padding: 10,
           borderRadius: 4,
@@ -689,12 +729,14 @@ const ServiceSheetInternalForm = ({ onSubmit }: { onSubmit: (data: any) => void 
           color: 'var(--text-primary)',
           minHeight: 100,
           fontFamily: 'inherit',
+          cursor: loading ? 'wait' : 'text',
         }}
       />
       <textarea
         placeholder="Observaciones"
-        value={formData.observations}
-        onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
+        value={data.observations}
+        onChange={(e) => setData({ ...data, observations: e.target.value })}
+        disabled={loading}
         style={{
           padding: 10,
           borderRadius: 4,
@@ -703,20 +745,24 @@ const ServiceSheetInternalForm = ({ onSubmit }: { onSubmit: (data: any) => void 
           color: 'var(--text-primary)',
           minHeight: 100,
           fontFamily: 'inherit',
+          cursor: loading ? 'wait' : 'text',
         }}
       />
       <button
         type="submit"
+        disabled={loading}
         style={{
-          padding: '10px 20px',
-          backgroundColor: 'var(--primary)',
+          padding: '12px 24px',
+          backgroundColor: '#060',
           color: 'white',
           border: 'none',
           borderRadius: 4,
-          cursor: 'pointer',
+          cursor: loading ? 'wait' : 'pointer',
+          fontSize: 16,
+          fontWeight: 'bold',
         }}
       >
-        ✓ Completar Plantilla →
+        {loading ? '⏳ Guardando...' : '✓ Siguiente Paso →'}
       </button>
     </form>
   );
