@@ -608,6 +608,11 @@ export class AttendanceService {
           attendances: attendances.map((att) => ({
             type: att.type,
             timestamp: att.timestamp.toISOString(),
+            photoUrl: att.photoUrl || undefined,
+            entryLatitude: att.entryLatitude || undefined,
+            entryLongitude: att.entryLongitude || undefined,
+            exitLatitude: att.exitLatitude || undefined,
+            exitLongitude: att.exitLongitude || undefined,
           })),
           activities: activities.map((activity) => ({
             id: activity.id,
