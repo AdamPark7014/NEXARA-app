@@ -608,10 +608,12 @@ const ConsoleAttendanceTable = () => {
                                                         height: 50,
                                                         borderRadius: 4,
                                                         border: '2px solid var(--primary)',
+                                                        backgroundColor: 'rgba(var(--primary-rgb), 0.1)',
                                                         cursor: 'pointer',
-                                                        backgroundImage: `url('https://maps.googleapis.com/maps/api/staticmap?center=${entry.latitude},${entry.longitude}&zoom=13&size=50x50&style=feature:all|element:labels|visibility:off&markers=color:red|${entry.latitude},${entry.longitude}')`,
-                                                        backgroundSize: 'cover',
-                                                        backgroundPosition: 'center',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        fontSize: 24,
                                                         transition: 'all 0.2s ease',
                                                         boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
                                                       }}
@@ -619,12 +621,16 @@ const ConsoleAttendanceTable = () => {
                                                       onMouseEnter={(e) => {
                                                         e.currentTarget.style.transform = 'scale(1.1)';
                                                         e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.25)';
+                                                        e.currentTarget.style.backgroundColor = 'rgba(var(--primary-rgb), 0.2)';
                                                       }}
                                                       onMouseLeave={(e) => {
                                                         e.currentTarget.style.transform = 'scale(1)';
                                                         e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.15)';
+                                                        e.currentTarget.style.backgroundColor = 'rgba(var(--primary-rgb), 0.1)';
                                                       }}
-                                                    />
+                                                    >
+                                                      🗺️
+                                                    </div>
                                                   )}
                                                 </div>
                                               ))}
@@ -667,10 +673,12 @@ const ConsoleAttendanceTable = () => {
                                                         height: 50,
                                                         borderRadius: 4,
                                                         border: '2px solid var(--primary)',
+                                                        backgroundColor: 'rgba(var(--primary-rgb), 0.1)',
                                                         cursor: 'pointer',
-                                                        backgroundImage: `url('https://maps.googleapis.com/maps/api/staticmap?center=${exit.latitude},${exit.longitude}&zoom=13&size=50x50&style=feature:all|element:labels|visibility:off&markers=color:red|${exit.latitude},${exit.longitude}')`,
-                                                        backgroundSize: 'cover',
-                                                        backgroundPosition: 'center',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        fontSize: 24,
                                                         transition: 'all 0.2s ease',
                                                         boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
                                                       }}
@@ -678,12 +686,16 @@ const ConsoleAttendanceTable = () => {
                                                       onMouseEnter={(e) => {
                                                         e.currentTarget.style.transform = 'scale(1.1)';
                                                         e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.25)';
+                                                        e.currentTarget.style.backgroundColor = 'rgba(var(--primary-rgb), 0.2)';
                                                       }}
                                                       onMouseLeave={(e) => {
                                                         e.currentTarget.style.transform = 'scale(1)';
                                                         e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.15)';
+                                                        e.currentTarget.style.backgroundColor = 'rgba(var(--primary-rgb), 0.1)';
                                                       }}
-                                                    />
+                                                    >
+                                                      🗺️
+                                                    </div>
                                                   )}
                                                 </div>
                                               ))}
