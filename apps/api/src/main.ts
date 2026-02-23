@@ -73,11 +73,11 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // Servir archivos estáticos desde apps/api/uploads (ANTES del prefijo global)
-  const uploadsPath = path.join(__dirname, '..', 'uploads');
+  // Servir archivos estáticos desde uploads (en raíz del proyecto)
+  const fs = require('fs');
+  const uploadsPath = path.join(process.cwd(), 'uploads');
   
   // Asegurar que el directorio uploads existe
-  const fs = require('fs');
   if (!fs.existsSync(uploadsPath)) {
     fs.mkdirSync(uploadsPath, { recursive: true });
     console.log(`📁 Created uploads directory: ${uploadsPath}`);
