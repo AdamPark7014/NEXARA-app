@@ -290,21 +290,44 @@ const AttendanceForm = () => {
     }
     setLoading(true);
     try {
+      // Obtener ubicación GPS actual
+      let latitude: number | undefined;
+      let longitude: number | undefined;
+      
+      if (navigator.geolocation) {
+        try {
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, { 
+              enableHighAccuracy: true, 
+              timeout: 5000 
+            });
+          });
+          latitude = position.coords.latitude;
+          longitude = position.coords.longitude;
+        } catch (gpsErr) {
+          // Si no puede obtener GPS, continúa sin él
+          console.warn('No se pudo obtener ubicación GPS:', gpsErr);
+        }
+      }
+
       const res = await fetch(buildApiUrl('attendance'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${user.token}` },
         body: JSON.stringify({ 
           type: tipo, 
           timestamp: new Date().toISOString(),
-          photoBase64: photoBase64 || undefined, // Incluir foto si existe
+          photoBase64: photoBase64 || undefined,
+          latitude,
+          longitude,
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data.message || 'Error al registrar asistencia');
       }
-      setStatus(tipo === 'salida' ? 'Salida registrada exitosamente' : 'Entrada registrada exitosamente');
+
       if (tipo === 'entrada') {
+        setStatus('✓ Entrada registrada correctamente. Compartiendo ubicación...');
         try {
           await updateGpsConsent(true);
           startGpsTracking();
@@ -313,6 +336,7 @@ const AttendanceForm = () => {
           setError(gpsErr instanceof Error ? gpsErr.message : 'No se pudo activar el GPS');
         }
       } else {
+        setStatus('✓ Salida registrada correctamente. Se detuvo el compartir ubicación.');
         stopGpsTracking();
         try {
           await updateGpsConsent(false);
@@ -321,6 +345,7 @@ const AttendanceForm = () => {
           setError(gpsErr instanceof Error ? gpsErr.message : 'No se pudo desactivar el GPS');
         }
       }
+
       if (data.day) {
         setTotalMinutes(data.day.totalMinutes || 0);
         if (isToday(selectedDate) && data.day.isOpen && data.day.lastEntryAt) {
@@ -333,6 +358,7 @@ const AttendanceForm = () => {
       } else if (tipo === 'salida') {
         setStartTime(null);
       }
+
       // Refrescar historial
       const historyRes = await fetch(buildApiUrl(`attendance/history?date=${selectedDate}`), {
         headers: { Authorization: `Bearer ${user.token}` },

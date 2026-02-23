@@ -189,16 +189,29 @@ export class AttendanceService {
     const now = dto.timestamp ? new Date(dto.timestamp) : new Date();
     const today = this.getDateOnly(now);
 
+    // Determinar si es entrada o salida para guardar coordenadas correctas
+    const isEntry = dto.type === 'entrada';
+    
     const attendance = await this.prisma.attendance.create({
       data: {
         userId,
         type: dto.type,
         timestamp: now,
-        photoUrl: dto.photoBase64 || null, // Guardar foto en base64 o null si no hay
+        photoUrl: dto.photoBase64 || null,
+        // Guardar coordenadas en los campos apropiados según si es entrada o salida
+        ...(isEntry && {
+          entryLatitude: dto.latitude || null,
+          entryLongitude: dto.longitude || null,
+        }),
+        ...(!isEntry && {
+          exitLatitude: dto.latitude || null,
+          exitLongitude: dto.longitude || null,
+        }),
       },
+      include: { user: true },
     });
 
-    if (dto.type === 'entrada') {
+    if (isEntry) {
       const day = await this.prisma.attendanceDay.upsert({
         where: { userId_date: { userId, date: today } },
         create: {
@@ -213,7 +226,7 @@ export class AttendanceService {
           isOpen: true,
         },
       });
-      this.emitAttendanceUpdate(userId, dto.type, now);
+      this.emitAttendanceUpdate(userId, dto.type, now, attendance.user);
       return {
         message: 'Entrada registrada exitosamente',
         data: attendance,
@@ -237,7 +250,7 @@ export class AttendanceService {
         isOpen: false,
       },
     });
-    this.emitAttendanceUpdate(userId, dto.type, now);
+    this.emitAttendanceUpdate(userId, dto.type, now, attendance.user);
     return {
       message: 'Salida registrada exitosamente',
       data: attendance,
@@ -245,13 +258,74 @@ export class AttendanceService {
     };
   }
 
-  private emitAttendanceUpdate(userId: number, type: string, timestamp: Date) {
+  private async emitAttendanceUpdate(userId: number, type: string, timestamp: Date, user: any) {
+    // Emit al usuario para actualizar su UI
     this.realtimeGateway.emit('attendance:updated', {
       userId,
       type,
       timestamp: timestamp.toISOString(),
       date: this.getDateOnly(timestamp).toISOString().split('T')[0],
     });
+
+    // Obtener admins relevantes y crear notificaciones
+    try {
+      const allAdmins = await this.prisma.user.findMany({
+        where: {
+          OR: [
+            // Superadmins
+            { email: { in: ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'] } },
+            // Admins de consola
+            { role: { accesoConsoleAdmin: true } },
+            // Admins del mismo departamento
+            { 
+              AND: [
+                { departmentId: user.departmentId },
+                { role: { accesoConsoleAdmin: true } },
+              ]
+            },
+          ],
+        },
+        select: { id: true, nombre: true, email: true },
+      });
+
+      // Crear notificaciones para cada admin
+      const isSuperAdmin = this.isSuperAdminEmail(user.email);
+      for (const admin of allAdmins) {
+        // No notificar al propio usuario
+        if (admin.id === userId) continue;
+        
+        // No notificar a admins si el usuario es un admin (except superadmins notifican a todos)
+        const isAdminUser = !isSuperAdmin && allAdmins.some(a => a.id === userId);
+        if (!this.isSuperAdminEmail(admin.email) && isAdminUser) continue;
+
+        const typeLabel = type === 'entrada' ? 'entrada' : 'salida';
+        const title = `${user.nombre} registró ${typeLabel}`;
+        const message = `${user.nombre} (${user.email}) registró ${typeLabel} a las ${timestamp.toLocaleTimeString('es-MX')}`;
+
+        await this.prisma.notification.create({
+          data: {
+            userId: admin.id,
+            type: 'ATTENDANCE_UPDATE' as any,
+            title,
+            message,
+            relatedEntityId: userId,
+            entityType: 'Attendance',
+          },
+        });
+
+        // Emitir notificación en tiempo real al admin
+        this.realtimeGateway.emit('attendance:notification', {
+          adminId: admin.id,
+          userId,
+          type,
+          userName: user.nombre,
+          userEmail: user.email,
+          timestamp: timestamp.toISOString(),
+        });
+      }
+    } catch (error) {
+      console.error('Error emitting attendance notifications:', error);
+    }
   }
 
   private normalizeProductivity(value?: string | null) {
