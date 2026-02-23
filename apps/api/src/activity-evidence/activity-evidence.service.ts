@@ -240,4 +240,190 @@ export class ActivityEvidenceService {
       },
     });
   }
+
+  /**
+   * Aprobar evidencias (Admin)
+   */
+  async approveEvidence(activityId: number, reviewerId: number, notes?: string) {
+    const evidence = await this.getOrCreateActivityEvidence(activityId);
+
+    if (evidence.status !== 'COMPLETED') {
+      throw new BadRequestException('Las evidencias deben estar completadas antes de aprobar');
+    }
+
+    const updated = await this.prisma.activityEvidence.update({
+      where: { activityId },
+      data: {
+        reviewStatus: 'APPROVED',
+        reviewNotes: notes || null,
+        reviewedById: reviewerId,
+        reviewedAt: new Date(),
+      },
+    });
+
+    // Actualizar estatus de actividad
+    await this.prisma.activity.update({
+      where: { id: activityId },
+      data: {
+        estatus: 'Aprobada',
+      },
+    });
+
+    return updated;
+  }
+
+  /**
+   * Rechazar evidencias (Admin) - seleccionar paso a corregir
+   */
+  async rejectEvidence(
+    activityId: number,
+    reviewerId: number,
+    rejectedStep: string,
+    notes: string,
+  ) {
+    const evidence = await this.getOrCreateActivityEvidence(activityId);
+
+    if (evidence.status !== 'COMPLETED') {
+      throw new BadRequestException('Las evidencias deben estar completadas antes de rechazar');
+    }
+
+    const validSteps = [
+      'ENTRY_PHOTO',
+      'EVIDENCE_PHOTOS',
+      'SERVICE_SHEET_PDF',
+      'SERVICE_SHEET_DATA',
+      'EXIT_PHOTO',
+    ];
+
+    if (!validSteps.includes(rejectedStep)) {
+      throw new BadRequestException('Paso inválido para rechazo');
+    }
+
+    const updated = await this.prisma.activityEvidence.update({
+      where: { activityId },
+      data: {
+        reviewStatus: 'REJECTED',
+        rejectedStep,
+        reviewNotes: notes,
+        reviewedById: reviewerId,
+        reviewedAt: new Date(),
+        status: rejectedStep, // Regresar al paso rechazado
+      },
+    });
+
+    // Actualizar estatus de actividad
+    await this.prisma.activity.update({
+      where: { id: activityId },
+      data: {
+        estatus: 'Rechazada',
+      },
+    });
+
+    return updated;
+  }
+
+  /**
+   * Reenviar paso específico (Usuario corrige)
+   */
+  async resubmitStep(activityId: number, step: string, data: any) {
+    const evidence = await this.getOrCreateActivityEvidence(activityId);
+
+    if (evidence.reviewStatus !== 'REJECTED') {
+      throw new BadRequestException('Solo puedes reenviar si fue rechazada');
+    }
+
+    if (evidence.rejectedStep !== step) {
+      throw new BadRequestException(
+        `Debes corregir el paso: ${evidence.rejectedStep}`,
+      );
+    }
+
+    // Actualizar según el paso
+    let updateData: any = {
+      correctionSubmittedAt: new Date(),
+    };
+
+    switch (step) {
+      case 'ENTRY_PHOTO':
+        updateData = {
+          ...updateData,
+          entryPhotoUrl: data.photoUrl,
+          entryLatitude: data.latitude,
+          entryLongitude: data.longitude,
+          entryPhotoUploadedAt: new Date(),
+          status: 'EVIDENCE_PHOTOS',
+          reviewStatus: 'PENDING',
+          rejectedStep: null,
+        };
+        break;
+
+      case 'EVIDENCE_PHOTOS':
+        if (data.photoUrls.length < 4 || data.photoUrls.length > 8) {
+          throw new BadRequestException('Requiere entre 4-8 fotos de evidencia');
+        }
+        updateData = {
+          ...updateData,
+          evidencePhotos: data.photoUrls,
+          evidencePhotosUploadedAt: new Date(),
+          status: 'SERVICE_SHEET_PDF',
+          reviewStatus: 'PENDING',
+          rejectedStep: null,
+        };
+        break;
+
+      case 'SERVICE_SHEET_PDF':
+        updateData = {
+          ...updateData,
+          serviceSheetPdfUrl: data.pdfUrl,
+          serviceSheetUploadedAt: new Date(),
+          status: 'SERVICE_SHEET_DATA',
+          reviewStatus: 'PENDING',
+          rejectedStep: null,
+        };
+        break;
+
+      case 'SERVICE_SHEET_DATA':
+        updateData = {
+          ...updateData,
+          serviceSheetData: data.formData,
+          serviceSheetCompletedAt: new Date(),
+          status: 'EXIT_PHOTO',
+          reviewStatus: 'PENDING',
+          rejectedStep: null,
+        };
+        break;
+
+      case 'EXIT_PHOTO':
+        updateData = {
+          ...updateData,
+          exitPhotoUrl: data.photoUrl,
+          exitLatitude: data.latitude,
+          exitLongitude: data.longitude,
+          exitPhotoUploadedAt: new Date(),
+          status: 'COMPLETED',
+          reviewStatus: 'PENDING',
+          rejectedStep: null,
+          completedAt: new Date(),
+        };
+        break;
+
+      default:
+        throw new BadRequestException('Paso inválido');
+    }
+
+    const updated = await this.prisma.activityEvidence.update({
+      where: { activityId },
+      data: updateData,
+    });
+
+    // Actualizar actividad a "En revisión"
+    await this.prisma.activity.update({
+      where: { id: activityId },
+      data: {
+        estatus: 'En Revisión',
+      },
+    });
+
+    return updated;
+  }
 }

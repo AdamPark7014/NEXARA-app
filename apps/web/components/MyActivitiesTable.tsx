@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
+import EvidenceReviewModal from './EvidenceReviewModal';
 
 interface Activity {
   id: number;
@@ -27,6 +28,9 @@ interface Activity {
   activityEvidence?: {
     id: number;
     status: string;
+    reviewStatus?: string;  // PENDING, APPROVED, REJECTED
+    rejectedStep?: string;
+    reviewNotes?: string;
     entryPhotoUrl?: string;
     evidencePhotos: string[];
     serviceSheetPdfUrl?: string;
@@ -39,6 +43,9 @@ const MyActivitiesTable: React.FC = () => {
   const { user } = useUser();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reviewModal, setReviewModal] = useState<{ activityId: number; activityNumber: string } | null>(null);
+
+  const isAdmin = user?.role?.permissions?.includes('CONSOLE_ADMIN') || false;
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
@@ -98,80 +105,200 @@ const MyActivitiesTable: React.FC = () => {
 
   const getEvidenceStatus = (activity: Activity) => {
     if (!activity.activityEvidence) return 'Sin iniciar';
-    const status = activity.activityEvidence.status;
+    
+    const evidence = activity.activityEvidence;
+    const status = evidence.status;
+    
+    // Si está rechazado, mostrar el paso rechazado
+    if (evidence.reviewStatus === 'REJECTED' && evidence.rejectedStep) {
+      const stepNames: Record<string, string> = {
+        'ENTRY_PHOTO': '❌ Rechazado: Foto Entrada',
+        'EVIDENCE_PHOTOS': '❌ Rechazado: Evidencias',
+        'SERVICE_SHEET_PDF': '❌ Rechazado: PDF',
+        'SERVICE_SHEET_DATA': '❌ Rechazado: Plantilla',
+        'EXIT_PHOTO': '❌ Rechazado: Foto Salida',
+      };
+      return stepNames[evidence.rejectedStep] || '❌ Rechazado';
+    }
+    
+    // Si está aprobado
+    if (evidence.reviewStatus === 'APPROVED') {
+      return '✅ Aprobado';
+    }
+    
+    // Estados normales del flujo
     const statusMap: Record<string, string> = {
       'ENTRY_PHOTO': '📸 Entrada',
       'EVIDENCE_PHOTOS': '📷 Evidencias',
       'SERVICE_SHEET_PDF': '📄 PDF',
       'SERVICE_SHEET_DATA': '📝 Plantilla',
       'EXIT_PHOTO': '🚪 Salida',
-      'COMPLETED': '✅ Completado',
+      'COMPLETED': '✅ Completado - En revisión',
     };
     return statusMap[status] || status;
+  };
+
+  const getReviewStatusColor = (evidence: Activity['activityEvidence']) => {
+    if (!evidence) return { bg: '#fef', color: '#f90' };
+    
+    if (evidence.reviewStatus === 'APPROVED') {
+      return { bg: '#d1fae5', color: '#047857' };
+    }
+    
+    if (evidence.reviewStatus === 'REJECTED') {
+      return { bg: '#fee2e2', color: '#dc2626' };
+    }
+    
+    if (evidence.status === 'COMPLETED') {
+      return { bg: '#fef3c7', color: '#d97706' }; // Amarillo para "en revisión"
+    }
+    
+    return { bg: '#e0f2fe', color: '#0369a1' }; // Azul para en progreso
   };
 
   if (loading) return <div>Cargando actividades...</div>;
 
   return (
-    <div className="card">
-      <h2 style={{ color: 'var(--primary)', marginBottom: 12 }}>Mis Actividades</h2>
-      <table className="table">
-        <thead>
-          <tr>
-            <th>AN</th>
-            <th>Titulo</th>
-            <th>Cliente</th>
-            <th>Sucursal</th>
-            <th>Tipo</th>
-            <th>Estatus</th>
-            <th>Prioridad</th>
-            <th>Evidencias</th>
-            <th>Inicio</th>
-            <th>Entrega</th>
-            <th>Estimado/Max</th>
-            <th>Indicaciones</th>
-            <th>Mapa</th>
-          </tr>
-        </thead>
-        <tbody>
-          {activities.map((a) => (
-            <tr key={a.id}>
-              <td>{a.anNumber}</td>
-              <td>{a.titulo}</td>
-              <td>{a.client?.name || 'Interna'}</td>
-              <td>{[a.branchName, a.branchCity, a.branchState].filter(Boolean).join(', ') || '-'}</td>
-              <td>{a.ticketType || '-'}</td>
-              <td><span className={`badge ${a.estatus === 'Aprobada' ? 'approved' : a.estatus === 'Pendiente' ? 'pending' : ''}`}>{a.estatus}</span></td>
-              <td>{a.prioridad}</td>
-              <td>
-                <span style={{
-                  display: 'inline-block',
-                  padding: '4px 8px',
-                  borderRadius: 4,
-                  backgroundColor: a.activityEvidence?.status === 'COMPLETED' ? '#efe' : '#fef',
-                  color: a.activityEvidence?.status === 'COMPLETED' ? '#060' : '#f90',
-                  fontSize: 12,
-                  fontWeight: 500,
-                }}>
-                  {getEvidenceStatus(a)}
-                </span>
-              </td>
-              <td>{formatDateTime(a.fechaInicio)}</td>
-              <td>{formatDateTime(a.fechaEntregaEsperada)}</td>
-              <td>{a.tiempoEstimadoMin || 0}/{a.tiempoMaximoMin || 0}</td>
-              <td>{a.indicaciones || '-'}</td>
-              <td>
-                {getMapsUrl(a) ? (
-                  <a href={getMapsUrl(a)} target="_blank" rel="noreferrer">Como llegar</a>
-                ) : (
-                  '-'
-                )}
-              </td>
+    <>
+      <div className="card">
+        <h2 style={{ color: 'var(--primary)', marginBottom: 12 }}>Mis Actividades</h2>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>AN</th>
+              <th>Titulo</th>
+              <th>Cliente</th>
+              <th>Sucursal</th>
+              <th>Tipo</th>
+              <th>Estatus</th>
+              <th>Prioridad</th>
+              <th>Evidencias</th>
+              {isAdmin && <th>Acciones</th>}
+              {!isAdmin && <th>Corrección</th>}
+              <th>Inicio</th>
+              <th>Entrega</th>
+              <th>Estimado/Max</th>
+              <th>Indicaciones</th>
+              <th>Mapa</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {activities.map((a) => {
+              const colors = getReviewStatusColor(a.activityEvidence);
+              const canReview = isAdmin && a.activityEvidence?.status === 'COMPLETED' && a.activityEvidence?.reviewStatus === 'PENDING';
+              const needsCorrection = !isAdmin && a.activityEvidence?.reviewStatus === 'REJECTED';
+
+              return (
+                <tr key={a.id}>
+                  <td>{a.anNumber}</td>
+                  <td>{a.titulo}</td>
+                  <td>{a.client?.name || 'Interna'}</td>
+                  <td>{[a.branchName, a.branchCity, a.branchState].filter(Boolean).join(', ') || '-'}</td>
+                  <td>{a.ticketType || '-'}</td>
+                  <td><span className={`badge ${a.estatus === 'Aprobada' ? 'approved' : a.estatus === 'Pendiente' ? 'pending' : ''}`}>{a.estatus}</span></td>
+                  <td>{a.prioridad}</td>
+                  <td>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '4px 8px',
+                        borderRadius: 4,
+                        backgroundColor: colors.bg,
+                        color: colors.color,
+                        fontSize: 12,
+                        fontWeight: 500,
+                      }}>
+                        {getEvidenceStatus(a)}
+                      </span>
+                      {a.activityEvidence?.reviewNotes && (
+                        <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                          {a.activityEvidence.reviewNotes.substring(0, 50)}{a.activityEvidence.reviewNotes.length > 50 ? '...' : ''}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  
+                  {/* Columna de Acciones para Admin */}
+                  {isAdmin && (
+                    <td>
+                      {canReview ? (
+                        <button
+                          className="button-primary"
+                          onClick={() => setReviewModal({ activityId: a.id, activityNumber: a.anNumber })}
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: 13,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          📋 Revisar
+                        </button>
+                      ) : a.activityEvidence?.reviewStatus === 'APPROVED' ? (
+                        <span style={{ color: '#10b981', fontSize: 12, fontWeight: 600 }}>✅ Aprobada</span>
+                      ) : a.activityEvidence?.reviewStatus === 'REJECTED' ? (
+                        <span style={{ color: '#ef4444', fontSize: 12, fontWeight: 600 }}>❌ Rechazada</span>
+                      ) : (
+                        <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>-</span>
+                      )}
+                    </td>
+                  )}
+                  
+                  {/* Columna de Corrección para Usuario */}
+                  {!isAdmin && (
+                    <td>
+                      {needsCorrection ? (
+                        <a
+                          href="/my-evidences"
+                          className="button-primary"
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: 13,
+                            backgroundColor: '#ef4444',
+                            textDecoration: 'none',
+                            display: 'inline-block',
+                          }}
+                        >
+                          🔧 Corregir
+                        </a>
+                      ) : a.activityEvidence?.reviewStatus === 'APPROVED' ? (
+                        <span style={{ color: '#10b981', fontSize: 12, fontWeight: 600 }}>✅ Aprobada</span>
+                      ) : (
+                        <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>-</span>
+                      )}
+                    </td>
+                  )}
+                  
+                  <td>{formatDateTime(a.fechaInicio)}</td>
+                  <td>{formatDateTime(a.fechaEntregaEsperada)}</td>
+                  <td>{a.tiempoEstimadoMin || 0}/{a.tiempoMaximoMin || 0}</td>
+                  <td>{a.indicaciones || '-'}</td>
+                  <td>
+                    {getMapsUrl(a) ? (
+                      <a href={getMapsUrl(a)} target="_blank" rel="noreferrer">Como llegar</a>
+                    ) : (
+                      '-'
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Modal de Revisión */}
+      {reviewModal && (
+        <EvidenceReviewModal
+          activityId={reviewModal.activityId}
+          activityNumber={reviewModal.activityNumber}
+          onClose={() => setReviewModal(null)}
+          onSuccess={() => {
+            setReviewModal(null);
+            fetchActivities();
+          }}
+        />
+      )}
+    </>
   );
 };
 
