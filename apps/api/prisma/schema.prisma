@@ -402,6 +402,7 @@ model Activity {
   client               ServiceClient?     @relation(fields: [clientId], references: [id])
   serviceSheet         ServiceSheet?
   evidencias           Evidence[]
+  activityEvidence     ActivityEvidence?
   clientTicketRequest  ClientTicketRequest?
   clientFeedback       ClientActivityFeedback?
   expenses             Expense[]
@@ -568,6 +569,46 @@ model Evidence {
   actividad     Activity @relation(fields: [actividadId], references: [id], onDelete: Cascade)
   user          User?    @relation(fields: [userId], references: [id])
   aprobadoPor   User?    @relation("EvidenceApprover", fields: [aprobadoPorId], references: [id])
+}
+
+// Nuevo modelo para el flujo de evidencias de actividades (5 pasos)
+model ActivityEvidence {
+  id                        Int       @id @default(autoincrement())
+  activityId                Int       @unique
+  
+  // Paso 1: Foto de entrada
+  entryPhotoUrl             String?   @db.VarChar(500)
+  entryLatitude             Decimal?  @db.Decimal(10, 8)
+  entryLongitude            Decimal?  @db.Decimal(11, 8)
+  entryPhotoUploadedAt      DateTime?
+  
+  // Paso 2: Evidencias (4-8 fotos)
+  evidencePhotos            String[]  @default([])  // Array de URLs
+  evidencePhotosUploadedAt  DateTime?
+  
+  // Paso 3: Hoja de servicio (PDF)
+  serviceSheetPdfUrl        String?   @db.VarChar(500)
+  serviceSheetUploadedAt    DateTime?
+  
+  // Paso 4: Plantilla de hoja de servicio interna
+  serviceSheetData          Json?     // Datos del formulario de plantilla
+  serviceSheetCompletedAt   DateTime?
+  
+  // Paso 5: Foto de salida
+  exitPhotoUrl              String?   @db.VarChar(500)
+  exitLatitude              Decimal?  @db.Decimal(10, 8)
+  exitLongitude             Decimal?  @db.Decimal(11, 8)
+  exitPhotoUploadedAt       DateTime?
+  
+  // Generales
+  status                    String    @default("ENTRY_PHOTO") @db.VarChar(50)  // ENTRY_PHOTO, EVIDENCE_PHOTOS, SERVICE_SHEET_PDF, SERVICE_SHEET_DATA, EXIT_PHOTO, COMPLETED
+  completedAt               DateTime?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+  
+  activity                  Activity  @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  
+  @@map("activity_evidences")
 }
 
 model VehicleControl {
