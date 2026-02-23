@@ -42,6 +42,15 @@ const ActivitiesTable: React.FC = () => {
     fechaMaxima?: string;
     fechaEntregaEsperada?: string;
     responsable?: { nombre: string };
+    activityEvidence?: {
+      id: number;
+      status: string;
+      entryPhotoUrl?: string;
+      evidencePhotos: string[];
+      serviceSheetPdfUrl?: string;
+      exitPhotoUrl?: string;
+      completedAt?: string;
+    } | null;
     // Agrega más campos según tu modelo real
   }
   interface ClientTicketRequest {
@@ -835,6 +844,7 @@ const ActivitiesTable: React.FC = () => {
                 <th>Estatus</th>
                 <th>Responsable</th>
                 <th>Prioridad</th>
+                <th>Evidencias</th>
                 <th>Inicio</th>
                 <th>Entrega</th>
                 <th>Estimado/Max</th>
@@ -843,30 +853,58 @@ const ActivitiesTable: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {paginated.map((a: Activity) => (
-                <tr key={a.id}>
-                  <td>{a.anNumber}</td>
-                  <td>{a.titulo}</td>
-                  <td>{a.client?.name || 'Interna'}</td>
-                  <td>{a.branchName || '-'}</td>
-                  <td>{a.ticketType || '-'}</td>
-                  <td><span className={`badge ${a.estatus === 'Aprobada' ? 'approved' : a.estatus === 'Pendiente' ? 'pending' : ''}`}>{a.estatus}</span></td>
-                  <td>{a.responsable?.nombre}</td>
-                  <td>{a.prioridad}</td>
-                  <td>{formatDateTime(a.fechaInicio)}</td>
-                  <td>{formatDateTime(a.fechaEntregaEsperada)}</td>
-                  <td>{a.tiempoEstimadoMin || 0}/{a.tiempoMaximoMin || 0}</td>
-                  <td>{a.indicaciones || '-'}</td>
-                  {hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && (
+              {paginated.map((a: Activity) => {
+                const getEvidenceStatus = (activity: Activity) => {
+                  if (!activity.activityEvidence) return 'Sin iniciar';
+                  const status = activity.activityEvidence.status;
+                  const statusMap: Record<string, string> = {
+                    'ENTRY_PHOTO': '📸 Entrada',
+                    'EVIDENCE_PHOTOS': '📷 Evidencias',
+                    'SERVICE_SHEET_PDF': '📄 PDF',
+                    'SERVICE_SHEET_DATA': '📝 Plantilla',
+                    'EXIT_PHOTO': '🚪 Salida',
+                    'COMPLETED': '✅ Completado',
+                  };
+                  return statusMap[status] || status;
+                };
+                return (
+                  <tr key={a.id}>
+                    <td>{a.anNumber}</td>
+                    <td>{a.titulo}</td>
+                    <td>{a.client?.name || 'Interna'}</td>
+                    <td>{a.branchName || '-'}</td>
+                    <td>{a.ticketType || '-'}</td>
+                    <td><span className={`badge ${a.estatus === 'Aprobada' ? 'approved' : a.estatus === 'Pendiente' ? 'pending' : ''}`}>{a.estatus}</span></td>
+                    <td>{a.responsable?.nombre}</td>
+                    <td>{a.prioridad}</td>
                     <td>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <button className="button-secondary">Editar</button>
-                        <button className="button-primary">Borrar</button>
-                      </div>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '4px 8px',
+                        borderRadius: 4,
+                        backgroundColor: a.activityEvidence?.status === 'COMPLETED' ? '#efe' : '#fef',
+                        color: a.activityEvidence?.status === 'COMPLETED' ? '#060' : '#f90',
+                        fontSize: 12,
+                        fontWeight: 500,
+                      }}>
+                        {getEvidenceStatus(a)}
+                      </span>
                     </td>
-                  )}
-                </tr>
-              ))}
+                    <td>{formatDateTime(a.fechaInicio)}</td>
+                    <td>{formatDateTime(a.fechaEntregaEsperada)}</td>
+                    <td>{a.tiempoEstimadoMin || 0}/{a.tiempoMaximoMin || 0}</td>
+                    <td>{a.indicaciones || '-'}</td>
+                    {hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && (
+                      <td>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <button className="button-secondary">Editar</button>
+                          <button className="button-primary">Borrar</button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
