@@ -124,15 +124,37 @@ const AttendanceForm = () => {
       const context = canvasRef.current.getContext('2d');
       if (!context) return;
 
-      canvasRef.current.width = videoRef.current.videoWidth;
-      canvasRef.current.height = videoRef.current.videoHeight;
-      context.drawImage(videoRef.current, 0, 0);
+      // Obtener dimensiones del video y reducirlas para compresión
+      const videoWidth = videoRef.current.videoWidth;
+      const videoHeight = videoRef.current.videoHeight;
+      
+      // Reducir a máximo 640x480 manteniendo aspecto
+      const maxWidth = 640;
+      const maxHeight = 480;
+      let destWidth = videoWidth;
+      let destHeight = videoHeight;
+      
+      if (destWidth > maxWidth) {
+        destHeight = (destHeight * maxWidth) / destWidth;
+        destWidth = maxWidth;
+      }
+      if (destHeight > maxHeight) {
+        destWidth = (destWidth * maxHeight) / destHeight;
+        destHeight = maxHeight;
+      }
 
-      const photoBase64 = canvasRef.current.toDataURL('image/jpeg', 0.8);
-      console.log('📸 Foto capturada:', {
+      canvasRef.current.width = Math.floor(destWidth);
+      canvasRef.current.height = Math.floor(destHeight);
+      context.drawImage(videoRef.current, 0, 0, destWidth, destHeight);
+
+      // Usar calidad baja (0.4 = 40% de calidad) para reducir tamaño
+      const photoBase64 = canvasRef.current.toDataURL('image/jpeg', 0.4);
+      console.log('📸 Foto capturada y comprimida:', {
         type: cameraType,
-        size: photoBase64.length,
-        preview: photoBase64.substring(0, 50) + '...'
+        originalSize: videoWidth + 'x' + videoHeight,
+        compressedSize: destWidth + 'x' + destHeight,
+        base64Length: photoBase64.length,
+        dataSize: (photoBase64.length / 1024).toFixed(2) + ' KB',
       });
       closeCamera();
 
