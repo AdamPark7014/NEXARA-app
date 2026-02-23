@@ -37,27 +37,6 @@ const ensureUploadsDir = () => {
 export class ServiceClientsController {
   constructor(private readonly serviceClientsService: ServiceClientsService) {}
 
-  private getFileInterceptor() {
-    const uploadDir = this.getUploadDir();
-    return FileInterceptor('logo', {
-      storage: diskStorage({
-        destination: (req, file, cb) => {
-          cb(null, uploadDir);
-        },
-        filename: (req, file, cb) => {
-          const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${file.originalname}`;
-          cb(null, uniqueName);
-        },
-      }),
-      fileFilter: (req, file, cb) => {
-        if (!file.mimetype.startsWith('image/')) {
-          return cb(new BadRequestException('Solo se aceptan imágenes'), false);
-        }
-        cb(null, true);
-      },
-    });
-  }
-
   private normalizeBoolean(value: unknown) {
     if (typeof value === 'boolean') return value;
     if (typeof value === 'string') {
