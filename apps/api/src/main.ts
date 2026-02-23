@@ -76,13 +76,23 @@ async function bootstrap() {
   // Servir archivos estáticos desde uploads (en raíz del proyecto)
   const fs = require('fs');
   
+  // Helper para resolver la raíz del proyecto tomando como referencia el folder "apps"
+  const resolveProjectRoot = () => {
+    const segments = __dirname.split(path.sep);
+    const appsIndex = segments.lastIndexOf('apps');
+    if (appsIndex > 0) {
+      const root = segments.slice(0, appsIndex).join(path.sep) || path.sep;
+      return root;
+    }
+    return path.resolve(__dirname, '../../..');
+  };
+
   // Log __dirname para debugging
   console.error(`[DEBUG] __dirname: ${__dirname}`);
-  
-  // En desarrollo: /workspace/apps/api/dist
-  // En producción: /var/www/nexara-app/apps/api/dist
-  // Necesitamos subir a la raíz del proyecto (3 niveles arriba)
-  const uploadsPath = path.join(__dirname, '../../..', 'uploads');
+  const projectRoot = resolveProjectRoot();
+  console.error(`[DEBUG] Project root resolved: ${projectRoot}`);
+
+  const uploadsPath = path.join(projectRoot, 'uploads');
   const clientsPath = path.join(uploadsPath, 'clients');
   
   console.error(`[DEBUG] Calculated uploads path: ${uploadsPath}`);

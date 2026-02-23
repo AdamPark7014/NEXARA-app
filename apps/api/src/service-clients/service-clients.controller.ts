@@ -27,7 +27,13 @@ import { Request } from 'express';
 
 // Resuelve la ruta absoluta a /uploads/clients en la raíz del proyecto y asegura su existencia
 const ensureUploadsDir = () => {
-  const baseUploads = path.join(__dirname, '../../..', 'uploads');
+  const segments = __dirname.split(path.sep);
+  const appsIndex = segments.lastIndexOf('apps');
+  const projectRoot = appsIndex > 0
+    ? (segments.slice(0, appsIndex).join(path.sep) || path.sep)
+    : path.resolve(__dirname, '../../..');
+
+  const baseUploads = path.join(projectRoot, 'uploads');
   const dir = path.join(baseUploads, 'clients');
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
