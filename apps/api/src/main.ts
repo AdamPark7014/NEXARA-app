@@ -76,8 +76,8 @@ async function bootstrap() {
   // Prefijo global '/api' para todas las rutas
   app.setGlobalPrefix('api');
 
-  // Servir archivos estáticos desde apps/api/uploads
-  const uploadsPath = path.join(process.cwd(), 'apps', 'api', 'uploads');
+  // Servir archivos estáticos desde apps/api/uploads (cwd ya es apps/api)
+  const uploadsPath = path.join(process.cwd(), 'uploads');
   app.use('/uploads', express.static(uploadsPath));
   console.log(`📁 Serving static files from: ${uploadsPath}`);
 
