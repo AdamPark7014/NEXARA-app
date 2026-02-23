@@ -110,7 +110,8 @@ async function bootstrap() {
     console.error(`✅ Uploads directory is accessible (isDirectory: ${stats.isDirectory()})`);
     
   } catch (err) {
-    console.error(`❌ ERROR setting up uploads directory: ${err.message}`);
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.error(`❌ ERROR setting up uploads directory: ${errorMsg}`);
     console.error(err);
   }
   
