@@ -595,7 +595,7 @@ export default function ClientTicketsPage() {
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
             <a
-              href="./mis-sucursales"
+              href="mis-sucursales"
               className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
             >
               Mis sucursales
@@ -990,7 +990,7 @@ export default function ClientTicketsPage() {
                 <p style={{ margin: 0, fontSize: 12, color: "var(--text-secondary)" }}>
                   Para crear, editar o eliminar sucursales y configurar su logo, dirígete a la sección Mis sucursales en el menú.
                 </p>
-                <a href="/mis-sucursales" className="button-primary" style={{ display: "inline-block", textAlign: "center", textDecoration: "none", paddingTop: 10, paddingBottom: 10 }}>
+                <a href="mis-sucursales" className="button-primary" style={{ display: "inline-block", textAlign: "center", textDecoration: "none", paddingTop: 10, paddingBottom: 10 }}>
                   Ir a Mis Sucursales
                 </a>
               </div>
