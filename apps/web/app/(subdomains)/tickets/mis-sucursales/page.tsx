@@ -34,6 +34,13 @@ export default function MyBranchesPage() {
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
   const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, "");
 
+  const getAssetUrl = (url?: string | null) => {
+    if (!url) return "";
+    if (url.startsWith("http")) return url;
+    const base = getSocketBaseUrl();
+    return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
+  };
+
   useEffect(() => {
     const saved = typeof window !== "undefined" ? window.sessionStorage.getItem("clientSession") : null;
     if (saved) {
@@ -42,13 +49,17 @@ export default function MyBranchesPage() {
   }, []);
 
   const fetchProfile = async (token: string) => {
-    const res = await fetch(buildApiUrl("client-portal/profile"), {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await res.json().catch(() => null);
-    if (data) {
-      setProfile(data);
-      setBranches(Array.isArray(data.branches) ? data.branches : []);
+    try {
+      const res = await fetch(buildApiUrl("client-portal/profile"), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => null);
+      if (data) {
+        setProfile(data);
+        setBranches(Array.isArray(data.branches) ? data.branches : []);
+      }
+    } catch (err) {
+      console.error("Error fetching profile:", err);
     }
   };
 
@@ -79,11 +90,6 @@ export default function MyBranchesPage() {
     setError(null);
   };
 
-  const handleBranchLogin = (data: { access_token: string; branch: any }) => {
-    const slug = data.branch.branchNumber || `branch-${data.branch.id}`;
-    window.location.replace(`/${slug}`);
-  };
-
   const handleLogout = () => {
     window.sessionStorage.removeItem("clientSession");
     setSession(null);
@@ -94,26 +100,6 @@ export default function MyBranchesPage() {
   if (!session) {
     return (
       <div style={{ display: "grid", gap: 16 }}>
-        <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
-          <button
-            className="button-primary"
-            type="button"
-            onClick={() => {}}
-            style={{ opacity: 0.5, cursor: "default" }}
-            disabled
-          >
-            Cliente
-          </button>
-          <button
-            className="button-secondary"
-            type="button"
-            onClick={() => {}}
-            style={{ opacity: 0.5, cursor: "default" }}
-            disabled
-          >
-            Sucursal
-          </button>
-        </div>
         <PanelLogin
           mode="client"
           redirectTo="/mis-sucursales"
@@ -126,92 +112,148 @@ export default function MyBranchesPage() {
   }
 
   return (
-    <div className={consoleStyles.consolePage}>
-      <div className={consoleStyles.consoleHeader}>
-        <div className={consoleStyles.headerContent}>
-          <div>
-            <div className={consoleStyles.brandMain} title="Portal del cliente">
-              Mis sucursales
-            </div>
-            <span className={consoleStyles.brandSub}>Gestión de sucursales</span>
-          </div>
+    <div className={consoleStyles.consoleLayout}>
+      {/* Sidebar */}
+      <aside className={consoleStyles.sidebar}>
+        <div className={consoleStyles.sidebarLogo}>
+          <span className={consoleStyles.brandMark}>NEXARA</span>
+          <span className={consoleStyles.brandSub}>Portal</span>
+        </div>
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              marginLeft: "auto",
-            }}
-          >
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontWeight: 600, fontSize: 13 }}>
-                {session.client.name}
-              </div>
-              <button
-                onClick={handleLogout}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "var(--text-secondary)",
-                  cursor: "pointer",
-                  fontSize: 12,
-                  padding: 0,
-                  textDecoration: "underline",
-                }}
-              >
-                Cerrar sesión
-              </button>
-            </div>
-            {session.client.logoUrl && (
+        <div className={consoleStyles.sidebarUser}>
+          <div className={consoleStyles.sidebarAvatar}>
+            {session.client.logoUrl ? (
               <img
-                src={(process.env.NEXT_PUBLIC_API_URL?.replace(/[\/.]+api\/?$/, "") || "") + session.client.logoUrl}
-                alt="Logo"
-                style={{
-                  height: 40,
-                  width: 40,
-                  borderRadius: 8,
-                  objectFit: "cover",
-                }}
+                className={consoleStyles.avatarImage}
+                src={getAssetUrl(session.client.logoUrl)}
+                alt={session.client.name}
+                width={64}
+                height={64}
               />
+            ) : (
+              <span className={consoleStyles.sidebarName}>{session.client.name.slice(0, 2).toUpperCase()}</span>
             )}
           </div>
-        </div>
-      </div>
-
-      <div
-        style={{
-          padding: "24px",
-          maxWidth: "1200px",
-          margin: "0 auto",
-          width: "100%",
-        }}
-      >
-        {error && (
-          <div
-            style={{
-              padding: 12,
-              background: "rgba(255, 76, 76, 0.1)",
-              border: "1px solid rgba(255, 76, 76, 0.3)",
-              borderRadius: 8,
-              color: "var(--error)",
-              fontSize: 13,
-              marginBottom: 24,
-            }}
-          >
-            {error}
+          <div className={consoleStyles.sidebarName}>{session.client.name}</div>
+          <div className={consoleStyles.sidebarEmail}>Gestión de sucursales</div>
+          <div className={consoleStyles.sidebarMeta}>
+            <span className={consoleStyles.rolePill}>Cliente</span>
           </div>
-        )}
+        </div>
 
-        <BranchesForm
-          token={session.token}
-          branches={branches}
-          onBranchSaved={() => fetchProfile(session.token)}
-          clientLogoUrl={profile?.logoUrl}
-          companyLogoUrl={session.client.logoUrl}
-          apiUrl={API_URL}
-        />
-      </div>
+        <div className={consoleStyles.menuTitle}>Menu cliente</div>
+        <ul className={consoleStyles.sidebarMenu}>
+          <li className={consoleStyles.sidebarMenuItem}>
+            <a href="/tickets" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
+              Tickets
+            </a>
+          </li>
+          <li className={consoleStyles.sidebarMenuItem}>
+            <a href="/tickets" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
+              Levantar ticket
+            </a>
+          </li>
+          <li className={consoleStyles.sidebarMenuItem}>
+            <a href="/tickets" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
+              Perfil
+            </a>
+          </li>
+          <li className={consoleStyles.sidebarMenuItem}>
+            <a href="/mis-sucursales" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${consoleStyles.active}`}>
+              Mis sucursales
+            </a>
+          </li>
+          <li className={consoleStyles.sidebarMenuItem}>
+            <button type="button" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`} onClick={handleLogout}>
+              Cerrar sesion
+            </button>
+          </li>
+        </ul>
+      </aside>
+
+      {/* Main Content */}
+      <main className={consoleStyles.consoleMain}>
+        <div style={{ display: "grid", gap: 24 }}>
+          {/* Header Card */}
+          <div className="card" style={{ display: "grid", gap: 12, background: "linear-gradient(140deg, rgba(31,137,252,0.12), rgba(20,162,133,0.08))" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+              <div>
+                <h1 style={{ margin: "0 0 4px 0", fontSize: 28, fontWeight: 700, color: "var(--primary)" }}>Mis sucursales</h1>
+                <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
+                  Administra todas las sucursales de tu empresa en un solo lugar
+                </p>
+              </div>
+              {profile && (
+                <div
+                  style={{
+                    display: "grid",
+                    gap: 8,
+                    padding: 16,
+                    background: "var(--surface)",
+                    borderRadius: 12,
+                    border: "1px solid var(--border)",
+                    minWidth: 200,
+                  }}
+                >
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>Empresa</div>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{profile.name}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                    Contacto: {profile.contactName || "-"}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Error Alert */}
+          {error && (
+            <div
+              style={{
+                padding: 12,
+                background: "rgba(255, 76, 76, 0.1)",
+                border: "1px solid rgba(255, 76, 76, 0.3)",
+                borderRadius: 8,
+                color: "var(--error)",
+                fontSize: 13,
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          {/* BranchesForm Component */}
+          <BranchesForm
+            token={session.token}
+            branches={branches}
+            onBranchSaved={() => fetchProfile(session.token)}
+            clientLogoUrl={profile?.logoUrl}
+            companyLogoUrl={session.client.logoUrl}
+            apiUrl={API_URL}
+          />
+
+          {/* Stats Card */}
+          {branches.length > 0 && (
+            <div className="card" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16 }}>
+              <div style={{ padding: 12, background: "var(--surface)", borderRadius: 8, border: "1px solid rgba(76, 175, 80, 0.2)" }}>
+                <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Sucursales activas</div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: "#4caf50" }}>
+                  {branches.filter((b) => b.isActive !== false).length}
+                </div>
+              </div>
+              <div style={{ padding: 12, background: "var(--surface)", borderRadius: 8, border: "1px solid rgba(255, 76, 76, 0.2)" }}>
+                <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Sucursales inactivas</div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: "#ff4c4c" }}>
+                  {branches.filter((b) => b.isActive === false).length}
+                </div>
+              </div>
+              <div style={{ padding: 12, background: "var(--surface)", borderRadius: 8, border: "1px solid rgba(31,137,252, 0.2)" }}>
+                <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Total de sucursales</div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: "var(--primary)" }}>{branches.length}</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
