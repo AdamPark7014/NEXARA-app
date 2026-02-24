@@ -366,6 +366,10 @@ export default function Dashboard() {
     }, {} as Record<string, number>),
   ).map(([estatus, cantidad]) => ({ estatus, cantidad }));
 
+  const hasAttendanceData = attendanceChart.some((item) => item.horas > 0);
+  const hasActivityData = activityStatusData.length > 0;
+  const hasViaticData = viaticStatusData.length > 0;
+
   const ChartTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ name?: string; value?: number }>; label?: string }) => {
     if (!active || !payload || payload.length === 0) return null;
     return (
@@ -492,22 +496,26 @@ export default function Dashboard() {
             <span className="analysisPill">Semana actual</span>
           </div>
           <div className="chartWrap">
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={attendanceChart} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="hoursFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--primary)" />
-                    <stop offset="100%" stopColor="var(--secondary)" />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="rgba(23, 137, 252, 0.18)" vertical={false} />
-                <XAxis dataKey="date" stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
-                <YAxis allowDecimals={false} stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
-                <Tooltip content={<ChartTooltip />} />
-                <Legend wrapperStyle={{ fontSize: '12px' }} />
-                <Bar dataKey="horas" name="Horas" fill="url(#hoursFill)" radius={[8, 8, 0, 0]} barSize={28} />
-              </BarChart>
-            </ResponsiveContainer>
+            {hasAttendanceData ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={attendanceChart} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="hoursFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--primary)" />
+                      <stop offset="100%" stopColor="var(--secondary)" />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="rgba(23, 137, 252, 0.18)" vertical={false} />
+                  <XAxis dataKey="date" stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: '12px' }} />
+                  <Bar dataKey="horas" name="Horas" fill="url(#hoursFill)" radius={[8, 8, 0, 0]} barSize={28} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="chartEmpty">Sin datos en la semana actual.</div>
+            )}
           </div>
         </div>
 
@@ -520,21 +528,25 @@ export default function Dashboard() {
             <span className="analysisPill">{activityTotals.total} total</span>
           </div>
           <div className="chartWrap">
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={activityStatusData} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="activityFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--primary)" />
-                    <stop offset="100%" stopColor="var(--primary-light)" />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="rgba(23, 137, 252, 0.18)" vertical={false} />
-                <XAxis dataKey="estatus" stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
-                <YAxis allowDecimals={false} stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
-                <Tooltip content={<ChartTooltip />} />
-                <Bar dataKey="cantidad" name="Actividades" fill="url(#activityFill)" radius={[8, 8, 0, 0]} barSize={26} />
-              </BarChart>
-            </ResponsiveContainer>
+            {hasActivityData ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={activityStatusData} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="activityFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--primary)" />
+                      <stop offset="100%" stopColor="var(--primary-light)" />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="rgba(23, 137, 252, 0.18)" vertical={false} />
+                  <XAxis dataKey="estatus" stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Bar dataKey="cantidad" name="Actividades" fill="url(#activityFill)" radius={[8, 8, 0, 0]} barSize={26} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="chartEmpty">Sin datos en la semana actual.</div>
+            )}
           </div>
         </div>
 
@@ -547,21 +559,25 @@ export default function Dashboard() {
             <span className="analysisPill">{viaticTotals.total} registros</span>
           </div>
           <div className="chartWrap">
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={viaticStatusData} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="viaticFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--secondary)" />
-                    <stop offset="100%" stopColor="var(--accent)" />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="rgba(23, 137, 252, 0.18)" vertical={false} />
-                <XAxis dataKey="estatus" stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
-                <YAxis allowDecimals={false} stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
-                <Tooltip content={<ChartTooltip />} />
-                <Bar dataKey="cantidad" name="Viaticos" fill="url(#viaticFill)" radius={[8, 8, 0, 0]} barSize={26} />
-              </BarChart>
-            </ResponsiveContainer>
+            {hasViaticData ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={viaticStatusData} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="viaticFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--secondary)" />
+                      <stop offset="100%" stopColor="var(--accent)" />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="rgba(23, 137, 252, 0.18)" vertical={false} />
+                  <XAxis dataKey="estatus" stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Bar dataKey="cantidad" name="Viaticos" fill="url(#viaticFill)" radius={[8, 8, 0, 0]} barSize={26} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="chartEmpty">Sin datos en la semana actual.</div>
+            )}
           </div>
         </div>
         {weeklyUserHours.length > 0 && (
@@ -943,6 +959,23 @@ export default function Dashboard() {
           border-radius: 16px;
           border: 1px solid rgba(23, 137, 252, 0.2);
           background: rgba(35, 39, 47, 0.6);
+        }
+
+        .chartEmpty {
+          height: 100%;
+          display: grid;
+          place-items: center;
+          text-align: center;
+          color: var(--text-tertiary);
+          font-size: 12px;
+          border-radius: 12px;
+          background: rgba(15, 106, 214, 0.06);
+          border: 1px dashed rgba(15, 106, 214, 0.2);
+        }
+
+        :global(body.dark) .chartEmpty {
+          background: rgba(23, 137, 252, 0.08);
+          border-color: rgba(23, 137, 252, 0.24);
         }
 
         :global(body.light) .chartWrap {
