@@ -104,17 +104,7 @@ export default function ClientTicketsPage() {
   const [error, setError] = useState<string | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(false);
-  
-  // Get tab from URL params: "tickets", "new-ticket" -> "nuevo", "profile" -> "perfil"
-  const getInitialTab = () => {
-    const tabParam = searchParams.get("tab");
-    if (tabParam === "tickets") return "tickets";
-    if (tabParam === "new-ticket") return "nuevo";
-    if (tabParam === "profile") return "perfil";
-    return "tickets";
-  };
-  
-  const [activeTab, setActiveTab] = useState<"tickets" | "nuevo" | "perfil">(getInitialTab());
+  const [activeTab, setActiveTab] = useState<"tickets" | "nuevo" | "perfil">("tickets");
   const [reportRange, setReportRange] = useState<"today" | "7d" | "30d" | "custom">("7d");
   const [reportStart, setReportStart] = useState("");
   const [reportEnd, setReportEnd] = useState("");
@@ -171,7 +161,17 @@ export default function ClientTicketsPage() {
   // Marcar como mounted después del primer render en el cliente
   useEffect(() => {
     setMounted(true);
-  }, []);
+    
+    // Read tab from URL params after mounting
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "tickets") {
+      setActiveTab("tickets");
+    } else if (tabParam === "new-ticket") {
+      setActiveTab("nuevo");
+    } else if (tabParam === "profile") {
+      setActiveTab("perfil");
+    }
+  }, [searchParams]);
 
   const fetchTickets = async (token: string) => {
     setLoading(true);
