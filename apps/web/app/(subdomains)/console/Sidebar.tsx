@@ -52,7 +52,6 @@ export default function Sidebar() {
       <div className={styles.menuTitle}>Menu principal</div>
       <ul className={styles.sidebarMenu}>
         {menu.filter(item => {
-          if (item.hideForAdmins && user.isSuperAdmin) return false;
           if (item.permissions && !item.permissions.every((permission) => hasPermission(user, permission))) {
             return false;
           }
