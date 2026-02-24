@@ -109,7 +109,6 @@ export default function ClientTicketsPage() {
     wasSolved: string;
     comments: string;
   }>>({});
-  const [editingBranchId, setEditingBranchId] = useState<number | null>(null);
   const [profileDraft, setProfileDraft] = useState({
     contactName: "",
     contactEmail: "",
@@ -118,19 +117,6 @@ export default function ClientTicketsPage() {
     city: "",
     state: "",
     country: "",
-  });
-  const [branchDraft, setBranchDraft] = useState({
-    name: "",
-    branchNumber: "",
-    address: "",
-    city: "",
-    state: "",
-    country: "",
-    placeId: "",
-    latitud: null as number | null,
-    longitud: null as number | null,
-    portalEmail: "",
-    portalPassword: "",
   });
   const [requestDraft, setRequestDraft] = useState({
     branchId: "",
@@ -352,89 +338,7 @@ export default function ClientTicketsPage() {
     await fetchProfile(session.token);
   };
 
-  const resetBranchDraft = () => {
-    setBranchDraft({
-      name: "",
-      branchNumber: "",
-      address: "",
-      city: "",
-      state: "",
-      country: "",
-      placeId: "",
-      latitud: null,
-      longitud: null,
-      portalEmail: "",
-      portalPassword: "",
-    });
-    setEditingBranchId(null);
-  };
 
-  const handleBranchSave = async () => {
-    if (!session?.token) return;
-    if (!branchDraft.name.trim()) {
-      setError("El nombre de la sucursal es obligatorio");
-      return;
-    }
-    if (!branchDraft.branchNumber.trim()) {
-      setError("El numero de sucursal es obligatorio");
-      return;
-    }
-    if (!branchDraft.portalEmail.trim()) {
-      setError("El usuario de acceso es obligatorio");
-      return;
-    }
-    if (!editingBranchId && !branchDraft.portalPassword.trim()) {
-      setError("El password de acceso es obligatorio");
-      return;
-    }
-    const payload = {
-      ...branchDraft,
-      latitud: branchDraft.latitud,
-      longitud: branchDraft.longitud,
-    };
-    const endpoint = editingBranchId ? `client-portal/branches/${editingBranchId}` : "client-portal/branches";
-    const res = await fetch(buildApiUrl(endpoint), {
-      method: editingBranchId ? "PUT" : "POST",
-      headers: { Authorization: `Bearer ${session.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      setError("No se pudo guardar la sucursal");
-      return;
-    }
-    await fetchProfile(session.token);
-    resetBranchDraft();
-  };
-
-  const handleBranchEdit = (branch: Branch) => {
-    setEditingBranchId(branch.id);
-    setBranchDraft({
-      name: branch.name || "",
-      branchNumber: branch.branchNumber || "",
-      address: branch.address || "",
-      city: branch.city || "",
-      state: branch.state || "",
-      country: branch.country || "",
-      placeId: branch.placeId || "",
-      latitud: branch.latitud ?? null,
-      longitud: branch.longitud ?? null,
-      portalEmail: branch.portalEmail || "",
-      portalPassword: "",
-    });
-  };
-
-  const handleBranchDelete = async (id: number) => {
-    if (!session?.token) return;
-    const res = await fetch(buildApiUrl(`client-portal/branches/${id}`), {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${session.token}` },
-    });
-    if (!res.ok) {
-      setError("No se pudo eliminar la sucursal");
-      return;
-    }
-    await fetchProfile(session.token);
-  };
 
   const handleRequestSubmit = async () => {
     if (!session?.token) return;
@@ -688,6 +592,14 @@ export default function ClientTicketsPage() {
             >
               Perfil
             </button>
+          </li>
+          <li className={consoleStyles.sidebarMenuItem}>
+            <a
+              href="/mis-sucursales"
+              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
+            >
+              Mis sucursales
+            </a>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
             <button
@@ -1074,66 +986,13 @@ export default function ClientTicketsPage() {
                 </div>
               </div>
               <div className="card" style={{ display: "grid", gap: 12 }}>
-                <div style={{ fontWeight: 700 }}>Perfil de sucursal</div>
-                <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                  Crea usuarios internos para cada sucursal. Usaran estas credenciales en tickets.nexara.com.mx.
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
-                  <input className="input" placeholder="Nombre" value={branchDraft.name} onChange={(e) => setBranchDraft((prev) => ({ ...prev, name: e.target.value }))} />
-                  <input className="input" placeholder="Numero" value={branchDraft.branchNumber} onChange={(e) => setBranchDraft((prev) => ({ ...prev, branchNumber: e.target.value }))} />
-                  <input className="input" placeholder="Ciudad" value={branchDraft.city} onChange={(e) => setBranchDraft((prev) => ({ ...prev, city: e.target.value }))} />
-                  <input className="input" placeholder="Estado" value={branchDraft.state} onChange={(e) => setBranchDraft((prev) => ({ ...prev, state: e.target.value }))} />
-                  <input className="input" placeholder="Pais" value={branchDraft.country} onChange={(e) => setBranchDraft((prev) => ({ ...prev, country: e.target.value }))} />
-                  <input className="input" placeholder="Direccion" value={branchDraft.address} onChange={(e) => setBranchDraft((prev) => ({ ...prev, address: e.target.value }))} />
-                  <input className="input" placeholder="Usuario acceso sucursal" value={branchDraft.portalEmail} onChange={(e) => setBranchDraft((prev) => ({ ...prev, portalEmail: e.target.value }))} />
-                  <input className="input" type="password" placeholder={editingBranchId ? "Nuevo password (opcional)" : "Password sucursal"} value={branchDraft.portalPassword} onChange={(e) => setBranchDraft((prev) => ({ ...prev, portalPassword: e.target.value }))} />
-                </div>
-                <ClientLocationPicker
-                  label="Ubicacion de la sucursal"
-                  value={{
-                    address: branchDraft.address,
-                    placeId: branchDraft.placeId,
-                    latitud: branchDraft.latitud,
-                    longitud: branchDraft.longitud,
-                  }}
-                  onChange={(value: ClientLocationValue) =>
-                    setBranchDraft((prev) => ({
-                      ...prev,
-                      address: value.address || prev.address,
-                      placeId: value.placeId || prev.placeId,
-                      latitud: value.latitud ?? prev.latitud,
-                      longitud: value.longitud ?? prev.longitud,
-                    }))
-                  }
-                />
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <button className="button-primary" type="button" onClick={handleBranchSave}>
-                    {editingBranchId ? "Actualizar sucursal" : "Guardar sucursal"}
-                  </button>
-                  {editingBranchId && (
-                    <button className="button-secondary" type="button" onClick={resetBranchDraft}>Cancelar</button>
-                  )}
-                </div>
-                <div style={{ display: "grid", gap: 10 }}>
-                  {branches.map((branch) => (
-                    <div key={branch.id} style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", border: "1px solid rgba(15, 106, 214, 0.12)", borderRadius: 12, padding: 12 }}>
-                      <div>
-                        <div style={{ fontWeight: 600 }}>{branch.name}</div>
-                        <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{[branch.address, branch.city, branch.state].filter(Boolean).join(", ")}</div>
-                        {branch.portalEmail && (
-                          <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>Usuario: {branch.portalEmail}</div>
-                        )}
-                        <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                          Ruta sucursal: /{branch.branchNumber || `branch-${branch.id}`}
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button className="button-secondary" type="button" onClick={() => handleBranchEdit(branch)}>Editar</button>
-                        <button className="button-secondary" type="button" onClick={() => handleBranchDelete(branch.id)}>Eliminar</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <div style={{ fontWeight: 700 }}>Gestión de sucursales</div>
+                <p style={{ margin: 0, fontSize: 12, color: "var(--text-secondary)" }}>
+                  Para crear, editar o eliminar sucursales y configurar su logo, dirígete a la sección Mis sucursales en el menú.
+                </p>
+                <a href="/mis-sucursales" className="button-primary" style={{ display: "inline-block", textAlign: "center", textDecoration: "none", paddingTop: 10, paddingBottom: 10 }}>
+                  Ir a Mis Sucursales
+                </a>
               </div>
             </div>
           )}

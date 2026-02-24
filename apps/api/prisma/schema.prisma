@@ -476,6 +476,7 @@ model ServiceClientBranch {
   longitud     Decimal?  @db.Decimal(11, 8)
   portalEmail  String?   @unique @db.VarChar(200)
   portalPasswordHash String?
+  logoUrl      String?   @db.VarChar(500)
   isActive     Boolean   @default(true)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt

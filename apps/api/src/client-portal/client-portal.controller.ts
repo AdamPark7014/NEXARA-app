@@ -87,6 +87,8 @@ export class ClientPortalController {
         longitud: Number.isFinite(longitud) ? longitud : undefined,
         portalEmail: portalEmail || null,
         portalPasswordHash,
+        logoUrl: body.logoUrl?.trim() || null,
+        isActive: body.isActive !== false,
       },
     });
   }
@@ -141,6 +143,8 @@ export class ClientPortalController {
       latitud: Number.isFinite(latitud) ? latitud : undefined,
       longitud: Number.isFinite(longitud) ? longitud : undefined,
       portalEmail,
+      logoUrl: body.logoUrl !== undefined ? (body.logoUrl?.trim() || null) : undefined,
+      isActive: body.isActive !== undefined ? body.isActive : undefined,
     };
     if (portalPasswordHash) data.portalPasswordHash = portalPasswordHash;
     return this.prisma['serviceClientBranch'].update({
