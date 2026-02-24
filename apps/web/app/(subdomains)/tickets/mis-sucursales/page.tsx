@@ -24,7 +24,14 @@ type ClientProfile = {
 };
 
 export default function MyBranchesPage() {
-  const [session, setSession] = useState<ClientSession | null>(null);
+  // Inicializar sesión desde sessionStorage directamente
+  const [session, setSession] = useState<ClientSession | null>(() => {
+    if (typeof window !== "undefined") {
+      const saved = window.sessionStorage.getItem("clientSession");
+      return saved ? JSON.parse(saved) : null;
+    }
+    return null;
+  });
   const [error, setError] = useState<string | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [profile, setProfile] = useState<ClientProfile | null>(null);
@@ -40,13 +47,6 @@ export default function MyBranchesPage() {
     const base = getSocketBaseUrl();
     return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
   };
-
-  useEffect(() => {
-    const saved = typeof window !== "undefined" ? window.sessionStorage.getItem("clientSession") : null;
-    if (saved) {
-      setSession(JSON.parse(saved));
-    }
-  }, []);
 
   const fetchProfile = async (token: string) => {
     try {
