@@ -343,18 +343,28 @@ export default function Dashboard() {
     }, {} as Record<string, number>),
   };
 
+  // Para gráficas: mostrar datos de TODOS los usuarios, no solo el seleccionado
+  const allViatics = viatics.filter((item) => isWithinWeek(item.createdAt));
+  const allActivities = activities.filter((item) => {
+    const dateRef = item.fechaAsignacion || item.fechaInicio || item.fechaFinalizacion || null;
+    return isWithinWeek(dateRef);
+  });
+
   const viaticStatusData = Object.entries(
-    filteredViatics.reduce((acc, item) => {
+    allViatics.reduce((acc, item) => {
       const key = item.estatusPago || 'Sin estatus';
       acc[key] = (acc[key] || 0) + 1;
       return acc;
     }, {} as Record<string, number>),
   ).map(([estatus, cantidad]) => ({ estatus, cantidad }));
 
-  const activityStatusData = Object.entries(activityTotals.statusCounts).map(([estatus, cantidad]) => ({
-    estatus,
-    cantidad,
-  }));
+  const activityStatusData = Object.entries(
+    allActivities.reduce((acc, item) => {
+      const key = item.estatus || 'Sin estatus';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>),
+  ).map(([estatus, cantidad]) => ({ estatus, cantidad }));
 
   const ChartTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ name?: string; value?: number }>; label?: string }) => {
     if (!active || !payload || payload.length === 0) return null;
