@@ -155,22 +155,37 @@ export default function Dashboard() {
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isConsoleAdmin = hasPermission(user, PERMISSIONS.CONSOLE_ADMIN);
+  const normalizedUserId = user?.id ? Number(user.id) : null;
 
   const weekRange = useMemo(() => getWeekRange(new Date()), []);
 
-  useEffect(() => {
-    if (user?.id && selectedUserId === null) {
-      setSelectedUserId(Number(user.id));
-    }
-  }, [user?.id, selectedUserId]);
+  const availableUsers = useMemo(() => {
+    const list = attendance?.users || [];
+    if (!isConsoleAdmin) return list;
+    if (!normalizedUserId || !user?.nombre) return list;
+    const exists = list.some((item) => item.userId === normalizedUserId);
+    if (exists) return list;
+    return [...list, { userId: normalizedUserId, userName: user.nombre }];
+  }, [attendance?.users, isConsoleAdmin, normalizedUserId, user?.nombre]);
 
   useEffect(() => {
-    if (!attendance?.users?.length) return;
-    const exists = attendance.users.some((item) => item.userId === selectedUserId);
-    if (!exists) {
-      setSelectedUserId(attendance.users[0].userId);
+    if (normalizedUserId && selectedUserId === null) {
+      setSelectedUserId(normalizedUserId);
     }
-  }, [attendance?.users, selectedUserId]);
+  }, [normalizedUserId, selectedUserId]);
+
+  useEffect(() => {
+    if (!isConsoleAdmin || !availableUsers.length) return;
+    const exists = availableUsers.some((item) => item.userId === selectedUserId);
+    if (!exists) {
+      if (normalizedUserId && availableUsers.some((item) => item.userId === normalizedUserId)) {
+        setSelectedUserId(normalizedUserId);
+      } else {
+        setSelectedUserId(availableUsers[0].userId);
+      }
+    }
+  }, [availableUsers, isConsoleAdmin, normalizedUserId, selectedUserId]);
 
   useEffect(() => {
     if (!user?.token) return;
@@ -260,7 +275,6 @@ export default function Dashboard() {
     return date >= weekRange.start && date <= weekRange.end;
   };
 
-  const availableUsers = attendance?.users || [];
   const userName = availableUsers.find((item) => item.userId === activeUserId)?.userName || user.nombre;
 
   const filteredViatics = viatics.filter((item) => {
@@ -417,7 +431,7 @@ export default function Dashboard() {
           <span className="chip">Semana: {formatDate(weekRange.from)} - {formatDate(weekRange.to)}</span>
           <span className="chip chipLive">Usuario: {userName}</span>
         </div>
-        {hasPermission(user, PERMISSIONS.ATTENDANCE_MANAGE) && availableUsers.length > 0 && (
+        {isConsoleAdmin && availableUsers.length > 0 && (
           <div className="filtersRow">
             <label className="filterControl">
               <span className="filterLabel">Usuario</span>
