@@ -16,7 +16,6 @@ export type UserRole = {
   nombre: string;
   accesoConsole?: boolean;
   accesoConsoleAdmin?: boolean;
-  accesoGestionTienda?: boolean;
   accesoGestionWeb?: boolean;
   accesoPanelVentas?: boolean;
   accesoContabilidad?: boolean;
@@ -57,7 +56,6 @@ export default function UserForm({
     roleNombre: initialUser?.role?.nombre || "",
     accesoConsole: initialUser?.role?.accesoConsole || false,
     accesoConsoleAdmin: initialUser?.role?.accesoConsoleAdmin || false,
-    accesoGestionTienda: initialUser?.role?.accesoGestionTienda || false,
     accesoGestionWeb: initialUser?.role?.accesoGestionWeb || false,
     accesoPanelVentas: initialUser?.role?.accesoPanelVentas || false,
     accesoContabilidad: initialUser?.role?.accesoContabilidad || false,
@@ -160,7 +158,6 @@ export default function UserForm({
         accesoAsistencia: enableConsoleModules,
         accesoGps: enableConsoleModules,
         accesoGestionUsuarios: isConsoleAdmin,
-        accesoGestionTienda: form.accesoGestionTienda,
         accesoGestionWeb: form.accesoGestionWeb,
         accesoPanelVentas: form.accesoPanelVentas,
         accesoContabilidad: form.accesoContabilidad,
@@ -273,7 +270,6 @@ export default function UserForm({
           roleNombre: "",
           accesoConsole: false,
           accesoConsoleAdmin: false,
-          accesoGestionTienda: false,
           accesoGestionWeb: false,
           accesoPanelVentas: false,
           accesoContabilidad: false,
@@ -352,11 +348,10 @@ export default function UserForm({
         <label className="label">Accesos permitidos</label>
         <div className="checkboxGrid">
           <label className="checkboxItem"><input type="checkbox" name="accesoConsole" checked={form.accesoConsole} onChange={handleChange} /> Consola usuario</label>
-          <label className="checkboxItem"><input type="checkbox" name="accesoConsoleAdmin" checked={form.accesoConsoleAdmin} onChange={handleChange} /> Consola admin</label>
+          {user?.isSuperAdmin && <label className="checkboxItem"><input type="checkbox" name="accesoConsoleAdmin" checked={form.accesoConsoleAdmin} onChange={handleChange} /> Consola admin</label>}
           <label className="checkboxItem"><input type="checkbox" name="accesoGestionWeb" checked={form.accesoGestionWeb} onChange={handleChange} /> Panel Web</label>
-          <label className="checkboxItem"><input type="checkbox" name="accesoGestionTienda" checked={form.accesoGestionTienda} onChange={handleChange} /> Panel Tienda</label>
           <label className="checkboxItem"><input type="checkbox" name="accesoPanelVentas" checked={form.accesoPanelVentas} onChange={handleChange} /> Panel Ventas</label>
-          <label className="checkboxItem"><input type="checkbox" name="accesoContabilidad" checked={form.accesoContabilidad} onChange={handleChange} /> Panel Contabilidad</label>
+          {user?.isSuperAdmin && <label className="checkboxItem"><input type="checkbox" name="accesoContabilidad" checked={form.accesoContabilidad} onChange={handleChange} /> Panel Contabilidad</label>}
           <label className="checkboxItem"><input type="checkbox" name="accesoCotizaciones" checked={form.accesoCotizaciones} onChange={handleChange} /> Panel Cotizaciones</label>
         </div>
       </div>
