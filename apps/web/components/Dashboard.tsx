@@ -451,7 +451,7 @@ export default function Dashboard() {
               <span className="filterLabel">Usuario</span>
               <select
                 className="input"
-                value={activeUserId}
+                value={activeUserId ?? ""}
                 onChange={(event) => setSelectedUserId(Number(event.target.value))}
               >
                 {availableUsers.map((item) => (
