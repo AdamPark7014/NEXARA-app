@@ -155,17 +155,17 @@ export default function MyBranchesPage() {
         <div className={consoleStyles.menuTitle}>Menu cliente</div>
         <ul className={consoleStyles.sidebarMenu}>
           <li className={consoleStyles.sidebarMenuItem}>
-            <a href=".." className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
+            <a href="..?tab=tickets" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
               Tickets
             </a>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
-            <a href=".." className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
+            <a href="..?tab=new-ticket" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
               Levantar ticket
             </a>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
-            <a href=".." className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
+            <a href="..?tab=profile" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
               Perfil
             </a>
           </li>
