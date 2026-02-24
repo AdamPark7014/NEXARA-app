@@ -1,5 +1,6 @@
 ﻿"use client";
 import React, { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { io, Socket } from "socket.io-client";
 import PanelLogin from "@/components/PanelLogin";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
@@ -97,12 +98,23 @@ export default function ClientTicketsPage() {
     }
     return null;
   });
+  const searchParams = useSearchParams();
   const [mounted, setMounted] = useState(false);
   const [loginMode, setLoginMode] = useState<"client" | "branch">("client");
   const [error, setError] = useState<string | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"tickets" | "nuevo" | "perfil">("tickets");
+  
+  // Get tab from URL params: "tickets", "new-ticket" -> "nuevo", "profile" -> "perfil"
+  const getInitialTab = () => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "tickets") return "tickets";
+    if (tabParam === "new-ticket") return "nuevo";
+    if (tabParam === "profile") return "perfil";
+    return "tickets";
+  };
+  
+  const [activeTab, setActiveTab] = useState<"tickets" | "nuevo" | "perfil">(getInitialTab());
   const [reportRange, setReportRange] = useState<"today" | "7d" | "30d" | "custom">("7d");
   const [reportStart, setReportStart] = useState("");
   const [reportEnd, setReportEnd] = useState("");
