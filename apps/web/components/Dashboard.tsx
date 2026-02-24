@@ -156,36 +156,48 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const isConsoleAdmin = hasPermission(user, PERMISSIONS.CONSOLE_ADMIN);
+  const isSuperAdmin = Boolean(user?.isSuperAdmin);
   const normalizedUserId = user?.id ? Number(user.id) : null;
 
   const weekRange = useMemo(() => getWeekRange(new Date()), []);
 
   const availableUsers = useMemo(() => {
     const list = attendance?.users || [];
+    if (isSuperAdmin) {
+      return list.filter((item) => item.userId !== normalizedUserId);
+    }
     if (!isConsoleAdmin) return list;
     if (!normalizedUserId || !user?.nombre) return list;
     const exists = list.some((item) => item.userId === normalizedUserId);
     if (exists) return list;
     return [...list, { userId: normalizedUserId, userName: user.nombre }];
-  }, [attendance?.users, isConsoleAdmin, normalizedUserId, user?.nombre]);
+  }, [attendance?.users, isConsoleAdmin, isSuperAdmin, normalizedUserId, user?.nombre]);
 
   useEffect(() => {
-    if (normalizedUserId && selectedUserId === null) {
+    if (selectedUserId !== null) return;
+    if (isSuperAdmin) {
+      const target = availableUsers.find((item) => item.userId !== normalizedUserId) || availableUsers[0];
+      if (target) setSelectedUserId(target.userId);
+    } else if (normalizedUserId) {
       setSelectedUserId(normalizedUserId);
     }
-  }, [normalizedUserId, selectedUserId]);
+  }, [availableUsers, isSuperAdmin, normalizedUserId, selectedUserId]);
 
   useEffect(() => {
-    if (!isConsoleAdmin || !availableUsers.length) return;
+    if (!availableUsers.length) return;
     const exists = availableUsers.some((item) => item.userId === selectedUserId);
-    if (!exists) {
-      if (normalizedUserId && availableUsers.some((item) => item.userId === normalizedUserId)) {
-        setSelectedUserId(normalizedUserId);
-      } else {
-        setSelectedUserId(availableUsers[0].userId);
-      }
+    if (exists) return;
+    if (isSuperAdmin) {
+      const target = availableUsers.find((item) => item.userId !== normalizedUserId) || availableUsers[0];
+      setSelectedUserId(target?.userId ?? null);
+      return;
     }
-  }, [availableUsers, isConsoleAdmin, normalizedUserId, selectedUserId]);
+    if (normalizedUserId && availableUsers.some((item) => item.userId === normalizedUserId)) {
+      setSelectedUserId(normalizedUserId);
+    } else {
+      setSelectedUserId(availableUsers[0].userId);
+    }
+  }, [availableUsers, isSuperAdmin, normalizedUserId, selectedUserId]);
 
   useEffect(() => {
     if (!user?.token) return;
@@ -267,7 +279,7 @@ export default function Dashboard() {
   if (error) return <div className="errorCard">{error}</div>;
   if (!user) return null;
 
-  const activeUserId = selectedUserId ?? Number(user.id);
+  const activeUserId = selectedUserId ?? (isSuperAdmin ? null : Number(user.id));
   const isWithinWeek = (value?: string | null) => {
     if (!value) return false;
     const date = new Date(value);
@@ -275,7 +287,9 @@ export default function Dashboard() {
     return date >= weekRange.start && date <= weekRange.end;
   };
 
-  const userName = availableUsers.find((item) => item.userId === activeUserId)?.userName || user.nombre;
+  const userName =
+    availableUsers.find((item) => item.userId === activeUserId)?.userName ||
+    (isSuperAdmin ? 'Sin usuario seleccionado' : user.nombre);
 
   const filteredViatics = viatics.filter((item) => {
     if (!isWithinWeek(item.createdAt)) return false;
