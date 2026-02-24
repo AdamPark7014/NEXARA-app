@@ -32,6 +32,7 @@ export default function MyBranchesPage() {
     }
     return null;
   });
+  const [mounted, setMounted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [profile, setProfile] = useState<ClientProfile | null>(null);
@@ -47,6 +48,11 @@ export default function MyBranchesPage() {
     const base = getSocketBaseUrl();
     return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
   };
+
+  // Marcar como mounted después del primer render en el cliente
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const fetchProfile = async (token: string) => {
     try {
@@ -97,12 +103,17 @@ export default function MyBranchesPage() {
     setBranches([]);
   };
 
+  // No renderizar nada hasta que el componente esté mounted (evita hydration mismatch)
+  if (!mounted) {
+    return null;
+  }
+
   if (!session) {
     return (
       <div style={{ display: "grid", gap: 16 }}>
         <PanelLogin
           mode="client"
-          redirectTo="/mis-sucursales"
+          redirectTo="mis-sucursales"
           onClientLogin={handleClientLogin}
           title="Mis sucursales"
           subtitle="Gestiona las sucursales de tu empresa"

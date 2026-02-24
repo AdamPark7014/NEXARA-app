@@ -97,6 +97,7 @@ export default function ClientTicketsPage() {
     }
     return null;
   });
+  const [mounted, setMounted] = useState(false);
   const [loginMode, setLoginMode] = useState<"client" | "branch">("client");
   const [error, setError] = useState<string | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -154,6 +155,11 @@ export default function ClientTicketsPage() {
     return `https://www.google.com/maps?q=${lat},${lng}`;
   };
   const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, "");
+
+  // Marcar como mounted después del primer render en el cliente
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const fetchTickets = async (token: string) => {
     setLoading(true);
@@ -502,6 +508,11 @@ export default function ClientTicketsPage() {
     });
     return sorted[sorted.length - 1];
   };
+
+  // No renderizar nada hasta que el componente esté mounted (evita hydration mismatch)
+  if (!mounted) {
+    return null;
+  }
 
   if (!session) {
     return (
