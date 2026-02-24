@@ -1,6 +1,5 @@
 ﻿"use client";
 import React, { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { io, Socket } from "socket.io-client";
 import PanelLogin from "@/components/PanelLogin";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
@@ -98,7 +97,6 @@ export default function ClientTicketsPage() {
     }
     return null;
   });
-  const searchParams = useSearchParams();
   const [mounted, setMounted] = useState(false);
   const [loginMode, setLoginMode] = useState<"client" | "branch">("client");
   const [error, setError] = useState<string | null>(null);
@@ -162,16 +160,19 @@ export default function ClientTicketsPage() {
   useEffect(() => {
     setMounted(true);
     
-    // Read tab from URL params after mounting
-    const tabParam = searchParams.get("tab");
-    if (tabParam === "tickets") {
-      setActiveTab("tickets");
-    } else if (tabParam === "new-ticket") {
-      setActiveTab("nuevo");
-    } else if (tabParam === "profile") {
-      setActiveTab("perfil");
+    // Read tab from URL params after mounting using window.location
+    if (typeof window !== "undefined") {
+      const searchParams = new URLSearchParams(window.location.search);
+      const tabParam = searchParams.get("tab");
+      if (tabParam === "tickets") {
+        setActiveTab("tickets");
+      } else if (tabParam === "new-ticket") {
+        setActiveTab("nuevo");
+      } else if (tabParam === "profile") {
+        setActiveTab("perfil");
+      }
     }
-  }, [searchParams]);
+  }, []);
 
   const fetchTickets = async (token: string) => {
     setLoading(true);
