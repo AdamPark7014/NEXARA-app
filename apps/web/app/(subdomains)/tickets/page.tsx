@@ -89,7 +89,14 @@ type PendingFeedback = {
 };
 
 export default function ClientTicketsPage() {
-  const [session, setSession] = useState<ClientSession | null>(null);
+  // Inicializar sesión desde sessionStorage directamente
+  const [session, setSession] = useState<ClientSession | null>(() => {
+    if (typeof window !== "undefined") {
+      const saved = window.sessionStorage.getItem("clientSession");
+      return saved ? JSON.parse(saved) : null;
+    }
+    return null;
+  });
   const [loginMode, setLoginMode] = useState<"client" | "branch">("client");
   const [error, setError] = useState<string | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -147,13 +154,6 @@ export default function ClientTicketsPage() {
     return `https://www.google.com/maps?q=${lat},${lng}`;
   };
   const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, "");
-
-  useEffect(() => {
-    const saved = typeof window !== "undefined" ? window.sessionStorage.getItem("clientSession") : null;
-    if (saved) {
-      setSession(JSON.parse(saved));
-    }
-  }, []);
 
   const fetchTickets = async (token: string) => {
     setLoading(true);
