@@ -81,9 +81,13 @@ export default function UserForm({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const target = e.target as HTMLInputElement;
     const { name, value, type } = target;
-    setForm({
-      ...form,
-      [name]: type === "checkbox" ? target.checked : value,
+    const nextValue = type === "checkbox" ? target.checked : value;
+    setForm((prev) => {
+      const nextForm = { ...prev, [name]: nextValue };
+      if (name === "accesoConsoleAdmin" && target.checked) {
+        nextForm.accesoConsole = true;
+      }
+      return nextForm;
     });
   };
 
@@ -144,7 +148,7 @@ export default function UserForm({
     e.preventDefault();
     setLoading(true);
     try {
-      const isConsoleUser = form.accesoConsole;
+      const isConsoleUser = form.accesoConsole || form.accesoConsoleAdmin;
       const isConsoleAdmin = form.accesoConsoleAdmin;
       const enableConsoleModules = isConsoleUser || isConsoleAdmin;
       const rolePayload = {
