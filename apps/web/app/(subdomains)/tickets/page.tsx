@@ -595,7 +595,7 @@ export default function ClientTicketsPage() {
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
             <a
-              href="/mis-sucursales"
+              href="./mis-sucursales"
               className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
             >
               Mis sucursales
