@@ -31,7 +31,10 @@ export default function EvidencesPage() {
               </p>
             </div>
             <ActivityEvidenceFlow />
-            <EvidenceTable mode="user" />
+            <div>
+              <h2 style={{ marginBottom: 16 }}>Historial de Mis Evidencias</h2>
+              <EvidenceTable mode="user" />
+            </div>
           </div>
         )}
       </div>
