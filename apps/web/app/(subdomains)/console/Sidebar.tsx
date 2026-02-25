@@ -13,8 +13,15 @@ export default function Sidebar() {
   const { darkMode, toggleDarkMode } = useTheme();
   if (!user) return null;
 
+  type MenuItem = {
+    label: string;
+    href: string;
+    permissions?: string[];
+    anyPermissions?: string[];
+  };
+
   // Menú por permisos
-  const menu = [
+  const menu: MenuItem[] = [
     { label: "Dashboard", href: "/dashboard", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
     { label: "Actividades", href: "/activities", permissions: [PERMISSIONS.CONSOLE_ACCESS] },
     { label: "Evidencias", href: "/evidences", permissions: [PERMISSIONS.CONSOLE_ACCESS] },
@@ -30,7 +37,7 @@ export default function Sidebar() {
   ];
 
   // Menú de Herramientas
-  const toolsMenu = [
+  const toolsMenu: MenuItem[] = [
     { label: "Reportes", href: "/tools/reports", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
     { label: "Configuración", href: "/tools/settings", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
   ];
