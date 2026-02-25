@@ -16,7 +16,7 @@ export default function EvidencesPage() {
         {/* Admin y superadmin ven tabla de gestion de todas las evidencias */}
         {isAdmin && (
           <div>
-            <h2 style={{ marginBottom: 16 }}>{isSuperAdmin ? 'Evidencias de Todos' : 'Gestión de Evidencias'}</h2>
+            <h2 style={{ marginBottom: 16 }}>{isSuperAdmin ? 'Evidencias de Todos - Revisión' : 'Evidencias del Equipo - Revisión'}</h2>
             <EvidenceTable />
           </div>
         )}
@@ -25,7 +25,7 @@ export default function EvidencesPage() {
         {!isSuperAdmin && (
           <div>
             <div className="card" style={{ marginBottom: 16 }}>
-              <h2 style={{ color: 'var(--primary)', marginBottom: 12 }}>Mis Evidencias</h2>
+              <h2 style={{ color: 'var(--primary)', marginBottom: 12 }}>Mis Evidencias - Registro</h2>
               <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>
                 Sigue los 5 pasos para completar la evidencia de tu actividad.
               </p>
