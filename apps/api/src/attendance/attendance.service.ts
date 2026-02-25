@@ -450,10 +450,23 @@ export class AttendanceService {
     // Obtener usuarios accesibles
     let accessibleUsers = await this.getAccessibleUsers(currentUser);
 
-    // Filtrar superadmins: nunca se muestran en las listas (excepto el que consulta si es superadmin)
-    accessibleUsers = accessibleUsers.filter(
-      (user) => !this.isSuperAdminEmail(user.email),
-    );
+    // Filtrar según el tipo de usuario:
+    // - Superadmin: Ve todos EXCEPTO otros superadmins
+    // - Admin consola (no superadmin): Ve solo a él mismo + usuarios normales (sin permisos de admin)
+    // - Usuario normal: Solo ve su propia información (manejado por getAccessibleUsers)
+    if (currentUser.isSuperAdmin) {
+      // Superadmin: excluir otros superadmins
+      accessibleUsers = accessibleUsers.filter(
+        (user) => !this.isSuperAdminEmail(user.email),
+      );
+    } else if (currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
+      // Admin consola (no superadmin): solo él mismo + usuarios normales sin permisos de admin
+      accessibleUsers = accessibleUsers.filter(
+        (user) => 
+          user.id === currentUser.id || // Él mismo
+          (!user.role?.accesoConsoleAdmin && !this.isSuperAdminEmail(user.email)) // Usuarios normales sin accesoConsoleAdmin
+      );
+    }
 
     // Filtrar por departamento si se proporciona
     if (targetDepartmentId) {

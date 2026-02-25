@@ -35,7 +35,15 @@ export class VehiclesController {
     if (user.isSuperAdmin) {
       return this.vehiclesService.findAll();
     } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
-      return this.vehiclesService.findByDepartment(user.departmentId);
+      // Admin consola: ve sus propios vehículos + vehículos de usuarios normales
+      const allDeptUsers = await this.usersService.findByDepartment(user.departmentId);
+      const allowedUserIds = [
+        user.id,
+        ...allDeptUsers
+          .filter(u => u.role && !u.role.accesoConsoleAdmin)
+          .map(u => u.id),
+      ];
+      return this.vehiclesService.findByAllowedUsers(allowedUserIds);
     } else {
       return this.vehiclesService.findByResponsible(user.id);
     }
@@ -238,7 +246,15 @@ export class VehiclesController {
     if (user.isSuperAdmin) {
       data = await this.vehiclesService.findAll();
     } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
-      data = await this.vehiclesService.findByDepartment(user.departmentId);
+      // Admin consola: ve sus propios vehículos + vehículos de usuarios normales
+      const allDeptUsers = await this.usersService.findByDepartment(user.departmentId);
+      const allowedUserIds = [
+        user.id,
+        ...allDeptUsers
+          .filter(u => u.role && !u.role.accesoConsoleAdmin)
+          .map(u => u.id),
+      ];
+      data = await this.vehiclesService.findByAllowedUsers(allowedUserIds);
     } else {
       data = await this.vehiclesService.findByResponsible(user.id);
     }

@@ -75,6 +75,19 @@ export class ViaticosService {
     }));
   }
 
+  async findByAllowedUsers(userIds: number[]) {
+    if (!userIds || userIds.length === 0) return [];
+    const data = await this.prisma['viatico'].findMany({
+      where: { usuarioId: { in: userIds } },
+      include: { Activity: true, User: true },
+    });
+    return data.map((row: any) => ({
+      ...row,
+      actividad: row.Activity,
+      usuario: row.User,
+    }));
+  }
+
   findOne(id: number) {
     return this.prisma['viatico'].findUnique({
       where: { id },

@@ -78,6 +78,15 @@ export class VehiclesService {
     });
   }
 
+  findByAllowedUsers(userIds: number[]) {
+    if (!userIds || userIds.length === 0) return [];
+    return this.prisma['vehicleControl'].findMany({
+      where: { solicitanteId: { in: userIds } },
+      include: { actividad: true, solicitante: true, vehiculo: true, entregaRevisadoPor: true },
+      orderBy: { fechaSolicitud: 'desc' },
+    });
+  }
+
   findOne(id: number) {
     return this.prisma['vehicleControl'].findUnique({
       where: { id },

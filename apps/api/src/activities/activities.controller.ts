@@ -43,7 +43,15 @@ export class ActivitiesController {
     if (user.isSuperAdmin) {
       data = await this.activitiesService.findAll();
     } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
-      data = await this.activitiesService.findByDepartment(user.departmentId);
+      // Admin consola: ve sus propias actividades + actividades de usuarios normales (sin accesoConsoleAdmin)
+      const allDeptUsers = await this.usersService.findByDepartment(user.departmentId);
+      const allowedUserIds = [
+        user.id, // Él mismo
+        ...allDeptUsers
+          .filter(u => u.role && !u.role.accesoConsoleAdmin)
+          .map(u => u.id),
+      ];
+      data = await this.activitiesService.findByAllowedUsers(allowedUserIds);
     } else {
       data = await this.activitiesService.findByResponsible(user.id);
     }
@@ -118,11 +126,19 @@ export class ActivitiesController {
   @Get()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_VIEW] })
-  findAll(@CurrentUser() user: any) {
+  async findAll(@CurrentUser() user: any) {
     if (user.isSuperAdmin) {
       return this.activitiesService.findAll();
     } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
-      return this.activitiesService.findByDepartment(user.departmentId);
+      // Admin consola: ve sus propias actividades + actividades de usuarios normales (sin accesoConsoleAdmin)
+      const allDeptUsers = await this.usersService.findByDepartment(user.departmentId);
+      const allowedUserIds = [
+        user.id, // Él mismo
+        ...allDeptUsers
+          .filter(u => u.role && !u.role.accesoConsoleAdmin)
+          .map(u => u.id),
+      ];
+      return this.activitiesService.findByAllowedUsers(allowedUserIds);
     } else {
       return this.activitiesService.findByResponsible(user.id);
     }
