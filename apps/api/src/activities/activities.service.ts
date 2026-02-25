@@ -94,6 +94,15 @@ export class ActivitiesService {
     });
   }
 
+  async findByAllowedUsers(userIds: number[]) {
+    // Busca actividades solo de usuarios permitidos (admin de consola viendo usuarios normales)
+    if (!userIds || userIds.length === 0) return [];
+    return this.prisma['activity'].findMany({
+      where: { responsableId: { in: userIds } },
+      include: { creador: true, responsable: true, client: true, serviceSheet: true, activityEvidence: true },
+    });
+  }
+
   async findOne(id: number) {
     return this.prisma['activity'].findUnique({
       where: { id },

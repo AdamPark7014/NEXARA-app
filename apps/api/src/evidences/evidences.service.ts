@@ -96,9 +96,31 @@ export class EvidencesService {
     permissions?: string[];
     isSuperAdmin?: boolean;
   }) {
-    if (currentUser.isSuperAdmin || this.hasPermission(currentUser, PERMISSIONS.CONSOLE_ADMIN)) {
-      const users = await this.prisma['user'].findMany({ select: { id: true } });
+    if (currentUser.isSuperAdmin) {
+      // Superadmin: ve todos EXCEPTO otros superadmins
+      const users = await this.prisma['user'].findMany({ 
+        where: {
+          email: {
+            notIn: ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'],
+          },
+        },
+        select: { id: true } 
+      });
       return users.map((u) => u.id);
+    }
+
+    if (this.hasPermission(currentUser, PERMISSIONS.CONSOLE_ADMIN)) {
+      // Admin consola: ve a él mismo + usuarios normales sin accesoConsoleAdmin
+      const users = await this.prisma['user'].findMany({
+        where: {
+          departmentId: currentUser.departmentId,
+          role: {
+            accesoConsoleAdmin: false,
+          },
+        },
+        select: { id: true },
+      });
+      return [currentUser.id, ...users.map((u) => u.id)];
     }
 
     if (!this.hasPermission(currentUser, PERMISSIONS.EVIDENCES_REVIEW)) {
@@ -148,6 +170,15 @@ export class EvidencesService {
   findByUser(userId: number) {
     return this.prisma['evidence'].findMany({
       where: { userId },
+      include: this.buildInclude(),
+      orderBy: { subidoEn: 'desc' },
+    });
+  }
+
+  findByAllowedUsers(userIds: number[]) {
+    if (!userIds || userIds.length === 0) return [];
+    return this.prisma['evidence'].findMany({
+      where: { userId: { in: userIds } },
       include: this.buildInclude(),
       orderBy: { subidoEn: 'desc' },
     });

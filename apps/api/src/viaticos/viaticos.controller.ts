@@ -31,7 +31,15 @@ export class ViaticosController {
       return this.viaticosService.findAll();
     }
     if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
-      return this.viaticosService.findByDepartment(user.departmentId);
+      // Admin consola: ve sus propios viáticos + viáticos de usuarios normales
+      const allDeptUsers = await this.usersService.findByDepartment(user.departmentId);
+      const allowedUserIds = [
+        user.id,
+        ...allDeptUsers
+          .filter(u => u.role && !u.role.accesoConsoleAdmin)
+          .map(u => u.id),
+      ];
+      return this.viaticosService.findByAllowedUsers(allowedUserIds);
     }
     return this.viaticosService.findByUser(user.id);
   }
