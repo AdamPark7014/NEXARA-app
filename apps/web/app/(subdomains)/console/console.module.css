@@ -610,3 +610,119 @@
     box-shadow: 0 12px 32px rgba(15, 106, 214, 0.45), 0 6px 16px rgba(15, 106, 214, 0.3);
   }
 }
+
+/* Tools Page Styles */
+.pageContainer {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.pageHeader {
+  margin-bottom: 3rem;
+}
+
+.pageHeader h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: var(--text-color);
+  font-family: 'Playfair Display', serif;
+}
+
+.pageHeader p {
+  font-size: 1rem;
+  color: var(--text-secondary);
+}
+
+.toolsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.toolCard {
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.toolCard::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(31, 141, 242, 0.1), rgba(22, 169, 110, 0.05));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.toolCard:hover {
+  border-color: var(--primary-color);
+  box-shadow: 0 12px 32px rgba(15, 106, 214, 0.15), 0 4px 12px rgba(15, 106, 214, 0.1);
+  transform: translateY(-4px);
+}
+
+.toolCard:hover::before {
+  opacity: 1;
+}
+
+.toolIcon {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  display: inline-block;
+}
+
+.toolCard h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: var(--text-color);
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+.toolCard p {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+  flex-grow: 1;
+  line-height: 1.5;
+}
+
+.toolArrow {
+  font-size: 1.5rem;
+  color: var(--primary-color);
+  transition: transform 0.3s ease;
+  display: inline-block;
+  align-self: flex-start;
+}
+
+.toolCard:hover .toolArrow {
+  transform: translateX(4px);
+}
+
+.emptyState {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-secondary);
+  font-size: 1rem;
+}
+
+/* Dark mode adjustments for tools */
+:global(body.dark) .toolCard {
+  background: linear-gradient(135deg, rgba(20, 26, 38, 0.6), rgba(11, 16, 28, 0.6));
+  border: 1px solid rgba(31, 137, 252, 0.2);
+}
+
+:global(body.dark) .toolCard:hover {
+  border-color: rgba(31, 137, 252, 0.5);
+  box-shadow: 0 12px 32px rgba(31, 137, 252, 0.1), 0 4px 12px rgba(31, 137, 252, 0.08);
+}
+

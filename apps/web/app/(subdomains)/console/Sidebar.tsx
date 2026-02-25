@@ -34,12 +34,7 @@ export default function Sidebar() {
     { label: "Entradas/Salidas", href: "/attendance", permissions: [PERMISSIONS.ATTENDANCE_VIEW] },
     { label: "Mapa GPS", href: "/gps", permissions: [PERMISSIONS.GPS_VIEW] },
     { label: "Cotizaciones", href: "/cotizaciones", permissions: [PERMISSIONS.COTIZACIONES_ACCESS] },
-  ];
-
-  // Menú de Herramientas
-  const toolsMenu: MenuItem[] = [
-    { label: "Reportes", href: "/tools/reports", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Configuración", href: "/tools/settings", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Herramientas", href: "/tools", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
   ];
 
   // Avatar: usa user.avatarUrl si existe, si no, usa un avatar generado por ui-avatars.com
@@ -65,31 +60,6 @@ export default function Sidebar() {
       <div className={styles.menuTitle}>Menu principal</div>
       <ul className={styles.sidebarMenu}>
         {menu.filter(item => {
-          if (item.permissions && !item.permissions.every((permission) => hasPermission(user, permission))) {
-            return false;
-          }
-          if (item.anyPermissions && !hasAnyPermission(user, item.anyPermissions)) {
-            return false;
-          }
-          return true;
-        }).map((item) => (
-          <li key={item.href} className={styles.sidebarMenuItem}>
-            <Link
-              href={item.href}
-              className={
-                pathname && pathname === item.href
-                  ? `${styles.menuLink} ${styles.active}`
-                  : styles.menuLink
-              }
-            >
-              {item.label}
-            </Link>
-          </li>
-        ))}
-      </ul>
-      <div className={styles.menuTitle}>Herramientas</div>
-      <ul className={styles.sidebarMenu}>
-        {toolsMenu.filter(item => {
           if (item.permissions && !item.permissions.every((permission) => hasPermission(user, permission))) {
             return false;
           }
