@@ -726,3 +726,244 @@
   box-shadow: 0 12px 32px rgba(31, 137, 252, 0.1), 0 4px 12px rgba(31, 137, 252, 0.08);
 }
 
+/* Forms and Tools Section */
+.toolsSection {
+  margin-bottom: 3rem;
+}
+
+.toolsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.toolsHeader h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-color);
+  margin: 0;
+}
+
+.primaryButton {
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #1f6db8, #0f6ad6);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.95rem;
+}
+
+.primaryButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(15, 106, 214, 0.35);
+}
+
+.secondaryButton {
+  padding: 0.75rem 1.5rem;
+  background: var(--card-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.95rem;
+}
+
+.secondaryButton:hover {
+  border-color: var(--text-color);
+  background: var(--surface);
+}
+
+.formCard {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+.fineForm {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.formGroup label {
+  font-weight: 600;
+  color: var(--text-color);
+  font-size: 0.95rem;
+}
+
+.formInput {
+  padding: 0.75rem 1rem;
+  background: var(--background);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-color);
+  font-family: 'Space Grotesk', sans-serif;
+  transition: all 0.2s ease;
+}
+
+.formInput:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(31, 141, 242, 0.1);
+}
+
+.formActions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.tableContainer {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.table thead {
+  background: var(--surface);
+  border-bottom: 2px solid var(--border-color);
+}
+
+.table th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-color);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.table tbody tr:hover {
+  background: var(--surface);
+}
+
+.emptyTableMessage {
+  text-align: center;
+  color: var(--text-secondary) !important;
+  padding: 3rem 1rem !important;
+  font-style: italic;
+}
+
+.filterSection {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+  background: var(--card-bg);
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.filterGroup label {
+  font-weight: 600;
+  color: var(--text-color);
+  font-size: 0.9rem;
+}
+
+.statusSummary {
+  margin-top: 3rem;
+}
+
+.statusSummary h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-color);
+  margin-bottom: 1.5rem;
+}
+
+.statusCards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.statusCard {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+}
+
+.statusNumber {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--primary-color);
+  margin-bottom: 0.5rem;
+}
+
+.statusLabel {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.accessDenied {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 3rem;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+}
+
+/* Dark mode form adjustments */
+:global(body.dark) .formInput {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(31, 137, 252, 0.2);
+  color: #e7eefc;
+}
+
+:global(body.dark) .formInput:focus {
+  border-color: rgba(31, 137, 252, 0.5);
+}
+
+:global(body.dark) .formCard {
+  background: linear-gradient(135deg, rgba(20, 26, 38, 0.6), rgba(11, 16, 28, 0.6));
+  border: 1px solid rgba(31, 137, 252, 0.2);
+}
+
+:global(body.dark) .tableContainer {
+  background: linear-gradient(135deg, rgba(20, 26, 38, 0.6), rgba(11, 16, 28, 0.6));
+  border: 1px solid rgba(31, 137, 252, 0.2);
+}
+
+:global(body.dark) .filterSection {
+  background: linear-gradient(135deg, rgba(20, 26, 38, 0.6), rgba(11, 16, 28, 0.6));
+  border: 1px solid rgba(31, 137, 252, 0.2);
+}
+
+
