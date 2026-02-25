@@ -34,7 +34,10 @@ export default function Sidebar() {
     { label: "Entradas/Salidas", href: "/attendance", permissions: [PERMISSIONS.ATTENDANCE_VIEW] },
     { label: "Mapa GPS", href: "/gps", permissions: [PERMISSIONS.GPS_VIEW] },
     { label: "Cotizaciones", href: "/cotizaciones", permissions: [PERMISSIONS.COTIZACIONES_ACCESS] },
-    { label: "Herramientas", href: "/tools", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    // Gestor de Multas solo para admin/superadmin
+    { label: "Gestor de Multas", href: "/tools/fines", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    // Herramientas visibles para usuarios de consola y admin (propias), superadmin las ve como gestor
+    { label: "Herramientas", href: "/tools/tools-history", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
   ];
 
   // Avatar: usa user.avatarUrl si existe, si no, usa un avatar generado por ui-avatars.com
