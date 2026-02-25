@@ -1,6 +1,7 @@
 "use client";
 import ActivitiesTable from '../../../../components/ActivitiesTable';
 import MyActivitiesTable from '../../../../components/MyActivitiesTable';
+import FinesTable from '../../../../components/FinesTable';
 import { RoleGuard } from '../../../../components/RoleGuard';
 import { useUser } from '../../../../components/UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
@@ -26,6 +27,10 @@ export default function ActivitiesPage() {
           <div>
             <h2 style={{ marginBottom: 16 }}>Mis Actividades</h2>
             <MyActivitiesTable />
+            
+            <div style={{ marginTop: 24 }}>
+              <FinesTable tipo="actividad" usuarioId={user?.id} showUser={false} />
+            </div>
           </div>
         )}
       </div>
