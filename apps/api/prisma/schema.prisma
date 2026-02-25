@@ -325,6 +325,8 @@ model User {
   notifications    Notification[]
   reviewedEvidences ActivityEvidence[]  // Evidencias revisadas por este usuario
   fines            Fine[]
+  toolRequests     ToolRequest[]       @relation("UserToolRequests")
+  approvedToolRequests ToolRequest[]   @relation("AdminApprovals")
 }
 
 model UserProfile {
@@ -1172,3 +1174,44 @@ model Fine {
   @@index([usuarioId, tipo, estatusPago])
   @@map("fines")
 }
+
+enum ToolRequestStatus {
+  PENDING      // Solicitud pendiente de aprobación
+  APPROVED     // Aprobada por admin
+  IN_USE       // Herramienta en uso por el usuario
+  RETURNED     // Devuelta
+  DAMAGED      // Devuelta con daños
+  REJECTED     // Solicitud rechazada
+}
+
+model ToolRequest {
+  id                    Int                 @id @default(autoincrement())
+  usuarioId             Int
+  toolName              String              @db.VarChar(200)      // Nombre de la herramienta
+  model                 String              @db.VarChar(200)      // Modelo
+  serialNumber          String              @db.VarChar(200)      // Número de serie
+  reason                String              @db.Text              // Motivo de uso
+  estimatedPeriod       String              @db.VarChar(100)      // Periodo estimado (ej. "3 días")
+  generalPhotoUrl       String              @db.VarChar(500)      // Foto panorámica
+  specificationsPhotoUrl String             @db.VarChar(500)      // Foto de modelo y serie
+  status                ToolRequestStatus   @default(PENDING)
+  requestDate           DateTime            @default(now())       // Fecha de solicitud
+  approvalDate          DateTime?                                 // Fecha de aprobación
+  deliveryDate          DateTime?                                 // Fecha de entrega al usuario
+  returnDate            DateTime?                                 // Fecha de devolución
+  expectedReturnDate    DateTime?                                 // Fecha esperada de devolución
+  damageDescription     String?             @db.Text              // Descripción de daños si aplica
+  damagePhotoUrl        String?             @db.VarChar(500)      // Foto de daños si aplica
+  adminNotes            String?             @db.Text              // Notas del administrador
+  approvedBy            Int?                                      // Usuario admin que aprobó
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  
+  usuario               User                @relation("UserToolRequests", fields: [usuarioId], references: [id], onDelete: Cascade)
+  approver              User?               @relation("AdminApprovals", fields: [approvedBy], references: [id])
+
+  @@index([usuarioId, status])
+  @@index([status, requestDate])
+  @@map("tool_requests")
+}
+
