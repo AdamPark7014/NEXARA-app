@@ -13,6 +13,10 @@ export default function Sidebar() {
   const { darkMode, toggleDarkMode } = useTheme();
   if (!user) return null;
 
+  const isAdmin = hasPermission(user, PERMISSIONS.CONSOLE_ADMIN);
+  const isSuperAdmin = user.isSuperAdmin;
+  const isConsoleUser = hasAnyPermission(user, [PERMISSIONS.CONSOLE_ACCESS]);
+
   type MenuItem = {
     label: string;
     href: string;
@@ -34,11 +38,15 @@ export default function Sidebar() {
     { label: "Entradas/Salidas", href: "/attendance", permissions: [PERMISSIONS.ATTENDANCE_VIEW] },
     { label: "Mapa GPS", href: "/gps", permissions: [PERMISSIONS.GPS_VIEW] },
     { label: "Cotizaciones", href: "/cotizaciones", permissions: [PERMISSIONS.COTIZACIONES_ACCESS] },
-    // Gestor de Multas solo para admin/superadmin
-    { label: "Gestor de Multas", href: "/tools/fines", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
-    // Herramientas visibles para usuarios de consola y admin (propias), superadmin las ve como gestor
-    { label: "Herramientas", href: "/tools/tools-history", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
   ];
+
+  // Entradas dinámicas según rol
+  if (isAdmin || isSuperAdmin) {
+    menu.push({ label: "Gestor de Multas", href: "/tools/fines", permissions: [PERMISSIONS.CONSOLE_ADMIN] });
+    menu.push({ label: "Gestor de Herramientas", href: "/tools/tools-history", permissions: [PERMISSIONS.CONSOLE_ADMIN] });
+  } else if (isConsoleUser) {
+    menu.push({ label: "Mis Herramientas", href: "/tools/my-tools", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS] });
+  }
 
   // Avatar: usa user.avatarUrl si existe, si no, usa un avatar generado por ui-avatars.com
   const avatarUrl = user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nombre)}&background=0D8ABC&color=fff&size=96`;
