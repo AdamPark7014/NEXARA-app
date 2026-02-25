@@ -374,7 +374,6 @@ export class AttendanceService {
    * 
    * NOTA: El filtrado de superadmins se hace en getHierarchyAttendanceRange
    */
-   */
   private async getAccessibleUsers(
     currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean },
   ) {
