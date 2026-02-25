@@ -12,19 +12,19 @@ export default function ToolsPage() {
 
   const tools = [
     {
-      id: "reports",
-      label: "Reportes",
-      description: "Genera y visualiza reportes detallados de actividades, ventas y más",
-      icon: "📊",
-      href: "/tools/reports",
+      id: "fines",
+      label: "Gestión de Multas",
+      description: "Panel de control de multas: crear, visualizar y asignar multas a usuarios por incumplimientos laborales, daños a vehículos, herramientas y más.",
+      icon: "📋",
+      href: "/tools/fines",
       permissions: [PERMISSIONS.CONSOLE_ADMIN],
     },
     {
-      id: "settings",
-      label: "Configuración",
-      description: "Administra la configuración general del sistema",
-      icon: "⚙️",
-      href: "/tools/settings",
+      id: "tools-history",
+      label: "Historial de Herramientas",
+      description: "Gestión completa de herramientas prestadas: visualizar historial, estado actual, devoluciones pendientes y multas por daño de herramientas.",
+      icon: "🔧",
+      href: "/tools/tools-history",
       permissions: [PERMISSIONS.CONSOLE_ADMIN],
     },
   ];
@@ -39,7 +39,7 @@ export default function ToolsPage() {
     <div className={styles.pageContainer}>
       <div className={styles.pageHeader}>
         <h1>Herramientas</h1>
-        <p>Panel de herramientas y utilidades del sistema</p>
+        <p>Panel de control de multas y herramientas prestadas</p>
       </div>
 
       <div className={styles.toolsGrid}>
@@ -63,3 +63,4 @@ export default function ToolsPage() {
     </div>
   );
 }
+
