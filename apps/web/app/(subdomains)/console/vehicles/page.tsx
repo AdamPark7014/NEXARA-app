@@ -2,6 +2,7 @@
 import VehicleTable from '../../../../components/VehicleTable';
 import VehicleRequestForm from '@/components/VehicleRequestForm';
 import MyVehiclesTable from '@/components/MyVehiclesTable';
+import FinesTable from '../../../../components/FinesTable';
 import { RoleGuard } from '../../../../components/RoleGuard';
 import { useUser } from '../../../../components/UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
@@ -40,6 +41,10 @@ export default function VehiclesPage() {
             </div>
             <VehicleRequestForm />
             <MyVehiclesTable />
+            
+            <div style={{ marginTop: 24 }}>
+              <FinesTable tipo="vehiculo" usuarioId={user?.id} showUser={false} />
+            </div>
           </div>
         )}
       </div>

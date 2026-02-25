@@ -1,6 +1,7 @@
 "use client";
 import AttendanceForm from '../../../../components/AttendanceForm';
 import ConsoleAttendanceTable from './ConsoleAttendanceTable';
+import FinesTable from '../../../../components/FinesTable';
 import { RoleGuard } from '../../../../components/RoleGuard';
 import { useUser } from '../../../../components/UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
@@ -18,6 +19,10 @@ export default function AttendancePage() {
           <div>
             <h2 style={{ marginBottom: 16 }}>Mi Asistencia</h2>
             <AttendanceForm />
+            
+            <div style={{ marginTop: 24 }}>
+              <FinesTable tipo="asistencia" usuarioId={user?.id} showUser={false} />
+            </div>
           </div>
         )}
 
