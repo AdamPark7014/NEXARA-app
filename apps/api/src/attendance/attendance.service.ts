@@ -372,7 +372,8 @@ export class AttendanceService {
    * - Console admin (ATTENDANCE_MANAGE): Ve todos los usuarios
    * - Otros: No tiene acceso a esta funcion
    * 
-   * NOTA: El filtrado de quienes son "normales" vs "admins" se hace en getHierarchyAttendanceRange
+   * NOTA: El filtrado de superadmins se hace en getHierarchyAttendanceRange
+   */
    */
   private async getAccessibleUsers(
     currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean },
@@ -450,20 +451,10 @@ export class AttendanceService {
     // Obtener usuarios accesibles
     let accessibleUsers = await this.getAccessibleUsers(currentUser);
 
-    // Si NO es superadmin, excluir a otros admins (solo ve usuarios normales)
-    // Si ES superadmin, ve a todos (incluyendo otros admins)
-    if (!currentUser.isSuperAdmin) {
-      accessibleUsers = accessibleUsers.filter(
-        (user) => !this.isSuperAdminEmail(user.email) && 
-                  !user.role?.accesoConsoleAdmin && 
-                  !user.role?.accesoConsole,
-      );
-    } else {
-      // Superadmin ve a todos EXCEPTO él mismo y otros superadmins
-      accessibleUsers = accessibleUsers.filter(
-        (user) => !this.isSuperAdminEmail(user.email),
-      );
-    }
+    // Filtrar superadmins: nunca se muestran en las listas (excepto el que consulta si es superadmin)
+    accessibleUsers = accessibleUsers.filter(
+      (user) => !this.isSuperAdminEmail(user.email),
+    );
 
     // Filtrar por departamento si se proporciona
     if (targetDepartmentId) {
