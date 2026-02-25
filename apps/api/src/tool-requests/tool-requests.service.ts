@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { ToolRequestStatus } from '@prisma/client';
+
+// Definir el tipo localmente
+type ToolRequestStatus = 'PENDING' | 'APPROVED' | 'IN_USE' | 'RETURNED' | 'DAMAGED' | 'REJECTED';
 
 export interface CreateToolRequestDto {
   usuarioId: number;
