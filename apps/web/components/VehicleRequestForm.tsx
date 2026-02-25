@@ -20,7 +20,6 @@ const VehicleRequestForm: React.FC<VehicleRequestFormProps> = ({ actividadId }) 
   const [actividades, setActividades] = useState<ActivityOption[]>([]);
   const [vehicleId, setVehicleId] = useState<string>('');
   const [vehicles, setVehicles] = useState<{ id: number; nombre: string; placas?: string | null; estatus?: string }[]>([]);
-  const [placas, setPlacas] = useState('');
   const [motivo, setMotivo] = useState('');
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
@@ -61,10 +60,6 @@ const VehicleRequestForm: React.FC<VehicleRequestFormProps> = ({ actividadId }) 
       setError('Selecciona un vehiculo');
       return false;
     }
-    if (!placas || placas.length < 3) {
-      setError('Las placas deben tener al menos 3 caracteres');
-      return false;
-    }
     if (!motivo || motivo.length < 3) {
       setError('El motivo debe tener al menos 3 caracteres');
       return false;
@@ -94,10 +89,11 @@ const VehicleRequestForm: React.FC<VehicleRequestFormProps> = ({ actividadId }) 
         return;
       }
 
+      const selectedVehicle = vehicles.find(v => v.id === Number(vehicleId));
       const payload = {
         actividadId: actividadFinal,
         vehicleId: Number(vehicleId),
-        placasVehiculo: placas,
+        placasVehiculo: selectedVehicle?.placas || '',
         motivoUso: motivo,
         fechaInicioSolicitada: fechaInicio,
         fechaFinSolicitada: fechaFin,
@@ -118,7 +114,6 @@ const VehicleRequestForm: React.FC<VehicleRequestFormProps> = ({ actividadId }) 
       }
 
       setSuccess('Solicitud enviada correctamente');
-      setPlacas('');
       setMotivo('');
       setFechaInicio('');
       setFechaFin('');
@@ -175,10 +170,6 @@ const VehicleRequestForm: React.FC<VehicleRequestFormProps> = ({ actividadId }) 
               </option>
             ))}
           </select>
-        </label>
-        <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
-          Placas del vehiculo
-          <input className="input" type="text" value={placas} onChange={e => setPlacas(e.target.value)} required disabled={loading} />
         </label>
         <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
           Motivo de uso
