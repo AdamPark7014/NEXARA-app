@@ -966,4 +966,205 @@
   border: 1px solid rgba(31, 137, 252, 0.2);
 }
 
+/* Photo capture styles */
+.photoSection {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 2px solid var(--border-color);
+}
+
+.photoSection h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-color);
+  margin-bottom: 0.5rem;
+}
+
+.photoNote {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+  font-style: italic;
+}
+
+.photoGroup {
+  margin-bottom: 1.5rem;
+}
+
+.photoGroup label {
+  display: block;
+  font-weight: 600;
+  color: var(--text-color);
+  margin-bottom: 0.75rem;
+  font-size: 0.95rem;
+}
+
+.photoButton {
+  width: 100%;
+  padding: 1rem;
+  background: linear-gradient(135deg, #16a96a, #14b872);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 1rem;
+}
+
+.photoButton:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(22, 169, 106, 0.35);
+}
+
+.photoButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.photoPreview {
+  position: relative;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.photoPreview img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.retakeButton {
+  width: 100%;
+  padding: 0.75rem;
+  background: var(--card-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-top: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.retakeButton:hover {
+  background: var(--surface);
+  border-color: var(--text-color);
+}
+
+/* Camera modal styles */
+.cameraModal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 1rem;
+}
+
+.cameraContainer {
+  width: 100%;
+  max-width: 800px;
+  background: var(--card-bg);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.cameraHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  background: var(--surface);
+  border-bottom: 2px solid var(--border-color);
+}
+
+.cameraHeader h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-color);
+  margin: 0;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  color: var(--text-color);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.closeButton:hover {
+  color: #ff4444;
+  transform: scale(1.1);
+}
+
+.cameraVideo {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: #000;
+}
+
+.cameraControls {
+  display: flex;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: var(--surface);
+  border-top: 2px solid var(--border-color);
+}
+
+.captureButton {
+  flex: 1;
+  padding: 1rem;
+  background: linear-gradient(135deg, #1f6db8, #0f6ad6);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 1rem;
+}
+
+.captureButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(15, 106, 214, 0.35);
+}
+
+.cancelButton {
+  padding: 1rem 2rem;
+  background: var(--card-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cancelButton:hover {
+  background: var(--surface);
+  border-color: var(--text-color);
+}
+
+/* Dark mode adjustments for camera */
+:global(body.dark) .cameraContainer {
+  background: linear-gradient(135deg, rgba(20, 26, 38, 0.98), rgba(11, 16, 28, 0.98));
+  border: 1px solid rgba(31, 137, 252, 0.3);
+}
+
+:global(body.dark) .photoPreview {
+  border-color: rgba(31, 137, 252, 0.3);
+}
+
+
 
