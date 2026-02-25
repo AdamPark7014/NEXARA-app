@@ -28,7 +28,7 @@ interface Evidence {
   aprobadoPor?: { nombre: string } | null;
 }
 
-const EvidenceTable: React.FC<{ mode?: 'admin' | 'user' }> = ({ mode = 'admin' }) => {
+const EvidenceTable: React.FC<{ mode?: 'admin' | 'user'; title?: string | null }> = ({ mode = 'admin', title = 'Evidencias' }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const { user } = useUser();
@@ -188,7 +188,7 @@ const EvidenceTable: React.FC<{ mode?: 'admin' | 'user' }> = ({ mode = 'admin' }
 
   return (
     <div className="card">
-      <h2 style={{ color: 'var(--primary)', marginBottom: 12 }}>Evidencias</h2>
+      {title && <h2 style={{ color: 'var(--primary)', marginBottom: 12 }}>{title}</h2>}
       <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
         <select className="input" value={estatus} onChange={e => setEstatus(e.target.value)}>
           <option value="">Todos los estatus</option>

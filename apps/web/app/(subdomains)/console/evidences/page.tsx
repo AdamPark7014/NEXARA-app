@@ -15,10 +15,9 @@ export default function EvidencesPage() {
       <div style={{ display: 'grid', gap: 24 }}>
         {/* Admin y superadmin ven tabla de gestion de todas las evidencias */}
         {isAdmin && (
-          <div>
-            <h2 style={{ marginBottom: 16 }}>{isSuperAdmin ? 'Evidencias de Todos - Revisión' : 'Evidencias del Equipo - Revisión'}</h2>
-            <EvidenceTable />
-          </div>
+          <EvidenceTable
+            title={isSuperAdmin ? 'Evidencias de Todos - Revisión' : 'Evidencias del Equipo - Revisión'}
+          />
         )}
 
         {/* Usuario normal y admin (no superadmin) ven su flujo de evidencias */}
@@ -32,8 +31,7 @@ export default function EvidencesPage() {
             </div>
             <ActivityEvidenceFlow />
             <div>
-              <h2 style={{ marginBottom: 16 }}>Historial de Mis Evidencias</h2>
-              <EvidenceTable mode="user" />
+              <EvidenceTable mode="user" title="Historial de Mis Evidencias" />
             </div>
           </div>
         )}
