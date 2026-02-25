@@ -324,6 +324,7 @@ model User {
   orderTemplates   OrderTemplate[]             @relation("OrderTemplateCreator")
   notifications    Notification[]
   reviewedEvidences ActivityEvidence[]  // Evidencias revisadas por este usuario
+  fines            Fine[]
 }
 
 model UserProfile {
@@ -1154,3 +1155,20 @@ model Notification {
   @@map("notifications")
 }
 
+model Fine {
+  id                    Int       @id @default(autoincrement())
+  usuarioId             Int
+  tipo                  String    @db.VarChar(50)  // "actividad", "vehiculo", "asistencia", "herramienta"
+  razon                 String    @db.VarChar(100)
+  descripcion           String?   @db.Text
+  monto                 Decimal   @db.Decimal(10, 2)
+  referenciaId          Int?      // id de la actividad, vehiculo, etc.
+  estatusPago           String    @default("Pendiente") @db.VarChar(30)
+  fechaCreacion         DateTime  @default(now())
+  fechaPago             DateTime?
+  notas                 String?
+  usuario               User      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, tipo, estatusPago])
+  @@map("fines")
+}

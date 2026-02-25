@@ -38,6 +38,7 @@ import { BranchAuthModule } from './branch-auth/branch-auth.module';
 import { BranchPortalModule } from './branch-portal/branch-portal.module';
 import { VentasModule } from './ventas/ventas.module';
 import { ActivityEvidenceModule } from './activity-evidence/activity-evidence.module';
+import { FinesModule } from './fines/fines.module.js';
 
 @Module({
   imports: [
@@ -71,6 +72,7 @@ import { ActivityEvidenceModule } from './activity-evidence/activity-evidence.mo
     BranchPortalModule,
     VentasModule,
     ActivityEvidenceModule,
+    FinesModule,
   ],
   controllers: [AppController, ExcelExportController, ExcelImportController],
   providers: [
