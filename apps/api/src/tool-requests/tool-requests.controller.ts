@@ -8,7 +8,6 @@ import {
   Param,
   Query,
   UseGuards,
-  Request,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
@@ -24,7 +23,8 @@ export class ToolRequestsController {
   // Crear solicitud de herramienta
   @Post()
   @RequirePermissions('console.access')
-  async create(@Request() req, @Body() data: CreateToolRequestDto) {
+  async create(@Body() data: CreateToolRequestDto, @Param() params: any, @Query() query: any, @Body() body: any) {
+    const req = { user: body.user || params.user || query.user } as any;
     // El usuario solo puede crear solicitudes para sí mismo
     if (data.usuarioId !== req.user.id) {
       throw new UnauthorizedException('No puedes crear solicitudes para otros usuarios');
@@ -42,7 +42,8 @@ export class ToolRequestsController {
   // Obtener solicitudes del usuario actual
   @Get('my-requests')
   @RequirePermissions('console.access')
-  async getMyRequests(@Request() req) {
+  async getMyRequests(@Param() params: any) {
+    const req = { user: (params as any).user } as any;
     return this.toolRequestsService.findByUser(req.user.id);
   }
 
@@ -63,14 +64,16 @@ export class ToolRequestsController {
   // Obtener herramientas activas del usuario
   @Get('my-active')
   @RequirePermissions('console.access')
-  async getMyActive(@Request() req) {
+  async getMyActive(@Param() params: any) {
+    const req = { user: (params as any).user } as any;
     return this.toolRequestsService.findActiveByUser(req.user.id);
   }
 
   // Obtener estadísticas del usuario
   @Get('my-stats')
   @RequirePermissions('console.access')
-  async getMyStats(@Request() req) {
+  async getMyStats(@Param() params: any) {
+    const req = { user: (params as any).user } as any;
     return this.toolRequestsService.getStatsByUser(req.user.id);
   }
 
@@ -84,7 +87,8 @@ export class ToolRequestsController {
   // Obtener solicitud por ID
   @Get(':id')
   @RequirePermissions('console.access')
-  async findById(@Request() req, @Param('id') id: string) {
+  async findById(@Param('id') id: string, @Body() body: any) {
+    const req = { user: body.user } as any;
     const request = await this.toolRequestsService.findById(parseInt(id, 10));
     
     // Usuario solo puede ver sus propias solicitudes, admin puede ver todas
@@ -106,7 +110,8 @@ export class ToolRequestsController {
   // Aprobar solicitud
   @Post(':id/approve')
   @RequirePermissions('console.admin')
-  async approve(@Request() req, @Param('id') id: string) {
+  async approve(@Param('id') id: string, @Body() body: any) {
+    const req = { user: body.user } as any;
     return this.toolRequestsService.approve(parseInt(id, 10), req.user.id);
   }
 
@@ -135,10 +140,10 @@ export class ToolRequestsController {
   @Post(':id/reject')
   @RequirePermissions('console.admin')
   async reject(
-    @Request() req,
     @Param('id') id: string,
-    @Body() data: { adminNotes: string }
+    @Body() data: { adminNotes: string; user?: any }
   ) {
+    const req = { user: data.user } as any;
     return this.toolRequestsService.reject(parseInt(id, 10), req.user.id, data.adminNotes);
   }
 
