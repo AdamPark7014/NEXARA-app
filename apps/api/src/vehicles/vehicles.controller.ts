@@ -21,11 +21,15 @@ import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { VehiclesService } from './vehicles.service.js';
+import { UsersService } from '../users/users.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
 
 @Controller('vehicles')
 export class VehiclesController {
-  constructor(private readonly vehiclesService: VehiclesService) {}
+  constructor(
+    private readonly vehiclesService: VehiclesService,
+    private readonly usersService: UsersService,
+  ) {}
 
   // Endpoint para obtener todos los vehículos
   @Get()
@@ -40,8 +44,8 @@ export class VehiclesController {
       const allowedUserIds = [
         user.id,
         ...allDeptUsers
-          .filter(u => u.role && !u.role.accesoConsoleAdmin)
-          .map(u => u.id),
+          .filter((u: any) => u.role && !u.role.accesoConsoleAdmin)
+          .map((u: any) => u.id),
       ];
       return this.vehiclesService.findByAllowedUsers(allowedUserIds);
     } else {
@@ -251,8 +255,8 @@ export class VehiclesController {
       const allowedUserIds = [
         user.id,
         ...allDeptUsers
-          .filter(u => u.role && !u.role.accesoConsoleAdmin)
-          .map(u => u.id),
+          .filter((u: any) => u.role && !u.role.accesoConsoleAdmin)
+          .map((u: any) => u.id),
       ];
       data = await this.vehiclesService.findByAllowedUsers(allowedUserIds);
     } else {

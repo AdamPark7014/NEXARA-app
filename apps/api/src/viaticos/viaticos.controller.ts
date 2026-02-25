@@ -16,11 +16,15 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { ViaticosService } from './viaticos.service.js';
+import { UsersService } from '../users/users.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
 
 @Controller('viatics')
 export class ViaticosController {
-  constructor(private readonly viaticosService: ViaticosService) {}
+  constructor(
+    private readonly viaticosService: ViaticosService,
+    private readonly usersService: UsersService,
+  ) {}
 
   // Endpoint para obtener todos los viáticos
   @Get()
@@ -36,8 +40,8 @@ export class ViaticosController {
       const allowedUserIds = [
         user.id,
         ...allDeptUsers
-          .filter(u => u.role && !u.role.accesoConsoleAdmin)
-          .map(u => u.id),
+          .filter((u: any) => u.role && !u.role.accesoConsoleAdmin)
+          .map((u: any) => u.id),
       ];
       return this.viaticosService.findByAllowedUsers(allowedUserIds);
     }
