@@ -39,6 +39,7 @@ import { BranchPortalModule } from './branch-portal/branch-portal.module';
 import { VentasModule } from './ventas/ventas.module';
 import { ActivityEvidenceModule } from './activity-evidence/activity-evidence.module';
 import { FinesModule } from './fines/fines.module.js';
+import { ToolRequestsModule } from './tool-requests/tool-requests.module.js';
 
 @Module({
   imports: [
@@ -73,6 +74,7 @@ import { FinesModule } from './fines/fines.module.js';
     VentasModule,
     ActivityEvidenceModule,
     FinesModule,
+    ToolRequestsModule,
   ],
   controllers: [AppController, ExcelExportController, ExcelImportController],
   providers: [
