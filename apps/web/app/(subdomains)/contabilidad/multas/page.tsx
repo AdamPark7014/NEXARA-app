@@ -1,17 +1,20 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import FinesForm from "@/components/FinesForm";
 import { useUser } from "@/components/UserContext";
 import styles from "./page.module.css";
 
-type VehiclePenalty = {
+type Fine = {
   id: number;
-  penalizacionMonto?: number | null;
-  penalizacionNotas?: string | null;
-  estatusAprobacion?: string | null;
-  fechaInicio?: string | null;
-  solicitante?: { nombre: string } | null;
-  vehiculo?: { nombre?: string | null; placas?: string | null } | null;
+  usuarioId: number;
+  tipo: string;
+  razon: string;
+  descripcion?: string;
+  monto: number;
+  estatusPago: string;
+  fechaCreacion: string;
+  usuario?: { nombre: string; email?: string } | null;
 };
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(
@@ -27,29 +30,79 @@ const formatCurrency = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value);
 
-const formatDate = (value?: string | null) =>
-  value ? new Date(value).toLocaleDateString("es-MX") : "-";
+const formatDate = (value: string) =>
+  new Date(value).toLocaleDateString("es-MX");
 
 export default function ContabilidadMultas() {
   const { user } = useUser();
-  const [penalties, setPenalties] = useState<VehiclePenalty[]>([]);
+  const [fines, setFines] = useState<Fine[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!user?.token) return;
-    fetch(buildApiUrl("vehicles"), {
+    fetch(buildApiUrl("fines"), {
       headers: { Authorization: `Bearer ${user.token}` },
     })
       .then((res) => (res.ok ? res.json() : []))
-      .then((data) => {
-        const list = Array.isArray(data) ? data : [];
-        setPenalties(list.filter((item) => (item.penalizacionMonto || 0) > 0));
-      })
-      .catch(() => setPenalties([]));
-  }, [user]);
+      .then((data) => setFines(Array.isArray(data) ? data : []))
+      .catch(() => setFines([]));
+  }, [user?.token, refreshKey]);
 
   const total = useMemo(
-    () => penalties.reduce((sum, item) => sum + (item.penalizacionMonto || 0), 0),
-    [penalties]
+    () => fines.reduce((sum, fine) => sum + Number(fine.monto), 0),
+    [fines]
+  );
+
+  const finesByType = useMemo(() => {
+    return {
+      actividad: fines.filter((f) => f.tipo === "actividad"),
+      vehiculo: fines.filter((f) => f.tipo === "vehiculo"),
+      asistencia: fines.filter((f) => f.tipo === "asistencia"),
+      herramienta: fines.filter((f) => f.tipo === "herramienta"),
+    };
+  }, [fines]);
+
+  const handleFineCreated = () => {
+    setRefreshKey((prev) => prev + 1);
+  };
+
+  const renderTable = (tableData: Fine[], title: string) => (
+    <div>
+      <h3 style={{ marginBottom: 12, color: 'var(--primary)' }}>{title}</h3>
+      <div className={styles.tableWrap}>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>Usuario</th>
+              <th>Razón</th>
+              <th>Descripción</th>
+              <th>Monto</th>
+              <th>Estatus</th>
+              <th>Fecha</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tableData.map((fine) => (
+              <tr key={fine.id}>
+                <td>{fine.usuario?.nombre || "-"}</td>
+                <td>{fine.razon}</td>
+                <td>{fine.descripcion || "-"}</td>
+                <td>{formatCurrency(fine.monto)}</td>
+                <td>{fine.estatusPago}</td>
+                <td>{formatDate(fine.fechaCreacion)}</td>
+              </tr>
+            ))}
+            {tableData.length === 0 && (
+              <tr>
+                <td colSpan={6} style={{ textAlign: "center", padding: "20px" }}>
+                  No hay multas registradas
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 
   return (
@@ -57,9 +110,9 @@ export default function ContabilidadMultas() {
       <header className={styles.header}>
         <div>
           <p className={styles.kicker}>Contabilidad</p>
-          <h1 className={styles.title}>Multas y danos vehiculares</h1>
+          <h1 className={styles.title}>Gestión de Multas</h1>
           <p className={styles.subtitle}>
-            Concentrado de penalizaciones aplicadas a vehiculos en uso operativo.
+            Registra y supervisa todas las multas del personal: actividades, vehículos, asistencia y herramientas.
           </p>
         </div>
       </header>
@@ -67,42 +120,18 @@ export default function ContabilidadMultas() {
       <div className={styles.summaryCard}>
         <p>Total en multas</p>
         <h2>{formatCurrency(total)}</h2>
-        <span>{penalties.length} registros con cargos</span>
+        <span>{fines.length} registros</span>
       </div>
 
-      <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>Vehiculo</th>
-              <th>Responsable</th>
-              <th>Monto</th>
-              <th>Notas</th>
-              <th>Fecha</th>
-              <th>Estatus</th>
-            </tr>
-          </thead>
-          <tbody>
-            {penalties.map((item) => (
-              <tr key={item.id}>
-                <td>
-                  {item.vehiculo?.nombre || "Vehiculo"}
-                  {item.vehiculo?.placas ? ` (${item.vehiculo.placas})` : ""}
-                </td>
-                <td>{item.solicitante?.nombre || "-"}</td>
-                <td>{formatCurrency(item.penalizacionMonto || 0)}</td>
-                <td>{item.penalizacionNotas || "Sin notas"}</td>
-                <td>{formatDate(item.fechaInicio)}</td>
-                <td>{item.estatusAprobacion || "-"}</td>
-              </tr>
-            ))}
-            {penalties.length === 0 && (
-              <tr>
-                <td colSpan={6}>No hay multas registradas.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+      {/* Formulario para crear multas */}
+      <FinesForm onFineCreated={handleFineCreated} />
+
+      {/* Multas por tipo */}
+      <div style={{ display: 'grid', gap: 24 }}>
+        {renderTable(finesByType.actividad, "Multas por Actividades")}
+        {renderTable(finesByType.vehiculo, "Multas por Vehículos")}
+        {renderTable(finesByType.asistencia, "Multas por Asistencia")}
+        {renderTable(finesByType.herramienta, "Multas por Herramientas")}
       </div>
     </section>
   );
