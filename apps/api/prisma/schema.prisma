@@ -309,6 +309,7 @@ model User {
   Viatico              Viatico[]
   attendances          Attendance[]
   attendanceDays       AttendanceDay[]
+  lunchBreaks          LunchBreak[]
   employeePayments     EmployeePayment[]
   employeePaymentsCreated EmployeePayment[] @relation("EmployeePaymentCreator")
   cotizaciones         Cotizacion[]
@@ -748,6 +749,26 @@ model AttendanceDay {
   user        User      @relation(fields: [userId], references: [id])
 
   @@unique([userId, date])
+}
+
+model LunchBreak {
+  id                   Int      @id @default(autoincrement())
+  userId               Int
+  date                 DateTime @db.Date
+  checkinTime          DateTime
+  checkoutTime         DateTime?
+  checkinPhotoUrl      String   // Foto obligatoria al entrar a comida
+  checkoutPhotoUrl     String?  // Foto opcional al volver
+  status               String   @default("IN_PROGRESS") // PENDING, IN_PROGRESS, COMPLETED
+  isCheckinLate        Boolean  @default(false) // Si checkin fue fuera de 15:00-16:00
+  isCheckoutLate       Boolean  @default(false) // Si checkout fue fuera de horario esperado
+  notes                String?  // Comentario si se pasó de hora
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  user                 User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date])
+  @@map("lunch_breaks")
 }
 
 model EmployeePayment {
