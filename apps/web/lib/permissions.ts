@@ -29,6 +29,10 @@ export const PERMISSIONS = {
   CONTABILIDAD_VIEW: 'contabilidad.view',
   CONTABILIDAD_MANAGE: 'contabilidad.manage',
   COTIZACIONES_ACCESS: 'cotizaciones.access',
+  TOOLS_VIEW: 'tools.view',
+  TOOLS_REQUEST: 'tools.request',
+  TOOLS_MANAGE: 'tools.manage',
+  TOOLS_INVENTORY: 'tools.inventory',
 } as const;
 
 export type Permission = typeof PERMISSIONS[keyof typeof PERMISSIONS];

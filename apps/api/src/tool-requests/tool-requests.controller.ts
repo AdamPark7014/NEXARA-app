@@ -22,7 +22,7 @@ export class ToolRequestsController {
 
   // Crear solicitud de herramienta
   @Post()
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_REQUEST] })
   async create(@CurrentUser() user: any, @Body() data: CreateToolRequestDto) {
     // El usuario solo puede crear solicitudes para sí mismo
     if (data.usuarioId !== user.id) {
@@ -33,56 +33,56 @@ export class ToolRequestsController {
 
   // Obtener todas las solicitudes (admin/superadmin)
   @Get()
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
   async findAll() {
     return this.toolRequestsService.findAll();
   }
 
   // Obtener solicitudes del usuario actual
   @Get('my-requests')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_VIEW] })
   async getMyRequests(@CurrentUser() user: any) {
     return this.toolRequestsService.findByUser(user.id);
   }
 
   // Obtener solicitudes por usuario (admin)
   @Get('user/:id')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
   async findByUser(@Param('id') id: string) {
     return this.toolRequestsService.findByUser(parseInt(id, 10));
   }
 
   // Obtener solicitudes por estado
   @Get('status/:status')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
   async findByStatus(@Param('status') status: string) {
     return this.toolRequestsService.findByStatus(status as any);
   }
 
   // Obtener herramientas activas del usuario
   @Get('my-active')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_VIEW] })
   async getMyActive(@CurrentUser() user: any) {
     return this.toolRequestsService.findActiveByUser(user.id);
   }
 
   // Obtener estadísticas del usuario
   @Get('my-stats')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_VIEW] })
   async getMyStats(@CurrentUser() user: any) {
     return this.toolRequestsService.getStatsByUser(user.id);
   }
 
   // Obtener estadísticas por usuario (admin)
   @Get('stats/:id')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
   async getUserStats(@Param('id') id: string) {
     return this.toolRequestsService.getStatsByUser(parseInt(id, 10));
   }
 
   // Obtener solicitud por ID
   @Get(':id')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_VIEW] })
   async findById(@CurrentUser() user: any, @Param('id') id: string) {
     const request = await this.toolRequestsService.findById(parseInt(id, 10));
     
@@ -101,28 +101,28 @@ export class ToolRequestsController {
 
   // Actualizar solicitud
   @Put(':id')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
   async update(@Param('id') id: string, @Body() data: UpdateToolRequestDto) {
     return this.toolRequestsService.update(parseInt(id, 10), data);
   }
 
   // Aprobar solicitud
   @Post(':id/approve')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
   async approve(@CurrentUser() user: any, @Param('id') id: string) {
     return this.toolRequestsService.approve(parseInt(id, 10), user.id);
   }
 
   // Entregar herramienta
   @Post(':id/deliver')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
   async deliver(@Param('id') id: string) {
     return this.toolRequestsService.deliver(parseInt(id, 10));
   }
 
   // Devolver herramienta
   @Post(':id/return')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
   async return(
     @Param('id') id: string,
     @Body() data: { damageDescription?: string; damagePhotoUrl?: string }
@@ -136,7 +136,7 @@ export class ToolRequestsController {
 
   // Rechazar solicitud
   @Post(':id/reject')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
   async reject(
     @CurrentUser() user: any,
     @Param('id') id: string,
@@ -147,7 +147,7 @@ export class ToolRequestsController {
 
   // Eliminar solicitud
   @Delete(':id')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
   async delete(@Param('id') id: string) {
     return this.toolRequestsService.delete(parseInt(id, 10));
   }
@@ -156,7 +156,7 @@ export class ToolRequestsController {
 
   // Solicitar renovación de herramienta
   @Post(':id/renewal-request')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_VIEW] })
   async requestRenewal(
     @CurrentUser() user: any,
     @Param('id') id: string,
@@ -174,21 +174,21 @@ export class ToolRequestsController {
 
   // Obtener renovaciones pendientes (admin)
   @Get('renewals/pending')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
   async getPendingRenewals() {
     return this.toolRequestsService.findRenewals(undefined, 'PENDING');
   }
 
   // Obtener renovaciones de una herramienta
   @Get('renewals/by-tool/:toolId')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
   async getRenewalsByTool(@Param('toolId') toolId: string) {
     return this.toolRequestsService.findRenewals(parseInt(toolId, 10));
   }
 
   // Aprobar renovación
   @Post('renewals/:renewalId/approve')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
   async approveRenewal(
     @CurrentUser() user: any,
     @Param('renewalId') renewalId: string
@@ -198,7 +198,7 @@ export class ToolRequestsController {
 
   // Rechazar renovación
   @Post('renewals/:renewalId/reject')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
   async rejectRenewal(
     @CurrentUser() user: any,
     @Param('renewalId') renewalId: string,
@@ -215,21 +215,21 @@ export class ToolRequestsController {
 
   // Obtener notificaciones del usuario
   @Get('notifications/my')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_VIEW] })
   async getMyNotifications(@CurrentUser() user: any) {
     return this.toolRequestsService.getUserNotifications(user.id);
   }
 
   // Marcar notificación como leída
   @Put('notifications/:notificationId/read')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_VIEW] })
   async markNotificationAsRead(@Param('notificationId') notificationId: string) {
     return this.toolRequestsService.markNotificationAsRead(parseInt(notificationId, 10));
   }
 
   // Verificar herramientas próximas a vencer (cron job endpoint)
   @Post('check-expiring')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
   async checkExpiringTools() {
     const count = await this.toolRequestsService.checkExpiringTools();
     return {
