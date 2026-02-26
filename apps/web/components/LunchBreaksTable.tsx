@@ -39,7 +39,11 @@ const LunchBreaksTable: React.FC = () => {
     if (!user) return;
     setLoading(true);
     try {
-      let endpoint = buildApiUrl('lunch-breaks/users');
+      // Usar endpoint correspondiente según el rol
+      const isAdmin = user.permissions?.includes('attendance.manage') || user.isSuperAdmin;
+      const baseEndpoint = isAdmin ? 'lunch-breaks/users' : 'lunch-breaks/my-breaks';
+      let endpoint = buildApiUrl(baseEndpoint);
+      
       if (dateFilter) {
         const date = new Date(dateFilter);
         const startDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
