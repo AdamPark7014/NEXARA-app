@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 
 // Definir el tipo localmente
 type ToolRequestStatus = 'PENDING' | 'APPROVED' | 'IN_USE' | 'RETURNED' | 'DAMAGED' | 'REJECTED';
+type RenewalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface CreateToolRequestDto {
   usuarioId: number;
@@ -10,7 +11,8 @@ export interface CreateToolRequestDto {
   model: string;
   serialNumber: string;
   reason: string;
-  estimatedPeriod: string;
+  startDate: Date;
+  expectedReturnDate: Date;
   generalPhotoUrl: string;
   specificationsPhotoUrl: string;
 }
@@ -27,6 +29,12 @@ export interface UpdateToolRequestDto {
   approvedBy?: number;
 }
 
+export interface CreateRenewalDto {
+  toolRequestId: number;
+  newReturnDate: Date;
+  renewalReason?: string;
+}
+
 @Injectable()
 export class ToolRequestsService {
   constructor(private prisma: PrismaService) {}
@@ -39,7 +47,8 @@ export class ToolRequestsService {
         model: data.model,
         serialNumber: data.serialNumber,
         reason: data.reason,
-        estimatedPeriod: data.estimatedPeriod,
+        startDate: data.startDate,
+        expectedReturnDate: data.expectedReturnDate,
         generalPhotoUrl: data.generalPhotoUrl,
         specificationsPhotoUrl: data.specificationsPhotoUrl,
         status: 'PENDING',
@@ -313,5 +322,200 @@ export class ToolRequestsService {
       damaged,
       total: inUse + pending + returned + damaged,
     };
+  }
+
+  // Renovaciones (Extensions)
+  async requestRenewal(data: CreateRenewalDto, usuarioId: number) {
+    // Verificar que la herramienta pertenece al usuario
+    const toolRequest = await this.prisma.toolRequest.findUnique({
+      where: { id: data.toolRequestId },
+    });
+
+    if (!toolRequest || toolRequest.usuarioId !== usuarioId) {
+      throw new Error('No tienes permiso para renovar esta solicitud');
+    }
+
+    return this.prisma.toolRenewal.create({
+      data: {
+        toolRequestId: data.toolRequestId,
+        previousReturnDate: toolRequest.expectedReturnDate,
+        newReturnDate: data.newReturnDate,
+        renewalReason: data.renewalReason,
+        status: 'PENDING',
+      },
+      include: {
+        toolRequest: {
+          select: {
+            toolName: true,
+            usuario: {
+              select: {
+                nombre: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  async findRenewals(toolRequestId?: number, status?: RenewalStatus) {
+    const where: any = {};
+    if (toolRequestId) where.toolRequestId = toolRequestId;
+    if (status) where.status = status;
+
+    return this.prisma.toolRenewal.findMany({
+      where,
+      include: {
+        toolRequest: {
+          include: {
+            usuario: {
+              select: {
+                id: true,
+                nombre: true,
+                email: true,
+              },
+            },
+          },
+        },
+        approver: {
+          select: {
+            id: true,
+            nombre: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        requestDate: 'desc',
+      },
+    });
+  }
+
+  async approveRenewal(renewalId: number, approvedBy: number) {
+    const renewal = await this.prisma.toolRenewal.findUnique({
+      where: { id: renewalId },
+    });
+
+    if (!renewal) throw new Error('Renovación no encontrada');
+
+    // Actualizar la solicitud de herramienta con la nueva fecha de devolución
+    await this.prisma.toolRequest.update({
+      where: { id: renewal.toolRequestId },
+      data: {
+        expectedReturnDate: renewal.newReturnDate,
+        renewalCount: {
+          increment: 1,
+        },
+      },
+    });
+
+    // Actualizar la renovación
+    const updated = await this.prisma.toolRenewal.update({
+      where: { id: renewalId },
+      data: {
+        status: 'APPROVED',
+        approvalDate: new Date(),
+        approvedBy,
+      },
+    });
+
+    // Crear notificación
+    await this.createNotification(
+      renewal.toolRequestId,
+      (await this.prisma.toolRequest.findUnique({ where: { id: renewal.toolRequestId } }))!.usuarioId,
+      'TOOL_RENEWAL_APPROVED',
+      `Tu solicitud de renovación para ${(await this.prisma.toolRequest.findUnique({ where: { id: renewal.toolRequestId }, select: { toolName: true } }))!.toolName} ha sido aprobada`
+    );
+
+    return updated;
+  }
+
+  async rejectRenewal(renewalId: number, approvedBy: number, reason: string) {
+    return this.prisma.toolRenewal.update({
+      where: { id: renewalId },
+      data: {
+        status: 'REJECTED',
+        approvedBy,
+      },
+    });
+  }
+
+  // Notificaciones
+  async createNotification(toolRequestId: number, usuarioId: number, type: string, message: string) {
+    return this.prisma.toolRequestNotification.create({
+      data: {
+        toolRequestId,
+        usuarioId,
+        type: type as any,
+        message,
+      },
+    });
+  }
+
+  async getUserNotifications(usuarioId: number) {
+    return this.prisma.toolRequestNotification.findMany({
+      where: { usuarioId },
+      include: {
+        toolRequest: {
+          select: {
+            id: true,
+            toolName: true,
+            status: true,
+          },
+        },
+      },
+      orderBy: {
+        sentAt: 'desc',
+      },
+    });
+  }
+
+  async markNotificationAsRead(notificationId: number) {
+    return this.prisma.toolRequestNotification.update({
+      where: { id: notificationId },
+      data: {
+        isRead: true,
+        readAt: new Date(),
+      },
+    });
+  }
+
+  // Verificar y enviar alertas de vencimiento próximo (debe ejecutarse via cron)
+  async checkExpiringTools() {
+    const now = new Date();
+    // Alertar herramientas que vencen en 2 días
+    const twoDaysFromNow = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
+
+    const expiringTools = await this.prisma.toolRequest.findMany({
+      where: {
+        status: 'IN_USE',
+        expectedReturnDate: {
+          lte: twoDaysFromNow,
+          gt: now,
+        },
+        notificationSent: false,
+      },
+    });
+
+    for (const tool of expiringTools) {
+      await this.createNotification(
+        tool.id,
+        tool.usuarioId,
+        'TOOL_EXPIRATION_WARNING',
+        `La herramienta "${tool.toolName}" vence el ${tool.expectedReturnDate.toLocaleDateString()}. Por favor, devuélvela o solicita una renovación.`
+      );
+
+      // Marcar como notificado
+      await this.prisma.toolRequest.update({
+        where: { id: tool.id },
+        data: {
+          notificationSent: true,
+          notificationSentAt: new Date(),
+        },
+      });
+    }
+
+    return expiringTools.length;
   }
 }

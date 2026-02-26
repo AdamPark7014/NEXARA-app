@@ -1,9 +1,17 @@
 "use client";
 
-import { useState, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import styles from "../../console.module.css";
 import { useUser } from "@/components/UserContext";
 import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions";
+
+type BorrowTool = {
+  id: number;
+  toolName: string;
+  startDate: string;
+  expectedReturnDate: string;
+  status: string;
+};
 
 export default function MyToolsPage() {
   const { user } = useUser();
@@ -11,9 +19,28 @@ export default function MyToolsPage() {
   const [photoStep, setPhotoStep] = useState<"general" | "specifications" | null>(null);
   const [generalPhoto, setGeneralPhoto] = useState<string | null>(null);
   const [specificationsPhoto, setSpecificationsPhoto] = useState<string | null>(null);
+  const [borrowTools, setBorrowTools] = useState<BorrowTool[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const [formData, setFormData] = useState({
+    tool: "",
+    model: "",
+    serial: "",
+    reason: "",
+    startDate: new Date().toISOString().split("T")[0],
+    expectedReturnDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+  });
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      loadBorrowTools();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   if (!user) return null;
 
@@ -29,7 +56,7 @@ export default function MyToolsPage() {
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        await videoRef.current.play();
       }
     } catch (error) {
       console.error("Error al acceder a la cámara:", error);
@@ -48,13 +75,13 @@ export default function MyToolsPage() {
       if (ctx) {
         ctx.drawImage(video, 0, 0);
         const photoData = canvas.toDataURL("image/jpeg", 0.9);
-        
+
         if (photoStep === "general") {
           setGeneralPhoto(photoData);
         } else if (photoStep === "specifications") {
           setSpecificationsPhoto(photoData);
         }
-        
+
         stopCamera();
       }
     }
@@ -76,6 +103,103 @@ export default function MyToolsPage() {
     }
   };
 
+  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!generalPhoto || !specificationsPhoto) {
+      alert("Ambas fotos son obligatorias");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch("/api/tool-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          usuarioId: user.id,
+          toolName: formData.tool,
+          model: formData.model,
+          serialNumber: formData.serial,
+          reason: formData.reason,
+          startDate: formData.startDate,
+          expectedReturnDate: formData.expectedReturnDate,
+          generalPhotoUrl: generalPhoto,
+          specificationsPhotoUrl: specificationsPhoto,
+        }),
+      });
+
+      if (response.ok) {
+        alert("Solicitud enviada con éxito");
+        setShowRequest(false);
+        setFormData({
+          tool: "",
+          model: "",
+          serial: "",
+          reason: "",
+          startDate: new Date().toISOString().split("T")[0],
+          expectedReturnDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+        });
+        setGeneralPhoto(null);
+        setSpecificationsPhoto(null);
+        loadBorrowTools();
+      } else {
+        console.error("Respuesta no exitosa", await response.text());
+        alert("No se pudo enviar la solicitud");
+      }
+    } catch (error) {
+      console.error("Error al enviar solicitud:", error);
+      alert("Error al enviar la solicitud");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadBorrowTools = async () => {
+    try {
+      const response = await fetch("/api/tool-requests/my-active");
+      if (response.ok) {
+        const data = await response.json();
+        setBorrowTools(data);
+      }
+    } catch (error) {
+      console.error("Error al cargar herramientas:", error);
+    }
+  };
+
+  const handleRenew = async (toolId: number, currentDate: string) => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(newDate.getDate() + 7);
+    const reason = prompt("Describe el motivo de la renovación:");
+    if (!reason) return;
+
+    try {
+      const response = await fetch(`/api/tool-requests/${toolId}/renewal-request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          newReturnDate: newDate.toISOString(),
+          renewalReason: reason,
+        }),
+      });
+
+      if (!response.ok) {
+        alert("No se pudo enviar la renovación");
+      } else {
+        alert("Renovación enviada");
+        loadBorrowTools();
+      }
+    } catch (error) {
+      console.error("Error al solicitar renovación:", error);
+      alert("Error al solicitar renovación");
+    }
+  };
+
   return (
     <div className={styles.pageContainer}>
       <div className={styles.pageHeader}>
@@ -93,38 +217,93 @@ export default function MyToolsPage() {
 
         {showRequest && (
           <div className={styles.formCard}>
-            <form className={styles.fineForm}>
+            <form className={styles.fineForm} onSubmit={handleSubmit}>
               <div className={styles.formGroup}>
                 <label htmlFor="tool">Nombre de la herramienta</label>
-                <input id="tool" className={styles.formInput} placeholder="Ej. Taladro, Laptop, Equipo de seguridad" required />
+                <input
+                  id="tool"
+                  name="tool"
+                  value={formData.tool}
+                  onChange={handleFormChange}
+                  className={styles.formInput}
+                  placeholder="Ej. Taladro, Laptop, Equipo de seguridad"
+                  required
+                />
               </div>
 
               <div className={styles.formGroup}>
                 <label htmlFor="model">Modelo</label>
-                <input id="model" className={styles.formInput} placeholder="Modelo de la herramienta" required />
+                <input
+                  id="model"
+                  name="model"
+                  value={formData.model}
+                  onChange={handleFormChange}
+                  className={styles.formInput}
+                  placeholder="Modelo de la herramienta"
+                  required
+                />
               </div>
 
               <div className={styles.formGroup}>
                 <label htmlFor="serial">Número de serie</label>
-                <input id="serial" className={styles.formInput} placeholder="Número de serie único" required />
+                <input
+                  id="serial"
+                  name="serial"
+                  value={formData.serial}
+                  onChange={handleFormChange}
+                  className={styles.formInput}
+                  placeholder="Número de serie único"
+                  required
+                />
               </div>
 
               <div className={styles.formGroup}>
                 <label htmlFor="reason">Motivo de uso</label>
-                <textarea id="reason" className={styles.formInput} rows={3} placeholder="Describe para qué la necesitas" required />
+                <textarea
+                  id="reason"
+                  name="reason"
+                  value={formData.reason}
+                  onChange={handleFormChange}
+                  className={styles.formInput}
+                  rows={3}
+                  placeholder="Describe para qué la necesitas"
+                  required
+                />
               </div>
 
-              <div className={styles.formGroup}>
-                <label htmlFor="period">Periodo estimado de uso</label>
-                <input id="period" className={styles.formInput} placeholder="Ej. 3 días, 1 semana" required />
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label htmlFor="startDate">Fecha de inicio del préstamo</label>
+                  <input
+                    id="startDate"
+                    name="startDate"
+                    type="date"
+                    value={formData.startDate}
+                    onChange={handleFormChange}
+                    className={styles.formInput}
+                    required
+                  />
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label htmlFor="expectedReturnDate">Fecha esperada de devolución</label>
+                  <input
+                    id="expectedReturnDate"
+                    name="expectedReturnDate"
+                    type="date"
+                    value={formData.expectedReturnDate}
+                    onChange={handleFormChange}
+                    min={formData.startDate}
+                    className={styles.formInput}
+                    required
+                  />
+                </div>
               </div>
 
-              {/* Fotos requeridas */}
               <div className={styles.photoSection}>
                 <h3>Fotografías requeridas (2)</h3>
                 <p className={styles.photoNote}>Ambas fotos son obligatorias para completar la solicitud</p>
 
-                {/* Foto general */}
                 <div className={styles.photoGroup}>
                   <label>1. Foto panorámica de la herramienta</label>
                   {!generalPhoto ? (
@@ -150,7 +329,6 @@ export default function MyToolsPage() {
                   )}
                 </div>
 
-                {/* Foto especificaciones */}
                 <div className={styles.photoGroup}>
                   <label>2. Foto del modelo y número de serie</label>
                   {!specificationsPhoto ? (
@@ -181,9 +359,9 @@ export default function MyToolsPage() {
                 <button
                   type="submit"
                   className={styles.primaryButton}
-                  disabled={!generalPhoto || !specificationsPhoto}
+                  disabled={!generalPhoto || !specificationsPhoto || loading}
                 >
-                  Enviar solicitud
+                  {loading ? "Enviando..." : "Enviar solicitud"}
                 </button>
                 <button type="button" className={styles.secondaryButton} onClick={() => setShowRequest(false)}>
                   Cancelar
@@ -194,7 +372,6 @@ export default function MyToolsPage() {
         )}
       </div>
 
-      {/* Modal de cámara */}
       {photoStep && (
         <div className={styles.cameraModal}>
           <div className={styles.cameraContainer}>
@@ -232,13 +409,32 @@ export default function MyToolsPage() {
                 <th>Fecha préstamo</th>
                 <th>Fecha devolución</th>
                 <th>Estado</th>
-                <th>Observaciones</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td colSpan={5} className={styles.emptyTableMessage}>No tienes herramientas asignadas</td>
-              </tr>
+              {borrowTools.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className={styles.emptyTableMessage}>No tienes herramientas asignadas</td>
+                </tr>
+              ) : (
+                borrowTools.map((tool) => (
+                  <tr key={tool.id}>
+                    <td>{tool.toolName}</td>
+                    <td>{new Date(tool.startDate).toLocaleDateString()}</td>
+                    <td>{new Date(tool.expectedReturnDate).toLocaleDateString()}</td>
+                    <td>{tool.status}</td>
+                    <td>
+                      <button
+                        className={styles.secondaryButton}
+                        onClick={() => handleRenew(tool.id, tool.expectedReturnDate)}
+                      >
+                        🔄 Renovar
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

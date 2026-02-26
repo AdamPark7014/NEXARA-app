@@ -327,6 +327,8 @@ model User {
   fines            Fine[]
   toolRequests     ToolRequest[]       @relation("UserToolRequests")
   approvedToolRequests ToolRequest[]   @relation("AdminApprovals")
+  toolRenewalsApproved ToolRenewal[]    @relation("AdminRenewals")
+  toolNotifications ToolRequestNotification[] @relation("ToolNotifications")
 }
 
 model UserProfile {
@@ -1137,6 +1139,11 @@ enum NotificationType {
   VIATICO_APPROVED
   VIATICO_REJECTED
   ATTENDANCE_UPDATE
+  TOOL_EXPIRATION_WARNING
+  TOOL_EXPIRATION_DUE
+  TOOL_APPROVED
+  TOOL_DELIVERED
+  TOOL_RENEWAL_APPROVED
 }
 
 model Notification {
@@ -1184,6 +1191,12 @@ enum ToolRequestStatus {
   REJECTED     // Solicitud rechazada
 }
 
+enum RenewalStatus {
+  PENDING      // Solicitud de renovación pendiente
+  APPROVED     // Renovación aprobada
+  REJECTED     // Renovación rechazada
+}
+
 model ToolRequest {
   id                    Int                 @id @default(autoincrement())
   usuarioId             Int
@@ -1191,27 +1204,71 @@ model ToolRequest {
   model                 String              @db.VarChar(200)      // Modelo
   serialNumber          String              @db.VarChar(200)      // Número de serie
   reason                String              @db.Text              // Motivo de uso
-  estimatedPeriod       String              @db.VarChar(100)      // Periodo estimado (ej. "3 días")
+  startDate             DateTime                                  // Fecha de inicio del préstamo
+  expectedReturnDate    DateTime                                  // Fecha esperada de devolución (candlerizacion)
   generalPhotoUrl       String              @db.VarChar(500)      // Foto panorámica
   specificationsPhotoUrl String             @db.VarChar(500)      // Foto de modelo y serie
   status                ToolRequestStatus   @default(PENDING)
   requestDate           DateTime            @default(now())       // Fecha de solicitud
   approvalDate          DateTime?                                 // Fecha de aprobación
   deliveryDate          DateTime?                                 // Fecha de entrega al usuario
-  returnDate            DateTime?                                 // Fecha de devolución
-  expectedReturnDate    DateTime?                                 // Fecha esperada de devolución
+  returnDate            DateTime?                                 // Fecha de devolución real
   damageDescription     String?             @db.Text              // Descripción de daños si aplica
   damagePhotoUrl        String?             @db.VarChar(500)      // Foto de daños si aplica
   adminNotes            String?             @db.Text              // Notas del administrador
   approvedBy            Int?                                      // Usuario admin que aprobó
+  notificationSent      Boolean             @default(false)       // Notificación de vencimiento enviada
+  notificationSentAt    DateTime?                                 // Fecha de envío de notificación
+  renewalCount          Int                 @default(0)           // Contador de renovaciones
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
   
   usuario               User                @relation("UserToolRequests", fields: [usuarioId], references: [id], onDelete: Cascade)
   approver              User?               @relation("AdminApprovals", fields: [approvedBy], references: [id])
+  renewals              ToolRenewal[]       @relation("ToolRequestRenewals")
+  notifications         ToolRequestNotification[] @relation("ToolRequestNotifications")
 
   @@index([usuarioId, status])
   @@index([status, requestDate])
+  @@index([expectedReturnDate])
   @@map("tool_requests")
+}
+
+model ToolRenewal {
+  id                    Int                 @id @default(autoincrement())
+  toolRequestId         Int
+  previousReturnDate    DateTime                                  // Fecha de devolución anterior
+  newReturnDate         DateTime                                  // Nueva fecha de devolución
+  renewalReason         String?             @db.Text              // Razón de la renovación
+  approvedBy            Int?                                      // Usuario admin que aprobó
+  requestDate           DateTime            @default(now())       // Fecha de solicitud de renovación
+  approvalDate          DateTime?                                 // Fecha de aprobación
+  status                RenewalStatus       @default(PENDING)
+  createdAt             DateTime            @default(now())
+  
+  toolRequest           ToolRequest         @relation("ToolRequestRenewals", fields: [toolRequestId], references: [id], onDelete: Cascade)
+  approver              User?               @relation("AdminRenewals", fields: [approvedBy], references: [id])
+
+  @@index([toolRequestId, status])
+  @@index([approvalDate])
+  @@map("tool_renewals")
+}
+
+model ToolRequestNotification {
+  id                    Int                 @id @default(autoincrement())
+  toolRequestId         Int
+  usuarioId             Int
+  type                  NotificationType
+  message               String              @db.Text
+  isRead                Boolean             @default(false)
+  readAt                DateTime?
+  sentAt                DateTime            @default(now())
+  
+  toolRequest           ToolRequest         @relation("ToolRequestNotifications", fields: [toolRequestId], references: [id], onDelete: Cascade)
+  usuario               User                @relation("ToolNotifications", fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, isRead])
+  @@index([toolRequestId, type])
+  @@map("tool_request_notifications")
 }
 
