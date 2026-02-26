@@ -22,7 +22,7 @@ const LunchBreakPage = () => {
         🍽️ Gestión de Horas de Comida
       </h1>
 
-      {/* Tabs para usuarios normales */}
+      {/* Tabs - Se muestran para usuarios normales Y admins (NO para superadmins) */}
       {!isSuperAdmin && (
         <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
           <button
@@ -68,13 +68,13 @@ const LunchBreakPage = () => {
               transition: 'all 0.2s',
             }}
           >
-            📋 Mi Historial
+            📋 {isAdmin ? 'Historial de Todos' : 'Mi Historial'}
           </button>
         </div>
       )}
 
-      {/* Contenido */}
-      {activeTab === 'checkin' && (
+      {/* Formularios - Solo para usuarios normales y admins (NO superadmins) */}
+      {!isSuperAdmin && activeTab === 'checkin' && (
         <LunchBreakForm
           key={`checkin-${refreshKey}`}
           isCheckin={true}
@@ -85,7 +85,7 @@ const LunchBreakPage = () => {
         />
       )}
 
-      {activeTab === 'checkout' && (
+      {!isSuperAdmin && activeTab === 'checkout' && (
         <LunchBreakForm
           key={`checkout-${refreshKey}`}
           isCheckin={false}
@@ -96,7 +96,8 @@ const LunchBreakPage = () => {
         />
       )}
 
-      {(activeTab === 'history' || isAdmin || isSuperAdmin) && (
+      {/* Tabla - Se muestra en tab history para usuarios/admins, o siempre para superadmins */}
+      {(activeTab === 'history' || isSuperAdmin) && (
         <LunchBreaksTable key={refreshKey} />
       )}
     </div>
