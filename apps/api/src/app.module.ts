@@ -40,6 +40,7 @@ import { VentasModule } from './ventas/ventas.module';
 import { ActivityEvidenceModule } from './activity-evidence/activity-evidence.module';
 import { FinesModule } from './fines/fines.module.js';
 import { ToolRequestsModule } from './tool-requests/tool-requests.module.js';
+import { LunchBreaksModule } from './lunch-breaks/lunch-breaks.module.js';
 
 @Module({
   imports: [
@@ -75,6 +76,7 @@ import { ToolRequestsModule } from './tool-requests/tool-requests.module.js';
     ActivityEvidenceModule,
     FinesModule,
     ToolRequestsModule,
+    LunchBreaksModule,
   ],
   controllers: [AppController, ExcelExportController, ExcelImportController],
   providers: [

@@ -23,6 +23,9 @@ const SidebarMenu = () => {
         {hasPermission(user, PERMISSIONS.ATTENDANCE_VIEW) && (
           <li className="menu-item"><Link href="/console/attendance">Entradas/Salidas</Link></li>
         )}
+        {hasPermission(user, PERMISSIONS.ATTENDANCE_VIEW) && (
+          <li className="menu-item"><Link href="/console/lunch-breaks">🍽️ Horas de Comida</Link></li>
+        )}
         {hasPermission(user, PERMISSIONS.VEHICLES_VIEW) && (
           <li className="menu-item"><Link href="/console/vehicles">Vehículos</Link></li>
         )}
