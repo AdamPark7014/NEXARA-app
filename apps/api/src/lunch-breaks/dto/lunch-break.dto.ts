@@ -1,9 +1,17 @@
+import { IsString, IsISO8601 } from 'class-validator';
+
 export class CreateLunchBreakDto {
-  checkinTime: string; // ISO datetime string
-  checkinPhotoUrl: string;
+  @IsISO8601()
+  checkinTime!: string; // ISO datetime string
+
+  @IsString()
+  checkinPhotoUrl!: string;
 }
 
 export class UpdateLunchBreakDto {
-  checkoutTime: string; // ISO datetime string
-  checkoutPhotoUrl: string;
+  @IsISO8601()
+  checkoutTime!: string; // ISO datetime string
+
+  @IsString()
+  checkoutPhotoUrl?: string;
 }

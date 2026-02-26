@@ -14,7 +14,7 @@ export class LunchBreaksCronService {
     this.logger.debug('CRON: Enviando notificaciones de hora de comida próxima');
 
     try {
-      const users = await this.prisma['user'].findMany({
+      const users = await this.prisma.user.findMany({
         where: {
           role: {
             accesoConsole: true, // Usuarios con acceso a consola (no superadmin)
@@ -29,8 +29,8 @@ export class LunchBreaksCronService {
 
       // Crear notificaciones para cada usuario
       const notifications = users
-        .filter(u => u.email !== 'developer@nexara.com.mx' && u.email !== 'gerencia@nexara.com.mx') // Excluir superadmins
-        .map(u => ({
+        .filter((u: any) => u.email !== 'developer@nexara.com.mx' && u.email !== 'gerencia@nexara.com.mx') // Excluir superadmins
+        .map((u: any) => ({
           usuarioId: u.id,
           tipo: 'LUNCH_BREAK_APPROACHING',
           titulo: '🍽️ Hora de Comida',
@@ -64,13 +64,13 @@ export class LunchBreaksCronService {
       today.setHours(0, 0, 0, 0);
 
       // Obtener usuarios que no han hecho checkout de comida
-      const usersWithoutCheckout = await this.prisma['lunchBreak'].findMany({
+      const usersWithoutCheckout = await this.prisma.lunchBreak.findMany({
         where: {
           date: today,
           checkoutTime: null, // No han hecho checkout
         },
         select: {
-          usuario: {
+          user: {
             select: {
               id: true,
               nombre: true,
@@ -78,7 +78,7 @@ export class LunchBreaksCronService {
             },
           },
         },
-        distinct: ['usuarioId'],
+        distinct: ['userId'],
       });
 
       if (usersWithoutCheckout.length === 0) {
@@ -87,9 +87,9 @@ export class LunchBreaksCronService {
       }
 
       const notifications = usersWithoutCheckout
-        .filter(u => u.usuario.email !== 'developer@nexara.com.mx' && u.usuario.email !== 'gerencia@nexara.com.mx')
-        .map(u => ({
-          usuarioId: u.usuario.id,
+        .filter((u: any) => u.user.email !== 'developer@nexara.com.mx' && u.user.email !== 'gerencia@nexara.com.mx')
+        .map((u: any) => ({
+          usuarioId: u.user.id,
           tipo: 'LUNCH_BREAK_EXPIRED',
           titulo: '🍽️ Hora de Comida Completada',
           mensaje: `Tu hora de comida ha expirado. Por favor regresa al trabajo y registra tu salida con una foto de que iniciaste labores nuevamente.`,
@@ -115,7 +115,7 @@ export class LunchBreaksCronService {
   // Notificación para admins cuando usuarios registran comida (solo en horario de trabajo)
   async notifyAdminUserLunchBreak(userData: { id: number; nombre: string; email: string }, type: 'checkin' | 'checkout', photoUrl?: string) {
     try {
-      const adminUsers = await this.prisma['user'].findMany({
+      const adminUsers = await this.prisma.user.findMany({
         where: {
           role: {
             accesoConsoleAdmin: true,
@@ -142,14 +142,14 @@ export class LunchBreaksCronService {
 
       if (!isSuperAdmin && !userData.email.includes('@nexara.com.mx')) {
         // Usuario normal -> notificar a admins
-        targetUserIds = adminUsers.map(u => u.id);
+        targetUserIds = adminUsers.map((u: any) => u.id);
       } else if (adminUsers.length > 0) {
         // Admin -> notificar a otros admins y superadmins
-        targetUserIds = adminUsers.map(u => u.id).filter(id => id !== userData.id);
+        targetUserIds = adminUsers.map((u: any) => u.id).filter((id: any) => id !== userData.id);
       }
 
       if (targetUserIds.length > 0) {
-        const notifications = targetUserIds.map(userId => ({
+        const notifications = targetUserIds.map((userId: any) => ({
           usuarioId: userId,
           tipo: type === 'checkin' ? 'USER_LUNCH_CHECKIN' : 'USER_LUNCH_CHECKOUT',
           titulo: titles[type],
@@ -158,7 +158,7 @@ export class LunchBreaksCronService {
           createdAt: new Date(),
         }));
 
-        await this.prisma['notification'].createMany({
+        await this.prisma.notification.createMany({
           data: notifications as any,
         });
 

@@ -11,9 +11,9 @@ export class LunchBreaksService {
     today.setHours(0, 0, 0, 0);
 
     // Verificar si ya existe un registro de comida hoy
-    const existingLunch = await this.prisma['lunchBreak'].findUnique({
+    const existingLunch = await this.prisma.lunchBreak.findUnique({
       where: {
-        usuarioId_date: { usuarioId, date: today },
+        userId_date: { userId: usuarioId, date: today },
       },
     });
 
@@ -37,7 +37,7 @@ export class LunchBreaksService {
 
     if (existingLunch) {
       // Actualizar registro existente
-      return await this.prisma['lunchBreak'].update({
+      return await this.prisma.lunchBreak.update({
         where: { id: existingLunch.id },
         data: {
           checkinTime,
@@ -52,9 +52,9 @@ export class LunchBreaksService {
     }
 
     // Crear nuevo registro
-    return await this.prisma['lunchBreak'].create({
+    return await this.prisma.lunchBreak.create({
       data: {
-        usuarioId,
+        userId: usuarioId,
         date: today,
         checkinTime,
         checkinPhotoUrl: data.checkinPhotoUrl,
@@ -70,9 +70,9 @@ export class LunchBreaksService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const lunch = await this.prisma['lunchBreak'].findUnique({
+    const lunch = await this.prisma.lunchBreak.findUnique({
       where: {
-        usuarioId_date: { usuarioId, date: today },
+        userId_date: { userId: usuarioId, date: today },
       },
     });
 
@@ -97,7 +97,7 @@ export class LunchBreaksService {
       notes += `\nVolviste del almuerzo a horario`;
     }
 
-    return await this.prisma['lunchBreak'].update({
+    return await this.prisma.lunchBreak.update({
       where: { id: lunch.id },
       data: {
         checkoutTime,
@@ -112,7 +112,7 @@ export class LunchBreaksService {
   }
 
   async getUserLunchBreaks(usuarioId: number, startDate?: Date, endDate?: Date) {
-    const where: any = { usuarioId };
+    const where: any = { userId: usuarioId };
 
     if (startDate && endDate) {
       where.date = {
@@ -121,7 +121,7 @@ export class LunchBreaksService {
       };
     }
 
-    return await this.prisma['lunchBreak'].findMany({
+    return await this.prisma.lunchBreak.findMany({
       where,
       include: { user: { select: { id: true, nombre: true, email: true } } },
       orderBy: { date: 'desc' },
@@ -138,7 +138,7 @@ export class LunchBreaksService {
       };
     }
 
-    return await this.prisma['lunchBreak'].findMany({
+    return await this.prisma.lunchBreak.findMany({
       where,
       include: { user: { select: { id: true, nombre: true, email: true, department: true, role: true } } },
       orderBy: [{ date: 'desc' }, { checkinTime: 'desc' }],
@@ -149,7 +149,7 @@ export class LunchBreaksService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    return await this.prisma['lunchBreak'].findMany({
+    return await this.prisma.lunchBreak.findMany({
       where: { date: today },
       include: { user: { select: { id: true, nombre: true, email: true, role: true } } },
       orderBy: { checkinTime: 'desc' },
