@@ -151,4 +151,89 @@ export class ToolRequestsController {
   async delete(@Param('id') id: string) {
     return this.toolRequestsService.delete(parseInt(id, 10));
   }
-}
+
+  // ===== RENOVACIONES =====
+
+  // Solicitar renovación de herramienta
+  @Post(':id/renewal-request')
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
+  async requestRenewal(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() data: { newReturnDate: Date; renewalReason?: string }
+  ) {
+    return this.toolRequestsService.requestRenewal(
+      {
+        toolRequestId: parseInt(id, 10),
+        newReturnDate: new Date(data.newReturnDate),
+        renewalReason: data.renewalReason,
+      },
+      user.id
+    );
+  }
+
+  // Obtener renovaciones pendientes (admin)
+  @Get('renewals/pending')
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  async getPendingRenewals() {
+    return this.toolRequestsService.findRenewals(undefined, 'PENDING');
+  }
+
+  // Obtener renovaciones de una herramienta
+  @Get('renewals/by-tool/:toolId')
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  async getRenewalsByTool(@Param('toolId') toolId: string) {
+    return this.toolRequestsService.findRenewals(parseInt(toolId, 10));
+  }
+
+  // Aprobar renovación
+  @Post('renewals/:renewalId/approve')
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  async approveRenewal(
+    @CurrentUser() user: any,
+    @Param('renewalId') renewalId: string
+  ) {
+    return this.toolRequestsService.approveRenewal(parseInt(renewalId, 10), user.id);
+  }
+
+  // Rechazar renovación
+  @Post('renewals/:renewalId/reject')
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  async rejectRenewal(
+    @CurrentUser() user: any,
+    @Param('renewalId') renewalId: string,
+    @Body() data: { reason: string }
+  ) {
+    return this.toolRequestsService.rejectRenewal(
+      parseInt(renewalId, 10),
+      user.id,
+      data.reason
+    );
+  }
+
+  // ===== NOTIFICACIONES =====
+
+  // Obtener notificaciones del usuario
+  @Get('notifications/my')
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
+  async getMyNotifications(@CurrentUser() user: any) {
+    return this.toolRequestsService.getUserNotifications(user.id);
+  }
+
+  // Marcar notificación como leída
+  @Put('notifications/:notificationId/read')
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
+  async markNotificationAsRead(@Param('notificationId') notificationId: string) {
+    return this.toolRequestsService.markNotificationAsRead(parseInt(notificationId, 10));
+  }
+
+  // Verificar herramientas próximas a vencer (cron job endpoint)
+  @Post('check-expiring')
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  async checkExpiringTools() {
+    const count = await this.toolRequestsService.checkExpiringTools();
+    return {
+      message: `Se verificaron herramientas próximas a vencer`,
+      notificationsCreated: count,
+    };
+  }}

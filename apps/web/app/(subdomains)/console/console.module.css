@@ -798,6 +798,18 @@
   gap: 0.5rem;
 }
 
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .formRow {
+    grid-template-columns: 1fr;
+  }
+}
+
 .formGroup label {
   font-weight: 600;
   color: var(--text-color);
