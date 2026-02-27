@@ -31,16 +31,23 @@ export default function FinesPage() {
           </div>
         )}
 
-        {/* Tabla de multas - todos ven contenido dinámico */}
-        <div>
-          <h2 style={{ marginBottom: 16 }}>
-            {isAdmin 
-              ? (isSuperAdmin ? "Todas las Multas" : "Multas Registradas")
-              : "Mis Multas"
-            }
-          </h2>
-          <FinesTable key={refreshKey} showUser={isAdmin} />
-        </div>
+        {/* Tabla de multas - admin ve dos secciones */}
+        {isAdmin && (
+          <div>
+            <h2 style={{ marginBottom: 16 }}>
+              {isSuperAdmin ? "Todas las Multas" : "Multas"}
+            </h2>
+            <FinesTable key={refreshKey} showUser={isAdmin} />
+          </div>
+        )}
+
+        {/* Admin también ve sus multas, usuarios normales solo ven las suyas */}
+        {!isSuperAdmin && (
+          <div>
+            <h2 style={{ marginBottom: 16 }}>Mis Multas</h2>
+            <FinesTable key={refreshKey} showUser={false} usuarioId={user?.id} />
+          </div>
+        )}
       </div>
     </RoleGuard>
   );
