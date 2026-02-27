@@ -14,7 +14,10 @@ export class UsersService {
   }
   private canManageUsers(currentUser: { permissions?: string[]; isSuperAdmin?: boolean }) {
     if (currentUser.isSuperAdmin) return true;
-    return Boolean(currentUser.permissions?.includes(PERMISSIONS.USERS_MANAGE));
+    return Boolean(
+      currentUser.permissions?.includes(PERMISSIONS.USERS_MANAGE) ||
+      currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN),
+    );
   }
 
   findAllVisible(currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean }) {
