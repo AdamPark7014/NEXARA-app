@@ -33,6 +33,8 @@ export const PERMISSIONS = {
   TOOLS_REQUEST: 'tools.request',
   TOOLS_MANAGE: 'tools.manage',
   TOOLS_INVENTORY: 'tools.inventory',
+  FINES_VIEW: 'fines.view',
+  FINES_MANAGE: 'fines.manage',
 } as const;
 
 export type Permission = typeof PERMISSIONS[keyof typeof PERMISSIONS];

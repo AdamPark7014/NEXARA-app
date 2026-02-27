@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { useUser } from './UserContext';
+import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 
 const FINE_TYPES = {
   actividad: {
@@ -45,6 +46,10 @@ interface User {
   id: number;
   nombre: string;
   email: string;
+  role?: {
+    id: number;
+    nombre: string;
+  };
 }
 
 interface FineFormProps {
@@ -65,14 +70,24 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [permisoSi, setPermisoSi] = useState(false);
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
 
-  // Cargar lista de usuarios para asignar multas
+  // Verificar permisos
+  useEffect(() => {
+    if (user) {
+      const tienePermiso = hasPermission(user, PERMISSIONS.FINES_MANAGE);
+      setPermisoSi(tienePermiso);
+    }
+  }, [user]);
+
+  // Cargar lista de usuarios asignables según jerarquía
   useEffect(() => {
     if (!user?.token) return;
-    fetch(buildApiUrl('users'), {
+    
+    fetch(buildApiUrl('users/assignable'), {
       headers: { Authorization: `Bearer ${user.token}` },
     })
       .then((res) => (res.ok ? res.json() : []))
@@ -110,6 +125,12 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
     setLoading(true);
 
     try {
+      if (!permisoSi) {
+        setError('No tienes permisos para crear multas');
+        setLoading(false);
+        return;
+      }
+
       if (!usuarioSeleccionado) {
         setError('Selecciona un usuario');
         setLoading(false);
@@ -169,15 +190,29 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
   const currentReasons = FINE_TYPES[tipo].reasons;
   const usuarioElegido = usuarios.find((u) => u.id === Number(usuarioSeleccionado));
 
+  if (!permisoSi) {
+    return (
+      <div className="card" style={{ maxWidth: 600, marginBottom: 24 }}>
+        <h3 style={{ marginBottom: 16, color: 'var(--primary)' }}>Gestión de Multas</h3>
+        <div style={{ padding: 24, textAlign: 'center', color: 'var(--danger)' }}>
+          ⛔ No tienes permisos para crear multas
+        </div>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="card" style={{ maxWidth: 600, marginBottom: 24 }}>
       <h3 style={{ marginBottom: 16, color: 'var(--primary)' }}>Nueva Multa</h3>
       
       <div style={{ display: 'grid', gap: 12 }}>
-        {/* Usuario con búsqueda */}
+        {/* Usuario con búsqueda jerárquica */}
         <div style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
           <label htmlFor="usuario-search" style={{ fontWeight: 500 }}>
-            Usuario
+            👤 Seleccionar Usuario
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)', marginLeft: 8 }}>
+              (Según tu nivel jerárquico)
+            </span>
           </label>
           <div style={{ position: 'relative' }}>
             <input
@@ -191,14 +226,26 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
                 setMostrarDropdown(true);
               }}
               onFocus={() => setMostrarDropdown(true)}
-              disabled={loading}
+              disabled={loading || usuarios.length === 0}
               style={{
                 width: '100%',
               }}
             />
             
+            {/* Información de usuarios disponibles */}
+            {usuarios.length === 0 && !loading && (
+              <div style={{
+                marginTop: 4,
+                fontSize: 12,
+                color: 'var(--text-secondary)',
+                fontStyle: 'italic',
+              }}>
+                No hay usuarios disponibles según tu nivel
+              </div>
+            )}
+
             {/* Dropdown de usuarios */}
-            {mostrarDropdown && (
+            {mostrarDropdown && usuarios.length > 0 && (
               <div
                 style={{
                   position: 'absolute',
@@ -208,10 +255,11 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
                   backgroundColor: 'var(--bg-secondary)',
                   border: '1px solid var(--border)',
                   borderRadius: 4,
-                  maxHeight: 200,
+                  maxHeight: 240,
                   overflowY: 'auto',
                   zIndex: 10,
                   marginTop: 4,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                 }}
               >
                 {usuariosFiltrados.length > 0 ? (
@@ -240,14 +288,21 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
                         }
                       }}
                     >
-                      <div style={{ fontWeight: 500 }}>{u.nombre}</div>
+                      <div style={{ fontWeight: 500, fontSize: 14 }}>
+                        {u.nombre}
+                        {u.role && (
+                          <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginLeft: 8, fontWeight: 'normal' }}>
+                            ({u.role.nombre})
+                          </span>
+                        )}
+                      </div>
                       <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                         {u.email}
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                  <div style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: 12 }}>
                     No se encontraron usuarios
                   </div>
                 )}
@@ -258,12 +313,18 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
             {usuarioElegido && (
               <div style={{
                 marginTop: 8,
-                padding: 8,
+                padding: 10,
                 backgroundColor: 'var(--primary)20',
                 borderRadius: 4,
                 fontSize: 12,
+                borderLeft: '3px solid var(--primary)',
               }}>
-                ✓ Seleccionado: <strong>{usuarioElegido.nombre}</strong>
+                <div style={{ fontWeight: 500 }}>✓ Seleccionado: {usuarioElegido.nombre}</div>
+                {usuarioElegido.role && (
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginTop: 2 }}>
+                    Rol: {usuarioElegido.role.nombre}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -271,7 +332,7 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
 
         {/* Tipo de Multa */}
         <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
-          Tipo de Multa
+          📋 Tipo de Multa
           <select
             className="input"
             value={tipo}
@@ -339,14 +400,33 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
 
         {/* Botón */}
         <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
-          <button className="button-primary" type="submit" disabled={loading}>
-            {loading ? 'Registrando...' : 'Registrar Multa'}
+          <button 
+            className="button-primary" 
+            type="submit" 
+            disabled={loading || !usuarioSeleccionado || usuarios.length === 0}
+          >
+            {loading ? 'Registrando...' : '✓ Crear Multa'}
           </button>
         </div>
       </div>
 
-      {error && <p style={{ color: 'var(--danger)', marginTop: 12 }}>{error}</p>}
-      {success && <p style={{ color: 'var(--accent)', marginTop: 12 }}>{success}</p>}
+      {error && <p style={{ color: 'var(--danger)', marginTop: 12, fontSize: 13 }}>⚠️ {error}</p>}
+      {success && <p style={{ color: 'var(--accent)', marginTop: 12, fontSize: 13 }}>✓ {success}</p>}
+
+      {/* Información sobre permisos */}
+      {usuarios.length > 0 && (
+        <div style={{
+          marginTop: 16,
+          padding: 12,
+          backgroundColor: '#0f6ad620',
+          borderRadius: 4,
+          fontSize: 12,
+          color: 'var(--text-secondary)',
+          borderLeft: '2px solid #0f6ad6',
+        }}>
+          <strong style={{ color: 'var(--primary)' }}>Usuarios disponibles:</strong> {usuarios.length}
+        </div>
+      )}
     </form>
   );
 };
