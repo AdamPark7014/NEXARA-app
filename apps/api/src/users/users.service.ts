@@ -111,8 +111,19 @@ export class UsersService {
       // SuperAdmin emails (siempre excluir)
       const superAdminEmails = ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'];
 
-      // Si es SuperAdmin (isSuperAdmin=true), puede asignar a TODOS excepto a sí mismo y superadmins
-      if (currentUser.isSuperAdmin) {
+      // Cargar usuario actual de la BD para obtener rol actual
+      const userInDb = await this.prisma['user'].findUnique({
+        where: { id: currentUser.id },
+        include: { role: true },
+      });
+
+      if (!userInDb) return [];
+
+      // Si el usuario actual es SuperAdmin (email o bandera)
+      const isSuperAdmin = currentUser.isSuperAdmin || superAdminEmails.includes(userInDb.email);
+      
+      if (isSuperAdmin) {
+        // SuperAdmin puede asignar a TODOS excepto a sí mismo y otros superadmins
         return this.prisma['user'].findMany({
           where: {
             AND: [
@@ -125,9 +136,11 @@ export class UsersService {
         });
       }
 
-      // Si es Admin (tiene CONSOLE_ADMIN o USERS_MANAGE), puede asignar a usuarios normales (sin accesoConsoleAdmin)
-      if (currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) || 
-          currentUser.permissions?.includes(PERMISSIONS.USERS_MANAGE)) {
+      // Si el usuario actual es Admin de consola (accesoConsoleAdmin = true)
+      const isConsoleAdmin = userInDb.role?.accesoConsoleAdmin === true;
+      
+      if (isConsoleAdmin) {
+        // Admin puede asignar a usuarios normales (sin accesoConsoleAdmin) de cualquier departamento
         return this.prisma['user'].findMany({
           where: {
             AND: [
@@ -141,7 +154,7 @@ export class UsersService {
         });
       }
 
-      // Usuario normal sin permisos de gestión: retorna vacío
+      // Usuario normal sin permisos: retorna vacío
       return [];
     } catch (error) {
       console.error('Error finding assignable users:', error);
