@@ -52,6 +52,22 @@ interface User {
   };
 }
 
+const toLocalDateInput = (date: Date) => date.toLocaleDateString('sv-SE');
+
+const getWeekRange = (anchor: Date) => {
+  const dayOfWeek = (anchor.getDay() + 6) % 7;
+  const start = new Date(anchor);
+  start.setDate(anchor.getDate() - dayOfWeek);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+  return {
+    from: toLocalDateInput(start),
+    to: toLocalDateInput(end),
+  };
+};
+
 interface FineFormProps {
   onFineCreated?: () => void;
 }
@@ -83,13 +99,42 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
   // Cargar lista de usuarios asignables según jerarquía
   useEffect(() => {
     if (!user?.token) return;
-    
-    fetch(buildApiUrl('users/assignable'), {
-      headers: { Authorization: `Bearer ${user.token}` },
-    })
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data) => setUsuarios(Array.isArray(data) ? data : []))
-      .catch(() => setUsuarios([]));
+
+    const headers = { Authorization: `Bearer ${user.token}` };
+
+    const loadUsers = async () => {
+      try {
+        const assignableRes = await fetch(buildApiUrl('users/assignable'), { headers });
+        const assignableData = assignableRes.ok ? await assignableRes.json() : [];
+        const assignableUsers = Array.isArray(assignableData) ? assignableData : [];
+
+        if (assignableUsers.length > 0) {
+          setUsuarios(assignableUsers);
+          return;
+        }
+
+        const week = getWeekRange(new Date());
+        const params = new URLSearchParams({ from: week.from, to: week.to });
+        const hierarchyRes = await fetch(buildApiUrl(`attendance/hierarchy/range?${params.toString()}`), { headers });
+        const hierarchyData = hierarchyRes.ok ? await hierarchyRes.json() : null;
+        const fallbackUsers = Array.isArray(hierarchyData?.users)
+          ? hierarchyData.users
+              .map((item: any) => ({
+                id: Number(item.userId),
+                nombre: item.userName || `Usuario ${item.userId}`,
+                email: item.email || '',
+                role: item.role,
+              }))
+              .filter((item: User) => Number.isFinite(item.id) && item.id !== user.id)
+          : [];
+
+        setUsuarios(fallbackUsers);
+      } catch {
+        setUsuarios([]);
+      }
+    };
+
+    loadUsers();
   }, [user?.token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
