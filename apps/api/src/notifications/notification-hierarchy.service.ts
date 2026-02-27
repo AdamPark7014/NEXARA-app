@@ -418,17 +418,50 @@ export class NotificationHierarchyService {
     fineId: number,
     reason: string,
     amount: number,
+    tipoMulta?: string,
   ) {
     try {
+      // Determinar URL y mensaje según el tipo de multa
+      const fineTypeMap: { [key: string]: { url: string; entityType: string; titulo: string } } = {
+        asistencia: {
+          url: '/panel/asistencia',
+          entityType: 'Attendance',
+          titulo: '⏰ Multa por Asistencia',
+        },
+        vehiculo: {
+          url: '/panel/vehiculos',
+          entityType: 'Vehicle',
+          titulo: '🚗 Multa por Vehículos',
+        },
+        herramienta: {
+          url: '/panel/herramientas',
+          entityType: 'ToolRequest',
+          titulo: '🔧 Multa por Herramientas',
+        },
+        actividad: {
+          url: '/panel/actividades',
+          entityType: 'Activity',
+          titulo: '📋 Multa por Actividades',
+        },
+      };
+
+      const fineConfig = tipoMulta && fineTypeMap[tipoMulta]
+        ? fineTypeMap[tipoMulta]
+        : {
+            url: '/panel/multas',
+            entityType: 'Fine',
+            titulo: '⚠️ Nueva Multa',
+          };
+
       await this.notificationsService.createNotification({
         userId,
         type: 'FINE_CREATED',
         category: 'fines',
-        title: '⚠️ Has recibido una multa',
+        title: fineConfig.titulo,
         message: `Se registró una multa de $${amount.toFixed(2)} por: ${reason}`,
         relatedEntityId: fineId,
-        entityType: 'Fine',
-        relatedUrl: `/console/fines`,
+        entityType: fineConfig.entityType,
+        relatedUrl: fineConfig.url,
         priority: 'high',
       });
     } catch (error) {
