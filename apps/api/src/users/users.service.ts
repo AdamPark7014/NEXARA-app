@@ -98,26 +98,65 @@ export class UsersService {
     });
   }
 
-  findAssignableUsers(currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean }) {
-    if (!this.canManageUsers(currentUser)) {
+  async findAssignableUsers(currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean; role?: any }) {
+    try {
+      // Si no tiene permisos de gestión, retorna vacío (no puede asignar a nadie)
+      if (!currentUser.isSuperAdmin && !currentUser.permissions?.includes(PERMISSIONS.USERS_MANAGE)) {
+        return [];
+      }
+
+      // Obtener el rol actual del usuario para determinar su nivel
+      let currentUserRole = currentUser.role;
+      if (!currentUserRole) {
+        const userWithRole = await this.prisma['user'].findUnique({
+          where: { id: currentUser.id },
+          include: { role: true },
+        });
+        currentUserRole = userWithRole?.role;
+      }
+
+      const isCurrentUserSuperAdmin = currentUser.isSuperAdmin || 
+        currentUserRole?.accesoConsoleAdmin === true ||
+        currentUserRole?.accesoGestionUsuarios === true;
+
+      // Excluir los SuperAdmins del sistema (emails especiales)
+      const superAdminEmails = ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'];
+
+      // Construir consulta según jerarquía
+      let baseWhere: any = {
+        AND: [
+          { id: { not: currentUser.id } }, // Excluir al usuario actual
+          { email: { notIn: superAdminEmails } }, // Excluir superadmins
+        ],
+      };
+
+      // Si es SuperAdmin, puede asignar a todos excepto a sí mismo y superadmins
+      if (isCurrentUserSuperAdmin) {
+        return this.prisma['user'].findMany({
+          where: baseWhere,
+          select: { id: true, nombre: true, email: true, role: true, avatarUrl: true },
+          orderBy: { nombre: 'asc' },
+        });
+      }
+
+      // Si es Admin (pero no SuperAdmin), solo puede asignar a usuarios normales
+      // Excluir otros admins y superadmins
+      baseWhere.AND.push({
+        role: {
+          accesoConsoleAdmin: { not: true },
+          accesoGestionUsuarios: { not: true },
+        },
+      });
+
       return this.prisma['user'].findMany({
-        where: { id: currentUser.id },
-        include: { role: true, department: true },
+        where: baseWhere,
+        select: { id: true, nombre: true, email: true, role: true, avatarUrl: true },
         orderBy: { nombre: 'asc' },
       });
+    } catch (error) {
+      console.error('Error finding assignable users:', error);
+      return [];
     }
-
-    const baseWhere: any = { id: { not: currentUser.id } };
-    if (!currentUser.isSuperAdmin) {
-      baseWhere.departmentId = currentUser.departmentId;
-    }
-    baseWhere.email = { notIn: ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'] };
-
-    return this.prisma['user'].findMany({
-      where: baseWhere,
-      include: { role: true, department: true },
-      orderBy: { nombre: 'asc' },
-    });
   }
 
   findByDepartment(departmentId: number) {
