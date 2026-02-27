@@ -15,7 +15,7 @@ export default function Sidebar() {
 
   const isAdmin = hasPermission(user, PERMISSIONS.CONSOLE_ADMIN);
   const isSuperAdmin = user.isSuperAdmin;
-  const isConsoleUser = hasAnyPermission(user, [PERMISSIONS.CONSOLE_ACCESS]);
+  const isConsoleUser = hasAnyPermission(user, [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN]);
 
   type MenuItem = {
     label: string;
@@ -40,16 +40,10 @@ export default function Sidebar() {
     { label: "Cotizaciones", href: "/cotizaciones", permissions: [PERMISSIONS.COTIZACIONES_ACCESS] },
   ];
 
-  // Entradas dinámicas según rol
-  if (isAdmin || isSuperAdmin) {
-    menu.push({ label: "Multas", href: "/fines", permissions: [PERMISSIONS.FINES_MANAGE] });
-    menu.push({ label: "Herramientas", href: "/tools", permissions: [PERMISSIONS.CONSOLE_ADMIN] });
-  }
-
-  // Usuarios normales ven acceso a sus multas y herramientas
-  if (isConsoleUser && !isAdmin) {
-    menu.push({ label: "Multas", href: "/fines", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS] });
-    menu.push({ label: "Herramientas", href: "/tools", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS] });
+  // Usuarios de consola ven multas y herramientas
+  if (isConsoleUser || isSuperAdmin) {
+    menu.push({ label: "Multas", href: "/fines", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] });
+    menu.push({ label: "Herramientas", href: "/tools", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] });
   }
 
   // Avatar: usa user.avatarUrl si existe, si no, usa un avatar generado por ui-avatars.com

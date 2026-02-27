@@ -39,7 +39,8 @@ export class FinesController {
     ) {
       return this.finesService.findByUser(user?.id || 0);
     }
-    return this.finesService.findAll();
+    // Pasar el usuario para aplicar filtros jerárquicos
+    return this.finesService.findAll(user);
   }
 
   @Get('user/:usuarioId')

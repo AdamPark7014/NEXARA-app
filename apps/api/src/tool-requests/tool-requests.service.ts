@@ -79,7 +79,91 @@ export class ToolRequestsService {
     return toolRequest;
   }
 
-  async findAll() {
+  async findAll(currentUser?: any) {
+    // SuperAdmin ve todas las solicitudes
+    if (currentUser?.isSuperAdmin) {
+      return this.prisma.toolRequest.findMany({
+        include: {
+          usuario: {
+            select: {
+              id: true,
+              nombre: true,
+              email: true,
+              department: {
+                select: {
+                  id: true,
+                  nombre: true,
+                },
+              },
+              role: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  accesoConsoleAdmin: true,
+                },
+              },
+            },
+          },
+          approver: {
+            select: {
+              id: true,
+              nombre: true,
+              email: true,
+            },
+          },
+        },
+        orderBy: {
+          requestDate: 'desc',
+        },
+      });
+    }
+
+    // Admin solo ve solicitudes de usuarios regulares (no otros admins/superadmins)
+    if (currentUser?.permissions?.includes('CONSOLE_ADMIN')) {
+      return this.prisma.toolRequest.findMany({
+        where: {
+          usuario: {
+            role: {
+              accesoConsoleAdmin: false,
+            },
+          },
+        },
+        include: {
+          usuario: {
+            select: {
+              id: true,
+              nombre: true,
+              email: true,
+              department: {
+                select: {
+                  id: true,
+                  nombre: true,
+                },
+              },
+              role: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  accesoConsoleAdmin: true,
+                },
+              },
+            },
+          },
+          approver: {
+            select: {
+              id: true,
+              nombre: true,
+              email: true,
+            },
+          },
+        },
+        orderBy: {
+          requestDate: 'desc',
+        },
+      });
+    }
+
+    // Fallback: devolver todas (no debería llegar aquí)
     return this.prisma.toolRequest.findMany({
       include: {
         usuario: {
