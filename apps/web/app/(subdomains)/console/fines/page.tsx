@@ -6,54 +6,42 @@ import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import FinesForm from "@/components/FinesForm";
 import FinesTable from "@/components/FinesTable";
+import { RoleGuard } from "@/components/RoleGuard";
 
 export default function FinesPage() {
   const { user } = useUser();
   const [refreshKey, setRefreshKey] = useState(0);
-
-  if (!user) return null;
-
-  // Solo admins y superadmins pueden acceder
-  const isAdmin = hasPermission(user, PERMISSIONS.FINES_MANAGE);
-  if (!isAdmin) {
-    return (
-      <div className={styles.pageContainer}>
-        <div className={styles.accessDenied}>
-          <p>⛔ No tienes permiso para acceder a este módulo</p>
-        </div>
-      </div>
-    );
-  }
+  const isAdmin = hasPermission(user, PERMISSIONS.CONSOLE_ADMIN);
+  const isSuperAdmin = user?.isSuperAdmin;
 
   const handleFineCreated = () => {
     setRefreshKey((prev) => prev + 1);
   };
 
   return (
-    <div className={styles.pageContainer}>
-      <div className={styles.pageHeader}>
-        <h1>📋 Gestión de Multas</h1>
-        <p>
-          {user?.isSuperAdmin
-            ? "Panel de control: crear y administrar todas las multas del sistema"
-            : "Panel de control: crear y administrar multas de tu departamento"}
-        </p>
-      </div>
+    <RoleGuard permissions={[PERMISSIONS.CONSOLE_ACCESS]}>
+      <div style={{ display: "grid", gap: 24 }}>
+        {/* Admin y superadmin ven formulario y tabla de gestión */}
+        {isAdmin && (
+          <div>
+            <h2 style={{ marginBottom: 16 }}>
+              {isSuperAdmin ? "📋 Gestión de Multas" : "📋 Crear Multa"}
+            </h2>
+            <FinesForm onFineCreated={handleFineCreated} />
+          </div>
+        )}
 
-      <div className={styles.toolsSection}>
-        {/* Formulario para crear multas */}
-        <div style={{ marginBottom: 32 }}>
-          <FinesForm onFineCreated={handleFineCreated} />
-        </div>
-
-        {/* Tabla de todas las multas */}
+        {/* Tabla de multas - todos ven contenido dinámico */}
         <div>
-          <h2 style={{ marginBottom: 16, color: "var(--primary)" }}>
-            {user?.isSuperAdmin ? "Todas las Multas" : "Multas Registradas"}
+          <h2 style={{ marginBottom: 16 }}>
+            {isAdmin 
+              ? (isSuperAdmin ? "Todas las Multas" : "Multas Registradas")
+              : "Mis Multas"
+            }
           </h2>
-          <FinesTable key={refreshKey} showUser={true} />
+          <FinesTable key={refreshKey} showUser={isAdmin} />
         </div>
       </div>
-    </div>
+    </RoleGuard>
   );
 }

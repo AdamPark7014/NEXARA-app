@@ -14,7 +14,7 @@ export default function ToolsPage() {
   return (
     <RoleGuard permissions={[PERMISSIONS.CONSOLE_ACCESS]}>
       <div style={{ display: "grid", gap: 24 }}>
-        {/* Admin y superadmin ven tabla de gestion de todas las herramientas */}
+        {/* Admin y superadmin ven tabla de gestion */}
         {isAdmin && (
           <div>
             <h2 style={{ marginBottom: 16 }}>
