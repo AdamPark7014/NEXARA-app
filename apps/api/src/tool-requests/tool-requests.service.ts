@@ -89,6 +89,7 @@ export class ToolRequestsService {
               id: true,
               nombre: true,
               email: true,
+              departmentId: true,
               department: {
                 select: {
                   id: true,
@@ -118,14 +119,15 @@ export class ToolRequestsService {
       });
     }
 
-    // Admin solo ve solicitudes de usuarios regulares (no otros admins/superadmins)
+    // Admin solo ve solicitudes de usuarios regulares de su departamento
     if (currentUser?.permissions?.includes('CONSOLE_ADMIN')) {
       return this.prisma.toolRequest.findMany({
         where: {
           usuario: {
-            role: {
-              accesoConsoleAdmin: false,
-            },
+            AND: [
+              { departmentId: currentUser.departmentId },
+              { role: { accesoConsoleAdmin: false } },
+            ],
           },
         },
         include: {
@@ -134,6 +136,7 @@ export class ToolRequestsService {
               id: true,
               nombre: true,
               email: true,
+              departmentId: true,
               department: {
                 select: {
                   id: true,
@@ -163,34 +166,8 @@ export class ToolRequestsService {
       });
     }
 
-    // Fallback: devolver todas (no debería llegar aquí)
-    return this.prisma.toolRequest.findMany({
-      include: {
-        usuario: {
-          select: {
-            id: true,
-            nombre: true,
-            email: true,
-            department: {
-              select: {
-                id: true,
-                nombre: true,
-              },
-            },
-          },
-        },
-        approver: {
-          select: {
-            id: true,
-            nombre: true,
-            email: true,
-          },
-        },
-      },
-      orderBy: {
-        requestDate: 'desc',
-      },
-    });
+    // Fallback: devolver vacío
+    return [];
   }
 
   async findByUser(usuarioId: number) {

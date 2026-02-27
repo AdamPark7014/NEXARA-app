@@ -22,13 +22,15 @@ export class UsersService {
       NOT: { email: { in: ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'] } },
     };
 
-    if (this.canManageUsers(currentUser) && currentUser.isSuperAdmin) {
+    // SuperAdmin ve todos
+    if (currentUser.isSuperAdmin) {
       return this.prisma['user'].findMany({
         where: excludeSuperAdmins,
         include: { role: true, department: true },
       });
     }
 
+    // Admin regular ve usuarios de su departamento (excepto superadmins)
     if (this.canManageUsers(currentUser)) {
       return this.prisma['user'].findMany({
         where: { departmentId: currentUser.departmentId, ...excludeSuperAdmins },
@@ -36,6 +38,7 @@ export class UsersService {
       });
     }
 
+    // Usuario normal solo ve a sí mismo
     return this.prisma['user'].findMany({
       where: { id: currentUser.id, ...excludeSuperAdmins },
       include: { role: true, department: true },
@@ -100,8 +103,10 @@ export class UsersService {
 
   async findAssignableUsers(currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean; role?: any }) {
     try {
-      // Si no tiene permisos de gestión, retorna vacío (no puede asignar a nadie)
-      if (!currentUser.isSuperAdmin && !currentUser.permissions?.includes(PERMISSIONS.USERS_MANAGE)) {
+      // Si no tiene permisos de gestión (CONSOLE_ADMIN o USERS_MANAGE), retorna vacío
+      if (!currentUser.isSuperAdmin && 
+          !currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) && 
+          !currentUser.permissions?.includes(PERMISSIONS.USERS_MANAGE)) {
         return [];
       }
 
