@@ -53,7 +53,7 @@ const FinesTable: React.FC<FinesTableProps> = ({
   // Cargar usuarios disponibles
   useEffect(() => {
     if (!user?.token) return;
-    fetch(buildApiUrl('users'), {
+    fetch(buildApiUrl('users/assignable'), {
       headers: { Authorization: `Bearer ${user.token}` },
     })
       .then((res) => (res.ok ? res.json() : []))
