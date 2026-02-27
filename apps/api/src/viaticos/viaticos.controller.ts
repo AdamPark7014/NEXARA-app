@@ -31,21 +31,7 @@ export class ViaticosController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VIATICS_VIEW] })
   async findAll(@CurrentUser() user: any) {
-    if (user.isSuperAdmin) {
-      return this.viaticosService.findAll();
-    }
-    if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
-      // Admin consola: ve sus propios viáticos + viáticos de usuarios normales
-      const allDeptUsers = await this.usersService.findByDepartment(user.departmentId);
-      const allowedUserIds = [
-        user.id,
-        ...allDeptUsers
-          .filter((u: any) => u.role && !u.role.accesoConsoleAdmin)
-          .map((u: any) => u.id),
-      ];
-      return this.viaticosService.findByAllowedUsers(allowedUserIds);
-    }
-    return this.viaticosService.findByUser(user.id);
+    return this.viaticosService.findAll(user);
   }
 
   // Exportar viáticos (CSV o JSON)

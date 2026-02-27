@@ -70,6 +70,7 @@ export class FinesService {
               id: true,
               nombre: true,
               email: true,
+              departmentId: true,
               role: {
                 select: {
                   id: true,
@@ -86,14 +87,15 @@ export class FinesService {
       });
     }
 
-    // Admin solo ve multas de usuarios regulares (no otros admins/superadmins)
+    // Admin solo ve multas de usuarios regulares de su departamento
     if (currentUser?.permissions?.includes('CONSOLE_ADMIN')) {
       return this.prisma.fine.findMany({
         where: {
           usuario: {
-            role: {
-              accesoConsoleAdmin: false,
-            },
+            AND: [
+              { departmentId: currentUser.departmentId },
+              { role: { accesoConsoleAdmin: false } },
+            ],
           },
         },
         include: {
@@ -102,6 +104,7 @@ export class FinesService {
               id: true,
               nombre: true,
               email: true,
+              departmentId: true,
               role: {
                 select: {
                   id: true,
@@ -118,21 +121,8 @@ export class FinesService {
       });
     }
 
-    // Fallback: devolver todas (no debería llegar aquí)
-    return this.prisma.fine.findMany({
-      include: {
-        usuario: {
-          select: {
-            id: true,
-            nombre: true,
-            email: true,
-          },
-        },
-      },
-      orderBy: {
-        fechaCreacion: 'desc',
-      },
-    });
+    // Fallback: devolver vacío
+    return [];
   }
 
   async findByUser(usuarioId: number) {

@@ -119,67 +119,69 @@ const FinesTable: React.FC<FinesTableProps> = ({
       <div style={{ marginBottom: 16 }}>
         <h3 style={{ marginBottom: 12, color: 'var(--primary)' }}>Multas</h3>
 
-        {/* Filtros */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
-          {/* Filtro de Usuario */}
-          <div style={{ display: 'grid', gap: 6 }}>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
-              Filtrar por Usuario
-            </label>
-            <select
-              className="input"
-              value={usuarioFiltro}
-              onChange={(e) => setUsuarioFiltro(e.target.value)}
-              style={{ width: '100%' }}
-            >
-              <option value="">Todos los usuarios</option>
-              {usuarios.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Filtros - solo visible cuando showUser es true (gestión) Y no hay usuarioId específico */}
+        {showUser && !usuarioIdProp && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+            {/* Filtro de Usuario */}
+            <div style={{ display: 'grid', gap: 6 }}>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
+                Filtrar por Usuario
+              </label>
+              <select
+                className="input"
+                value={usuarioFiltro}
+                onChange={(e) => setUsuarioFiltro(e.target.value)}
+                style={{ width: '100%' }}
+              >
+                <option value="">Todos los usuarios</option>
+                {usuarios.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          {/* Filtro de Tipo */}
-          <div style={{ display: 'grid', gap: 6 }}>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
-              Filtrar por Tipo
-            </label>
-            <select
-              className="input"
-              value={tipoFiltro}
-              onChange={(e) => setTipoFiltro(e.target.value)}
-              style={{ width: '100%' }}
-            >
-              <option value="">Todos los tipos</option>
-              <option value="actividad">Actividades</option>
-              <option value="vehiculo">Vehículos</option>
-              <option value="asistencia">Asistencia</option>
-              <option value="herramienta">Herramientas</option>
-            </select>
-          </div>
+            {/* Filtro de Tipo */}
+            <div style={{ display: 'grid', gap: 6 }}>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
+                Filtrar por Tipo
+              </label>
+              <select
+                className="input"
+                value={tipoFiltro}
+                onChange={(e) => setTipoFiltro(e.target.value)}
+                style={{ width: '100%' }}
+              >
+                <option value="">Todos los tipos</option>
+                <option value="actividad">Actividades</option>
+                <option value="vehiculo">Vehículos</option>
+                <option value="asistencia">Asistencia</option>
+                <option value="herramienta">Herramientas</option>
+              </select>
+            </div>
 
-          {/* Filtro de Estatus */}
-          <div style={{ display: 'grid', gap: 6 }}>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
-              Filtrar por Estatus
-            </label>
-            <select
-              className="input"
-              value={estatusPago}
-              onChange={(e) => setEstatusPago(e.target.value)}
-              style={{ width: '100%' }}
-            >
-              <option value="">Todos los estatus</option>
-              <option value="Pendiente">Pendiente</option>
-              <option value="Pagada">Pagada</option>
-            </select>
+            {/* Filtro de Estatus */}
+            <div style={{ display: 'grid', gap: 6 }}>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
+                Filtrar por Estatus
+              </label>
+              <select
+                className="input"
+                value={estatusPago}
+                onChange={(e) => setEstatusPago(e.target.value)}
+                style={{ width: '100%' }}
+              >
+                <option value="">Todos los estatus</option>
+                <option value="Pendiente">Pendiente</option>
+                <option value="Pagada">Pagada</option>
+              </select>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Usuario seleccionado info */}
-        {usuarioActual && (
+        {showUser && usuarioActual && (
           <div style={{
             padding: 10,
             backgroundColor: 'var(--primary)20',

@@ -59,8 +59,42 @@ export class ViaticosService {
     return viatico;
   }
 
-  async findAll() {
+  async findAll(currentUser?: any) {
+    // SuperAdmin ve todos los viáticos
+    if (currentUser?.isSuperAdmin) {
+      const data = await this.prisma['viatico'].findMany({
+        include: { Activity: true, User: true },
+      });
+      return data.map((row: any) => ({
+        ...row,
+        actividad: row.Activity,
+        usuario: row.User,
+      }));
+    }
+
+    // Admin solo ve viáticos de usuarios regulares de su departamento
+    if (currentUser?.permissions?.includes('CONSOLE_ADMIN')) {
+      const data = await this.prisma['viatico'].findMany({
+        where: {
+          User: {
+            AND: [
+              { departmentId: currentUser.departmentId },
+              { role: { accesoConsoleAdmin: false } },
+            ],
+          },
+        },
+        include: { Activity: true, User: true },
+      });
+      return data.map((row: any) => ({
+        ...row,
+        actividad: row.Activity,
+        usuario: row.User,
+      }));
+    }
+
+    // Usuario normal solo ve sus propios viáticos
     const data = await this.prisma['viatico'].findMany({
+      where: { usuarioId: currentUser?.id },
       include: { Activity: true, User: true },
     });
     return data.map((row: any) => ({
