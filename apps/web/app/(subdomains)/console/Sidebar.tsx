@@ -46,10 +46,10 @@ export default function Sidebar() {
     menu.push({ label: "Herramientas", href: "/tools", permissions: [PERMISSIONS.CONSOLE_ADMIN] });
   }
 
-  // Todos ven mis herramientas y mis multas
-  if (isConsoleUser) {
-    menu.push({ label: "Mis Multas", href: "/my-fines", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS] });
-    menu.push({ label: "Mis Herramientas", href: "/my-tools", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS] });
+  // Usuarios normales ven acceso a sus multas y herramientas
+  if (isConsoleUser && !isAdmin) {
+    menu.push({ label: "Multas", href: "/fines", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS] });
+    menu.push({ label: "Herramientas", href: "/tools", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS] });
   }
 
   // Avatar: usa user.avatarUrl si existe, si no, usa un avatar generado por ui-avatars.com
