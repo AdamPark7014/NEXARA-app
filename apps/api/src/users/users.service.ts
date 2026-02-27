@@ -22,7 +22,7 @@ export class UsersService {
       NOT: { email: { in: ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'] } },
     };
 
-    // SuperAdmin ve todos
+    // SuperAdmin ve todos excepto superadmins
     if (currentUser.isSuperAdmin) {
       return this.prisma['user'].findMany({
         where: excludeSuperAdmins,
@@ -30,10 +30,15 @@ export class UsersService {
       });
     }
 
-    // Admin regular ve usuarios de su departamento (excepto superadmins)
+    // Admin ve todos los usuarios normales (sin accesoConsoleAdmin), sin restricción de departamento
     if (this.canManageUsers(currentUser)) {
       return this.prisma['user'].findMany({
-        where: { departmentId: currentUser.departmentId, ...excludeSuperAdmins },
+        where: {
+          AND: [
+            { role: { accesoConsoleAdmin: false } }, // Solo usuarios normales
+            excludeSuperAdmins,
+          ],
+        },
         include: { role: true, department: true },
       });
     }
@@ -103,61 +108,41 @@ export class UsersService {
 
   async findAssignableUsers(currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean; role?: any }) {
     try {
-      // Si no tiene permisos de gestión (CONSOLE_ADMIN o USERS_MANAGE), retorna vacío
-      if (!currentUser.isSuperAdmin && 
-          !currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) && 
-          !currentUser.permissions?.includes(PERMISSIONS.USERS_MANAGE)) {
-        return [];
-      }
-
-      // Obtener el rol actual del usuario para determinar su nivel
-      let currentUserRole = currentUser.role;
-      if (!currentUserRole) {
-        const userWithRole = await this.prisma['user'].findUnique({
-          where: { id: currentUser.id },
-          include: { role: true },
-        });
-        currentUserRole = userWithRole?.role;
-      }
-
-      const isCurrentUserSuperAdmin = currentUser.isSuperAdmin || 
-        currentUserRole?.accesoConsoleAdmin === true ||
-        currentUserRole?.accesoGestionUsuarios === true;
-
-      // Excluir los SuperAdmins del sistema (emails especiales)
+      // SuperAdmin emails (siempre excluir)
       const superAdminEmails = ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'];
 
-      // Construir consulta según jerarquía
-      let baseWhere: any = {
-        AND: [
-          { id: { not: currentUser.id } }, // Excluir al usuario actual
-          { email: { notIn: superAdminEmails } }, // Excluir superadmins
-        ],
-      };
-
-      // Si es SuperAdmin, puede asignar a todos excepto a sí mismo y superadmins
-      if (isCurrentUserSuperAdmin) {
+      // Si es SuperAdmin (isSuperAdmin=true), puede asignar a TODOS excepto a sí mismo y superadmins
+      if (currentUser.isSuperAdmin) {
         return this.prisma['user'].findMany({
-          where: baseWhere,
+          where: {
+            AND: [
+              { id: { not: currentUser.id } },
+              { email: { notIn: superAdminEmails } },
+            ],
+          },
           select: { id: true, nombre: true, email: true, role: true, avatarUrl: true },
           orderBy: { nombre: 'asc' },
         });
       }
 
-      // Si es Admin (pero no SuperAdmin), solo puede asignar a usuarios normales
-      // Excluir otros admins y superadmins
-      baseWhere.AND.push({
-        role: {
-          accesoConsoleAdmin: { not: true },
-          accesoGestionUsuarios: { not: true },
-        },
-      });
+      // Si es Admin (tiene CONSOLE_ADMIN o USERS_MANAGE), puede asignar a usuarios normales (sin accesoConsoleAdmin)
+      if (currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) || 
+          currentUser.permissions?.includes(PERMISSIONS.USERS_MANAGE)) {
+        return this.prisma['user'].findMany({
+          where: {
+            AND: [
+              { id: { not: currentUser.id } },
+              { email: { notIn: superAdminEmails } },
+              { role: { accesoConsoleAdmin: false } }, // Solo usuarios normales
+            ],
+          },
+          select: { id: true, nombre: true, email: true, role: true, avatarUrl: true },
+          orderBy: { nombre: 'asc' },
+        });
+      }
 
-      return this.prisma['user'].findMany({
-        where: baseWhere,
-        select: { id: true, nombre: true, email: true, role: true, avatarUrl: true },
-        orderBy: { nombre: 'asc' },
-      });
+      // Usuario normal sin permisos de gestión: retorna vacío
+      return [];
     } catch (error) {
       console.error('Error finding assignable users:', error);
       return [];
