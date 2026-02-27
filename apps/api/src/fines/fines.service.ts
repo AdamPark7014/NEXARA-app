@@ -48,12 +48,13 @@ export class FinesService {
       },
     });
 
-    // Notify user about fine creation
+    // Notify user about fine creation with type information
     await this.notificationHierarchy.notifyFineCreated(
       data.usuarioId,
       fine.id,
       data.razon,
       data.monto,
+      data.tipo, // Pass the fine type to route to correct section
     );
 
     return fine;

@@ -17,6 +17,12 @@ interface Fine {
   usuario?: { id: number; nombre: string; email: string };
 }
 
+interface User {
+  id: number;
+  nombre: string;
+  email: string;
+}
+
 interface FinesTableProps {
   tipo?: string;
   usuarioId?: number;
@@ -25,15 +31,18 @@ interface FinesTableProps {
 }
 
 const FinesTable: React.FC<FinesTableProps> = ({
-  tipo,
-  usuarioId,
+  tipo: tipoProp,
+  usuarioId: usuarioIdProp,
   showUser = true,
   onRefresh,
 }) => {
   const { user } = useUser();
   const [fines, setFines] = useState<Fine[]>([]);
+  const [usuarios, setUsuarios] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [estatusPago, setEstatusPago] = useState('');
+  const [usuarioFiltro, setUsuarioFiltro] = useState<string>(usuarioIdProp ? String(usuarioIdProp) : '');
+  const [tipoFiltro, setTipoFiltro] = useState(tipoProp || '');
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(
     /[\/.]+$/,
@@ -41,18 +50,30 @@ const FinesTable: React.FC<FinesTableProps> = ({
   );
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
 
+  // Cargar usuarios disponibles
+  useEffect(() => {
+    if (!user?.token) return;
+    fetch(buildApiUrl('users'), {
+      headers: { Authorization: `Bearer ${user.token}` },
+    })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setUsuarios(Array.isArray(data) ? data : []))
+      .catch(() => setUsuarios([]));
+  }, [user?.token]);
+
   // Función para cargar multas
   const loadFines = async () => {
     setLoading(true);
     try {
       let endpoint = 'fines';
-      if (usuarioId) {
-        endpoint = `fines/user/${usuarioId}`;
-        if (tipo) {
-          endpoint += `/type/${tipo}`;
+      
+      if (usuarioFiltro) {
+        endpoint = `fines/user/${usuarioFiltro}`;
+        if (tipoFiltro) {
+          endpoint += `/type/${tipoFiltro}`;
         }
-      } else if (tipo) {
-        endpoint = `fines/type/${tipo}`;
+      } else if (tipoFiltro) {
+        endpoint = `fines/type/${tipoFiltro}`;
       }
 
       const res = await fetch(buildApiUrl(endpoint), {
@@ -78,7 +99,7 @@ const FinesTable: React.FC<FinesTableProps> = ({
   useEffect(() => {
     if (!user?.token) return;
     loadFines();
-  }, [user?.token, tipo, usuarioId, estatusPago]);
+  }, [user?.token, tipoFiltro, usuarioFiltro, estatusPago]);
 
   useEffect(() => {
     if (onRefresh) {
@@ -86,51 +107,101 @@ const FinesTable: React.FC<FinesTableProps> = ({
     }
   }, []);
 
-  const getStatusColor = (count: number, tipo: string): string => {
-    if (count === 0) return '#22c55e'; // Verde
-    if (tipo === 'asistencia' || tipo === 'actividad') {
-      if (count <= 2) return '#eab308'; // Amarillo
-      return '#ef4444'; // Rojo
-    }
-    if (count <= 2) return '#eab308';
-    return '#ef4444';
-  };
-
   const countByStatus = (status: string) =>
     fines.filter((f) => f.estatusPago === status).length;
 
   if (loading) return <div style={{ padding: 12 }}>Cargando multas...</div>;
+
+  const usuarioActual = usuarios.find((u) => u.id === Number(usuarioFiltro));
 
   return (
     <div className="card">
       <div style={{ marginBottom: 16 }}>
         <h3 style={{ marginBottom: 12, color: 'var(--primary)' }}>Multas</h3>
 
-        {/* Filtro de estatus */}
-        <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-          <select
-            className="input"
-            value={estatusPago}
-            onChange={(e) => setEstatusPago(e.target.value)}
-            style={{ maxWidth: 200 }}
-          >
-            <option value="">Todos los estatus</option>
-            <option value="Pendiente">Pendiente</option>
-            <option value="Pagada">Pagada</option>
-          </select>
+        {/* Filtros */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+          {/* Filtro de Usuario */}
+          <div style={{ display: 'grid', gap: 6 }}>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
+              Filtrar por Usuario
+            </label>
+            <select
+              className="input"
+              value={usuarioFiltro}
+              onChange={(e) => setUsuarioFiltro(e.target.value)}
+              style={{ width: '100%' }}
+            >
+              <option value="">Todos los usuarios</option>
+              {usuarios.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Filtro de Tipo */}
+          <div style={{ display: 'grid', gap: 6 }}>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
+              Filtrar por Tipo
+            </label>
+            <select
+              className="input"
+              value={tipoFiltro}
+              onChange={(e) => setTipoFiltro(e.target.value)}
+              style={{ width: '100%' }}
+            >
+              <option value="">Todos los tipos</option>
+              <option value="actividad">Actividades</option>
+              <option value="vehiculo">Vehículos</option>
+              <option value="asistencia">Asistencia</option>
+              <option value="herramienta">Herramientas</option>
+            </select>
+          </div>
+
+          {/* Filtro de Estatus */}
+          <div style={{ display: 'grid', gap: 6 }}>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
+              Filtrar por Estatus
+            </label>
+            <select
+              className="input"
+              value={estatusPago}
+              onChange={(e) => setEstatusPago(e.target.value)}
+              style={{ width: '100%' }}
+            >
+              <option value="">Todos los estatus</option>
+              <option value="Pendiente">Pendiente</option>
+              <option value="Pagada">Pagada</option>
+            </select>
+          </div>
         </div>
 
+        {/* Usuario seleccionado info */}
+        {usuarioActual && (
+          <div style={{
+            padding: 10,
+            backgroundColor: 'var(--primary)20',
+            borderRadius: 4,
+            marginBottom: 12,
+            fontSize: 13,
+          }}>
+            📌 Mostrando multas de: <strong>{usuarioActual.nombre}</strong> ({usuarioActual.email})
+          </div>
+        )}
+
         {/* Indicadores de estatus */}
-        <div style={{ display: 'flex', gap: 24, marginBottom: 16 }}>
-          <div>
+        <div style={{ display: 'flex', gap: 24, marginBottom: 16, flexWrap: 'wrap' }}>
+          <div style={{ fontSize: 13 }}>
             <span style={{ color: '#22c55e', fontWeight: 'bold' }}>● </span>
             Sin multas: {countByStatus('Pendiente') === 0 ? '✓' : countByStatus('Pendiente')}
           </div>
-          <div>
+          <div style={{ fontSize: 13 }}>
             <span style={{ color: '#eab308', fontWeight: 'bold' }}>● </span>
             1-2 multas: {countByStatus('Pendiente') <= 2 && countByStatus('Pendiente') > 0 ? '✓' : '-'}
           </div>
-          <div>
+          <div style={{ fontSize: 13 }}>
             <span style={{ color: '#ef4444', fontWeight: 'bold' }}>● </span>
             3+ multas: {countByStatus('Pendiente') >= 3 ? '✓' : '-'}
           </div>
@@ -139,49 +210,62 @@ const FinesTable: React.FC<FinesTableProps> = ({
 
       {fines.length === 0 ? (
         <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-secondary)' }}>
-          Sin multas registradas
+          Sin multas registradas {usuarioActual ? `para ${usuarioActual.nombre}` : ''}
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)' }}>ID</th>
-                {showUser && (
-                  <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)' }}>Usuario</th>
+                <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>ID</th>
+                {showUser && !usuarioFiltro && (
+                  <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Usuario</th>
                 )}
-                <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)' }}>Tipo</th>
-                <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)' }}>Razón</th>
-                <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)' }}>Monto</th>
-                <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)' }}>Estatus</th>
-                <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)' }}>Fecha</th>
+                <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Tipo</th>
+                <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Razón</th>
+                <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Descripción</th>
+                <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Monto</th>
+                <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Estatus</th>
+                <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Fecha</th>
               </tr>
             </thead>
             <tbody>
               {fines.map((fine) => (
                 <tr key={fine.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: 12 }}>{fine.id}</td>
-                  {showUser && (
-                    <td style={{ padding: 12 }}>{fine.usuario?.nombre || '-'}</td>
+                  <td style={{ padding: 12, fontSize: 12 }}>{fine.id}</td>
+                  {showUser && !usuarioFiltro && (
+                    <td style={{ padding: 12, fontSize: 12 }}>{fine.usuario?.nombre || '-'}</td>
                   )}
-                  <td style={{ padding: 12 }}>
+                  <td style={{ padding: 12, fontSize: 12 }}>
                     <span
                       style={{
                         display: 'inline-block',
                         padding: '4px 8px',
                         borderRadius: 4,
-                        backgroundColor: 'var(--bg-secondary)',
-                        fontSize: 12,
+                        backgroundColor: getTipoColor(fine.tipo),
+                        color: 'white',
+                        fontWeight: 500,
+                        fontSize: 11,
                       }}
                     >
-                      {fine.tipo}
+                      {getTipoLabel(fine.tipo)}
                     </span>
                   </td>
-                  <td style={{ padding: 12 }}>{fine.razon}</td>
-                  <td style={{ padding: 12, fontWeight: 'bold' }}>
+                  <td style={{ padding: 12, fontSize: 12, fontWeight: 500 }}>{fine.razon}</td>
+                  <td style={{ padding: 12, fontSize: 12, maxWidth: 150 }}>
+                    {fine.descripcion ? (
+                      <span title={fine.descripcion}>
+                        {fine.descripcion.substring(0, 30)}
+                        {fine.descripcion.length > 30 ? '...' : ''}
+                      </span>
+                    ) : (
+                      <span style={{ color: 'var(--text-secondary)' }}>-</span>
+                    )}
+                  </td>
+                  <td style={{ padding: 12, fontSize: 12, fontWeight: 'bold', color: '#ef4444' }}>
                     ${Number(fine.monto).toFixed(2)}
                   </td>
-                  <td style={{ padding: 12 }}>
+                  <td style={{ padding: 12, fontSize: 12 }}>
                     <span
                       style={{
                         display: 'inline-block',
@@ -192,14 +276,14 @@ const FinesTable: React.FC<FinesTableProps> = ({
                             ? '#22c55e40'
                             : '#ef444440',
                         color: fine.estatusPago === 'Pagada' ? '#22c55e' : '#ef4444',
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: 'bold',
                       }}
                     >
                       {fine.estatusPago}
                     </span>
                   </td>
-                  <td style={{ padding: 12 }}>
+                  <td style={{ padding: 12, fontSize: 12 }}>
                     {new Date(fine.fechaCreacion).toLocaleDateString('es-MX')}
                   </td>
                 </tr>
@@ -211,5 +295,27 @@ const FinesTable: React.FC<FinesTableProps> = ({
     </div>
   );
 };
+
+// Función auxiliar para obtener color por tipo
+function getTipoColor(tipo: string): string {
+  const colors: { [key: string]: string } = {
+    actividad: '#f59e0b',
+    vehiculo: '#ef4444',
+    asistencia: '#0f6ad6',
+    herramienta: '#8b5cf6',
+  };
+  return colors[tipo] || '#6b7280';
+}
+
+// Función auxiliar para obtener label por tipo
+function getTipoLabel(tipo: string): string {
+  const labels: { [key: string]: string } = {
+    actividad: 'Actividades',
+    vehiculo: 'Vehículos',
+    asistencia: 'Asistencia',
+    herramienta: 'Herramientas',
+  };
+  return labels[tipo] || tipo;
+}
 
 export default FinesTable;
