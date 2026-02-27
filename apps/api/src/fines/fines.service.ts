@@ -60,7 +60,65 @@ export class FinesService {
     return fine;
   }
 
-  async findAll() {
+  async findAll(currentUser?: any) {
+    // SuperAdmin ve todas las multas
+    if (currentUser?.isSuperAdmin) {
+      return this.prisma.fine.findMany({
+        include: {
+          usuario: {
+            select: {
+              id: true,
+              nombre: true,
+              email: true,
+              role: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  accesoConsoleAdmin: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          fechaCreacion: 'desc',
+        },
+      });
+    }
+
+    // Admin solo ve multas de usuarios regulares (no otros admins/superadmins)
+    if (currentUser?.permissions?.includes('CONSOLE_ADMIN')) {
+      return this.prisma.fine.findMany({
+        where: {
+          usuario: {
+            role: {
+              accesoConsoleAdmin: false,
+            },
+          },
+        },
+        include: {
+          usuario: {
+            select: {
+              id: true,
+              nombre: true,
+              email: true,
+              role: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  accesoConsoleAdmin: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          fechaCreacion: 'desc',
+        },
+      });
+    }
+
+    // Fallback: devolver todas (no debería llegar aquí)
     return this.prisma.fine.findMany({
       include: {
         usuario: {

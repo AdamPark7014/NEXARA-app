@@ -34,8 +34,8 @@ export class ToolRequestsController {
   // Obtener todas las solicitudes (admin/superadmin)
   @Get()
   @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
-  async findAll() {
-    return this.toolRequestsService.findAll();
+  async findAll(@CurrentUser() user: any) {
+    return this.toolRequestsService.findAll(user);
   }
 
   // Obtener solicitudes del usuario actual
