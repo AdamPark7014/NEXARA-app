@@ -4,9 +4,10 @@ import { EvidencesController } from './evidences.controller.js';
 import { PrismaModule } from '../prisma/prisma.module.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { ServiceSheetsModule } from '../service-sheets/service-sheets.module.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule, ServiceSheetsModule],
+  imports: [PrismaModule, AuthModule, ServiceSheetsModule, NotificationsModule],
   controllers: [EvidencesController],
   providers: [EvidencesService],
   exports: [EvidencesService],

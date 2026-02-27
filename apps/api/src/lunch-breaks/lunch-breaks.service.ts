@@ -1,10 +1,14 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { CreateLunchBreakDto, UpdateLunchBreakDto } from './dto/lunch-break.dto.js';
 
 @Injectable()
 export class LunchBreaksService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationHierarchy: NotificationHierarchyService,
+  ) {}
 
   async createCheckin(usuarioId: number, data: CreateLunchBreakDto) {
     const today = new Date();
@@ -35,9 +39,11 @@ export class LunchBreaksService {
       notes = `Entraste a comida ${this.getMinutesDiff(lunchStartHour, checkinTime)} minutos después del horario permitido (3 PM)`;
     }
 
+    let lunchBreak;
+
     if (existingLunch) {
       // Actualizar registro existente
-      return await this.prisma.lunchBreak.update({
+      lunchBreak = await this.prisma.lunchBreak.update({
         where: { id: existingLunch.id },
         data: {
           checkinTime,
@@ -47,23 +53,32 @@ export class LunchBreaksService {
           status: 'IN_PROGRESS',
           updatedAt: new Date(),
         },
-        include: { user: { select: { nombre: true, email: true } } },
+        include: { user: { select: { nombre: true, email: true, id: true } } },
+      });
+    } else {
+      // Crear nuevo registro
+      lunchBreak = await this.prisma.lunchBreak.create({
+        data: {
+          userId: usuarioId,
+          date: today,
+          checkinTime,
+          checkinPhotoUrl: data.checkinPhotoUrl,
+          isCheckinLate: isLate,
+          notes,
+          status: 'IN_PROGRESS',
+        },
+        include: { user: { select: { nombre: true, email: true, id: true } } },
       });
     }
 
-    // Crear nuevo registro
-    return await this.prisma.lunchBreak.create({
-      data: {
-        userId: usuarioId,
-        date: today,
-        checkinTime,
-        checkinPhotoUrl: data.checkinPhotoUrl,
-        isCheckinLate: isLate,
-        notes,
-        status: 'IN_PROGRESS',
-      },
-      include: { user: { select: { nombre: true, email: true } } },
-    });
+    // Notify about lunch break checkin
+    await this.notificationHierarchy.notifyLunchBreakChange(
+      usuarioId,
+      'LUNCH_CHECKIN',
+      lunchBreak.user.nombre || 'Usuario',
+    );
+
+    return lunchBreak;
   }
 
   async createCheckout(usuarioId: number, data: UpdateLunchBreakDto) {
@@ -97,7 +112,7 @@ export class LunchBreaksService {
       notes += `\nVolviste del almuerzo a horario`;
     }
 
-    return await this.prisma.lunchBreak.update({
+    const lunchBreak = await this.prisma.lunchBreak.update({
       where: { id: lunch.id },
       data: {
         checkoutTime,
@@ -109,6 +124,15 @@ export class LunchBreaksService {
       },
       include: { user: { select: { nombre: true, email: true } } },
     });
+
+    // Notify about lunch break checkout
+    await this.notificationHierarchy.notifyLunchBreakChange(
+      usuarioId,
+      'LUNCH_CHECKOUT',
+      lunchBreak.user.nombre || 'Usuario',
+    );
+
+    return lunchBreak;
   }
 
   async getUserLunchBreaks(usuarioId: number, startDate?: Date, endDate?: Date) {

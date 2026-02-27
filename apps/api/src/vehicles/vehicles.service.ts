@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 // Removed unused imports for missing DTOs
 
 @Injectable()
@@ -33,10 +34,28 @@ export class VehiclesService {
     throw new Error('Modelo vehiculo no existe en Prisma.');
   }
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationHierarchy: NotificationHierarchyService,
+  ) {}
 
-  create(createVehicleDto: any) {
-    return this.prisma['vehicleControl'].create({ data: createVehicleDto });
+  async create(createVehicleDto: any) {
+    const vehicleControl = await this.prisma['vehicleControl'].create({
+      data: createVehicleDto,
+      include: { solicitante: { select: { id: true, nombre: true } } },
+    });
+
+    // Notify supervisors about vehicle request
+    if (vehicleControl.solicitanteId && vehicleControl.solicitante) {
+      await this.notificationHierarchy.notifyVehicleRequested(
+        vehicleControl.solicitanteId,
+        vehicleControl.id,
+        vehicleControl.solicitante.nombre || 'Usuario',
+        createVehicleDto.nombreVehiculo || 'Vehículo',
+      );
+    }
+
+    return vehicleControl;
   }
 
   createAsset(data: any) {
@@ -94,11 +113,34 @@ export class VehiclesService {
     });
   }
 
-  update(id: number, updateVehicleDto: any) {
-    return this.prisma['vehicleControl'].update({
+  async update(id: number, updateVehicleDto: any) {
+    // Get current vehicle to check for status changes
+    const currentVehicle = await this.findOne(id);
+
+    const updated = await this.prisma['vehicleControl'].update({
       where: { id },
       data: updateVehicleDto,
+      include: { solicitante: { select: { id: true, nombre: true } } },
     });
+
+    // Notify about vehicle approval/rejection
+    if (currentVehicle && updateVehicleDto.estatusAprobacion && currentVehicle.estatusAprobacion !== updateVehicleDto.estatusAprobacion) {
+      if (updateVehicleDto.estatusAprobacion === 'APPROVED' && updated.solicitanteId) {
+        await this.notificationHierarchy.notifyVehicleApproved(
+          updated.solicitanteId,
+          id,
+          updateVehicleDto.nombreVehiculo || 'Vehículo',
+        );
+      } else if (updateVehicleDto.estatusAprobacion === 'REJECTED' && updated.solicitanteId) {
+        await this.notificationHierarchy.notifyVehicleRejected(
+          updated.solicitanteId,
+          id,
+          updateVehicleDto.nombreVehiculo || 'Vehículo',
+        );
+      }
+    }
+
+    return updated;
   }
 
   remove(id: number) {

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 
 // Definir el tipo localmente
 type ToolRequestStatus = 'PENDING' | 'APPROVED' | 'IN_USE' | 'RETURNED' | 'DAMAGED' | 'REJECTED';
@@ -37,10 +38,13 @@ export interface CreateRenewalDto {
 
 @Injectable()
 export class ToolRequestsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationHierarchy: NotificationHierarchyService,
+  ) {}
 
   async create(data: CreateToolRequestDto) {
-    return this.prisma.toolRequest.create({
+    const toolRequest = await this.prisma.toolRequest.create({
       data: {
         usuarioId: data.usuarioId,
         toolName: data.toolName,
@@ -63,6 +67,16 @@ export class ToolRequestsService {
         },
       },
     });
+
+    // Notify supervisors about tool request
+    await this.notificationHierarchy.notifyToolRequested(
+      data.usuarioId,
+      toolRequest.id,
+      toolRequest.usuario?.nombre || 'Usuario',
+      data.toolName,
+    );
+
+    return toolRequest;
   }
 
   async findAll() {
@@ -190,7 +204,20 @@ export class ToolRequestsService {
   }
 
   async update(id: number, data: UpdateToolRequestDto) {
-    return this.prisma.toolRequest.update({
+    // Get current tool request to check for status changes
+    const currentToolRequest = await this.prisma.toolRequest.findUnique({
+      where: { id },
+      include: {
+        usuario: {
+          select: {
+            id: true,
+            nombre: true,
+          },
+        },
+      },
+    });
+
+    const updated = await this.prisma.toolRequest.update({
       where: { id },
       data,
       include: {
@@ -210,10 +237,37 @@ export class ToolRequestsService {
         },
       },
     });
+
+    // Notify user about rejection
+    if (currentToolRequest && data.status && currentToolRequest.status !== data.status) {
+      if (data.status === 'REJECTED' && currentToolRequest.usuarioId) {
+        await this.notificationHierarchy.notifyToolReview(
+          currentToolRequest.usuarioId,
+          id,
+          'rejected',
+          currentToolRequest.toolName || 'Herramienta',
+        );
+      }
+    }
+
+    return updated;
   }
 
   async approve(id: number, approvedBy: number) {
-    return this.prisma.toolRequest.update({
+    const toolRequest = await this.prisma.toolRequest.findUnique({
+      where: { id },
+      include: {
+        usuario: {
+          select: {
+            id: true,
+            nombre: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    const approved = await this.prisma.toolRequest.update({
       where: { id },
       data: {
         status: 'APPROVED',
@@ -230,6 +284,18 @@ export class ToolRequestsService {
         },
       },
     });
+
+    // Notify user about approval
+    if (toolRequest?.usuarioId) {
+      await this.notificationHierarchy.notifyToolReview(
+        toolRequest.usuarioId,
+        id,
+        'approved',
+        toolRequest.toolName,
+      );
+    }
+
+    return approved;
   }
 
   async deliver(id: number) {
@@ -329,13 +395,21 @@ export class ToolRequestsService {
     // Verificar que la herramienta pertenece al usuario
     const toolRequest = await this.prisma.toolRequest.findUnique({
       where: { id: data.toolRequestId },
+      include: {
+        usuario: {
+          select: {
+            nombre: true,
+            id: true,
+          },
+        },
+      },
     });
 
     if (!toolRequest || toolRequest.usuarioId !== usuarioId) {
       throw new Error('No tienes permiso para renovar esta solicitud');
     }
 
-    return this.prisma.toolRenewal.create({
+    const renewal = await this.prisma.toolRenewal.create({
       data: {
         toolRequestId: data.toolRequestId,
         previousReturnDate: toolRequest.expectedReturnDate,
@@ -357,6 +431,16 @@ export class ToolRequestsService {
         },
       },
     });
+
+    // Notify supervisors about renewal request
+    await this.notificationHierarchy.notifyToolRenewalRequested(
+      usuarioId,
+      renewal.id,
+      toolRequest.usuario?.nombre || 'Usuario',
+      toolRequest.toolName,
+    );
+
+    return renewal;
   }
 
   async findRenewals(toolRequestId?: number, status?: RenewalStatus) {

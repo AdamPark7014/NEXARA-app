@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { CreateActivityDto } from './dto/create-activity.dto.js';
 import { UpdateActivityDto } from './dto/update-activity.dto.js';
 import { generateTicketReportPdf } from './ticket-report-pdf.js';
@@ -8,7 +9,10 @@ import path from 'path';
 
 @Injectable()
 export class ActivitiesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationHierarchy: NotificationHierarchyService,
+  ) {}
 
   // Dummy implementation to avoid controller errors
   toCSV(_data: any[]): string {
@@ -53,9 +57,23 @@ export class ActivitiesService {
   async create(createActivityDto: CreateActivityDto) {
     const trimmed = createActivityDto.anNumber?.trim();
     const anNumber = trimmed ? trimmed : await this.generateNextAnNumber();
-    return this.prisma['activity'].create({
+    
+    const activity = await this.prisma['activity'].create({
       data: { ...createActivityDto, anNumber },
+      include: { responsable: { select: { nombre: true, id: true } }, creador: { select: { nombre: true } } },
     });
+
+    // Notify the assigned user about new activity
+    if (activity.responsableId && activity.responsable) {
+      await this.notificationHierarchy.notifyActivityAssigned(
+        activity.responsableId,
+        activity.id,
+        activity.anNumber || 'Nueva actividad',
+        activity.creador?.nombre || 'Sistema',
+      );
+    }
+
+    return activity;
   }
 
   async findAll() {
@@ -161,10 +179,13 @@ export class ActivitiesService {
   }
 
   async update(id: number, updateActivityDto: UpdateActivityDto) {
-    return this.prisma['activity'].update({
+    const updatedActivity = await this.prisma['activity'].update({
       where: { id },
       data: updateActivityDto,
+      include: { responsable: { select: { nombre: true, id: true } } },
     });
+
+    return updatedActivity;
   }
 
   async remove(id: number) {

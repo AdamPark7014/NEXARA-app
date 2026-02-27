@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 
 @Injectable()
 export class ViaticosService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationHierarchy: NotificationHierarchyService,
+  ) {}
 
   // Exportar a CSV
   toCSV(viatics: any[]): string {
@@ -34,10 +38,25 @@ export class ViaticosService {
     throw new Error('Modelo viatico no existe en Prisma.');
   }
 
-  create(dto: any) {
-    return this.prisma['viatico'].create({
+  async create(dto: any) {
+    const viatico = await this.prisma['viatico'].create({
       data: dto,
+      include: { User: { select: { nombre: true, id: true } }, Activity: { select: { anNumber: true, id: true } } },
     });
+
+    // Notify supervisors about viatico request
+    if (viatico.usuarioId && viatico.User) {
+      await this.notificationHierarchy.notifyViaticRequested(
+        viatico.usuarioId,
+        viatico.id,
+        viatico.User.nombre || 'Usuario',
+        typeof viatico.montoSolicitado === 'object' && 'toNumber' in viatico.montoSolicitado
+          ? viatico.montoSolicitado.toNumber()
+          : Number(viatico.montoSolicitado) || 0,
+      );
+    }
+
+    return viatico;
   }
 
   async findAll() {
@@ -95,11 +114,38 @@ export class ViaticosService {
     });
   }
 
-  update(id: number, dto: any) {
-    return this.prisma['viatico'].update({
+  async update(id: number, dto: any) {
+    // Get current viatico to check for status changes
+    const currentViatico = await this.findOne(id);
+
+    const updatedViatico = await this.prisma['viatico'].update({
       where: { id },
       data: dto,
+      include: { User: { select: { nombre: true, id: true } }, Activity: { select: { anNumber: true } } },
     });
+
+    // Notify about viatico review status changes
+    if (currentViatico && dto.estatus && currentViatico.estatus !== dto.estatus) {
+      if (dto.estatus === 'APPROVED' && updatedViatico.usuarioId) {
+        await this.notificationHierarchy.notifyViaticReview(
+          updatedViatico.usuarioId,
+          id,
+          'approved',
+          typeof updatedViatico.montoSolicitado === 'object' && 'toNumber' in updatedViatico.montoSolicitado
+            ? updatedViatico.montoSolicitado.toNumber()
+            : Number(updatedViatico.montoSolicitado) || 0,
+        );
+      } else if (dto.estatus === 'REJECTED' && updatedViatico.usuarioId) {
+        await this.notificationHierarchy.notifyViaticReview(
+          updatedViatico.usuarioId,
+          id,
+          'rejected',
+          0,
+        );
+      }
+    }
+
+    return updatedViatico;
   }
 
   remove(id: number) {
