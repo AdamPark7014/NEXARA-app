@@ -136,10 +136,13 @@ export class UsersService {
         });
       }
 
-      // Si el usuario actual es Admin de consola (accesoConsoleAdmin = true)
-      const isConsoleAdmin = userInDb.role?.accesoConsoleAdmin === true;
+      const hasConsoleAdminPermission = Boolean(currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN));
+      const hasUsersManagePermission = Boolean(currentUser.permissions?.includes(PERMISSIONS.USERS_MANAGE));
+      // Fallback por rol para compatibilidad con cuentas antiguas
+      const isConsoleAdminByRole = userInDb.role?.accesoConsoleAdmin === true;
+      const canAssignByHierarchy = hasConsoleAdminPermission || hasUsersManagePermission || isConsoleAdminByRole;
       
-      if (isConsoleAdmin) {
+      if (canAssignByHierarchy) {
         // Admin puede asignar a usuarios normales (sin accesoConsoleAdmin) de cualquier departamento
         return this.prisma['user'].findMany({
           where: {

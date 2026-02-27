@@ -53,7 +53,7 @@ export class UsersController {
 
   @Get('assignable')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
+  @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
   async findAssignable(@CurrentUser() user: any) {
     // Cargar rol completo del usuario actual
     const userWithRole = await this.usersService.findOne(user.id);
