@@ -64,9 +64,6 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
   const [monto, setMonto] = useState('');
   const [usuarioSeleccionado, setUsuarioSeleccionado] = useState('');
   const [usuarios, setUsuarios] = useState<User[]>([]);
-  const [usuariosFiltrados, setUsuariosFiltrados] = useState<User[]>([]);
-  const [busquedaUsuario, setBusquedaUsuario] = useState('');
-  const [mostrarDropdown, setMostrarDropdown] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -94,29 +91,6 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
       .then((data) => setUsuarios(Array.isArray(data) ? data : []))
       .catch(() => setUsuarios([]));
   }, [user?.token]);
-
-  // Filtrar usuarios según búsqueda
-  useEffect(() => {
-    if (!busquedaUsuario.trim()) {
-      setUsuariosFiltrados(usuarios);
-    } else {
-      const termino = busquedaUsuario.toLowerCase();
-      setUsuariosFiltrados(
-        usuarios.filter(
-          (u) =>
-            u.nombre.toLowerCase().includes(termino) ||
-            u.email.toLowerCase().includes(termino)
-        )
-      );
-    }
-  }, [busquedaUsuario, usuarios]);
-
-  const handleSelectUsuario = (usuarioId: number) => {
-    setUsuarioSeleccionado(String(usuarioId));
-    const usuarioSel = usuarios.find((u) => u.id === usuarioId);
-    setBusquedaUsuario(usuarioSel?.nombre || '');
-    setMostrarDropdown(false);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,7 +148,6 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
       setDescripcion('');
       setMonto('');
       setUsuarioSeleccionado('');
-      setBusquedaUsuario('');
       
       // Callback para recargar tabla
       if (onFineCreated) {
@@ -206,129 +179,40 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
       <h3 style={{ marginBottom: 16, color: 'var(--primary)' }}>Nueva Multa</h3>
       
       <div style={{ display: 'grid', gap: 12 }}>
-        {/* Usuario con búsqueda jerárquica */}
-        <div style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
-          <label htmlFor="usuario-search" style={{ fontWeight: 500 }}>
-            👤 Seleccionar Usuario
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)', marginLeft: 8 }}>
-              (Según tu nivel jerárquico)
-            </span>
-          </label>
-          <div style={{ position: 'relative' }}>
-            <input
-              id="usuario-search"
-              className="input"
-              type="text"
-              placeholder="Buscar usuario por nombre o email..."
-              value={busquedaUsuario}
-              onChange={(e) => {
-                setBusquedaUsuario(e.target.value);
-                setMostrarDropdown(true);
-              }}
-              onFocus={() => setMostrarDropdown(true)}
-              disabled={loading || usuarios.length === 0}
-              style={{
-                width: '100%',
-              }}
-            />
-            
-            {/* Información de usuarios disponibles */}
-            {usuarios.length === 0 && !loading && (
-              <div style={{
-                marginTop: 4,
-                fontSize: 12,
-                color: 'var(--text-secondary)',
-                fontStyle: 'italic',
-              }}>
-                No hay usuarios disponibles según tu nivel
-              </div>
-            )}
+        {/* Usuario - Selector Directo */}
+        <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
+          👤 Usuario
+          <select
+            className="input"
+            value={usuarioSeleccionado}
+            onChange={(e) => setUsuarioSeleccionado(e.target.value)}
+            disabled={loading || usuarios.length === 0}
+            required
+          >
+            <option value="">Selecciona un usuario</option>
+            {usuarios.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.nombre} {u.role ? `(${u.role.nombre})` : ''}
+              </option>
+            ))}
+          </select>
+        </label>
 
-            {/* Dropdown de usuarios */}
-            {mostrarDropdown && usuarios.length > 0 && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  backgroundColor: 'var(--bg-secondary)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 4,
-                  maxHeight: 240,
-                  overflowY: 'auto',
-                  zIndex: 10,
-                  marginTop: 4,
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                }}
-              >
-                {usuariosFiltrados.length > 0 ? (
-                  usuariosFiltrados.map((u) => (
-                    <div
-                      key={u.id}
-                      onClick={() => handleSelectUsuario(u.id)}
-                      style={{
-                        padding: '10px 12px',
-                        cursor: 'pointer',
-                        borderBottom: '1px solid var(--border)',
-                        backgroundColor:
-                          usuarioSeleccionado === String(u.id)
-                            ? 'var(--primary)20'
-                            : 'transparent',
-                        transition: 'background-color 0.2s',
-                      }}
-                      onMouseEnter={(e) => {
-                        if (usuarioSeleccionado !== String(u.id)) {
-                          (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--border)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (usuarioSeleccionado !== String(u.id)) {
-                          (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
-                        }
-                      }}
-                    >
-                      <div style={{ fontWeight: 500, fontSize: 14 }}>
-                        {u.nombre}
-                        {u.role && (
-                          <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginLeft: 8, fontWeight: 'normal' }}>
-                            ({u.role.nombre})
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                        {u.email}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: 12 }}>
-                    No se encontraron usuarios
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Usuario seleccionado */}
-            {usuarioElegido && (
-              <div style={{
-                marginTop: 8,
-                padding: 10,
-                backgroundColor: 'var(--primary)20',
-                borderRadius: 4,
-                fontSize: 12,
-                borderLeft: '3px solid var(--primary)',
-              }}>
-                <div style={{ fontWeight: 500 }}>✓ Seleccionado: {usuarioElegido.nombre}</div>
-                {usuarioElegido.role && (
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginTop: 2 }}>
-                    Rol: {usuarioElegido.role.nombre}
-                  </div>
-                )}
-              </div>
-            )}
+        {/* Información de usuario seleccionado */}
+        {usuarioElegido && (
+          <div style={{
+            padding: 10,
+            backgroundColor: 'var(--primary)20',
+            borderRadius: 4,
+            fontSize: 12,
+            borderLeft: '3px solid var(--primary)',
+          }}>
+            <div style={{ fontWeight: 500 }}>✓ {usuarioElegido.nombre}</div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginTop: 2 }}>
+              {usuarioElegido.email}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Tipo de Multa */}
         <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
@@ -338,7 +222,7 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
             value={tipo}
             onChange={(e) => {
               setTipo(e.target.value as keyof typeof FINE_TYPES);
-              setRazon(''); // Reset razón cuando cambia tipo
+              setRazon('');
             }}
             disabled={loading}
           >
@@ -350,7 +234,7 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
           </select>
         </label>
 
-        {/* Razón (Dinámico basado en tipo) */}
+        {/* Razón */}
         <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
           Razón
           <select
@@ -369,19 +253,6 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
           </select>
         </label>
 
-        {/* Descripción */}
-        <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
-          Descripción (Opcional)
-          <textarea
-            className="input"
-            value={descripcion}
-            onChange={(e) => setDescripcion(e.target.value)}
-            placeholder="Detalles adicionales..."
-            disabled={loading}
-            style={{ minHeight: 80, fontFamily: 'inherit' }}
-          />
-        </label>
-
         {/* Monto */}
         <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
           Monto ($)
@@ -395,6 +266,19 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
             step="0.01"
             required
             disabled={loading}
+          />
+        </label>
+
+        {/* Descripción */}
+        <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
+          Descripción (Opcional)
+          <textarea
+            className="input"
+            value={descripcion}
+            onChange={(e) => setDescripcion(e.target.value)}
+            placeholder="Detalles adicionales..."
+            disabled={loading}
+            style={{ minHeight: 70, fontFamily: 'inherit' }}
           />
         </label>
 
@@ -413,7 +297,7 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
       {error && <p style={{ color: 'var(--danger)', marginTop: 12, fontSize: 13 }}>⚠️ {error}</p>}
       {success && <p style={{ color: 'var(--accent)', marginTop: 12, fontSize: 13 }}>✓ {success}</p>}
 
-      {/* Información sobre permisos */}
+      {/* Usuarios disponibles */}
       {usuarios.length > 0 && (
         <div style={{
           marginTop: 16,
@@ -424,7 +308,21 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
           color: 'var(--text-secondary)',
           borderLeft: '2px solid #0f6ad6',
         }}>
-          <strong style={{ color: 'var(--primary)' }}>Usuarios disponibles:</strong> {usuarios.length}
+          <strong style={{ color: 'var(--primary)' }}>👥 Usuarios disponibles:</strong> {usuarios.length}
+        </div>
+      )}
+
+      {usuarios.length === 0 && (
+        <div style={{
+          marginTop: 16,
+          padding: 12,
+          backgroundColor: '#ef444420',
+          borderRadius: 4,
+          fontSize: 12,
+          color: '#ef4444',
+          borderLeft: '2px solid #ef4444',
+        }}>
+          <strong>⚠️ Sin usuarios disponibles</strong> según tu nivel jerárquico
         </div>
       )}
     </form>

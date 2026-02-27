@@ -42,10 +42,14 @@ export default function Sidebar() {
 
   // Entradas dinámicas según rol
   if (isAdmin || isSuperAdmin) {
-    menu.push({ label: "Gestor de Multas", href: "/tools/fines", permissions: [PERMISSIONS.CONSOLE_ADMIN] });
-    menu.push({ label: "Gestor de Herramientas", href: "/tools/tools-history", permissions: [PERMISSIONS.CONSOLE_ADMIN] });
-  } else if (isConsoleUser) {
-    menu.push({ label: "Mis Herramientas", href: "/tools/my-tools", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS] });
+    menu.push({ label: "Multas", href: "/fines", permissions: [PERMISSIONS.FINES_MANAGE] });
+    menu.push({ label: "Herramientas", href: "/tools", permissions: [PERMISSIONS.CONSOLE_ADMIN] });
+  }
+
+  // Todos ven mis herramientas y mis multas
+  if (isConsoleUser) {
+    menu.push({ label: "Mis Multas", href: "/my-fines", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS] });
+    menu.push({ label: "Mis Herramientas", href: "/my-tools", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS] });
   }
 
   // Avatar: usa user.avatarUrl si existe, si no, usa un avatar generado por ui-avatars.com
