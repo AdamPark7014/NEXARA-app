@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
+import { PERMISSIONS } from '../common/permissions.js';
 
 // Definir el tipo localmente
 type ToolRequestStatus = 'PENDING' | 'APPROVED' | 'IN_USE' | 'RETURNED' | 'DAMAGED' | 'REJECTED';
@@ -120,7 +121,7 @@ export class ToolRequestsService {
     }
 
     // Admin solo ve solicitudes de usuarios regulares de su departamento
-    if (currentUser?.permissions?.includes('CONSOLE_ADMIN')) {
+    if (currentUser?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
       return this.prisma.toolRequest.findMany({
         where: {
           usuario: {
