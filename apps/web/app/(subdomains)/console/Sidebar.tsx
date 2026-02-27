@@ -40,10 +40,11 @@ export default function Sidebar() {
     { label: "Cotizaciones", href: "/cotizaciones", permissions: [PERMISSIONS.COTIZACIONES_ACCESS] },
   ];
 
-  // Usuarios de consola ven multas y herramientas
-  if (isConsoleUser || isSuperAdmin) {
-    menu.push({ label: "Multas", href: "/fines", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] });
-    menu.push({ label: "Herramientas", href: "/tools", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] });
+  // Solo admin y superadmin ven multas y herramientas en el menú
+  // Usuarios normales ven sus multas en cada sección específica
+  if (isAdmin || isSuperAdmin) {
+    menu.push({ label: "Multas", href: "/fines", anyPermissions: [PERMISSIONS.CONSOLE_ADMIN] });
+    menu.push({ label: "Herramientas", href: "/tools", anyPermissions: [PERMISSIONS.CONSOLE_ADMIN] });
   }
 
   // Avatar: usa user.avatarUrl si existe, si no, usa un avatar generado por ui-avatars.com

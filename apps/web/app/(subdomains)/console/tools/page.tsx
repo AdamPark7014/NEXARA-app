@@ -18,17 +18,19 @@ export default function ToolsPage() {
         {isAdmin && (
           <div>
             <h2 style={{ marginBottom: 16 }}>
-              {isSuperAdmin ? "🔧 Todas las Herramientas" : "🔧 Gestión de Herramientas"}
+              {isSuperAdmin ? "🔧 Todas las Herramientas" : "🔧 Herramientas"}
             </h2>
             <ToolRequestsTable />
           </div>
         )}
 
-        {/* Todos ven su tabla personal de herramientas */}
-        <div>
-          <h2 style={{ marginBottom: 16 }}>🔧 Mis Herramientas</h2>
-          <MyToolsTable />
-        </div>
+        {/* Solo usuarios normales y admins (no superadmin) ven sus herramientas */}
+        {!isSuperAdmin && (
+          <div>
+            <h2 style={{ marginBottom: 16 }}>🔧 Mis Herramientas</h2>
+            <MyToolsTable />
+          </div>
+        )}
       </div>
     </RoleGuard>
   );

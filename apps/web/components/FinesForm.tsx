@@ -72,10 +72,10 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
 
-  // Verificar permisos
+  // Verificar permisos - Admin y SuperAdmin pueden crear multas
   useEffect(() => {
     if (user) {
-      const tienePermiso = hasPermission(user, PERMISSIONS.FINES_MANAGE);
+      const tienePermiso = hasPermission(user, PERMISSIONS.CONSOLE_ADMIN) || !!user?.isSuperAdmin;
       setPermisoSi(tienePermiso);
     }
   }, [user]);
