@@ -324,6 +324,7 @@ model User {
   salesProjectOrdersCreated SalesProjectOrder[] @relation("SalesProjectOrderCreator")
   orderTemplates   OrderTemplate[]             @relation("OrderTemplateCreator")
   notifications    Notification[]
+  notificationsTriggered Notification[]  @relation("NotificationTriggeredBy")
   reviewedEvidences ActivityEvidence[]  // Evidencias revisadas por este usuario
   fines            Fine[]
   toolRequests     ToolRequest[]       @relation("UserToolRequests")
@@ -1152,36 +1153,98 @@ model OrderTemplate {
 }
 
 enum NotificationType {
+  // ATTENDANCE - Entrada/Salida
+  ATTENDANCE_CHECKIN
+  ATTENDANCE_CHECKOUT
+  ATTENDANCE_ABSENCE
+  
+  // LUNCH BREAKS - Comida
+  LUNCH_CHECKIN
+  LUNCH_CHECKOUT
+  
+  // ACTIVITIES - Actividades
+  ACTIVITY_ASSIGNED
+  ACTIVITY_APPROVED
+  ACTIVITY_REJECTED
+  ACTIVITY_RESUBMIT_REQUESTED
+  
+  // EVIDENCE - Evidencias
+  EVIDENCE_SUBMITTED
+  EVIDENCE_APPROVED
+  EVIDENCE_REJECTED
+  EVIDENCE_RESUBMIT_REQUESTED
+  
+  // VIATICOS - Viáticos
+  VIATICO_ASSIGNED
+  VIATICO_APPROVED
+  VIATICO_REJECTED
+  VIATICO_PAID
+  
+  // TOOLS - Herramientas
+  TOOL_REQUESTED
+  TOOL_APPROVED
+  TOOL_REJECTED
+  TOOL_DELIVERED
+  TOOL_RETURNED
+  TOOL_RENEWAL_REQUESTED
+  TOOL_RENEWAL_APPROVED
+  TOOL_RENEWAL_REJECTED
+  TOOL_EXPIRATION_WARNING
+  TOOL_EXPIRATION_DUE
+  
+  // FINES - Multas
+  FINE_CREATED
+  FINE_PAID
+  FINE_CANCELLED
+  
+  // PROFILE - Perfil
+  PROFILE_DOCUMENT_UPLOADED
+  PROFILE_DOCUMENT_APPROVED
+  PROFILE_DOCUMENT_REJECTED
+  
+  // VEHICLES - Vehículos
+  VEHICLE_DELIVERY_REQUESTED
+  VEHICLE_DELIVERY_APPROVED
+  VEHICLE_DELIVERY_REJECTED
+  VEHICLE_RENEWAL_REQUESTED
+  VEHICLE_RENEWAL_APPROVED
+  VEHICLE_RENEWAL_REJECTED
+  
+  // QUOTES - Cotizaciones
   QUOTE_EXPIRING
   QUOTE_EXPIRED
   QUOTE_SIGNED
+  
+  // ORDERS - Órdenes
   ORDER_CREATED
+  
+  // PROJECTS - Proyectos
   PROJECT_COMPLETED
-  VIATICO_APPROVED
-  VIATICO_REJECTED
-  ATTENDANCE_UPDATE
-  TOOL_EXPIRATION_WARNING
-  TOOL_EXPIRATION_DUE
-  TOOL_APPROVED
-  TOOL_DELIVERED
-  TOOL_RENEWAL_APPROVED
 }
 
 model Notification {
-  id              Int                @id @default(autoincrement())
-  userId          Int
-  type            NotificationType
-  title           String             @db.VarChar(200)
-  message         String             @db.Text
-  relatedEntityId Int?
-  entityType      String?            @db.VarChar(50)
-  relatedUrl      String?            @db.VarChar(500)
-  isRead          Boolean            @default(false)
-  readAt          DateTime?
-  createdAt       DateTime           @default(now())
-  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                Int                @id @default(autoincrement())
+  userId            Int
+  type              NotificationType
+  category          String             @db.VarChar(50)  // "attendance", "activity", "tool", etc
+  title             String             @db.VarChar(200)
+  message           String             @db.Text
+  triggerUserId     Int?               // Usuario que desencadenó la notificación
+  relatedEntityId   Int?
+  entityType        String?            @db.VarChar(50)  // "activity", "evidence", "tool_request", etc
+  relatedUrl        String?            @db.VarChar(500)
+  priority          String?            @default("normal") @db.VarChar(20)  // "high", "normal", "low"
+  isRead            Boolean            @default(false)
+  readAt            DateTime?
+  createdAt         DateTime           @default(now())
+  
+  // Relaciones
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  triggerUser       User?              @relation("NotificationTriggeredBy", fields: [triggerUserId], references: [id], onDelete: SetNull)
 
   @@index([userId, isRead, createdAt])
+  @@index([userId, category])
+  @@index([isRead, createdAt])
   @@map("notifications")
 }
 

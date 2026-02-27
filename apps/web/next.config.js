@@ -64,6 +64,20 @@ const nextConfig = {
   webpack: (config, { isServer, dev }) => {
     config.resolve.alias['@'] = path.resolve(__dirname);
     
+    // Fallback para canvas (usado por pdfjs)
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      canvas: false,
+      fs: false,
+      path: false,
+      crypto: false,
+    };
+    
+    // Ignorar canvas en build de servidor
+    if (isServer) {
+      config.externals = [...(config.externals || []), 'canvas'];
+    }
+    
     // Optimizaciones de webpack
     if (dev) {
       config.watchOptions = {

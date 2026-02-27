@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 
 export interface CreateFineDto {
   usuarioId: number;
@@ -20,10 +21,13 @@ export interface UpdateFineDto {
 
 @Injectable()
 export class FinesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationHierarchy: NotificationHierarchyService,
+  ) {}
 
   async create(data: CreateFineDto) {
-    return this.prisma.fine.create({
+    const fine = await this.prisma.fine.create({
       data: {
         usuarioId: data.usuarioId,
         tipo: data.tipo,
@@ -43,6 +47,16 @@ export class FinesService {
         },
       },
     });
+
+    // Notify user about fine creation
+    await this.notificationHierarchy.notifyFineCreated(
+      data.usuarioId,
+      fine.id,
+      data.razon,
+      data.monto,
+    );
+
+    return fine;
   }
 
   async findAll() {

@@ -1,5 +1,6 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CreateEvidenceDto } from './dto/create-evidence.dto.js';
 import { UpdateEvidenceDto } from './dto/update-evidence.dto.js';
@@ -10,6 +11,7 @@ export class EvidencesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly serviceSheetsService: ServiceSheetsService,
+    private readonly notificationHierarchy: NotificationHierarchyService,
   ) {}
 
   // Exportar a CSV
@@ -191,11 +193,13 @@ export class EvidencesService {
     });
   }
 
-  update(id: number, updateEvidenceDto: UpdateEvidenceDto) {
-    return this.prisma['evidence'].update({
+  async update(id: number, updateEvidenceDto: UpdateEvidenceDto) {
+    const updated = await this.prisma['evidence'].update({
       where: { id },
       data: updateEvidenceDto,
     });
+
+    return updated;
   }
 
   remove(id: number) {

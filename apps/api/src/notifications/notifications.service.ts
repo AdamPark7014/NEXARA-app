@@ -1,19 +1,46 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationType } from '@prisma/client';
 import { Cron } from '@nestjs/schedule';
+
+export interface INotificationPayload {
+  userId: number;
+  type: NotificationType;
+  category: string;
+  title: string;
+  message: string;
+  triggerUserId?: number;
+  relatedEntityId?: number;
+  entityType?: string;
+  relatedUrl?: string;
+  priority?: 'high' | 'normal' | 'low';
+}
 
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() @Inject('NOTIFICATIONS_GATEWAY') private readonly gateway?: any,
+  ) {}
 
-  async getUserNotifications(userId: number, limit: number = 20) {
+  async getUserNotifications(userId: number, limit: number = 50, offset: number = 0) {
     return this.prisma.notification.findMany({
       where: { userId },
+      include: {
+        triggerUser: {
+          select: {
+            id: true,
+            nombre: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
       take: limit,
+      skip: offset,
     });
   }
 
@@ -24,16 +51,28 @@ export class NotificationsService {
   }
 
   async markAsRead(notificationId: number) {
-    return this.prisma.notification.update({
+    const notification = await this.prisma.notification.update({
       where: { id: notificationId },
       data: { isRead: true, readAt: new Date() },
+      include: { triggerUser: true },
     });
+
+    this.gateway?.notifyUser(notification.userId, {
+      event: 'notification:read',
+      notificationId,
+    });
+
+    return notification;
   }
 
   async markAllAsRead(userId: number) {
-    return this.prisma.notification.updateMany({
+    await this.prisma.notification.updateMany({
       where: { userId, isRead: false },
       data: { isRead: true, readAt: new Date() },
+    });
+
+    this.gateway?.notifyUser(userId, {
+      event: 'notifications:read-all',
     });
   }
 
@@ -41,16 +80,109 @@ export class NotificationsService {
     return this.prisma.notification.delete({ where: { id: notificationId } });
   }
 
-  async createNotification(data: {
-    userId: number;
-    type: NotificationType;
-    title: string;
-    message: string;
-    relatedEntityId?: number;
-    entityType?: string;
-    relatedUrl?: string;
-  }) {
-    return this.prisma.notification.create({ data });
+  /**
+   * Crear notificación individual con opciones completas
+   */
+  async createNotification(payload: INotificationPayload) {
+    try {
+      const notification = await this.prisma.notification.create({
+        data: {
+          userId: payload.userId,
+          type: payload.type,
+          category: payload.category || 'general',
+          title: payload.title,
+          message: payload.message,
+          triggerUserId: payload.triggerUserId,
+          relatedEntityId: payload.relatedEntityId,
+          entityType: payload.entityType,
+          relatedUrl: payload.relatedUrl,
+          priority: payload.priority || 'normal',
+        },
+        include: {
+          triggerUser: {
+            select: {
+              id: true,
+              nombre: true,
+              email: true,
+              avatarUrl: true,
+            },
+          },
+        },
+      });
+
+      // Emitir en tiempo real
+      if (this.gateway) {
+        this.gateway.notifyUser(payload.userId, {
+          event: 'notification:new',
+          notification,
+        });
+      }
+
+      return notification;
+    } catch (error) {
+      this.logger.error('Error creating notification:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Crear notificación para múltiples usuarios (uso jerárquico)
+   */
+  async createBulkNotifications(payloads: INotificationPayload[]) {
+    const notifications = await Promise.all(
+      payloads.map(payload => this.createNotification(payload)),
+    );
+    return notifications;
+  }
+
+  /**
+   * Obtener notificaciones por categoría
+   */
+  async getByCategory(userId: number, category: string, limit: number = 20) {
+    return this.prisma.notification.findMany({
+      where: { userId, category },
+      include: {
+        triggerUser: {
+          select: {
+            id: true,
+            nombre: true,
+            avatarUrl: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+  }
+
+  /**
+   * Obtener estadísticas de notificaciones
+   */
+  async getStats(userId: number) {
+    const total = await this.prisma.notification.count({
+      where: { userId },
+    });
+
+    const unread = await this.prisma.notification.count({
+      where: { userId, isRead: false },
+    });
+
+    const byCategory = await this.prisma.notification.groupBy({
+      by: ['category'],
+      where: { userId },
+      _count: { id: true },
+    });
+
+    return {
+      total,
+      unread,
+      read: total - unread,
+      readRate: total > 0 ? (((total - unread) / total) * 100).toFixed(1) : '0',
+      byCategory: byCategory.map(cat => ({
+        category: cat.category,
+        count: cat._count.id,
+      })),
+    };
   }
 
   // ==================== AUTOMATED TASKS ====================
@@ -93,6 +225,7 @@ export class NotificationsService {
             await this.createNotification({
               userId: quote.createdById,
               type: 'QUOTE_EXPIRING',
+              category: 'quotes',
               title: `Cotización por expirar - ${quote.quoteNumber}`,
               message: `La cotización ${quote.quoteNumber} para ${quote.clientCompany || quote.clientName || 'cliente'} expirará en ${daysUntilExpiry} día(s).`,
               relatedEntityId: quote.id,
@@ -107,6 +240,7 @@ export class NotificationsService {
               await this.createNotification({
                 userId: sq.opportunity.ownerId,
                 type: 'QUOTE_EXPIRING',
+                category: 'quotes',
                 title: `Cotización por expirar - ${quote.quoteNumber}`,
                 message: `La cotización ${quote.quoteNumber} expirará en ${daysUntilExpiry} día(s).`,
                 relatedEntityId: quote.id,
@@ -165,6 +299,7 @@ export class NotificationsService {
           await this.createNotification({
             userId: quote.createdById,
             type: 'QUOTE_EXPIRED',
+            category: 'quotes',
             title: `Cotización expirada - ${quote.quoteNumber}`,
             message: `La cotización ${quote.quoteNumber} ha expirado y ya no es válida.`,
             relatedEntityId: quote.id,
@@ -179,6 +314,7 @@ export class NotificationsService {
             await this.createNotification({
               userId: sq.opportunity.ownerId,
               type: 'QUOTE_EXPIRED',
+              category: 'quotes',
               title: `Cotización expirada - ${quote.quoteNumber}`,
               message: `La cotización ${quote.quoteNumber} ha expirado.`,
               relatedEntityId: quote.id,
@@ -216,6 +352,7 @@ export class NotificationsService {
         await this.createNotification({
           userId: quote.createdById,
           type: 'QUOTE_SIGNED',
+          category: 'quotes',
           title: `Cotización firmada - ${quote.quoteNumber}`,
           message: `${clientName} (${signerEmail}) ha firmado la cotización ${quote.quoteNumber}.`,
           relatedEntityId: quote.id,
@@ -229,6 +366,7 @@ export class NotificationsService {
           await this.createNotification({
             userId: sq.opportunity.ownerId,
             type: 'QUOTE_SIGNED',
+            category: 'quotes',
             title: `Cotización firmada - ${quote.quoteNumber}`,
             message: `${clientName} ha firmado la cotización ${quote.quoteNumber}.`,
             relatedEntityId: quote.id,
@@ -267,6 +405,7 @@ export class NotificationsService {
         await this.createNotification({
           userId: ownerId,
           type: 'ORDER_CREATED',
+          category: 'orders',
           title: `Nueva orden creada - ${orderId}`,
           message: `Se ha creado la orden ${orderId} para el proyecto "${order.project.name}".`,
           relatedEntityId: projectId,
@@ -295,6 +434,7 @@ export class NotificationsService {
       await this.createNotification({
         userId: viatico.usuarioId,
         type: 'VIATICO_APPROVED',
+        category: 'viatics',
         title: 'Viático aprobado',
         message: `Tu viático de $${amount.toLocaleString('es-MX')} ha sido aprobado.`,
         relatedEntityId: viaticId,
@@ -321,6 +461,7 @@ export class NotificationsService {
       await this.createNotification({
         userId: viatico.usuarioId,
         type: 'VIATICO_REJECTED',
+        category: 'viatics',
         title: 'Viático rechazado',
         message: reason || 'Tu viático ha sido rechazado. Contacta a tu supervisor para más información.',
         relatedEntityId: viaticId,

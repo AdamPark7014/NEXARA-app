@@ -4,9 +4,10 @@ import { VehiclesController } from './vehicles.controller.js';
 import { PrismaModule } from '../prisma/prisma.module.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { UsersModule } from '../users/users.module.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule, UsersModule],
+  imports: [PrismaModule, AuthModule, UsersModule, NotificationsModule],
   controllers: [VehiclesController],
   providers: [VehiclesService],
   exports: [VehiclesService],

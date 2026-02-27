@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, ForbiddenException } from '@nestjs/com
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service';
 import { PERMISSIONS } from '../common/permissions.js';
 
 @Injectable()
@@ -9,6 +10,7 @@ export class AttendanceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtimeGateway: RealtimeGateway,
+    private readonly notificationHierarchy: NotificationHierarchyService,
   ) {}
 
   private isSuperAdminEmail(email?: string | null) {
@@ -243,6 +245,14 @@ export class AttendanceService {
         },
       });
       this.emitAttendanceUpdate(userId, dto.type, now, attendance.user);
+      
+      // Enviar notificación a supervisores
+      await this.notificationHierarchy.notifyAttendanceChange(
+        userId,
+        'ATTENDANCE_CHECKIN',
+        attendance.user.nombre || 'Usuario',
+      );
+      
       return {
         message: 'Entrada registrada exitosamente',
         data: attendance,
@@ -267,6 +277,14 @@ export class AttendanceService {
       },
     });
     this.emitAttendanceUpdate(userId, dto.type, now, attendance.user);
+    
+    // Enviar notificación a supervisores
+    await this.notificationHierarchy.notifyAttendanceChange(
+      userId,
+      'ATTENDANCE_CHECKOUT',
+      attendance.user.nombre || 'Usuario',
+    );
+    
     return {
       message: 'Salida registrada exitosamente',
       data: attendance,
@@ -322,6 +340,7 @@ export class AttendanceService {
           data: {
             userId: admin.id,
             type: 'ATTENDANCE_UPDATE' as any,
+            category: 'attendance',
             title,
             message,
             relatedEntityId: userId,
