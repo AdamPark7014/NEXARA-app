@@ -46,7 +46,7 @@ export class UsersController {
 
   @Get()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
+  @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
   async findAll(@CurrentUser() user: any) {
     return this.usersService.findAllVisible(user);
   }
