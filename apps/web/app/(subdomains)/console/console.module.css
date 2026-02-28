@@ -973,41 +973,6 @@
     font-weight: 600;
   }
 
-  :global(.formInput),
-  :global(.input),
-  :global(input[type="text"]),
-  :global(input[type="email"]),
-  :global(input[type="date"]),
-  :global(textarea),
-  :global(select) {
-    padding: 12px 14px;
-    font-size: 16px;
-    border-radius: 10px;
-    border: 1px solid rgba(31,137,252,0.2);
-    min-height: 44px;
-    transition: all 0.3s ease;
-    width: 100%;
-    box-sizing: border-box;
-  }
-
-  :global(.formInput:focus),
-  :global(.input:focus),
-  :global(input[type="text"]:focus),
-  :global(input[type="email"]:focus),
-  :global(input[type="date"]:focus),
-  :global(textarea:focus),
-  :global(select:focus) {
-    outline: none;
-    border-color: rgba(31,137,252,0.5);
-    background: rgba(31,137,252,0.05);
-    box-shadow: 0 0 0 3px rgba(31,137,252,0.1);
-  }
-
-  .formRow {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 14px;
-  }
 
   .filterSection {
     grid-template-columns: 1fr;
@@ -1025,8 +990,6 @@
   }
 
   /* Mobile Button Improvements */
-  :global(.button-primary),
-  :global(.button-secondary),
   .photoButton {
     padding: 13px 16px;
     font-size: 15px;
@@ -1039,8 +1002,6 @@
     touch-action: manipulation;
   }
 
-  :global(.button-primary):active,
-  :global(.button-secondary):active,
   .photoButton:active {
     transform: scale(0.96);
   }
