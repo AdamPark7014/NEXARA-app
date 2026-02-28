@@ -973,7 +973,7 @@
     font-weight: 600;
   }
 
-  .formInput,
+  :global(.formInput),
   :global(.input),
   :global(input[type="text"]),
   :global(input[type="email"]),
@@ -990,7 +990,7 @@
     box-sizing: border-box;
   }
 
-  .formInput:focus,
+  :global(.formInput:focus),
   :global(.input:focus),
   :global(input[type="text"]:focus),
   :global(input[type="email"]:focus),
