@@ -596,79 +596,83 @@ export default function UserForm({
 
         .cropModal {
           background: var(--surface);
-          padding: 20px;
+          padding: 24px;
           border-radius: 16px;
-          max-width: 420px;
-          width: 90vw;
-          max-height: 90vh;
+          max-width: 480px;
+          width: calc(100vw - 40px);
+          max-height: calc(100vh - 80px);
           position: relative;
-          box-shadow: 0 24px 40px rgba(0, 0, 0, 0.35);
+          box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
           display: flex;
           flex-direction: column;
-          overflow: auto;
-          margin: 20px auto;
+          gap: 0;
+          margin: 0;
         }
 
         .cropModal > div:first-child {
-          flex-shrink: 0;
           position: relative;
-          height: 240px;
           width: 100%;
-          overflow: hidden;
+          height: 320px;
+          flex-shrink: 0;
+          background: #000;
           border-radius: 12px;
-          margin-bottom: 16px;
+          overflow: hidden;
+          margin-bottom: 20px;
         }
 
         .cropModal > div:nth-child(2) {
           flex-shrink: 0;
-          margin: 16px 0;
+          padding: 0 4px;
+          margin: 0 0 20px 0;
           height: auto;
         }
 
         .buttonRow {
           display: flex;
-          gap: 10px;
+          gap: 12px;
           flex-wrap: wrap;
           flex-shrink: 0;
-          margin-top: auto;
+          margin-top: 0;
+          padding-top: 8px;
         }
 
         .buttonRow button {
           flex: 1;
-          min-width: 100px;
+          min-width: 120px;
           min-height: 48px;
           touch-action: manipulation;
           -webkit-tap-highlight-color: transparent;
+          font-size: 14px;
         }
 
-        @media (max-width: 480px) {
+        @media (max-width: 600px) {
           .cropModal {
-            padding: 16px;
-            width: 95vw;
-            max-height: 90vh;
+            padding: 20px;
+            width: calc(100vw - 32px);
+            max-height: calc(100vh - 60px);
             border-radius: 14px;
-            margin: 16px auto;
           }
 
           .cropModal > div:first-child {
-            height: 220px;
-            margin-bottom: 12px;
+            height: 280px;
+            margin-bottom: 16px;
             border-radius: 10px;
           }
 
           .cropModal > div:nth-child(2) {
-            margin: 12px 0;
+            margin-bottom: 16px;
           }
 
           .buttonRow {
-            gap: 8px;
-            margin-top: auto;
+            gap: 10px;
+            flex-direction: column;
           }
 
           .buttonRow button {
-            min-height: 46px;
-            font-size: 14px;
-            padding: 12px 14px;
+            width: 100%;
+            min-height: 48px;
+            font-size: 15px;
+            padding: 14px 16px;
           }
         }
 
