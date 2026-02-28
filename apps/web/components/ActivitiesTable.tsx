@@ -9,6 +9,7 @@ const ActivitiesTable: React.FC = () => {
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const { user } = useUser();
   const [loading, setLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Filtros y paginación
   const [estatus, setEstatus] = useState<string>('');
@@ -219,6 +220,13 @@ const ActivitiesTable: React.FC = () => {
       socket.disconnect();
     };
   }, [user?.token]);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth <= 900);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const formatDateTime = (value?: string) => {
     if (!value) return '-';
@@ -435,6 +443,42 @@ const ActivitiesTable: React.FC = () => {
     flexWrap: 'wrap',
   };
 
+  const mobileCardListStyle: React.CSSProperties = {
+    display: 'grid',
+    gap: 12,
+    padding: 10,
+  };
+
+  const mobileCardStyle: React.CSSProperties = {
+    border: '1px solid rgba(31,137,252,0.18)',
+    borderRadius: 14,
+    padding: 12,
+    background: 'linear-gradient(140deg, rgba(31,137,252,0.06), rgba(20,162,133,0.05)), var(--surface)',
+    boxShadow: '0 8px 18px rgba(15,106,214,0.1)',
+    display: 'grid',
+    gap: 10,
+  };
+
+  const mobileMetaGridStyle: React.CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: 8,
+  };
+
+  const mobileMetaItemStyle: React.CSSProperties = {
+    padding: '8px 10px',
+    borderRadius: 10,
+    background: 'rgba(31,137,252,0.08)',
+    border: '1px solid rgba(31,137,252,0.12)',
+    fontSize: 12,
+  };
+
+  const mobileActionGridStyle: React.CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+    gap: 8,
+  };
+
   if (loading) {
     return (
       <div className="card" style={heroStyle}>
@@ -631,26 +675,85 @@ const ActivitiesTable: React.FC = () => {
         </div>
 
         <div style={tableWrapStyle}>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>AN</th>
-                <th>Título</th>
-                <th>Cliente</th>
-                <th>Sucursal</th>
-                <th>Tipo</th>
-                <th>Estatus</th>
-                <th>Responsable</th>
-                <th>Prioridad</th>
-                <th>Evidencias</th>
-                <th>Inicio</th>
-                <th>Entrega</th>
-                <th>Estimado/Max</th>
-                <th>Indicaciones</th>
-                {hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && <th>Acciones</th>}
-              </tr>
-            </thead>
-            <tbody>
+          {!isMobile && (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>AN</th>
+                  <th>Título</th>
+                  <th>Cliente</th>
+                  <th>Sucursal</th>
+                  <th>Tipo</th>
+                  <th>Estatus</th>
+                  <th>Responsable</th>
+                  <th>Prioridad</th>
+                  <th>Evidencias</th>
+                  <th>Inicio</th>
+                  <th>Entrega</th>
+                  <th>Estimado/Max</th>
+                  <th>Indicaciones</th>
+                  {hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && <th>Acciones</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {paginated.map((a: Activity) => {
+                  const getEvidenceStatus = (activity: Activity) => {
+                    if (!activity.activityEvidence) return 'Sin iniciar';
+                    const status = activity.activityEvidence.status;
+                    const statusMap: Record<string, string> = {
+                      'ENTRY_PHOTO': '📸 Entrada',
+                      'EVIDENCE_PHOTOS': '📷 Evidencias',
+                      'SERVICE_SHEET_PDF': '📄 PDF',
+                      'SERVICE_SHEET_DATA': '📝 Plantilla',
+                      'EXIT_PHOTO': '🚪 Salida',
+                      'COMPLETED': '✅ Completado',
+                    };
+                    return statusMap[status] || status;
+                  };
+                  return (
+                    <tr key={a.id}>
+                      <td>{a.anNumber}</td>
+                      <td>{a.titulo}</td>
+                      <td>{a.client?.name || 'Interna'}</td>
+                      <td>{a.branchName || '-'}</td>
+                      <td>{a.ticketType || '-'}</td>
+                      <td><span className={`badge ${a.estatus === 'Aprobada' ? 'approved' : a.estatus === 'Pendiente' ? 'pending' : ''}`}>{a.estatus}</span></td>
+                      <td>{a.responsable?.nombre}</td>
+                      <td>{a.prioridad}</td>
+                      <td>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '4px 8px',
+                          borderRadius: 4,
+                          backgroundColor: a.activityEvidence?.status === 'COMPLETED' ? '#efe' : '#fef',
+                          color: a.activityEvidence?.status === 'COMPLETED' ? '#060' : '#f90',
+                          fontSize: 12,
+                          fontWeight: 500,
+                        }}>
+                          {getEvidenceStatus(a)}
+                        </span>
+                      </td>
+                      <td>{formatDateTime(a.fechaInicio)}</td>
+                      <td>{formatDateTime(a.fechaEntregaEsperada)}</td>
+                      <td>{a.tiempoEstimadoMin || 0}/{a.tiempoMaximoMin || 0}</td>
+                      <td>{a.indicaciones || '-'}</td>
+                      {hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && (
+                        <td>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            <button className="button-secondary">Editar</button>
+                            <button className="button-primary">Borrar</button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+
+          {isMobile && (
+            <div style={mobileCardListStyle}>
               {paginated.map((a: Activity) => {
                 const getEvidenceStatus = (activity: Activity) => {
                   if (!activity.activityEvidence) return 'Sin iniciar';
@@ -665,52 +768,62 @@ const ActivitiesTable: React.FC = () => {
                   };
                   return statusMap[status] || status;
                 };
+
                 return (
-                  <tr key={a.id}>
-                    <td>{a.anNumber}</td>
-                    <td>{a.titulo}</td>
-                    <td>{a.client?.name || 'Interna'}</td>
-                    <td>{a.branchName || '-'}</td>
-                    <td>{a.ticketType || '-'}</td>
-                    <td><span className={`badge ${a.estatus === 'Aprobada' ? 'approved' : a.estatus === 'Pendiente' ? 'pending' : ''}`}>{a.estatus}</span></td>
-                    <td>{a.responsable?.nombre}</td>
-                    <td>{a.prioridad}</td>
-                    <td>
+                  <article key={a.id} style={mobileCardStyle}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
+                      <div style={{ display: 'grid', gap: 4 }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>AN {a.anNumber}</div>
+                        <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.3 }}>{a.titulo}</div>
+                      </div>
+                      <span className={`badge ${a.estatus === 'Aprobada' ? 'approved' : a.estatus === 'Pendiente' ? 'pending' : ''}`}>{a.estatus}</span>
+                    </div>
+
+                    <div style={mobileMetaGridStyle}>
+                      <div style={mobileMetaItemStyle}><strong>Cliente:</strong> {a.client?.name || 'Interna'}</div>
+                      <div style={mobileMetaItemStyle}><strong>Sucursal:</strong> {a.branchName || '-'}</div>
+                      <div style={mobileMetaItemStyle}><strong>Tipo:</strong> {a.ticketType || '-'}</div>
+                      <div style={mobileMetaItemStyle}><strong>Prioridad:</strong> {a.prioridad}</div>
+                      <div style={mobileMetaItemStyle}><strong>Responsable:</strong> {a.responsable?.nombre || '-'}</div>
+                      <div style={mobileMetaItemStyle}><strong>Estimado/Max:</strong> {a.tiempoEstimadoMin || 0}/{a.tiempoMaximoMin || 0} min</div>
+                      <div style={mobileMetaItemStyle}><strong>Inicio:</strong> {formatDateTime(a.fechaInicio)}</div>
+                      <div style={mobileMetaItemStyle}><strong>Entrega:</strong> {formatDateTime(a.fechaEntregaEsperada)}</div>
+                    </div>
+
+                    <div style={{ fontSize: 12 }}>
                       <span style={{
                         display: 'inline-block',
-                        padding: '4px 8px',
-                        borderRadius: 4,
+                        padding: '6px 10px',
+                        borderRadius: 8,
                         backgroundColor: a.activityEvidence?.status === 'COMPLETED' ? '#efe' : '#fef',
                         color: a.activityEvidence?.status === 'COMPLETED' ? '#060' : '#f90',
-                        fontSize: 12,
-                        fontWeight: 500,
+                        fontWeight: 600,
                       }}>
-                        {getEvidenceStatus(a)}
+                        Evidencias: {getEvidenceStatus(a)}
                       </span>
-                    </td>
-                    <td>{formatDateTime(a.fechaInicio)}</td>
-                    <td>{formatDateTime(a.fechaEntregaEsperada)}</td>
-                    <td>{a.tiempoEstimadoMin || 0}/{a.tiempoMaximoMin || 0}</td>
-                    <td>{a.indicaciones || '-'}</td>
+                    </div>
+
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                      <strong>Indicaciones:</strong> {a.indicaciones || '-'}
+                    </div>
+
                     {hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && (
-                      <td>
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                          <button className="button-secondary">Editar</button>
-                          <button className="button-primary">Borrar</button>
-                        </div>
-                      </td>
+                      <div style={mobileActionGridStyle}>
+                        <button className="button-secondary" style={{ minHeight: 46, borderRadius: 10, fontWeight: 700 }}>Editar</button>
+                        <button className="button-primary" style={{ minHeight: 46, borderRadius: 10, fontWeight: 700 }}>Borrar</button>
+                      </div>
                     )}
-                  </tr>
+                  </article>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          )}
         </div>
 
         <div style={paginationStyle}>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="button-secondary" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Anterior</button>
-            <button className="button-secondary" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0}>Siguiente</button>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'auto auto', gap: 8, width: isMobile ? '100%' : 'auto' }}>
+            <button className="button-secondary" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{ minHeight: isMobile ? 46 : undefined, fontWeight: 700 }}>Anterior</button>
+            <button className="button-secondary" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0} style={{ minHeight: isMobile ? 46 : undefined, fontWeight: 700 }}>Siguiente</button>
           </div>
           <span style={helperTextStyle}>Página {page} de {totalPages || 1}</span>
         </div>

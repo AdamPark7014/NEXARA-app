@@ -43,6 +43,14 @@ const ContabilidadViaticTable = () => {
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 900);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -152,6 +160,54 @@ const ContabilidadViaticTable = () => {
 
   if (!user) return null;
 
+  const mobileCardListStyle: React.CSSProperties = {
+    display: "flex",
+    flexDirection: "column",
+    gap: "16px",
+  };
+
+  const mobileCardStyle: React.CSSProperties = {
+    background: "linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)",
+    borderRadius: "12px",
+    padding: "16px",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+    border: "1px solid #e5e7eb",
+  };
+
+  const mobileMetaGridStyle: React.CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "12px",
+    marginTop: "12px",
+  };
+
+  const mobileMetaItemStyle: React.CSSProperties = {
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px",
+  };
+
+  const mobileMetaLabelStyle: React.CSSProperties = {
+    fontSize: "11px",
+    fontWeight: 600,
+    textTransform: "uppercase",
+    color: "#6b7280",
+    letterSpacing: "0.5px",
+  };
+
+  const mobileMetaValueStyle: React.CSSProperties = {
+    fontSize: "14px",
+    color: "#111827",
+    fontWeight: 500,
+  };
+
+  const mobileActionGridStyle: React.CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+    gap: "10px",
+    marginTop: "16px",
+  };
+
   return (
     <section className={styles.card}>
       <header className={styles.cardHeader}>
@@ -226,89 +282,162 @@ const ContabilidadViaticTable = () => {
         <div className={importMsg.startsWith("Error") ? styles.error : styles.success}>{importMsg}</div>
       )}
 
-      <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th>Actividad</th>
-              <th>Monto</th>
-              <th>Razon</th>
-              <th>Ticket</th>
-              <th>Estatus</th>
-              <th>Usuario</th>
-              {hasPermission(user, PERMISSIONS.VIATICS_MANAGE) && <th>Acciones</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {paginated.map((v) => (
-              <tr key={v.id}>
-                <td>{v.actividad?.anNumber}</td>
-                <td>{formatCurrency(v.montoSolicitado)}</td>
-                <td>{v.razonGasto}</td>
-                <td>
-                  {v.ticketEvidenciaUrl ? (
-                    <a className={styles.link} href={v.ticketEvidenciaUrl} target="_blank" rel="noopener noreferrer">
-                      Ver
-                    </a>
-                  ) : (
-                    "-"
-                  )}
-                </td>
-                <td>
-                  <span
-                    className={`${styles.badge} ${
-                      v.estatusPago === "Aprobado"
-                        ? styles.badgeApproved
-                        : v.estatusPago === "Pendiente"
-                          ? styles.badgePending
-                          : styles.badgeRejected
-                    }`}
-                  >
-                    {v.estatusPago}
-                  </span>
-                </td>
-                <td>{v.usuario?.nombre}</td>
-                {hasPermission(user, PERMISSIONS.VIATICS_MANAGE) && (
-                  <td className={styles.actions}>
-                    {v.estatusPago === "Pendiente" && (
-                      <>
-                        <button
-                          className={styles.primaryButton}
-                          onClick={() => handleApprove(v.id, "Aprobado")}
-                          disabled={actionLoading === v.id}
-                        >
-                          {actionLoading === v.id ? "Aprobando..." : "Aprobar"}
-                        </button>
-                        <button
-                          className={styles.dangerButton}
-                          onClick={() => handleApprove(v.id, "Rechazado")}
-                          disabled={actionLoading === v.id}
-                        >
-                          {actionLoading === v.id ? "Rechazando..." : "Rechazar"}
-                        </button>
-                      </>
+      {!isMobile && (
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Actividad</th>
+                <th>Monto</th>
+                <th>Razon</th>
+                <th>Ticket</th>
+                <th>Estatus</th>
+                <th>Usuario</th>
+                {hasPermission(user, PERMISSIONS.VIATICS_MANAGE) && <th>Acciones</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.map((v) => (
+                <tr key={v.id}>
+                  <td>{v.actividad?.anNumber}</td>
+                  <td>{formatCurrency(v.montoSolicitado)}</td>
+                  <td>{v.razonGasto}</td>
+                  <td>
+                    {v.ticketEvidenciaUrl ? (
+                      <a className={styles.link} href={v.ticketEvidenciaUrl} target="_blank" rel="noopener noreferrer">
+                        Ver
+                      </a>
+                    ) : (
+                      "-"
                     )}
                   </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                  <td>
+                    <span
+                      className={`${styles.badge} ${
+                        v.estatusPago === "Aprobado"
+                          ? styles.badgeApproved
+                          : v.estatusPago === "Pendiente"
+                            ? styles.badgePending
+                            : styles.badgeRejected
+                      }`}
+                    >
+                      {v.estatusPago}
+                    </span>
+                  </td>
+                  <td>{v.usuario?.nombre}</td>
+                  {hasPermission(user, PERMISSIONS.VIATICS_MANAGE) && (
+                    <td className={styles.actions}>
+                      {v.estatusPago === "Pendiente" && (
+                        <>
+                          <button
+                            className={styles.primaryButton}
+                            onClick={() => handleApprove(v.id, "Aprobado")}
+                            disabled={actionLoading === v.id}
+                          >
+                            {actionLoading === v.id ? "Aprobando..." : "Aprobar"}
+                          </button>
+                          <button
+                            className={styles.dangerButton}
+                            onClick={() => handleApprove(v.id, "Rechazado")}
+                            disabled={actionLoading === v.id}
+                          >
+                            {actionLoading === v.id ? "Rechazando..." : "Rechazar"}
+                          </button>
+                        </>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-      <footer className={styles.footer}>
+      {isMobile && (
+        <div style={mobileCardListStyle}>
+          {paginated.map((v) => (
+            <div key={v.id} style={mobileCardStyle}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: 1 }}>
+                  <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 600 }}>#{v.actividad?.anNumber || "N/A"}</span>
+                  <span style={{ fontSize: "18px", fontWeight: 700, color: "#059669" }}>{formatCurrency(v.montoSolicitado)}</span>
+                </div>
+                <span
+                  className={`${styles.badge} ${
+                    v.estatusPago === "Aprobado"
+                      ? styles.badgeApproved
+                      : v.estatusPago === "Pendiente"
+                        ? styles.badgePending
+                        : styles.badgeRejected
+                  }`}
+                  style={{ fontSize: "12px", padding: "4px 10px" }}
+                >
+                  {v.estatusPago}
+                </span>
+              </div>
+
+              <div style={mobileMetaGridStyle}>
+                <div style={mobileMetaItemStyle}>
+                  <span style={mobileMetaLabelStyle}>Razón</span>
+                  <span style={mobileMetaValueStyle}>{v.razonGasto}</span>
+                </div>
+                <div style={mobileMetaItemStyle}>
+                  <span style={mobileMetaLabelStyle}>Usuario</span>
+                  <span style={mobileMetaValueStyle}>{v.usuario?.nombre || "N/A"}</span>
+                </div>
+                <div style={mobileMetaItemStyle}>
+                  <span style={mobileMetaLabelStyle}>Ticket</span>
+                  {v.ticketEvidenciaUrl ? (
+                    <a className={styles.link} href={v.ticketEvidenciaUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: "14px" }}>
+                      Ver evidencia
+                    </a>
+                  ) : (
+                    <span style={{ fontSize: "14px", color: "#9ca3af" }}>Sin ticket</span>
+                  )}
+                </div>
+              </div>
+
+              {hasPermission(user, PERMISSIONS.VIATICS_MANAGE) && v.estatusPago === "Pendiente" && (
+                <div style={mobileActionGridStyle}>
+                  <button
+                    className={styles.primaryButton}
+                    onClick={() => handleApprove(v.id, "Aprobado")}
+                    disabled={actionLoading === v.id}
+                    style={{ minHeight: "46px", fontSize: "14px", fontWeight: 600 }}
+                  >
+                    {actionLoading === v.id ? "Aprobando..." : "Aprobar"}
+                  </button>
+                  <button
+                    className={styles.dangerButton}
+                    onClick={() => handleApprove(v.id, "Rechazado")}
+                    disabled={actionLoading === v.id}
+                    style={{ minHeight: "46px", fontSize: "14px", fontWeight: 600 }}
+                  >
+                    {actionLoading === v.id ? "Rechazando..." : "Rechazar"}
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <footer className={styles.footer} style={isMobile ? { display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: "12px", alignItems: "center" } : undefined}>
         <button
           className={styles.ghostButton}
           onClick={() => setPage((p) => Math.max(1, p - 1))}
           disabled={page === 1}
+          style={isMobile ? { minHeight: "46px", fontSize: "15px", fontWeight: 600 } : undefined}
         >
           Anterior
         </button>
-        <span className={styles.pageInfo}>Pagina {page} de {totalPages || 1}</span>
+        <span className={styles.pageInfo} style={isMobile ? { fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap" } : undefined}>Pagina {page} de {totalPages || 1}</span>
         <button
           className={styles.ghostButton}
           onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
           disabled={page === totalPages || totalPages === 0}
+          style={isMobile ? { minHeight: "46px", fontSize: "15px", fontWeight: 600 } : undefined}
         >
           Siguiente
         </button>
