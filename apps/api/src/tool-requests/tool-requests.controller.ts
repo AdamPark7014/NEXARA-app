@@ -175,17 +175,28 @@ export class ToolRequestsController {
   // Obtener renovaciones pendientes (admin)
   @Get('renewals/pending')
   @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
-  async getPendingRenewals() {
-    return this.toolRequestsService.findRenewals(undefined, 'PENDING');
+  async getPendingRenewals(@CurrentUser() user: any) {
+    return this.toolRequestsService.findRenewals(undefined, 'PENDING', {
+      id: user.id,
+      isSuperAdmin: user.isSuperAdmin,
+      permissions: user.permissions,
+      departmentId: user.departmentId,
+    });
   }
 
   // Obtener renovaciones de una herramienta
   @Get('renewals/by-tool/:toolId')
   @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
-  async getRenewalsByTool(@Param('toolId') toolId: string) {
-    return this.toolRequestsService.findRenewals(parseInt(toolId, 10));
+  async getRenewalsByTool(@CurrentUser() user: any, @Param('toolId') toolId: string) {
+    return this.toolRequestsService.findRenewals(parseInt(toolId, 10), undefined, {
+      id: user.id,
+      isSuperAdmin: user.isSuperAdmin,
+      permissions: user.permissions,
+      departmentId: user.departmentId,
+    });
   }
 
+  // Aprobar renovación
   // Aprobar renovación
   @Post('renewals/:renewalId/approve')
   @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
@@ -193,7 +204,12 @@ export class ToolRequestsController {
     @CurrentUser() user: any,
     @Param('renewalId') renewalId: string
   ) {
-    return this.toolRequestsService.approveRenewal(parseInt(renewalId, 10), user.id);
+    return this.toolRequestsService.approveRenewal(parseInt(renewalId, 10), {
+      id: user.id,
+      isSuperAdmin: user.isSuperAdmin,
+      permissions: user.permissions,
+      departmentId: user.departmentId,
+    });
   }
 
   // Rechazar renovación
@@ -206,7 +222,12 @@ export class ToolRequestsController {
   ) {
     return this.toolRequestsService.rejectRenewal(
       parseInt(renewalId, 10),
-      user.id,
+      {
+        id: user.id,
+        isSuperAdmin: user.isSuperAdmin,
+        permissions: user.permissions,
+        departmentId: user.departmentId,
+      },
       data.reason
     );
   }

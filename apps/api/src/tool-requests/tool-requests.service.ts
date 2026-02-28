@@ -505,10 +505,33 @@ export class ToolRequestsService {
     return renewal;
   }
 
-  async findRenewals(toolRequestId?: number, status?: RenewalStatus) {
+  async findRenewals(
+    toolRequestId?: number,
+    status?: RenewalStatus,
+    currentUser?: { id: number; isSuperAdmin?: boolean; permissions?: string[]; departmentId?: number }
+  ) {
     const where: any = {};
     if (toolRequestId) where.toolRequestId = toolRequestId;
     if (status) where.status = status;
+
+    // Si se proporciona usuario, filtrar por jerarquía
+    if (currentUser) {
+      const isSuperAdmin = currentUser.isSuperAdmin === true;
+      const isConsoleAdmin = currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN);
+
+      if (!isSuperAdmin && isConsoleAdmin) {
+        // Admin console: solo ve renovaciones de usuarios en su departamento
+        where.toolRequest = {
+          usuario: {
+            departmentId: currentUser.departmentId,
+          },
+        };
+      } else if (!isSuperAdmin && !isConsoleAdmin) {
+        // Usuario normal: no debería ver esta lista
+        return [];
+      }
+      // SuperAdmin: ve todas (sin filtro adicional)
+    }
 
     return this.prisma.toolRenewal.findMany({
       where,
@@ -520,6 +543,12 @@ export class ToolRequestsService {
                 id: true,
                 nombre: true,
                 email: true,
+                department: {
+                  select: {
+                    id: true,
+                    nombre: true,
+                  },
+                },
               },
             },
           },
@@ -538,12 +567,43 @@ export class ToolRequestsService {
     });
   }
 
-  async approveRenewal(renewalId: number, approvedBy: number) {
+  async approveRenewal(
+    renewalId: number,
+    approver: { id: number; isSuperAdmin?: boolean; permissions?: string[]; departmentId?: number }
+  ) {
     const renewal = await this.prisma.toolRenewal.findUnique({
       where: { id: renewalId },
+      include: {
+        toolRequest: {
+          include: {
+            usuario: {
+              select: {
+                id: true,
+                department: { select: { id: true } },
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!renewal) throw new Error('Renovación no encontrada');
+
+    // Validar permisos
+    const isSuperAdmin = approver.isSuperAdmin === true;
+    const isConsoleAdmin = approver.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN);
+
+    if (!isSuperAdmin && !isConsoleAdmin) {
+      throw new Error('No tienes permisos para aprobar renovaciones');
+    }
+
+    // Si es admin (no superadmin), validar que el usuario esté en su departamento
+    if (!isSuperAdmin && isConsoleAdmin) {
+      const requesterDeptId = renewal.toolRequest.usuario.department?.id;
+      if (requesterDeptId !== approver.departmentId) {
+        throw new Error('Solo puedes aprobar renovaciones de usuarios en tu departamento');
+      }
+    }
 
     // Actualizar la solicitud de herramienta con la nueva fecha de devolución
     await this.prisma.toolRequest.update({
@@ -562,29 +622,80 @@ export class ToolRequestsService {
       data: {
         status: 'APPROVED',
         approvalDate: new Date(),
-        approvedBy,
+        approvedBy: approver.id,
       },
     });
 
     // Crear notificación
+    const toolRequest = renewal.toolRequest;
     await this.createNotification(
       renewal.toolRequestId,
-      (await this.prisma.toolRequest.findUnique({ where: { id: renewal.toolRequestId } }))!.usuarioId,
+      toolRequest.usuarioId,
       'TOOL_RENEWAL_APPROVED',
-      `Tu solicitud de renovación para ${(await this.prisma.toolRequest.findUnique({ where: { id: renewal.toolRequestId }, select: { toolName: true } }))!.toolName} ha sido aprobada`
+      `Tu solicitud de renovación para "${toolRequest.toolName}" ha sido aprobada`
     );
 
     return updated;
   }
 
-  async rejectRenewal(renewalId: number, approvedBy: number, reason: string) {
-    return this.prisma.toolRenewal.update({
+  async rejectRenewal(
+    renewalId: number,
+    approver: { id: number; isSuperAdmin?: boolean; permissions?: string[]; departmentId?: number },
+    reason: string
+  ) {
+    const renewal = await this.prisma.toolRenewal.findUnique({
+      where: { id: renewalId },
+      include: {
+        toolRequest: {
+          include: {
+            usuario: {
+              select: {
+                id: true,
+                department: { select: { id: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!renewal) throw new Error('Renovación no encontrada');
+
+    // Validar permisos
+    const isSuperAdmin = approver.isSuperAdmin === true;
+    const isConsoleAdmin = approver.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN);
+
+    if (!isSuperAdmin && !isConsoleAdmin) {
+      throw new Error('No tienes permisos para rechazar renovaciones');
+    }
+
+    // Si es admin (no superadmin), validar que el usuario esté en su departamento
+    if (!isSuperAdmin && isConsoleAdmin) {
+      const requesterDeptId = renewal.toolRequest.usuario.department?.id;
+      if (requesterDeptId !== approver.departmentId) {
+        throw new Error('Solo puedes rechazar renovaciones de usuarios en tu departamento');
+      }
+    }
+
+    // Actualizar la renovación
+    const updated = await this.prisma.toolRenewal.update({
       where: { id: renewalId },
       data: {
         status: 'REJECTED',
-        approvedBy,
+        approvedBy: approver.id,
       },
     });
+
+    // Crear notificación de rechazo
+    const toolRequest = renewal.toolRequest;
+    await this.createNotification(
+      renewal.toolRequestId,
+      toolRequest.usuarioId,
+      'TOOL_RENEWAL_REJECTED',
+      `Tu solicitud de renovación para "${toolRequest.toolName}" ha sido rechazada. Motivo: ${reason}`
+    );
+
+    return updated;
   }
 
   // Notificaciones
