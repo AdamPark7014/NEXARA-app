@@ -10,10 +10,11 @@ echo "🔄 Actualizando NEXARA-app desde GitHub..."
 # 1. Ir al directorio del proyecto
 cd /var/www/nexara-app
 
-# 2. Hacer backup rápido de .env
+# 2. Hacer backup rápido de .env EN UN LUGAR SEGURO (fuera de git clean)
 echo "💾 Haciendo backup de archivos .env..."
-cp apps/api/.env apps/api/.env.backup || true
-cp apps/web/.env.local apps/web/.env.local.backup || true
+mkdir -p /tmp/nexara-backup
+cp apps/api/.env /tmp/nexara-backup/.env.api 2>/dev/null || echo "⚠️  No se encontró apps/api/.env"
+cp apps/web/.env.local /tmp/nexara-backup/.env.web 2>/dev/null || echo "⚠️  No se encontró apps/web/.env.local"
 
 # 3. Detener servicios temporalmente
 echo "⏸️ Deteniendo servicios..."
@@ -28,8 +29,15 @@ git clean -fd
 
 # 5. Restaurar archivos .env
 echo "📂 Restaurando archivos .env..."
-cp apps/api/.env.backup apps/api/.env || true
-cp apps/web/.env.local.backup apps/web/.env.local || true
+cp /tmp/nexara-backup/.env.api apps/api/.env 2>/dev/null || echo "⚠️  No se pudo restaurar apps/api/.env"
+cp /tmp/nexara-backup/.env.web apps/web/.env.local 2>/dev/null || echo "⚠️  No se pudo restaurar apps/web/.env.local"
+
+# Verificar que DATABASE_URL existe
+if ! grep -q "DATABASE_URL" apps/api/.env 2>/dev/null; then
+  echo "❌ ERROR: apps/api/.env no tiene DATABASE_URL"
+  echo "Por favor, configura manualmente el archivo .env antes de continuar"
+  exit 1
+fi
 
 # 6. Actualizar Backend (API)
 echo "🔧 Actualizando Backend..."
