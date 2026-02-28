@@ -47,13 +47,13 @@ export default function UserForm({
   API_URL = API_URL.replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
   
-  // Helper para convertir URLs relativas a completas
+  // Helper para convertir URLs relativas a completas con protocolo y dominio
   const getFullImageUrl = (url: string | undefined) => {
     if (!url) return '';
     if (url.startsWith('http://') || url.startsWith('https://')) return url;
-    // Convertir ruta relativa a URL completa del API
-    const apiBase = API_URL.replace('/api', '');
-    return `${apiBase}${url}`;
+    // Usar window.location.origin para obtener el dominio actual
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    return `${origin}/uploads${url.startsWith('/') ? '' : '/'}${url}`;
   };
 
   const [form, setForm] = useState({
