@@ -59,6 +59,13 @@ export function middleware(request: NextRequest) {
     const internalSlug = SUBDOMAIN_MAP[subdomain];
     const pathname = request.nextUrl.pathname;
     
+    // NO reescribir archivos estáticos (imágenes, fuentes, etc.)
+    // Permitir que Next.js los sirva directamente desde /public
+    const staticFileExtensions = /\.(png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot|css|js|json)$/i;
+    if (staticFileExtensions.test(pathname)) {
+      return NextResponse.next();
+    }
+    
     // Reescribir a /<slug><pathname>
     // Ejemplo: consola.localhost/ → /console/
     //          consola.localhost/dashboard → /console/dashboard
