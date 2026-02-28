@@ -596,18 +596,79 @@ export default function UserForm({
 
         .cropModal {
           background: var(--surface);
-          padding: 24px;
+          padding: 20px;
           border-radius: 16px;
           max-width: 420px;
-          margin: 60px auto;
+          width: 90vw;
+          max-height: 80vh;
+          margin: auto;
           position: relative;
           box-shadow: 0 24px 40px rgba(0, 0, 0, 0.35);
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+
+        .cropModal > div:first-child {
+          flex-shrink: 0;
+          position: relative;
+          height: 320px;
+          width: 100%;
+          overflow: hidden;
+          border-radius: 12px;
+          margin-bottom: 16px;
+        }
+
+        .cropModal > div:nth-child(2) {
+          flex-shrink: 0;
+          margin: 16px 0;
+          height: auto;
         }
 
         .buttonRow {
           display: flex;
           gap: 10px;
           flex-wrap: wrap;
+          flex-shrink: 0;
+          margin-top: auto;
+        }
+
+        .buttonRow button {
+          flex: 1;
+          min-width: 100px;
+          min-height: 48px;
+          touch-action: manipulation;
+          -webkit-tap-highlight-color: transparent;
+        }
+
+        @media (max-width: 480px) {
+          .cropModal {
+            padding: 16px;
+            width: 95vw;
+            max-height: 85vh;
+            border-radius: 14px;
+          }
+
+          .cropModal > div:first-child {
+            height: 280px;
+            margin-bottom: 12px;
+            border-radius: 10px;
+          }
+
+          .cropModal > div:nth-child(2) {
+            margin: 12px 0;
+          }
+
+          .buttonRow {
+            gap: 8px;
+            margin-top: auto;
+          }
+
+          .buttonRow button {
+            min-height: 46px;
+            font-size: 14px;
+            padding: 12px 14px;
+          }
         }
 
         @media (max-width: 720px) {

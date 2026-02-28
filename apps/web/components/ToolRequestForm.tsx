@@ -530,15 +530,15 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
               <canvas ref={canvasRef} style={{ display: 'none' }} />
 
               {/* Button Container */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
                 <button 
                   className="button-secondary" 
                   type="button" 
                   onClick={flipCamera}
                   style={{ 
-                    padding: '14px 16px', 
-                    borderRadius: 14, 
-                    fontSize: 'clamp(13px, 3vw, 15px)',
+                    padding: '14px 12px', 
+                    borderRadius: 12, 
+                    fontSize: 15,
                     fontWeight: 600,
                     display: 'flex',
                     alignItems: 'center',
@@ -548,9 +548,10 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
                     border: '1px solid rgba(31,137,252,0.3)',
                     color: 'rgba(207,224,255,0.95)',
                     cursor: 'pointer',
-                    transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                    transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
                     minHeight: 52,
                     touchAction: 'manipulation',
+                    WebkitAppearance: 'none',
                   }}
                   onMouseEnter={(e) => {
                     const el = e.currentTarget as HTMLElement;
@@ -562,6 +563,8 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
                     el.style.transform = 'translateY(0) scale(1)';
                     el.style.boxShadow = 'none';
                   }}
+                  onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
+                  onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
                 >
                   🔄 Voltear
                 </button>
@@ -570,9 +573,9 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
                   type="button" 
                   onClick={stopCamera}
                   style={{ 
-                    padding: '14px 16px', 
-                    borderRadius: 14, 
-                    fontSize: 'clamp(13px, 3vw, 15px)',
+                    padding: '14px 12px', 
+                    borderRadius: 12, 
+                    fontSize: 15,
                     fontWeight: 600,
                     display: 'flex',
                     alignItems: 'center',
@@ -582,9 +585,10 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
                     border: '1px solid rgba(255,255,255,0.12)',
                     color: 'rgba(207,224,255,0.9)',
                     cursor: 'pointer',
-                    transition: 'all 0.3s ease',
+                    transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
                     minHeight: 52,
                     touchAction: 'manipulation',
+                    WebkitAppearance: 'none',
                   }}
                   onMouseEnter={(e) => {
                     const el = e.currentTarget as HTMLElement;
@@ -594,6 +598,8 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
                     const el = e.currentTarget as HTMLElement;
                     el.style.background = 'rgba(255,255,255,0.06)';
                   }}
+                  onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
+                  onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
                 >
                   ✕ Cancelar
                 </button>
@@ -602,9 +608,9 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
                   type="button" 
                   onClick={capturePhoto}
                   style={{ 
-                    padding: '14px 20px', 
-                    borderRadius: 14, 
-                    fontSize: 'clamp(13px, 3vw, 15px)',
+                    padding: '14px 12px', 
+                    borderRadius: 12, 
+                    fontSize: 15,
                     fontWeight: 700,
                     display: 'flex',
                     alignItems: 'center',
@@ -614,10 +620,11 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
                     border: 'none',
                     color: 'white',
                     cursor: 'pointer',
-                    transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                    gridColumn: 'span 1',
+                    transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                    gridColumn: window.innerWidth < 480 ? 'span 2' : 'span 1',
                     minHeight: 52,
                     touchAction: 'manipulation',
+                    WebkitAppearance: 'none',
                   }}
                   onMouseEnter={(e) => {
                     const el = e.currentTarget as HTMLElement;
@@ -629,6 +636,8 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
                     el.style.transform = 'translateY(0) scale(1)';
                     el.style.boxShadow = 'none';
                   }}
+                  onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
+                  onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
                 >
                   📷 Capturar
                 </button>
