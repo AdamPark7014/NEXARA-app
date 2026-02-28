@@ -42,6 +42,7 @@ const AttendanceForm = () => {
   // Camera states
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraType, setCameraType] = useState<'entrada' | 'salida' | null>(null);
+  const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -127,12 +128,24 @@ const AttendanceForm = () => {
     return date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
   };
 
-  const openCamera = async (tipo: 'entrada' | 'salida') => {
+  const stopCameraStream = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  };
+
+  const openCamera = async (tipo: 'entrada' | 'salida', facingMode: 'environment' | 'user' = cameraFacing) => {
     try {
       setCameraType(tipo);
+      setCameraFacing(facingMode);
+      stopCameraStream();
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { 
-          facingMode: 'environment',
+          facingMode,
           width: { ideal: 1280 },
           height: { ideal: 720 }
         },
@@ -154,11 +167,14 @@ const AttendanceForm = () => {
     }
   };
 
+  const flipCamera = async () => {
+    if (!cameraType) return;
+    const nextFacing = cameraFacing === 'environment' ? 'user' : 'environment';
+    await openCamera(cameraType, nextFacing);
+  };
+
   const closeCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
+    stopCameraStream();
     setCameraOpen(false);
     setCameraType(null);
   };
@@ -341,6 +357,12 @@ const AttendanceForm = () => {
   }, [user, selectedDate]);
 
   useEffect(() => {
+    return () => {
+      stopCameraStream();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!user) return;
     const fetchRange = async () => {
       try {
@@ -507,22 +529,30 @@ const AttendanceForm = () => {
           justifyContent: 'center',
           alignItems: 'center',
           zIndex: 99999,
-          padding: 0,
+          padding: '10px 8px',
           overflow: 'hidden',
         }}>
-          <div style={{ textAlign: 'center', marginBottom: 20, zIndex: 100000, position: 'relative' }}>
-            <p style={{ color: 'white', fontSize: 20, marginBottom: 10, fontWeight: 'bold' }}>
+          <div style={{ textAlign: 'center', marginBottom: 12, zIndex: 100000, position: 'relative', width: '100%' }}>
+            <p style={{ color: 'white', fontSize: 'clamp(16px, 4vw, 20px)', marginBottom: 6, fontWeight: 'bold' }}>
               Toma foto de tu {cameraType === 'entrada' ? 'entrada' : 'salida'}
+            </p>
+            <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, margin: 0 }}>
+              Ajuste móvil optimizado para captura rápida y táctil
             </p>
           </div>
           <div style={{ 
             position: 'relative', 
-            width: '100%', 
-            height: '80%', 
+            width: '100%',
+            maxWidth: '920px',
+            height: 'calc(100dvh - 190px)',
+            minHeight: '320px',
             display: 'flex', 
             justifyContent: 'center', 
             alignItems: 'center',
             backgroundColor: '#000',
+            borderRadius: 16,
+            overflow: 'hidden',
+            border: '1px solid rgba(255,255,255,0.15)',
           }}>
             <video
               ref={videoRef}
@@ -537,18 +567,25 @@ const AttendanceForm = () => {
             />
           </div>
           <canvas ref={canvasRef} style={{ display: 'none' }} />
-          <div style={{ display: 'flex', gap: 16, marginTop: 20, zIndex: 100000, position: 'relative' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginTop: 12, zIndex: 100000, position: 'relative', width: 'min(920px, 100%)' }}>
+            <button
+              className="button-secondary"
+              onClick={flipCamera}
+              style={{ minHeight: 52, padding: '12px 14px', fontSize: 15, fontWeight: 'bold', borderRadius: 12, touchAction: 'manipulation' }}
+            >
+              🔄 Voltear cámara
+            </button>
             <button
               className="button-primary"
               onClick={capturePhoto}
-              style={{ padding: '14px 28px', fontSize: 16, fontWeight: 'bold' }}
+              style={{ minHeight: 52, padding: '12px 14px', fontSize: 15, fontWeight: 'bold', borderRadius: 12, touchAction: 'manipulation' }}
             >
               📸 Capturar foto
             </button>
             <button
               className="button-secondary"
               onClick={closeCamera}
-              style={{ padding: '14px 28px', fontSize: 16, fontWeight: 'bold' }}
+              style={{ minHeight: 52, padding: '12px 14px', fontSize: 15, fontWeight: 'bold', borderRadius: 12, touchAction: 'manipulation' }}
             >
               ✕ Cancelar
             </button>

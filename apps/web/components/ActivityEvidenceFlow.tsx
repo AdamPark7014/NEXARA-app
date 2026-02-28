@@ -34,11 +34,34 @@ const ActivityEvidenceFlow = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
+  const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/\.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
 
   const isCorrection = flowData?.reviewStatus === 'REJECTED';
+  const actionGridStyle: React.CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+    gap: 10,
+    width: '100%',
+  };
+  const actionPrimaryStyle: React.CSSProperties = {
+    minHeight: 50,
+    padding: '12px 16px',
+    borderRadius: 12,
+    fontSize: 15,
+    fontWeight: 'bold',
+    touchAction: 'manipulation',
+  };
+  const actionSecondaryStyle: React.CSSProperties = {
+    minHeight: 50,
+    padding: '12px 16px',
+    borderRadius: 12,
+    fontSize: 15,
+    fontWeight: 'bold',
+    touchAction: 'manipulation',
+  };
 
   // Cargar actividades
   useEffect(() => {
@@ -100,7 +123,13 @@ const ActivityEvidenceFlow = () => {
   const capturePhoto = async (): Promise<string> => {
     return new Promise((resolve, reject) => {
       navigator.mediaDevices
-        .getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } } })
+        .getUserMedia({
+          video: {
+            facingMode: cameraFacing,
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+        })
         .then((stream) => {
           const video = document.createElement('video');
           video.srcObject = stream;
@@ -553,22 +582,34 @@ const ActivityEvidenceFlow = () => {
           <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
             Toma una foto de entrada. Se guardará automáticamente con tu ubicación.
           </p>
-          <button
-            onClick={handleEntryPhoto}
-            disabled={loading || cameraActive}
-            style={{
-              padding: '12px 24px',
-              backgroundColor: 'var(--primary)',
-              color: 'white',
-              border: 'none',
-              borderRadius: 4,
-              cursor: loading ? 'wait' : 'pointer',
-              fontSize: 16,
-              fontWeight: 'bold',
-            }}
-          >
-            {loading ? '⏳ Capturando...' : '📷 Capturar Foto de Entrada'}
-          </button>
+          <div style={actionGridStyle}>
+            <button
+              onClick={handleEntryPhoto}
+              disabled={loading || cameraActive}
+              style={{
+                ...actionPrimaryStyle,
+                backgroundColor: 'var(--primary)',
+                color: 'white',
+                border: 'none',
+                cursor: loading ? 'wait' : 'pointer',
+              }}
+            >
+              {loading ? '⏳ Capturando...' : '📷 Capturar Foto de Entrada'}
+            </button>
+            <button
+              onClick={() => setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))}
+              disabled={loading}
+              style={{
+                ...actionSecondaryStyle,
+                backgroundColor: 'var(--surface-light)',
+                color: 'var(--foreground)',
+                border: '1px solid var(--border)',
+                cursor: loading ? 'not-allowed' : 'pointer',
+              }}
+            >
+              🔄 {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
+            </button>
+          </div>
         </div>
       )}
 
@@ -583,7 +624,7 @@ const ActivityEvidenceFlow = () => {
           {/* Grid de fotos */}
           {flowData.evidencePhotos.length > 0 && (
             <div style={{ marginBottom: 20 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 8 }}>
                 {flowData.evidencePhotos.map((photo, idx) => (
                   <div
                     key={idx}
@@ -634,37 +675,44 @@ const ActivityEvidenceFlow = () => {
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+          <div style={{ ...actionGridStyle, marginBottom: 20 }}>
             <button
               onClick={handleAddEvidencePhoto}
               disabled={loading || flowData.evidencePhotos.length >= 8}
               style={{
-                padding: '12px 24px',
+                ...actionPrimaryStyle,
                 backgroundColor: 'var(--accent)',
                 color: 'white',
                 border: 'none',
-                borderRadius: 4,
                 cursor: loading || flowData.evidencePhotos.length >= 8 ? 'not-allowed' : 'pointer',
-                fontSize: 16,
-                fontWeight: 'bold',
                 opacity: loading || flowData.evidencePhotos.length >= 8 ? 0.5 : 1,
               }}
             >
               {loading ? '⏳ Capturando...' : '📷 Agregar Foto'}
+            </button>
+            <button
+              onClick={() => setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))}
+              disabled={loading}
+              style={{
+                ...actionSecondaryStyle,
+                backgroundColor: 'var(--surface-light)',
+                color: 'var(--foreground)',
+                border: '1px solid var(--border)',
+                cursor: loading ? 'not-allowed' : 'pointer',
+              }}
+            >
+              🔄 {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
             </button>
             {flowData.evidencePhotos.length >= 4 && (
               <button
                 onClick={handleSaveEvidencePhotos}
                 disabled={loading}
                 style={{
-                  padding: '12px 24px',
+                  ...actionPrimaryStyle,
                   backgroundColor: 'var(--success)',
                   color: 'white',
                   border: 'none',
-                  borderRadius: 4,
                   cursor: loading ? 'wait' : 'pointer',
-                  fontSize: 16,
-                  fontWeight: 'bold',
                 }}
               >
                 {loading ? '⏳ Guardando...' : '✓ Siguiente Paso →'}
@@ -718,22 +766,34 @@ const ActivityEvidenceFlow = () => {
           <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
             Toma la foto de salida. Debe ser capturada en el momento actual.
           </p>
-          <button
-            onClick={handleExitPhoto}
-            disabled={loading}
-            style={{
-              padding: '12px 24px',
-              backgroundColor: '#c00',
-              color: 'white',
-              border: 'none',
-              borderRadius: 4,
-              cursor: loading ? 'wait' : 'pointer',
-              fontSize: 16,
-              fontWeight: 'bold',
-            }}
-          >
-            {loading ? '⏳ Capturando...' : '📷 Capturar Foto de Salida'}
-          </button>
+          <div style={actionGridStyle}>
+            <button
+              onClick={handleExitPhoto}
+              disabled={loading}
+              style={{
+                ...actionPrimaryStyle,
+                backgroundColor: '#c00',
+                color: 'white',
+                border: 'none',
+                cursor: loading ? 'wait' : 'pointer',
+              }}
+            >
+              {loading ? '⏳ Capturando...' : '📷 Capturar Foto de Salida'}
+            </button>
+            <button
+              onClick={() => setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))}
+              disabled={loading}
+              style={{
+                ...actionSecondaryStyle,
+                backgroundColor: 'var(--surface-light)',
+                color: 'var(--foreground)',
+                border: '1px solid var(--border)',
+                cursor: loading ? 'not-allowed' : 'pointer',
+              }}
+            >
+              🔄 {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
+            </button>
+          </div>
         </div>
       )}
 
