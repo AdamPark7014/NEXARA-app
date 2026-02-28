@@ -56,7 +56,15 @@ const nextConfig = {
       },
       {
         protocol: 'http',
+        hostname: 'localhost:3001',
+      },
+      {
+        protocol: 'http',
         hostname: '127.0.0.1',
+      },
+      {
+        protocol: 'http',
+        hostname: '127.0.0.1:3001',
       },
     ],
   },

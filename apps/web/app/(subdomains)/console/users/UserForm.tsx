@@ -46,6 +46,16 @@ export default function UserForm({
   let API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
   API_URL = API_URL.replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
+  
+  // Helper para convertir URLs relativas a completas
+  const getFullImageUrl = (url: string | undefined) => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    // Convertir ruta relativa a URL completa del API
+    const apiBase = API_URL.replace('/api', '');
+    return `${apiBase}${url}`;
+  };
+
   const [form, setForm] = useState({
     nombre: initialUser?.nombre || "",
     email: initialUser?.email || "",
@@ -65,7 +75,7 @@ export default function UserForm({
 
   // ...existing code...
 
-  const [preview, setPreview] = useState<string>(initialUser?.avatarUrl || "");
+  const [preview, setPreview] = useState<string>(getFullImageUrl(initialUser?.avatarUrl));
   const [cropModal, setCropModal] = useState(false);
   const [cropImage, setCropImage] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
