@@ -25,6 +25,7 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
 
   useEffect(() => {
     return () => {
@@ -77,12 +78,13 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
     return true;
   };
 
-  const startCamera = async (type: 'general' | 'specifications') => {
+  const startCamera = async (type: 'general' | 'specifications', facingMode: 'environment' | 'user' = 'environment') => {
     setError(null);
     setPhotoStep(type);
+    setCameraFacing(facingMode);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       });
       streamRef.current = stream;
@@ -93,6 +95,16 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
     } catch {
       setPhotoStep(null);
       setError('No se pudo acceder a la cámara. Verifica permisos del navegador.');
+    }
+  };
+
+  const flipCamera = async () => {
+    stopCamera();
+    const newFacing = cameraFacing === 'environment' ? 'user' : 'environment';
+    setCameraFacing(newFacing);
+    if (photoStep) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      startCamera(photoStep, newFacing);
     }
   };
 
@@ -409,51 +421,211 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0,0,0,0.65)',
+            background: 'rgba(0,0,0,0.88)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 9999,
-            padding: 16,
+            padding: '8px 12px',
+            backdropFilter: 'blur(6px)',
+            animation: 'fadeInOverlay 0.3s ease-out',
           }}
+          onClick={stopCamera}
         >
           <div
             style={{
-              width: 'min(900px, 100%)',
-              background: 'var(--surface)',
-              border: '1px solid var(--muted)',
-              borderRadius: 12,
+              width: '100%',
+              maxWidth: '100vw',
+              maxHeight: '95vh',
+              background: 'linear-gradient(135deg, rgba(20,26,38,0.98), rgba(11,16,28,0.98))',
+              border: '2px solid rgba(31,137,252,0.35)',
+              borderRadius: '20px',
               overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 30px 60px rgba(0,0,0,0.6), 0 0 80px rgba(31,137,252,0.15)',
+              animation: 'slideInRight 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
+            {/* Header */}
             <div
               style={{
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                padding: '12px 16px',
-                borderBottom: '1px solid var(--muted)',
+                padding: '16px 20px',
+                borderBottom: '1px solid rgba(31,137,252,0.2)',
+                background: 'linear-gradient(135deg, rgba(31,137,252,0.12), rgba(20,162,133,0.08))',
+                minHeight: '56px',
               }}
             >
-              <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>
-                {photoStep === 'general'
-                  ? '📸 Toma una foto panorámica de la herramienta'
-                  : '📸 Toma una foto del modelo y número de serie'}
-              </h3>
-              <button className="button-secondary" type="button" onClick={stopCamera}>✕</button>
+              <div>
+                <h3 style={{ margin: 0, color: 'white', fontSize: 'clamp(16px, 4vw, 20px)', fontWeight: 700 }}>
+                  📸 {photoStep === 'general' ? 'Foto Panorámica' : 'Especificaciones'}
+                </h3>
+                <p style={{ margin: '4px 0 0 0', color: 'rgba(207,224,255,0.7)', fontSize: '12px' }}>
+                  {photoStep === 'general' ? '(Vista completa de la herramienta)' : '(Modelo, serie y detalles)'}
+                </p>
+              </div>
+              <button 
+                className="button-secondary" 
+                type="button" 
+                onClick={stopCamera}
+                style={{ 
+                  padding: '10px 14px', 
+                  borderRadius: 12, 
+                  fontSize: 18,
+                  minWidth: 'auto',
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.12)';
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)';
+                }}
+              >
+                ✕
+              </button>
             </div>
 
-            <div style={{ padding: 16, display: 'grid', gap: 12 }}>
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                style={{ width: '100%', maxHeight: '65vh', borderRadius: 10, background: '#000' }}
-              />
+            {/* Video Container */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, padding: 12, minHeight: 0 }}>
+              <div 
+                style={{ 
+                  flex: 1, 
+                  position: 'relative', 
+                  borderRadius: 16, 
+                  overflow: 'hidden', 
+                  background: '#000',
+                  boxShadow: 'inset 0 0 20px rgba(0,0,0,0.5)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: '200px',
+                }}
+              >
+                {/* Grid overlay for composition */}
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundImage: 'linear-gradient(90deg, transparent 33%, rgba(31,137,252,0.08) 33%, rgba(31,137,252,0.08) 66%, transparent 66%), linear-gradient(0deg, transparent 33%, rgba(31,137,252,0.08) 33%, rgba(31,137,252,0.08) 66%, transparent 66%)',
+                  backgroundSize: '33.33% 33.33%',
+                  pointerEvents: 'none',
+                  zIndex: 1,
+                }} />
+                
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+              </div>
+
               <canvas ref={canvasRef} style={{ display: 'none' }} />
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                <button className="button-secondary" type="button" onClick={stopCamera}>Cancelar</button>
-                <button className="button-primary" type="button" onClick={capturePhoto}>📷 Capturar foto</button>
+
+              {/* Button Container */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 10 }}>
+                <button 
+                  className="button-secondary" 
+                  type="button" 
+                  onClick={flipCamera}
+                  style={{ 
+                    padding: '14px 16px', 
+                    borderRadius: 14, 
+                    fontSize: 'clamp(13px, 3vw, 15px)',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    background: 'linear-gradient(135deg, rgba(31,137,252,0.15), rgba(20,162,133,0.1))',
+                    border: '1px solid rgba(31,137,252,0.3)',
+                    color: 'rgba(207,224,255,0.95)',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                  }}
+                  onMouseEnter={(e) => {
+                    const el = e.currentTarget as HTMLElement;
+                    el.style.transform = 'translateY(-2px) scale(1.05)';
+                    el.style.boxShadow = '0 8px 16px rgba(31,137,252,0.25)';
+                  }}
+                  onMouseLeave={(e) => {
+                    const el = e.currentTarget as HTMLElement;
+                    el.style.transform = 'translateY(0) scale(1)';
+                    el.style.boxShadow = 'none';
+                  }}
+                >
+                  🔄 Voltear
+                </button>
+                <button 
+                  className="button-secondary" 
+                  type="button" 
+                  onClick={stopCamera}
+                  style={{ 
+                    padding: '14px 16px', 
+                    borderRadius: 14, 
+                    fontSize: 'clamp(13px, 3vw, 15px)',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    color: 'rgba(207,224,255,0.9)',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    const el = e.currentTarget as HTMLElement;
+                    el.style.background = 'rgba(255,255,255,0.09)';
+                  }}
+                  onMouseLeave={(e) => {
+                    const el = e.currentTarget as HTMLElement;
+                    el.style.background = 'rgba(255,255,255,0.06)';
+                  }}
+                >
+                  ✕ Cancelar
+                </button>
+                <button 
+                  className="button-primary" 
+                  type="button" 
+                  onClick={capturePhoto}
+                  style={{ 
+                    padding: '14px 20px', 
+                    borderRadius: 14, 
+                    fontSize: 'clamp(13px, 3vw, 15px)',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    background: 'linear-gradient(135deg, rgb(31,137,252), rgb(20,162,133))',
+                    border: 'none',
+                    color: 'white',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                    gridColumn: 'span 1',
+                  }}
+                  onMouseEnter={(e) => {
+                    const el = e.currentTarget as HTMLElement;
+                    el.style.transform = 'translateY(-3px) scale(1.08)';
+                    el.style.boxShadow = '0 12px 24px rgba(31,137,252,0.35)';
+                  }}
+                  onMouseLeave={(e) => {
+                    const el = e.currentTarget as HTMLElement;
+                    el.style.transform = 'translateY(0) scale(1)';
+                    el.style.boxShadow = 'none';
+                  }}
+                >
+                  📷 Capturar
+                </button>
               </div>
             </div>
           </div>
