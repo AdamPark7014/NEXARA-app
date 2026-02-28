@@ -358,11 +358,168 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         }
 
         @media (max-width: 480px) {
-          .login-card {
-            padding: 36px 24px;
+          .login-container {
+            padding: 16px;
+            background: linear-gradient(135deg, #0a0e27 0%, #0f1419 50%, #1a1a2e 100%);
           }
+
+          .login-card {
+            padding: 32px 20px;
+            border-radius: 20px;
+            max-width: 100%;
+            box-shadow:
+              0 4px 24px rgba(0, 0, 0, 0.5),
+              0 0 0 1px rgba(255, 255, 255, 0.06),
+              inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+          }
+
+          .logo-container {
+            margin-bottom: 32px;
+          }
+
+          .logo {
+            width: 76px;
+            height: 76px;
+            border-radius: 18px;
+            margin-bottom: 10px;
+          }
+
+          .logoImage {
+            width: 52px;
+            height: 52px;
+          }
+
+          .brandName {
+            font-size: 12px;
+            letter-spacing: 0.25rem;
+            margin-bottom: 6px;
+          }
+
           .title {
-            font-size: 24px;
+            font-size: 22px;
+            letter-spacing: -0.3px;
+            margin-bottom: 6px;
+          }
+
+          .subtitle {
+            font-size: 13px;
+            line-height: 1.5;
+            padding: 0 10px;
+          }
+
+          .form {
+            margin-top: 28px;
+          }
+
+          .input-group {
+            margin-bottom: 20px;
+          }
+
+          .input-label {
+            font-size: 13px;
+            margin-bottom: 7px;
+          }
+
+          .input {
+            padding: 15px 14px 15px 46px;
+            font-size: 16px;
+            border-radius: 10px;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+          }
+
+          .input-icon {
+            left: 14px;
+            width: 19px;
+            height: 19px;
+          }
+
+          .password-toggle {
+            right: 14px;
+          }
+
+          .submit-button {
+            padding: 17px 16px;
+            font-size: 16px;
+            border-radius: 10px;
+            font-weight: 700;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+          }
+
+          .error-message {
+            padding: 14px 16px;
+            font-size: 13px;
+            margin-top: 16px;
+            line-height: 1.4;
+          }
+
+          .footer {
+            margin-top: 28px;
+            padding-top: 20px;
+          }
+
+          .footer-text {
+            font-size: 12px;
+          }
+
+          .loader {
+            width: 16px;
+            height: 16px;
+          }
+        }
+
+        @media (max-width: 380px) {
+          .login-card {
+            padding: 28px 18px;
+          }
+
+          .logo {
+            width: 68px;
+            height: 68px;
+          }
+
+          .logoImage {
+            width: 46px;
+            height: 46px;
+          }
+
+          .title {
+            font-size: 20px;
+          }
+
+          .subtitle {
+            font-size: 12px;
+          }
+
+          .input {
+            padding: 14px 12px 14px 44px;
+            font-size: 15px;
+          }
+
+          .input-icon {
+            left: 12px;
+          }
+
+          .password-toggle {
+            right: 12px;
+          }
+
+          .submit-button {
+            padding: 16px 14px;
+            font-size: 15px;
+          }
+        }
+
+        @media (min-width: 481px) and (max-width: 768px) {
+          .login-card {
+            max-width: 420px;
+            padding: 40px 32px;
+          }
+
+          .title {
+            font-size: 26px;
           }
         }
       `}</style>

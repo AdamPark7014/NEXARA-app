@@ -58,8 +58,14 @@ const FinesTable: React.FC<FinesTableProps> = ({
   const [loading, setLoading] = useState(true);
   const [estatusPago, setEstatusPago] = useState('');
   const [usuarioFiltro, setUsuarioFiltro] = useState<string>(usuarioIdProp ? String(usuarioIdProp) : '');
-  const [tipoFiltro, setTipoFiltro] = useState(tipoProp || '');
+  const [tipoFiltro, setTipoFiltro] = useState(tipoProp || '');  const [isMobile, setIsMobile] = useState(false);
 
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 900);
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(
     /[\/.]+$/,
     ''
@@ -158,6 +164,47 @@ const FinesTable: React.FC<FinesTableProps> = ({
   if (loading) return <div style={{ padding: 12 }}>Cargando multas...</div>;
 
   const usuarioActual = usuarios.find((u) => u.id === Number(usuarioFiltro));
+
+  const mobileCardListStyle: React.CSSProperties = {
+    display: "flex",
+    flexDirection: "column",
+    gap: "16px",
+  };
+
+  const mobileCardStyle: React.CSSProperties = {
+    background: "linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)",
+    borderRadius: "12px",
+    padding: "16px",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+    border: "1px solid #e5e7eb",
+  };
+
+  const mobileMetaGridStyle: React.CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "12px",
+    marginTop: "12px",
+  };
+
+  const mobileMetaItemStyle: React.CSSProperties = {
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px",
+  };
+
+  const mobileMetaLabelStyle: React.CSSProperties = {
+    fontSize: "11px",
+    fontWeight: 600,
+    textTransform: "uppercase",
+    color: "#6b7280",
+    letterSpacing: "0.5px",
+  };
+
+  const mobileMetaValueStyle: React.CSSProperties = {
+    fontSize: "14px",
+    color: "#111827",
+    fontWeight: 500,
+  };
 
   return (
     <div className="card">
@@ -260,84 +307,167 @@ const FinesTable: React.FC<FinesTableProps> = ({
           Sin multas registradas {usuarioActual ? `para ${usuarioActual.nombre}` : ''}
         </div>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>ID</th>
-                {showUser && !usuarioFiltro && (
-                  <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Usuario</th>
-                )}
-                <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Tipo</th>
-                <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Razón</th>
-                <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Descripción</th>
-                <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Monto</th>
-                <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Estatus</th>
-                <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Fecha</th>
-              </tr>
-            </thead>
-            <tbody>
-              {fines.map((fine) => (
-                <tr key={fine.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: 12, fontSize: 12 }}>{fine.id}</td>
-                  {showUser && !usuarioFiltro && (
-                    <td style={{ padding: 12, fontSize: 12 }}>{fine.usuario?.nombre || '-'}</td>
-                  )}
-                  <td style={{ padding: 12, fontSize: 12 }}>
-                    <span
-                      style={{
-                        display: 'inline-block',
-                        padding: '4px 8px',
-                        borderRadius: 4,
-                        backgroundColor: getTipoColor(fine.tipo),
-                        color: 'white',
-                        fontWeight: 500,
-                        fontSize: 11,
-                      }}
-                    >
-                      {getTipoLabel(fine.tipo)}
-                    </span>
-                  </td>
-                  <td style={{ padding: 12, fontSize: 12, fontWeight: 500 }}>{fine.razon}</td>
-                  <td style={{ padding: 12, fontSize: 12, maxWidth: 150 }}>
-                    {fine.descripcion ? (
-                      <span title={fine.descripcion}>
-                        {fine.descripcion.substring(0, 30)}
-                        {fine.descripcion.length > 30 ? '...' : ''}
-                      </span>
-                    ) : (
-                      <span style={{ color: 'var(--text-secondary)' }}>-</span>
+        <>
+          {!isMobile && (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>ID</th>
+                    {showUser && !usuarioFiltro && (
+                      <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Usuario</th>
                     )}
-                  </td>
-                  <td style={{ padding: 12, fontSize: 12, fontWeight: 'bold', color: '#ef4444' }}>
-                    ${Number(fine.monto).toFixed(2)}
-                  </td>
-                  <td style={{ padding: 12, fontSize: 12 }}>
+                    <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Tipo</th>
+                    <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Razón</th>
+                    <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Descripción</th>
+                    <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Monto</th>
+                    <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Estatus</th>
+                    <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Fecha</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fines.map((fine) => (
+                    <tr key={fine.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: 12, fontSize: 12 }}>{fine.id}</td>
+                      {showUser && !usuarioFiltro && (
+                        <td style={{ padding: 12, fontSize: 12 }}>{fine.usuario?.nombre || '-'}</td>
+                      )}
+                      <td style={{ padding: 12, fontSize: 12 }}>
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            padding: '4px 8px',
+                            borderRadius: 4,
+                            backgroundColor: getTipoColor(fine.tipo),
+                            color: 'white',
+                            fontWeight: 500,
+                            fontSize: 11,
+                          }}
+                        >
+                          {getTipoLabel(fine.tipo)}
+                        </span>
+                      </td>
+                      <td style={{ padding: 12, fontSize: 12, fontWeight: 500 }}>{fine.razon}</td>
+                      <td style={{ padding: 12, fontSize: 12, maxWidth: 150 }}>
+                        {fine.descripcion ? (
+                          <span title={fine.descripcion}>
+                            {fine.descripcion.substring(0, 30)}
+                            {fine.descripcion.length > 30 ? '...' : ''}
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--text-secondary)' }}>-</span>
+                        )}
+                      </td>
+                      <td style={{ padding: 12, fontSize: 12, fontWeight: 'bold', color: '#ef4444' }}>
+                        ${Number(fine.monto).toFixed(2)}
+                      </td>
+                      <td style={{ padding: 12, fontSize: 12 }}>
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            padding: '4px 12px',
+                            borderRadius: 4,
+                            backgroundColor:
+                              fine.estatusPago === 'Pagada'
+                                ? '#22c55e40'
+                                : '#ef444440',
+                            color: fine.estatusPago === 'Pagada' ? '#22c55e' : '#ef4444',
+                            fontSize: 11,
+                            fontWeight: 'bold',
+                          }}
+                        >
+                          {fine.estatusPago}
+                        </span>
+                      </td>
+                      <td style={{ padding: 12, fontSize: 12 }}>
+                        {new Date(fine.fechaCreacion).toLocaleDateString('es-MX')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {isMobile && (
+            <div style={mobileCardListStyle}>
+              {fines.map((fine) => (
+                <div key={fine.id} style={mobileCardStyle}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: "13px", color: "#6b7280", marginBottom: "4px" }}>Multa #{fine.id}</div>
+                      <div style={{ fontSize: "16px", fontWeight: 700, color: "#111827" }}>{fine.razon}</div>
+                    </div>
                     <span
                       style={{
-                        display: 'inline-block',
-                        padding: '4px 12px',
-                        borderRadius: 4,
+                        padding: '6px 12px',
+                        borderRadius: 6,
                         backgroundColor:
                           fine.estatusPago === 'Pagada'
                             ? '#22c55e40'
                             : '#ef444440',
                         color: fine.estatusPago === 'Pagada' ? '#22c55e' : '#ef4444',
-                        fontSize: 11,
-                        fontWeight: 'bold',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        whiteSpace: "nowrap",
                       }}
                     >
                       {fine.estatusPago}
                     </span>
-                  </td>
-                  <td style={{ padding: 12, fontSize: 12 }}>
-                    {new Date(fine.fechaCreacion).toLocaleDateString('es-MX')}
-                  </td>
-                </tr>
+                  </div>
+
+                  <div style={{ fontSize: "20px", fontWeight: 700, color: "#ef4444", marginBottom: "12px" }}>
+                    ${Number(fine.monto).toFixed(2)}
+                  </div>
+
+                  <div style={mobileMetaGridStyle}>
+                    <div style={mobileMetaItemStyle}>
+                      <span style={mobileMetaLabelStyle}>Tipo</span>
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          padding: '4px 10px',
+                          borderRadius: 6,
+                          backgroundColor: getTipoColor(fine.tipo),
+                          color: 'white',
+                          fontWeight: 600,
+                          fontSize: 12,
+                          width: "fit-content",
+                        }}
+                      >
+                        {getTipoLabel(fine.tipo)}
+                      </span>
+                    </div>
+                    <div style={mobileMetaItemStyle}>
+                      <span style={mobileMetaLabelStyle}>Fecha</span>
+                      <span style={mobileMetaValueStyle}>
+                        {new Date(fine.fechaCreacion).toLocaleDateString('es-MX', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </span>
+                    </div>
+                    {showUser && !usuarioFiltro && fine.usuario?.nombre && (
+                      <div style={{ ...mobileMetaItemStyle, gridColumn: "1 / -1" }}>
+                        <span style={mobileMetaLabelStyle}>Usuario</span>
+                        <span style={mobileMetaValueStyle}>{fine.usuario.nombre}</span>
+                      </div>
+                    )}
+                    {fine.descripcion && (
+                      <div style={{ ...mobileMetaItemStyle, gridColumn: "1 / -1" }}>
+                        <span style={mobileMetaLabelStyle}>Descripción</span>
+                        <span style={{ ...mobileMetaValueStyle, fontSize: "13px", color: "#6b7280" }}>
+                          {fine.descripcion}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
