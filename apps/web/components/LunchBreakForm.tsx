@@ -178,6 +178,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
               <button
                 className="button-primary"
+                type="button"
                 onClick={capturePhoto}
                 style={{
                   width: '100%',
@@ -203,6 +204,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
               </button>
               <button
                 className="button-secondary"
+                type="button"
                 onClick={flipCamera}
                 style={{
                   width: '100%',
@@ -244,6 +246,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
             <button
               className="button-secondary"
+              type="button"
               onClick={() => {
                 setStep('camera');
                 setPhoto(null);
@@ -258,6 +261,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
 
             <button
               className="button-primary"
+              type="button"
               onClick={handleSubmit}
               disabled={loading}
               style={{ minHeight: 50, borderRadius: 12, fontWeight: 700, touchAction: 'manipulation' }}

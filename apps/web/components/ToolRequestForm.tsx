@@ -98,8 +98,15 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
     }
   };
 
+  const stopCameraStream = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+  };
+
   const flipCamera = async () => {
-    stopCamera();
+    stopCameraStream();
     const newFacing = cameraFacing === 'environment' ? 'user' : 'environment';
     setCameraFacing(newFacing);
     if (photoStep) {
@@ -109,10 +116,7 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
   };
 
   const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
+    stopCameraStream();
     setPhotoStep(null);
   };
 
