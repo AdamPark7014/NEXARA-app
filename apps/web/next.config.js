@@ -33,6 +33,7 @@ const nextConfig = {
   },
   
   images: {
+    unoptimized: true, // Disable Image Optimization since we serve local files from /uploads
     remotePatterns: [
       {
         protocol: 'https',
