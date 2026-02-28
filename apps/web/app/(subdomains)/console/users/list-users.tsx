@@ -308,7 +308,7 @@ export default function ListUsers() {
               <tr key={u.id}>
                 <td>
                   {u.avatarUrl ? (
-                    <Image src={u.avatarUrl} alt={u.nombre} width={40} height={40} style={{ borderRadius: "50%", objectFit: "cover" }} />
+                    <Image src={u.avatarUrl} alt={u.nombre} width={40} height={40} style={{ borderRadius: "50%", objectFit: "cover" }} unoptimized />
                   ) : (
                     <span style={{ width: 40, height: 40, display: "inline-block", borderRadius: "50%", background: "var(--muted)", textAlign: "center", lineHeight: "40px", color: "var(--primary)", fontWeight: 700 }}>
                       {u.nombre[0]}
@@ -405,7 +405,7 @@ export default function ListUsers() {
             <button onClick={() => setProfileModalOpen(false)} style={{ position: "absolute", top: 8, right: 8 }}>✕</button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
               {profileUser?.avatarUrl ? (
-                <Image src={profileUser.avatarUrl} alt={profileUser.nombre} width={56} height={56} style={{ borderRadius: '50%', objectFit: 'cover' }} />
+                <Image src={profileUser.avatarUrl} alt={profileUser.nombre} width={56} height={56} style={{ borderRadius: '50%', objectFit: 'cover' }} unoptimized />
               ) : (
                 <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--muted)', display: 'grid', placeItems: 'center', fontWeight: 700, color: 'var(--primary)' }}>
                   {profileUser?.nombre?.[0] || 'U'}

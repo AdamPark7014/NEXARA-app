@@ -96,7 +96,7 @@ export default function Sidebar() {
       <div className={styles.sidebarContent} id="sidebar-menu">
       <div className={styles.sidebarUser}>
         <div className={styles.sidebarAvatar}>
-          <Image className={styles.avatarImage} src={avatarUrl} alt={user.nombre} width={64} height={64} />
+          <Image className={styles.avatarImage} src={avatarUrl} alt={user.nombre} width={64} height={64} unoptimized />
         </div>
         <div className={styles.sidebarName}>{user.nombre}</div>
         <div className={styles.sidebarEmail}>{user.email}</div>

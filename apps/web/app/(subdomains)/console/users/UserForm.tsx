@@ -47,13 +47,11 @@ export default function UserForm({
   API_URL = API_URL.replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
   
-  // Helper para convertir URLs relativas a completas con protocolo y dominio
+  // Helper para obtener la ruta del avatar
   const getFullImageUrl = (url: string | undefined) => {
     if (!url) return '';
-    if (url.startsWith('http://') || url.startsWith('https://')) return url;
-    // Usar window.location.origin para obtener el dominio actual
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    return `${origin}/uploads${url.startsWith('/') ? '' : '/'}${url}`;
+    // Retornar la ruta relativa, el servidor la servirá correctamente
+    return url.startsWith('/') ? url : `/${url}`;
   };
 
   const [form, setForm] = useState({
@@ -388,7 +386,7 @@ export default function UserForm({
           style={preview ? { backgroundImage: `url(${preview})` } : undefined}
         >
           {preview ? (
-            <Image src={preview} alt="preview" width={86} height={86} className="previewAvatar" />
+            <Image src={preview} alt="preview" width={86} height={86} className="previewAvatar" unoptimized />
           ) : (
             <span>Arrastra una imagen aqui o haz click</span>
           )}
