@@ -875,13 +875,251 @@
   }
   
   .consoleMain {
-    padding: 20px 16px;
+    padding: 16px 12px;
   }
   
   .consoleTitle {
-    font-size: 1.6rem;
-    margin-bottom: 20px;
+    font-size: 1.4rem;
+    margin-bottom: 16px;
     font-weight: 700;
+  }
+
+  /* Mobile Table Styles - MAJORLY IMPROVED */
+  .tableContainer {
+    border-radius: 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    margin-bottom: 20px;
+    -webkit-overflow-scrolling: touch;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .table {
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+
+  .table thead {
+    background: linear-gradient(135deg, rgba(31,137,252,0.08), rgba(20,162,133,0.08));
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .table th {
+    padding: 14px 16px;
+    font-weight: 700;
+    min-width: 120px;
+    text-align: left;
+    color: var(--primary);
+    border-bottom: 2px solid rgba(31,137,252,0.2);
+    background: inherit;
+  }
+
+  .table td {
+    padding: 14px 16px;
+    min-width: 120px;
+    border-bottom: 1px solid rgba(31,137,252,0.1);
+  }
+
+  .table tbody tr {
+    transition: all 0.3s ease;
+  }
+
+  .table tbody tr:hover {
+    background: rgba(31,137,252,0.04);
+  }
+
+  /* Scrollbar styling for tables */
+  .tableContainer::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .tableContainer::-webkit-scrollbar-track {
+    background: rgba(31,137,252,0.05);
+    border-radius: 10px;
+  }
+
+  .tableContainer::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(31,137,252,0.4), rgba(20,162,133,0.4));
+    border-radius: 10px;
+  }
+
+  .tableContainer::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(31,137,252,0.6), rgba(20,162,133,0.6));
+  }
+
+  .emptyTableMessage {
+    padding: 24px 16px !important;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+  }
+
+  /* Mobile Form Improvements */
+  .formCard {
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .formGroup {
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .formGroup label {
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .formInput,
+  :global(.input),
+  :global(input[type="text"]),
+  :global(input[type="email"]),
+  :global(input[type="date"]),
+  :global(textarea),
+  :global(select) {
+    padding: 12px 14px;
+    font-size: 16px;
+    border-radius: 10px;
+    border: 1px solid rgba(31,137,252,0.2);
+    min-height: 44px;
+    transition: all 0.3s ease;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .formInput:focus,
+  :global(.input:focus),
+  :global(input[type="text"]:focus),
+  :global(input[type="email"]:focus),
+  :global(input[type="date"]:focus),
+  :global(textarea:focus),
+  :global(select:focus) {
+    outline: none;
+    border-color: rgba(31,137,252,0.5);
+    background: rgba(31,137,252,0.05);
+    box-shadow: 0 0 0 3px rgba(31,137,252,0.1);
+  }
+
+  .formRow {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .filterSection {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 14px;
+    margin-bottom: 16px;
+  }
+
+  .filterGroup {
+    gap: 8px;
+  }
+
+  .filterGroup label {
+    font-size: 0.9rem;
+  }
+
+  /* Mobile Button Improvements */
+  :global(.button-primary),
+  :global(.button-secondary),
+  .photoButton {
+    padding: 13px 16px;
+    font-size: 15px;
+    border-radius: 12px;
+    min-height: 44px;
+    font-weight: 600;
+    min-width: 44px;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  :global(.button-primary):active,
+  :global(.button-secondary):active,
+  .photoButton:active {
+    transform: scale(0.96);
+  }
+
+  /* Photo Section - MAJOR IMPROVEMENTS */
+  .photoSection {
+    margin-top: 16px;
+    padding-top: 16px;
+  }
+
+  .photoGroup {
+    margin-bottom: 14px;
+  }
+
+  .photoGroup label {
+    font-size: 0.95rem;
+    margin-bottom: 8px;
+  }
+
+  .photoButton {
+    width: 100%;
+    padding: 14px 16px;
+    font-size: 16px;
+    border-radius: 12px;
+    min-height: 48px;
+  }
+
+  .photoPreview {
+    border-radius: 12px;
+    overflow: hidden;
+    margin-top: 8px;
+    max-height: 280px;
+  }
+
+  .photoPreview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* Status Cards Mobile */
+  .statusCards {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .statusCard {
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .statusNumber {
+    font-size: 2rem;
+  }
+
+  /* Tool Cards Mobile */
+  .toolsGrid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .toolCard {
+    padding: 16px;
+  }
+
+  .toolIcon {
+    font-size: 2rem;
+    margin-bottom: 8px;
+  }
+
+  .toolCard h3 {
+    font-size: 1.1rem;
+    margin-bottom: 6px;
+  }
+
+  .toolCard p {
+    font-size: 0.85rem;
+    margin-bottom: 8px;
   }
 }
 
@@ -1631,6 +1869,33 @@
   .menuLink {
     font-size: 0.95rem;
     padding: 11px 14px;
+  }
+}
+
+/* Mobile Table & Form Optimization - 900px breakpoint */
+@media (max-width: 900px) {
+  .tableContainer {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table {
+    min-width: 100%;
+  }
+
+  .table th,
+  .table td {
+    padding: 12px 14px;
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
+
+  .formRow {
+    grid-template-columns: 1fr;
+  }
+
+  .filterSection {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
 }
 
