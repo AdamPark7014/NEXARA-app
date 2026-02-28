@@ -169,14 +169,20 @@ const FinesTable: React.FC<FinesTableProps> = ({
     display: "flex",
     flexDirection: "column",
     gap: "16px",
+    padding: "16px 12px",
+    boxSizing: "border-box",
+    width: "100%",
   };
 
   const mobileCardStyle: React.CSSProperties = {
     background: "linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)",
     borderRadius: "12px",
-    padding: "16px",
+    padding: "16px 14px",
     boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
     border: "1px solid #e5e7eb",
+    boxSizing: "border-box",
+    width: "100%",
+    minWidth: 0,
   };
 
   const mobileMetaGridStyle: React.CSSProperties = {
@@ -184,12 +190,17 @@ const FinesTable: React.FC<FinesTableProps> = ({
     gridTemplateColumns: "1fr 1fr",
     gap: "12px",
     marginTop: "12px",
+    width: "100%",
+    minWidth: 0,
   };
 
   const mobileMetaItemStyle: React.CSSProperties = {
     display: "flex",
     flexDirection: "column",
     gap: "4px",
+    minWidth: 0,
+    wordBreak: "break-word",
+    overflowWrap: "break-word",
   };
 
   const mobileMetaLabelStyle: React.CSSProperties = {
@@ -198,12 +209,16 @@ const FinesTable: React.FC<FinesTableProps> = ({
     textTransform: "uppercase",
     color: "#6b7280",
     letterSpacing: "0.5px",
+    wordBreak: "break-word",
   };
 
   const mobileMetaValueStyle: React.CSSProperties = {
     fontSize: "14px",
     color: "#111827",
     fontWeight: 500,
+    wordBreak: "break-word",
+    overflowWrap: "break-word",
+    minWidth: 0,
   };
 
   return (

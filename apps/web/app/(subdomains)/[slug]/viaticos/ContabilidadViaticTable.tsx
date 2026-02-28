@@ -193,12 +193,16 @@ const ContabilidadViaticTable = () => {
     textTransform: "uppercase",
     color: "#6b7280",
     letterSpacing: "0.5px",
+    wordBreak: "break-word",
   };
 
   const mobileMetaValueStyle: React.CSSProperties = {
     fontSize: "14px",
     color: "#111827",
     fontWeight: 500,
+    wordBreak: "break-word",
+    overflowWrap: "break-word",
+    minWidth: 0,
   };
 
   const mobileActionGridStyle: React.CSSProperties = {
@@ -206,6 +210,7 @@ const ContabilidadViaticTable = () => {
     gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
     gap: "10px",
     marginTop: "16px",
+    width: "100%",
   };
 
   return (

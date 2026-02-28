@@ -445,24 +445,30 @@ const ActivitiesTable: React.FC = () => {
 
   const mobileCardListStyle: React.CSSProperties = {
     display: 'grid',
-    gap: 12,
-    padding: 10,
+    gap: 14,
+    padding: '16px 12px',
+    boxSizing: 'border-box',
   };
 
   const mobileCardStyle: React.CSSProperties = {
     border: '1px solid rgba(31,137,252,0.18)',
     borderRadius: 14,
-    padding: 12,
+    padding: '14px 12px',
     background: 'linear-gradient(140deg, rgba(31,137,252,0.06), rgba(20,162,133,0.05)), var(--surface)',
     boxShadow: '0 8px 18px rgba(15,106,214,0.1)',
     display: 'grid',
     gap: 10,
+    boxSizing: 'border-box',
+    width: '100%',
+    minWidth: 0,
   };
 
   const mobileMetaGridStyle: React.CSSProperties = {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
     gap: 8,
+    width: '100%',
+    minWidth: 0,
   };
 
   const mobileMetaItemStyle: React.CSSProperties = {
@@ -471,6 +477,9 @@ const ActivitiesTable: React.FC = () => {
     background: 'rgba(31,137,252,0.08)',
     border: '1px solid rgba(31,137,252,0.12)',
     fontSize: 12,
+    minWidth: 0,
+    wordBreak: 'break-word',
+    overflowWrap: 'break-word',
   };
 
   const mobileActionGridStyle: React.CSSProperties = {
@@ -771,12 +780,12 @@ const ActivitiesTable: React.FC = () => {
 
                 return (
                   <article key={a.id} style={mobileCardStyle}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
-                      <div style={{ display: 'grid', gap: 4 }}>
-                        <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>AN {a.anNumber}</div>
-                        <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.3 }}>{a.titulo}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start', width: '100%', minWidth: 0 }}>
+                      <div style={{ display: 'grid', gap: 4, minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-tertiary)', wordBreak: 'break-word' }}>AN {a.anNumber}</div>
+                        <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.3, wordBreak: 'break-word', overflowWrap: 'break-word' }}>{a.titulo}</div>
                       </div>
-                      <span className={`badge ${a.estatus === 'Aprobada' ? 'approved' : a.estatus === 'Pendiente' ? 'pending' : ''}`}>{a.estatus}</span>
+                      <span className={`badge ${a.estatus === 'Aprobada' ? 'approved' : a.estatus === 'Pendiente' ? 'pending' : ''}`} style={{ flexShrink: 0 }}>{a.estatus}</span>
                     </div>
 
                     <div style={mobileMetaGridStyle}>
@@ -803,7 +812,7 @@ const ActivitiesTable: React.FC = () => {
                       </span>
                     </div>
 
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', wordBreak: 'break-word', overflowWrap: 'break-word', minWidth: 0 }}>
                       <strong>Indicaciones:</strong> {a.indicaciones || '-'}
                     </div>
 

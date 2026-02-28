@@ -175,20 +175,55 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
 
             {error && <div style={{ color: 'var(--danger)', marginBottom: 16 }}>{error}</div>}
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
               <button
                 className="button-primary"
                 onClick={capturePhoto}
-                style={{ width: '100%', minHeight: 50, borderRadius: 12, fontWeight: 700, touchAction: 'manipulation' }}
+                style={{
+                  width: '100%',
+                  minHeight: 52,
+                  padding: '14px 12px',
+                  borderRadius: 12,
+                  fontWeight: 700,
+                  touchAction: 'manipulation',
+                  WebkitAppearance: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                  fontSize: 15,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  gridColumn: window.innerWidth < 480 ? 'span 2' : 'span 1',
+                }}
+                onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
+                onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
               >
                 📷 Capturar Foto
               </button>
               <button
                 className="button-secondary"
                 onClick={flipCamera}
-                style={{ width: '100%', minHeight: 50, borderRadius: 12, fontWeight: 700, touchAction: 'manipulation' }}
+                style={{
+                  width: '100%',
+                  minHeight: 52,
+                  padding: '14px 12px',
+                  borderRadius: 12,
+                  fontWeight: 700,
+                  touchAction: 'manipulation',
+                  WebkitAppearance: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                  fontSize: 15,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                }}
+                onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
+                onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
               >
-                🔄 Voltear cámara
+                🔄 Voltear
               </button>
             </div>
           </div>

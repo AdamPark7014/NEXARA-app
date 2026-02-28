@@ -42,25 +42,39 @@ const ActivityEvidenceFlow = () => {
   const isCorrection = flowData?.reviewStatus === 'REJECTED';
   const actionGridStyle: React.CSSProperties = {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-    gap: 10,
+    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+    gap: 12,
     width: '100%',
   };
   const actionPrimaryStyle: React.CSSProperties = {
-    minHeight: 50,
-    padding: '12px 16px',
+    minHeight: 52,
+    padding: '14px 12px',
     borderRadius: 12,
     fontSize: 15,
     fontWeight: 'bold',
     touchAction: 'manipulation',
+    WebkitAppearance: 'none',
+    cursor: 'pointer',
+    transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
   };
   const actionSecondaryStyle: React.CSSProperties = {
-    minHeight: 50,
-    padding: '12px 16px',
+    minHeight: 52,
+    padding: '14px 12px',
     borderRadius: 12,
     fontSize: 15,
     fontWeight: 'bold',
     touchAction: 'manipulation',
+    WebkitAppearance: 'none',
+    cursor: 'pointer',
+    transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
   };
 
   // Cargar actividades
@@ -592,9 +606,12 @@ const ActivityEvidenceFlow = () => {
                 color: 'white',
                 border: 'none',
                 cursor: loading ? 'wait' : 'pointer',
+                gridColumn: window.innerWidth < 480 ? 'span 2' : 'span 1',
               }}
+              onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
+              onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
-              {loading ? '⏳ Capturando...' : '📷 Capturar Foto de Entrada'}
+              {loading ? '⏳ Capturando...' : '📷 Entrada'}
             </button>
             <button
               onClick={() => setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))}
@@ -606,6 +623,8 @@ const ActivityEvidenceFlow = () => {
                 border: '1px solid var(--border)',
                 cursor: loading ? 'not-allowed' : 'pointer',
               }}
+              onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
+              onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
               🔄 {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
             </button>
@@ -686,9 +705,12 @@ const ActivityEvidenceFlow = () => {
                 border: 'none',
                 cursor: loading || flowData.evidencePhotos.length >= 8 ? 'not-allowed' : 'pointer',
                 opacity: loading || flowData.evidencePhotos.length >= 8 ? 0.5 : 1,
+                gridColumn: window.innerWidth < 480 ? 'span 2' : 'span 1',
               }}
+              onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
+              onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
-              {loading ? '⏳ Capturando...' : '📷 Agregar Foto'}
+              {loading ? '⏳ Capturando...' : '📷 Agregar'}
             </button>
             <button
               onClick={() => setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))}
@@ -700,6 +722,8 @@ const ActivityEvidenceFlow = () => {
                 border: '1px solid var(--border)',
                 cursor: loading ? 'not-allowed' : 'pointer',
               }}
+              onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
+              onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
               🔄 {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
             </button>
@@ -776,9 +800,12 @@ const ActivityEvidenceFlow = () => {
                 color: 'white',
                 border: 'none',
                 cursor: loading ? 'wait' : 'pointer',
+                gridColumn: window.innerWidth < 480 ? 'span 2' : 'span 1',
               }}
+              onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
+              onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
-              {loading ? '⏳ Capturando...' : '📷 Capturar Foto de Salida'}
+              {loading ? '⏳ Capturando...' : '📷 Salida'}
             </button>
             <button
               onClick={() => setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))}
@@ -790,6 +817,8 @@ const ActivityEvidenceFlow = () => {
                 border: '1px solid var(--border)',
                 cursor: loading ? 'not-allowed' : 'pointer',
               }}
+              onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
+              onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
               🔄 {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
             </button>

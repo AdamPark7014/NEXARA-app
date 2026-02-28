@@ -567,25 +567,74 @@ const AttendanceForm = () => {
             />
           </div>
           <canvas ref={canvasRef} style={{ display: 'none' }} />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginTop: 12, zIndex: 100000, position: 'relative', width: 'min(920px, 100%)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginTop: 16, zIndex: 100000, position: 'relative', width: 'min(100%, 920px)', justifyItems: 'stretch' }}>
             <button
               className="button-secondary"
               onClick={flipCamera}
-              style={{ minHeight: 52, padding: '12px 14px', fontSize: 15, fontWeight: 'bold', borderRadius: 12, touchAction: 'manipulation' }}
+              style={{
+                minHeight: 52,
+                padding: '14px 12px',
+                fontSize: 15,
+                fontWeight: 700,
+                borderRadius: 12,
+                touchAction: 'manipulation',
+                WebkitAppearance: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+              }}
+              onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
+              onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
-              🔄 Voltear cámara
+              🔄 Voltear
             </button>
             <button
               className="button-primary"
               onClick={capturePhoto}
-              style={{ minHeight: 52, padding: '12px 14px', fontSize: 15, fontWeight: 'bold', borderRadius: 12, touchAction: 'manipulation' }}
+              style={{
+                minHeight: 52,
+                padding: '14px 12px',
+                fontSize: 15,
+                fontWeight: 700,
+                borderRadius: 12,
+                touchAction: 'manipulation',
+                WebkitAppearance: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                gridColumn: window.innerWidth < 480 ? 'span 2' : 'span 1',
+              }}
+              onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
+              onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
-              📸 Capturar foto
+              📸 Capturar
             </button>
             <button
               className="button-secondary"
               onClick={closeCamera}
-              style={{ minHeight: 52, padding: '12px 14px', fontSize: 15, fontWeight: 'bold', borderRadius: 12, touchAction: 'manipulation' }}
+              style={{
+                minHeight: 52,
+                padding: '14px 12px',
+                fontSize: 15,
+                fontWeight: 700,
+                borderRadius: 12,
+                touchAction: 'manipulation',
+                WebkitAppearance: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+              }}
+              onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
+              onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
               ✕ Cancelar
             </button>
