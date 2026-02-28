@@ -16,7 +16,7 @@ export class UsersController {
   @Post()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
-  @UseInterceptors(FileInterceptor('avatar', { dest: 'apps/api/uploads/users' }))
+  @UseInterceptors(FileInterceptor('avatar', { dest: 'uploads/users' }))
   async create(
     @CurrentUser() user: any,
     @Body() createUserDto: CreateUserDto,
@@ -170,7 +170,7 @@ export class UsersController {
   @Patch(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
-  @UseInterceptors(FileInterceptor('avatar', { dest: 'apps/api/uploads/users' }))
+  @UseInterceptors(FileInterceptor('avatar', { dest: 'uploads/users' }))
   update(
     @Param('id') id: string,
     @Body() updateUserDto: UpdateUserDto,
