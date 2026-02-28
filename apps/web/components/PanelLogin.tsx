@@ -528,7 +528,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         <div className="login-card">
           <div className="logo-container">
             <div className="logo">
-              <Image src="/logo-nexara.png" alt="Nexara" width={64} height={64} className="logoImage" />
+              <img src="/logo-nexara.png" alt="Nexara" width={64} height={64} className="logoImage" />
             </div>
             <p className="brandName">Nexara</p>
             <h1 className="title">{title || "Iniciar sesion"}</h1>

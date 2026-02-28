@@ -478,7 +478,7 @@ export default function LoginPage() {
         <div className="login-card">
           <div className="logo-container">
             <div className="logo">
-              <Image src="/logo-nexara.png" alt="Nexara" width={64} height={64} className="logoImage" />
+              <img src="/logo-nexara.png" alt="Nexara" width={64} height={64} className="logoImage" />
             </div>
             <p className="brandName">Nexara</p>
             <h1 className="title">Iniciar sesión</h1>
