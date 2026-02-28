@@ -29,6 +29,14 @@ const MyToolsTable: React.FC = () => {
   const [newReturnDate, setNewReturnDate] = useState('');
   const [renewalReason, setRenewalReason] = useState('');
   const [renewalLoading, setRenewalLoading] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth <= 900);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
@@ -173,81 +181,194 @@ const MyToolsTable: React.FC = () => {
             No tienes herramientas solicitadas aún
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--muted)' }}>
-                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                    Herramienta
-                  </th>
-                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                    Modelo/Serie
-                  </th>
-                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                    Estado
-                  </th>
-                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                    Devolución
-                  </th>
-                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                    Renovaciones
-                  </th>
-                  <th style={{ padding: 12, textAlign: 'center', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
+          <>
+            {/* Vista Desktop - Tabla */}
+            {!isMobile && (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 800 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--muted)' }}>
+                      <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        Herramienta
+                      </th>
+                      <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        Modelo/Serie
+                      </th>
+                      <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        Estado
+                      </th>
+                      <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        Devolución
+                      </th>
+                      <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        Renovaciones
+                      </th>
+                      <th style={{ padding: 12, textAlign: 'center', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        Acciones
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tools.map((tool) => (
+                      <tr key={tool.id} style={{ borderBottom: '1px solid var(--muted)' }}>
+                        <td style={{ padding: 12 }}>
+                          <div style={{ fontWeight: 500 }}>{tool.toolName}</div>
+                          <div style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
+                            {tool.reason.substring(0, 50)}...
+                          </div>
+                        </td>
+                        <td style={{ padding: 12, color: 'var(--text-secondary)', fontSize: 12 }}>
+                          {tool.model} / {tool.serialNumber}
+                        </td>
+                        <td style={{ padding: 12 }}>
+                          <div
+                            style={{
+                              display: 'inline-block',
+                              padding: '4px 8px',
+                              borderRadius: 4,
+                              background: getStatusColor(tool.status) + '20',
+                              color: getStatusColor(tool.status),
+                              fontWeight: 500,
+                              fontSize: 11,
+                            }}
+                          >
+                            {getStatusLabel(tool.status)}
+                          </div>
+                        </td>
+                        <td style={{ padding: 12, color: 'var(--text-secondary)', fontSize: 12 }}>
+                          {new Date(tool.expectedReturnDate).toLocaleDateString('es-MX')}
+                        </td>
+                        <td style={{ padding: 12, textAlign: 'center', fontWeight: 500 }}>
+                          {tool.renewalCount}
+                        </td>
+                        <td style={{ padding: 12, textAlign: 'center' }}>
+                          {canRenew(tool) ? (
+                            <button
+                              className="button-secondary"
+                              onClick={() => openRenewalModal(tool.id)}
+                              style={{ padding: '4px 8px', fontSize: 11 }}
+                            >
+                              ↻ Renovar
+                            </button>
+                          ) : (
+                            <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Vista Móvil - Cards */}
+            {isMobile && (
+              <div style={{ display: 'grid', gap: 16 }}>
                 {tools.map((tool) => (
-                  <tr key={tool.id} style={{ borderBottom: '1px solid var(--muted)' }}>
-                    <td style={{ padding: 12 }}>
-                      <div style={{ fontWeight: 500 }}>{tool.toolName}</div>
-                      <div style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
-                        {tool.reason.substring(0, 50)}...
+                  <div
+                    key={tool.id}
+                    style={{
+                      padding: 16,
+                      borderRadius: 12,
+                      background: 'var(--surface-light)',
+                      border: '1px solid var(--border)',
+                      display: 'grid',
+                      gap: 12
+                    }}
+                  >
+                    {/* Header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>
+                          {tool.toolName}
+                        </div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                          {tool.model} • {tool.serialNumber}
+                        </div>
                       </div>
-                    </td>
-                    <td style={{ padding: 12, color: 'var(--text-secondary)', fontSize: 12 }}>
-                      {tool.model} / {tool.serialNumber}
-                    </td>
-                    <td style={{ padding: 12 }}>
                       <div
                         style={{
-                          display: 'inline-block',
-                          padding: '4px 8px',
-                          borderRadius: 4,
+                          padding: '6px 10px',
+                          borderRadius: 6,
                           background: getStatusColor(tool.status) + '20',
                           color: getStatusColor(tool.status),
-                          fontWeight: 500,
+                          fontWeight: 600,
                           fontSize: 11,
+                          whiteSpace: 'nowrap'
                         }}
                       >
                         {getStatusLabel(tool.status)}
                       </div>
-                    </td>
-                    <td style={{ padding: 12, color: 'var(--text-secondary)', fontSize: 12 }}>
-                      {new Date(tool.expectedReturnDate).toLocaleDateString('es-MX')}
-                    </td>
-                    <td style={{ padding: 12, textAlign: 'center', fontWeight: 500 }}>
-                      {tool.renewalCount}
-                    </td>
-                    <td style={{ padding: 12, textAlign: 'center' }}>
-                      {canRenew(tool) ? (
-                        <button
-                          className="button-secondary"
-                          onClick={() => openRenewalModal(tool.id)}
-                          style={{ padding: '4px 8px', fontSize: 11 }}
-                        >
-                          ↻ Renovar
-                        </button>
-                      ) : (
-                        <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>—</span>
-                      )}
-                    </td>
-                  </tr>
+                    </div>
+
+                    {/* Motivo */}
+                    <div style={{ 
+                      padding: 10, 
+                      borderRadius: 8, 
+                      background: 'var(--surface)',
+                      border: '1px solid var(--border)',
+                      fontSize: 12
+                    }}>
+                      <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--text-secondary)' }}>Motivo</div>
+                      <div>{tool.reason}</div>
+                    </div>
+
+                    {/* Info Grid */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 13 }}>
+                      <div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginBottom: 2 }}>Fecha Inicio</div>
+                        <div style={{ fontWeight: 500 }}>
+                          {new Date(tool.startDate).toLocaleDateString('es-MX', { 
+                            day: '2-digit', 
+                            month: 'short',
+                            year: 'numeric'
+                          })}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginBottom: 2 }}>Devolución</div>
+                        <div style={{ fontWeight: 500 }}>
+                          {new Date(tool.expectedReturnDate).toLocaleDateString('es-MX', { 
+                            day: '2-digit', 
+                            month: 'short',
+                            year: 'numeric'
+                          })}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginBottom: 2 }}>Renovaciones</div>
+                        <div style={{ fontWeight: 600, color: 'var(--primary)' }}>
+                          {tool.renewalCount}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginBottom: 2 }}>Solicitud</div>
+                        <div style={{ fontWeight: 500, fontSize: 12 }}>
+                          {new Date(tool.requestDate).toLocaleDateString('es-MX')}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    {canRenew(tool) && (
+                      <button
+                        className="button-secondary"
+                        onClick={() => openRenewalModal(tool.id)}
+                        style={{ 
+                          width: '100%',
+                          padding: '10px 16px', 
+                          fontSize: 13,
+                          marginTop: 4
+                        }}
+                      >
+                        ↻ Solicitar Renovación
+                      </button>
+                    )}
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 

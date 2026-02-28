@@ -29,6 +29,14 @@ const MyVehiclesTable: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [renewalDrafts, setRenewalDrafts] = useState<Record<number, { inicio: string; fin: string }>>({});
   const [deliveryDrafts, setDeliveryDrafts] = useState<Record<number, File[]>>({});
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth <= 900);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
@@ -144,129 +152,270 @@ const MyVehiclesTable: React.FC = () => {
   return (
     <div className="card">
       <h2 style={{ color: 'var(--primary)', marginBottom: 12 }}>Mis solicitudes de vehiculo</h2>
-      {requests.length === 0 && (
-        <div style={{ color: 'var(--text-secondary)' }}>Aun no tienes solicitudes registradas.</div>
-      )}
-      {requests.map((request) => (
-        <div key={request.id} className="card" style={{ marginBottom: 12, background: 'var(--surface-light)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-            <div>
-              <strong>{request.vehiculo?.nombre || request.nombreVehiculo || 'Vehiculo'}</strong>
-              <div style={{ color: 'var(--text-secondary)' }}>{request.placasVehiculo || request.vehiculo?.placas || '-'}</div>
-            </div>
-            <div>
-              <span className={`badge ${request.estatusAprobacion === 'Aprobado' ? 'approved' : request.estatusAprobacion === 'Pendiente' ? 'pending' : request.estatusAprobacion === 'Rechazado' ? 'rejected' : ''}`}>
-                {request.estatusAprobacion}
-              </span>
-              {request.renovacionEstatus && (
-                <span className={`badge ${request.renovacionEstatus === 'Aprobada' ? 'approved' : request.renovacionEstatus === 'Pendiente' ? 'pending' : 'rejected'}`}>
-                  Renovacion {request.renovacionEstatus}
-                </span>
+      
+      {requests.length === 0 ? (
+        <div style={{ color: 'var(--text-secondary)', padding: 24, textAlign: 'center' }}>
+          Aun no tienes solicitudes registradas.
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: 16 }}>
+          {requests.map((request) => (
+            <div 
+              key={request.id} 
+              className="card" 
+              style={{ 
+                marginBottom: 0,
+                background: 'var(--surface-light)',
+                border: '1px solid var(--border)'
+              }}
+            >
+              {/* Header */}
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                gap: 12, 
+                flexWrap: 'wrap',
+                paddingBottom: 12,
+                borderBottom: '1px solid var(--border)',
+                marginBottom: 12
+              }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>
+                    {request.vehiculo?.nombre || request.nombreVehiculo || 'Vehiculo'}
+                  </div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
+                    {request.placasVehiculo || request.vehiculo?.placas || 'Sin placas'}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 6, alignItems: 'flex-end' }}>
+                  <span className={`badge ${request.estatusAprobacion === 'Aprobado' ? 'approved' : request.estatusAprobacion === 'Pendiente' ? 'pending' : request.estatusAprobacion === 'Rechazado' ? 'rejected' : ''}`}>
+                    {request.estatusAprobacion}
+                  </span>
+                  {request.renovacionEstatus && (
+                    <span className={`badge ${request.renovacionEstatus === 'Aprobada' ? 'approved' : request.renovacionEstatus === 'Pendiente' ? 'pending' : 'rejected'}`}>
+                      Renovacion {request.renovacionEstatus}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Info Grid */}
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))', 
+                gap: 16, 
+                marginBottom: 16 
+              }}>
+                <div style={{ 
+                  padding: 12, 
+                  borderRadius: 8, 
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)'
+                }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginBottom: 6, fontWeight: 600 }}>
+                    📅 Periodo solicitado
+                  </div>
+                  <div style={{ fontSize: 13, marginBottom: 2 }}>{formatDateTime(request.fechaInicioSolicitada)}</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{formatDateTime(request.fechaFinSolicitada)}</div>
+                </div>
+                
+                <div style={{ 
+                  padding: 12, 
+                  borderRadius: 8, 
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)'
+                }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginBottom: 6, fontWeight: 600 }}>
+                    ✅ Periodo aprobado
+                  </div>
+                  <div style={{ fontSize: 13, marginBottom: 2 }}>{formatDateTime(request.fechaInicioAprobada)}</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{formatDateTime(request.fechaFinAprobada)}</div>
+                </div>
+                
+                <div style={{ 
+                  padding: 12, 
+                  borderRadius: 8, 
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)'
+                }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginBottom: 6, fontWeight: 600 }}>
+                    📦 Entrega
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>
+                    {request.entregaEstatus || 'Pendiente'}
+                  </div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                    {Array.isArray(request.entregaFotos) ? `${request.entregaFotos.length} foto(s)` : 'Sin fotos'}
+                  </div>
+                </div>
+                
+                <div style={{ 
+                  padding: 12, 
+                  borderRadius: 8, 
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)'
+                }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginBottom: 6, fontWeight: 600 }}>
+                    💰 Penalizacion
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2, color: request.penalizacionMonto ? 'var(--danger)' : 'var(--text-primary)' }}>
+                    {request.penalizacionMonto ? `$${request.penalizacionMonto}` : 'Sin penalizacion'}
+                  </div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
+                    {request.penalizacionNotas || '-'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Fotos de entrega */}
+              {Array.isArray(request.entregaFotos) && request.entregaFotos.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>
+                    Evidencias de entrega
+                  </div>
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: isMobile ? 'repeat(auto-fill, minmax(80px, 1fr))' : 'repeat(auto-fill, minmax(100px, 1fr))',
+                    gap: 8
+                  }}>
+                    {request.entregaFotos.map((foto, index) => (
+                      <img
+                        key={`${request.id}-foto-${index}`}
+                        src={foto}
+                        alt={`Entrega ${index + 1}`}
+                        style={{
+                          width: '100%',
+                          aspectRatio: '1',
+                          objectFit: 'cover',
+                          borderRadius: 10,
+                          border: '1px solid var(--muted)',
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => window.open(foto, '_blank')}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Acciones - Solo si está aprobado */}
+              {request.estatusAprobacion === 'Aprobado' && (
+                <div style={{ 
+                  display: 'grid', 
+                  gap: 16, 
+                  paddingTop: 16, 
+                  borderTop: '1px solid var(--border)' 
+                }}>
+                  {/* Evidencia de entrega */}
+                  <div style={{ 
+                    padding: 12, 
+                    borderRadius: 8, 
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)'
+                  }}>
+                    <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>
+                      📸 Subir evidencia de entrega
+                    </div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginBottom: 8 }}>
+                      Minimo 5 fotos del estado del vehiculo
+                    </div>
+                    <input
+                      className="input"
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={(event) => handleDeliverySelect(request.id, Array.from(event.target.files || []))}
+                      style={{ marginBottom: 8, fontSize: 13 }}
+                    />
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 12, marginBottom: 10 }}>
+                      {deliveryDrafts[request.id]?.length ? `${deliveryDrafts[request.id].length} archivo(s) seleccionados` : ''}
+                    </div>
+                    <button
+                      className="button-primary"
+                      style={{ width: isMobile ? '100%' : 'auto', padding: '10px 16px', fontSize: 13 }}
+                      disabled={actionLoading === request.id}
+                      onClick={() => handleSubmitDelivery(request.id)}
+                    >
+                      {actionLoading === request.id ? '⏳ Subiendo...' : '✓ Subir evidencia'}
+                    </button>
+                  </div>
+
+                  {/* Solicitar renovacion */}
+                  <div style={{ 
+                    padding: 12, 
+                    borderRadius: 8, 
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)'
+                  }}>
+                    <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>
+                      🔄 Solicitar renovacion
+                    </div>
+                    <div style={{ 
+                      display: 'grid', 
+                      gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+                      gap: 8, 
+                      marginBottom: 10 
+                    }}>
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4, display: 'block' }}>
+                          Fecha inicio
+                        </label>
+                        <input
+                          className="input"
+                          type="datetime-local"
+                          value={renewalDrafts[request.id]?.inicio || ''}
+                          onChange={(event) => setRenewalDrafts((prev) => ({
+                            ...prev,
+                            [request.id]: { ...prev[request.id], inicio: event.target.value },
+                          }))}
+                          style={{ fontSize: 13 }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4, display: 'block' }}>
+                          Fecha fin
+                        </label>
+                        <input
+                          className="input"
+                          type="datetime-local"
+                          value={renewalDrafts[request.id]?.fin || ''}
+                          onChange={(event) => setRenewalDrafts((prev) => ({
+                            ...prev,
+                            [request.id]: { ...prev[request.id], fin: event.target.value },
+                          }))}
+                          style={{ fontSize: 13 }}
+                        />
+                      </div>
+                    </div>
+                    <button
+                      className="button-secondary"
+                      style={{ width: isMobile ? '100%' : 'auto', padding: '10px 16px', fontSize: 13 }}
+                      disabled={actionLoading === request.id}
+                      onClick={() => handleRenewalRequest(request.id)}
+                    >
+                      {actionLoading === request.id ? '⏳ Enviando...' : '↻ Solicitar renovacion'}
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 12 }}>
-            <div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Periodo solicitado</div>
-              <div>{formatDateTime(request.fechaInicioSolicitada)}</div>
-              <div style={{ color: 'var(--text-secondary)' }}>{formatDateTime(request.fechaFinSolicitada)}</div>
-            </div>
-            <div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Periodo aprobado</div>
-              <div>{formatDateTime(request.fechaInicioAprobada)}</div>
-              <div style={{ color: 'var(--text-secondary)' }}>{formatDateTime(request.fechaFinAprobada)}</div>
-            </div>
-            <div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Entrega</div>
-              <div>{request.entregaEstatus || 'Pendiente'}</div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-                {Array.isArray(request.entregaFotos) ? `${request.entregaFotos.length} foto(s)` : 'Sin fotos'}
-              </div>
-            </div>
-            <div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Penalizacion</div>
-              <div>{request.penalizacionMonto ? `$${request.penalizacionMonto}` : '-'}</div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-                {request.penalizacionNotas || 'Sin notas'}
-              </div>
-            </div>
-          </div>
-          {Array.isArray(request.entregaFotos) && request.entregaFotos.length > 0 && (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-              {request.entregaFotos.map((foto, index) => (
-                <img
-                  key={`${request.id}-foto-${index}`}
-                  src={foto}
-                  alt={`Entrega ${index + 1}`}
-                  style={{
-                    width: 72,
-                    height: 72,
-                    objectFit: 'cover',
-                    borderRadius: 10,
-                    border: '1px solid var(--muted)',
-                  }}
-                />
-              ))}
-            </div>
-          )}
-          {request.estatusAprobacion === 'Aprobado' && (
-            <div style={{ marginTop: 12, display: 'grid', gap: 12 }}>
-              <div>
-                <div style={{ color: 'var(--text-secondary)', marginBottom: 6 }}>Evidencia de entrega (minimo 5 fotos)</div>
-                <input
-                  className="input"
-                  type="file"
-                  multiple
-                  onChange={(event) => handleDeliverySelect(request.id, Array.from(event.target.files || []))}
-                />
-                <div style={{ color: 'var(--text-secondary)', fontSize: 12, marginTop: 6 }}>
-                  {deliveryDrafts[request.id]?.length ? `${deliveryDrafts[request.id].length} archivo(s) seleccionados` : ''}
-                </div>
-                <button
-                  className="button-primary"
-                  style={{ marginTop: 8 }}
-                  disabled={actionLoading === request.id}
-                  onClick={() => handleSubmitDelivery(request.id)}
-                >
-                  {actionLoading === request.id ? 'Subiendo...' : 'Subir evidencia'}
-                </button>
-              </div>
-              <div>
-                <div style={{ color: 'var(--text-secondary)', marginBottom: 6 }}>Solicitar renovacion</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
-                  <input
-                    className="input"
-                    type="datetime-local"
-                    value={renewalDrafts[request.id]?.inicio || ''}
-                    onChange={(event) => setRenewalDrafts((prev) => ({
-                      ...prev,
-                      [request.id]: { ...prev[request.id], inicio: event.target.value },
-                    }))}
-                  />
-                  <input
-                    className="input"
-                    type="datetime-local"
-                    value={renewalDrafts[request.id]?.fin || ''}
-                    onChange={(event) => setRenewalDrafts((prev) => ({
-                      ...prev,
-                      [request.id]: { ...prev[request.id], fin: event.target.value },
-                    }))}
-                  />
-                </div>
-                <button
-                  className="button-secondary"
-                  style={{ marginTop: 8 }}
-                  disabled={actionLoading === request.id}
-                  onClick={() => handleRenewalRequest(request.id)}
-                >
-                  {actionLoading === request.id ? 'Enviando...' : 'Solicitar renovacion'}
-                </button>
-              </div>
-            </div>
-          )}
+          ))}
         </div>
-      ))}
-      {error && <div style={{ color: 'var(--danger)', marginTop: 8 }}>{error}</div>}
+      )}
+      
+      {error && (
+        <div style={{ 
+          color: 'var(--danger)', 
+          marginTop: 16, 
+          padding: 12, 
+          borderRadius: 8, 
+          background: 'var(--danger)10',
+          border: '1px solid var(--danger)30',
+          fontSize: 13
+        }}>
+          {error}
+        </div>
+      )}
     </div>
   );
 };
