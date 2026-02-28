@@ -389,7 +389,7 @@ export default function UserForm({
           </button>
         )}
         <input type="file" accept="image/*" ref={fileInput} style={{ display: "none" }} onChange={handleFileChange} />
-        <Modal open={cropModal} onClose={() => setCropModal(false)}>
+        <Modal open={cropModal} onClose={() => setCropModal(false)} sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '20px', overflow: 'auto' }}>
           <div className="cropModal">
             <Cropper
               image={cropImage || undefined}
@@ -600,19 +600,19 @@ export default function UserForm({
           border-radius: 16px;
           max-width: 420px;
           width: 90vw;
-          max-height: 80vh;
-          margin: auto;
+          max-height: 90vh;
           position: relative;
           box-shadow: 0 24px 40px rgba(0, 0, 0, 0.35);
           display: flex;
           flex-direction: column;
-          overflow: hidden;
+          overflow: auto;
+          margin: 20px auto;
         }
 
         .cropModal > div:first-child {
           flex-shrink: 0;
           position: relative;
-          height: 320px;
+          height: 240px;
           width: 100%;
           overflow: hidden;
           border-radius: 12px;
@@ -645,12 +645,13 @@ export default function UserForm({
           .cropModal {
             padding: 16px;
             width: 95vw;
-            max-height: 85vh;
+            max-height: 90vh;
             border-radius: 14px;
+            margin: 16px auto;
           }
 
           .cropModal > div:first-child {
-            height: 280px;
+            height: 220px;
             margin-bottom: 12px;
             border-radius: 10px;
           }
