@@ -6,12 +6,45 @@ import { useUser } from '@/components/UserContext';
 import { useTheme } from '@/components/ThemeContext';
 import Image from "next/image";
 import { hasAnyPermission, hasPermission, PERMISSIONS } from '@/lib/permissions';
+import { useEffect, useState } from "react";
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { user } = useUser();
   const { darkMode, toggleDarkMode } = useTheme();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   if (!user) return null;
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth <= 900);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    document.body.style.overflow = isMenuOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMenuOpen, isMobile]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    setIsMenuOpen(false);
+  }, [pathname, isMobile]);
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isMenuOpen) setIsMenuOpen(false);
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [isMenuOpen]);
+
+  const closeMenu = () => setIsMenuOpen(false);
 
   // Menú por permisos
   const menu = [
@@ -37,11 +70,30 @@ export default function Sidebar() {
   const avatarUrl = user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nombre)}&background=0D8ABC&color=fff&size=96`;
 
   return (
-    <aside className={styles.sidebar}>
-      <div className={styles.sidebarLogo}>
-        <span className={styles.brandMark}>NEXARA</span>
-        <span className={styles.brandSub}>Console</span>
+    <aside className={`${styles.sidebar} ${isMenuOpen && isMobile ? styles.sidebarOpen : ''}`}>
+      <div className={styles.sidebarHeader}>
+        <div className={styles.sidebarLogo}>
+          <span className={styles.brandMark}>NEXARA</span>
+          <span className={styles.brandSub}>Console</span>
+        </div>
+        {isMobile && (
+          <button
+            className={`${styles.hamburgerButton} ${isMenuOpen ? styles.hamburgerActive : ''}`}
+            onClick={() => setIsMenuOpen((prev) => !prev)}
+            aria-label={isMenuOpen ? "Cerrar menú" : "Abrir menú"}
+            aria-expanded={isMenuOpen}
+            aria-controls="sidebar-menu"
+          >
+            <span className={styles.hamburgerLine}></span>
+            <span className={styles.hamburgerLine}></span>
+            <span className={styles.hamburgerLine}></span>
+          </button>
+        )}
       </div>
+
+      {isMobile && isMenuOpen && <div className={styles.sidebarOverlay} onClick={closeMenu} role="presentation" />}
+
+      <div className={styles.sidebarContent} id="sidebar-menu">
       <div className={styles.sidebarUser}>
         <div className={styles.sidebarAvatar}>
           <Image className={styles.avatarImage} src={avatarUrl} alt={user.nombre} width={64} height={64} />
@@ -73,30 +125,24 @@ export default function Sidebar() {
                   ? `${styles.menuLink} ${styles.active}`
                   : styles.menuLink
               }
+              onClick={closeMenu}
             >
               {item.label}
             </Link>
           </li>
         ))}
       </ul>
-      <div style={{ padding: '1rem', marginTop: 'auto', borderTop: '1px solid var(--border-color)' }}>
+      <div className={styles.sidebarFooter}>
         <button
           onClick={toggleDarkMode}
-          style={{
-            width: '100%',
-            padding: '0.75rem',
-            borderRadius: '8px',
-            border: 'none',
-            background: 'var(--card-bg)',
-            color: 'var(--text-color)',
-            cursor: 'pointer',
-            fontSize: '1.5rem',
-            transition: 'all 0.2s ease',
-          }}
+          className={styles.themeSwitcher}
           aria-label={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+          title={darkMode ? 'Modo claro' : 'Modo oscuro'}
         >
-          {darkMode ? '🌙' : '☀️'}
+          <span className={styles.themeIcon}>{darkMode ? '🌙' : '☀️'}</span>
+          <span className={styles.themeLabel}>{darkMode ? 'Oscuro' : 'Claro'}</span>
         </button>
+      </div>
       </div>
     </aside>
   );

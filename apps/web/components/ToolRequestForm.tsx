@@ -436,7 +436,7 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
             style={{
               width: '100%',
               maxWidth: '100vw',
-              maxHeight: '95vh',
+              maxHeight: 'calc(100dvh - 16px)',
               background: 'linear-gradient(135deg, rgba(20,26,38,0.98), rgba(11,16,28,0.98))',
               border: '2px solid rgba(31,137,252,0.35)',
               borderRadius: '20px',
@@ -506,7 +506,7 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  minHeight: '200px',
+                  minHeight: 'min(56vh, 380px)',
                 }}
               >
                 {/* Grid overlay for composition */}
@@ -549,6 +549,8 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
                     color: 'rgba(207,224,255,0.95)',
                     cursor: 'pointer',
                     transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                    minHeight: 52,
+                    touchAction: 'manipulation',
                   }}
                   onMouseEnter={(e) => {
                     const el = e.currentTarget as HTMLElement;
@@ -581,6 +583,8 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
                     color: 'rgba(207,224,255,0.9)',
                     cursor: 'pointer',
                     transition: 'all 0.3s ease',
+                    minHeight: 52,
+                    touchAction: 'manipulation',
                   }}
                   onMouseEnter={(e) => {
                     const el = e.currentTarget as HTMLElement;
@@ -612,6 +616,8 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
                     cursor: 'pointer',
                     transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
                     gridColumn: 'span 1',
+                    minHeight: 52,
+                    touchAction: 'manipulation',
                   }}
                   onMouseEnter={(e) => {
                     const el = e.currentTarget as HTMLElement;

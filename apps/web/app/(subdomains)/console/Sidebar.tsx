@@ -38,6 +38,14 @@ export default function Sidebar() {
     return () => window.removeEventListener("keydown", handleEscape);
   }, [isMenuOpen]);
 
+  useEffect(() => {
+    if (!isMobile) return;
+    document.body.style.overflow = isMenuOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMenuOpen, isMobile]);
+
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
   };

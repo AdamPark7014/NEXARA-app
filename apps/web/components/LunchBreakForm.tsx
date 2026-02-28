@@ -16,24 +16,45 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cameraFacing, setCameraFacing] = useState<'user' | 'environment'>('user');
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
 
-  const initCamera = async () => {
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  };
+
+  const initCamera = async (facingMode: 'user' | 'environment' = cameraFacing) => {
+    stopCamera();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'user' },
+        video: { facingMode },
         audio: false,
       });
+      setCameraFacing(facingMode);
+      streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        await videoRef.current.play();
       }
     } catch (err) {
       setError('No se pudo acceder a la cámara. Verifica los permisos del navegador.');
     }
+  };
+
+  const flipCamera = async () => {
+    const nextFacing = cameraFacing === 'user' ? 'environment' : 'user';
+    await initCamera(nextFacing);
   };
 
   const capturePhoto = () => {
@@ -46,9 +67,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
             setPhoto(blob);
             setPhotoPreview(URL.createObjectURL(blob));
             setStep('confirmation');
-            // Detener la cámara
-            const stream = videoRef.current?.srcObject as MediaStream;
-            stream?.getTracks().forEach(track => track.stop());
+            stopCamera();
           }
         }, 'image/jpeg', 0.95);
       }
@@ -106,14 +125,19 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
 
   React.useEffect(() => {
     initializeNotifications();
-    initCamera();
+    initCamera('user');
+
+    return () => {
+      stopCamera();
+      if (photoPreview) URL.revokeObjectURL(photoPreview);
+    };
   }, []);
 
   const lunchStatus = isCheckin ? 'De Entrada a Comida' : 'De Regreso al Trabajo';
   const lunchEmoji = isCheckin ? '🍽️ Entrada' : '✅ Regreso';
 
   return (
-    <div className="card" style={{ maxWidth: 600, margin: '0 auto', padding: 24 }}>
+    <div className="card" style={{ maxWidth: 680, margin: '0 auto', padding: 'clamp(14px, 3vw, 24px)' }}>
       <h2 style={{ color: 'var(--primary)', marginBottom: 20, textAlign: 'center' }}>
         {lunchEmoji} - Hora de Comida
       </h2>
@@ -133,10 +157,12 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
               playsInline
               style={{
                 width: '100%',
-                height: 480,
-                borderRadius: 8,
+                height: 'min(58vh, 420px)',
+                borderRadius: 14,
                 background: '#000',
+                border: '1px solid rgba(31,137,252,0.18)',
                 marginBottom: 16,
+                objectFit: 'cover',
               }}
             />
 
@@ -149,13 +175,22 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
 
             {error && <div style={{ color: 'var(--danger)', marginBottom: 16 }}>{error}</div>}
 
-            <button
-              className="button-primary"
-              onClick={capturePhoto}
-              style={{ width: '100%' }}
-            >
-              📷 Capturar Foto
-            </button>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
+              <button
+                className="button-primary"
+                onClick={capturePhoto}
+                style={{ width: '100%', minHeight: 50, borderRadius: 12, fontWeight: 700, touchAction: 'manipulation' }}
+              >
+                📷 Capturar Foto
+              </button>
+              <button
+                className="button-secondary"
+                onClick={flipCamera}
+                style={{ width: '100%', minHeight: 50, borderRadius: 12, fontWeight: 700, touchAction: 'manipulation' }}
+              >
+                🔄 Voltear cámara
+              </button>
+            </div>
           </div>
         </>
       ) : (
@@ -171,18 +206,17 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
             <button
               className="button-secondary"
               onClick={() => {
                 setStep('camera');
                 setPhoto(null);
                 setPhotoPreview(null);
-                // Reiniciar cámara
-                setTimeout(initCamera, 100);
+                setTimeout(() => initCamera(cameraFacing), 100);
               }}
               disabled={loading}
-              style={{ flex: 1 }}
+              style={{ minHeight: 50, borderRadius: 12, fontWeight: 700, touchAction: 'manipulation' }}
             >
               ↻ Nueva Foto
             </button>
@@ -191,7 +225,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
               className="button-primary"
               onClick={handleSubmit}
               disabled={loading}
-              style={{ flex: 1 }}
+              style={{ minHeight: 50, borderRadius: 12, fontWeight: 700, touchAction: 'manipulation' }}
             >
               {loading ? 'Registrando...' : '✓ Confirmar'}
             </button>
