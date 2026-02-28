@@ -18,15 +18,21 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
   const [specificationsPhoto, setSpecificationsPhoto] = useState<File | null>(null);
   const [generalPhotoPreview, setGeneralPhotoPreview] = useState<string | null>(null);
   const [specificationsPhotoPreview, setSpecificationsPhotoPreview] = useState<string | null>(null);
+  const [photoStep, setPhotoStep] = useState<'general' | 'specifications' | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     return () => {
       if (generalPhotoPreview) URL.revokeObjectURL(generalPhotoPreview);
       if (specificationsPhotoPreview) URL.revokeObjectURL(specificationsPhotoPreview);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
     };
   }, [generalPhotoPreview, specificationsPhotoPreview]);
 
@@ -71,24 +77,70 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
     return true;
   };
 
-  const handlePhotoSelect = (type: 'general' | 'specifications', file: File | null) => {
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      setError('Solo se permiten imágenes');
-      return;
-    }
-
-    if (type === 'general') {
-      if (generalPhotoPreview) URL.revokeObjectURL(generalPhotoPreview);
-      setGeneralPhoto(file);
-      setGeneralPhotoPreview(URL.createObjectURL(file));
-    } else {
-      if (specificationsPhotoPreview) URL.revokeObjectURL(specificationsPhotoPreview);
-      setSpecificationsPhoto(file);
-      setSpecificationsPhotoPreview(URL.createObjectURL(file));
-    }
+  const startCamera = async (type: 'general' | 'specifications') => {
     setError(null);
+    setPhotoStep(type);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+    } catch {
+      setPhotoStep(null);
+      setError('No se pudo acceder a la cámara. Verifica permisos del navegador.');
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    setPhotoStep(null);
+  };
+
+  const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current || !photoStep) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const width = video.videoWidth || 1280;
+    const height = video.videoHeight || 720;
+    canvas.width = width;
+    canvas.height = height;
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+
+    context.drawImage(video, 0, 0, width, height);
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        setError('No se pudo capturar la foto. Intenta nuevamente.');
+        return;
+      }
+
+      const fileName = `${photoStep}-${Date.now()}.jpg`;
+      const file = new File([blob], fileName, { type: 'image/jpeg' });
+      const preview = URL.createObjectURL(file);
+
+      if (photoStep === 'general') {
+        if (generalPhotoPreview) URL.revokeObjectURL(generalPhotoPreview);
+        setGeneralPhoto(file);
+        setGeneralPhotoPreview(preview);
+      } else {
+        if (specificationsPhotoPreview) URL.revokeObjectURL(specificationsPhotoPreview);
+        setSpecificationsPhoto(file);
+        setSpecificationsPhotoPreview(preview);
+      }
+
+      stopCamera();
+      setError(null);
+    }, 'image/jpeg', 0.9);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -242,18 +294,12 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
             <button
               className="button-secondary"
               type="button"
-              onClick={() => fileInputRefs.current['general']?.click()}
+              onClick={() => startCamera('general')}
               style={{ justifySelf: 'center' }}
+              disabled={!!photoStep}
             >
-              {generalPhoto ? '📸 Cambiar foto' : '📸 Seleccionar foto'}
+              {generalPhoto ? '📷 Retomar foto' : '📷 Tomar foto'}
             </button>
-            <input
-              ref={(el) => { if (el) fileInputRefs.current['general'] = el; }}
-              type="file"
-              accept="image/*"
-              onChange={(e) => handlePhotoSelect('general', e.target.files?.[0] || null)}
-              style={{ display: 'none' }}
-            />
           </div>
           {generalPhotoPreview && (
             <div
@@ -296,18 +342,12 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
             <button
               className="button-secondary"
               type="button"
-              onClick={() => fileInputRefs.current['specifications']?.click()}
+              onClick={() => startCamera('specifications')}
               style={{ justifySelf: 'center' }}
+              disabled={!!photoStep}
             >
-              {specificationsPhoto ? '📸 Cambiar foto' : '📸 Seleccionar foto'}
+              {specificationsPhoto ? '📷 Retomar foto' : '📷 Tomar foto'}
             </button>
-            <input
-              ref={(el) => { if (el) fileInputRefs.current['specifications'] = el; }}
-              type="file"
-              accept="image/*"
-              onChange={(e) => handlePhotoSelect('specifications', e.target.files?.[0] || null)}
-              style={{ display: 'none' }}
-            />
           </div>
           {specificationsPhotoPreview && (
             <div
@@ -333,7 +373,7 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
       </div>
 
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button className="button-primary" type="submit" disabled={loading}>
+        <button className="button-primary" type="submit" disabled={loading || !!photoStep}>
           {loading ? 'Enviando...' : '✓ Solicitar Herramienta'}
         </button>
         <button
@@ -348,17 +388,77 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
             setExpectedReturnDate('');
             setGeneralPhoto(null);
             setSpecificationsPhoto(null);
+            if (generalPhotoPreview) URL.revokeObjectURL(generalPhotoPreview);
+            if (specificationsPhotoPreview) URL.revokeObjectURL(specificationsPhotoPreview);
             setGeneralPhotoPreview(null);
             setSpecificationsPhotoPreview(null);
+            stopCamera();
             setError(null);
             setSuccess(null);
           }}
+          disabled={!!photoStep}
         >
           Limpiar
         </button>
         {error && <span style={{ color: 'var(--danger)' }}>{error}</span>}
         {success && <span style={{ color: 'var(--accent)' }}>{success}</span>}
       </div>
+
+      {photoStep && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              width: 'min(900px, 100%)',
+              background: 'var(--surface)',
+              border: '1px solid var(--muted)',
+              borderRadius: 12,
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '12px 16px',
+                borderBottom: '1px solid var(--muted)',
+              }}
+            >
+              <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>
+                {photoStep === 'general'
+                  ? '📸 Toma una foto panorámica de la herramienta'
+                  : '📸 Toma una foto del modelo y número de serie'}
+              </h3>
+              <button className="button-secondary" type="button" onClick={stopCamera}>✕</button>
+            </div>
+
+            <div style={{ padding: 16, display: 'grid', gap: 12 }}>
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                style={{ width: '100%', maxHeight: '65vh', borderRadius: 10, background: '#000' }}
+              />
+              <canvas ref={canvasRef} style={{ display: 'none' }} />
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button className="button-secondary" type="button" onClick={stopCamera}>Cancelar</button>
+                <button className="button-primary" type="button" onClick={capturePhoto}>📷 Capturar foto</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 };
