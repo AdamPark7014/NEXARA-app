@@ -7,16 +7,20 @@ import { CreateUserDto } from './dto/create-user.dto.js';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { getUsersUploadDir, getUserDocsUploadDir } from '../common/upload-paths.js';
 
 @Controller('users')
 export class UsersController {
+  private readonly usersUploadDir = getUsersUploadDir(__dirname);
+  private readonly userDocsUploadDir = getUserDocsUploadDir(__dirname);
+
   constructor(private readonly usersService: UsersService) {}
 
   // CEO (100) puede crear cualquier usuario, Supervisor (50) solo staff (10) de su departamento
   @Post()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
-  @UseInterceptors(FileInterceptor('avatar', { dest: 'uploads/users' }))
+  @UseInterceptors(FileInterceptor('avatar', { dest: getUsersUploadDir(__dirname) }))
   async create(
     @CurrentUser() user: any,
     @Body() createUserDto: CreateUserDto,
@@ -96,7 +100,7 @@ export class UsersController {
   @Post('profile/me/documents')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
-  @UseInterceptors(FilesInterceptor('files', 10, { dest: 'apps/api/uploads/user-docs' }))
+  @UseInterceptors(FilesInterceptor('files', 10, { dest: getUserDocsUploadDir(__dirname) }))
   async uploadMyDocuments(
     @CurrentUser() user: any,
     @UploadedFiles() files: any[],
@@ -170,7 +174,7 @@ export class UsersController {
   @Patch(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
-  @UseInterceptors(FileInterceptor('avatar', { dest: 'uploads/users' }))
+  @UseInterceptors(FileInterceptor('avatar', { dest: getUsersUploadDir(__dirname) }))
   update(
     @Param('id') id: string,
     @Body() updateUserDto: UpdateUserDto,
