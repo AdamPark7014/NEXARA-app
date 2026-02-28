@@ -389,19 +389,21 @@ export default function UserForm({
           </button>
         )}
         <input type="file" accept="image/*" ref={fileInput} style={{ display: "none" }} onChange={handleFileChange} />
-        <Modal open={cropModal} onClose={() => setCropModal(false)} sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '20px', overflow: 'auto' }}>
+        <Modal open={cropModal} onClose={() => setCropModal(false)} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto' }}>
           <div className="cropModal">
-            <Cropper
-              image={cropImage || undefined}
-              crop={crop}
-              zoom={zoom}
-              aspect={1}
-              onCropChange={setCrop}
-              onZoomChange={setZoom}
-              onCropComplete={onCropComplete}
-              cropShape="round"
-              showGrid={false}
-            />
+            <div className="cropperContainer">
+              <Cropper
+                image={cropImage || undefined}
+                crop={crop}
+                zoom={zoom}
+                aspect={1}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onCropComplete={onCropComplete}
+                cropShape="round"
+                showGrid={false}
+              />
+            </div>
             <div style={{ margin: '16px 0' }}>
               <Slider
                 value={zoom}
@@ -607,9 +609,10 @@ export default function UserForm({
           flex-direction: column;
           gap: 0;
           margin: 0;
+          outline: none;
         }
 
-        .cropModal > div:first-child {
+        .cropperContainer {
           position: relative;
           width: 100%;
           height: 320px;
@@ -653,7 +656,7 @@ export default function UserForm({
             border-radius: 14px;
           }
 
-          .cropModal > div:first-child {
+          .cropperContainer {
             height: 280px;
             margin-bottom: 16px;
             border-radius: 10px;
