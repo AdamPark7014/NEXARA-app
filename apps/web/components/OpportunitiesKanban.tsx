@@ -21,13 +21,13 @@ interface OpportunitiesKanbanProps {
 }
 
 const STAGES = [
-  { id: 'DISCOVERY', label: '🔍 Descubrimiento', color: '#6c757d' },
-  { id: 'QUALIFICATION', label: '✅ Calificación', color: '#0dcaf0' },
-  { id: 'PROPOSAL', label: '📋 Propuesta', color: '#0d6efd' },
-  { id: 'NEGOTIATION', label: '💬 Negociación', color: '#ffc107' },
-  { id: 'CLOSING', label: '🎯 Cierre', color: '#198754' },
-  { id: 'WON', label: '🏆 Ganada', color: '#20c997' },
-  { id: 'LOST', label: '❌ Perdida', color: '#dc3545' },
+  { id: 'DISCOVERY', label: '🔍 Descubrimiento' },
+  { id: 'QUALIFICATION', label: '✅ Calificación' },
+  { id: 'PROPOSAL', label: '📋 Propuesta' },
+  { id: 'NEGOTIATION', label: '💬 Negociación' },
+  { id: 'CLOSING', label: '🎯 Cierre' },
+  { id: 'WON', label: '🏆 Ganada' },
+  { id: 'LOST', label: '❌ Perdida' },
 ];
 
 export default function OpportunitiesKanban({
@@ -169,7 +169,7 @@ export default function OpportunitiesKanban({
             onDragOver={handleDragOver}
             onDrop={(e) => handleDropOnStage(e, stage.id)}
           >
-            <div className={styles.columnHeader} style={{ borderColor: stage.color }}>
+            <div className={styles.columnHeader} data-stage={stage.id}>
               <h3 className={styles.columnTitle}>{stage.label}</h3>
               <div className={styles.columnMeta}>
                 <span className={styles.cardCount}>{opportunities[stage.id]?.length || 0}</span>
@@ -185,10 +185,10 @@ export default function OpportunitiesKanban({
                   draggable
                   onDragStart={(e) => handleDragStart(e, opp, stage.id)}
                   onClick={() => onSelectOpportunity?.(opp)}
-                  style={{ borderLeftColor: stage.color }}
+                  data-stage={stage.id}
                 >
                   {opp.expectedCloseDate && new Date(opp.expectedCloseDate).getTime() < Date.now() && stage.id !== 'WON' && stage.id !== 'LOST' && (
-                    <div style={{ fontSize: 11, color: '#dc3545', fontWeight: 600, marginBottom: 6 }}>
+                    <div className={styles.overdueAction}>
                       Próxima acción vencida
                     </div>
                   )}
