@@ -88,6 +88,29 @@ export class VentasService {
     return date;
   }
 
+  private normalizeDateTimeInput(value: string | Date | null | undefined, fieldName: string) {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+
+    if (value instanceof Date) {
+      if (Number.isNaN(value.getTime())) {
+        throw new BadRequestException(`Formato inválido para ${fieldName}. Usa fecha ISO-8601`);
+      }
+      return value;
+    }
+
+    const raw = String(value).trim();
+    if (!raw) return null;
+
+    const normalized = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T00:00:00.000Z` : raw;
+    const parsed = new Date(normalized);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException(`Formato inválido para ${fieldName}. Usa fecha ISO-8601`);
+    }
+
+    return parsed;
+  }
+
   private validateNextActionPlan(
     stage: string | undefined,
     description?: string | null,
@@ -334,7 +357,8 @@ export class VentasService {
   async createOpportunity(dto: CreateSalesOpportunityDto, user?: any) {
     const ownerId = this.resolveOwnerForWrite(dto.ownerId, user);
     const stage = dto.stage || 'DISCOVERY';
-    this.validateNextActionPlan(stage, dto.description, dto.expectedCloseDate);
+    const expectedCloseDate = this.normalizeDateTimeInput(dto.expectedCloseDate, 'expectedCloseDate');
+    this.validateNextActionPlan(stage, dto.description, expectedCloseDate);
     return this.prisma.salesOpportunity.create({
       data: {
         title: dto.title,
@@ -342,7 +366,7 @@ export class VentasService {
         stage,
         value: dto.value ?? 0,
         probability: dto.probability ?? 0,
-        expectedCloseDate: dto.expectedCloseDate || null,
+        expectedCloseDate: expectedCloseDate ?? null,
         clientId: dto.clientId ?? null,
         leadId: dto.leadId ?? null,
         ownerId,
@@ -374,7 +398,9 @@ export class VentasService {
     const ownerId = this.resolveOwnerForWrite(dto.ownerId, user, existing.ownerId);
     const mergedStage = dto.stage || existing.stage;
     const mergedDescription = dto.description ?? existing.description;
-    const mergedExpectedCloseDate = dto.expectedCloseDate ?? existing.expectedCloseDate;
+    const normalizedExpectedCloseDate = this.normalizeDateTimeInput(dto.expectedCloseDate, 'expectedCloseDate');
+    const normalizedClosedAt = this.normalizeDateTimeInput(dto.closedAt, 'closedAt');
+    const mergedExpectedCloseDate = normalizedExpectedCloseDate ?? existing.expectedCloseDate;
     this.validateNextActionPlan(mergedStage, mergedDescription, mergedExpectedCloseDate);
 
     return this.prisma.salesOpportunity.update({
@@ -385,8 +411,8 @@ export class VentasService {
         stage: dto.stage,
         value: dto.value,
         probability: dto.probability,
-        expectedCloseDate: dto.expectedCloseDate,
-        closedAt: dto.closedAt,
+        expectedCloseDate: normalizedExpectedCloseDate,
+        closedAt: normalizedClosedAt,
         clientId: dto.clientId,
         leadId: dto.leadId,
         ownerId,
