@@ -1528,8 +1528,10 @@ export class VentasService {
   async getExecutiveInsights(period: 'week' | 'month' | 'year', user?: any) {
     const startDate = this.getPeriodStart(period);
     const ownerFilter = !this.isSuperAdminUser(user) && user?.id ? { ownerId: user.id } : undefined;
+    const now = new Date();
+    const recentActivityStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    const [metrics, opportunities, auditEventsRaw, vendorStats] = await Promise.all([
+    const [metrics, opportunities, auditEventsRaw, vendorStats, notesActivity] = await Promise.all([
       this.getMetricsByPeriod(period, user),
       this.prisma.salesOpportunity.findMany({
         where: {
@@ -1542,6 +1544,8 @@ export class VentasService {
           value: true,
           probability: true,
           createdAt: true,
+          updatedAt: true,
+          ownerId: true,
           closedAt: true,
           expectedCloseDate: true,
           description: true,
@@ -1556,9 +1560,21 @@ export class VentasService {
         _count: { action: true },
       }),
       this.getVendorStatsByPeriod(period, user),
+      this.prisma.salesOpportunityNote.groupBy({
+        by: ['opportunityId'],
+        where: {
+          createdAt: { gte: recentActivityStart },
+          ...(ownerFilter ? { opportunity: ownerFilter } : {}),
+        },
+        _count: { opportunityId: true },
+      }),
     ]);
 
     const auditEvents = (auditEventsRaw ?? []) as Array<{ action: string; _count: { action: number } }>;
+    const notesByOpportunity = new Map<number, number>();
+    (notesActivity || []).forEach((entry: any) => {
+      notesByOpportunity.set(entry.opportunityId, Number(entry?._count?.opportunityId || 0));
+    });
 
     const stageDistribution = opportunities.reduce<Record<string, number>>((acc, opportunity) => {
       const key = opportunity.stage || 'UNKNOWN';
@@ -1587,7 +1603,6 @@ export class VentasService {
       : 0;
 
     const activeOpportunities = opportunities.filter((opportunity) => opportunity.stage !== 'WON' && opportunity.stage !== 'LOST');
-    const now = new Date();
 
     const pipelineAgingByStage = activeOpportunities.reduce<Record<string, { count: number; avgDays: number }>>((acc, opportunity) => {
       const key = opportunity.stage || 'UNKNOWN';
@@ -1622,9 +1637,69 @@ export class VentasService {
       return summary.length >= 10 && Boolean(due);
     }).length;
 
+    const staleOpportunities14d = activeOpportunities.filter((opportunity) => {
+      const ageFromUpdate = (now.getTime() - new Date(opportunity.updatedAt).getTime()) / (1000 * 60 * 60 * 24);
+      return ageFromUpdate > 14;
+    }).length;
+
+    const staleOpportunities30d = activeOpportunities.filter((opportunity) => {
+      const ageFromUpdate = (now.getTime() - new Date(opportunity.updatedAt).getTime()) / (1000 * 60 * 60 * 24);
+      return ageFromUpdate > 30;
+    }).length;
+
+    const opportunitiesWithoutRecentActivity = activeOpportunities.filter((opportunity) => {
+      const notesCount = notesByOpportunity.get(opportunity.id) || 0;
+      return notesCount === 0;
+    }).length;
+
+    const highValueLowProbability = activeOpportunities.filter((opportunity) => {
+      const value = Number(opportunity.value || 0);
+      const probability = Number(opportunity.probability || 0);
+      return value >= 100000 && probability < 30;
+    }).length;
+
+    const hygienePenalty =
+      overdueNextActions * 8 +
+      staleOpportunities14d * 4 +
+      opportunitiesWithoutRecentActivity * 3 +
+      highValueLowProbability * 2;
+    const hygieneScore = Math.max(0, Math.min(100, 100 - hygienePenalty));
+
     const actionPlanCoverage = activeOpportunities.length > 0
       ? (opportunitiesWithActionPlan / activeOpportunities.length) * 100
       : 100;
+
+    const commitForecast = activeOpportunities
+      .filter((opportunity) => Number(opportunity.probability || 0) >= 70)
+      .reduce((sum, opportunity) => sum + Number(opportunity.value || 0), 0);
+
+    const bestCaseForecast = activeOpportunities
+      .reduce((sum, opportunity) => {
+        const value = Number(opportunity.value || 0);
+        const probability = Math.max(Number(opportunity.probability || 0), 60);
+        return sum + value * (probability / 100);
+      }, 0);
+
+    const worstCaseForecast = activeOpportunities
+      .reduce((sum, opportunity) => {
+        const value = Number(opportunity.value || 0);
+        const probability = Math.min(Number(opportunity.probability || 0), 35);
+        return sum + value * (probability / 100);
+      }, 0);
+
+    const avgTouchesPerOpportunity = activeOpportunities.length > 0
+      ? activeOpportunities.reduce((sum, opportunity) => sum + (notesByOpportunity.get(opportunity.id) || 0), 0) / activeOpportunities.length
+      : 0;
+
+    const repRiskSummary = (vendorStats || []).reduce(
+      (acc: { onTrack: number; risk: number; offTrack: number }, vendor: any) => {
+        if (vendor.status === 'on-track') acc.onTrack += 1;
+        else if (vendor.status === 'risk') acc.risk += 1;
+        else acc.offTrack += 1;
+        return acc;
+      },
+      { onTrack: 0, risk: 0, offTrack: 0 },
+    );
 
     const riskAlerts: Array<{ level: 'high' | 'medium' | 'low'; message: string }> = [];
     if (forecastCoverage < 60) {
@@ -1652,6 +1727,9 @@ export class VentasService {
       forecast: {
         weightedForecast: Number(weightedForecast.toFixed(2)),
         forecastCoverage: Number(forecastCoverage.toFixed(2)),
+        commitForecast: Number(commitForecast.toFixed(2)),
+        bestCaseForecast: Number(bestCaseForecast.toFixed(2)),
+        worstCaseForecast: Number(worstCaseForecast.toFixed(2)),
       },
       efficiency: {
         avgCycleDays: Number(avgCycleDays.toFixed(2)),
@@ -1673,12 +1751,153 @@ export class VentasService {
         actionPlanCoverage: Number(actionPlanCoverage.toFixed(2)),
         overdueNextActions,
       },
+      pipelineHygiene: {
+        score: Number(hygieneScore.toFixed(0)),
+        staleOpportunities14d,
+        staleOpportunities30d,
+        opportunitiesWithoutRecentActivity,
+        highValueLowProbability,
+      },
+      cadenceExecution: {
+        opportunitiesWithoutRecentActivity,
+        avgTouchesPerOpportunity: Number(avgTouchesPerOpportunity.toFixed(2)),
+      },
+      repRiskSummary,
       vendorStatus,
       riskAlerts,
       topActions: auditEvents
         .map((entry) => ({ action: entry.action, count: entry._count.action }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 8),
+    };
+  }
+
+  async getManagerCockpit(period: 'week' | 'month' | 'year', user?: any) {
+    const startDate = this.getPeriodStart(period);
+    const ownerFilter = !this.isSuperAdminUser(user) && user?.id ? { ownerId: user.id } : undefined;
+    const now = new Date();
+    const recentActivityStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    const [opportunities, vendorStats, notesActivity] = await Promise.all([
+      this.prisma.salesOpportunity.findMany({
+        where: {
+          createdAt: { gte: startDate },
+          ...(ownerFilter || {}),
+        },
+        select: {
+          id: true,
+          title: true,
+          stage: true,
+          value: true,
+          probability: true,
+          ownerId: true,
+          expectedCloseDate: true,
+          updatedAt: true,
+          description: true,
+        },
+      }),
+      this.getVendorStatsByPeriod(period, user),
+      this.prisma.salesOpportunityNote.groupBy({
+        by: ['opportunityId'],
+        where: {
+          createdAt: { gte: recentActivityStart },
+          ...(ownerFilter ? { opportunity: ownerFilter } : {}),
+        },
+        _count: { opportunityId: true },
+      }),
+    ]);
+
+    const vendorMap = new Map<number, string>();
+    (vendorStats || []).forEach((vendor: any) => {
+      vendorMap.set(Number(vendor.userId), vendor.userName || `Vendedor ${vendor.userId}`);
+    });
+
+    const notesByOpportunity = new Map<number, number>();
+    (notesActivity || []).forEach((entry: any) => {
+      notesByOpportunity.set(entry.opportunityId, Number(entry?._count?.opportunityId || 0));
+    });
+
+    const activeOpportunities = opportunities.filter((opportunity) => opportunity.stage !== 'WON' && opportunity.stage !== 'LOST');
+
+    const coachingPriorities = activeOpportunities
+      .map((opportunity) => {
+        const due = this.toDate(opportunity.expectedCloseDate);
+        const overdue = Boolean(due && due.getTime() < now.getTime());
+        const staleDays = (now.getTime() - new Date(opportunity.updatedAt).getTime()) / (1000 * 60 * 60 * 24);
+        const withoutRecentActivity = (notesByOpportunity.get(opportunity.id) || 0) === 0;
+        const lowProbabilityHighValue = Number(opportunity.value || 0) >= 100000 && Number(opportunity.probability || 0) < 30;
+
+        let riskScore = 0;
+        if (overdue) riskScore += 50;
+        if (staleDays > 14) riskScore += 30;
+        if (withoutRecentActivity) riskScore += 20;
+        if (lowProbabilityHighValue) riskScore += 10;
+
+        return {
+          opportunityId: opportunity.id,
+          title: opportunity.title,
+          ownerId: opportunity.ownerId,
+          ownerName: vendorMap.get(Number(opportunity.ownerId || 0)) || 'Sin asignar',
+          stage: opportunity.stage,
+          value: Number(opportunity.value || 0),
+          riskScore,
+          overdue,
+          staleDays: Number(staleDays.toFixed(1)),
+          withoutRecentActivity,
+          recommendation: overdue
+            ? 'Reprogramar próxima acción hoy y registrar contacto.'
+            : staleDays > 14
+              ? 'Actualizar estado y ejecutar seguimiento esta semana.'
+              : withoutRecentActivity
+                ? 'Registrar touchpoint en las próximas 24h.'
+                : 'Mantener ritmo actual.',
+        };
+      })
+      .filter((item) => item.riskScore > 0)
+      .sort((a, b) => b.riskScore - a.riskScore)
+      .slice(0, 10);
+
+    const capacityBySellerMap = new Map<number, { ownerId: number; ownerName: string; activePipeline: number; targetCapacity: number }>();
+    activeOpportunities.forEach((opportunity) => {
+      const ownerId = Number(opportunity.ownerId || 0);
+      if (!ownerId) return;
+      const current = capacityBySellerMap.get(ownerId) || {
+        ownerId,
+        ownerName: vendorMap.get(ownerId) || `Vendedor ${ownerId}`,
+        activePipeline: 0,
+        targetCapacity: 25,
+      };
+      current.activePipeline += 1;
+      capacityBySellerMap.set(ownerId, current);
+    });
+
+    const capacityBySeller = Array.from(capacityBySellerMap.values())
+      .map((item) => ({
+        ...item,
+        utilization: Number(((item.activePipeline / item.targetCapacity) * 100).toFixed(1)),
+      }))
+      .sort((a, b) => b.utilization - a.utilization);
+
+    const leaderboard = [...(vendorStats || [])]
+      .sort((a: any, b: any) => Number(b.performance || 0) - Number(a.performance || 0))
+      .slice(0, 5)
+      .map((vendor: any) => ({
+        userId: vendor.userId,
+        userName: vendor.userName,
+        performance: Number(vendor.performance || 0),
+        revenue: Number(vendor.revenue || 0),
+        status: vendor.status || 'off-track',
+      }));
+
+    return {
+      summary: {
+        activeOpportunities: activeOpportunities.length,
+        coachingQueue: coachingPriorities.length,
+        overdueActions: coachingPriorities.filter((item) => item.overdue).length,
+      },
+      coachingPriorities,
+      capacityBySeller,
+      leaderboard,
     };
   }
 
