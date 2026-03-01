@@ -54,9 +54,7 @@ export default function Sidebar() {
     setIsMenuOpen(false);
   };
 
-  const isAdmin = hasPermission(user, PERMISSIONS.CONSOLE_ADMIN);
   const isSuperAdmin = user.isSuperAdmin;
-  const isConsoleUser = hasAnyPermission(user, [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN]);
 
   type MenuItem = {
     label: string;
@@ -85,48 +83,56 @@ export default function Sidebar() {
     { label: "Mi perfil", href: "/my-profile", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
   ];
 
-  const userItems: MenuItem[] = [
+  const operationItems: MenuItem[] = [
     { label: "Resumen ejecutivo", href: "/dashboard", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Operación: actividades", href: "/activities", permissions: [PERMISSIONS.CONSOLE_ACCESS] },
-    { label: "Evidencias de servicio", href: "/evidences", permissions: [PERMISSIONS.CONSOLE_ACCESS] },
-    { label: "Viáticos operativos", href: "/viatics", permissions: [PERMISSIONS.CONSOLE_ACCESS] },
-    { label: "Control vehicular", href: "/vehicles", permissions: [PERMISSIONS.CONSOLE_ACCESS] },
-    { label: "Asistencia", href: "/attendance", permissions: [PERMISSIONS.ATTENDANCE_VIEW] },
+    { label: "Operación: actividades", href: "/activities", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Evidencias de servicio", href: "/evidences", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Viáticos operativos", href: "/viatics", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Control vehicular", href: "/vehicles", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
     { label: "Monitoreo GPS", href: "/gps", permissions: [PERMISSIONS.GPS_VIEW] },
-    { label: "Cotizaciones", href: "/cotizaciones", permissions: [PERMISSIONS.COTIZACIONES_ACCESS] },
   ];
 
-  const adminItems: MenuItem[] = [
-    { label: "Clientes corporativos", href: "/clients", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+  const peopleItems: MenuItem[] = [
+    { label: "Asistencia", href: "/attendance", permissions: [PERMISSIONS.ATTENDANCE_VIEW] },
     { label: "Multas y sanciones", href: "/fines", anyPermissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Gestión de usuarios", href: "/users", permissions: [PERMISSIONS.USERS_MANAGE] },
+  ];
+
+  const commercialItems: MenuItem[] = [
+    { label: "Clientes corporativos", href: "/clients", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Cotizaciones", href: "/cotizaciones", permissions: [PERMISSIONS.COTIZACIONES_ACCESS] },
     { label: "Gestión comercial", href: "/gestion-vendedores", anyPermissions: [PERMISSIONS.CONSOLE_ADMIN] },
   ];
 
-  const superAdminItems: MenuItem[] = [
-    { label: "Gestión de usuarios", href: "/users", permissions: [PERMISSIONS.USERS_MANAGE] },
+  const systemItems: MenuItem[] = [
     { label: "Herramientas internas", href: "/tools", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
   ];
 
   const groups: MenuGroup[] = [
     {
       id: "profile",
-      title: "Tu cuenta",
+      title: "Cuenta personal",
       items: profileItems,
     },
     {
-      id: "user",
-      title: "Acceso usuario",
-      items: [...userItems, ...(isAdmin || isSuperAdmin ? [] : isConsoleUser ? [{ label: "Herramientas internas", href: "/tools", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] }] : [])],
+      id: "operations",
+      title: "Operación y seguimiento",
+      items: operationItems,
     },
     {
-      id: "admin",
-      title: "Acceso administrador",
-      items: [...adminItems, ...(!isSuperAdmin && isAdmin ? [{ label: "Gestión de usuarios", href: "/users", permissions: [PERMISSIONS.USERS_MANAGE] }, ...(isConsoleUser ? [{ label: "Herramientas internas", href: "/tools", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] }] : [])] : [])],
+      id: "people",
+      title: "RRHH y control de personal",
+      items: peopleItems,
     },
     {
-      id: "superadmin",
-      title: "Acceso superadmin",
-      items: isSuperAdmin ? superAdminItems : [],
+      id: "commercial",
+      title: "Clientes y comercial",
+      items: commercialItems,
+    },
+    {
+      id: "system",
+      title: "Administración interna",
+      items: systemItems,
     },
   ].filter((group) => group.items.some(canAccessItem));
 
