@@ -410,6 +410,10 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
     marginTop: 24,
     display: 'grid',
     gap: 12,
+    background: 'linear-gradient(170deg, rgba(255,255,255,0.9), rgba(235,243,255,0.95))',
+    border: '1px solid rgba(15, 106, 214, 0.16)',
+    borderRadius: 16,
+    padding: 16,
   };
 
   return (
@@ -634,10 +638,11 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
           </div>
 
           {/* Tabla */}
-          <div style={{ overflowX: 'auto' }}>
+          <div style={{ overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', borderRadius: 12 }}>
             <table
               style={{
                 width: '100%',
+                minWidth: 980,
                 borderCollapse: 'collapse',
                 fontSize: 13,
               }}

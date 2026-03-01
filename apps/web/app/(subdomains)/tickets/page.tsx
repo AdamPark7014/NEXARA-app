@@ -4,6 +4,7 @@ import { io, Socket } from "socket.io-client";
 import PanelLogin from "@/components/PanelLogin";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
 import consoleStyles from "../console/console.module.css";
+import styles from "./tickets.module.css";
 
 type ClientSession = {
   token: string;
@@ -529,8 +530,8 @@ export default function ClientTicketsPage() {
 
   if (!session) {
     return (
-      <div style={{ display: "grid", gap: 16 }}>
-        <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+      <div className={styles.authWrap}>
+        <div className={styles.authSwitch}>
           <button
             className={loginMode === "client" ? "button-primary" : "button-secondary"}
             type="button"
@@ -637,29 +638,29 @@ export default function ClientTicketsPage() {
         </ul>
       </aside>
       <main className={consoleStyles.consoleMain}>
-        <div style={{ display: "grid", gap: 16 }}>
+        <div className={styles.mainStack}>
           {activeTab === "tickets" && (
-            <div style={{ display: "grid", gap: 16 }}>
+            <div className={styles.sectionStack}>
               {pendingFeedback.length > 0 && (
-                <div className="card" style={{ display: "grid", gap: 12, border: "1px solid rgba(31,107,186,0.2)" }}>
+                <div className={`card ${styles.cardPanel}`}>
                   <div>
                     <div style={{ fontWeight: 700 }}>Confirma tu servicio</div>
                     <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>Ayudanos a validar que todo quedo resuelto.</div>
                   </div>
-                  <div style={{ display: "grid", gap: 12 }}>
+                  <div className={styles.listStack}>
                     {pendingFeedback.map((activity) => (
-                      <div key={activity.id} style={{ display: "grid", gap: 10, padding: 12, borderRadius: 12, border: "1px solid rgba(15,106,214,0.12)" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                      <div key={activity.id} className={styles.itemCard}>
+                        <div className={styles.itemHeader}>
                           <div>
                             <strong>{activity.anNumber || "Ticket"}</strong>
-                            <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{activity.titulo || "Servicio finalizado"}</div>
+                            <div className={styles.mutedText}>{activity.titulo || "Servicio finalizado"}</div>
                           </div>
                           <span className="badge">Pendiente</span>
                         </div>
-                        <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                        <div className={styles.mutedText}>
                           Ingeniero: {activity.responsable?.nombre || "-"} · Finalizado: {activity.fechaFinalizacion || "-"}
                         </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+                        <div className={styles.grid180}>
                           <div>
                             <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Calificacion (1-5)</label>
                             <select
@@ -706,7 +707,7 @@ export default function ClientTicketsPage() {
                           value={feedbackDrafts[activity.id]?.comments || ""}
                           onChange={(e) => updateFeedbackDraft(activity.id, { comments: e.target.value })}
                         />
-                        <div style={{ display: "flex", gap: 10 }}>
+                        <div className={styles.actionRow}>
                           <button className="button-primary" type="button" onClick={() => handleFeedbackSubmit(activity.id)}>
                             Enviar encuesta
                           </button>
@@ -716,15 +717,15 @@ export default function ClientTicketsPage() {
                   </div>
                 </div>
               )}
-              <div className="card" style={{ display: "grid", gap: 12 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+              <div className={`card ${styles.cardSoft}`}>
+                <div className={styles.itemHeader}>
                   <div>
                     <div style={{ fontWeight: 700 }}>Tickets activos</div>
-                    <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>Actualiza en tiempo real conforme se suben evidencias.</div>
+                    <div className={styles.mutedText}>Actualiza en tiempo real conforme se suben evidencias.</div>
                   </div>
-                  <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{loading ? "Sincronizando..." : "Actualizado"}</div>
+                  <div className={styles.mutedText}>{loading ? "Sincronizando..." : "Actualizado"}</div>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+                <div className={styles.grid200}>
                   <div>
                     <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Rango del reporte</label>
                     <select className="input" value={reportRange} onChange={(e) => setReportRange(e.target.value as typeof reportRange)}>
@@ -754,7 +755,7 @@ export default function ClientTicketsPage() {
                       disabled={reportRange !== "custom"}
                     />
                   </div>
-                  <div style={{ display: "flex", alignItems: "flex-end" }}>
+                  <div className={styles.actionRow}>
                     <button className="button-primary" onClick={handleReportDownload} disabled={loading}>
                       Descargar reporte
                     </button>
@@ -764,15 +765,15 @@ export default function ClientTicketsPage() {
               </div>
               {loading && <div>cargando...</div>}
               {sortedTickets.map((ticket) => (
-                <div key={ticket.id} className="card" style={{ display: "grid", gap: 10 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                <div key={ticket.id} className={`card ${styles.itemCard}`}>
+                  <div className={styles.itemHeader}>
                     <div>
                       <div style={{ fontWeight: 700 }}>{ticket.anNumber}</div>
                       <div style={{ color: "var(--text-secondary)", fontSize: 12 }}>{ticket.titulo}</div>
                     </div>
                     <span className="badge">{ticket.estatus}</span>
                   </div>
-                  <div style={{ display: "grid", gap: 4, fontSize: 12, color: "var(--text-secondary)" }}>
+                  <div className={styles.metaGrid}>
                     <span>{ticket.branchName || "-"} · {ticket.branchCity || "-"} {ticket.branchState || ""}</span>
                     <span>Tipo: {ticket.ticketType || "-"}</span>
                     <span>Atendio: {ticket.responsable?.nombre || "-"}</span>
@@ -784,7 +785,7 @@ export default function ClientTicketsPage() {
                       </span>
                     )}
                   </div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <div className={styles.actionRow}>
                     {ticket.estatus === "Finalizada" && ticket.serviceSheet?.pdfUrl && (
                       <a className="button-secondary" href={getAssetUrl(ticket.serviceSheet.pdfUrl)} target="_blank" rel="noreferrer">
                         Hoja de servicio (PDF)
@@ -794,9 +795,9 @@ export default function ClientTicketsPage() {
                       Reporte del ticket (PDF)
                     </button>
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
+                  <div className={styles.grid140}>
                     {(ticket.evidencias || []).map((ev) => (
-                      <div key={ev.id} className="card" style={{ padding: 8 }}>
+                      <div key={ev.id} className={`card ${styles.cardSoft}`} style={{ padding: 8 }}>
                         {ev.archivoUrl.endsWith(".pdf") ? (
                           <object data={getAssetUrl(ev.archivoUrl)} type="application/pdf" width="100%" height="140">
                             <embed src={getAssetUrl(ev.archivoUrl)} type="application/pdf" />
@@ -823,11 +824,11 @@ export default function ClientTicketsPage() {
             </div>
           )}
           {activeTab === "nuevo" && (
-            <div style={{ display: "grid", gap: 16 }}>
-              <div className="card" style={{ display: "grid", gap: 12 }}>
+            <div className={styles.sectionStack}>
+              <div className={`card ${styles.cardSoft}`}>
                 <div style={{ fontWeight: 700 }}>Levantar ticket</div>
-                <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>Describe el problema y selecciona la ubicacion.</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+                <div className={styles.mutedText}>Describe el problema y selecciona la ubicacion.</div>
+                <div className={styles.grid200}>
                   <div>
                     <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Sucursal existente</label>
                     <select
@@ -863,7 +864,7 @@ export default function ClientTicketsPage() {
                     />
                   </div>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+                <div className={styles.grid200}>
                   <input
                     className="input"
                     placeholder="Nombre de la sucursal"
@@ -920,24 +921,24 @@ export default function ClientTicketsPage() {
                     }))
                   }
                 />
-                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <div className={styles.actionRow}>
                   <button className="button-primary" type="button" onClick={handleRequestSubmit}>Levantar ticket</button>
                   {error && <span style={{ color: "var(--danger)", fontSize: 12 }}>{error}</span>}
                 </div>
               </div>
-              <div className="card" style={{ display: "grid", gap: 12 }}>
+              <div className={`card ${styles.cardSoft}`}>
                 <div style={{ fontWeight: 700 }}>Tickets levantados</div>
-                {requests.length === 0 && <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>No hay solicitudes aun.</div>}
+                {requests.length === 0 && <div className={styles.mutedText}>No hay solicitudes aun.</div>}
                 {requests.map((request) => (
-                  <div key={request.id} style={{ display: "grid", gap: 6, padding: 12, borderRadius: 12, border: "1px solid rgba(15, 106, 214, 0.15)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                  <div key={request.id} className={styles.itemCard}>
+                    <div className={styles.itemHeader}>
                       <strong>{request.branchName || "Ticket"}</strong>
                       <span className="badge">{request.status}</span>
                     </div>
-                    <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{request.description}</div>
-                    <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>Urgencia: {request.urgency}</div>
+                    <div className={styles.mutedText}>{request.description}</div>
+                    <div className={styles.mutedText}>Urgencia: {request.urgency}</div>
                     {request.activity?.anNumber && (
-                      <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>Asignado a: {request.activity.anNumber}</div>
+                      <div className={styles.mutedText}>Asignado a: {request.activity.anNumber}</div>
                     )}
                     {request.latitud && request.longitud && (
                       <a href={getMapsUrl(request.latitud, request.longitud)} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>Ver ubicacion</a>
@@ -953,22 +954,22 @@ export default function ClientTicketsPage() {
                       />
                     )}
                     {Array.isArray(request.evidenceUrls) && request.evidenceUrls.length > 0 && (
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
+                      <div className={styles.grid120}>
                         {request.evidenceUrls.map((url, idx) => (
-                          <div key={`${request.id}-${idx}`} style={{ borderRadius: 10, overflow: "hidden", border: "1px solid rgba(255,255,255,0.12)", background: "rgba(15, 106, 214, 0.08)" }}>
+                          <div key={`${request.id}-${idx}`} className={styles.mediaTile}>
                             {url.toLowerCase().endsWith(".pdf") ? (
                               <object data={getAssetUrl(url)} type="application/pdf" width="100%" height="120">
                                 <embed src={getAssetUrl(url)} type="application/pdf" />
                               </object>
                             ) : (
-                              <img src={getAssetUrl(url)} alt="evidencia" style={{ width: "100%", height: 120, objectFit: "cover" }} />
+                              <img src={getAssetUrl(url)} alt="evidencia" className={styles.mediaImg} />
                             )}
                           </div>
                         ))}
                       </div>
                     )}
                     {request.status !== "CLOSED" && (
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <div className={styles.actionRow}>
                         <button className="button-secondary" type="button" onClick={() => handleRequestClose(request.id)}>Cerrar solicitud</button>
                         {request.status === "NEW" && (
                           <>
@@ -984,19 +985,19 @@ export default function ClientTicketsPage() {
             </div>
           )}
           {activeTab === "perfil" && (
-            <div style={{ display: "grid", gap: 16 }}>
-              <div className="card" style={{ display: "flex", gap: 16, alignItems: "center" }}>
+            <div className={styles.sectionStack}>
+              <div className={`card ${styles.heroRow}`}>
                 {session.client.logoUrl && (
-                  <img src={getAssetUrl(session.client.logoUrl)} alt={session.client.name} style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover", border: "1px solid rgba(15, 106, 214, 0.2)" }} />
+                  <img src={getAssetUrl(session.client.logoUrl)} alt={session.client.name} className={styles.heroLogo} />
                 )}
                 <div>
                   <h3 style={{ margin: 0 }}>{session.client.name}</h3>
-                  <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 12 }}>Acceso exclusivo para consultar tickets y reportes.</p>
+                  <p className={styles.mutedText} style={{ margin: 0 }}>Acceso exclusivo para consultar tickets y reportes.</p>
                 </div>
               </div>
-              <div className="card" style={{ display: "grid", gap: 12 }}>
+              <div className={`card ${styles.cardSoft}`}>
                 <div style={{ fontWeight: 700 }}>Datos de contacto</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+                <div className={styles.grid200}>
                   <input className="input" placeholder="Contacto" value={profileDraft.contactName} onChange={(e) => setProfileDraft((prev) => ({ ...prev, contactName: e.target.value }))} />
                   <input className="input" placeholder="Email" value={profileDraft.contactEmail} onChange={(e) => setProfileDraft((prev) => ({ ...prev, contactEmail: e.target.value }))} />
                   <input className="input" placeholder="Telefono" value={profileDraft.contactPhone} onChange={(e) => setProfileDraft((prev) => ({ ...prev, contactPhone: e.target.value }))} />
@@ -1005,16 +1006,16 @@ export default function ClientTicketsPage() {
                   <input className="input" placeholder="Estado" value={profileDraft.state} onChange={(e) => setProfileDraft((prev) => ({ ...prev, state: e.target.value }))} />
                   <input className="input" placeholder="Pais" value={profileDraft.country} onChange={(e) => setProfileDraft((prev) => ({ ...prev, country: e.target.value }))} />
                 </div>
-                <div style={{ display: "flex", gap: 10 }}>
+                <div className={styles.actionRow}>
                   <button className="button-primary" type="button" onClick={handleProfileSave}>Guardar perfil</button>
                 </div>
               </div>
-              <div className="card" style={{ display: "grid", gap: 12 }}>
+              <div className={`card ${styles.cardSoft}`}>
                 <div style={{ fontWeight: 700 }}>Gestión de sucursales</div>
-                <p style={{ margin: 0, fontSize: 12, color: "var(--text-secondary)" }}>
+                <p className={styles.mutedText} style={{ margin: 0 }}>
                   Para crear, editar o eliminar sucursales y configurar su logo, dirígete a la sección Mis sucursales en el menú.
                 </p>
-                <a href="mis-sucursales" className="button-primary" style={{ display: "inline-block", textAlign: "center", textDecoration: "none", paddingTop: 10, paddingBottom: 10 }}>
+                <a href="mis-sucursales" className={`button-primary ${styles.linkCta}`}>
                   Ir a Mis Sucursales
                 </a>
               </div>

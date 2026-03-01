@@ -125,6 +125,8 @@
 
 .tableWrap {
   overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
   border-radius: 18px;
   border: 1px solid rgba(15, 106, 214, 0.18);
   background: rgba(255, 255, 255, 0.7);

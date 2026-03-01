@@ -140,7 +140,13 @@
 }
 
 .tableWrap {
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tableWrap :global(.table) {
+  min-width: 940px;
 }
 
 .metaText {

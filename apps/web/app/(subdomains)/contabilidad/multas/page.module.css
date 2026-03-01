@@ -61,7 +61,9 @@
 
 .tableWrap {
   border-radius: 20px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid rgba(15, 106, 214, 0.16);
   background: rgba(255, 255, 255, 0.9);
   box-shadow: 0 12px 24px rgba(11, 32, 68, 0.12);
@@ -73,6 +75,7 @@
 
 .table {
   width: 100%;
+  min-width: 820px;
   border-collapse: collapse;
   font-size: 0.92rem;
 }
