@@ -505,6 +505,8 @@
     margin-bottom: 0;
     padding: 14px 16px;
     border-bottom: 1px solid rgba(15, 106, 214, 0.16);
+    position: relative;
+    z-index: 1003;
   }
 
   .logoContainer {

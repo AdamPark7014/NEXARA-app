@@ -568,7 +568,8 @@
     background: rgba(15, 106, 214, 0.5);
   }
 
-  .sidebarOpen .sidebarContent {
+  .sidebarOpen .sidebarContent,
+  .sidebarContentOpen {
     display: flex;
     position: fixed;
     top: 64px;
@@ -585,7 +586,8 @@
     animation: none;
   }
 
-  :global(body.dark) .sidebarOpen .sidebarContent {
+  :global(body.dark) .sidebarOpen .sidebarContent,
+  :global(body.dark) .sidebarContentOpen {
     background: var(--card-bg, rgba(20, 26, 38, 0.98));
     border-color: rgba(31, 137, 252, 0.22);
     box-shadow: 0 24px 54px rgba(5, 12, 24, 0.62), 0 8px 18px rgba(31, 137, 252, 0.18);
