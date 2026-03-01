@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
+import styles from './EvidenceTable.module.css';
 
 interface Evidence {
   id: number;
@@ -189,7 +190,7 @@ const EvidenceTable: React.FC<{ mode?: 'admin' | 'user'; title?: string | null }
   return (
     <div className="card">
       {title && <h2 style={{ color: 'var(--primary)', marginBottom: 12 }}>{title}</h2>}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+      <div className={styles.filtersRow}>
         <select className="input" value={estatus} onChange={e => setEstatus(e.target.value)}>
           <option value="">Todos los estatus</option>
           {estatusList.map((e: string) => <option key={e} value={e}>{e}</option>)}
@@ -231,15 +232,16 @@ const EvidenceTable: React.FC<{ mode?: 'admin' | 'user'; title?: string | null }
               type="file"
               accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               ref={fileInputRef}
-              style={{ display: 'none' }}
+              className={styles.hiddenInput}
               onChange={handleImport}
             />
           </>
         )}
       </div>
       {importMsg && <div style={{ color: importMsg.startsWith('Error') ? 'var(--danger)' : 'var(--accent)' }}>{importMsg}</div>}
-      <table className="table">
-        <thead>
+      <div className={styles.tableWrapper}>
+      <table className={`table ${styles.evidenceTable}`}>
+        <thead className={styles.tableHead}>
           <tr>
             <th>ID</th>
             <th>Actividad</th>
@@ -253,19 +255,19 @@ const EvidenceTable: React.FC<{ mode?: 'admin' | 'user'; title?: string | null }
             {mode === 'user' && <th>Gestion</th>}
           </tr>
         </thead>
-        <tbody>
+        <tbody className={styles.tableBody}>
           {paginated.map((evi: Evidence) => (
-            <tr key={evi.id}>
-              <td>{evi.id}</td>
-              <td>
+            <tr key={evi.id} className={styles.dataRow}>
+              <td className={styles.dataCell} data-label="ID">{evi.id}</td>
+              <td className={styles.dataCell} data-label="Actividad">
                 <div>{evi.actividad?.titulo || evi.actividad?.anNumber}</div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{evi.actividad?.anNumber}</div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{evi.actividad?.indicaciones || '-'}</div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                <div className={styles.cellSubtext}>{evi.actividad?.anNumber}</div>
+                <div className={styles.cellSubtext}>{evi.actividad?.indicaciones || '-'}</div>
+                <div className={styles.cellSubtext}>
                   {evi.actividad?.creador?.nombre ? `Asignado por ${evi.actividad?.creador?.nombre}` : 'Asignado por -'}
                 </div>
               </td>
-              <td>
+              <td className={styles.dataCell} data-label="Estatus">
                 <span
                   className={`badge ${
                     evi.estatus === 'Aprobada'
@@ -280,31 +282,19 @@ const EvidenceTable: React.FC<{ mode?: 'admin' | 'user'; title?: string | null }
                   {evi.estatus}
                 </span>
               </td>
-              <td>{evi.user?.nombre || evi.actividad?.responsable?.nombre || '-'}</td>
-              <td>
+              <td className={styles.dataCell} data-label="Responsable">{evi.user?.nombre || evi.actividad?.responsable?.nombre || '-'}</td>
+              <td className={styles.dataCell} data-label="Archivo">
                 {evi.archivoUrl ? (
-                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <div className={styles.fileCell}>
                     {evi.archivoUrl.toLowerCase().endsWith('.pdf') ? (
-                      <div
-                        style={{
-                          width: 64,
-                          height: 64,
-                          borderRadius: 10,
-                          border: '1px solid rgba(255,255,255,0.12)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'var(--text-secondary)',
-                          fontWeight: 700,
-                        }}
-                      >
+                      <div className={styles.filePreviewPdf}>
                         PDF
                       </div>
                     ) : (
                       <img
                         src={getAssetUrl(evi.archivoUrl)}
                         alt="Evidencia"
-                        style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 10 }}
+                        className={styles.filePreviewImage}
                       />
                     )}
                     <a className="link" href={getAssetUrl(evi.archivoUrl)} target="_blank" rel="noopener noreferrer">Ver archivo</a>
@@ -313,26 +303,26 @@ const EvidenceTable: React.FC<{ mode?: 'admin' | 'user'; title?: string | null }
                   '-'
                 )}
               </td>
-              <td>
+              <td className={styles.dataCell} data-label="Comentarios">
                 <div>{evi.comentarios || '-'}</div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{evi.tipoEvidencia}</div>
+                <div className={styles.cellSubtext}>{evi.tipoEvidencia}</div>
               </td>
-              <td>
+              <td className={styles.dataCell} data-label="Ubicacion">
                 {getMapsUrl(evi.latitud, evi.longitud) ? (
                   <a className="link" href={getMapsUrl(evi.latitud, evi.longitud)} target="_blank" rel="noopener noreferrer">Ver mapa</a>
                 ) : (
                   '-'
                 )}
               </td>
-              <td>
+              <td className={styles.dataCell} data-label="Revision">
                 <div>{evi.calificacionEficiencia || '-'}</div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{evi.observacionesRevision || '-'}</div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{evi.aprobadoPor?.nombre ? `Reviso ${evi.aprobadoPor?.nombre}` : ''}</div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{formatDateTime(evi.revisadoEn)}</div>
+                <div className={styles.cellSubtext}>{evi.observacionesRevision || '-'}</div>
+                <div className={styles.cellSubtext}>{evi.aprobadoPor?.nombre ? `Reviso ${evi.aprobadoPor?.nombre}` : ''}</div>
+                <div className={styles.cellSubtext}>{formatDateTime(evi.revisadoEn)}</div>
               </td>
               {hasPermission(user, PERMISSIONS.EVIDENCES_REVIEW) && (
-                <td>
-                  <div style={{ display: 'grid', gap: 8 }}>
+                <td className={styles.dataCell} data-label="Acciones">
+                  <div className={styles.actionsCell}>
                     <select
                       className="input"
                       value={reviewDrafts[evi.id]?.calificacion || ''}
@@ -350,7 +340,7 @@ const EvidenceTable: React.FC<{ mode?: 'admin' | 'user'; title?: string | null }
                       value={reviewDrafts[evi.id]?.observaciones || ''}
                       onChange={(event) => updateReviewDraft(evi.id, { observaciones: event.target.value })}
                     />
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div className={styles.actionsButtons}>
                       <button className="button-primary" onClick={() => handleReview(evi.id, true)}>Aprobar</button>
                       <button className="button-secondary" onClick={() => handleReview(evi.id, false)}>Rechazar</button>
                     </div>
@@ -358,7 +348,7 @@ const EvidenceTable: React.FC<{ mode?: 'admin' | 'user'; title?: string | null }
                 </td>
               )}
               {mode === 'user' && (
-                <td>
+                <td className={styles.dataCell} data-label="Gestion">
                   {evi.estatus === 'Pendiente' ? (
                     <button
                       className="button-secondary"
@@ -375,7 +365,8 @@ const EvidenceTable: React.FC<{ mode?: 'admin' | 'user'; title?: string | null }
           ))}
         </tbody>
       </table>
-      <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+      </div>
+      <div className={styles.paginationRow}>
         <button className="button-secondary" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Anterior</button>
         <span>Página {page} de {totalPages || 1}</span>
         <button className="button-secondary" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0}>Siguiente</button>

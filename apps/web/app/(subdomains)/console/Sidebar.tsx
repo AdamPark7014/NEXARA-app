@@ -92,7 +92,9 @@ export default function Sidebar() {
   }
 
   // Avatar: usa user.avatarUrl si existe, si no, usa un avatar generado por ui-avatars.com
-  const avatarUrl = user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nombre)}&background=0D8ABC&color=fff&size=96`;
+  const avatarUrl = user.isSuperAdmin
+    ? '/logo-nexara.png'
+    : (user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nombre)}&background=0D8ABC&color=fff&size=96`);
 
   return (
     <aside className={`${styles.sidebar} ${isMenuOpen && isMobile ? styles.sidebarOpen : ''}`}>
@@ -127,13 +129,14 @@ export default function Sidebar() {
         <div className={styles.sidebarUser}>
           <div className={styles.sidebarAvatar}>
             <Image 
-              className={styles.avatarImage} 
+              className={`${styles.avatarImage} ${user.isSuperAdmin ? styles.avatarImageLogo : ''}`} 
               src={avatarUrl} 
-              alt={user.nombre}
+              alt={user.isSuperAdmin ? 'NEXARA' : user.nombre}
               width={64} 
               height={64}
               priority={false}
               loading="lazy"
+              unoptimized
             />
           </div>
           <div className={styles.sidebarName}>{user.nombre}</div>
