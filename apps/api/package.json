@@ -8,6 +8,7 @@
     "start:dev": "nest start --watch",
     "dev": "nest start --watch",
     "build": "nest build",
+    "user:reset-password": "ts-node ./src/users/reset-user-password.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:status": "prisma migrate status",
