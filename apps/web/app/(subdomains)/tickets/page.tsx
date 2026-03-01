@@ -337,11 +337,14 @@ export default function ClientTicketsPage() {
 
   const handleLogout = () => {
     window.sessionStorage.removeItem("clientSession");
+    window.sessionStorage.removeItem("branchSession");
     setSession(null);
     setTickets([]);
     setProfile(null);
     setBranches([]);
     setRequests([]);
+    setPendingFeedback([]);
+    window.location.replace("/tickets");
   };
 
   const handleProfileSave = async () => {
@@ -531,21 +534,34 @@ export default function ClientTicketsPage() {
   if (!session) {
     return (
       <div className={styles.authWrap}>
-        <div className={styles.authSwitch}>
-          <button
-            className={loginMode === "client" ? "button-primary" : "button-secondary"}
-            type="button"
-            onClick={() => setLoginMode("client")}
-          >
-            Cliente
-          </button>
-          <button
-            className={loginMode === "branch" ? "button-primary" : "button-secondary"}
-            type="button"
-            onClick={() => setLoginMode("branch")}
-          >
-            Sucursal
-          </button>
+        <div className={styles.authHeader}>
+          <p className={styles.authEyebrow}>Nexara · Portal de Tickets</p>
+          <div className={styles.authHeaderRow}>
+            <div>
+              <h1 className={styles.authTitle}>Acceso corporativo seguro</h1>
+              <p className={styles.authLead}>
+                Selecciona el tipo de acceso para ingresar con el perfil correcto.
+              </p>
+            </div>
+            <div className={styles.authSwitch}>
+              <button
+                className={`${styles.authSwitchBtn} ${loginMode === "client" ? styles.authSwitchBtnActive : ""}`}
+                type="button"
+                onClick={() => setLoginMode("client")}
+                aria-pressed={loginMode === "client"}
+              >
+                Cliente
+              </button>
+              <button
+                className={`${styles.authSwitchBtn} ${loginMode === "branch" ? styles.authSwitchBtnActive : ""}`}
+                type="button"
+                onClick={() => setLoginMode("branch")}
+                aria-pressed={loginMode === "branch"}
+              >
+                Sucursal
+              </button>
+            </div>
+          </div>
         </div>
         {loginMode === "client" ? (
           <PanelLogin
@@ -553,7 +569,7 @@ export default function ClientTicketsPage() {
             redirectTo="/"
             onClientLogin={handleClientLogin}
             title="Portal de atención corporativa"
-            subtitle="Ingresa con tu cuenta de cliente para dar seguimiento a tus servicios"
+            subtitle="Ingresa con la cuenta corporativa de cliente para seguimiento de servicios y reportes."
           />
         ) : (
           <PanelLogin
@@ -561,7 +577,7 @@ export default function ClientTicketsPage() {
             redirectTo="/"
             onBranchLogin={handleBranchLogin}
             title="Portal de sucursal"
-            subtitle="Acceso operativo para reportar solicitudes de servicio"
+            subtitle="Acceso operativo para crear y monitorear solicitudes de servicio por sucursal."
           />
         )}
       </div>
