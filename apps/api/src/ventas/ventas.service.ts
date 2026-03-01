@@ -1463,16 +1463,15 @@ export class VentasService {
       ];
     }
 
-    // Get all sales owner users
+    // Get seller users (must have sales panel access configured in role)
+    const protectedEmails = ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'];
     const users = await this.prisma.user.findMany({
       where: {
-        salesOpportunitiesOwned: {
-          some: {
-            createdAt: { gte: startDate },
-          },
-        },
+        role: { accesoPanelVentas: true },
+        email: { notIn: protectedEmails },
       },
       include: {
+        role: true,
         salesOpportunitiesOwned: {
           where: { createdAt: { gte: startDate } },
         },

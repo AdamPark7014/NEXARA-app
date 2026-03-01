@@ -135,6 +135,25 @@ export default function VentasGestionVendedoresPage() {
           attendancePayload = (await attendanceRes.json()) as AttendanceRangeResponse;
         }
 
+        if (attendancePayload) {
+          const sellerIds = new Set(
+            vendorData
+              .map((seller) => Number(seller.userId))
+              .filter((id) => Number.isFinite(id) && id > 0),
+          );
+
+          const filteredUsers = (attendancePayload.users || []).filter((item) => sellerIds.has(Number(item.userId)));
+          const totalMinutesAll = filteredUsers.reduce((sum, item) => sum + Number(item.totalMinutes || 0), 0);
+
+          attendancePayload = {
+            ...attendancePayload,
+            users: filteredUsers,
+            totalUsers: filteredUsers.length,
+            totalMinutesAll,
+            avgMinutesPerUser: filteredUsers.length ? totalMinutesAll / filteredUsers.length : 0,
+          };
+        }
+
         setMetrics(metricsData);
         setVendorStats(vendorData);
         setCockpit(cockpitData);
