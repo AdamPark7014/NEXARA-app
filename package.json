@@ -18,7 +18,10 @@
     "dev:web": "npm run dev --workspace=apps/web",
     "dev:api": "npm run dev --workspace=apps/api",
     "build": "turbo run build",
-    "start": "turbo run start"
+    "start": "turbo run start",
+    "local:setup": "npm run prisma:generate --workspace=apps/api && npm run prisma:deploy --workspace=apps/api && npm run prisma:seed --workspace=apps/api",
+    "local:status": "npm run prisma:status --workspace=apps/api",
+    "local:dev": "turbo run dev --parallel"
   },
   "dependencies": {
     "@nestjs/jwt": "^10.0.0",
