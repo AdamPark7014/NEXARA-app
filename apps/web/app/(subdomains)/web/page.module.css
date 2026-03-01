@@ -61,8 +61,16 @@
 }
 
 .secondaryButton {
-  background: rgba(15, 106, 214, 0.12);
+  background: linear-gradient(145deg, rgba(15, 106, 214, 0.2), rgba(22, 169, 110, 0.14));
+  border: 1px solid rgba(15, 106, 214, 0.24);
   color: var(--foreground);
+}
+
+:global(body.dark) .secondaryButton {
+  background: linear-gradient(145deg, rgba(24, 54, 92, 0.9), rgba(13, 40, 73, 0.92));
+  border-color: rgba(31, 137, 252, 0.34);
+  color: #e8f1ff;
+  box-shadow: 0 10px 18px rgba(8, 28, 56, 0.4);
 }
 
 .grid {
