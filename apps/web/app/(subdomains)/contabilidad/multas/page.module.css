@@ -64,6 +64,8 @@
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
+  width: 100%;
+  max-width: 100%;
   border: 1px solid rgba(15, 106, 214, 0.16);
   background: rgba(255, 255, 255, 0.9);
   box-shadow: 0 12px 24px rgba(11, 32, 68, 0.12);
@@ -75,7 +77,7 @@
 
 .table {
   width: 100%;
-  min-width: 820px;
+  min-width: 700px;
   border-collapse: collapse;
   font-size: 0.92rem;
 }
@@ -96,4 +98,20 @@
 
 .table td {
   color: var(--foreground);
+}
+
+@media (max-width: 700px) {
+  .page {
+    padding: 0;
+  }
+
+  .table {
+    min-width: 620px;
+    font-size: 0.86rem;
+  }
+
+  .table th,
+  .table td {
+    padding: 10px 12px;
+  }
 }
