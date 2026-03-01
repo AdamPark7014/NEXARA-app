@@ -73,7 +73,6 @@ export default function Sidebar() {
     { label: "Viáticos operativos", href: "/viatics", permissions: [PERMISSIONS.CONSOLE_ACCESS] },
     { label: "Control vehicular", href: "/vehicles", permissions: [PERMISSIONS.CONSOLE_ACCESS] },
     { label: "Clientes corporativos", href: "/clients", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Tickets de clientes", href: "/client-tickets", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
     { label: "Gestión de usuarios", href: "/users", permissions: [PERMISSIONS.USERS_MANAGE] },
     { label: "Mi perfil", href: "/my-profile", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
     { label: "Asistencia", href: "/attendance", permissions: [PERMISSIONS.ATTENDANCE_VIEW] },

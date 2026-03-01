@@ -112,6 +112,30 @@
   gap: 8px;
 }
 
+@media (min-width: 769px) {
+  .authWrap {
+    background: linear-gradient(180deg, rgba(8, 21, 40, 0.96) 0, rgba(8, 21, 40, 0.96) 118px, transparent 118px);
+  }
+
+  .authHeader {
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 12px clamp(14px, 3.2vw, 34px);
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+  }
+
+  .authEyebrow,
+  .authHeaderRow {
+    width: 100%;
+    max-width: 1080px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
 :global(body.light) .authHeader {
   background: linear-gradient(140deg, rgba(247, 252, 255, 0.95), rgba(234, 245, 255, 0.92));
   border-color: rgba(15, 106, 214, 0.24);

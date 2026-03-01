@@ -94,7 +94,7 @@ const getMapsUrl = (lat?: number | null, lng?: number | null) => {
   return `https://www.google.com/maps?q=${lat},${lng}`;
 };
 
-export default function ClientTicketsPage() {
+export function ClientTicketsPanel({ embedded = false }: { embedded?: boolean }) {
   const { user } = useUser();
   const [clients, setClients] = useState<Client[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -174,16 +174,11 @@ export default function ClientTicketsPage() {
   };
 
   if (loading) {
-    return (
-      <RoleGuard permissions={[PERMISSIONS.CONSOLE_ADMIN]}>
-        <div className="card">Cargando tickets por cliente...</div>
-      </RoleGuard>
-    );
+    return <div className="card">Cargando tickets por cliente...</div>;
   }
 
-  return (
-    <RoleGuard permissions={[PERMISSIONS.CONSOLE_ADMIN]}>
-      <div style={{ display: 'grid', gap: 16 }}>
+  const content = (
+    <div style={{ display: 'grid', gap: 16 }}>
         <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
           <div>
             <h2 style={{ margin: 0, color: 'var(--primary)' }}>Gestion de tickets por cliente</h2>
@@ -343,6 +338,17 @@ export default function ClientTicketsPage() {
           })}
         </div>
       </div>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <RoleGuard permissions={[PERMISSIONS.CONSOLE_ADMIN]}>
+      {content}
     </RoleGuard>
   );
+}
+
+export default function ClientTicketsPage() {
+  return <ClientTicketsPanel />;
 }

@@ -27,10 +27,8 @@ const LunchBreaksTable: React.FC = () => {
   const [lunchBreaks, setLunchBreaks] = useState<LunchBreak[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [expandedPhotoId, setExpandedPhotoId] = useState<number | null>(null);
   const [expandedPhotoUrl, setExpandedPhotoUrl] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState('');
-  const [isMobile, setIsMobile] = useState(false);
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
@@ -86,44 +84,85 @@ const LunchBreaksTable: React.FC = () => {
     };
   }, [user?.token]);
 
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth <= 900);
-    onResize();
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
   const openPhotoGallery = (photoUrl: string) => {
     setExpandedPhotoUrl(photoUrl);
   };
 
   const closePhotoGallery = () => {
     setExpandedPhotoUrl(null);
-    setExpandedPhotoId(null);
   };
 
   if (loading) return <div style={{ textAlign: 'center', padding: 20 }}>Cargando horas de comida...</div>;
 
   return (
     <div style={{ display: 'grid', gap: 24 }}>
+      <style jsx>{`
+        .lunch-filter-row {
+          display: grid;
+          grid-template-columns: auto auto 1fr;
+          gap: 12px;
+          align-items: center;
+        }
+
+        .lunch-date-input {
+          max-width: 200px;
+          width: 100%;
+        }
+
+        .desktop-table {
+          display: block;
+        }
+
+        .mobile-cards {
+          display: none;
+        }
+
+        @media (max-width: 900px) {
+          .lunch-filter-row {
+            grid-template-columns: 1fr;
+          }
+
+          .lunch-date-input,
+          .lunch-clear-btn {
+            max-width: 100%;
+            width: 100%;
+          }
+
+          .desktop-table {
+            display: none;
+          }
+
+          .mobile-cards {
+            display: grid;
+            gap: 12px;
+          }
+        }
+
+        @media (max-width: 520px) {
+          .mobile-photo-actions {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
       <div className="card" style={{ display: 'grid', gap: 16 }}>
         <h3 style={{ color: 'var(--primary)', marginBottom: 4 }}>🍽️ Registro de Horas de Comida</h3>
 
         {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}
 
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'auto auto 1fr', gap: 12, alignItems: 'center' }}>
+        <div className="lunch-filter-row">
           <input
             type="date"
             className="input"
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
-            style={{ maxWidth: isMobile ? '100%' : 200, width: '100%' }}
+            style={{ width: '100%' }}
+            data-lunch-filter="date"
           />
           {dateFilter && (
             <button
-              className="button-secondary"
+              className="button-secondary lunch-clear-btn"
               onClick={() => setDateFilter('')}
-              style={{ padding: '8px 12px', fontSize: 13, width: isMobile ? '100%' : 'auto' }}
+              style={{ padding: '8px 12px', fontSize: 13 }}
             >
               Limpiar
             </button>
@@ -139,7 +178,7 @@ const LunchBreaksTable: React.FC = () => {
           </div>
         ) : (
           <>
-            {!isMobile && (
+            <div className="desktop-table">
               <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', border: '1px solid var(--muted)', borderRadius: 12 }}>
                 <table style={{ width: '100%', minWidth: 860, borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
@@ -270,13 +309,12 @@ const LunchBreaksTable: React.FC = () => {
                   </tbody>
                 </table>
               </div>
-            )}
+            </div>
 
-            {isMobile && (
-              <div style={{ display: 'grid', gap: 12 }}>
+            <div className="mobile-cards">
                 {lunchBreaks.map((lunch) => (
-                  <div key={lunch.id} className="card" style={{ border: '1px solid var(--muted)', padding: 12, display: 'grid', gap: 10 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+                  <div key={lunch.id} className="card" style={{ border: '1px solid var(--muted)', padding: 12, display: 'grid', gap: 10, minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontWeight: 600 }}>{lunch.user.nombre}</div>
                         <div style={{ color: 'var(--text-secondary)', fontSize: 12, wordBreak: 'break-word' }}>{lunch.user.email}</div>
@@ -297,7 +335,7 @@ const LunchBreaksTable: React.FC = () => {
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gap: 4, fontSize: 13 }}>
+                    <div style={{ display: 'grid', gap: 6, fontSize: 13 }}>
                       <div><strong>Fecha:</strong> {new Date(lunch.date).toLocaleDateString('es-MX')}</div>
                       <div>
                         <strong>Entrada:</strong>{' '}
@@ -313,7 +351,7 @@ const LunchBreaksTable: React.FC = () => {
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <div className="mobile-photo-actions" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                       <button
                         style={{
                           padding: '10px 8px',
@@ -349,8 +387,7 @@ const LunchBreaksTable: React.FC = () => {
                     </div>
                   </div>
                 ))}
-              </div>
-            )}
+            </div>
           </>
         )}
       </div>
