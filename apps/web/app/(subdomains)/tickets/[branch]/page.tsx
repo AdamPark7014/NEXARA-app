@@ -182,7 +182,9 @@ export default function BranchTicketsPage() {
 
   const handleLogout = () => {
     window.sessionStorage.removeItem("branchSession");
+    window.sessionStorage.removeItem("clientSession");
     setSession(null);
+    window.location.replace("/tickets");
   };
 
   if (!session) {

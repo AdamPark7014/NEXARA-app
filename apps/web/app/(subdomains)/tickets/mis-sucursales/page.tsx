@@ -99,9 +99,11 @@ export default function MyBranchesPage() {
 
   const handleLogout = () => {
     window.sessionStorage.removeItem("clientSession");
+    window.sessionStorage.removeItem("branchSession");
     setSession(null);
     setProfile(null);
     setBranches([]);
+    window.location.replace("/tickets");
   };
 
   // No renderizar nada hasta que el componente esté mounted (evita hydration mismatch)
