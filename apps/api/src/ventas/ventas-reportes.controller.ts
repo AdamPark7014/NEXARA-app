@@ -80,6 +80,13 @@ export class VentasReportesController {
     return this.ventasService.getExecutiveInsights(period, user);
   }
 
+  @Get('cockpit')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: SALES_REPORT_VIEW_ACCESS })
+  async cockpit(@Query('period') period: 'week' | 'month' | 'year' = 'month', @CurrentUser() user: any) {
+    return this.ventasService.getManagerCockpit(period, user);
+  }
+
   @Get('auditoria')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_AUDIT_ACCESS })

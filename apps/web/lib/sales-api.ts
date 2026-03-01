@@ -162,6 +162,9 @@ export type SalesExecutiveInsights = {
   forecast: {
     weightedForecast: number;
     forecastCoverage: number;
+    commitForecast: number;
+    bestCaseForecast: number;
+    worstCaseForecast: number;
   };
   efficiency: {
     avgCycleDays: number;
@@ -184,6 +187,22 @@ export type SalesExecutiveInsights = {
     actionPlanCoverage: number;
     overdueNextActions: number;
   };
+  pipelineHygiene: {
+    score: number;
+    staleOpportunities14d: number;
+    staleOpportunities30d: number;
+    opportunitiesWithoutRecentActivity: number;
+    highValueLowProbability: number;
+  };
+  cadenceExecution: {
+    opportunitiesWithoutRecentActivity: number;
+    avgTouchesPerOpportunity: number;
+  };
+  repRiskSummary: {
+    onTrack: number;
+    risk: number;
+    offTrack: number;
+  };
   vendorStatus: Array<{
     userId: number;
     userName: string;
@@ -194,6 +213,41 @@ export type SalesExecutiveInsights = {
   }>;
   riskAlerts: Array<{ level: 'high' | 'medium' | 'low'; message: string }>;
   topActions: Array<{ action: string; count: number }>;
+};
+
+export type SalesManagerCockpit = {
+  summary: {
+    activeOpportunities: number;
+    coachingQueue: number;
+    overdueActions: number;
+  };
+  coachingPriorities: Array<{
+    opportunityId: number;
+    title: string;
+    ownerId: number | null;
+    ownerName: string;
+    stage: string;
+    value: number;
+    riskScore: number;
+    overdue: boolean;
+    staleDays: number;
+    withoutRecentActivity: boolean;
+    recommendation: string;
+  }>;
+  capacityBySeller: Array<{
+    ownerId: number;
+    ownerName: string;
+    activePipeline: number;
+    targetCapacity: number;
+    utilization: number;
+  }>;
+  leaderboard: Array<{
+    userId: number;
+    userName: string;
+    performance: number;
+    revenue: number;
+    status: 'on-track' | 'risk' | 'off-track';
+  }>;
 };
 
 export type SalesAuditEvent = {
@@ -533,6 +587,14 @@ export const getSalesExecutiveInsights = async (token: string, period: 'week' | 
     `ventas/reportes/insights?period=${period}`,
     { token, method: 'GET' },
     'Error al cargar insights ejecutivos',
+  );
+};
+
+export const getSalesManagerCockpit = async (token: string, period: 'week' | 'month' | 'year') => {
+  return apiRequest<SalesManagerCockpit>(
+    `ventas/reportes/cockpit?period=${period}`,
+    { token, method: 'GET' },
+    'Error al cargar cockpit comercial',
   );
 };
 

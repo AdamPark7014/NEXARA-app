@@ -4,12 +4,14 @@ import PDFViewer from './PDFViewer';
 import {
   getSalesAuditEvents,
   getSalesExecutiveInsights,
+  getSalesManagerCockpit,
   getSalesMetrics,
   getSalesQuotaProgress,
   setSalesQuota,
   type SalesQuotaPayload,
   type SalesAuditEvent,
   type SalesExecutiveInsights,
+  type SalesManagerCockpit,
   type SalesMetrics,
   type SalesVendorStats,
 } from '@/lib/sales-api';
@@ -30,6 +32,7 @@ export default function SalesReportsDashboard({
   const [metrics, setMetrics] = useState<SalesMetrics | null>(null);
   const [vendorStats, setVendorStats] = useState<SalesVendorStats[]>([]);
   const [insights, setInsights] = useState<SalesExecutiveInsights | null>(null);
+  const [cockpit, setCockpit] = useState<SalesManagerCockpit | null>(null);
   const [auditEvents, setAuditEvents] = useState<SalesAuditEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,16 +58,18 @@ export default function SalesReportsDashboard({
     setLoading(true);
     setError(null);
     try {
-      const [metricsData, vendorData, insightsData, auditData] = await Promise.all([
+      const [metricsData, vendorData, insightsData, cockpitData, auditData] = await Promise.all([
         getSalesMetrics(user.token, currentPeriod),
         getSalesQuotaProgress(user.token, currentPeriod),
         getSalesExecutiveInsights(user.token, currentPeriod),
+        getSalesManagerCockpit(user.token, currentPeriod),
         getSalesAuditEvents(user.token, currentPeriod, 20),
       ]);
 
       setMetrics(metricsData);
       setVendorStats(vendorData);
       setInsights(insightsData);
+      setCockpit(cockpitData);
       setAuditEvents(auditData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
@@ -396,6 +401,18 @@ export default function SalesReportsDashboard({
                       <span>Ciclo promedio:</span>
                       <strong>{insights.efficiency.avgCycleDays.toFixed(1)} días</strong>
                     </div>
+                    <div className={styles.vendorMetricItem}>
+                      <span>Commit:</span>
+                      <strong>{formatMoney(insights.forecast.commitForecast)}</strong>
+                    </div>
+                    <div className={styles.vendorMetricItem}>
+                      <span>Best case:</span>
+                      <strong>{formatMoney(insights.forecast.bestCaseForecast)}</strong>
+                    </div>
+                    <div className={styles.vendorMetricItem}>
+                      <span>Worst case:</span>
+                      <strong>{formatMoney(insights.forecast.worstCaseForecast)}</strong>
+                    </div>
                   </div>
                 </div>
 
@@ -468,6 +485,62 @@ export default function SalesReportsDashboard({
                     </div>
                   </div>
                 </div>
+
+                <div className={styles.vendorCard}>
+                  <div className={styles.vendorHeader}>
+                    <h4 className={styles.vendorName}>Higiene de pipeline</h4>
+                  </div>
+                  <div className={styles.vendorMetrics}>
+                    <div className={styles.vendorMetricItem}>
+                      <span>Score:</span>
+                      <strong>{insights.pipelineHygiene.score}/100</strong>
+                    </div>
+                    <div className={styles.vendorMetricItem}>
+                      <span>Stale +14d:</span>
+                      <strong>{insights.pipelineHygiene.staleOpportunities14d}</strong>
+                    </div>
+                    <div className={styles.vendorMetricItem}>
+                      <span>Stale +30d:</span>
+                      <strong>{insights.pipelineHygiene.staleOpportunities30d}</strong>
+                    </div>
+                    <div className={styles.vendorMetricItem}>
+                      <span>Sin actividad reciente:</span>
+                      <strong>{insights.pipelineHygiene.opportunitiesWithoutRecentActivity}</strong>
+                    </div>
+                    <div className={styles.vendorMetricItem}>
+                      <span>Alto valor/baja prob.:</span>
+                      <strong>{insights.pipelineHygiene.highValueLowProbability}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.vendorCard}>
+                  <div className={styles.vendorHeader}>
+                    <h4 className={styles.vendorName}>Ejecución comercial</h4>
+                  </div>
+                  <div className={styles.vendorMetrics}>
+                    <div className={styles.vendorMetricItem}>
+                      <span>Promedio touches:</span>
+                      <strong>{insights.cadenceExecution.avgTouchesPerOpportunity.toFixed(2)}</strong>
+                    </div>
+                    <div className={styles.vendorMetricItem}>
+                      <span>Sin touchpoint 7d:</span>
+                      <strong>{insights.cadenceExecution.opportunitiesWithoutRecentActivity}</strong>
+                    </div>
+                    <div className={styles.vendorMetricItem}>
+                      <span>Vendedores on-track:</span>
+                      <strong>{insights.repRiskSummary.onTrack}</strong>
+                    </div>
+                    <div className={styles.vendorMetricItem}>
+                      <span>Vendedores en riesgo:</span>
+                      <strong>{insights.repRiskSummary.risk}</strong>
+                    </div>
+                    <div className={styles.vendorMetricItem}>
+                      <span>Vendedores off-track:</span>
+                      <strong>{insights.repRiskSummary.offTrack}</strong>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {insights.riskAlerts.length > 0 && (
@@ -483,6 +556,81 @@ export default function SalesReportsDashboard({
                             {alert.level === 'high' ? '🔴' : alert.level === 'medium' ? '🟠' : '🟡'} {alert.message}
                           </span>
                           <strong>{alert.level.toUpperCase()}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {cockpit && (
+            <div className={styles.vendorSection}>
+              <h3 className={styles.sectionTitle}>Cockpit de Manager</h3>
+              <div className={styles.vendorGrid}>
+                <div className={styles.vendorCard}>
+                  <div className={styles.vendorHeader}>
+                    <h4 className={styles.vendorName}>Resumen operativo</h4>
+                  </div>
+                  <div className={styles.vendorMetrics}>
+                    <div className={styles.vendorMetricItem}>
+                      <span>Oportunidades activas:</span>
+                      <strong>{cockpit.summary.activeOpportunities}</strong>
+                    </div>
+                    <div className={styles.vendorMetricItem}>
+                      <span>Queue de coaching:</span>
+                      <strong>{cockpit.summary.coachingQueue}</strong>
+                    </div>
+                    <div className={styles.vendorMetricItem}>
+                      <span>Acciones vencidas:</span>
+                      <strong>{cockpit.summary.overdueActions}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.vendorCard}>
+                  <div className={styles.vendorHeader}>
+                    <h4 className={styles.vendorName}>Capacidad por vendedor</h4>
+                  </div>
+                  <div className={styles.vendorMetrics}>
+                    {cockpit.capacityBySeller.slice(0, 8).map((row) => (
+                      <div key={row.ownerId} className={styles.vendorMetricItem}>
+                        <span>{row.ownerName}: {row.activePipeline}/{row.targetCapacity}</span>
+                        <strong>{row.utilization.toFixed(1)}%</strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className={styles.vendorCard}>
+                  <div className={styles.vendorHeader}>
+                    <h4 className={styles.vendorName}>Leaderboard</h4>
+                  </div>
+                  <div className={styles.vendorMetrics}>
+                    {cockpit.leaderboard.map((row) => (
+                      <div key={row.userId} className={styles.vendorMetricItem}>
+                        <span>{row.userName} · {formatMoney(row.revenue)}</span>
+                        <strong>{row.performance}%</strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {cockpit.coachingPriorities.length > 0 && (
+                <div className={`${styles.vendorGrid} ${styles.spacingTop}`}>
+                  <div className={`${styles.vendorCard} ${styles.fullWidthCard}`}>
+                    <div className={styles.vendorHeader}>
+                      <h4 className={styles.vendorName}>Prioridades de coaching</h4>
+                    </div>
+                    <div className={styles.vendorMetrics}>
+                      {cockpit.coachingPriorities.slice(0, 10).map((item) => (
+                        <div key={item.opportunityId} className={styles.vendorMetricItem}>
+                          <span>
+                            [{item.riskScore}] {item.title} · {item.ownerName} · {item.stage}
+                          </span>
+                          <strong>{item.recommendation}</strong>
                         </div>
                       ))}
                     </div>
