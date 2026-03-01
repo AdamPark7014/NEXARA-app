@@ -38,14 +38,14 @@ export default function ContabilidadLayout({ children }: { children: React.React
       <header className={styles.mobileTopbar}>
         <button
           type="button"
-          className={styles.mobileMenuButton}
+          className={`${consoleStyles.hamburgerButton} ${mobileMenuOpen ? consoleStyles.hamburgerActive : ""}`}
           onClick={() => setMobileMenuOpen((prev) => !prev)}
           aria-label={mobileMenuOpen ? "Cerrar menu" : "Abrir menu"}
           aria-expanded={mobileMenuOpen}
         >
-          <span />
-          <span />
-          <span />
+          <span className={consoleStyles.hamburgerLine} />
+          <span className={consoleStyles.hamburgerLine} />
+          <span className={consoleStyles.hamburgerLine} />
         </button>
         <div className={`${styles.mobileBrand} ${consoleStyles.sidebarLogo}`}>
           <span className={consoleStyles.brandMark}>NEXARA</span>
