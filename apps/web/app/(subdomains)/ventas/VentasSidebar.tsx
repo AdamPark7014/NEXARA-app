@@ -143,6 +143,8 @@ export default function VentasSidebar() {
   return (
     <aside
       className={`${styles.ventasSidebar} ${sidebarOpen ? styles.sidebarOpen : styles.sidebarCollapsed} ${isMenuOpen && isMobile ? styles.mobileOpen : ""}`}
+      data-mobile={isMobile ? "true" : "false"}
+      data-open={isMenuOpen ? "true" : "false"}
     >
       {/* Header con Logo */}
       <div className={styles.sidebarHeader}>
@@ -152,11 +154,12 @@ export default function VentasSidebar() {
         </div>
         {isMobile ? (
           <button
-            className={`${styles.hamburgerButton} ${isMenuOpen ? styles.hamburgerActive : ""}`}
+            className={styles.hamburgerButton}
             onClick={() => setIsMenuOpen((prev) => !prev)}
             aria-label={isMenuOpen ? "Cerrar menú" : "Abrir menú"}
             aria-expanded={isMenuOpen}
             aria-controls="ventas-sidebar-menu"
+            data-open={isMenuOpen ? "true" : "false"}
           >
             <span className={styles.hamburgerLine}></span>
             <span className={styles.hamburgerLine}></span>
@@ -176,7 +179,7 @@ export default function VentasSidebar() {
 
       {isMobile && isMenuOpen && <div className={styles.sidebarOverlay} onClick={closeMenu} role="presentation" />}
 
-      <div className={styles.sidebarContent} id="ventas-sidebar-menu">
+      <div className={styles.sidebarContent} id="ventas-sidebar-menu" data-open={isMenuOpen ? "true" : "false"}>
 
       {/* User Info Card */}
       {showExpandedContent && (

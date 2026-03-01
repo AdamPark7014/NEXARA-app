@@ -606,7 +606,7 @@ export default function ClientTicketsPage() {
 
   return (
     <div className={`${consoleStyles.consoleLayout} ${styles.ticketsConsole}`}>
-      <aside className={`${consoleStyles.sidebar} ${isMobile && mobileMenuOpen ? consoleStyles.sidebarOpen : ""}`}>
+      <aside className={consoleStyles.sidebar} data-mobile={isMobile ? "true" : "false"} data-open={mobileMenuOpen ? "true" : "false"}>
         <div className={consoleStyles.sidebarHeader}>
           <div className={consoleStyles.sidebarLogo}>
             <span className={consoleStyles.brandMark}>NEXARA</span>
@@ -615,11 +615,12 @@ export default function ClientTicketsPage() {
           {isMobile && (
             <button
               type="button"
-              className={`${consoleStyles.hamburgerButton} ${mobileMenuOpen ? consoleStyles.hamburgerActive : ""}`}
+              className={consoleStyles.hamburgerButton}
               onClick={() => setMobileMenuOpen((prev) => !prev)}
               aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
               aria-expanded={mobileMenuOpen}
               aria-controls="tickets-sidebar-menu"
+              data-open={mobileMenuOpen ? "true" : "false"}
             >
               <span className={consoleStyles.hamburgerLine}></span>
               <span className={consoleStyles.hamburgerLine}></span>
@@ -632,7 +633,7 @@ export default function ClientTicketsPage() {
           <div className={consoleStyles.sidebarOverlay} onClick={() => setMobileMenuOpen(false)} role="presentation"></div>
         )}
 
-        <div className={consoleStyles.sidebarContent} id="tickets-sidebar-menu">
+        <div className={consoleStyles.sidebarContent} id="tickets-sidebar-menu" data-open={mobileMenuOpen ? "true" : "false"}>
         <div className={consoleStyles.sidebarLogo}>
           <span className={consoleStyles.brandMark}>NEXARA</span>
           <span className={consoleStyles.brandSub}>Portal</span>
