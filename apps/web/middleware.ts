@@ -20,15 +20,156 @@ const SUBDOMAIN_MAP: Record<string, string> = {
   'tickets': 'tickets',
 };
 
+const DEFAULT_ALLOWED_METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']);
+const SUSPICIOUS_PATH_PATTERN = /\.\.|%2e%2e|%00|<|>|\\/i;
+const SUSPICIOUS_QUERY_PATTERN = /<script|javascript:|union\s+select|or\s+1\s*=\s*1|drop\s+table|information_schema|%00|\$\{jndi:/i;
+const MALICIOUS_USER_AGENT_PATTERN = /sqlmap|nikto|acunetix|dirbuster|wpscan|masscan|nmap|burpsuite|gobuster/i;
+const SENSITIVE_PATH_PATTERN = /\/(auth|login|signin|reset-password|api\/auth)\b/i;
+const HONEYPOT_PATH_PATTERN = /\/(wp-admin|wp-login|phpmyadmin|\.git|\.env|\.aws|server-status|\.well-known\/acme-challenge(?!\/))/i;
+
+const getAllowedSubdomains = (): string[] => {
+  const envSubdomains = process.env.ALLOWED_SUBDOMAINS;
+  if (!envSubdomains) {
+    return Object.keys(SUBDOMAIN_MAP);
+  }
+
+  const configured = envSubdomains
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  return configured.length > 0 ? configured : Object.keys(SUBDOMAIN_MAP);
+};
+
+const buildDefaultAllowedHostPatterns = (): RegExp[] => {
+  const allowedSubdomains = getAllowedSubdomains().map((subdomain) => subdomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const subdomainAlternation = allowedSubdomains.join('|');
+
+  return [
+    /^localhost(?::\d+)?$/i,
+    /^127\.0\.0\.1(?::\d+)?$/i,
+    /^nexara\.com\.mx(?::\d+)?$/i,
+    /^www\.nexara\.com\.mx(?::\d+)?$/i,
+    new RegExp(`^(${subdomainAlternation})\\.localhost(?::\\d+)?$`, 'i'),
+    new RegExp(`^(${subdomainAlternation})\\.nexara\\.com\\.mx(?::\\d+)?$`, 'i'),
+    new RegExp(`^(${subdomainAlternation})\\.nexara\\.local(?::\\d+)?$`, 'i'),
+  ];
+};
+
+const buildCsp = () => {
+  const isDev = process.env.NODE_ENV !== 'production';
+  const scriptSrc = isDev ? "'self' 'unsafe-inline' 'unsafe-eval'" : "'self' 'unsafe-inline'";
+
+  return [
+    "default-src 'self'",
+    `script-src ${scriptSrc}`,
+    "style-src 'self' 'unsafe-inline' https:",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data: https:",
+    "connect-src 'self' https: wss: http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:*",
+    "media-src 'self' blob: https:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+    'upgrade-insecure-requests',
+  ].join('; ');
+};
+
+const applySecurityHeaders = (response: NextResponse) => {
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  response.headers.set('X-DNS-Prefetch-Control', 'off');
+  response.headers.set('X-Permitted-Cross-Domain-Policies', 'none');
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=()');
+  response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+  response.headers.set('Cross-Origin-Resource-Policy', 'same-site');
+  response.headers.set('Cross-Origin-Embedder-Policy', 'credentialless');
+  response.headers.set('Origin-Agent-Cluster', '?1');
+  response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  response.headers.set('Content-Security-Policy', buildCsp());
+  return response;
+};
+
+const rejectWithSecurityHeaders = (message: string, status: number) => {
+  return applySecurityHeaders(new NextResponse(message, { status }));
+};
+
+const getAllowedHostPatterns = (): RegExp[] => {
+  const defaultPatterns = buildDefaultAllowedHostPatterns();
+  const envHosts = process.env.ALLOWED_HOSTS;
+  if (!envHosts) {
+    return defaultPatterns;
+  }
+
+  const exactHosts = envHosts
+    .split(',')
+    .map((host) => host.trim().toLowerCase())
+    .filter(Boolean)
+    .map((host) => host.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+
+  return [...defaultPatterns, ...exactHosts.map((host) => new RegExp(`^${host}(?::\\d+)?$`, 'i'))];
+};
+
+const ALLOWED_HOST_PATTERNS = getAllowedHostPatterns();
+
+const isAllowedHost = (host: string) => {
+  return ALLOWED_HOST_PATTERNS.some((pattern) => pattern.test(host));
+};
+
 export function middleware(request: NextRequest) {
-  const hostname = request.headers.get('host');
+  const isProduction = process.env.NODE_ENV === 'production';
+  const forwardedProto = request.headers.get('x-forwarded-proto');
+
+  if (!DEFAULT_ALLOWED_METHODS.has(request.method.toUpperCase())) {
+    return rejectWithSecurityHeaders('Método no permitido', 405);
+  }
+
+  const userAgent = request.headers.get('user-agent') || '';
+  if (MALICIOUS_USER_AGENT_PATTERN.test(userAgent)) {
+    return rejectWithSecurityHeaders('Cliente no permitido', 403);
+  }
+
+  const pathnameWithQuery = `${request.nextUrl.pathname}${request.nextUrl.search || ''}`;
+  if (HONEYPOT_PATH_PATTERN.test(request.nextUrl.pathname)) {
+    return rejectWithSecurityHeaders('Not found', 404);
+  }
+
+  if (SUSPICIOUS_PATH_PATTERN.test(pathnameWithQuery)) {
+    return rejectWithSecurityHeaders('Ruta inválida', 400);
+  }
+
+  const queryString = request.nextUrl.searchParams.toString();
+  if (SUSPICIOUS_QUERY_PATTERN.test(queryString)) {
+    return rejectWithSecurityHeaders('Query inválida', 400);
+  }
+
+  const mutatingMethod = request.method === 'POST' || request.method === 'PUT' || request.method === 'PATCH' || request.method === 'DELETE';
+  if (mutatingMethod) {
+    const fetchSite = request.headers.get('sec-fetch-site');
+    if (fetchSite && !['same-origin', 'same-site', 'none'].includes(fetchSite.toLowerCase())) {
+      return rejectWithSecurityHeaders('Cross-site request bloqueada', 403);
+    }
+  }
+
+  const hostname = request.headers.get('host')?.trim().toLowerCase();
   
   if (!hostname) {
-    return NextResponse.next();
+    return applySecurityHeaders(NextResponse.next());
+  }
+
+  if (!isAllowedHost(hostname)) {
+    return rejectWithSecurityHeaders('Host no permitido', 400);
+  }
+
+  const hostWithoutPort = hostname.split(':')[0];
+  const isLocalHost = hostWithoutPort.includes('localhost') || hostWithoutPort === '127.0.0.1';
+  if (isProduction && !isLocalHost && forwardedProto && forwardedProto !== 'https') {
+    return rejectWithSecurityHeaders('HTTPS requerido', 426);
   }
 
   // Remover puerto para obtener host limpio
-  const hostWithoutPort = hostname.split(':')[0];
   const hostParts = hostWithoutPort.split('.');
 
   // Detectar tipo de entorno y subdominio
@@ -63,7 +204,7 @@ export function middleware(request: NextRequest) {
     // Permitir que Next.js los sirva directamente desde /public
     const staticFileExtensions = /\.(png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot|css|js|json)$/i;
     if (staticFileExtensions.test(pathname)) {
-      return NextResponse.next();
+      return applySecurityHeaders(NextResponse.next());
     }
     
     // Reescribir a /<slug><pathname>
@@ -74,13 +215,17 @@ export function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = rewritePath;
     
-    console.log('[MIDDLEWARE] Subdomain:', subdomain, '→ Rewrite:', pathname, '→', rewritePath);
-    
-    return NextResponse.rewrite(url);
+    return applySecurityHeaders(NextResponse.rewrite(url));
   }
 
   // Dominio principal o www: mantener como está, Next.js maneja normalmente
-  return NextResponse.next();
+  const response = applySecurityHeaders(NextResponse.next());
+  if (SENSITIVE_PATH_PATTERN.test(request.nextUrl.pathname)) {
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+  }
+  return response;
 }
 
 export const config = {
