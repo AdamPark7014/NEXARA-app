@@ -178,13 +178,36 @@ export default function VentasSidebar() {
         )}
       </div>
 
-      {isMobile && isMenuOpen && <div className={styles.sidebarOverlay} onClick={closeMenu} role="presentation" />}
+      {isMobile && isMenuOpen && (
+        <div
+          className={styles.sidebarOverlay}
+          onClick={closeMenu}
+          role="presentation"
+          style={{ zIndex: 12001 }}
+        />
+      )}
 
       {(!isMobile || isMenuOpen) && (
       <div
         className={styles.sidebarContent}
         id="ventas-sidebar-menu"
         data-open={isMobile && isMenuOpen ? "true" : undefined}
+        style={
+          isMobile && isMenuOpen
+            ? {
+                position: "fixed",
+                top: "58px",
+                left: "6px",
+                right: "6px",
+                zIndex: 12002,
+                display: "flex",
+                opacity: 1,
+                visibility: "visible",
+                transform: "translateY(0) scale(1)",
+                pointerEvents: "auto",
+              }
+            : undefined
+        }
       >
 
       {/* User Info Card */}
