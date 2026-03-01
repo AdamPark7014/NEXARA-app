@@ -630,7 +630,12 @@ export default function ClientTicketsPage() {
         </div>
 
         {isMobile && mobileMenuOpen && (
-          <div className={consoleStyles.sidebarOverlay} onClick={() => setMobileMenuOpen(false)} role="presentation"></div>
+          <div
+            className={consoleStyles.sidebarOverlay}
+            onClick={() => setMobileMenuOpen(false)}
+            role="presentation"
+            style={{ zIndex: 12001 }}
+          ></div>
         )}
 
         {(!isMobile || mobileMenuOpen) && (
@@ -638,6 +643,22 @@ export default function ClientTicketsPage() {
           className={consoleStyles.sidebarContent}
           id="tickets-sidebar-menu"
           data-open={isMobile && mobileMenuOpen ? "true" : undefined}
+          style={
+            isMobile && mobileMenuOpen
+              ? {
+                  position: "fixed",
+                  top: "64px",
+                  left: "8px",
+                  right: "8px",
+                  zIndex: 12002,
+                  display: "flex",
+                  opacity: 1,
+                  visibility: "visible",
+                  transform: "translateY(0) scale(1)",
+                  pointerEvents: "auto",
+                }
+              : undefined
+          }
         >
         <div className={consoleStyles.sidebarLogo}>
           <span className={consoleStyles.brandMark}>NEXARA</span>

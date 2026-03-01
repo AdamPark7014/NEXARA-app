@@ -118,6 +118,7 @@ export default function ContabilidadLayout({ children }: { children: React.React
           className={styles.mobileBackdrop}
           onClick={() => setMobileMenuOpen(false)}
           aria-label="Cerrar menú"
+          style={{ zIndex: 12001 }}
         />
       )}
 
@@ -127,11 +128,13 @@ export default function ContabilidadLayout({ children }: { children: React.React
         style={
           mobileMenuOpen
             ? {
+                zIndex: 12002,
                 opacity: 1,
                 visibility: "visible",
                 transform: "translateY(0) scale(1)",
+                pointerEvents: "auto",
               }
-            : undefined
+            : { pointerEvents: "none" }
         }
       >
         <div className={consoleStyles.sidebarLogo}>

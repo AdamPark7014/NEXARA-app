@@ -158,7 +158,7 @@
     backdrop-filter: blur(8px);
     position: sticky;
     top: 8px;
-    z-index: 36;
+    z-index: 12003;
   }
 
   .mobileMenuButton {
@@ -204,7 +204,7 @@
     inset: 0;
     border: none;
     background: rgba(0, 0, 0, 0.45);
-    z-index: 34;
+    z-index: 12001;
   }
 
   .contaSidebar {
@@ -220,7 +220,7 @@
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease;
-    z-index: 35;
+    z-index: 12002;
     overflow-y: auto;
     overscroll-behavior: contain;
     padding-bottom: 8px;
