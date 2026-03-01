@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "@/components/ThemeContext";
 import { useUser } from "@/components/UserContext";
+import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import consoleStyles from "../console/console.module.css";
 import styles from "./layout.module.css";
 
@@ -13,11 +14,28 @@ export default function ContabilidadLayout({ children }: { children: React.React
   const pathname = usePathname();
   const router = useRouter();
   const { darkMode, toggleDarkMode } = useTheme();
-  const { logout } = useUser();
+  const { user, logout } = useUser();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
   const currentPath = pathname ? pathname.replace(/\/+$/, "") : "";
+  const userName = user?.nombre || "Panel Contabilidad";
+  const userEmail = user?.email || "Dirección financiera corporativa";
+  const userRole = user?.role || "Contabilidad";
+  const userInitials = userName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || "")
+    .join("") || "CO";
+
+  const isSuperAdmin = Boolean(user?.isSuperAdmin);
+  const isAdmin = Boolean(
+    user && (
+      hasPermission(user, PERMISSIONS.CONSOLE_ADMIN) ||
+      hasPermission(user, PERMISSIONS.CONTABILIDAD_MANAGE)
+    ),
+  );
 
   const navGroups = [
     {
@@ -152,12 +170,14 @@ export default function ContabilidadLayout({ children }: { children: React.React
 
         <div className={consoleStyles.sidebarUser}>
           <div className={consoleStyles.sidebarAvatar}>
-            <span className={consoleStyles.sidebarName}>CO</span>
+            <span className={consoleStyles.sidebarName}>{userInitials}</span>
           </div>
-          <div className={consoleStyles.sidebarName}>Panel Contabilidad</div>
-          <div className={consoleStyles.sidebarEmail}>Dirección financiera corporativa</div>
+          <div className={consoleStyles.sidebarName}>{userName}</div>
+          <div className={consoleStyles.sidebarEmail}>{userEmail}</div>
           <div className={consoleStyles.sidebarMeta}>
-            <span className={consoleStyles.rolePill}>Contabilidad</span>
+            <span className={consoleStyles.rolePill}>{userRole}</span>
+            {isSuperAdmin && <span className={consoleStyles.levelPill}>Superadmin</span>}
+            {!isSuperAdmin && isAdmin && <span className={consoleStyles.levelPill}>Admin</span>}
           </div>
         </div>
 
