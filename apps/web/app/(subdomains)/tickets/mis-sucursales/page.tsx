@@ -179,17 +179,7 @@ export default function MyBranchesPage() {
         <div
           className={consoleStyles.sidebarContent}
           id="tickets-branches-sidebar-menu"
-          data-open={mobileMenuOpen ? "true" : "false"}
-          style={
-            isMobile
-              ? {
-                  display: "flex",
-                  opacity: 1,
-                  visibility: "visible",
-                  transform: "translateY(0) scale(1)",
-                }
-              : undefined
-          }
+          data-open={isMobile && mobileMenuOpen ? "true" : undefined}
         >
         <div className={consoleStyles.sidebarLogo}>
           <span className={consoleStyles.brandMark}>NEXARA</span>

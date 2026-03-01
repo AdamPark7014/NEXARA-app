@@ -142,7 +142,7 @@ export default function VentasSidebar() {
 
   return (
     <aside
-      className={`${styles.ventasSidebar} ${sidebarOpen ? styles.sidebarOpen : styles.sidebarCollapsed} ${isMenuOpen && isMobile ? styles.mobileOpen : ""}`}
+      className={`${styles.ventasSidebar} ${sidebarOpen ? styles.sidebarOpen : styles.sidebarCollapsed}`}
       data-mobile={isMobile ? "true" : "false"}
       data-open={isMenuOpen ? "true" : "false"}
     >
@@ -154,6 +154,7 @@ export default function VentasSidebar() {
         </div>
         {isMobile ? (
           <button
+            type="button"
             className={styles.hamburgerButton}
             onClick={() => setIsMenuOpen((prev) => !prev)}
             aria-label={isMenuOpen ? "Cerrar menú" : "Abrir menú"}
@@ -183,17 +184,7 @@ export default function VentasSidebar() {
       <div
         className={styles.sidebarContent}
         id="ventas-sidebar-menu"
-        data-open={isMenuOpen ? "true" : "false"}
-        style={
-          isMobile
-            ? {
-                display: "flex",
-                opacity: 1,
-                visibility: "visible",
-                transform: "translateY(0) scale(1)",
-              }
-            : undefined
-        }
+        data-open={isMobile && isMenuOpen ? "true" : undefined}
       >
 
       {/* User Info Card */}
