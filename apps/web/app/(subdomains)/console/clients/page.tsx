@@ -5,7 +5,7 @@ import { RoleGuard } from '@/components/RoleGuard';
 import { PERMISSIONS } from '@/lib/permissions';
 import { useUser } from '@/components/UserContext';
 import ClientCreationForm from '@/components/ClientCreationForm';
-import { ClientTicketsPanel } from '../client-tickets/page';
+import { ClientTicketsPanel } from '../client-tickets/ClientTicketsPanel';
 
 export default function ClientsPage() {
   const { user } = useUser();
