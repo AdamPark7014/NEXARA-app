@@ -1,12 +1,19 @@
 "use client";
 import React, { useEffect, useRef, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { RoleGuard } from '@/components/RoleGuard';
 import { PERMISSIONS } from '@/lib/permissions';
 import { useUser } from '@/components/UserContext';
 import ClientCreationForm from '@/components/ClientCreationForm';
+import { ClientTicketsPanel } from '../client-tickets/page';
 
 export default function ClientsPage() {
   const { user } = useUser();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [isMobile, setIsMobile] = useState(false);
+  const [activeTab, setActiveTab] = useState<'clients' | 'tickets'>(searchParams.get('view') === 'tickets' ? 'tickets' : 'clients');
   const [clients, setClients] = useState<any[]>([]);
   const [editingClient, setEditingClient] = useState<any | null>(null);
   const [editForm, setEditForm] = useState({
@@ -61,6 +68,30 @@ export default function ClientsPage() {
   useEffect(() => {
     fetchClients();
   }, [user?.token]);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 720);
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
+    const view = searchParams.get('view');
+    setActiveTab(view === 'tickets' ? 'tickets' : 'clients');
+  }, [searchParams]);
+
+  const handleTabChange = (tab: 'clients' | 'tickets') => {
+    setActiveTab(tab);
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === 'tickets') {
+      params.set('view', 'tickets');
+    } else {
+      params.delete('view');
+    }
+    const queryString = params.toString();
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false });
+  };
 
   useEffect(() => {
     if (!editLogo) {
@@ -190,13 +221,42 @@ export default function ClientsPage() {
 
   return (
     <RoleGuard permissions={[PERMISSIONS.CONSOLE_ADMIN]}>
-      <div style={{ display: 'grid', gap: 16 }}>
-        {/* Formulario de creación */}
-        <ClientCreationForm onClientCreated={fetchClients} />
+      <div style={{ display: 'grid', gap: 16, maxWidth: 1440, margin: '0 auto', width: '100%' }}>
+        <div className="card" style={{ display: 'grid', gap: 14 }}>
+          <div>
+            <h1 style={{ margin: 0, color: 'var(--primary)', fontSize: isMobile ? 24 : 30 }}>🤝 Clientes corporativos</h1>
+            <p style={{ margin: '6px 0 0', color: 'var(--text-secondary)', fontSize: isMobile ? 13 : 14 }}>
+              Administra cuentas corporativas y su operación de tickets desde un solo lugar.
+            </p>
+          </div>
+          <div style={{ display: isMobile ? 'grid' : 'flex', gridTemplateColumns: isMobile ? '1fr' : undefined, gap: 10 }}>
+            <button
+              type="button"
+              className={activeTab === 'clients' ? 'button-primary' : 'button-secondary'}
+              onClick={() => handleTabChange('clients')}
+              style={{ width: isMobile ? '100%' : undefined }}
+            >
+              🧾 Gestión de clientes
+            </button>
+            <button
+              type="button"
+              className={activeTab === 'tickets' ? 'button-primary' : 'button-secondary'}
+              onClick={() => handleTabChange('tickets')}
+              style={{ width: isMobile ? '100%' : undefined }}
+            >
+              🎫 Tickets de clientes
+            </button>
+          </div>
+        </div>
 
-        {/* Formulario de edición */}
-        {editingClient && (
-          <div className="card" style={{ display: 'grid', gap: 12 }}>
+        {activeTab === 'clients' && (
+          <>
+            {/* Formulario de creación */}
+            <ClientCreationForm onClientCreated={fetchClients} />
+
+            {/* Formulario de edición */}
+            {editingClient && (
+              <div className="card" style={{ display: 'grid', gap: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
               <h2 style={{ color: 'var(--primary)' }}>Editar cliente</h2>
               <button className="button-secondary" onClick={() => setEditingClient(null)}>Cancelar</button>
@@ -347,13 +407,13 @@ export default function ClientsPage() {
                 )}
               </div>
             </div>
-          </div>
-        )}
-        
-        {/* Lista de clientes */}
-        <div className="card" style={{ display: 'grid', gap: 12 }}>
-          <h2 style={{ color: 'var(--primary)' }}>Clientes Registrados</h2>
-          <table className="table">
+              </div>
+            )}
+
+            {/* Lista de clientes */}
+            <div className="card" style={{ display: 'grid', gap: 12 }}>
+              <h2 style={{ color: 'var(--primary)' }}>Clientes Registrados</h2>
+              <table className="table">
             <thead>
               <tr>
                 <th>Logo</th>
@@ -467,8 +527,12 @@ export default function ClientsPage() {
                 })
               )}
             </tbody>
-          </table>
-        </div>
+              </table>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'tickets' && <ClientTicketsPanel embedded />}
       </div>
     </RoleGuard>
   );

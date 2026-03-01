@@ -2,14 +2,17 @@
 
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "@/components/ThemeContext";
+import { useUser } from "@/components/UserContext";
 import consoleStyles from "../console/console.module.css";
 import styles from "./layout.module.css";
 
 export default function ContabilidadLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { darkMode, toggleDarkMode } = useTheme();
+  const { logout } = useUser();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const currentPath = pathname ? pathname.replace(/\/+$/, "") : "";
@@ -27,6 +30,12 @@ export default function ContabilidadLayout({ children }: { children: React.React
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
+
+  const handleLogout = () => {
+    logout();
+    setMobileMenuOpen(false);
+    router.replace("/login");
+  };
 
   // Si estamos en login, no renderizar el sidebar
   if (pathname && pathname.includes("/login")) {
@@ -106,6 +115,17 @@ export default function ContabilidadLayout({ children }: { children: React.React
               aria-label={darkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
             >
               {darkMode ? "Cambiar a vista clara" : "Cambiar a vista oscura"}
+            </button>
+          </li>
+
+          <li className={consoleStyles.sidebarMenuItem}>
+            <button
+              type="button"
+              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
+              onClick={handleLogout}
+              aria-label="Cerrar sesión"
+            >
+              Cerrar sesión
             </button>
           </li>
         </ul>
