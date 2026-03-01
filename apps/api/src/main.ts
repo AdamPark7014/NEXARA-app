@@ -75,28 +75,6 @@ async function bootstrap() {
     next();
   });
 
-  app.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
-    const isProduction = process.env['NODE_ENV'] === 'production';
-    const forwardedProto = request.headers['x-forwarded-proto'];
-    const proto = Array.isArray(forwardedProto)
-      ? forwardedProto[0]
-      : typeof forwardedProto === 'string'
-        ? forwardedProto.split(',')[0]
-        : request.protocol;
-
-    const host = (request.headers.host || '').toLowerCase();
-    const isLocalHost = host.includes('localhost') || host.includes('127.0.0.1');
-    if (isProduction && !isLocalHost && proto !== 'https') {
-      response.status(426).json({
-        statusCode: 426,
-        message: 'HTTPS required',
-      });
-      return;
-    }
-
-    next();
-  });
-
   const ipPenaltyBox = createInMemoryIpBanList({
     maxStrikes: Number(process.env['IP_BAN_MAX_STRIKES'] || 6),
     banWindowMs: Number(process.env['IP_BAN_WINDOW_MS'] || 60 * 60_000),

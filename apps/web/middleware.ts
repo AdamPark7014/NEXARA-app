@@ -119,9 +119,6 @@ const isAllowedHost = (host: string) => {
 };
 
 export function middleware(request: NextRequest) {
-  const isProduction = process.env.NODE_ENV === 'production';
-  const forwardedProto = request.headers.get('x-forwarded-proto');
-
   if (!DEFAULT_ALLOWED_METHODS.has(request.method.toUpperCase())) {
     return rejectWithSecurityHeaders('Método no permitido', 405);
   }
@@ -164,10 +161,6 @@ export function middleware(request: NextRequest) {
   }
 
   const hostWithoutPort = hostname.split(':')[0];
-  const isLocalHost = hostWithoutPort.includes('localhost') || hostWithoutPort === '127.0.0.1';
-  if (isProduction && !isLocalHost && forwardedProto && forwardedProto !== 'https') {
-    return rejectWithSecurityHeaders('HTTPS requerido', 426);
-  }
 
   // Remover puerto para obtener host limpio
   const hostParts = hostWithoutPort.split('.');
