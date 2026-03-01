@@ -84,7 +84,7 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const toggleMobileMenu = () => {
-    setMobileMenuOpen(!mobileMenuOpen);
+    setMobileMenuOpen((prev) => !prev);
   };
 
   const closeMobileMenu = () => {
@@ -121,6 +121,7 @@ export default function Header() {
           
           {/* Mobile Menu Button */}
           <button 
+            type="button"
             className={`${styles.mobileMenuButton} ${mobileMenuOpen ? styles.active : ''}`}
             onClick={toggleMobileMenu}
             aria-label="Menú"
