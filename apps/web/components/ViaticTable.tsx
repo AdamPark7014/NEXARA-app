@@ -28,6 +28,7 @@ const ViaticTable = () => {
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
@@ -62,6 +63,13 @@ const ViaticTable = () => {
       socket.disconnect();
     };
   }, [user?.token]);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 900);
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   // Filtering
   useEffect(() => {
@@ -143,7 +151,7 @@ const ViaticTable = () => {
   return (
     <div className="card">
       <h2 style={{ color: 'var(--primary)', marginBottom: 12 }}>Viáticos</h2>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 12, alignItems: 'center' }}>
         <select className="input" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
           <option value="">Todos los estatus</option>
           <option value="Pendiente">Pendiente</option>
@@ -167,82 +175,129 @@ const ViaticTable = () => {
             <option key={size} value={size}>{size} por página</option>
           ))}
         </select>
-        {hasPermission(user, PERMISSIONS.VIATICS_EXPORT) && (
-          <>
-            <button
-              className="button-primary"
-              onClick={async () => {
-                const res = await fetch(buildApiUrl('export/viatic'));
-                if (!res.ok) return alert('Error al exportar');
-                const blob = await res.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'viaticos.xlsx';
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                window.URL.revokeObjectURL(url);
-              }}
-            >
-              Exportar Excel
-            </button>
-            <button className="button-primary" onClick={() => fileInputRef.current?.click()}>Importar Excel</button>
-            <input
-              type="file"
-              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              ref={fileInputRef}
-              style={{ display: 'none' }}
-              onChange={handleImport}
-            />
-          </>
-        )}
       </div>
+      {hasPermission(user, PERMISSIONS.VIATICS_EXPORT) && (
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'auto auto', gap: 10, marginBottom: 12, justifyContent: isMobile ? 'stretch' : 'start' }}>
+          <button
+            className="button-primary"
+            onClick={async () => {
+              const res = await fetch(buildApiUrl('export/viatic'));
+              if (!res.ok) return alert('Error al exportar');
+              const blob = await res.blob();
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'viaticos.xlsx';
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              window.URL.revokeObjectURL(url);
+            }}
+            style={{ width: isMobile ? '100%' : 'auto' }}
+          >
+            Exportar Excel
+          </button>
+          <button className="button-primary" onClick={() => fileInputRef.current?.click()} style={{ width: isMobile ? '100%' : 'auto' }}>Importar Excel</button>
+          <input
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            onChange={handleImport}
+          />
+        </div>
+      )}
       {importMsg && (
         <div style={{ color: importMsg.startsWith('Error') ? 'var(--danger)' : 'var(--accent)' }}>{importMsg}</div>
       )}
-      <table className="table">
-        <thead>
-          <tr>
-            <th>Actividad</th>
-            <th>Monto</th>
-            <th>Razón</th>
-            <th>Ticket</th>
-            <th>Estatus</th>
-            <th>Usuario</th>
-            {hasPermission(user, PERMISSIONS.VIATICS_MANAGE) && <th>Acciones</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {paginated.map((v: Viatic) => (
-            <tr key={v.id}>
-              <td>{v.actividad?.anNumber}</td>
-              <td>${v.montoSolicitado}</td>
-              <td>{v.razonGasto}</td>
-              <td>{v.ticketEvidenciaUrl ? <a className="link" href={v.ticketEvidenciaUrl} target="_blank" rel="noopener noreferrer">Ver</a> : '-'}</td>
-              <td>
-                <span className={`badge ${v.estatusPago === 'Aprobado' ? 'approved' : v.estatusPago === 'Pendiente' ? 'pending' : v.estatusPago === 'Rechazado' ? 'rejected' : ''}`}>{v.estatusPago}</span>
-              </td>
-              <td>{v.usuario?.nombre}</td>
-              {hasPermission(user, PERMISSIONS.VIATICS_MANAGE) && (
-                <td>
-                  {v.estatusPago === 'Pendiente' && (
-                    <>
-                      <button className="button-primary" onClick={() => handleApprove(v.id, 'Aprobado')} disabled={actionLoading === v.id}>
-                        {actionLoading === v.id ? 'Aprobando...' : 'Aprobar'}
-                      </button>
-                      <button className="button-secondary" onClick={() => handleApprove(v.id, 'Rechazado')} disabled={actionLoading === v.id}>
-                        {actionLoading === v.id ? 'Rechazando...' : 'Rechazar'}
-                      </button>
-                    </>
+      {!isMobile && (
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', border: '1px solid var(--muted)', borderRadius: 12 }}>
+          <table className="table" style={{ minWidth: 840 }}>
+            <thead>
+              <tr>
+                <th>Actividad</th>
+                <th>Monto</th>
+                <th>Razón</th>
+                <th>Ticket</th>
+                <th>Estatus</th>
+                <th>Usuario</th>
+                {hasPermission(user, PERMISSIONS.VIATICS_MANAGE) && <th>Acciones</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.map((v: Viatic) => (
+                <tr key={v.id}>
+                  <td>{v.actividad?.anNumber}</td>
+                  <td>${v.montoSolicitado}</td>
+                  <td>{v.razonGasto}</td>
+                  <td>{v.ticketEvidenciaUrl ? <a className="link" href={v.ticketEvidenciaUrl} target="_blank" rel="noopener noreferrer">Ver</a> : '-'}</td>
+                  <td>
+                    <span className={`badge ${v.estatusPago === 'Aprobado' ? 'approved' : v.estatusPago === 'Pendiente' ? 'pending' : v.estatusPago === 'Rechazado' ? 'rejected' : ''}`}>{v.estatusPago}</span>
+                  </td>
+                  <td>{v.usuario?.nombre}</td>
+                  {hasPermission(user, PERMISSIONS.VIATICS_MANAGE) && (
+                    <td>
+                      {v.estatusPago === 'Pendiente' && (
+                        <>
+                          <button className="button-primary" onClick={() => handleApprove(v.id, 'Aprobado')} disabled={actionLoading === v.id}>
+                            {actionLoading === v.id ? 'Aprobando...' : 'Aprobar'}
+                          </button>
+                          <button className="button-secondary" onClick={() => handleApprove(v.id, 'Rechazado')} disabled={actionLoading === v.id}>
+                            {actionLoading === v.id ? 'Rechazando...' : 'Rechazar'}
+                          </button>
+                        </>
+                      )}
+                    </td>
                   )}
-                </td>
-              )}
-            </tr>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {isMobile && (
+        <div style={{ display: 'grid', gap: 12 }}>
+          {paginated.map((v: Viatic) => (
+            <div key={v.id} className="card" style={{ border: '1px solid var(--muted)', padding: 12, display: 'grid', gap: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 600 }}>Actividad: {v.actividad?.anNumber || '-'}</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Usuario: {v.usuario?.nombre || '-'}</div>
+                </div>
+                <span className={`badge ${v.estatusPago === 'Aprobado' ? 'approved' : v.estatusPago === 'Pendiente' ? 'pending' : v.estatusPago === 'Rechazado' ? 'rejected' : ''}`}>{v.estatusPago}</span>
+              </div>
+
+              <div style={{ fontSize: 13 }}>
+                <strong>Monto:</strong> ${v.montoSolicitado}
+              </div>
+
+              <div style={{ fontSize: 13, wordBreak: 'break-word' }}>
+                <strong>Razón:</strong> {v.razonGasto}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: hasPermission(user, PERMISSIONS.VIATICS_MANAGE) && v.estatusPago === 'Pendiente' ? '1fr 1fr 1fr' : '1fr', gap: 8 }}>
+                <a className="button-secondary" href={v.ticketEvidenciaUrl || '#'} target="_blank" rel="noopener noreferrer" style={{ textAlign: 'center', pointerEvents: v.ticketEvidenciaUrl ? 'auto' : 'none', opacity: v.ticketEvidenciaUrl ? 1 : 0.6 }}>
+                  Ver ticket
+                </a>
+
+                {hasPermission(user, PERMISSIONS.VIATICS_MANAGE) && v.estatusPago === 'Pendiente' && (
+                  <>
+                    <button className="button-primary" onClick={() => handleApprove(v.id, 'Aprobado')} disabled={actionLoading === v.id} style={{ minHeight: 42 }}>
+                      {actionLoading === v.id ? 'Aprobando...' : 'Aprobar'}
+                    </button>
+                    <button className="button-secondary" onClick={() => handleApprove(v.id, 'Rechazado')} disabled={actionLoading === v.id} style={{ minHeight: 42 }}>
+                      {actionLoading === v.id ? 'Rechazando...' : 'Rechazar'}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
           ))}
-        </tbody>
-      </table>
-      <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+        </div>
+      )}
+
+      <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <button className="button-secondary" onClick={() => setPage((p: number) => Math.max(1, p - 1))} disabled={page === 1}>Anterior</button>
         <span>Página {page} de {totalPages || 1}</span>
         <button className="button-secondary" onClick={() => setPage((p: number) => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0}>Siguiente</button>
