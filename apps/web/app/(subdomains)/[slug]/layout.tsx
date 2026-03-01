@@ -1,6 +1,6 @@
 "use client";
 import { useParams, usePathname } from "next/navigation";
-import styles from "./console.module.css";
+import styles from "../console/console.module.css";
 import Sidebar from "./Sidebar";
 
 export default function DynamicPanelLayout({ children }: { children: React.ReactNode }) {
