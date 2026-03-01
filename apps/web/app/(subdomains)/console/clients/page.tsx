@@ -1,6 +1,5 @@
 "use client";
 import React, { useEffect, useRef, useState } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { RoleGuard } from '@/components/RoleGuard';
 import { PERMISSIONS } from '@/lib/permissions';
 import { useUser } from '@/components/UserContext';
@@ -9,11 +8,8 @@ import { ClientTicketsPanel } from '../client-tickets/ClientTicketsPanel';
 
 export default function ClientsPage() {
   const { user } = useUser();
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [isMobile, setIsMobile] = useState(false);
-  const [activeTab, setActiveTab] = useState<'clients' | 'tickets'>(searchParams.get('view') === 'tickets' ? 'tickets' : 'clients');
+  const [activeTab, setActiveTab] = useState<'clients' | 'tickets'>('clients');
   const [clients, setClients] = useState<any[]>([]);
   const [editingClient, setEditingClient] = useState<any | null>(null);
   const [editForm, setEditForm] = useState({
@@ -76,21 +72,8 @@ export default function ClientsPage() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  useEffect(() => {
-    const view = searchParams.get('view');
-    setActiveTab(view === 'tickets' ? 'tickets' : 'clients');
-  }, [searchParams]);
-
   const handleTabChange = (tab: 'clients' | 'tickets') => {
     setActiveTab(tab);
-    const params = new URLSearchParams(searchParams.toString());
-    if (tab === 'tickets') {
-      params.set('view', 'tickets');
-    } else {
-      params.delete('view');
-    }
-    const queryString = params.toString();
-    router.replace(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false });
   };
 
   useEffect(() => {
