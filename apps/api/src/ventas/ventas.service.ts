@@ -30,6 +30,11 @@ export class VentasService {
     return Boolean(user?.isSuperAdmin);
   }
 
+  private isConsoleAdminUser(user?: any) {
+    const permissions = Array.isArray(user?.permissions) ? user.permissions : [];
+    return permissions.includes('console.admin');
+  }
+
   private canAccessOwner(user: any, ownerId?: number | null) {
     if (!ownerId) return true;
     if (this.isSuperAdminUser(user)) return true;
@@ -1433,7 +1438,9 @@ export class VentasService {
       startDate.setMonth(0, 1);
     }
 
-    if (!this.isSuperAdminUser(user)) {
+    const canViewAllSellers = this.isSuperAdminUser(user) || this.isConsoleAdminUser(user);
+
+    if (!canViewAllSellers) {
       const metrics = await this.getMetricsByPeriod(period, user);
       const performance = Math.min(100, (metrics.totalRevenue / 1000000) * 100 + metrics.conversionRate);
       const quotaMap = await this.getQuotaMap(period, user?.id ? [user.id] : []);
@@ -1468,6 +1475,7 @@ export class VentasService {
     const users = await this.prisma.user.findMany({
       where: {
         role: { accesoPanelVentas: true },
+        NOT: { role: { accesoConsoleAdmin: true } },
         email: { notIn: protectedEmails },
       },
       include: {
