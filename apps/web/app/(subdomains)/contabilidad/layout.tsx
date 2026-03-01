@@ -9,6 +9,7 @@ import consoleStyles from "../console/console.module.css";
 import styles from "./layout.module.css";
 
 export default function ContabilidadLayout({ children }: { children: React.ReactNode }) {
+  const MOBILE_BREAKPOINT = 980;
   const pathname = usePathname();
   const router = useRouter();
   const { darkMode, toggleDarkMode } = useTheme();
@@ -45,6 +46,39 @@ export default function ContabilidadLayout({ children }: { children: React.React
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && mobileMenuOpen) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth > MOBILE_BREAKPOINT) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [MOBILE_BREAKPOINT]);
+
+  useEffect(() => {
+    const isMobile = typeof window !== "undefined" ? window.innerWidth <= MOBILE_BREAKPOINT : false;
+    if (!isMobile) {
+      return;
+    }
+    document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileMenuOpen, MOBILE_BREAKPOINT]);
 
   const handleLogout = () => {
     logout();

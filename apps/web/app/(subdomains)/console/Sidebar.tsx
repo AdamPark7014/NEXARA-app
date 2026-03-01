@@ -141,7 +141,27 @@ export default function Sidebar() {
       title: "Administración interna",
       items: systemItems,
     },
-  ].filter((group) => group.items.some(canAccessItem));
+  ];
+
+  const visibleGroups = groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(canAccessItem),
+    }))
+    .filter((group) => group.items.length > 0);
+
+  const fallbackGroups: MenuGroup[] = [
+    {
+      id: "fallback",
+      title: "Menú principal",
+      items: [
+        { label: "Mi perfil", href: "/my-profile" },
+        { label: "Resumen ejecutivo", href: "/dashboard" },
+      ],
+    },
+  ];
+
+  const groupsToRender = visibleGroups.length > 0 ? visibleGroups : fallbackGroups;
 
   // Avatar: usa user.avatarUrl si existe, si no, usa un avatar generado por ui-avatars.com
   const avatarUrl = user.isSuperAdmin
@@ -198,11 +218,11 @@ export default function Sidebar() {
             {user.isSuperAdmin && <span className={styles.levelPill}>Superadmin</span>}
           </div>
         </div>
-        {groups.map((group) => (
+        {groupsToRender.map((group) => (
           <div key={group.id}>
             <div className={styles.menuTitle}>{group.title}</div>
             <ul className={styles.sidebarMenu}>
-              {group.items.filter(canAccessItem).map((item) => {
+              {group.items.map((item) => {
                 const isItemActive = pathname === item.href || (pathname?.startsWith(`${item.href}/`) ?? false);
                 return (
                   <li key={`${group.id}-${item.href}`} className={styles.sidebarMenuItem}>
