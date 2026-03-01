@@ -7,6 +7,15 @@
   padding: var(--panel-padding-y) var(--panel-padding-x);
 }
 
+:global(body.light) .page {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(15, 106, 214, 0.08), transparent 36%),
+    radial-gradient(circle at 88% 4%, rgba(22, 169, 110, 0.1), transparent 42%),
+    linear-gradient(180deg, rgba(247, 252, 255, 0.92), rgba(238, 247, 255, 0.9));
+  border-radius: 22px;
+  border: 1px solid rgba(15, 106, 214, 0.14);
+}
+
 .header {
   display: flex;
   justify-content: space-between;
@@ -65,6 +74,12 @@
   gap: 6px;
 }
 
+:global(body.light) .metricCard {
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.95), rgba(231, 243, 255, 0.92));
+  border-color: rgba(15, 106, 214, 0.22);
+  box-shadow: 0 12px 24px rgba(15, 106, 214, 0.14);
+}
+
 :global(body.dark) .metricCard {
   background: linear-gradient(150deg, rgba(16, 22, 36, 0.95), rgba(8, 12, 22, 0.98));
   border-color: rgba(23, 137, 252, 0.2);
@@ -96,6 +111,13 @@
   box-shadow: 0 14px 28px rgba(11, 32, 68, 0.14);
 }
 
+:global(body.light) .formCard,
+:global(body.light) .tableCard {
+  background: linear-gradient(170deg, rgba(255, 255, 255, 0.95), rgba(232, 244, 255, 0.92));
+  border-color: rgba(15, 106, 214, 0.2);
+  box-shadow: 0 14px 28px rgba(15, 106, 214, 0.14);
+}
+
 :global(body.dark) .formCard,
 :global(body.dark) .tableCard {
   background: linear-gradient(170deg, rgba(16, 22, 36, 0.96), rgba(8, 12, 22, 0.98));
@@ -122,6 +144,11 @@
   display: grid;
   gap: 6px;
   margin-bottom: 12px;
+}
+
+:global(body.light) .dropzone {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.9), rgba(234, 245, 255, 0.85));
+  border-color: rgba(15, 106, 214, 0.3);
 }
 
 .fileList {

@@ -3,6 +3,13 @@
   align-items: flex-start;
 }
 
+:global(body.light) .contaRoot {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(15, 106, 214, 0.08), transparent 38%),
+    radial-gradient(circle at 86% 3%, rgba(22, 169, 110, 0.1), transparent 42%),
+    linear-gradient(180deg, rgba(246, 251, 255, 0.95), rgba(238, 246, 255, 0.95));
+}
+
 .contaRoot :global(.sidebar) {
   position: sticky;
   top: var(--panel-padding-y);
@@ -26,8 +33,19 @@
   outline: none;
 }
 
+:global(body.light) .contaRoot :global(.menuLink:hover),
+:global(body.light) .contaRoot :global(.menuLink:focus-visible) {
+  border-color: rgba(15, 106, 214, 0.28);
+  background: linear-gradient(120deg, rgba(15, 106, 214, 0.12), rgba(22, 169, 110, 0.08));
+}
+
 .contaRoot :global(.active) {
   border-color: var(--border-color, rgba(127, 127, 127, 0.32));
+}
+
+:global(body.light) .contaRoot :global(.active) {
+  border-color: rgba(15, 106, 214, 0.34);
+  box-shadow: 0 10px 20px rgba(15, 106, 214, 0.18);
 }
 
 .contaRoot :global(.consoleMain) {

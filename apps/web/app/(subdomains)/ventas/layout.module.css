@@ -11,6 +11,13 @@
   position: relative;
 }
 
+:global(body.light) .salesRoot {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(15, 106, 214, 0.09), transparent 38%),
+    radial-gradient(circle at 88% 4%, rgba(22, 169, 110, 0.11), transparent 42%),
+    linear-gradient(180deg, rgba(246, 251, 255, 0.96), rgba(238, 247, 255, 0.96));
+}
+
 :global(body.dark) .salesRoot {
   --surface: #192535;
   --surface-light: #1f3046;
@@ -27,6 +34,12 @@
   color: var(--foreground);
   overflow-y: auto;
   min-width: 0;
+}
+
+:global(body.light) .salesMain {
+  background: linear-gradient(180deg, rgba(250, 253, 255, 0.8), rgba(238, 247, 255, 0.72));
+  border-radius: 20px;
+  border: 1px solid rgba(15, 106, 214, 0.14);
 }
 
 .lockedCard {

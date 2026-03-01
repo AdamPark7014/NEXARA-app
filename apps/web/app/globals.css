@@ -9,7 +9,7 @@
   --panel-padding-x: clamp(16px, 3vw, 32px);
   --panel-padding-y: clamp(16px, 3vw, 32px);
   --panel-sidebar-width: clamp(240px, 22vw, 300px);
-  --background: #f7f9fc;
+  --background: #f4f8ff;
   --foreground: #0b1220;
   --primary: #0f6ad6; /* azul rey */
   --primary-light: #3a8efb;
@@ -19,9 +19,9 @@
   --danger: #d64545;
   --info: #1f8df2;
   --surface: #ffffff;
-  --muted: #e1e7f1;
+  --muted: #d7e4f6;
   --link: #0f6ad6;
-  --shadow: rgba(21, 106, 214, 0.14);
+  --shadow: rgba(21, 106, 214, 0.18);
   /* Extra blues for light mode */
   --blue-1: #0f6ad6;
   --blue-2: #1e88f5;
@@ -34,13 +34,14 @@
   --email-color-dark: #dc2626;
   --whatsapp-color: #25D366;
   --whatsapp-color-dark: #128C7E;
-  --text-secondary: #23324a;
-  --text-tertiary: #344560;
+  --text-secondary: #1d2f4d;
+  --text-tertiary: #2d4264;
+  --surface-light: #eaf2ff;
 }
 
 /* Light mode explicit override */
 body.light {
-  --background: #f7f9fc;
+  --background: #f4f8ff;
   --foreground: #0b1220;
   --primary: #0f6ad6;
   --primary-light: #3a8efb;
@@ -50,9 +51,9 @@ body.light {
   --danger: #d64545;
   --info: #1f8df2;
   --surface: #ffffff;
-  --muted: #e1e7f1;
+  --muted: #d7e4f6;
   --link: #0f6ad6;
-  --shadow: rgba(21, 106, 214, 0.14);
+  --shadow: rgba(21, 106, 214, 0.18);
   /* Extra blues for light mode */
   --blue-1: #0f6ad6;
   --blue-2: #1e88f5;
@@ -65,9 +66,9 @@ body.light {
   --email-color-dark: #dc2626;
   --whatsapp-color: #25D366;
   --whatsapp-color-dark: #128C7E;
-  --text-secondary: #23324a;
-  --text-tertiary: #344560;
-  --surface-light: #eef3fb;
+  --text-secondary: #1d2f4d;
+  --text-tertiary: #2d4264;
+  --surface-light: #eaf2ff;
 }
 
 /* Dark mode explicit override */
@@ -165,6 +166,13 @@ main [id] {
 body {
   color: var(--foreground);
   background: var(--background) !important;
+}
+
+body.light {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(15, 106, 214, 0.1), transparent 44%),
+    radial-gradient(circle at 88% 0%, rgba(22, 169, 110, 0.12), transparent 46%),
+    linear-gradient(180deg, #f5f9ff 0%, #edf4ff 100%) !important;
 }
 
 * {

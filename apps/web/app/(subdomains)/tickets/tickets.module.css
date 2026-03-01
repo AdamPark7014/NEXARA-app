@@ -2,6 +2,13 @@
   min-height: 100vh;
 }
 
+:global(body.light) .ticketsConsole {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(15, 106, 214, 0.08), transparent 34%),
+    radial-gradient(circle at 90% 2%, rgba(22, 169, 110, 0.1), transparent 40%),
+    linear-gradient(180deg, rgba(246, 251, 255, 0.95), rgba(237, 246, 255, 0.95));
+}
+
 .ticketsConsole :global(.consoleMain) {
   width: 100%;
   min-width: 0;
@@ -12,6 +19,12 @@
   border: 1px solid var(--border-color, rgba(127, 127, 127, 0.2));
   border-radius: 18px;
   box-shadow: 0 8px 18px rgba(11, 32, 68, 0.08);
+}
+
+:global(body.light) .ticketsConsole :global(.card) {
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.96), rgba(235, 245, 255, 0.9));
+  border-color: rgba(15, 106, 214, 0.18);
+  box-shadow: 0 12px 24px rgba(15, 106, 214, 0.12), 0 3px 8px rgba(15, 106, 214, 0.08);
 }
 
 .ticketsConsole :global(.input),
@@ -100,6 +113,11 @@
   padding: 14px;
 }
 
+:global(body.light) .cardPanel {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.9), rgba(232, 244, 255, 0.88));
+  border-color: rgba(15, 106, 214, 0.22);
+}
+
 .cardSoft {
   display: grid;
   gap: 12px;
@@ -108,6 +126,11 @@
   border-radius: 14px;
   padding: 14px;
   min-width: 0;
+}
+
+:global(body.light) .cardSoft {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.88), rgba(234, 244, 255, 0.84));
+  border-color: rgba(15, 106, 214, 0.16);
 }
 
 .listStack {
@@ -226,6 +249,11 @@
   border-radius: 14px;
   border: 1px solid var(--border-color, rgba(127, 127, 127, 0.18));
   padding: 12px;
+}
+
+:global(body.light) .gradientHeader {
+  background: linear-gradient(135deg, rgba(15, 106, 214, 0.12), rgba(22, 169, 110, 0.1));
+  border-color: rgba(15, 106, 214, 0.24);
 }
 
 .headerSplit {

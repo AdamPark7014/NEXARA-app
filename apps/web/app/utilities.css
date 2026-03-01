@@ -7,6 +7,12 @@
   padding: 16px;
 }
 
+body.light .card {
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.97), rgba(239, 246, 255, 0.95));
+  border-color: rgba(15, 106, 214, 0.16);
+  box-shadow: 0 10px 24px rgba(15, 106, 214, 0.12), 0 2px 6px rgba(15, 106, 214, 0.08);
+}
+
 @media (max-width: 480px) {
   .card {
     padding: 14px;
@@ -31,9 +37,18 @@
   touch-action: manipulation;
 }
 
+body.light .button-primary {
+  background: linear-gradient(135deg, #0f6ad6, #1e88f5);
+  box-shadow: 0 8px 18px rgba(15, 106, 214, 0.24);
+}
+
 .button-primary:hover {
   transform: translateY(-1px);
   box-shadow: 0 8px 14px rgba(31, 137, 252, 0.24);
+}
+
+body.light .button-primary:hover {
+  box-shadow: 0 10px 20px rgba(15, 106, 214, 0.28);
 }
 
 .button-primary:active {
@@ -71,6 +86,11 @@
   touch-action: manipulation;
 }
 
+body.light .button-secondary {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.95), rgba(233, 243, 255, 0.9));
+  border-color: rgba(15, 106, 214, 0.26);
+}
+
 .button-secondary:hover {
   background: var(--surface-light);
   transform: translateY(-1px);
@@ -102,6 +122,11 @@
   background: var(--surface);
 }
 
+body.light .table {
+  background: linear-gradient(180deg, #ffffff, #f5f9ff);
+  border: 1px solid rgba(15, 106, 214, 0.12);
+}
+
 .table th {
   background: var(--muted);
   color: var(--text-secondary);
@@ -110,6 +135,11 @@
   border-bottom: 2px solid var(--muted);
   text-align: left;
   white-space: nowrap;
+}
+
+body.light .table th {
+  background: linear-gradient(135deg, rgba(15, 106, 214, 0.16), rgba(22, 169, 110, 0.1));
+  color: #173057;
 }
 
 .table td {
@@ -123,6 +153,10 @@
 
 .table tbody tr:hover {
   background: rgba(31, 137, 252, 0.05);
+}
+
+body.light .table tbody tr:hover {
+  background: rgba(15, 106, 214, 0.08);
 }
 
 @media (max-width: 900px) {
@@ -194,6 +228,14 @@ textarea {
   min-height: 44px;
   box-sizing: border-box;
   font-family: inherit;
+}
+
+body.light .input,
+body.light input,
+body.light select,
+body.light textarea {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(235, 244, 255, 0.96));
+  border-color: rgba(15, 106, 214, 0.22);
 }
 
 .input:focus,
