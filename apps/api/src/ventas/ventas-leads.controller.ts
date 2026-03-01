@@ -17,42 +17,68 @@ import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 
+const SALES_VIEW_ACCESS = [PERMISSIONS.SALES_VIEW, PERMISSIONS.PANEL_VENTAS];
+const SALES_MANAGE_ACCESS = [PERMISSIONS.SALES_MANAGE, PERMISSIONS.PANEL_VENTAS];
+
 @Controller('ventas/leads')
 export class VentasLeadsController {
   constructor(private readonly ventasService: VentasService) {}
 
   @Post()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.PANEL_VENTAS] })
-  create(@Body() dto: CreateSalesLeadDto, @CurrentUser() user: any) {
-    return this.ventasService.createLead(dto, user);
+  @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
+  async create(@Body() dto: CreateSalesLeadDto, @CurrentUser() user: any) {
+    const created = await this.ventasService.createLead(dto, user);
+    await this.ventasService.createAuditEvent({
+      action: 'lead.create',
+      entityType: 'lead',
+      entityId: created.id,
+      actorId: user?.id,
+      metadata: { status: created.status, source: created.source || null },
+    });
+    return created;
   }
 
   @Get()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.PANEL_VENTAS] })
+  @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
   findAll(@CurrentUser() user: any) {
     return this.ventasService.listLeads(user);
   }
 
   @Get(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.PANEL_VENTAS] })
+  @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
   findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
     return this.ventasService.getLead(id, user);
   }
 
   @Patch(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.PANEL_VENTAS] })
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateSalesLeadDto, @CurrentUser() user: any) {
-    return this.ventasService.updateLead(id, dto, user);
+  @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
+  async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateSalesLeadDto, @CurrentUser() user: any) {
+    const updated = await this.ventasService.updateLead(id, dto, user);
+    await this.ventasService.createAuditEvent({
+      action: 'lead.update',
+      entityType: 'lead',
+      entityId: updated.id,
+      actorId: user?.id,
+      metadata: { status: updated.status },
+    });
+    return updated;
   }
 
   @Delete(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.PANEL_VENTAS] })
-  remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    return this.ventasService.deleteLead(id, user);
+  @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
+  async remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    const removed = await this.ventasService.deleteLead(id, user);
+    await this.ventasService.createAuditEvent({
+      action: 'lead.delete',
+      entityType: 'lead',
+      entityId: removed.id,
+      actorId: user?.id,
+    });
+    return removed;
   }
 }

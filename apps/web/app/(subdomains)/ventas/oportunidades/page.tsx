@@ -1,47 +1,29 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { useUser } from "@/components/UserContext";
 import OpportunitiesKanban from "@/components/OpportunitiesKanban";
+import { getApiBase } from "@/lib/api-base";
+import {
+  addSalesOpportunityNote,
+  createSalesOpportunity,
+  getSalesOpportunity,
+  updateSalesOpportunityStage,
+  type SalesOpportunity,
+  type SalesOpportunityEvidence,
+  type SalesOpportunityNote,
+  type SalesOpportunityQuote,
+} from "@/lib/sales-api";
 import styles from "./page.module.css";
 
-type Opportunity = {
-  id: number;
-  title: string;
-  description?: string | null;
-  stage: string;
-  value: number;
-  probability: number;
-  expectedCloseDate?: string | null;
-  clientName?: string | null;
-  notes?: OpportunityNote[];
-  evidences?: OpportunityEvidence[];
-  quotes?: OpportunityQuote[];
-};
-
-type OpportunityNote = {
-  id: number;
-  message: string;
-  createdAt: string;
-};
-
-type OpportunityEvidence = {
-  id: number;
-  fileUrl: string;
-  fileName?: string | null;
-  kind?: string | null;
-};
-
-type OpportunityQuote = {
-  id: number;
-  cotizacionId?: number | null;
-  versionLabel?: string | null;
-  pdfUrl?: string | null;
-  createdAt: string;
-};
+type Opportunity = SalesOpportunity;
+type OpportunityNote = SalesOpportunityNote;
+type OpportunityEvidence = SalesOpportunityEvidence;
+type OpportunityQuote = SalesOpportunityQuote;
 
 export default function VentasOportunidadesPage() {
   const { user } = useUser();
+  const apiUrl = getApiBase();
   const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -56,41 +38,17 @@ export default function VentasOportunidadesPage() {
   });
   const [viewMode, setViewMode] = useState<'kanban' | 'table'>('kanban');
 
-  const apiUrl = useMemo(() => {
-    const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
-    return base.replace(/[/.]+$/, "");
-  }, []);
-
-  const getAssetUrl = (url?: string | null) => {
-    if (!url) return "";
-    if (url.startsWith("http")) return url;
-    const base = apiUrl.replace(/\/+api\/?$/, "");
-    return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
-  };
-
   const handleAddNote = async (id: number) => {
     if (!user?.token || !noteDraft.trim()) return;
     
     setLoading(true);
     try {
-      await fetch(`${apiUrl}/ventas/oportunidades/${id}/notas`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${user.token}`,
-        },
-        body: JSON.stringify({ message: noteDraft }),
-      });
+      await addSalesOpportunityNote(user.token, id, noteDraft);
       setNoteDraft("");
       // Fetch updated opportunity if detail view
       if (selectedOpportunity && selectedOpportunity.id === id) {
-        const res = await fetch(`${apiUrl}/ventas/oportunidades/${id}`, {
-          headers: { Authorization: `Bearer ${user.token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setSelectedOpportunity(data);
-        }
+        const data = await getSalesOpportunity(user.token, id);
+        setSelectedOpportunity(data);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al agregar nota");
@@ -112,15 +70,7 @@ export default function VentasOportunidadesPage() {
         ...form,
         expectedCloseDate: form.expectedCloseDate || undefined,
       };
-      const res = await fetch(`${apiUrl}/ventas/oportunidades`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${user.token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error("No se pudo crear la oportunidad");
+      await createSalesOpportunity(user.token, payload);
       setForm({ title: "", description: "", stage: "DISCOVERY", value: 0, probability: 0, expectedCloseDate: "" });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error inesperado");
@@ -140,15 +90,7 @@ export default function VentasOportunidadesPage() {
   const handleUpdateStage = async (opportunityId: number, newStage: string) => {
     if (!user?.token) return;
     try {
-      const res = await fetch(`${apiUrl}/ventas/oportunidades/${opportunityId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${user.token}`,
-        },
-        body: JSON.stringify({ stage: newStage }),
-      });
-      if (!res.ok) throw new Error("Error al actualizar etapa");
+      await updateSalesOpportunityStage(user.token, opportunityId, newStage);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error desconocido");
     }
@@ -159,13 +101,8 @@ export default function VentasOportunidadesPage() {
     
     // Fetch full opportunity details
     try {
-      const res = await fetch(`${apiUrl}/ventas/oportunidades/${opp.id}`, {
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSelectedOpportunity(data);
-      }
+      const data = await getSalesOpportunity(user.token, opp.id);
+      setSelectedOpportunity(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar detalles");
     }

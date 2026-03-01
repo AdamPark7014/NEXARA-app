@@ -1,30 +1,19 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import Link from "next/link";
+import { getSalesDashboardData, type SalesDashboardData } from "@/lib/sales-api";
 import styles from "./page.module.css";
-
-type DashboardData = {
-  leads: { id: number; name: string; company: string; score: number }[];
-  opportunities: { id: number; title: string; stage: string; value: number }[];
-  projects: { id: number; name: string; status: string; margin: number }[];
-  stats: { pipelineValue: number; opportunityCount: number; projectCount: number; clientCount: number };
-};
 
 const money = (value: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 2 }).format(value || 0);
 
 export default function VentasDashboardPage() {
   const { user } = useUser();
-  const [data, setData] = useState<DashboardData | null>(null);
+  const [data, setData] = useState<SalesDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const apiUrl = useMemo(() => {
-    const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
-    return base.replace(/[\/\.]+$/, "");
-  }, []);
 
   useEffect(() => {
     if (!user?.token) return;
@@ -32,31 +21,8 @@ export default function VentasDashboardPage() {
       setLoading(true);
       setError(null);
       try {
-        const [leadsRes, oppsRes, projectsRes] = await Promise.all([
-          fetch(`${apiUrl}/ventas/leads`, { headers: { Authorization: `Bearer ${user.token}` } }),
-          fetch(`${apiUrl}/ventas/oportunidades`, { headers: { Authorization: `Bearer ${user.token}` } }),
-          fetch(`${apiUrl}/ventas/proyectos`, { headers: { Authorization: `Bearer ${user.token}` } }),
-        ]);
-
-        const leads = await leadsRes.json().catch(() => []);
-        const opportunities = await oppsRes.json().catch(() => []);
-        const projects = await projectsRes.json().catch(() => []);
-
-        const pipelineValue = opportunities.reduce((sum: number, o: any) => sum + Number(o.value || 0), 0);
-        const clientCount = new Set(opportunities.map((o: any) => o.clientId)).size;
-        const avgMargin = projects.length ? projects.reduce((sum: number, p: any) => sum + Number(p.margin || 0), 0) / projects.length : 0;
-
-        setData({
-          leads: leads.slice(0, 5),
-          opportunities: opportunities.slice(0, 5),
-          projects: projects.slice(0, 5),
-          stats: {
-            pipelineValue,
-            opportunityCount: opportunities.length,
-            projectCount: projects.length,
-            clientCount,
-          },
-        });
+        const dashboard = await getSalesDashboardData(user.token);
+        setData(dashboard);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Error al cargar datos");
       } finally {
@@ -64,7 +30,7 @@ export default function VentasDashboardPage() {
       }
     };
     fetchData();
-  }, [user?.token, apiUrl]);
+  }, [user?.token]);
 
   if (loading) return <div className={styles.loading}>cargando...</div>;
 

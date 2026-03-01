@@ -1,32 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
+import {
+  createSalesClient,
+  listSalesClients,
+  uploadSalesClientDocuments,
+  type SalesClient,
+  type SalesClientDocument,
+} from "@/lib/sales-api";
+import { getApiBase } from "@/lib/api-base";
 import styles from "./page.module.css";
-
-type SalesClient = {
-  id: number;
-  name: string;
-  legalName?: string | null;
-  taxId?: string | null;
-  fiscalAddress?: string | null;
-  billingEmail?: string | null;
-  billingPhone?: string | null;
-  industry?: string | null;
-  website?: string | null;
-  status?: string | null;
-  notes?: string | null;
-  documents?: SalesClientDocument[];
-};
-
-type SalesClientDocument = {
-  id: number;
-  type: string;
-  fileUrl: string;
-  fileName?: string | null;
-  version: number;
-  createdAt: string;
-};
 
 export default function VentasClientesPage() {
   const { user } = useUser();
@@ -49,30 +33,15 @@ export default function VentasClientesPage() {
     status: "Activo",
     notes: "",
   });
-
-  const apiUrl = useMemo(() => {
-    const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
-    return base.replace(/[/.]+$/, "");
-  }, []);
-
-  const getAssetUrl = (url?: string | null) => {
-    if (!url) return "";
-    if (url.startsWith("http")) return url;
-    const base = apiUrl.replace(/\/+api\/?$/, "");
-    return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
-  };
+  const apiBase = getApiBase().replace(/\/+api\/?$/, "");
 
   const fetchClients = async () => {
     if (!user?.token) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${apiUrl}/ventas/clientes`, {
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-      if (!res.ok) throw new Error("No se pudieron cargar los clientes");
-      const data = await res.json();
-      setClients(Array.isArray(data) ? data : []);
+      const data = await listSalesClients(user.token);
+      setClients(data);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error inesperado");
     } finally {
@@ -98,15 +67,7 @@ export default function VentasClientesPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${apiUrl}/ventas/clientes`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${user.token}`,
-        },
-        body: JSON.stringify(form),
-      });
-      if (!res.ok) throw new Error("No se pudo crear el cliente");
+      await createSalesClient(user.token, form);
       setForm({
         name: "",
         legalName: "",
@@ -168,18 +129,11 @@ export default function VentasClientesPage() {
       setError("Selecciona al menos un PDF");
       return;
     }
-    const formData = new FormData();
-    formData.append("type", docType.trim());
-    docFiles.forEach((file) => formData.append("files", file));
+
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${apiUrl}/ventas/clientes/${selectedClientId}/documentos`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${user.token}` },
-        body: formData,
-      });
-      if (!res.ok) throw new Error("No se pudo subir el documento");
+      await uploadSalesClientDocuments(user.token, selectedClientId, docType, docFiles);
       setDocFiles([]);
       await fetchClients();
     } catch (err: unknown) {
@@ -302,4 +256,10 @@ export default function VentasClientesPage() {
       </div>
     </section>
   );
+
+  function getAssetUrl(url?: string | null) {
+    if (!url) return "";
+    if (url.startsWith("http")) return url;
+    return `${apiBase}${url.startsWith("/") ? "" : "/"}${url}`;
+  }
 }

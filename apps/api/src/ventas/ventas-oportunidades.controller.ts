@@ -24,66 +24,101 @@ import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 
+const SALES_VIEW_ACCESS = [PERMISSIONS.SALES_VIEW, PERMISSIONS.PANEL_VENTAS];
+const SALES_MANAGE_ACCESS = [PERMISSIONS.SALES_MANAGE, PERMISSIONS.PANEL_VENTAS];
+
 @Controller('ventas/oportunidades')
 export class VentasOportunidadesController {
   constructor(private readonly ventasService: VentasService) {}
 
   @Post()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.PANEL_VENTAS] })
-  create(@Body() dto: CreateSalesOpportunityDto, @CurrentUser() user: any) {
-    return this.ventasService.createOpportunity(dto, user);
+  @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
+  async create(@Body() dto: CreateSalesOpportunityDto, @CurrentUser() user: any) {
+    const created = await this.ventasService.createOpportunity(dto, user);
+    await this.ventasService.createAuditEvent({
+      action: 'opportunity.create',
+      entityType: 'opportunity',
+      entityId: created.id,
+      actorId: user?.id,
+      metadata: { stage: created.stage, value: created.value },
+    });
+    return created;
   }
 
   @Get()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.PANEL_VENTAS] })
+  @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
   findAll(@CurrentUser() user: any) {
     return this.ventasService.listOpportunities(user);
   }
 
   @Get(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.PANEL_VENTAS] })
+  @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
   findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
     return this.ventasService.getOpportunity(id, user);
   }
 
   @Get(':id/cotizaciones')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.PANEL_VENTAS] })
+  @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
   listQuotes(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
     return this.ventasService.listOpportunityQuotes(id, user);
   }
 
   @Patch(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.PANEL_VENTAS] })
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateSalesOpportunityDto, @CurrentUser() user: any) {
-    return this.ventasService.updateOpportunity(id, dto, user);
+  @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
+  async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateSalesOpportunityDto, @CurrentUser() user: any) {
+    const updated = await this.ventasService.updateOpportunity(id, dto, user);
+    await this.ventasService.createAuditEvent({
+      action: dto?.stage ? 'opportunity.stage.update' : 'opportunity.update',
+      entityType: 'opportunity',
+      entityId: updated.id,
+      actorId: user?.id,
+      metadata: { stage: updated.stage, probability: updated.probability },
+    });
+    return updated;
   }
 
   @Delete(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.PANEL_VENTAS] })
-  remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    return this.ventasService.deleteOpportunity(id, user);
+  @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
+  async remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    const removed = await this.ventasService.deleteOpportunity(id, user);
+    await this.ventasService.createAuditEvent({
+      action: 'opportunity.delete',
+      entityType: 'opportunity',
+      entityId: removed.id,
+      actorId: user?.id,
+    });
+    return removed;
   }
 
   @Post(':id/notas')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.PANEL_VENTAS] })
+  @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
   addNote(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CreateSalesOpportunityNoteDto,
     @CurrentUser() user: any,
   ) {
-    return this.ventasService.addOpportunityNote(id, dto, user);
+    return this.ventasService.addOpportunityNote(id, dto, user).then(async (note) => {
+      await this.ventasService.createAuditEvent({
+        action: 'opportunity.note.add',
+        entityType: 'opportunity',
+        entityId: id,
+        actorId: user?.id,
+        metadata: { noteId: note.id },
+      });
+      return note;
+    });
   }
 
   @Post(':id/evidencias')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.PANEL_VENTAS] })
+  @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
   @UseInterceptors(FilesInterceptor('files', 15, { dest: 'apps/api/uploads/sales-evidences' }))
   async addEvidence(
     @Param('id', ParseIntPipe) id: number,
@@ -105,23 +140,40 @@ export class VentasOportunidadesController {
       kind: (file.mimetype || '').includes('pdf') ? 'pdf' : 'image',
     }));
 
-    return this.ventasService.addOpportunityEvidence(id, payload, user);
+    const evidences = await this.ventasService.addOpportunityEvidence(id, payload, user);
+    await this.ventasService.createAuditEvent({
+      action: 'opportunity.evidence.add',
+      entityType: 'opportunity',
+      entityId: id,
+      actorId: user?.id,
+      metadata: { count: payload.length },
+    });
+    return evidences;
   }
 
   @Post(':id/cotizaciones')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.PANEL_VENTAS] })
+  @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
   addQuote(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: CreateSalesOpportunityQuoteDto,
     @CurrentUser() user: any,
   ) {
-    return this.ventasService.addOpportunityQuote(id, dto, user);
+    return this.ventasService.addOpportunityQuote(id, dto, user).then(async (quote) => {
+      await this.ventasService.createAuditEvent({
+        action: 'opportunity.quote.add',
+        entityType: 'opportunity',
+        entityId: id,
+        actorId: user?.id,
+        metadata: { quoteId: quote.id },
+      });
+      return quote;
+    });
   }
 
   @Post(':id/cotizaciones/archivo')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.PANEL_VENTAS] })
+  @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
   @UseInterceptors(FileInterceptor('file', { dest: 'apps/api/uploads/sales-quotes' }))
   async addQuoteFile(
     @Param('id', ParseIntPipe) id: number,
@@ -137,6 +189,14 @@ export class VentasOportunidadesController {
       pdfUrl: `/uploads/sales-quotes/${file.filename}`,
       versionLabel: versionLabel?.trim() || undefined,
     };
-    return this.ventasService.addOpportunityQuote(id, payload, user);
+    const quote = await this.ventasService.addOpportunityQuote(id, payload, user);
+    await this.ventasService.createAuditEvent({
+      action: 'opportunity.quote.upload',
+      entityType: 'opportunity',
+      entityId: id,
+      actorId: user?.id,
+      metadata: { quoteId: quote.id },
+    });
+    return quote;
   }
 }
