@@ -18,6 +18,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
   const [error, setError] = useState<string | null>(null);
   const [cameraFacing, setCameraFacing] = useState<'user' | 'environment'>('user');
   const [isMobile, setIsMobile] = useState(false);
+  const [isSmallMobile, setIsSmallMobile] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -143,6 +144,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
     const updateViewport = () => {
       if (typeof window === 'undefined') return;
       setIsMobile(window.innerWidth <= 640);
+      setIsSmallMobile(window.innerWidth <= 430);
     };
 
     updateViewport();
@@ -154,7 +156,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
   const lunchEmoji = isCheckin ? '🍽️ Entrada' : '✅ Regreso';
 
   return (
-    <div className="card" style={{ maxWidth: 680, margin: '0 auto', padding: isMobile ? 14 : 'clamp(16px, 3vw, 24px)' }}>
+    <div className="card" style={{ maxWidth: 680, width: '100%', margin: '0 auto', padding: isMobile ? 12 : 'clamp(16px, 3vw, 24px)', boxSizing: 'border-box' }}>
       <h2 style={{ color: 'var(--primary)', marginBottom: 20, textAlign: 'center' }}>
         {lunchEmoji} - Hora de Comida
       </h2>
@@ -175,12 +177,14 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
               muted
               style={{
                 width: '100%',
-                height: isMobile ? 'min(50vh, 360px)' : 'min(58vh, 420px)',
+                height: isMobile ? 'auto' : 'min(58vh, 420px)',
+                maxHeight: isMobile ? '52vh' : undefined,
+                aspectRatio: isMobile ? '3 / 4' : undefined,
                 borderRadius: 14,
                 background: '#000',
                 border: '1px solid rgba(31,137,252,0.18)',
                 marginBottom: 16,
-                objectFit: 'cover',
+                objectFit: isMobile ? 'contain' : 'cover',
                 display: 'block',
               }}
             />
@@ -197,7 +201,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+                gridTemplateColumns: isSmallMobile ? '1fr' : isMobile ? '1fr 1fr' : 'repeat(2, minmax(0, 1fr))',
                 gap: 12,
                 position: 'relative',
                 zIndex: 2,
@@ -209,7 +213,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
                 onClick={capturePhoto}
                 style={{
                   width: '100%',
-                  minHeight: isMobile ? 58 : 52,
+                  minHeight: isSmallMobile ? 56 : isMobile ? 54 : 52,
                   padding: isMobile ? '16px 14px' : '14px 12px',
                   borderRadius: 12,
                   fontWeight: 700,
@@ -217,7 +221,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
                   WebkitAppearance: 'none',
                   cursor: 'pointer',
                   transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                  fontSize: isMobile ? 16 : 15,
+                  fontSize: isMobile ? 15 : 15,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -235,7 +239,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
                 onClick={flipCamera}
                 style={{
                   width: '100%',
-                  minHeight: isMobile ? 58 : 52,
+                  minHeight: isSmallMobile ? 56 : isMobile ? 54 : 52,
                   padding: isMobile ? '16px 14px' : '14px 12px',
                   borderRadius: 12,
                   fontWeight: 700,
@@ -243,7 +247,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
                   WebkitAppearance: 'none',
                   cursor: 'pointer',
                   transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                  fontSize: isMobile ? 16 : 15,
+                  fontSize: isMobile ? 15 : 15,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -271,7 +275,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
             )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
             <button
               className="button-secondary"
               type="button"
@@ -282,7 +286,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
                 setTimeout(() => initCamera(cameraFacing), 100);
               }}
               disabled={loading}
-              style={{ minHeight: 50, borderRadius: 12, fontWeight: 700, touchAction: 'manipulation' }}
+              style={{ minHeight: isMobile ? 54 : 50, borderRadius: 12, fontWeight: 700, touchAction: 'manipulation' }}
             >
               ↻ Nueva Foto
             </button>
@@ -292,7 +296,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
               type="button"
               onClick={handleSubmit}
               disabled={loading}
-              style={{ minHeight: 50, borderRadius: 12, fontWeight: 700, touchAction: 'manipulation' }}
+              style={{ minHeight: isMobile ? 54 : 50, borderRadius: 12, fontWeight: 700, touchAction: 'manipulation' }}
             >
               {loading ? 'Registrando...' : '✓ Confirmar'}
             </button>
