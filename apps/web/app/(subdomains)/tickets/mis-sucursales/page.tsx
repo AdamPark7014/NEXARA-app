@@ -38,6 +38,8 @@ export default function MyBranchesPage() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [profile, setProfile] = useState<ClientProfile | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
@@ -54,6 +56,24 @@ export default function MyBranchesPage() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 900);
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) {
+      setMobileMenuOpen(false);
+      return;
+    }
+    document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobile, mobileMenuOpen]);
 
   const fetchProfile = async (token: string) => {
     try {
@@ -128,7 +148,33 @@ export default function MyBranchesPage() {
   return (
     <div className={`${consoleStyles.consoleLayout} ${styles.ticketsConsole}`}>
       {/* Sidebar */}
-      <aside className={consoleStyles.sidebar}>
+      <aside className={`${consoleStyles.sidebar} ${isMobile && mobileMenuOpen ? consoleStyles.sidebarOpen : ""}`}>
+        <div className={consoleStyles.sidebarHeader}>
+          <div className={consoleStyles.sidebarLogo}>
+            <span className={consoleStyles.brandMark}>NEXARA</span>
+            <span className={consoleStyles.brandSub}>Portal</span>
+          </div>
+          {isMobile && (
+            <button
+              type="button"
+              className={`${consoleStyles.hamburgerButton} ${mobileMenuOpen ? consoleStyles.hamburgerActive : ""}`}
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="tickets-branches-sidebar-menu"
+            >
+              <span className={consoleStyles.hamburgerLine}></span>
+              <span className={consoleStyles.hamburgerLine}></span>
+              <span className={consoleStyles.hamburgerLine}></span>
+            </button>
+          )}
+        </div>
+
+        {isMobile && mobileMenuOpen && (
+          <div className={consoleStyles.sidebarOverlay} onClick={() => setMobileMenuOpen(false)} role="presentation"></div>
+        )}
+
+        <div className={consoleStyles.sidebarContent} id="tickets-branches-sidebar-menu">
         <div className={consoleStyles.sidebarLogo}>
           <span className={consoleStyles.brandMark}>NEXARA</span>
           <span className={consoleStyles.brandSub}>Portal</span>
@@ -155,7 +201,21 @@ export default function MyBranchesPage() {
           </div>
         </div>
 
-        <div className={consoleStyles.menuTitle}>Centro de servicio</div>
+        <div className={consoleStyles.menuTitle}>Cuenta corporativa</div>
+        <ul className={consoleStyles.sidebarMenu}>
+          <li className={consoleStyles.sidebarMenuItem}>
+            <a href="..?tab=profile" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
+              Mi perfil corporativo
+            </a>
+          </li>
+          <li className={consoleStyles.sidebarMenuItem}>
+            <a href="." className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${consoleStyles.active}`}>
+              Gestión de sucursales
+            </a>
+          </li>
+        </ul>
+
+        <div className={consoleStyles.menuTitle}>Servicio y solicitudes</div>
         <ul className={consoleStyles.sidebarMenu}>
           <li className={consoleStyles.sidebarMenuItem}>
             <a href="..?tab=tickets" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
@@ -183,6 +243,7 @@ export default function MyBranchesPage() {
             </button>
           </li>
         </ul>
+        </div>
       </aside>
 
       {/* Main Content */}
@@ -261,3 +322,7 @@ export default function MyBranchesPage() {
     </div>
   );
 }
+        </ul>
+
+        <div className={consoleStyles.menuTitle}>Sesión</div>
+        <ul className={consoleStyles.sidebarMenu}>

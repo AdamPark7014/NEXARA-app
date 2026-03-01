@@ -17,14 +17,29 @@ export default function ContabilidadLayout({ children }: { children: React.React
 
   const currentPath = pathname ? pathname.replace(/\/+$/, "") : "";
 
-  const navItems = [
-    { label: "Resumen ejecutivo", href: "/dashboard" },
-    { label: "Viáticos", href: "/viaticos" },
-    { label: "Multas y sanciones", href: "/multas" },
-    { label: "Control de horas", href: "/horas" },
-    { label: "Pagos y dispersión", href: "/pagos" },
-    { label: "Proyectos y costos", href: "/proyectos" },
-    { label: "Capital y liquidez", href: "/capital" },
+  const navGroups = [
+    {
+      title: "Panorama financiero",
+      items: [
+        { label: "Resumen ejecutivo", href: "/dashboard" },
+        { label: "Capital y liquidez", href: "/capital" },
+      ],
+    },
+    {
+      title: "RRHH y control de personal",
+      items: [
+        { label: "Control de horas", href: "/horas" },
+        { label: "Viáticos", href: "/viaticos" },
+        { label: "Multas y sanciones", href: "/multas" },
+      ],
+    },
+    {
+      title: "Operación contable",
+      items: [
+        { label: "Pagos y dispersión", href: "/pagos" },
+        { label: "Proyectos y costos", href: "/proyectos" },
+      ],
+    },
   ];
 
   useEffect(() => {
@@ -51,15 +66,15 @@ export default function ContabilidadLayout({ children }: { children: React.React
         </div>
         <button
           type="button"
-          className={`${consoleStyles.hamburgerButton} ${mobileMenuOpen ? consoleStyles.hamburgerActive : ""}`}
+          className={styles.mobileMenuButton}
           onClick={() => setMobileMenuOpen((prev) => !prev)}
           aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
           aria-expanded={mobileMenuOpen}
           aria-controls="conta-mobile-menu"
         >
-          <span className={consoleStyles.hamburgerLine} />
-          <span className={consoleStyles.hamburgerLine} />
-          <span className={consoleStyles.hamburgerLine} />
+          <span />
+          <span />
+          <span />
         </button>
       </header>
 
@@ -89,24 +104,31 @@ export default function ContabilidadLayout({ children }: { children: React.React
           </div>
         </div>
 
-        <div className={consoleStyles.menuTitle}>Centro de control</div>
-        <ul className={consoleStyles.sidebarMenu}>
-          {navItems.map((item, index) => {
-            const itemPath = item.href.replace(/\/+$/, "");
-            const isActive = itemPath === currentPath;
-            return (
-              <li key={item.href} className={consoleStyles.sidebarMenuItem} style={{ animationDelay: `${0.08 + index * 0.05}s` }}>
-                <Link
-                  href={item.href}
-                  className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${isActive ? consoleStyles.active : ""}`}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {item.label}
-                </Link>
-              </li>
-            );
-          })}
+        {navGroups.map((group, groupIndex) => (
+          <div key={group.title}>
+            <div className={consoleStyles.menuTitle}>{group.title}</div>
+            <ul className={consoleStyles.sidebarMenu}>
+              {group.items.map((item, index) => {
+                const itemPath = item.href.replace(/\/+$/, "");
+                const isActive = itemPath === currentPath;
+                return (
+                  <li key={item.href} className={consoleStyles.sidebarMenuItem} style={{ animationDelay: `${0.08 + (groupIndex * 0.12) + index * 0.05}s` }}>
+                    <Link
+                      href={item.href}
+                      className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${isActive ? consoleStyles.active : ""}`}
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
 
+        <div className={consoleStyles.menuTitle}>Cuenta y sesión</div>
+        <ul className={consoleStyles.sidebarMenu}>
           <li className={consoleStyles.sidebarMenuItem}>
             <button
               type="button"

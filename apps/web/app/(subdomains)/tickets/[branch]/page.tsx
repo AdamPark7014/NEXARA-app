@@ -36,6 +36,8 @@ type BranchRequest = {
 
 export default function BranchTicketsPage() {
   const [session, setSession] = useState<BranchSession | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profile, setProfile] = useState<BranchProfile | null>(null);
   const [requests, setRequests] = useState<BranchRequest[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +71,24 @@ export default function BranchTicketsPage() {
     const saved = typeof window !== "undefined" ? window.sessionStorage.getItem("branchSession") : null;
     if (saved) setSession(JSON.parse(saved));
   }, []);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 900);
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) {
+      setMobileMenuOpen(false);
+      return;
+    }
+    document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobile, mobileMenuOpen]);
 
   useEffect(() => () => {
     files.forEach((entry) => URL.revokeObjectURL(entry.url));
@@ -201,7 +221,33 @@ export default function BranchTicketsPage() {
 
   return (
     <div className={`${consoleStyles.consoleLayout} ${styles.ticketsConsole}`}>
-      <aside className={consoleStyles.sidebar}>
+      <aside className={`${consoleStyles.sidebar} ${isMobile && mobileMenuOpen ? consoleStyles.sidebarOpen : ""}`}>
+        <div className={consoleStyles.sidebarHeader}>
+          <div className={consoleStyles.sidebarLogo}>
+            <span className={consoleStyles.brandMark}>NEXARA</span>
+            <span className={consoleStyles.brandSub}>Sucursal</span>
+          </div>
+          {isMobile && (
+            <button
+              type="button"
+              className={`${consoleStyles.hamburgerButton} ${mobileMenuOpen ? consoleStyles.hamburgerActive : ""}`}
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="tickets-branch-sidebar-menu"
+            >
+              <span className={consoleStyles.hamburgerLine}></span>
+              <span className={consoleStyles.hamburgerLine}></span>
+              <span className={consoleStyles.hamburgerLine}></span>
+            </button>
+          )}
+        </div>
+
+        {isMobile && mobileMenuOpen && (
+          <div className={consoleStyles.sidebarOverlay} onClick={() => setMobileMenuOpen(false)} role="presentation"></div>
+        )}
+
+        <div className={consoleStyles.sidebarContent} id="tickets-branch-sidebar-menu">
         <div className={consoleStyles.sidebarLogo}>
           <span className={consoleStyles.brandMark}>NEXARA</span>
           <span className={consoleStyles.brandSub}>Sucursal</span>
@@ -216,22 +262,28 @@ export default function BranchTicketsPage() {
             <span className={consoleStyles.rolePill}>Sucursal</span>
           </div>
         </div>
-        <div className={consoleStyles.menuTitle}>Centro operativo</div>
+        <div className={consoleStyles.menuTitle}>Servicio y solicitudes</div>
         <ul className={consoleStyles.sidebarMenu}>
           <li className={consoleStyles.sidebarMenuItem}>
             <button
               type="button"
               className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${consoleStyles.active}`}
+              onClick={() => setMobileMenuOpen(false)}
             >
               Nueva solicitud
             </button>
           </li>
+        </ul>
+
+        <div className={consoleStyles.menuTitle}>Sesión</div>
+        <ul className={consoleStyles.sidebarMenu}>
           <li className={consoleStyles.sidebarMenuItem}>
             <button type="button" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`} onClick={handleLogout}>
               Cerrar sesión
             </button>
           </li>
         </ul>
+        </div>
       </aside>
       <main className={consoleStyles.consoleMain}>
         <div className={styles.mainStack}>

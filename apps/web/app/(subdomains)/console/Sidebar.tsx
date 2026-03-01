@@ -9,6 +9,7 @@ import { hasAnyPermission, hasPermission, PERMISSIONS } from '@/lib/permissions'
 import { useState, useEffect } from "react";
 
 export default function Sidebar() {
+  const MOBILE_BREAKPOINT = 900;
   const pathname = usePathname();
   const { user } = useUser();
   const { darkMode, toggleDarkMode } = useTheme();
@@ -20,12 +21,18 @@ export default function Sidebar() {
   // Detectar si es móvil
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 900);
+      setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT);
     };
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
-  }, []);
+  }, [MOBILE_BREAKPOINT]);
+
+  useEffect(() => {
+    if (isMobile) {
+      setIsMenuOpen(false);
+    }
+  }, [pathname, isMobile]);
 
   // Cerrar menú al hacer Escape
   useEffect(() => {
