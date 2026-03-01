@@ -72,7 +72,7 @@ export default function Sidebar() {
     : (user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nombre)}&background=0D8ABC&color=fff&size=96`);
 
   return (
-    <aside className={`${styles.sidebar} ${isMenuOpen && isMobile ? styles.sidebarOpen : ''}`}>
+    <aside className={styles.sidebar} data-mobile={isMobile ? 'true' : 'false'} data-open={isMenuOpen ? 'true' : 'false'}>
       <div className={styles.sidebarHeader}>
         <div className={styles.sidebarLogo}>
           <span className={styles.brandMark}>NEXARA</span>
@@ -80,11 +80,12 @@ export default function Sidebar() {
         </div>
         {isMobile && (
           <button
-            className={`${styles.hamburgerButton} ${isMenuOpen ? styles.hamburgerActive : ''}`}
+            className={styles.hamburgerButton}
             onClick={() => setIsMenuOpen((prev) => !prev)}
             aria-label={isMenuOpen ? "Cerrar menú" : "Abrir menú"}
             aria-expanded={isMenuOpen}
             aria-controls="sidebar-menu"
+            data-open={isMenuOpen ? 'true' : 'false'}
           >
             <span className={styles.hamburgerLine}></span>
             <span className={styles.hamburgerLine}></span>
@@ -95,7 +96,7 @@ export default function Sidebar() {
 
       {isMobile && isMenuOpen && <div className={styles.sidebarOverlay} onClick={closeMenu} role="presentation" />}
 
-      <div className={`${styles.sidebarContent} ${isMenuOpen && isMobile ? styles.sidebarContentOpen : ''}`} id="sidebar-menu">
+      <div className={styles.sidebarContent} id="sidebar-menu" data-open={isMenuOpen ? 'true' : 'false'}>
       <div className={styles.sidebarUser}>
         <div className={styles.sidebarAvatar}>
           <Image
