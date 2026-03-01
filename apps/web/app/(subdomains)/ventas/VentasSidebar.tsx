@@ -17,28 +17,32 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
-  // PRINCIPAL
-  { label: "Dashboard", icon: "📊", href: "/dashboard", section: "Principal", description: "Visión general de ventas" },
+  { label: "Dashboard", icon: "📊", href: "/dashboard", section: "Cuenta y panorama", description: "Visión general de ventas" },
 
-  // PETICIONES
-  { label: "Leads", icon: "🎯", href: "/leads", section: "Peticiones", description: "Gestiona leads potenciales" },
-  { label: "Oportunidades", icon: "💼", href: "/oportunidades", section: "Peticiones", description: "Oportunidades comerciales" },
+  { label: "Leads", icon: "🎯", href: "/leads", section: "Prospección comercial", description: "Gestiona leads potenciales" },
+  { label: "Oportunidades", icon: "💼", href: "/oportunidades", section: "Prospección comercial", description: "Oportunidades comerciales" },
 
-  // GESTIÓN
-  { label: "Clientes", icon: "👥", href: "/clientes", section: "Gestión", description: "Base de datos de clientes" },
-  { label: "Proyectos", icon: "📁", href: "/proyectos", section: "Gestión", description: "Proyectos en desarrollo" },
-  { label: "Cotizaciones", icon: "📄", href: "/cotizaciones", section: "Gestión", description: "Gestiona cotizaciones" },
+  { label: "Clientes", icon: "👥", href: "/clientes", section: "Clientes y ejecución", description: "Base de datos de clientes" },
+  { label: "Proyectos", icon: "📁", href: "/proyectos", section: "Clientes y ejecución", description: "Proyectos en desarrollo" },
+  { label: "Cotizaciones", icon: "📄", href: "/cotizaciones", section: "Clientes y ejecución", description: "Gestiona cotizaciones" },
+  { label: "Plantillas", icon: "🎨", href: "/plantillas", section: "Clientes y ejecución", description: "Plantillas de órdenes PDF" },
 
-  // OPERACIONES (Nuevos features)
-  { label: "Plantillas", icon: "🎨", href: "/plantillas", section: "Operaciones", description: "Plantillas de órdenes PDF" },
-  { label: "Notificaciones", icon: "🔔", href: "/notificaciones", section: "Operaciones", description: "Centro de notificaciones" },
+  { label: "Notificaciones", icon: "🔔", href: "/notificaciones", section: "Comunicación y seguimiento", description: "Centro de notificaciones" },
 
-  // ANÁLISIS
-  { label: "Reportes", icon: "📈", href: "/reportes", section: "Análisis", description: "Reportes detallados" },
-  { label: "Crecimiento", icon: "📶", href: "/crecimiento", section: "Análisis", description: "Análisis de crecimiento" },
+  { label: "Reportes", icon: "📈", href: "/reportes", section: "Análisis y estrategia", description: "Reportes detallados" },
+  { label: "Crecimiento", icon: "📶", href: "/crecimiento", section: "Análisis y estrategia", description: "Análisis de crecimiento" },
+];
+
+const sectionOrder = [
+  "Cuenta y panorama",
+  "Prospección comercial",
+  "Clientes y ejecución",
+  "Comunicación y seguimiento",
+  "Análisis y estrategia",
 ];
 
 export default function VentasSidebar() {
+  const MOBILE_BREAKPOINT = 768;
   const pathname = usePathname();
   const { user } = useUser();
   const { darkMode, toggleDarkMode } = useTheme();
@@ -47,11 +51,11 @@ export default function VentasSidebar() {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth <= 900);
+    const checkMobile = () => setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT);
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
-  }, []);
+  }, [MOBILE_BREAKPOINT]);
 
   useEffect(() => {
     if (!isMobile) return;
@@ -112,7 +116,7 @@ export default function VentasSidebar() {
         label: "Gestión Vendedores",
         icon: "🧠",
         href: "/gestion-vendedores",
-        section: "Análisis",
+        section: "Análisis y estrategia",
         description: "Control ejecutivo y productividad diaria",
       });
     }
@@ -126,7 +130,12 @@ export default function VentasSidebar() {
       groups[section].push(item);
     });
 
-    return groups;
+    return sectionOrder
+      .filter((section) => groups[section]?.length)
+      .reduce((acc, section) => {
+        acc[section] = groups[section];
+        return acc;
+      }, {} as { [key: string]: MenuItem[] });
   }, [canManageSellers]);
 
   if (!user) return null;

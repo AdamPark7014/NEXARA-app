@@ -99,6 +99,8 @@ export default function ClientTicketsPage() {
     return null;
   });
   const [mounted, setMounted] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loginMode, setLoginMode] = useState<"client" | "branch">("client");
   const [error, setError] = useState<string | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -174,6 +176,24 @@ export default function ClientTicketsPage() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 900);
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) {
+      setMobileMenuOpen(false);
+      return;
+    }
+    document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobile, mobileMenuOpen]);
 
   const fetchTickets = async (token: string) => {
     setLoading(true);
@@ -586,7 +606,33 @@ export default function ClientTicketsPage() {
 
   return (
     <div className={`${consoleStyles.consoleLayout} ${styles.ticketsConsole}`}>
-      <aside className={consoleStyles.sidebar}>
+      <aside className={`${consoleStyles.sidebar} ${isMobile && mobileMenuOpen ? consoleStyles.sidebarOpen : ""}`}>
+        <div className={consoleStyles.sidebarHeader}>
+          <div className={consoleStyles.sidebarLogo}>
+            <span className={consoleStyles.brandMark}>NEXARA</span>
+            <span className={consoleStyles.brandSub}>Portal</span>
+          </div>
+          {isMobile && (
+            <button
+              type="button"
+              className={`${consoleStyles.hamburgerButton} ${mobileMenuOpen ? consoleStyles.hamburgerActive : ""}`}
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="tickets-sidebar-menu"
+            >
+              <span className={consoleStyles.hamburgerLine}></span>
+              <span className={consoleStyles.hamburgerLine}></span>
+              <span className={consoleStyles.hamburgerLine}></span>
+            </button>
+          )}
+        </div>
+
+        {isMobile && mobileMenuOpen && (
+          <div className={consoleStyles.sidebarOverlay} onClick={() => setMobileMenuOpen(false)} role="presentation"></div>
+        )}
+
+        <div className={consoleStyles.sidebarContent} id="tickets-sidebar-menu">
         <div className={consoleStyles.sidebarLogo}>
           <span className={consoleStyles.brandMark}>NEXARA</span>
           <span className={consoleStyles.brandSub}>Portal</span>
@@ -605,13 +651,41 @@ export default function ClientTicketsPage() {
             <span className={consoleStyles.rolePill}>Cliente</span>
           </div>
         </div>
-        <div className={consoleStyles.menuTitle}>Centro de servicio</div>
+        <div className={consoleStyles.menuTitle}>Cuenta corporativa</div>
+        <ul className={consoleStyles.sidebarMenu}>
+          <li className={consoleStyles.sidebarMenuItem}>
+            <button
+              type="button"
+              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "perfil" ? consoleStyles.active : ""}`}
+              onClick={() => {
+                setActiveTab("perfil");
+                setMobileMenuOpen(false);
+              }}
+            >
+              Mi perfil corporativo
+            </button>
+          </li>
+          <li className={consoleStyles.sidebarMenuItem}>
+            <a
+              href="mis-sucursales"
+              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Gestión de sucursales
+            </a>
+          </li>
+        </ul>
+
+        <div className={consoleStyles.menuTitle}>Servicio y solicitudes</div>
         <ul className={consoleStyles.sidebarMenu}>
           <li className={consoleStyles.sidebarMenuItem}>
             <button
               type="button"
               className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "tickets" ? consoleStyles.active : ""}`}
-              onClick={() => setActiveTab("tickets")}
+              onClick={() => {
+                setActiveTab("tickets");
+                setMobileMenuOpen(false);
+              }}
             >
               Estado de tickets
             </button>
@@ -620,28 +694,18 @@ export default function ClientTicketsPage() {
             <button
               type="button"
               className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "nuevo" ? consoleStyles.active : ""}`}
-              onClick={() => setActiveTab("nuevo")}
+              onClick={() => {
+                setActiveTab("nuevo");
+                setMobileMenuOpen(false);
+              }}
             >
               Nueva solicitud
             </button>
           </li>
-          <li className={consoleStyles.sidebarMenuItem}>
-            <button
-              type="button"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "perfil" ? consoleStyles.active : ""}`}
-              onClick={() => setActiveTab("perfil")}
-            >
-              Perfil corporativo
-            </button>
-          </li>
-          <li className={consoleStyles.sidebarMenuItem}>
-            <a
-              href="mis-sucursales"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
-            >
-              Gestión de sucursales
-            </a>
-          </li>
+        </ul>
+
+        <div className={consoleStyles.menuTitle}>Sesión</div>
+        <ul className={consoleStyles.sidebarMenu}>
           <li className={consoleStyles.sidebarMenuItem}>
             <button
               type="button"
@@ -652,6 +716,7 @@ export default function ClientTicketsPage() {
             </button>
           </li>
         </ul>
+        </div>
       </aside>
       <main className={consoleStyles.consoleMain}>
         <div className={styles.mainStack}>
