@@ -100,15 +100,16 @@ export default function ContabilidadLayout({ children }: { children: React.React
         </div>
         <button
           type="button"
-          className={styles.mobileMenuButton}
+          className={consoleStyles.hamburgerButton}
           onClick={() => setMobileMenuOpen((prev) => !prev)}
           aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
           aria-expanded={mobileMenuOpen}
           aria-controls="conta-mobile-menu"
+          data-open={mobileMenuOpen ? "true" : "false"}
         >
-          <span />
-          <span />
-          <span />
+          <span className={consoleStyles.hamburgerLine}></span>
+          <span className={consoleStyles.hamburgerLine}></span>
+          <span className={consoleStyles.hamburgerLine}></span>
         </button>
       </header>
 
