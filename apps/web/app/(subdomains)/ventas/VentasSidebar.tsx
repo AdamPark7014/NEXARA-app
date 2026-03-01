@@ -179,7 +179,22 @@ export default function VentasSidebar() {
 
       {isMobile && isMenuOpen && <div className={styles.sidebarOverlay} onClick={closeMenu} role="presentation" />}
 
-      <div className={styles.sidebarContent} id="ventas-sidebar-menu" data-open={isMenuOpen ? "true" : "false"}>
+      {(!isMobile || isMenuOpen) && (
+      <div
+        className={styles.sidebarContent}
+        id="ventas-sidebar-menu"
+        data-open={isMenuOpen ? "true" : "false"}
+        style={
+          isMobile
+            ? {
+                display: "flex",
+                opacity: 1,
+                visibility: "visible",
+                transform: "translateY(0) scale(1)",
+              }
+            : undefined
+        }
+      >
 
       {/* User Info Card */}
       {showExpandedContent && (
@@ -270,6 +285,7 @@ export default function VentasSidebar() {
         )}
       </div>
       </div>
+      )}
     </aside>
   );
 }

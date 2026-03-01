@@ -96,7 +96,22 @@ export default function Sidebar() {
 
       {isMobile && isMenuOpen && <div className={styles.sidebarOverlay} onClick={closeMenu} role="presentation" />}
 
-      <div className={`${styles.sidebarContent} ${isMenuOpen && isMobile ? styles.sidebarContentOpen : ''}`} id="sidebar-menu" data-open={isMenuOpen ? 'true' : 'false'}>
+      {(!isMobile || isMenuOpen) && (
+      <div
+        className={`${styles.sidebarContent} ${isMenuOpen && isMobile ? styles.sidebarContentOpen : ''}`}
+        id="sidebar-menu"
+        data-open={isMenuOpen ? 'true' : 'false'}
+        style={
+          isMobile
+            ? {
+                display: 'flex',
+                opacity: 1,
+                visibility: 'visible',
+                transform: 'translateY(0) scale(1)',
+              }
+            : undefined
+        }
+      >
       <div className={styles.sidebarUser}>
         <div className={styles.sidebarAvatar}>
           <Image
@@ -154,6 +169,7 @@ export default function Sidebar() {
         </button>
       </div>
       </div>
+      )}
     </aside>
   );
 }

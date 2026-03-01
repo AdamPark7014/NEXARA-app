@@ -175,7 +175,22 @@ export default function MyBranchesPage() {
           <div className={consoleStyles.sidebarOverlay} onClick={() => setMobileMenuOpen(false)} role="presentation"></div>
         )}
 
-        <div className={consoleStyles.sidebarContent} id="tickets-branches-sidebar-menu" data-open={mobileMenuOpen ? "true" : "false"}>
+        {(!isMobile || mobileMenuOpen) && (
+        <div
+          className={consoleStyles.sidebarContent}
+          id="tickets-branches-sidebar-menu"
+          data-open={mobileMenuOpen ? "true" : "false"}
+          style={
+            isMobile
+              ? {
+                  display: "flex",
+                  opacity: 1,
+                  visibility: "visible",
+                  transform: "translateY(0) scale(1)",
+                }
+              : undefined
+          }
+        >
         <div className={consoleStyles.sidebarLogo}>
           <span className={consoleStyles.brandMark}>NEXARA</span>
           <span className={consoleStyles.brandSub}>Portal</span>
@@ -245,6 +260,7 @@ export default function MyBranchesPage() {
           </li>
         </ul>
         </div>
+        )}
       </aside>
 
       {/* Main Content */}

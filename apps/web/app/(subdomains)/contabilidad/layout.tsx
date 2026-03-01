@@ -121,7 +121,19 @@ export default function ContabilidadLayout({ children }: { children: React.React
         />
       )}
 
-      <aside id="conta-mobile-menu" className={`${consoleStyles.sidebar} ${styles.contaSidebar} ${mobileMenuOpen ? styles.contaSidebarOpen : ""}`}>
+      <aside
+        id="conta-mobile-menu"
+        className={`${consoleStyles.sidebar} ${styles.contaSidebar} ${mobileMenuOpen ? styles.contaSidebarOpen : ""}`}
+        style={
+          mobileMenuOpen
+            ? {
+                opacity: 1,
+                visibility: "visible",
+                transform: "translateY(0) scale(1)",
+              }
+            : undefined
+        }
+      >
         <div className={consoleStyles.sidebarLogo}>
           <span className={consoleStyles.brandMark}>NEXARA</span>
           <span className={consoleStyles.brandSub}>Contabilidad</span>
