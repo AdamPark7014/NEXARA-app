@@ -1,13 +1,37 @@
 .contaRoot {
   min-height: 100vh;
   align-items: flex-start;
+  --card-bg: rgba(10, 20, 34, 0.88);
+  --panel-bg-soft: rgba(12, 24, 40, 0.68);
+  --primary-soft: rgba(31, 137, 252, 0.16);
+  --border-color: rgba(31, 137, 252, 0.24);
 }
 
 :global(body.light) .contaRoot {
+  --card-bg: rgba(255, 255, 255, 0.9);
+  --panel-bg-soft: rgba(231, 243, 255, 0.82);
+  --primary-soft: rgba(15, 106, 214, 0.12);
+  --border-color: rgba(15, 106, 214, 0.24);
   background:
     radial-gradient(circle at 10% 0%, rgba(15, 106, 214, 0.08), transparent 38%),
     radial-gradient(circle at 86% 3%, rgba(22, 169, 110, 0.1), transparent 42%),
     linear-gradient(180deg, rgba(246, 251, 255, 0.95), rgba(238, 246, 255, 0.95));
+}
+
+:global(body.dark) .contaRoot {
+  --card-bg: rgba(10, 20, 34, 0.9);
+  --panel-bg-soft: rgba(12, 24, 40, 0.7);
+  --primary-soft: rgba(31, 137, 252, 0.16);
+  --border-color: rgba(31, 137, 252, 0.24);
+}
+
+@media (prefers-color-scheme: dark) {
+  .contaRoot {
+    --card-bg: rgba(10, 20, 34, 0.9);
+    --panel-bg-soft: rgba(12, 24, 40, 0.7);
+    --primary-soft: rgba(31, 137, 252, 0.16);
+    --border-color: rgba(31, 137, 252, 0.24);
+  }
 }
 
 .contaRoot :global(.sidebar) {

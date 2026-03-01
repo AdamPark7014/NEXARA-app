@@ -81,14 +81,26 @@
 .authWrap {
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.authWrap :global(.login-container) {
+  min-height: calc(100vh - 118px);
+  min-height: calc(100dvh - 118px);
+  align-items: flex-start;
+  padding-top: 24px;
+}
+
+.authWrap :global(.login-card) {
+  width: min(100%, 460px);
 }
 
 .authHeader {
-  position: fixed;
-  top: 14px;
-  left: 50%;
-  transform: translateX(-50%);
+  position: sticky;
+  top: 10px;
   width: min(860px, calc(100% - 24px));
+  margin: 12px auto 0;
   z-index: 60;
   border-radius: 16px;
   border: 1px solid rgba(31, 137, 252, 0.28);
@@ -445,11 +457,34 @@
 
   .authWrap {
     min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .authWrap :global(.login-container) {
+    min-height: calc(100vh - 136px);
+    min-height: calc(100dvh - 136px);
+    padding-top: 16px;
+    padding-left: max(10px, env(safe-area-inset-left, 0px));
+    padding-right: max(10px, env(safe-area-inset-right, 0px));
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  }
+
+  .authWrap :global(.login-card) {
+    width: min(100%, 420px);
+    margin-inline: auto;
+  }
+
+  .authWrap :global(.input),
+  .authWrap :global(input),
+  .authWrap :global(select),
+  .authWrap :global(textarea) {
+    font-size: 16px;
   }
 
   .authHeader {
-    top: 10px;
+    top: 8px;
     width: calc(100% - 16px);
+    margin-top: 8px;
     padding: 10px;
     border-radius: 14px;
   }
@@ -473,6 +508,7 @@
 
   .authSwitchBtn {
     flex: 1;
+    min-width: 0;
     padding: 8px 10px;
     font-size: 0.84rem;
     min-height: 38px;
@@ -535,8 +571,22 @@
   .authHeader {
     width: calc(100% - 12px);
     top: 8px;
+    margin-top: 6px;
     padding: 9px;
     gap: 7px;
+  }
+
+  .authWrap :global(.login-container) {
+    min-height: calc(100vh - 148px);
+    min-height: calc(100dvh - 148px);
+    padding-top: 12px;
+    padding-left: max(8px, env(safe-area-inset-left, 0px));
+    padding-right: max(8px, env(safe-area-inset-right, 0px));
+    padding-bottom: max(10px, env(safe-area-inset-bottom, 0px));
+  }
+
+  .authWrap :global(.login-card) {
+    width: 100%;
   }
 
   .authEyebrow {

@@ -57,7 +57,7 @@
   border: 1px solid var(--border-color, rgba(127, 127, 127, 0.2));
   border-radius: 999px;
   padding: 4px;
-  background: var(--card-bg, rgba(255, 255, 255, 0.5));
+  background: var(--card-bg, rgba(10, 20, 34, 0.9));
 }
 
 :global(body.light) .periodButtons {
@@ -184,7 +184,8 @@
   padding: 18px;
   border-radius: 20px;
   border: 1px solid var(--border-color, rgba(127, 127, 127, 0.2));
-  background: var(--card-bg, rgba(255, 255, 255, 0.74));
+  background: var(--card-bg, rgba(10, 20, 34, 0.9));
+  box-shadow: 0 14px 28px rgba(5, 14, 28, 0.34);
   display: grid;
   gap: 12px;
   min-height: 132px;
@@ -226,7 +227,8 @@
   padding: 20px;
   border-radius: 22px;
   border: 1px solid var(--border-color, rgba(127, 127, 127, 0.2));
-  background: var(--card-bg, rgba(255, 255, 255, 0.75));
+  background: var(--card-bg, rgba(10, 20, 34, 0.9));
+  box-shadow: 0 16px 30px rgba(4, 12, 24, 0.34);
   min-width: 0;
 }
 
@@ -277,7 +279,7 @@
   padding: 12px 14px;
   border-radius: 16px;
   border: 1px solid var(--border-color, rgba(127, 127, 127, 0.2));
-  background: var(--panel-bg-soft, rgba(255, 255, 255, 0.5));
+  background: var(--panel-bg-soft, rgba(12, 24, 40, 0.72));
   min-width: 0;
 }
 
@@ -340,7 +342,7 @@
   flex: 1;
   height: 10px;
   border-radius: 999px;
-  background: var(--primary-soft, rgba(127, 127, 127, 0.12));
+  background: var(--primary-soft, rgba(31, 137, 252, 0.16));
   overflow: hidden;
 }
 
@@ -393,7 +395,30 @@
   border: 1px solid var(--border-color, rgba(127, 127, 127, 0.2));
   border-radius: 14px;
   padding: 12px;
-  background: var(--panel-bg-soft, rgba(255, 255, 255, 0.45));
+  background: var(--panel-bg-soft, rgba(12, 24, 40, 0.72));
+}
+
+:global(body.dark) .periodButtons {
+  background: linear-gradient(145deg, rgba(17, 30, 52, 0.94), rgba(11, 22, 40, 0.96));
+  border-color: rgba(31, 137, 252, 0.32);
+}
+
+:global(body.dark) .metricCard {
+  background: linear-gradient(165deg, rgba(16, 28, 48, 0.95), rgba(9, 18, 34, 0.96));
+  border-color: rgba(31, 137, 252, 0.25);
+  box-shadow: 0 16px 32px rgba(4, 12, 24, 0.44);
+}
+
+:global(body.dark) .panelCard {
+  background: linear-gradient(165deg, rgba(16, 28, 48, 0.95), rgba(9, 18, 34, 0.96));
+  border-color: rgba(31, 137, 252, 0.24);
+  box-shadow: 0 18px 34px rgba(4, 12, 24, 0.46);
+}
+
+:global(body.dark) .activityItem,
+:global(body.dark) .integrationItem {
+  background: linear-gradient(145deg, rgba(18, 31, 52, 0.88), rgba(10, 22, 40, 0.9));
+  border-color: rgba(31, 137, 252, 0.22);
 }
 
 .integrationTitle {
