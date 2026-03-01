@@ -75,6 +75,70 @@ export class VentasService {
     return startDate;
   }
 
+  private getPeriodRange(period: 'week' | 'month' | 'year') {
+    const start = this.getPeriodStart(period);
+    const end = new Date();
+    return { start, end };
+  }
+
+  private toDate(value?: string | Date | null) {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return date;
+  }
+
+  private validateNextActionPlan(
+    stage: string | undefined,
+    description?: string | null,
+    expectedCloseDate?: string | Date | null,
+  ) {
+    const currentStage = stage || 'DISCOVERY';
+    if (currentStage === 'WON' || currentStage === 'LOST') return;
+
+    const summary = (description || '').trim();
+    if (summary.length < 10) {
+      throw new BadRequestException('Debes definir la próxima acción con al menos 10 caracteres');
+    }
+
+    const actionDate = this.toDate(expectedCloseDate);
+    if (!actionDate) {
+      throw new BadRequestException('Debes definir la fecha de próxima acción para oportunidades activas');
+    }
+  }
+
+  private async getQuotaMap(period: 'week' | 'month' | 'year', ownerIds: number[]) {
+    if (ownerIds.length === 0) return new Map<number, { targetRevenue: number; targetOpportunities: number }>();
+    const { start } = this.getPeriodRange(period);
+    const salesAuditEvent = (this.prisma as any).salesAuditEvent;
+    const events = await salesAuditEvent.findMany({
+      where: {
+        action: 'quota.set',
+        createdAt: { gte: start },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        metadata: true,
+      },
+    });
+
+    const quotaMap = new Map<number, { targetRevenue: number; targetOpportunities: number }>();
+    for (const event of events) {
+      const metadata = (event?.metadata || {}) as any;
+      if (metadata?.period !== period) continue;
+      const ownerId = Number(metadata?.ownerId || 0);
+      if (!ownerId || !ownerIds.includes(ownerId)) continue;
+      if (quotaMap.has(ownerId)) continue;
+
+      quotaMap.set(ownerId, {
+        targetRevenue: Number(metadata?.targetRevenue || 0),
+        targetOpportunities: Number(metadata?.targetOpportunities || 0),
+      });
+    }
+
+    return quotaMap;
+  }
+
   async createAuditEvent(payload: {
     action: string;
     entityType: string;
@@ -269,11 +333,13 @@ export class VentasService {
 
   async createOpportunity(dto: CreateSalesOpportunityDto, user?: any) {
     const ownerId = this.resolveOwnerForWrite(dto.ownerId, user);
+    const stage = dto.stage || 'DISCOVERY';
+    this.validateNextActionPlan(stage, dto.description, dto.expectedCloseDate);
     return this.prisma.salesOpportunity.create({
       data: {
         title: dto.title,
         description: dto.description || null,
-        stage: dto.stage,
+        stage,
         value: dto.value ?? 0,
         probability: dto.probability ?? 0,
         expectedCloseDate: dto.expectedCloseDate || null,
@@ -306,6 +372,11 @@ export class VentasService {
   async updateOpportunity(id: number, dto: UpdateSalesOpportunityDto, user?: any) {
     const existing = await this.getOpportunity(id, user);
     const ownerId = this.resolveOwnerForWrite(dto.ownerId, user, existing.ownerId);
+    const mergedStage = dto.stage || existing.stage;
+    const mergedDescription = dto.description ?? existing.description;
+    const mergedExpectedCloseDate = dto.expectedCloseDate ?? existing.expectedCloseDate;
+    this.validateNextActionPlan(mergedStage, mergedDescription, mergedExpectedCloseDate);
+
     return this.prisma.salesOpportunity.update({
       where: { id },
       data: {
@@ -1286,6 +1357,13 @@ export class VentasService {
     if (!this.isSuperAdminUser(user)) {
       const metrics = await this.getMetricsByPeriod(period, user);
       const performance = Math.min(100, (metrics.totalRevenue / 1000000) * 100 + metrics.conversionRate);
+      const quotaMap = await this.getQuotaMap(period, user?.id ? [user.id] : []);
+      const quota = user?.id ? quotaMap.get(user.id) : undefined;
+      const targetRevenue = Number(quota?.targetRevenue || 0);
+      const targetOpportunities = Number(quota?.targetOpportunities || 0);
+      const attainmentRevenue = targetRevenue > 0 ? (metrics.totalRevenue / targetRevenue) * 100 : 0;
+      const attainmentOpportunities = targetOpportunities > 0 ? (metrics.opportunityCount / targetOpportunities) * 100 : 0;
+      const status = attainmentRevenue >= 100 ? 'on-track' : attainmentRevenue >= 70 ? 'risk' : 'off-track';
       return [
         {
           userId: user?.id,
@@ -1296,6 +1374,12 @@ export class VentasService {
           margin: Number(metrics.averageMargin),
           conversionRate: Number(metrics.conversionRate),
           performance: Number(performance.toFixed(0)),
+          targetRevenue,
+          targetOpportunities,
+          attainmentRevenue: Number(attainmentRevenue.toFixed(2)),
+          attainmentOpportunities: Number(attainmentOpportunities.toFixed(2)),
+          revenueGap: Number((targetRevenue - Number(metrics.totalRevenue || 0)).toFixed(2)),
+          status,
         },
       ];
     }
@@ -1353,14 +1437,73 @@ export class VentasService {
       })
     );
 
-    return vendorStats.sort((a, b) => b.revenue - a.revenue);
+    const quotaMap = await this.getQuotaMap(period, vendorStats.map((vendor) => vendor.userId));
+
+    const withQuotas = vendorStats.map((vendor) => {
+      const quota = quotaMap.get(vendor.userId);
+      const targetRevenue = Number(quota?.targetRevenue || 0);
+      const targetOpportunities = Number(quota?.targetOpportunities || 0);
+      const attainmentRevenue = targetRevenue > 0 ? (vendor.revenue / targetRevenue) * 100 : 0;
+      const attainmentOpportunities = targetOpportunities > 0 ? (vendor.opportunities / targetOpportunities) * 100 : 0;
+      const status = attainmentRevenue >= 100 ? 'on-track' : attainmentRevenue >= 70 ? 'risk' : 'off-track';
+
+      return {
+        ...vendor,
+        targetRevenue,
+        targetOpportunities,
+        attainmentRevenue: Number(attainmentRevenue.toFixed(2)),
+        attainmentOpportunities: Number(attainmentOpportunities.toFixed(2)),
+        revenueGap: Number((targetRevenue - vendor.revenue).toFixed(2)),
+        status,
+      };
+    });
+
+    return withQuotas.sort((a, b) => b.revenue - a.revenue);
+  }
+
+  async setSalesQuota(
+    period: 'week' | 'month' | 'year',
+    targetRevenue: number,
+    targetOpportunities: number,
+    ownerId: number | undefined,
+    user?: any,
+  ) {
+    const resolvedOwnerId = ownerId || user?.id;
+    if (!resolvedOwnerId) throw new BadRequestException('ownerId requerido para configurar cuota');
+    if (!this.isSuperAdminUser(user) && resolvedOwnerId !== user?.id) {
+      throw new ForbiddenException('Solo super admin puede configurar cuotas de otros vendedores');
+    }
+
+    const payload = {
+      ownerId: resolvedOwnerId,
+      period,
+      targetRevenue: Math.max(0, Number(targetRevenue || 0)),
+      targetOpportunities: Math.max(0, Number(targetOpportunities || 0)),
+      configuredAt: new Date().toISOString(),
+    };
+
+    const event = await this.createAuditEvent({
+      action: 'quota.set',
+      entityType: 'quota',
+      actorId: user?.id,
+      metadata: payload,
+    });
+
+    return {
+      id: event.id,
+      ...payload,
+    };
+  }
+
+  async getSalesQuotaProgress(period: 'week' | 'month' | 'year', user?: any) {
+    return this.getVendorStatsByPeriod(period, user);
   }
 
   async getExecutiveInsights(period: 'week' | 'month' | 'year', user?: any) {
     const startDate = this.getPeriodStart(period);
     const ownerFilter = !this.isSuperAdminUser(user) && user?.id ? { ownerId: user.id } : undefined;
 
-    const [metrics, opportunities, auditEventsRaw] = await Promise.all([
+    const [metrics, opportunities, auditEventsRaw, vendorStats] = await Promise.all([
       this.getMetricsByPeriod(period, user),
       this.prisma.salesOpportunity.findMany({
         where: {
@@ -1374,6 +1517,8 @@ export class VentasService {
           probability: true,
           createdAt: true,
           closedAt: true,
+          expectedCloseDate: true,
+          description: true,
         },
       }),
       (this.prisma as any).salesAuditEvent.groupBy({
@@ -1384,6 +1529,7 @@ export class VentasService {
         },
         _count: { action: true },
       }),
+      this.getVendorStatsByPeriod(period, user),
     ]);
 
     const auditEvents = (auditEventsRaw ?? []) as Array<{ action: string; _count: { action: number } }>;
@@ -1414,6 +1560,68 @@ export class VentasService {
       ? (weightedForecast / metrics.pipelineValue) * 100
       : 0;
 
+    const activeOpportunities = opportunities.filter((opportunity) => opportunity.stage !== 'WON' && opportunity.stage !== 'LOST');
+    const now = new Date();
+
+    const pipelineAgingByStage = activeOpportunities.reduce<Record<string, { count: number; avgDays: number }>>((acc, opportunity) => {
+      const key = opportunity.stage || 'UNKNOWN';
+      const current = acc[key] || { count: 0, avgDays: 0 };
+      const ageDays = (now.getTime() - new Date(opportunity.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+      current.avgDays = ((current.avgDays * current.count) + ageDays) / (current.count + 1);
+      current.count += 1;
+      acc[key] = current;
+      return acc;
+    }, {});
+
+    const agingBuckets = activeOpportunities.reduce(
+      (acc, opportunity) => {
+        const ageDays = (now.getTime() - new Date(opportunity.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+        if (ageDays <= 7) acc.bucket0to7 += 1;
+        else if (ageDays <= 30) acc.bucket8to30 += 1;
+        else if (ageDays <= 60) acc.bucket31to60 += 1;
+        else acc.bucket60plus += 1;
+        return acc;
+      },
+      { bucket0to7: 0, bucket8to30: 0, bucket31to60: 0, bucket60plus: 0 },
+    );
+
+    const overdueNextActions = activeOpportunities.filter((opportunity) => {
+      const due = this.toDate(opportunity.expectedCloseDate);
+      return Boolean(due && due.getTime() < now.getTime());
+    }).length;
+
+    const opportunitiesWithActionPlan = activeOpportunities.filter((opportunity) => {
+      const summary = (opportunity.description || '').trim();
+      const due = this.toDate(opportunity.expectedCloseDate);
+      return summary.length >= 10 && Boolean(due);
+    }).length;
+
+    const actionPlanCoverage = activeOpportunities.length > 0
+      ? (opportunitiesWithActionPlan / activeOpportunities.length) * 100
+      : 100;
+
+    const riskAlerts: Array<{ level: 'high' | 'medium' | 'low'; message: string }> = [];
+    if (forecastCoverage < 60) {
+      riskAlerts.push({ level: 'high', message: 'Cobertura de forecast por debajo de 60% del pipeline.' });
+    } else if (forecastCoverage < 85) {
+      riskAlerts.push({ level: 'medium', message: 'Cobertura de forecast por debajo de 85%; revisar etapas críticas.' });
+    }
+    if (overdueNextActions > 0) {
+      riskAlerts.push({ level: 'high', message: `Hay ${overdueNextActions} oportunidades con próxima acción vencida.` });
+    }
+    if (agingBuckets.bucket60plus > 0) {
+      riskAlerts.push({ level: 'medium', message: `Existen ${agingBuckets.bucket60plus} oportunidades con más de 60 días en pipeline.` });
+    }
+
+    const vendorStatus = (vendorStats || []).map((vendor: any) => ({
+      userId: vendor.userId,
+      userName: vendor.userName,
+      status: vendor.status || 'off-track',
+      attainmentRevenue: Number(vendor.attainmentRevenue || 0),
+      targetRevenue: Number(vendor.targetRevenue || 0),
+      revenue: Number(vendor.revenue || 0),
+    }));
+
     return {
       forecast: {
         weightedForecast: Number(weightedForecast.toFixed(2)),
@@ -1425,6 +1633,22 @@ export class VentasService {
         averageMargin: Number(metrics.averageMargin || 0),
       },
       stageDistribution,
+      pipelineAging: {
+        byStage: Object.entries(pipelineAgingByStage).map(([stage, data]) => ({
+          stage,
+          count: data.count,
+          avgDays: Number(data.avgDays.toFixed(1)),
+        })),
+        buckets: agingBuckets,
+      },
+      nextActionCompliance: {
+        activeOpportunities: activeOpportunities.length,
+        opportunitiesWithActionPlan,
+        actionPlanCoverage: Number(actionPlanCoverage.toFixed(2)),
+        overdueNextActions,
+      },
+      vendorStatus,
+      riskAlerts,
       topActions: auditEvents
         .map((entry) => ({ action: entry.action, count: entry._count.action }))
         .sort((a, b) => b.count - a.count)

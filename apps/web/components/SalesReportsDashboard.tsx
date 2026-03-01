@@ -1,11 +1,13 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useUser } from './UserContext';
 import PDFViewer from './PDFViewer';
 import {
   getSalesAuditEvents,
   getSalesExecutiveInsights,
   getSalesMetrics,
-  getSalesVendorStats,
+  getSalesQuotaProgress,
+  setSalesQuota,
+  type SalesQuotaPayload,
   type SalesAuditEvent,
   type SalesExecutiveInsights,
   type SalesMetrics,
@@ -35,6 +37,12 @@ export default function SalesReportsDashboard({
   const [generatePdfLoading, setGeneratePdfLoading] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [showPdfViewer, setShowPdfViewer] = useState(false);
+  const [quotaForm, setQuotaForm] = useState<SalesQuotaPayload>({
+    period,
+    ownerId: undefined,
+    targetRevenue: 0,
+    targetOpportunities: 0,
+  });
 
   const fetchMetrics = async () => {
     if (!user?.token) return;
@@ -43,7 +51,7 @@ export default function SalesReportsDashboard({
     try {
       const [metricsData, vendorData, insightsData, auditData] = await Promise.all([
         getSalesMetrics(user.token, currentPeriod),
-        getSalesVendorStats(user.token, currentPeriod),
+        getSalesQuotaProgress(user.token, currentPeriod),
         getSalesExecutiveInsights(user.token, currentPeriod),
         getSalesAuditEvents(user.token, currentPeriod, 20),
       ]);
@@ -65,7 +73,24 @@ export default function SalesReportsDashboard({
 
   const handlePeriodChange = (newPeriod: 'week' | 'month' | 'year') => {
     setCurrentPeriod(newPeriod);
+    setQuotaForm((prev) => ({ ...prev, period: newPeriod }));
     onPeriodChange?.(newPeriod);
+  };
+
+  const handleSaveQuota = async () => {
+    if (!user?.token) return;
+    if (quotaForm.targetRevenue <= 0) {
+      setError('Define una meta de ingresos mayor a 0');
+      return;
+    }
+
+    try {
+      await setSalesQuota(user.token, quotaForm);
+      await fetchMetrics();
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al guardar cuota');
+    }
   };
 
   const handleGeneratePdf = async () => {
@@ -219,6 +244,27 @@ export default function SalesReportsDashboard({
                   <div key={vendor.userId} className={styles.vendorCard}>
                     <div className={styles.vendorHeader}>
                       <h4 className={styles.vendorName}>{vendor.userName}</h4>
+                      <span
+                        style={{
+                          fontSize: 12,
+                          padding: '4px 8px',
+                          borderRadius: 999,
+                          background:
+                            vendor.status === 'on-track'
+                              ? 'rgba(25,135,84,0.15)'
+                              : vendor.status === 'risk'
+                                ? 'rgba(255,193,7,0.2)'
+                                : 'rgba(220,53,69,0.15)',
+                          color:
+                            vendor.status === 'on-track'
+                              ? '#198754'
+                              : vendor.status === 'risk'
+                                ? '#b8860b'
+                                : '#dc3545',
+                        }}
+                      >
+                        {vendor.status === 'on-track' ? 'On-track' : vendor.status === 'risk' ? 'Risk' : 'Off-track'}
+                      </span>
                       <div
                         className={styles.performanceBar}
                         style={{
@@ -250,10 +296,68 @@ export default function SalesReportsDashboard({
                         <span>Conversión:</span>
                         <strong>{vendor.conversionRate.toFixed(1)}%</strong>
                       </div>
+                      <div className={styles.vendorMetricItem}>
+                        <span>Meta ingresos:</span>
+                        <strong>{formatMoney(vendor.targetRevenue || 0)}</strong>
+                      </div>
+                      <div className={styles.vendorMetricItem}>
+                        <span>Cumplimiento:</span>
+                        <strong>{Number(vendor.attainmentRevenue || 0).toFixed(1)}%</strong>
+                      </div>
+                      <div className={styles.vendorMetricItem}>
+                        <span>Gap:</span>
+                        <strong>{formatMoney(Number(vendor.revenueGap || 0))}</strong>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
+
+              {user?.isSuperAdmin && vendorStats.length > 0 && (
+                <div className={styles.vendorGrid} style={{ marginTop: 12 }}>
+                  <div className={styles.vendorCard} style={{ gridColumn: '1 / -1' }}>
+                    <div className={styles.vendorHeader}>
+                      <h4 className={styles.vendorName}>Configurar cuota</h4>
+                    </div>
+                    <div className={styles.vendorMetrics}>
+                      <div className={styles.vendorMetricItem}>
+                        <span>Vendedor:</span>
+                        <select
+                          value={quotaForm.ownerId || ''}
+                          onChange={(event) => setQuotaForm((prev) => ({ ...prev, ownerId: Number(event.target.value) || undefined }))}
+                        >
+                          <option value="">Selecciona</option>
+                          {vendorStats.map((vendor) => (
+                            <option key={vendor.userId} value={vendor.userId}>{vendor.userName}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className={styles.vendorMetricItem}>
+                        <span>Meta ingresos:</span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={quotaForm.targetRevenue}
+                          onChange={(event) => setQuotaForm((prev) => ({ ...prev, targetRevenue: Number(event.target.value || 0) }))}
+                        />
+                      </div>
+                      <div className={styles.vendorMetricItem}>
+                        <span>Meta oportunidades:</span>
+                        <input
+                          type="number"
+                          min={0}
+                          value={quotaForm.targetOpportunities || 0}
+                          onChange={(event) => setQuotaForm((prev) => ({ ...prev, targetOpportunities: Number(event.target.value || 0) }))}
+                        />
+                      </div>
+                      <div className={styles.vendorMetricItem}>
+                        <span></span>
+                        <button className={styles.exportBtn} onClick={handleSaveQuota}>Guardar cuota</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -322,7 +426,81 @@ export default function SalesReportsDashboard({
                       ))}
                   </div>
                 </div>
+
+                <div className={styles.vendorCard}>
+                  <div className={styles.vendorHeader}>
+                    <h4 className={styles.vendorName}>Aging de pipeline</h4>
+                  </div>
+                  <div className={styles.vendorMetrics}>
+                    {insights.pipelineAging.byStage.map((item) => (
+                      <div key={item.stage} className={styles.vendorMetricItem}>
+                        <span>{item.stage} ({item.count}):</span>
+                        <strong>{item.avgDays.toFixed(1)} días</strong>
+                      </div>
+                    ))}
+                    <div className={styles.vendorMetricItem}>
+                      <span>0-7 días:</span>
+                      <strong>{insights.pipelineAging.buckets.bucket0to7}</strong>
+                    </div>
+                    <div className={styles.vendorMetricItem}>
+                      <span>8-30 días:</span>
+                      <strong>{insights.pipelineAging.buckets.bucket8to30}</strong>
+                    </div>
+                    <div className={styles.vendorMetricItem}>
+                      <span>31-60 días:</span>
+                      <strong>{insights.pipelineAging.buckets.bucket31to60}</strong>
+                    </div>
+                    <div className={styles.vendorMetricItem}>
+                      <span>+60 días:</span>
+                      <strong>{insights.pipelineAging.buckets.bucket60plus}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.vendorCard}>
+                  <div className={styles.vendorHeader}>
+                    <h4 className={styles.vendorName}>Próxima acción</h4>
+                  </div>
+                  <div className={styles.vendorMetrics}>
+                    <div className={styles.vendorMetricItem}>
+                      <span>Oportunidades activas:</span>
+                      <strong>{insights.nextActionCompliance.activeOpportunities}</strong>
+                    </div>
+                    <div className={styles.vendorMetricItem}>
+                      <span>Con plan de acción:</span>
+                      <strong>{insights.nextActionCompliance.opportunitiesWithActionPlan}</strong>
+                    </div>
+                    <div className={styles.vendorMetricItem}>
+                      <span>Cobertura:</span>
+                      <strong>{insights.nextActionCompliance.actionPlanCoverage.toFixed(1)}%</strong>
+                    </div>
+                    <div className={styles.vendorMetricItem}>
+                      <span>Acciones vencidas:</span>
+                      <strong>{insights.nextActionCompliance.overdueNextActions}</strong>
+                    </div>
+                  </div>
+                </div>
               </div>
+
+              {insights.riskAlerts.length > 0 && (
+                <div className={styles.vendorGrid} style={{ marginTop: 12 }}>
+                  <div className={styles.vendorCard} style={{ gridColumn: '1 / -1' }}>
+                    <div className={styles.vendorHeader}>
+                      <h4 className={styles.vendorName}>Alertas comerciales</h4>
+                    </div>
+                    <div className={styles.vendorMetrics}>
+                      {insights.riskAlerts.map((alert, index) => (
+                        <div key={`${alert.level}-${index}`} className={styles.vendorMetricItem}>
+                          <span>
+                            {alert.level === 'high' ? '🔴' : alert.level === 'medium' ? '🟠' : '🟡'} {alert.message}
+                          </span>
+                          <strong>{alert.level.toUpperCase()}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
