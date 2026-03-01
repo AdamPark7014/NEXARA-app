@@ -9,6 +9,7 @@ import { VentasService } from './ventas.service.js';
 const SALES_REPORT_VIEW_ACCESS = [PERMISSIONS.SALES_REPORTS_VIEW, PERMISSIONS.SALES_VIEW, PERMISSIONS.PANEL_VENTAS];
 const SALES_REPORT_EXPORT_ACCESS = [PERMISSIONS.SALES_REPORTS_EXPORT, PERMISSIONS.SALES_MANAGE, PERMISSIONS.PANEL_VENTAS];
 const SALES_AUDIT_ACCESS = [PERMISSIONS.SALES_AUDIT_VIEW, PERMISSIONS.SALES_REPORTS_VIEW, PERMISSIONS.PANEL_VENTAS];
+const SALES_QUOTA_MANAGE_ACCESS = [PERMISSIONS.SALES_MANAGE, PERMISSIONS.PANEL_VENTAS];
 
 @Controller('ventas/reportes')
 export class VentasReportesController {
@@ -33,6 +34,43 @@ export class VentasReportesController {
   @RBAC({ anyPermissions: SALES_REPORT_VIEW_ACCESS })
   async vendorStats(@Query('period') period: 'week' | 'month' | 'year' = 'month', @CurrentUser() user: any) {
     return this.ventasService.getVendorStatsByPeriod(period, user);
+  }
+
+  @Get('cuotas')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: SALES_REPORT_VIEW_ACCESS })
+  async quotas(@Query('period') period: 'week' | 'month' | 'year' = 'month', @CurrentUser() user: any) {
+    return this.ventasService.getSalesQuotaProgress(period, user);
+  }
+
+  @Post('cuotas')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: SALES_QUOTA_MANAGE_ACCESS })
+  async setQuota(
+    @Body() dto: {
+      period: 'week' | 'month' | 'year';
+      ownerId?: number;
+      targetRevenue: number;
+      targetOpportunities?: number;
+    },
+    @CurrentUser() user: any,
+  ) {
+    const result = await this.ventasService.setSalesQuota(
+      dto.period,
+      dto.targetRevenue,
+      dto.targetOpportunities || 0,
+      dto.ownerId,
+      user,
+    );
+
+    await this.ventasService.createAuditEvent({
+      action: 'report.quota.set',
+      entityType: 'quota',
+      actorId: user?.id,
+      metadata: result,
+    });
+
+    return result;
   }
 
   @Get('insights')

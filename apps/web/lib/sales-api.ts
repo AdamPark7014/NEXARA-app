@@ -143,6 +143,19 @@ export type SalesVendorStats = {
   margin: number;
   conversionRate: number;
   performance: number;
+  targetRevenue?: number;
+  targetOpportunities?: number;
+  attainmentRevenue?: number;
+  attainmentOpportunities?: number;
+  revenueGap?: number;
+  status?: 'on-track' | 'risk' | 'off-track';
+};
+
+export type SalesQuotaPayload = {
+  period: 'week' | 'month' | 'year';
+  ownerId?: number;
+  targetRevenue: number;
+  targetOpportunities?: number;
 };
 
 export type SalesExecutiveInsights = {
@@ -156,6 +169,30 @@ export type SalesExecutiveInsights = {
     averageMargin: number;
   };
   stageDistribution: Record<string, number>;
+  pipelineAging: {
+    byStage: Array<{ stage: string; count: number; avgDays: number }>;
+    buckets: {
+      bucket0to7: number;
+      bucket8to30: number;
+      bucket31to60: number;
+      bucket60plus: number;
+    };
+  };
+  nextActionCompliance: {
+    activeOpportunities: number;
+    opportunitiesWithActionPlan: number;
+    actionPlanCoverage: number;
+    overdueNextActions: number;
+  };
+  vendorStatus: Array<{
+    userId: number;
+    userName: string;
+    status: 'on-track' | 'risk' | 'off-track';
+    attainmentRevenue: number;
+    targetRevenue: number;
+    revenue: number;
+  }>;
+  riskAlerts: Array<{ level: 'high' | 'medium' | 'low'; message: string }>;
   topActions: Array<{ action: string; count: number }>;
 };
 
@@ -494,4 +531,26 @@ export const getSalesAuditEvents = async (token: string, period: 'week' | 'month
     'Error al cargar auditoría comercial',
   );
   return Array.isArray(data) ? (data as SalesAuditEvent[]) : [];
+};
+
+export const getSalesQuotaProgress = async (token: string, period: 'week' | 'month' | 'year') => {
+  const data = await apiRequest<unknown>(
+    `ventas/reportes/cuotas?period=${period}`,
+    { token, method: 'GET' },
+    'Error al cargar cuotas de ventas',
+  );
+  return Array.isArray(data) ? (data as SalesVendorStats[]) : [];
+};
+
+export const setSalesQuota = async (token: string, payload: SalesQuotaPayload) => {
+  return apiRequest<unknown>(
+    'ventas/reportes/cuotas',
+    {
+      token,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+    'Error al configurar cuota de ventas',
+  );
 };

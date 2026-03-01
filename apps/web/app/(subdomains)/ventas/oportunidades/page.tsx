@@ -63,6 +63,14 @@ export default function VentasOportunidadesPage() {
       setError("El título es obligatorio");
       return;
     }
+    if (!form.description.trim() || form.description.trim().length < 10) {
+      setError("Debes definir la próxima acción con al menos 10 caracteres");
+      return;
+    }
+    if (!form.expectedCloseDate) {
+      setError("Debes definir la fecha de próxima acción");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -183,13 +191,14 @@ export default function VentasOportunidadesPage() {
                 value={form.expectedCloseDate}
                 onChange={handleChange}
                 type="date"
+                title="Fecha de próxima acción"
               />
               <textarea
                 className={styles.input}
                 name="description"
                 value={form.description}
                 onChange={handleChange}
-                placeholder="Descripción"
+                placeholder="Próxima acción obligatoria (ej: llamar al cliente para validar alcance)"
                 rows={2}
               />
             </div>
@@ -217,6 +226,9 @@ export default function VentasOportunidadesPage() {
               <p className={styles.meta}>Etapa: <strong>{selectedOpportunity.stage}</strong></p>
               <p className={styles.meta}>Valor: <strong>${selectedOpportunity.value.toLocaleString('es-MX')}</strong></p>
               <p className={styles.meta}>Probabilidad: <strong>{selectedOpportunity.probability}%</strong></p>
+              <p className={styles.meta}>
+                Próxima acción: <strong>{selectedOpportunity.expectedCloseDate ? new Date(selectedOpportunity.expectedCloseDate).toLocaleDateString('es-MX') : 'No definida'}</strong>
+              </p>
               
               {selectedOpportunity.description && (
                 <p className={styles.description}>{selectedOpportunity.description}</p>

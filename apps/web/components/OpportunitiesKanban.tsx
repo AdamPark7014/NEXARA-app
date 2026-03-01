@@ -187,6 +187,11 @@ export default function OpportunitiesKanban({
                   onClick={() => onSelectOpportunity?.(opp)}
                   style={{ borderLeftColor: stage.color }}
                 >
+                  {opp.expectedCloseDate && new Date(opp.expectedCloseDate).getTime() < Date.now() && stage.id !== 'WON' && stage.id !== 'LOST' && (
+                    <div style={{ fontSize: 11, color: '#dc3545', fontWeight: 600, marginBottom: 6 }}>
+                      Próxima acción vencida
+                    </div>
+                  )}
                   <div className={styles.cardHeader}>
                     <h4 className={styles.cardTitle}>{opp.title}</h4>
                     <span className={styles.probability}>{opp.probability}%</span>
