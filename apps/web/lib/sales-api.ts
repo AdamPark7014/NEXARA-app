@@ -212,6 +212,9 @@ type FetchInit = RequestInit & {
 };
 
 const getErrorMessage = (payload: unknown, fallback: string) => {
+  if (typeof payload === "string" && payload.trim()) {
+    return payload;
+  }
   if (payload && typeof payload === "object") {
     const maybeMessage = (payload as { message?: unknown }).message;
     if (typeof maybeMessage === "string" && maybeMessage.trim()) {
@@ -222,6 +225,15 @@ const getErrorMessage = (payload: unknown, fallback: string) => {
     }
   }
   return fallback;
+};
+
+const parseResponsePayload = (text: string): unknown => {
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 };
 
 const apiRequest = async <T>(path: string, init: FetchInit, fallbackError = "Error en solicitud"): Promise<T> => {
@@ -235,7 +247,7 @@ const apiRequest = async <T>(path: string, init: FetchInit, fallbackError = "Err
   });
 
   const text = await response.text();
-  const payload: unknown = text ? JSON.parse(text) : null;
+  const payload = parseResponsePayload(text);
 
   if (!response.ok) {
     throw new Error(getErrorMessage(payload, fallbackError));

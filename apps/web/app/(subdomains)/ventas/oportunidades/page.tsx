@@ -38,6 +38,15 @@ export default function VentasOportunidadesPage() {
   });
   const [viewMode, setViewMode] = useState<'kanban' | 'table'>('kanban');
 
+  const toIsoDateTime = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      return `${trimmed}T12:00:00.000Z`;
+    }
+    return trimmed;
+  };
+
   const handleAddNote = async (id: number) => {
     if (!user?.token || !noteDraft.trim()) return;
     
@@ -76,7 +85,7 @@ export default function VentasOportunidadesPage() {
     try {
       const payload = {
         ...form,
-        expectedCloseDate: form.expectedCloseDate || undefined,
+        expectedCloseDate: toIsoDateTime(form.expectedCloseDate),
       };
       await createSalesOpportunity(user.token, payload);
       setForm({ title: "", description: "", stage: "DISCOVERY", value: 0, probability: 0, expectedCloseDate: "" });

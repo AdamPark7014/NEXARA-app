@@ -208,6 +208,36 @@
   color: #333;
 }
 
+.statusBadge {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.statusOnTrack {
+  background: rgba(25, 135, 84, 0.15);
+  color: #198754;
+}
+
+.statusRisk {
+  background: rgba(15, 106, 214, 0.12);
+  color: #0f6ad6;
+}
+
+.statusOffTrack {
+  background: rgba(220, 53, 69, 0.15);
+  color: #dc3545;
+}
+
+.spacingTop {
+  margin-top: 12px;
+}
+
+.fullWidthCard {
+  grid-column: 1 / -1;
+}
+
 .performanceBar {
   height: 24px;
   background: linear-gradient(90deg, #hsl(212, 98%, 45%) 0%, #198754 100%), #e0e0e0;

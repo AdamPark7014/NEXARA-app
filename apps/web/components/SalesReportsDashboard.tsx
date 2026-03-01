@@ -44,6 +44,12 @@ export default function SalesReportsDashboard({
     targetOpportunities: 0,
   });
 
+  const getStatusBadgeClass = (status?: 'on-track' | 'risk' | 'off-track') => {
+    if (status === 'on-track') return `${styles.statusBadge} ${styles.statusOnTrack}`;
+    if (status === 'risk') return `${styles.statusBadge} ${styles.statusRisk}`;
+    return `${styles.statusBadge} ${styles.statusOffTrack}`;
+  };
+
   const fetchMetrics = async () => {
     if (!user?.token) return;
     setLoading(true);
@@ -244,25 +250,7 @@ export default function SalesReportsDashboard({
                   <div key={vendor.userId} className={styles.vendorCard}>
                     <div className={styles.vendorHeader}>
                       <h4 className={styles.vendorName}>{vendor.userName}</h4>
-                      <span
-                        style={{
-                          fontSize: 12,
-                          padding: '4px 8px',
-                          borderRadius: 999,
-                          background:
-                            vendor.status === 'on-track'
-                              ? 'rgba(25,135,84,0.15)'
-                              : vendor.status === 'risk'
-                                ? 'rgba(255,193,7,0.2)'
-                                : 'rgba(220,53,69,0.15)',
-                          color:
-                            vendor.status === 'on-track'
-                              ? '#198754'
-                              : vendor.status === 'risk'
-                                ? '#b8860b'
-                                : '#dc3545',
-                        }}
-                      >
+                      <span className={getStatusBadgeClass(vendor.status)}>
                         {vendor.status === 'on-track' ? 'On-track' : vendor.status === 'risk' ? 'Risk' : 'Off-track'}
                       </span>
                       <div
@@ -314,8 +302,8 @@ export default function SalesReportsDashboard({
               </div>
 
               {user?.isSuperAdmin && vendorStats.length > 0 && (
-                <div className={styles.vendorGrid} style={{ marginTop: 12 }}>
-                  <div className={styles.vendorCard} style={{ gridColumn: '1 / -1' }}>
+                <div className={`${styles.vendorGrid} ${styles.spacingTop}`}> 
+                  <div className={`${styles.vendorCard} ${styles.fullWidthCard}`}>
                     <div className={styles.vendorHeader}>
                       <h4 className={styles.vendorName}>Configurar cuota</h4>
                     </div>
@@ -483,8 +471,8 @@ export default function SalesReportsDashboard({
               </div>
 
               {insights.riskAlerts.length > 0 && (
-                <div className={styles.vendorGrid} style={{ marginTop: 12 }}>
-                  <div className={styles.vendorCard} style={{ gridColumn: '1 / -1' }}>
+                <div className={`${styles.vendorGrid} ${styles.spacingTop}`}>
+                  <div className={`${styles.vendorCard} ${styles.fullWidthCard}`}>
                     <div className={styles.vendorHeader}>
                       <h4 className={styles.vendorName}>Alertas comerciales</h4>
                     </div>
@@ -509,7 +497,7 @@ export default function SalesReportsDashboard({
             <div className={styles.vendorSection}>
               <h3 className={styles.sectionTitle}>Auditoría Comercial Reciente</h3>
               <div className={styles.vendorGrid}>
-                <div className={styles.vendorCard} style={{ gridColumn: '1 / -1' }}>
+                <div className={`${styles.vendorCard} ${styles.fullWidthCard}`}>
                   <div className={styles.vendorMetrics}>
                     {auditEvents.slice(0, 12).map((event) => (
                       <div key={event.id} className={styles.vendorMetricItem}>

@@ -54,6 +54,34 @@
   background: #f8f9fa;
 }
 
+.columnHeader[data-stage='DISCOVERY'] {
+  border-bottom-color: #6c757d;
+}
+
+.columnHeader[data-stage='QUALIFICATION'] {
+  border-bottom-color: #0dcaf0;
+}
+
+.columnHeader[data-stage='PROPOSAL'] {
+  border-bottom-color: #0d6efd;
+}
+
+.columnHeader[data-stage='NEGOTIATION'] {
+  border-bottom-color: #ffc107;
+}
+
+.columnHeader[data-stage='CLOSING'] {
+  border-bottom-color: #198754;
+}
+
+.columnHeader[data-stage='WON'] {
+  border-bottom-color: #20c997;
+}
+
+.columnHeader[data-stage='LOST'] {
+  border-bottom-color: #dc3545;
+}
+
 .columnTitle {
   margin: 0 0 8px 0;
   font-size: 16px;
@@ -126,6 +154,41 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
     transform: translateY(-2px);
   }
+}
+
+.card[data-stage='DISCOVERY'] {
+  border-left-color: #6c757d;
+}
+
+.card[data-stage='QUALIFICATION'] {
+  border-left-color: #0dcaf0;
+}
+
+.card[data-stage='PROPOSAL'] {
+  border-left-color: #0d6efd;
+}
+
+.card[data-stage='NEGOTIATION'] {
+  border-left-color: #ffc107;
+}
+
+.card[data-stage='CLOSING'] {
+  border-left-color: #198754;
+}
+
+.card[data-stage='WON'] {
+  border-left-color: #20c997;
+}
+
+.card[data-stage='LOST'] {
+  border-left-color: #dc3545;
+}
+
+.overdueAction {
+  font-size: 11px;
+  color: #dc3545;
+  font-weight: 600;
+  margin-bottom: 6px;
 }
 
 .cardHeader {
