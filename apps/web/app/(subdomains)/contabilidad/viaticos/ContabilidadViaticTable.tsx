@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
+import { canViewContabilidadTarget } from "@/lib/contabilidad-visibility";
 import styles from "./ContabilidadViaticTable.module.css";
 
 type Viatic = {
@@ -13,7 +14,14 @@ type Viatic = {
   razonGasto: string;
   ticketEvidenciaUrl: string;
   estatusPago: string;
-  usuario?: { nombre: string };
+  usuario?: {
+    id?: number;
+    nombre: string;
+    roleName?: string;
+    roleFlags?: { accesoConsoleAdmin?: boolean } | null;
+    isSuperAdmin?: boolean;
+    permissions?: string[];
+  };
 };
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(
@@ -84,7 +92,17 @@ const ContabilidadViaticTable = () => {
   }, [user?.token]);
 
   const filtered = useMemo(() => {
-    let data = viatics;
+    let data = user
+      ? viatics.filter((item) =>
+          canViewContabilidadTarget(user, {
+            id: item.usuario?.id,
+            isSuperAdmin: item.usuario?.isSuperAdmin,
+            roleName: item.usuario?.roleName,
+            roleFlags: item.usuario?.roleFlags,
+            permissions: item.usuario?.permissions,
+          }),
+        )
+      : [];
     if (filterStatus) data = data.filter((v) => v.estatusPago === filterStatus);
     if (filterUsuario)
       data = data.filter((v) =>
@@ -93,7 +111,7 @@ const ContabilidadViaticTable = () => {
     if (filterRazon)
       data = data.filter((v) => v.razonGasto?.toLowerCase().includes(filterRazon.toLowerCase()));
     return data;
-  }, [viatics, filterStatus, filterUsuario, filterRazon]);
+  }, [viatics, filterStatus, filterUsuario, filterRazon, user]);
 
   const totals = useMemo(() => {
     const total = filtered.reduce((sum, item) => sum + (item.montoSolicitado || 0), 0);
