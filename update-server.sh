@@ -52,7 +52,7 @@ echo "🎨 Actualizando Frontend..."
 cd ../web
 rm -rf .next node_modules package-lock.json
 npm install --legacy-peer-deps
-npm run build
+NODE_OPTIONS="--max_old_space_size=2048" npm run build
 
 # 8. Reiniciar servicios con PM2
 echo "🚀 Reiniciando servicios..."
