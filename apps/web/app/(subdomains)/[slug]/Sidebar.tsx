@@ -72,7 +72,7 @@ export default function Sidebar() {
     : (user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nombre)}&background=0D8ABC&color=fff&size=96`);
 
   return (
-    <aside className={`${styles.sidebar} ${isMenuOpen && isMobile ? styles.sidebarOpen : ''}`} data-mobile={isMobile ? 'true' : 'false'} data-open={isMenuOpen ? 'true' : 'false'}>
+    <aside className={styles.sidebar} data-mobile={isMobile ? 'true' : 'false'} data-open={isMenuOpen ? 'true' : 'false'}>
       <div className={styles.sidebarHeader}>
         <div className={styles.sidebarLogo}>
           <span className={styles.brandMark}>NEXARA</span>
@@ -80,7 +80,8 @@ export default function Sidebar() {
         </div>
         {isMobile && (
           <button
-            className={`${styles.hamburgerButton} ${isMenuOpen ? styles.hamburgerActive : ''}`}
+            type="button"
+            className={styles.hamburgerButton}
             onClick={() => setIsMenuOpen((prev) => !prev)}
             aria-label={isMenuOpen ? "Cerrar menú" : "Abrir menú"}
             aria-expanded={isMenuOpen}
@@ -98,19 +99,9 @@ export default function Sidebar() {
 
       {(!isMobile || isMenuOpen) && (
       <div
-        className={`${styles.sidebarContent} ${isMenuOpen && isMobile ? styles.sidebarContentOpen : ''}`}
+        className={styles.sidebarContent}
         id="sidebar-menu"
-        data-open={isMenuOpen ? 'true' : 'false'}
-        style={
-          isMobile
-            ? {
-                display: 'flex',
-                opacity: 1,
-                visibility: 'visible',
-                transform: 'translateY(0) scale(1)',
-              }
-            : undefined
-        }
+        data-open={isMobile && isMenuOpen ? 'true' : undefined}
       >
       <div className={styles.sidebarUser}>
         <div className={styles.sidebarAvatar}>
