@@ -112,6 +112,45 @@ const nextConfig = {
     };
   },
 
+  async headers() {
+    const isDev = process.env.NODE_ENV !== 'production';
+    const scriptSrc = isDev ? "'self' 'unsafe-inline' 'unsafe-eval'" : "'self' 'unsafe-inline'";
+    const csp = [
+      "default-src 'self'",
+      `script-src ${scriptSrc}`,
+      "style-src 'self' 'unsafe-inline' https:",
+      "img-src 'self' data: blob: https:",
+      "font-src 'self' data: https:",
+      "connect-src 'self' https: wss: http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:*",
+      "media-src 'self' blob: https:",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      'upgrade-insecure-requests',
+    ].join('; ');
+
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'X-DNS-Prefetch-Control', value: 'off' },
+          { key: 'X-Permitted-Cross-Domain-Policies', value: 'none' },
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self), payment=()' },
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+          { key: 'Cross-Origin-Resource-Policy', value: 'same-site' },
+          { key: 'Cross-Origin-Embedder-Policy', value: 'credentialless' },
+          { key: 'Origin-Agent-Cluster', value: '?1' },
+          { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains; preload' },
+          { key: 'Content-Security-Policy', value: csp },
+        ],
+      },
+    ];
+  },
+
 
 };
 

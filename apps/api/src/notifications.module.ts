@@ -6,8 +6,32 @@ import {
   MessageBody,
 } from '@nestjs/websockets';
 import { Server } from 'socket.io';
+import {
+  createInMemoryWsConnectionGuard,
+  getClientIpFromRequestMeta,
+  isOriginAllowed,
+} from './common/security/security.utils';
 
-@WebSocketGateway({ cors: { origin: '*', credentials: true } })
+const wsConnectionGuard = createInMemoryWsConnectionGuard(
+  Number(process.env['WS_MAX_CONNECTIONS_PER_IP'] || 5),
+);
+
+@WebSocketGateway({
+  transports: ['websocket'],
+  allowEIO3: false,
+  maxHttpBufferSize: Number(process.env['WS_MAX_HTTP_BUFFER_SIZE'] || 1_000_000),
+  perMessageDeflate: false,
+  cors: {
+    origin: (origin, callback) => {
+      if (isOriginAllowed(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error('Not allowed by WebSocket CORS'));
+    },
+    credentials: true,
+  },
+})
 export class NotificationsGateway {
   @WebSocketServer()
     server!: Server;
@@ -17,10 +41,32 @@ export class NotificationsGateway {
   }
 
   handleConnection(client: any) {
+    const origin = client?.handshake?.headers?.origin;
+    const ip = getClientIpFromRequestMeta(
+      client?.handshake?.headers?.['x-forwarded-for'],
+      client?.handshake?.address,
+    );
+
+    if (!isOriginAllowed(origin)) {
+      client.disconnect(true);
+      return;
+    }
+
+    const connectionAttempt = wsConnectionGuard.open(ip);
+    if (!connectionAttempt.allowed) {
+      client.disconnect(true);
+      return;
+    }
+
     console.log('Client connected:', client.id);
   }
 
   handleDisconnect(client: any) {
+    const ip = getClientIpFromRequestMeta(
+      client?.handshake?.headers?.['x-forwarded-for'],
+      client?.handshake?.address,
+    );
+    wsConnectionGuard.close(ip);
     console.log('Client disconnected:', client.id);
   }
 
