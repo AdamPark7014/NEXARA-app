@@ -79,17 +79,119 @@
 }
 
 .authWrap {
+  position: relative;
+  min-height: 100vh;
+}
+
+.authHeader {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(860px, calc(100% - 24px));
+  z-index: 60;
+  border-radius: 16px;
+  border: 1px solid rgba(31, 137, 252, 0.28);
+  background: linear-gradient(140deg, rgba(11, 26, 49, 0.84), rgba(8, 21, 41, 0.82));
+  box-shadow: 0 18px 30px rgba(2, 8, 18, 0.45);
+  backdrop-filter: blur(10px);
+  padding: 12px 14px;
   display: grid;
-  gap: 16px;
-  max-width: 560px;
-  margin: 0 auto;
+  gap: 8px;
+}
+
+:global(body.light) .authHeader {
+  background: linear-gradient(140deg, rgba(247, 252, 255, 0.95), rgba(234, 245, 255, 0.92));
+  border-color: rgba(15, 106, 214, 0.24);
+  box-shadow: 0 16px 26px rgba(15, 106, 214, 0.14);
+}
+
+.authEyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.2rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: rgba(183, 209, 244, 0.86);
+}
+
+:global(body.light) .authEyebrow {
+  color: rgba(30, 69, 117, 0.8);
+}
+
+.authHeaderRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.authTitle {
+  margin: 0;
+  font-size: clamp(1rem, 2.1vw, 1.2rem);
+  color: #f3f8ff;
+  font-weight: 700;
+}
+
+:global(body.light) .authTitle {
+  color: #102b4d;
+}
+
+.authLead {
+  margin: 3px 0 0;
+  color: rgba(213, 229, 249, 0.78);
+  font-size: 0.82rem;
+}
+
+:global(body.light) .authLead {
+  color: rgba(26, 62, 106, 0.72);
 }
 
 .authSwitch {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  flex-wrap: wrap;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 5px;
+  border-radius: 12px;
+  border: 1px solid rgba(31, 137, 252, 0.24);
+  background: rgba(8, 21, 40, 0.55);
+}
+
+:global(body.light) .authSwitch {
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(15, 106, 214, 0.22);
+}
+
+.authSwitchBtn {
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: rgba(198, 219, 245, 0.9);
+  background: transparent;
+  cursor: pointer;
+  min-height: 40px;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+:global(body.light) .authSwitchBtn {
+  color: rgba(22, 60, 104, 0.82);
+}
+
+.authSwitchBtn:hover {
+  background: rgba(31, 137, 252, 0.16);
+}
+
+:global(body.light) .authSwitchBtn:hover {
+  background: rgba(15, 106, 214, 0.12);
+}
+
+.authSwitchBtnActive {
+  background: linear-gradient(135deg, #0f6ad6, #1f8df2);
+  color: #ffffff;
+  box-shadow: 0 10px 18px rgba(15, 106, 214, 0.35);
 }
 
 .mainStack {
@@ -342,8 +444,38 @@
   }
 
   .authWrap {
-    max-width: 100%;
-    padding: 0 4px;
+    min-height: 100vh;
+  }
+
+  .authHeader {
+    top: 10px;
+    width: calc(100% - 16px);
+    padding: 10px;
+    border-radius: 14px;
+  }
+
+  .authHeaderRow {
+    align-items: flex-start;
+  }
+
+  .authTitle {
+    font-size: 0.98rem;
+  }
+
+  .authLead {
+    font-size: 0.76rem;
+  }
+
+  .authSwitch {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .authSwitchBtn {
+    flex: 1;
+    padding: 8px 10px;
+    font-size: 0.84rem;
+    min-height: 38px;
   }
 
   .cardSoft,
@@ -398,6 +530,18 @@
 @media (max-width: 520px) {
   .ticketsConsole :global(.consoleMain) {
     padding: 10px 6px 14px;
+  }
+
+  .authHeader {
+    width: calc(100% - 12px);
+    top: 8px;
+    padding: 9px;
+    gap: 7px;
+  }
+
+  .authEyebrow {
+    letter-spacing: 0.15rem;
+    font-size: 0.6rem;
   }
 
   .mainStack,
