@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import styles from "./console.module.css";
+import styles from "../console/console.module.css";
 import { useUser } from '@/components/UserContext';
 import { useTheme } from '@/components/ThemeContext';
 import Image from "next/image";
