@@ -12,6 +12,36 @@ import { Request, Response } from 'express';
 export class AllExceptionsFilter implements ExceptionFilter {
   constructor(private readonly logger: any) {}
 
+  private sanitizeValue(value: unknown): unknown {
+    const sensitiveKeys = new Set([
+      'password',
+      'passwordHash',
+      'token',
+      'access_token',
+      'refresh_token',
+      'authorization',
+    ]);
+
+    if (Array.isArray(value)) {
+      return value.map((item) => this.sanitizeValue(item));
+    }
+
+    if (value && typeof value === 'object') {
+      const source = value as Record<string, unknown>;
+      const sanitized: Record<string, unknown> = {};
+      for (const [key, current] of Object.entries(source)) {
+        if (sensitiveKeys.has(key.toLowerCase())) {
+          sanitized[key] = '[REDACTED]';
+        } else {
+          sanitized[key] = this.sanitizeValue(current);
+        }
+      }
+      return sanitized;
+    }
+
+    return value;
+  }
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -44,11 +74,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
       status,
       message,
       errorCode,
-      details,
+      details: this.sanitizeValue(details),
       user: (request as any).user || null,
-      body: request.body,
-      query: request.query,
-      params: request.params,
+      body: this.sanitizeValue(request.body),
+      query: this.sanitizeValue(request.query),
+      params: this.sanitizeValue(request.params),
     });
 
     // Suggest possible solutions for common errors
