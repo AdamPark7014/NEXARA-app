@@ -7,6 +7,15 @@
   min-width: 0;
 }
 
+:global(body.light) .page {
+  background:
+    radial-gradient(circle at 8% 0%, rgba(15, 106, 214, 0.08), transparent 36%),
+    radial-gradient(circle at 92% 3%, rgba(22, 169, 110, 0.1), transparent 40%),
+    linear-gradient(180deg, rgba(248, 252, 255, 0.9), rgba(238, 246, 255, 0.9));
+  border-radius: 22px;
+  border: 1px solid rgba(15, 106, 214, 0.14);
+}
+
 .header {
   display: flex;
   justify-content: space-between;
@@ -51,6 +60,11 @@
   background: var(--card-bg, rgba(255, 255, 255, 0.5));
 }
 
+:global(body.light) .periodButtons {
+  background: linear-gradient(140deg, rgba(255, 255, 255, 0.85), rgba(230, 242, 255, 0.82));
+  border-color: rgba(15, 106, 214, 0.24);
+}
+
 .periodButton {
   border: 0;
   border-radius: 999px;
@@ -66,6 +80,11 @@
 .periodButtonActive {
   background: var(--primary);
   color: var(--button-text, #fff);
+}
+
+:global(body.light) .periodButtonActive {
+  background: linear-gradient(135deg, #0f6ad6, #1e88f5);
+  box-shadow: 0 8px 16px rgba(15, 106, 214, 0.24);
 }
 
 .filters {
@@ -156,6 +175,12 @@
   min-height: 132px;
 }
 
+:global(body.light) .metricCard {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.94), rgba(230, 243, 255, 0.9));
+  border-color: rgba(15, 106, 214, 0.2);
+  box-shadow: 0 12px 24px rgba(15, 106, 214, 0.12);
+}
+
 .metricLabel {
   text-transform: uppercase;
   letter-spacing: 0.2rem;
@@ -188,6 +213,12 @@
   border: 1px solid var(--border-color, rgba(127, 127, 127, 0.2));
   background: var(--card-bg, rgba(255, 255, 255, 0.75));
   min-width: 0;
+}
+
+:global(body.light) .panelCard {
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.94), rgba(231, 244, 255, 0.9));
+  border-color: rgba(15, 106, 214, 0.2);
+  box-shadow: 0 14px 28px rgba(15, 106, 214, 0.12);
 }
 
 .cardHeader {
@@ -233,6 +264,11 @@
   border: 1px solid var(--border-color, rgba(127, 127, 127, 0.2));
   background: var(--panel-bg-soft, rgba(255, 255, 255, 0.5));
   min-width: 0;
+}
+
+:global(body.light) .activityItem {
+  background: linear-gradient(140deg, rgba(255, 255, 255, 0.84), rgba(233, 245, 255, 0.76));
+  border-color: rgba(15, 106, 214, 0.18);
 }
 
 .activityLabel {
@@ -297,6 +333,10 @@
   height: 100%;
   border-radius: inherit;
   background: var(--primary);
+}
+
+:global(body.light) .barFill {
+  background: linear-gradient(135deg, #0f6ad6, #20b981);
 }
 
 .sectionBlock {
