@@ -38,9 +38,52 @@ interface OrderPdfData extends QuotePdfData {
   orderNumber: string;
 }
 
+type TemplateSections = {
+  showClientInfo: boolean;
+  showProjectScope: boolean;
+  showItemsTable: boolean;
+  showTotals: boolean;
+  showTerms: boolean;
+  showNotes: boolean;
+  showPreparedBy: boolean;
+  showValidity: boolean;
+  showPaymentTerms: boolean;
+  showFooterBrand: boolean;
+};
+
 @Injectable()
 export class PdfGeneratorService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private resolveTemplateSections(template: any): TemplateSections {
+    const defaults: TemplateSections = {
+      showClientInfo: true,
+      showProjectScope: true,
+      showItemsTable: true,
+      showTotals: true,
+      showTerms: true,
+      showNotes: true,
+      showPreparedBy: true,
+      showValidity: true,
+      showPaymentTerms: true,
+      showFooterBrand: true,
+    };
+
+    if (!template?.sections || typeof template.sections !== 'object') return defaults;
+    const raw = template.sections as Record<string, unknown>;
+    return {
+      showClientInfo: raw.showClientInfo !== false,
+      showProjectScope: raw.showProjectScope !== false,
+      showItemsTable: raw.showItemsTable !== false,
+      showTotals: raw.showTotals !== false,
+      showTerms: raw.showTerms !== false,
+      showNotes: raw.showNotes !== false,
+      showPreparedBy: raw.showPreparedBy !== false,
+      showValidity: raw.showValidity !== false,
+      showPaymentTerms: raw.showPaymentTerms !== false,
+      showFooterBrand: raw.showFooterBrand !== false,
+    };
+  }
 
   /**
    * Genera un PDF de cotización dinámico embebiendo datos del cliente
@@ -210,43 +253,49 @@ export class PdfGeneratorService {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', (error) => reject(error));
 
-      // Colores del template o defaults
       const primaryColor = template?.primaryColor || '#1F6BBA';
+      const secondaryColor = template?.secondaryColor || '#F5F7FB';
+      const textColor = template?.textColor || '#1E293B';
       const darkColor = '#0B1F3A';
-      const lightColor = '#F5F7FB';
+      const sections = this.resolveTemplateSections(template);
 
       const margin = 40;
       const pageWidth = doc.page.width;
       const contentWidth = pageWidth - margin * 2;
 
       // ===== HEADER =====
-      this._drawHeader(doc, data, template, primaryColor, darkColor, lightColor, margin, pageWidth);
+      this._drawHeader(doc, data, template, primaryColor, darkColor, secondaryColor, margin, pageWidth, sections);
 
-      // ===== CLIENT INFO =====
-      doc.moveDown(1);
-      this._drawClientInfo(doc, data, primaryColor, margin, contentWidth);
+      doc.fillColor(textColor);
 
-      // ===== ITEMS TABLE =====
-      doc.moveDown(1);
-      this._drawItemsTable(doc, data, primaryColor, margin, contentWidth);
+      if (sections.showClientInfo) {
+        doc.moveDown(1);
+        this._drawClientInfo(doc, data, primaryColor, margin, contentWidth);
+      }
 
-      // ===== TOTALS =====
-      doc.moveDown(0.5);
-      this._drawTotalsSection(doc, data, primaryColor, darkColor, margin, contentWidth);
+      if (sections.showItemsTable) {
+        doc.moveDown(1);
+        this._drawItemsTable(doc, data, primaryColor, margin, contentWidth);
+      }
 
-      // ===== PROJECT BUDGET (si es orden) =====
-      if (docType === 'order' && 'projectBudget' in data) {
+      if (sections.showTotals) {
+        doc.moveDown(0.5);
+        this._drawTotalsSection(doc, data, primaryColor, darkColor, margin, contentWidth);
+      }
+
+      if (docType === 'order' && 'projectBudget' in data && sections.showProjectScope) {
         doc.moveDown(0.8);
         this._drawBudgetSection(doc, data as OrderPdfData, primaryColor, margin, contentWidth);
       }
 
-      // ===== TERMS & NOTES =====
-      doc.moveDown(1);
-      this._drawTermsAndNotes(doc, data, primaryColor, margin, contentWidth);
+      if (sections.showTerms || sections.showNotes || sections.showPaymentTerms) {
+        doc.moveDown(1);
+        this._drawTermsAndNotes(doc, data, primaryColor, margin, contentWidth, sections);
+      }
 
       // ===== FOOTER =====
       doc.moveDown(1);
-      this._drawFooter(doc, data, primaryColor, darkColor, margin, pageWidth);
+      this._drawFooter(doc, data, template, primaryColor, darkColor, margin, pageWidth, sections);
 
       doc.end();
     });
@@ -264,6 +313,7 @@ export class PdfGeneratorService {
     lightColor: string,
     margin: number,
     pageWidth: number,
+    sections: TemplateSections,
   ): void {
     // Background color
     doc.rect(0, 0, pageWidth, 100).fill(lightColor);
@@ -283,10 +333,18 @@ export class PdfGeneratorService {
       .fillColor(darkColor)
       .fontSize(24)
       .font('Helvetica-Bold')
-      .text(data.quoteNumber || 'COTIZACIÓN', margin + 100, 25);
+      .text(template?.headerText || data.quoteNumber || 'COTIZACIÓN', margin + 100, 25, { width: 260 });
 
     // Doc type badge
-    doc.fontSize(10).font('Helvetica').fillColor('#666').text('Propuesta Comercial', margin + 100, 55);
+    doc
+      .fontSize(10)
+      .font('Helvetica')
+      .fillColor('#666')
+      .text(data.quoteNumber || 'Propuesta Comercial', margin + 100, 55);
+
+    if (template?.companyName) {
+      doc.fontSize(9).font('Helvetica').fillColor('#4b5563').text(template.companyName, margin + 100, 70);
+    }
 
     // Right column info
     const rightX = margin + pageWidth - 200;
@@ -294,10 +352,16 @@ export class PdfGeneratorService {
       .fontSize(9)
       .fillColor('#333')
       .text(`Fecha: ${data.date || ''}`, rightX, 25);
-    if (data.validity) {
+    if (sections.showValidity && data.validity) {
       doc.text(`Vigencia: ${data.validity}`, rightX, 40);
     }
-    doc.text(`Estado: ${data.currency || 'MXN'}`, rightX, 55);
+    doc.text(`Moneda: ${data.currency || 'MXN'}`, rightX, 55);
+    if (template?.companyEmail) {
+      doc.text(`Email: ${template.companyEmail}`, rightX, 70);
+    }
+    if (template?.companyPhone) {
+      doc.text(`Tel: ${template.companyPhone}`, rightX, 85);
+    }
   }
 
   /**
@@ -475,15 +539,16 @@ export class PdfGeneratorService {
     primaryColor: string,
     margin: number,
     contentWidth: number,
+    sections: TemplateSections,
   ): void {
-    if (data.paymentTerms) {
+    if (sections.showPaymentTerms && data.paymentTerms) {
       doc.fontSize(10).font('Helvetica-Bold').fillColor(primaryColor).text('TÉRMINOS DE PAGO', margin);
       doc.fontSize(9).font('Helvetica').fillColor('#333').text(data.paymentTerms, margin, doc.y + 3, {
         width: contentWidth,
       });
     }
 
-    if (data.notes) {
+    if (sections.showNotes && data.notes) {
       doc.moveDown(0.8);
       doc.fontSize(10).font('Helvetica-Bold').fillColor(primaryColor).text('NOTAS', margin);
       doc.fontSize(9).font('Helvetica').fillColor('#333').text(data.notes, margin, doc.y + 3, {
@@ -498,23 +563,31 @@ export class PdfGeneratorService {
   private _drawFooter(
     doc: any,
     data: any,
+    template: any,
     primaryColor: string,
     darkColor: string,
     margin: number,
     pageWidth: number,
+    sections: TemplateSections,
   ): void {
     const footerY = doc.page.height - 50;
 
     doc.moveTo(margin, footerY).lineTo(pageWidth - margin, footerY).stroke(primaryColor);
 
+    const footerAlignment = (template?.footerAlignment || 'center') as 'left' | 'center' | 'right';
+    const company = template?.companyName || 'NEXARA SOFTWARE';
+    const footerText = template?.footerText || `${company} · Documento comercial confidencial`;
+
     doc.fontSize(9).font('Helvetica').fillColor('#666');
-    doc.text(`Preparado por: ${data.preparedBy || 'NEXARA'}`, margin, footerY + 10);
+    if (sections.showPreparedBy) {
+      doc.text(`Preparado por: ${data.preparedBy || company}`, margin, footerY + 10);
+    }
     doc.text(`Documento: ${data.quoteNumber} - ${data.date}`, margin, footerY + 20);
-    doc.text(
-      'NEXARA SOFTWARE © 2026 - Soluciones Tecnológicas Integrales',
-      margin,
-      footerY + 30,
-      { align: 'center', width: pageWidth - margin * 2 },
-    );
+    if (sections.showFooterBrand) {
+      doc.text(footerText, margin, footerY + 30, {
+        align: footerAlignment,
+        width: pageWidth - margin * 2,
+      });
+    }
   }
 }

@@ -1194,9 +1194,43 @@ export class VentasService {
 
   // ==================== ORDER TEMPLATES ====================
 
+  private getDefaultTemplateSections() {
+    return {
+      showClientInfo: true,
+      showProjectScope: true,
+      showItemsTable: true,
+      showTotals: true,
+      showTerms: true,
+      showNotes: true,
+      showPreparedBy: true,
+      showValidity: true,
+      showPaymentTerms: true,
+      showFooterBrand: true,
+    };
+  }
+
+  private normalizeHexColor(value: string | undefined, fallback: string) {
+    const safe = (value || '').trim();
+    return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(safe) ? safe : fallback;
+  }
+
+  private normalizeTemplateSections(value: unknown) {
+    const base = this.getDefaultTemplateSections();
+    if (!value || typeof value !== 'object') return base;
+    const current = value as Record<string, unknown>;
+    return {
+      ...base,
+      ...Object.fromEntries(
+        Object.keys(base).map((key) => [key, Boolean(current[key])]),
+      ),
+    };
+  }
+
   async createOrderTemplate(dto: CreateOrderTemplateDto, userId?: number) {
-    // If this is default, unset previous defaults
-    if (dto.isDefault) {
+    const existingCount = await this.prisma.orderTemplate.count();
+    const shouldBeDefault = dto.isDefault ?? existingCount === 0;
+
+    if (shouldBeDefault) {
       await this.prisma.orderTemplate.updateMany({
         where: { isDefault: true },
         data: { isDefault: false },
@@ -1207,18 +1241,20 @@ export class VentasService {
       data: {
         name: dto.name,
         description: dto.description || null,
-        isDefault: dto.isDefault ?? false,
+        isDefault: shouldBeDefault,
         headerLogo: dto.headerLogo || null,
-        headerText: dto.headerText || null,
+        headerText: dto.headerText || 'Propuesta Comercial',
         companyName: dto.companyName || null,
         companyEmail: dto.companyEmail || null,
         companyPhone: dto.companyPhone || null,
         footerText: dto.footerText || null,
-        footerAlignment: dto.footerAlignment || 'center',
-        primaryColor: dto.primaryColor || '#0f6ad6',
-        secondaryColor: dto.secondaryColor || '#f5f5f5',
-        textColor: dto.textColor || '#000000',
-        sections: dto.sections || null,
+        footerAlignment: ['left', 'center', 'right'].includes((dto.footerAlignment || '').toLowerCase())
+          ? (dto.footerAlignment || 'center').toLowerCase()
+          : 'center',
+        primaryColor: this.normalizeHexColor(dto.primaryColor, '#0f6ad6'),
+        secondaryColor: this.normalizeHexColor(dto.secondaryColor, '#f5f5f5'),
+        textColor: this.normalizeHexColor(dto.textColor, '#000000'),
+        sections: this.normalizeTemplateSections(dto.sections) as any,
         customCss: dto.customCss || null,
         createdById: userId || null,
       },
@@ -1243,9 +1279,8 @@ export class VentasService {
   }
 
   async updateOrderTemplate(id: number, dto: UpdateOrderTemplateDto) {
-    await this.getOrderTemplate(id);
+    const existing = await this.getOrderTemplate(id);
 
-    // If setting as default, unset previous defaults
     if (dto.isDefault) {
       await this.prisma.orderTemplate.updateMany({
         where: { isDefault: true, id: { not: id } },
@@ -1265,11 +1300,15 @@ export class VentasService {
         companyEmail: dto.companyEmail,
         companyPhone: dto.companyPhone,
         footerText: dto.footerText,
-        footerAlignment: dto.footerAlignment,
-        primaryColor: dto.primaryColor,
-        secondaryColor: dto.secondaryColor,
-        textColor: dto.textColor,
-        sections: dto.sections,
+        footerAlignment: dto.footerAlignment
+          ? (['left', 'center', 'right'].includes(dto.footerAlignment.toLowerCase()) ? dto.footerAlignment.toLowerCase() : 'center')
+          : undefined,
+        primaryColor: dto.primaryColor ? this.normalizeHexColor(dto.primaryColor, existing.primaryColor || '#0f6ad6') : undefined,
+        secondaryColor: dto.secondaryColor ? this.normalizeHexColor(dto.secondaryColor, existing.secondaryColor || '#f5f5f5') : undefined,
+        textColor: dto.textColor ? this.normalizeHexColor(dto.textColor, existing.textColor || '#000000') : undefined,
+        sections: dto.sections !== undefined
+          ? (this.normalizeTemplateSections(dto.sections) as any)
+          : undefined,
         customCss: dto.customCss,
       },
       include: { createdBy: true },
@@ -1277,8 +1316,22 @@ export class VentasService {
   }
 
   async deleteOrderTemplate(id: number) {
-    await this.getOrderTemplate(id);
-    return this.prisma.orderTemplate.delete({ where: { id } });
+    const target = await this.getOrderTemplate(id);
+    const deleted = await this.prisma.orderTemplate.delete({ where: { id } });
+
+    if (target.isDefault) {
+      const fallback = await this.prisma.orderTemplate.findFirst({
+        orderBy: { updatedAt: 'desc' },
+      });
+      if (fallback) {
+        await this.prisma.orderTemplate.update({
+          where: { id: fallback.id },
+          data: { isDefault: true },
+        });
+      }
+    }
+
+    return deleted;
   }
 
   async getDefaultOrderTemplate() {

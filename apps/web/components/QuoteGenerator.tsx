@@ -75,7 +75,7 @@ export default function QuoteGenerator({ onQuoteGenerated }: QuoteGeneratorProps
         fetch('/api/ventas/clientes', {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        fetch('/api/ventas/templates', {
+        fetch('/api/ventas/order-templates', {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
