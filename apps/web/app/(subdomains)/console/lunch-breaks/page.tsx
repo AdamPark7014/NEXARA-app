@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useUser } from '@/components/UserContext';
 import LunchBreakForm from '@/components/LunchBreakForm';
 import LunchBreaksTable from '@/components/LunchBreaksTable';
@@ -8,6 +8,14 @@ const LunchBreakPage = () => {
   const { user } = useUser();
   const [activeTab, setActiveTab] = useState<'checkin' | 'checkout' | 'history'>('checkin');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 640);
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   if (!user) {
     return <div style={{ textAlign: 'center', padding: 20 }}>Cargando...</div>;
@@ -17,18 +25,18 @@ const LunchBreakPage = () => {
   const isAdmin = user?.permissions?.includes('attendance.manage');
 
   return (
-    <div style={{ maxWidth: 1400, margin: '0 auto', padding: 24 }}>
-      <h1 style={{ fontSize: 28, fontWeight: 600, color: 'var(--primary)', marginBottom: 24 }}>
+    <div style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? 12 : 24 }}>
+      <h1 style={{ fontSize: isMobile ? 22 : 28, fontWeight: 600, color: 'var(--primary)', marginBottom: isMobile ? 14 : 24 }}>
         🍽️ Gestión de Horas de Comida
       </h1>
 
       {/* Tabs - Se muestran para usuarios normales Y admins (NO para superadmins) */}
       {!isSuperAdmin && (
-        <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 10, marginBottom: 16 }}>
           <button
             onClick={() => setActiveTab('checkin')}
             style={{
-              padding: '10px 16px',
+              padding: isMobile ? '12px 14px' : '10px 16px',
               background: activeTab === 'checkin' ? 'var(--primary)' : 'var(--bg-secondary)',
               color: activeTab === 'checkin' ? '#fff' : 'var(--text-primary)',
               border: 'none',
@@ -36,6 +44,8 @@ const LunchBreakPage = () => {
               fontWeight: 500,
               cursor: 'pointer',
               transition: 'all 0.2s',
+              width: '100%',
+              textAlign: 'center',
             }}
           >
             📌 Entrada a Comida
@@ -43,7 +53,7 @@ const LunchBreakPage = () => {
           <button
             onClick={() => setActiveTab('checkout')}
             style={{
-              padding: '10px 16px',
+              padding: isMobile ? '12px 14px' : '10px 16px',
               background: activeTab === 'checkout' ? 'var(--primary)' : 'var(--bg-secondary)',
               color: activeTab === 'checkout' ? '#fff' : 'var(--text-primary)',
               border: 'none',
@@ -51,6 +61,8 @@ const LunchBreakPage = () => {
               fontWeight: 500,
               cursor: 'pointer',
               transition: 'all 0.2s',
+              width: '100%',
+              textAlign: 'center',
             }}
           >
             ✅ Regreso al Trabajo
@@ -58,7 +70,7 @@ const LunchBreakPage = () => {
           <button
             onClick={() => setActiveTab('history')}
             style={{
-              padding: '10px 16px',
+              padding: isMobile ? '12px 14px' : '10px 16px',
               background: activeTab === 'history' ? 'var(--primary)' : 'var(--bg-secondary)',
               color: activeTab === 'history' ? '#fff' : 'var(--text-primary)',
               border: 'none',
@@ -66,6 +78,8 @@ const LunchBreakPage = () => {
               fontWeight: 500,
               cursor: 'pointer',
               transition: 'all 0.2s',
+              width: '100%',
+              textAlign: 'center',
             }}
           >
             📋 {isAdmin ? 'Historial de Todos' : 'Mi Historial'}

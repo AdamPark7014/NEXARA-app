@@ -10,6 +10,7 @@ const ActivitiesTable: React.FC = () => {
   const { user } = useUser();
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+  const [isSmallMobile, setIsSmallMobile] = useState(false);
 
   // Filtros y paginación
   const [estatus, setEstatus] = useState<string>('');
@@ -222,7 +223,10 @@ const ActivitiesTable: React.FC = () => {
   }, [user?.token]);
 
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth <= 900);
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 1024);
+      setIsSmallMobile(window.innerWidth <= 640);
+    };
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
@@ -398,7 +402,7 @@ const ActivitiesTable: React.FC = () => {
 
   const formGridStyle: React.CSSProperties = {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))',
     gap: 12,
   };
 
@@ -416,7 +420,7 @@ const ActivitiesTable: React.FC = () => {
 
   const filtersRowStyle: React.CSSProperties = {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
+    gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(190px, 1fr))',
     gap: 12,
   };
 
@@ -432,6 +436,8 @@ const ActivitiesTable: React.FC = () => {
     borderRadius: 16,
     border: '1px solid var(--muted)',
     overflow: 'auto',
+    overflowX: 'auto',
+    WebkitOverflowScrolling: 'touch',
     background: 'var(--surface)',
   };
 
@@ -465,7 +471,7 @@ const ActivitiesTable: React.FC = () => {
 
   const mobileMetaGridStyle: React.CSSProperties = {
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
+    gridTemplateColumns: isSmallMobile ? '1fr' : '1fr 1fr',
     gap: 8,
     width: '100%',
     minWidth: 0,

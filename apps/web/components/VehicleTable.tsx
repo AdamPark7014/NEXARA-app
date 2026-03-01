@@ -42,6 +42,7 @@ const VehicleTable = () => {
   const [filterPlacas, setFilterPlacas] = useState<string>('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [isMobile, setIsMobile] = useState(false);
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
@@ -111,6 +112,13 @@ const VehicleTable = () => {
       socket.disconnect();
     };
   }, [user?.token]);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 900);
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     let data = vehicles;
@@ -334,7 +342,7 @@ const VehicleTable = () => {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 12 }}>
         <select className="input" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
           <option value="">Todos los estatus</option>
           <option value="Pendiente">Pendiente</option>
@@ -395,191 +403,293 @@ const VehicleTable = () => {
       {importMsg && (
         <div style={{ color: importMsg.startsWith('Error') ? 'var(--danger)' : 'var(--accent)' }}>{importMsg}</div>
       )}
-      <table className="table">
-        <thead>
-          <tr>
-            <th>Vehiculo</th>
-            <th>Estatus</th>
-            <th>Responsable</th>
-            <th>Periodo</th>
-            <th>Evidencias</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {paginated.map(vehicle => (
-            <tr key={vehicle.id}>
-              <td>
-                <div>{vehicle.vehiculo?.nombre || vehicle.nombreVehiculo || 'Vehiculo'}</div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{vehicle.placasVehiculo || vehicle.vehiculo?.placas || '-'}</div>
-              </td>
-              <td>
-                <span className={`badge ${vehicle.estatusAprobacion === 'Aprobado' ? 'approved' : vehicle.estatusAprobacion === 'Pendiente' ? 'pending' : vehicle.estatusAprobacion === 'Rechazado' ? 'rejected' : ''}`}>{vehicle.estatusAprobacion}</span>
-                {vehicle.renovacionEstatus && (
-                  <div style={{ marginTop: 6 }}>
+      {!isMobile && (
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 12, border: '1px solid var(--muted)' }}>
+          <table className="table" style={{ minWidth: 980 }}>
+            <thead>
+              <tr>
+                <th>Vehiculo</th>
+                <th>Estatus</th>
+                <th>Responsable</th>
+                <th>Periodo</th>
+                <th>Evidencias</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.map(vehicle => (
+                <tr key={vehicle.id}>
+                  <td>
+                    <div>{vehicle.vehiculo?.nombre || vehicle.nombreVehiculo || 'Vehiculo'}</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{vehicle.placasVehiculo || vehicle.vehiculo?.placas || '-'}</div>
+                  </td>
+                  <td>
+                    <span className={`badge ${vehicle.estatusAprobacion === 'Aprobado' ? 'approved' : vehicle.estatusAprobacion === 'Pendiente' ? 'pending' : vehicle.estatusAprobacion === 'Rechazado' ? 'rejected' : ''}`}>{vehicle.estatusAprobacion}</span>
+                    {vehicle.renovacionEstatus && (
+                      <div style={{ marginTop: 6 }}>
+                        <span className={`badge ${vehicle.renovacionEstatus === 'Aprobada' ? 'approved' : vehicle.renovacionEstatus === 'Pendiente' ? 'pending' : 'rejected'}`}>
+                          Renovacion {vehicle.renovacionEstatus}
+                        </span>
+                      </div>
+                    )}
+                  </td>
+                  <td>{vehicle.solicitante?.nombre || '-'}</td>
+                  <td>
+                    <div>{formatDateTime(vehicle.fechaInicioSolicitada || vehicle.fechaInicio)}</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{formatDateTime(vehicle.fechaFinSolicitada || vehicle.fechaFin)}</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                      Aprobado: {formatDateTime(vehicle.fechaInicioAprobada)} - {formatDateTime(vehicle.fechaFinAprobada)}
+                    </div>
+                  </td>
+                  <td>
+                    <div>
+                      {vehicle.evidenciaEntregaUrl ? (
+                        <a className="link" href={vehicle.evidenciaEntregaUrl} target="_blank" rel="noopener noreferrer">Entrega</a>
+                      ) : (
+                        <span style={{ color: 'var(--text-secondary)' }}>Entrega: -</span>
+                      )}
+                    </div>
+                    <div>
+                      {vehicle.evidenciaDevolucionUrl ? (
+                        <a className="link" href={vehicle.evidenciaDevolucionUrl} target="_blank" rel="noopener noreferrer">Devolucion</a>
+                      ) : (
+                        <span style={{ color: 'var(--text-secondary)' }}>Devolucion: -</span>
+                      )}
+                    </div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                      Entrega fotos: {Array.isArray(vehicle.entregaFotos) ? vehicle.entregaFotos.length : 0}
+                    </div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                      Entrega estatus: {vehicle.entregaEstatus || 'Pendiente'}
+                    </div>
+                    {Array.isArray(vehicle.entregaFotos) && vehicle.entregaFotos.length > 0 && (
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                        {vehicle.entregaFotos.slice(0, 6).map((foto, index) => (
+                          <img
+                            key={`${vehicle.id}-thumb-${index}`}
+                            src={foto}
+                            alt={`Entrega ${index + 1}`}
+                            style={{
+                              width: 48,
+                              height: 48,
+                              objectFit: 'cover',
+                              borderRadius: 8,
+                              border: '1px solid var(--muted)',
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                  <td>
+                    {vehicle.estatusAprobacion === 'Pendiente' && hasPermission(user, PERMISSIONS.VEHICLES_REVIEW) && (
+                      <>
+                        <div style={{ display: 'grid', gap: 6, marginBottom: 8 }}>
+                          <input
+                            className="input"
+                            type="datetime-local"
+                            value={approvalDrafts[vehicle.id]?.inicio || ''}
+                            onChange={(event) => setApprovalDrafts((prev) => ({
+                              ...prev,
+                              [vehicle.id]: { ...prev[vehicle.id], inicio: event.target.value },
+                            }))}
+                          />
+                          <input
+                            className="input"
+                            type="datetime-local"
+                            value={approvalDrafts[vehicle.id]?.fin || ''}
+                            onChange={(event) => setApprovalDrafts((prev) => ({
+                              ...prev,
+                              [vehicle.id]: { ...prev[vehicle.id], fin: event.target.value },
+                            }))}
+                          />
+                        </div>
+                        <button
+                          className="button-primary"
+                          disabled={actionLoading === vehicle.id}
+                          onClick={() => handleApprove(vehicle.id, 'Aprobado')}
+                        >{actionLoading === vehicle.id ? 'Aprobando...' : 'Aprobar'}</button>
+                        <button
+                          className="button-secondary"
+                          disabled={actionLoading === vehicle.id}
+                          onClick={() => handleApprove(vehicle.id, 'Rechazado')}
+                        >{actionLoading === vehicle.id ? 'Rechazando...' : 'Rechazar'}</button>
+                      </>
+                    )}
+                    {hasPermission(user, PERMISSIONS.VEHICLES_REVIEW) && vehicle.entregaEstatus === 'En revision' && (
+                      <div style={{ marginTop: 8 }}>
+                        <textarea
+                          className="input"
+                          rows={2}
+                          placeholder="Observaciones de entrega"
+                          value={deliveryDrafts[vehicle.id] || ''}
+                          onChange={(event) => setDeliveryDrafts((prev) => ({ ...prev, [vehicle.id]: event.target.value }))}
+                        />
+                        <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                          <button className="button-primary" onClick={() => handleDeliveryReview(vehicle.id, true)}>
+                            Aprobar entrega
+                          </button>
+                          <button className="button-secondary" onClick={() => handleDeliveryReview(vehicle.id, false)}>
+                            Rechazar entrega
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {hasPermission(user, PERMISSIONS.VEHICLES_REVIEW) && vehicle.renovacionEstatus === 'Pendiente' && (
+                      <div style={{ marginTop: 8 }}>
+                        <button
+                          className="button-primary"
+                          onClick={() => handleRenewalReview(vehicle.id, true, vehicle.renovacionSolicitadaFin || null)}
+                        >
+                          Aprobar renovacion
+                        </button>
+                        <button
+                          className="button-secondary"
+                          onClick={() => handleRenewalReview(vehicle.id, false)}
+                        >
+                          Rechazar renovacion
+                        </button>
+                      </div>
+                    )}
+                    {hasPermission(user, PERMISSIONS.VEHICLES_REVIEW) && (
+                      <div style={{ marginTop: 10 }}>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: 12, marginBottom: 6 }}>Penalizacion</div>
+                        <input
+                          className="input"
+                          type="number"
+                          placeholder="Monto"
+                          value={penaltyDrafts[vehicle.id]?.monto ?? (vehicle.penalizacionMonto ? String(vehicle.penalizacionMonto) : '')}
+                          onChange={(event) => setPenaltyDrafts((prev) => ({
+                            ...prev,
+                            [vehicle.id]: { ...prev[vehicle.id], monto: event.target.value },
+                          }))}
+                        />
+                        <textarea
+                          className="input"
+                          rows={2}
+                          placeholder="Notas"
+                          value={penaltyDrafts[vehicle.id]?.notas ?? (vehicle.penalizacionNotas || '')}
+                          onChange={(event) => setPenaltyDrafts((prev) => ({
+                            ...prev,
+                            [vehicle.id]: { ...prev[vehicle.id], notas: event.target.value },
+                          }))}
+                          style={{ marginTop: 6 }}
+                        />
+                        <button
+                          className="button-secondary"
+                          style={{ marginTop: 6 }}
+                          onClick={() => handlePenaltySave(vehicle.id)}
+                        >
+                          Guardar penalizacion
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {isMobile && (
+        <div style={{ display: 'grid', gap: 12 }}>
+          {paginated.map((vehicle) => (
+            <div key={vehicle.id} className="card" style={{ border: '1px solid var(--muted)', padding: 12, display: 'grid', gap: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                <div>
+                  <div style={{ fontWeight: 700 }}>{vehicle.vehiculo?.nombre || vehicle.nombreVehiculo || 'Vehiculo'}</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{vehicle.placasVehiculo || vehicle.vehiculo?.placas || '-'}</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Responsable: {vehicle.solicitante?.nombre || '-'}</div>
+                </div>
+                <div style={{ display: 'grid', gap: 6, justifyItems: 'end' }}>
+                  <span className={`badge ${vehicle.estatusAprobacion === 'Aprobado' ? 'approved' : vehicle.estatusAprobacion === 'Pendiente' ? 'pending' : vehicle.estatusAprobacion === 'Rechazado' ? 'rejected' : ''}`}>{vehicle.estatusAprobacion}</span>
+                  {vehicle.renovacionEstatus && (
                     <span className={`badge ${vehicle.renovacionEstatus === 'Aprobada' ? 'approved' : vehicle.renovacionEstatus === 'Pendiente' ? 'pending' : 'rejected'}`}>
                       Renovacion {vehicle.renovacionEstatus}
                     </span>
-                  </div>
-                )}
-              </td>
-              <td>{vehicle.solicitante?.nombre || '-'}</td>
-              <td>
-                <div>{formatDateTime(vehicle.fechaInicioSolicitada || vehicle.fechaInicio)}</div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{formatDateTime(vehicle.fechaFinSolicitada || vehicle.fechaFin)}</div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-                  Aprobado: {formatDateTime(vehicle.fechaInicioAprobada)} - {formatDateTime(vehicle.fechaFinAprobada)}
-                </div>
-              </td>
-              <td>
-                <div>
-                  {vehicle.evidenciaEntregaUrl ? (
-                    <a className="link" href={vehicle.evidenciaEntregaUrl} target="_blank" rel="noopener noreferrer">Entrega</a>
-                  ) : (
-                    <span style={{ color: 'var(--text-secondary)' }}>Entrega: -</span>
                   )}
                 </div>
-                <div>
-                  {vehicle.evidenciaDevolucionUrl ? (
-                    <a className="link" href={vehicle.evidenciaDevolucionUrl} target="_blank" rel="noopener noreferrer">Devolucion</a>
-                  ) : (
-                    <span style={{ color: 'var(--text-secondary)' }}>Devolucion: -</span>
-                  )}
+              </div>
+
+              <div style={{ display: 'grid', gap: 4, fontSize: 13 }}>
+                <div><strong>Solicitado:</strong> {formatDateTime(vehicle.fechaInicioSolicitada || vehicle.fechaInicio)} - {formatDateTime(vehicle.fechaFinSolicitada || vehicle.fechaFin)}</div>
+                <div style={{ color: 'var(--text-secondary)' }}><strong>Aprobado:</strong> {formatDateTime(vehicle.fechaInicioAprobada)} - {formatDateTime(vehicle.fechaFinAprobada)}</div>
+              </div>
+
+              <div style={{ display: 'grid', gap: 6 }}>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  {vehicle.evidenciaEntregaUrl ? <a className="link" href={vehicle.evidenciaEntregaUrl} target="_blank" rel="noopener noreferrer">Entrega</a> : <span style={{ color: 'var(--text-secondary)' }}>Entrega: -</span>}
+                  {vehicle.evidenciaDevolucionUrl ? <a className="link" href={vehicle.evidenciaDevolucionUrl} target="_blank" rel="noopener noreferrer">Devolucion</a> : <span style={{ color: 'var(--text-secondary)' }}>Devolucion: -</span>}
                 </div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-                  Entrega fotos: {Array.isArray(vehicle.entregaFotos) ? vehicle.entregaFotos.length : 0}
+                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Entrega fotos: {Array.isArray(vehicle.entregaFotos) ? vehicle.entregaFotos.length : 0} · Estatus: {vehicle.entregaEstatus || 'Pendiente'}</div>
+              </div>
+
+              {Array.isArray(vehicle.entregaFotos) && vehicle.entregaFotos.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(56px, 1fr))', gap: 6 }}>
+                  {vehicle.entregaFotos.slice(0, 8).map((foto, index) => (
+                    <img
+                      key={`${vehicle.id}-thumb-m-${index}`}
+                      src={foto}
+                      alt={`Entrega ${index + 1}`}
+                      style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 8, border: '1px solid var(--muted)' }}
+                    />
+                  ))}
                 </div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-                  Entrega estatus: {vehicle.entregaEstatus || 'Pendiente'}
+              )}
+
+              {vehicle.estatusAprobacion === 'Pendiente' && hasPermission(user, PERMISSIONS.VEHICLES_REVIEW) && (
+                <div style={{ display: 'grid', gap: 8, borderTop: '1px solid var(--muted)', paddingTop: 8 }}>
+                  <input
+                    className="input"
+                    type="datetime-local"
+                    value={approvalDrafts[vehicle.id]?.inicio || ''}
+                    onChange={(event) => setApprovalDrafts((prev) => ({ ...prev, [vehicle.id]: { ...prev[vehicle.id], inicio: event.target.value } }))}
+                  />
+                  <input
+                    className="input"
+                    type="datetime-local"
+                    value={approvalDrafts[vehicle.id]?.fin || ''}
+                    onChange={(event) => setApprovalDrafts((prev) => ({ ...prev, [vehicle.id]: { ...prev[vehicle.id], fin: event.target.value } }))}
+                  />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <button className="button-primary" style={{ minHeight: 44 }} disabled={actionLoading === vehicle.id} onClick={() => handleApprove(vehicle.id, 'Aprobado')}>{actionLoading === vehicle.id ? 'Aprobando...' : 'Aprobar'}</button>
+                    <button className="button-secondary" style={{ minHeight: 44 }} disabled={actionLoading === vehicle.id} onClick={() => handleApprove(vehicle.id, 'Rechazado')}>{actionLoading === vehicle.id ? 'Rechazando...' : 'Rechazar'}</button>
+                  </div>
                 </div>
-                {Array.isArray(vehicle.entregaFotos) && vehicle.entregaFotos.length > 0 && (
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-                    {vehicle.entregaFotos.slice(0, 6).map((foto, index) => (
-                      <img
-                        key={`${vehicle.id}-thumb-${index}`}
-                        src={foto}
-                        alt={`Entrega ${index + 1}`}
-                        style={{
-                          width: 48,
-                          height: 48,
-                          objectFit: 'cover',
-                          borderRadius: 8,
-                          border: '1px solid var(--muted)',
-                        }}
-                      />
-                    ))}
+              )}
+
+              {hasPermission(user, PERMISSIONS.VEHICLES_REVIEW) && vehicle.entregaEstatus === 'En revision' && (
+                <div style={{ display: 'grid', gap: 8, borderTop: '1px solid var(--muted)', paddingTop: 8 }}>
+                  <textarea className="input" rows={2} placeholder="Observaciones de entrega" value={deliveryDrafts[vehicle.id] || ''} onChange={(event) => setDeliveryDrafts((prev) => ({ ...prev, [vehicle.id]: event.target.value }))} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <button className="button-primary" style={{ minHeight: 44 }} onClick={() => handleDeliveryReview(vehicle.id, true)}>Aprobar entrega</button>
+                    <button className="button-secondary" style={{ minHeight: 44 }} onClick={() => handleDeliveryReview(vehicle.id, false)}>Rechazar entrega</button>
                   </div>
-                )}
-              </td>
-              <td>
-                {vehicle.estatusAprobacion === 'Pendiente' && hasPermission(user, PERMISSIONS.VEHICLES_REVIEW) && (
-                  <>
-                    <div style={{ display: 'grid', gap: 6, marginBottom: 8 }}>
-                      <input
-                        className="input"
-                        type="datetime-local"
-                        value={approvalDrafts[vehicle.id]?.inicio || ''}
-                        onChange={(event) => setApprovalDrafts((prev) => ({
-                          ...prev,
-                          [vehicle.id]: { ...prev[vehicle.id], inicio: event.target.value },
-                        }))}
-                      />
-                      <input
-                        className="input"
-                        type="datetime-local"
-                        value={approvalDrafts[vehicle.id]?.fin || ''}
-                        onChange={(event) => setApprovalDrafts((prev) => ({
-                          ...prev,
-                          [vehicle.id]: { ...prev[vehicle.id], fin: event.target.value },
-                        }))}
-                      />
-                    </div>
-                    <button
-                      className="button-primary"
-                      disabled={actionLoading === vehicle.id}
-                      onClick={() => handleApprove(vehicle.id, 'Aprobado')}
-                    >{actionLoading === vehicle.id ? 'Aprobando...' : 'Aprobar'}</button>
-                    <button
-                      className="button-secondary"
-                      disabled={actionLoading === vehicle.id}
-                      onClick={() => handleApprove(vehicle.id, 'Rechazado')}
-                    >{actionLoading === vehicle.id ? 'Rechazando...' : 'Rechazar'}</button>
-                  </>
-                )}
-                {hasPermission(user, PERMISSIONS.VEHICLES_REVIEW) && vehicle.entregaEstatus === 'En revision' && (
-                  <div style={{ marginTop: 8 }}>
-                    <textarea
-                      className="input"
-                      rows={2}
-                      placeholder="Observaciones de entrega"
-                      value={deliveryDrafts[vehicle.id] || ''}
-                      onChange={(event) => setDeliveryDrafts((prev) => ({ ...prev, [vehicle.id]: event.target.value }))}
-                    />
-                    <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                      <button className="button-primary" onClick={() => handleDeliveryReview(vehicle.id, true)}>
-                        Aprobar entrega
-                      </button>
-                      <button className="button-secondary" onClick={() => handleDeliveryReview(vehicle.id, false)}>
-                        Rechazar entrega
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {hasPermission(user, PERMISSIONS.VEHICLES_REVIEW) && vehicle.renovacionEstatus === 'Pendiente' && (
-                  <div style={{ marginTop: 8 }}>
-                    <button
-                      className="button-primary"
-                      onClick={() => handleRenewalReview(vehicle.id, true, vehicle.renovacionSolicitadaFin || null)}
-                    >
-                      Aprobar renovacion
-                    </button>
-                    <button
-                      className="button-secondary"
-                      onClick={() => handleRenewalReview(vehicle.id, false)}
-                    >
-                      Rechazar renovacion
-                    </button>
-                  </div>
-                )}
-                {hasPermission(user, PERMISSIONS.VEHICLES_REVIEW) && (
-                  <div style={{ marginTop: 10 }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: 12, marginBottom: 6 }}>Penalizacion</div>
-                    <input
-                      className="input"
-                      type="number"
-                      placeholder="Monto"
-                      value={penaltyDrafts[vehicle.id]?.monto ?? (vehicle.penalizacionMonto ? String(vehicle.penalizacionMonto) : '')}
-                      onChange={(event) => setPenaltyDrafts((prev) => ({
-                        ...prev,
-                        [vehicle.id]: { ...prev[vehicle.id], monto: event.target.value },
-                      }))}
-                    />
-                    <textarea
-                      className="input"
-                      rows={2}
-                      placeholder="Notas"
-                      value={penaltyDrafts[vehicle.id]?.notas ?? (vehicle.penalizacionNotas || '')}
-                      onChange={(event) => setPenaltyDrafts((prev) => ({
-                        ...prev,
-                        [vehicle.id]: { ...prev[vehicle.id], notas: event.target.value },
-                      }))}
-                      style={{ marginTop: 6 }}
-                    />
-                    <button
-                      className="button-secondary"
-                      style={{ marginTop: 6 }}
-                      onClick={() => handlePenaltySave(vehicle.id)}
-                    >
-                      Guardar penalizacion
-                    </button>
-                  </div>
-                )}
-              </td>
-            </tr>
+                </div>
+              )}
+
+              {hasPermission(user, PERMISSIONS.VEHICLES_REVIEW) && vehicle.renovacionEstatus === 'Pendiente' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, borderTop: '1px solid var(--muted)', paddingTop: 8 }}>
+                  <button className="button-primary" style={{ minHeight: 44 }} onClick={() => handleRenewalReview(vehicle.id, true, vehicle.renovacionSolicitadaFin || null)}>Aprobar renovacion</button>
+                  <button className="button-secondary" style={{ minHeight: 44 }} onClick={() => handleRenewalReview(vehicle.id, false)}>Rechazar renovacion</button>
+                </div>
+              )}
+
+              {hasPermission(user, PERMISSIONS.VEHICLES_REVIEW) && (
+                <div style={{ display: 'grid', gap: 8, borderTop: '1px solid var(--muted)', paddingTop: 8 }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Penalizacion</div>
+                  <input className="input" type="number" placeholder="Monto" value={penaltyDrafts[vehicle.id]?.monto ?? (vehicle.penalizacionMonto ? String(vehicle.penalizacionMonto) : '')} onChange={(event) => setPenaltyDrafts((prev) => ({ ...prev, [vehicle.id]: { ...prev[vehicle.id], monto: event.target.value } }))} />
+                  <textarea className="input" rows={2} placeholder="Notas" value={penaltyDrafts[vehicle.id]?.notas ?? (vehicle.penalizacionNotas || '')} onChange={(event) => setPenaltyDrafts((prev) => ({ ...prev, [vehicle.id]: { ...prev[vehicle.id], notas: event.target.value } }))} />
+                  <button className="button-secondary" style={{ minHeight: 44 }} onClick={() => handlePenaltySave(vehicle.id)}>Guardar penalizacion</button>
+                </div>
+              )}
+            </div>
           ))}
-        </tbody>
-      </table>
-      <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+        </div>
+      )}
+
+      <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
         <button className="button-secondary" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Anterior</button>
         <span>Página {page} de {totalPages || 1}</span>
         <button className="button-secondary" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0}>Siguiente</button>
