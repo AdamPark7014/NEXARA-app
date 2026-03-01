@@ -807,12 +807,25 @@ export default function CotizacionesPage() {
 
       <style jsx>{`
         :global(.quoteShell) {
+          --quote-surface: rgba(255, 255, 255, 0.96);
+          --quote-panel: rgba(236, 246, 255, 0.92);
+          --quote-border: rgba(15, 106, 214, 0.24);
+          --quote-accent: #1f8cff;
+          --quote-hot: #f39c3d;
+          --quote-text: #10253f;
+          --quote-muted: rgba(30, 59, 95, 0.72);
+          --quote-deep: rgba(226, 239, 255, 0.86);
+          --quote-deep-2: rgba(213, 231, 252, 0.8);
+        }
+
+        :global(body.dark .quoteShell) {
           --quote-surface: rgba(8, 22, 40, 0.94);
           --quote-panel: rgba(12, 32, 58, 0.92);
           --quote-border: rgba(64, 149, 235, 0.25);
-          --quote-accent: #1f8cff;
-          --quote-hot: #f39c3d;
           --quote-text: #e6f0ff;
+          --quote-muted: rgba(230, 240, 255, 0.7);
+          --quote-deep: rgba(8, 18, 34, 0.85);
+          --quote-deep-2: rgba(6, 14, 26, 0.65);
         }
 
         .quoteShell {
@@ -1316,6 +1329,85 @@ export default function CotizacionesPage() {
           font-size: 11px;
           margin-bottom: 6px;
           color: rgba(230, 240, 255, 0.7);
+        }
+
+        :global(body.light) .quoteShell .quoteHeader {
+          background: linear-gradient(125deg, rgba(15, 106, 214, 0.2), rgba(22, 169, 110, 0.16));
+          border-color: rgba(15, 106, 214, 0.26);
+          box-shadow: 0 16px 30px rgba(15, 106, 214, 0.16);
+        }
+
+        :global(body.light) .quoteShell .eyebrow,
+        :global(body.light) .quoteShell .subline,
+        :global(body.light) .quoteShell .saveMessage,
+        :global(body.light) .quoteShell .previewSub,
+        :global(body.light) .quoteShell .previewMeta,
+        :global(body.light) .quoteShell .previewItemMeta,
+        :global(body.light) .quoteShell .previewLabel,
+        :global(body.light) .quoteShell .tableHeader,
+        :global(body.light) .quoteShell .previewSplit,
+        :global(body.light) .quoteShell .previewNoteTitle {
+          color: var(--quote-muted);
+        }
+
+        :global(body.light) .quoteShell .statCard,
+        :global(body.light) .quoteShell .editorCard,
+        :global(body.light) .quoteShell .previewCard,
+        :global(body.light) .quoteShell .tableGroup,
+        :global(body.light) .quoteShell .itemCard,
+        :global(body.light) .quoteShell .previewMetaGrid,
+        :global(body.light) .quoteShell .previewClient,
+        :global(body.light) .quoteShell .previewScope,
+        :global(body.light) .quoteShell .previewCategories,
+        :global(body.light) .quoteShell .previewFoot,
+        :global(body.light) .quoteShell .previewSplit div {
+          background: linear-gradient(155deg, var(--quote-surface), var(--quote-deep));
+          border-color: rgba(15, 106, 214, 0.2);
+          box-shadow: 0 10px 20px rgba(15, 106, 214, 0.1);
+        }
+
+        :global(body.light) .quoteShell .statCard.accent {
+          background: linear-gradient(130deg, rgba(15, 106, 214, 0.22), rgba(22, 169, 110, 0.16));
+        }
+
+        :global(body.light) .quoteShell .statusPill,
+        :global(body.light) .quoteShell .chip,
+        :global(body.light) .quoteShell .itemIndex {
+          background: rgba(15, 106, 214, 0.12);
+          color: #1d3f6b;
+        }
+
+        :global(body.light) .quoteShell .ghostButton {
+          background: rgba(15, 106, 214, 0.1);
+          color: #1a3a66;
+          border: 1px solid rgba(15, 106, 214, 0.2);
+        }
+
+        :global(body.light) .quoteShell .field input,
+        :global(body.light) .quoteShell .field select,
+        :global(body.light) .quoteShell .itemGrid input,
+        :global(body.light) .quoteShell .noteArea,
+        :global(body.light) .quoteShell .itemDescription,
+        :global(body.light) .quoteShell .itemTitle,
+        :global(body.light) .quoteShell .tableWrap input,
+        :global(body.light) .quoteShell .tableWrap select,
+        :global(body.light) .quoteShell .detailRow input {
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(234, 245, 255, 0.92));
+          border-color: rgba(15, 106, 214, 0.24);
+          color: #0f2744;
+        }
+
+        :global(body.light) .quoteShell .previewValue,
+        :global(body.light) .quoteShell .previewItemName,
+        :global(body.light) .quoteShell .previewItemAmount,
+        :global(body.light) .quoteShell .previewTotal,
+        :global(body.light) .quoteShell .statCard strong,
+        :global(body.light) .quoteShell .cell.total {
+          color: #0f2744;
+        }
+
+        :global(body.light) .quoteShell .previewRow {
+          border-bottom-color: rgba(15, 106, 214, 0.12);
         }
 
         @media (max-width: 1100px) {

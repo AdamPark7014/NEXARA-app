@@ -268,8 +268,8 @@
 }
 
 .syncButton:disabled {
-  background-color: #cbd5e1;
-  color: #64748b;
+  background: linear-gradient(145deg, rgba(95, 136, 193, 0.62), rgba(79, 120, 179, 0.56));
+  color: rgba(233, 242, 255, 0.88);
   cursor: not-allowed;
 }
 
@@ -413,23 +413,25 @@
 }
 
 .saveButton:disabled {
-  background-color: #cbd5e1;
-  color: #64748b;
+  background: linear-gradient(145deg, rgba(81, 140, 196, 0.62), rgba(62, 122, 179, 0.56));
+  color: rgba(233, 242, 255, 0.88);
   cursor: not-allowed;
 }
 
 .cancelButton {
-  background-color: #e5e7eb;
-  color: #1f2a37;
+  background: linear-gradient(145deg, rgba(226, 241, 255, 0.9), rgba(211, 231, 252, 0.84));
+  color: #163a66;
+  border: 1px solid rgba(22, 93, 176, 0.24);
 }
 
 .cancelButton:hover:not(:disabled) {
-  background-color: #d1d5db;
+  background: linear-gradient(145deg, rgba(214, 234, 255, 0.96), rgba(194, 220, 250, 0.9));
 }
 
 .cancelButton:disabled {
-  background-color: #f3f4f6;
-  color: #d1d5db;
+  background: linear-gradient(145deg, rgba(205, 225, 248, 0.72), rgba(191, 214, 241, 0.66));
+  color: rgba(22, 59, 102, 0.6);
+  border-color: rgba(88, 132, 191, 0.28);
   cursor: not-allowed;
 }
 

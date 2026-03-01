@@ -213,26 +213,35 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           position: relative;
           display: flex;
           align-items: center;
+          min-width: 0;
         }
 
         .input-icon {
           position: absolute;
           left: 16px;
+          width: 20px;
+          height: 20px;
           color: rgba(255, 255, 255, 0.4);
           pointer-events: none;
           transition: color 0.3s ease;
+          z-index: 2;
         }
 
         .input {
           width: 100%;
-          padding: 14px 16px 14px 48px;
+          padding: 14px 16px 14px 50px;
           background: rgba(255, 255, 255, 0.05);
           border: 1px solid rgba(255, 255, 255, 0.1);
           border-radius: 12px;
           color: #ffffff;
           font-size: 15px;
+          line-height: 1.35;
           transition: all 0.3s ease;
           outline: none;
+        }
+
+        .input-has-toggle {
+          padding-right: 56px;
         }
 
         .input:focus {
@@ -251,15 +260,20 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
 
         .password-toggle {
           position: absolute;
-          right: 16px;
+          right: 10px;
+          width: 32px;
+          height: 32px;
           background: none;
           border: none;
+          border-radius: 8px;
           color: rgba(255, 255, 255, 0.4);
           cursor: pointer;
           padding: 0;
           display: flex;
           align-items: center;
+          justify-content: center;
           transition: color 0.3s ease;
+          z-index: 3;
         }
 
         .password-toggle:hover {
@@ -421,12 +435,16 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           }
 
           .input {
-            padding: 15px 14px 15px 46px;
+            padding: 15px 14px 15px 48px;
             font-size: 16px;
             border-radius: 10px;
             -webkit-appearance: none;
             -moz-appearance: none;
             appearance: none;
+          }
+
+          .input-has-toggle {
+            padding-right: 54px;
           }
 
           .input-icon {
@@ -436,7 +454,9 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           }
 
           .password-toggle {
-            right: 14px;
+            right: 8px;
+            width: 34px;
+            height: 34px;
           }
 
           .submit-button {
@@ -494,8 +514,12 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           }
 
           .input {
-            padding: 14px 12px 14px 44px;
+            padding: 14px 12px 14px 46px;
             font-size: 15px;
+          }
+
+          .input-has-toggle {
+            padding-right: 52px;
           }
 
           .input-icon {
@@ -503,7 +527,9 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           }
 
           .password-toggle {
-            right: 12px;
+            right: 7px;
+            width: 32px;
+            height: 32px;
           }
 
           .submit-button {
@@ -568,13 +594,12 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
                 <input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  className="input"
+                  className="input input-has-toggle"
                   placeholder="••••••••••••"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
-                  style={{ paddingRight: "48px" }}
                 />
                 <button
                   type="button"
