@@ -15,7 +15,7 @@
 .titleBlock h1 {
   margin: 0;
   font-size: 1.8rem;
-  color: var(--text-dark, #000);
+  color: var(--foreground);
 }
 
 .subtitle {
@@ -65,10 +65,15 @@
   border: 1px solid rgba(15, 106, 214, 0.18);
   border-radius: 14px;
   padding: 14px;
-  background: #fff;
+  background: var(--surface);
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+:global(body.dark) .card {
+  background: rgba(20, 26, 38, 0.9);
+  border-color: rgba(31, 137, 252, 0.25);
 }
 
 .card.default {
@@ -149,13 +154,20 @@
 
 .smallBtn {
   border: 1px solid rgba(15, 106, 214, 0.35);
-  background: #fff;
+  background: var(--surface);
   color: #0f6ad6;
   border-radius: 8px;
   padding: 6px 10px;
   font-size: 0.8rem;
   font-weight: 700;
   cursor: pointer;
+}
+
+:global(body.dark) .smallBtn,
+:global(body.dark) .presetBtn {
+  background: rgba(15, 22, 36, 0.75);
+  color: #93c5fd;
+  border-color: rgba(31, 137, 252, 0.45);
 }
 
 .modal {
@@ -172,10 +184,15 @@
   width: min(1000px, 94vw);
   max-height: 92vh;
   overflow: auto;
-  background: #fff;
+  background: var(--surface);
   border-radius: 14px;
   border: 1px solid rgba(15, 106, 214, 0.2);
   padding: 18px;
+}
+
+:global(body.dark) .modalContent {
+  background: rgba(11, 16, 28, 0.98);
+  border-color: rgba(31, 137, 252, 0.22);
 }
 
 .modalHeader {
@@ -195,6 +212,12 @@
   border: 1px solid rgba(15, 106, 214, 0.18);
   border-radius: 12px;
   padding: 12px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+}
+
+:global(body.dark) .section {
+  background: rgba(20, 26, 38, 0.75);
+  border-color: rgba(31, 137, 252, 0.22);
 }
 
 .section h3 {
@@ -211,7 +234,7 @@
 
 .field label {
   font-size: 0.85rem;
-  color: #4b5563;
+  color: var(--text-secondary);
   font-weight: 700;
 }
 
@@ -224,6 +247,16 @@
   padding: 10px;
   font-size: 0.9rem;
   font-family: inherit;
+  background: var(--surface);
+  color: var(--foreground);
+}
+
+:global(body.dark) .field input,
+:global(body.dark) .field textarea,
+:global(body.dark) .field select {
+  background: rgba(15, 22, 36, 0.8);
+  border-color: rgba(31, 137, 252, 0.35);
+  color: #e7eefc;
 }
 
 .row {
@@ -263,7 +296,7 @@
 
 .presetBtn {
   border: 1px solid rgba(15, 106, 214, 0.35);
-  background: #fff;
+  background: var(--surface);
   color: #0f6ad6;
   border-radius: 999px;
   padding: 6px 10px;
@@ -302,7 +335,7 @@
 .loading {
   padding: 24px;
   text-align: center;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 @media (max-width: 940px) {

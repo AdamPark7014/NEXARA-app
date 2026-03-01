@@ -91,7 +91,7 @@ export default function VentasCotizacionesPage() {
       </div>
 
       {/* Generador de PDFs dinámicos */}
-      <div style={{ marginBottom: "2rem", padding: "1.5rem", backgroundColor: "#f8f9fa", borderRadius: "8px" }}>
+      <div className={styles.generatorWrapper}>
         <QuoteGenerator onQuoteGenerated={fetchCotizaciones} />
       </div>
 

@@ -340,6 +340,32 @@ export const createSalesLead = async (
   );
 };
 
+export const updateSalesLead = async (
+  token: string,
+  id: number,
+  payload: Partial<{
+    name: string;
+    company: string;
+    email: string;
+    phone: string;
+    source: string;
+    status: string;
+    score: number;
+    notes: string;
+  }>,
+) => {
+  return apiRequest<SalesLead>(
+    `ventas/leads/${id}`,
+    {
+      token,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+    "No se pudo actualizar el lead",
+  );
+};
+
 export const listSalesOpportunities = async (token: string) => {
   const data = await apiRequest<unknown>("ventas/oportunidades", { token, method: "GET" }, "No se pudieron cargar las oportunidades");
   return Array.isArray(data) ? (data as SalesOpportunity[]) : [];

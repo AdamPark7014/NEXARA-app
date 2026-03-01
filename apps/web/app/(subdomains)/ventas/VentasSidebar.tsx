@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import styles from "./VentasSidebar.module.css";
 import { useUser } from "@/components/UserContext";
 import { useTheme } from "@/components/ThemeContext";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions";
 
 interface MenuItem {
@@ -43,18 +43,58 @@ export default function VentasSidebar() {
   const { user } = useUser();
   const { darkMode, toggleDarkMode } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
-  const canManageSellers = hasAnyPermission(user, [
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth <= 900);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    document.body.style.overflow = isMenuOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMenuOpen, isMobile]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    setIsMenuOpen(false);
+  }, [pathname, isMobile]);
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && isMenuOpen) setIsMenuOpen(false);
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [isMenuOpen]);
+
+  const closeMenu = () => setIsMenuOpen(false);
+
+  const isAdminOrSuperAdmin =
+    Boolean(user?.isSuperAdmin) ||
+    (user?.role || "").toLowerCase().includes("admin") ||
+    hasAnyPermission(user, [
+      PERMISSIONS.CONSOLE_ADMIN,
+      PERMISSIONS.SALES_MANAGE,
+      PERMISSIONS.USERS_MANAGE,
+    ]);
+
+  const canManageSellers = isAdminOrSuperAdmin && hasAnyPermission(user, [
     PERMISSIONS.CONSOLE_ADMIN,
+    PERMISSIONS.SALES_VIEW,
     PERMISSIONS.SALES_MANAGE,
-    PERMISSIONS.ATTENDANCE_MANAGE,
-    PERMISSIONS.USERS_MANAGE,
     PERMISSIONS.PANEL_VENTAS,
   ]);
 
   const userRoleLabel = user?.isSuperAdmin
     ? "Super Admin"
-    : canManageSellers
+    : isAdminOrSuperAdmin
       ? "Admin Comercial"
       : "Vendedor";
 
@@ -62,6 +102,8 @@ export default function VentasSidebar() {
     if (!pathname) return false;
     return pathname.startsWith(href);
   };
+
+  const showExpandedContent = sidebarOpen || isMobile;
 
   const groupedItems = useMemo(() => {
     const items = [...menuItems];
@@ -90,25 +132,45 @@ export default function VentasSidebar() {
   if (!user) return null;
 
   return (
-    <aside className={`${styles.ventasSidebar} ${sidebarOpen ? styles.sidebarOpen : styles.sidebarCollapsed}`}>
+    <aside
+      className={`${styles.ventasSidebar} ${sidebarOpen ? styles.sidebarOpen : styles.sidebarCollapsed} ${isMenuOpen && isMobile ? styles.mobileOpen : ""}`}
+    >
       {/* Header con Logo */}
       <div className={styles.sidebarHeader}>
         <div className={styles.logoContainer}>
           <img src="/logo-nexara.png" alt="NEXARA Logo" className={styles.logoIcon} />
-          {sidebarOpen && <h2 className={styles.logoText}>NEXARA</h2>}
+          {showExpandedContent && <h2 className={styles.logoText}>NEXARA</h2>}
         </div>
-        <button
-          className={styles.toggleBtn}
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          title={sidebarOpen ? "Contraer" : "Expandir"}
-          aria-label="Toggle sidebar"
-        >
-          {sidebarOpen ? "◀" : "▶"}
-        </button>
+        {isMobile ? (
+          <button
+            className={`${styles.hamburgerButton} ${isMenuOpen ? styles.hamburgerActive : ""}`}
+            onClick={() => setIsMenuOpen((prev) => !prev)}
+            aria-label={isMenuOpen ? "Cerrar menú" : "Abrir menú"}
+            aria-expanded={isMenuOpen}
+            aria-controls="ventas-sidebar-menu"
+          >
+            <span className={styles.hamburgerLine}></span>
+            <span className={styles.hamburgerLine}></span>
+            <span className={styles.hamburgerLine}></span>
+          </button>
+        ) : (
+          <button
+            className={styles.toggleBtn}
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            title={sidebarOpen ? "Contraer" : "Expandir"}
+            aria-label="Toggle sidebar"
+          >
+            {sidebarOpen ? "◀" : "▶"}
+          </button>
+        )}
       </div>
 
+      {isMobile && isMenuOpen && <div className={styles.sidebarOverlay} onClick={closeMenu} role="presentation" />}
+
+      <div className={styles.sidebarContent} id="ventas-sidebar-menu">
+
       {/* User Info Card */}
-      {sidebarOpen && (
+      {showExpandedContent && (
         <div className={styles.userCard}>
           <div className={styles.userAvatar}>
             {user.nombre.charAt(0).toUpperCase()}
@@ -125,7 +187,7 @@ export default function VentasSidebar() {
       <nav className={styles.navContainer}>
         {Object.entries(groupedItems).map(([section, items]) => (
           <div key={section} className={styles.navSection}>
-            {sidebarOpen && <div className={styles.sectionTitle}>{section}</div>}
+            {showExpandedContent && <div className={styles.sectionTitle}>{section}</div>}
             <ul className={styles.navList}>
               {items.map((item) => {
                 const active = isActive(item.href);
@@ -136,9 +198,10 @@ export default function VentasSidebar() {
                       className={`${styles.navLink} ${active ? styles.navLinkActive : ""}`}
                       title={item.label}
                       aria-current={active ? "page" : undefined}
+                      onClick={closeMenu}
                     >
                       <span className={styles.navIcon}>{item.icon}</span>
-                      {sidebarOpen && (
+                      {showExpandedContent && (
                         <div className={styles.navContent}>
                           <span className={styles.navLabel}>{item.label}</span>
                           {item.description && (
@@ -169,23 +232,23 @@ export default function VentasSidebar() {
             background: 'var(--card-bg)',
             color: 'var(--text-color)',
             cursor: 'pointer',
-            fontSize: sidebarOpen ? '1rem' : '1.5rem',
+            fontSize: showExpandedContent ? '1rem' : '1.5rem',
             transition: 'all 0.2s ease',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: sidebarOpen ? 'flex-start' : 'center',
+            justifyContent: showExpandedContent ? 'flex-start' : 'center',
             gap: '0.5rem',
           }}
           aria-label={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
         >
           <span style={{ fontSize: '1.5rem' }}>{darkMode ? '🌙' : '☀️'}</span>
-          {sidebarOpen && <span>{darkMode ? 'Modo Oscuro' : 'Modo Claro'}</span>}
+          {showExpandedContent && <span>{darkMode ? 'Modo Oscuro' : 'Modo Claro'}</span>}
         </button>
       </div>
 
       {/* Footer */}
       <div className={styles.sidebarFooter}>
-        {sidebarOpen ? (
+        {showExpandedContent ? (
           <>
             <div className={styles.statusIndicator} />
             <span className={styles.statusText}>En línea</span>
@@ -193,6 +256,7 @@ export default function VentasSidebar() {
         ) : (
           <div className={styles.statusIndicatorSmall} />
         )}
+      </div>
       </div>
     </aside>
   );
