@@ -15,6 +15,7 @@ export default function ContabilidadLayout({ children }: { children: React.React
   const { darkMode, toggleDarkMode } = useTheme();
   const { logout } = useUser();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   const currentPath = pathname ? pathname.replace(/\/+$/, "") : "";
 
@@ -60,17 +61,19 @@ export default function ContabilidadLayout({ children }: { children: React.React
 
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth > MOBILE_BREAKPOINT) {
+      const mobile = window.innerWidth <= MOBILE_BREAKPOINT;
+      setIsMobile(mobile);
+      if (!mobile) {
         setMobileMenuOpen(false);
       }
     };
 
+    handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [MOBILE_BREAKPOINT]);
 
   useEffect(() => {
-    const isMobile = typeof window !== "undefined" ? window.innerWidth <= MOBILE_BREAKPOINT : false;
     if (!isMobile) {
       return;
     }
@@ -78,7 +81,7 @@ export default function ContabilidadLayout({ children }: { children: React.React
     return () => {
       document.body.style.overflow = "";
     };
-  }, [mobileMenuOpen, MOBILE_BREAKPOINT]);
+  }, [mobileMenuOpen, isMobile]);
 
   const handleLogout = () => {
     logout();
@@ -113,7 +116,7 @@ export default function ContabilidadLayout({ children }: { children: React.React
         </button>
       </header>
 
-      {mobileMenuOpen && (
+      {isMobile && mobileMenuOpen && (
         <button
           type="button"
           className={styles.mobileBackdrop}
@@ -123,11 +126,12 @@ export default function ContabilidadLayout({ children }: { children: React.React
         />
       )}
 
+      {(!isMobile || mobileMenuOpen) && (
       <aside
         id="conta-mobile-menu"
         className={`${consoleStyles.sidebar} ${styles.contaSidebar} ${mobileMenuOpen ? styles.contaSidebarOpen : ""}`}
         style={
-          mobileMenuOpen
+          isMobile
             ? {
                 zIndex: 12002,
                 opacity: 1,
@@ -135,7 +139,7 @@ export default function ContabilidadLayout({ children }: { children: React.React
                 transform: "translateY(0) scale(1)",
                 pointerEvents: "auto",
               }
-            : { pointerEvents: "none" }
+            : undefined
         }
       >
         <div className={consoleStyles.sidebarLogo}>
@@ -202,6 +206,7 @@ export default function ContabilidadLayout({ children }: { children: React.React
           </li>
         </ul>
       </aside>
+      )}
       <main className={consoleStyles.consoleMain}>{children}</main>
     </div>
   );
