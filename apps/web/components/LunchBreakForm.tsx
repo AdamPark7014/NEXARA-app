@@ -17,6 +17,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cameraFacing, setCameraFacing] = useState<'user' | 'environment'>('user');
+  const [isMobile, setIsMobile] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -38,9 +39,14 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
     stopCamera();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode },
+        video: {
+          facingMode,
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
         audio: false,
       });
+      setError(null);
       setCameraFacing(facingMode);
       streamRef.current = stream;
       if (videoRef.current) {
@@ -94,7 +100,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
         const timeKey = isCheckin ? 'checkinTime' : 'checkoutTime';
 
         const res = await fetch(endpoint, {
-          method: 'POST',
+          method: isCheckin ? 'POST' : 'PUT',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${user.token}`,
@@ -133,11 +139,22 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
     };
   }, []);
 
+  React.useEffect(() => {
+    const updateViewport = () => {
+      if (typeof window === 'undefined') return;
+      setIsMobile(window.innerWidth <= 640);
+    };
+
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+    return () => window.removeEventListener('resize', updateViewport);
+  }, []);
+
   const lunchStatus = isCheckin ? 'De Entrada a Comida' : 'De Regreso al Trabajo';
   const lunchEmoji = isCheckin ? '🍽️ Entrada' : '✅ Regreso';
 
   return (
-    <div className="card" style={{ maxWidth: 680, margin: '0 auto', padding: 'clamp(14px, 3vw, 24px)' }}>
+    <div className="card" style={{ maxWidth: 680, margin: '0 auto', padding: isMobile ? 14 : 'clamp(16px, 3vw, 24px)' }}>
       <h2 style={{ color: 'var(--primary)', marginBottom: 20, textAlign: 'center' }}>
         {lunchEmoji} - Hora de Comida
       </h2>
@@ -155,14 +172,16 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
               ref={videoRef}
               autoPlay
               playsInline
+              muted
               style={{
                 width: '100%',
-                height: 'min(58vh, 420px)',
+                height: isMobile ? 'min(50vh, 360px)' : 'min(58vh, 420px)',
                 borderRadius: 14,
                 background: '#000',
                 border: '1px solid rgba(31,137,252,0.18)',
                 marginBottom: 16,
                 objectFit: 'cover',
+                display: 'block',
               }}
             />
 
@@ -175,27 +194,35 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
 
             {error && <div style={{ color: 'var(--danger)', marginBottom: 16 }}>{error}</div>}
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+                gap: 12,
+                position: 'relative',
+                zIndex: 2,
+              }}
+            >
               <button
                 className="button-primary"
                 type="button"
                 onClick={capturePhoto}
                 style={{
                   width: '100%',
-                  minHeight: 52,
-                  padding: '14px 12px',
+                  minHeight: isMobile ? 58 : 52,
+                  padding: isMobile ? '16px 14px' : '14px 12px',
                   borderRadius: 12,
                   fontWeight: 700,
                   touchAction: 'manipulation',
                   WebkitAppearance: 'none',
                   cursor: 'pointer',
                   transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                  fontSize: 15,
+                  fontSize: isMobile ? 16 : 15,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '6px',
-                  gridColumn: window.innerWidth < 480 ? 'span 2' : 'span 1',
+                  pointerEvents: 'auto',
                 }}
                 onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
                 onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
@@ -208,19 +235,20 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
                 onClick={flipCamera}
                 style={{
                   width: '100%',
-                  minHeight: 52,
-                  padding: '14px 12px',
+                  minHeight: isMobile ? 58 : 52,
+                  padding: isMobile ? '16px 14px' : '14px 12px',
                   borderRadius: 12,
                   fontWeight: 700,
                   touchAction: 'manipulation',
                   WebkitAppearance: 'none',
                   cursor: 'pointer',
                   transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                  fontSize: 15,
+                  fontSize: isMobile ? 16 : 15,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '6px',
+                  pointerEvents: 'auto',
                 }}
                 onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
                 onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
