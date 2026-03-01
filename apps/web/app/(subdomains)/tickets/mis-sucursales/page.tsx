@@ -117,14 +117,14 @@ export default function MyBranchesPage() {
           redirectTo="mis-sucursales"
           onClientLogin={handleClientLogin}
           title="Mis sucursales"
-          subtitle="Gestiona las sucursales de tu empresa"
+          subtitle="Administra las sucursales de tu empresa desde un solo lugar"
         />
       </div>
     );
   }
 
   return (
-    <div className={consoleStyles.consoleLayout}>
+    <div className={`${consoleStyles.consoleLayout} ${styles.ticketsConsole}`}>
       {/* Sidebar */}
       <aside className={consoleStyles.sidebar}>
         <div className={consoleStyles.sidebarLogo}>
@@ -147,27 +147,27 @@ export default function MyBranchesPage() {
             )}
           </div>
           <div className={consoleStyles.sidebarName}>{session.client.name}</div>
-          <div className={consoleStyles.sidebarEmail}>Gestión de sucursales</div>
+          <div className={consoleStyles.sidebarEmail}>Administración de sucursales</div>
           <div className={consoleStyles.sidebarMeta}>
             <span className={consoleStyles.rolePill}>Cliente</span>
           </div>
         </div>
 
-        <div className={consoleStyles.menuTitle}>Menu cliente</div>
+        <div className={consoleStyles.menuTitle}>Centro de servicio</div>
         <ul className={consoleStyles.sidebarMenu}>
           <li className={consoleStyles.sidebarMenuItem}>
             <a href="..?tab=tickets" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
-              Tickets
+              Estado de tickets
             </a>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
             <a href="..?tab=new-ticket" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
-              Levantar ticket
+              Nueva solicitud
             </a>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
             <a href="..?tab=profile" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
-              Perfil
+              Perfil corporativo
             </a>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
@@ -177,7 +177,7 @@ export default function MyBranchesPage() {
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
             <button type="button" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`} onClick={handleLogout}>
-              Cerrar sesion
+              Cerrar sesión
             </button>
           </li>
         </ul>
@@ -192,7 +192,7 @@ export default function MyBranchesPage() {
               <div>
                 <h1 style={{ margin: "0 0 4px 0", fontSize: 28, fontWeight: 700, color: "var(--primary)" }}>Mis sucursales</h1>
                 <p className={styles.mutedText} style={{ margin: 0, fontSize: 13 }}>
-                  Administra todas las sucursales de tu empresa en un solo lugar
+                  Administra todas las sucursales de tu empresa en una vista centralizada
                 </p>
               </div>
               {profile && (

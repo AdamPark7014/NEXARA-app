@@ -1,5 +1,41 @@
 .contaRoot {
   min-height: 100vh;
+  align-items: flex-start;
+}
+
+.contaRoot :global(.sidebar) {
+  position: sticky;
+  top: var(--panel-padding-y);
+  max-height: calc(100vh - (var(--panel-padding-y) * 2));
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.contaRoot :global(.sidebarMenu) {
+  gap: 8px;
+}
+
+.contaRoot :global(.menuLink) {
+  min-height: 46px;
+  border: 1px solid transparent;
+}
+
+.contaRoot :global(.menuLink:hover),
+.contaRoot :global(.menuLink:focus-visible) {
+  border-color: var(--border-color, rgba(127, 127, 127, 0.28));
+  outline: none;
+}
+
+.contaRoot :global(.active) {
+  border-color: var(--border-color, rgba(127, 127, 127, 0.32));
+}
+
+.contaRoot :global(.consoleMain) {
+  min-width: 0;
+}
+
+.contaRoot :global(.consoleMain > *) {
+  min-width: 0;
 }
 
 .mobileTopbar,
@@ -14,24 +50,73 @@
     gap: 12px;
   }
 
+  .contaRoot :global(.sidebar) {
+    position: fixed;
+    top: auto;
+    max-height: none;
+    overflow-y: auto;
+  }
+
+  .contaRoot :global(.consoleMain) {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding: 14px 10px 18px;
+  }
+
+  .contaRoot :global(.consoleMain > *) {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .contaRoot :global(.consoleMain *) {
+    box-sizing: border-box;
+    min-width: 0;
+  }
+
+  .contaRoot :global(.consoleMain [class*="tableWrap"]),
+  .contaRoot :global(.consoleMain [class*="tableContainer"]),
+  .contaRoot :global(.consoleMain [class*="tableWrap"] *) {
+    max-width: 100%;
+  }
+
+  .contaRoot :global(.consoleMain [class*="tableWrap"]),
+  .contaRoot :global(.consoleMain [class*="tableContainer"]) {
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .contaRoot :global(.consoleMain img),
+  .contaRoot :global(.consoleMain object),
+  .contaRoot :global(.consoleMain iframe),
+  .contaRoot :global(.consoleMain video) {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .contaRoot :global(.consoleMain input),
+  .contaRoot :global(.consoleMain select),
+  .contaRoot :global(.consoleMain textarea),
+  .contaRoot :global(.consoleMain button) {
+    max-width: 100%;
+  }
+
   .mobileTopbar {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 12px;
-    padding: 12px 14px;
-    border-radius: 16px;
-    border: 1px solid rgba(15, 106, 214, 0.18);
-    background: linear-gradient(160deg, rgba(255, 255, 255, 0.95), rgba(232, 241, 255, 0.98));
-    box-shadow: 0 12px 26px rgba(11, 32, 68, 0.14);
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid var(--border-color, rgba(127, 127, 127, 0.2));
+    background: var(--card-bg, rgba(255, 255, 255, 0.85));
+    box-shadow: var(--shadow-md, 0 8px 18px rgba(0, 0, 0, 0.12));
+    backdrop-filter: blur(8px);
     position: sticky;
-    top: 10px;
+    top: 8px;
     z-index: 25;
-  }
-
-  :global(body.dark) .mobileTopbar {
-    background: linear-gradient(160deg, rgba(15, 22, 36, 0.98), rgba(8, 12, 22, 0.98));
-    border-color: rgba(23, 137, 252, 0.22);
-    box-shadow: 0 14px 28px rgba(4, 10, 18, 0.5);
   }
 
   .mobileMenuButton {
@@ -39,13 +124,13 @@
     flex-direction: column;
     justify-content: center;
     gap: 4px;
-    width: 42px;
+    width: 44px;
     height: 38px;
-    border-radius: 10px;
-    border: 1px solid rgba(15, 106, 214, 0.24);
-    background: rgba(15, 106, 214, 0.08);
+    border-radius: 9px;
+    border: 1px solid var(--border-color, rgba(127, 127, 127, 0.28));
+    background: var(--panel-bg-soft, rgba(255, 255, 255, 0.55));
     cursor: pointer;
-    padding: 0 10px;
+    padding: 0 9px;
   }
 
   .mobileMenuButton span {
@@ -76,25 +161,65 @@
     position: fixed;
     inset: 0;
     border: none;
-    background: rgba(4, 10, 18, 0.45);
+    background: rgba(0, 0, 0, 0.45);
     z-index: 34;
   }
 
   .contaSidebar {
     position: fixed;
-    top: 0;
-    left: 0;
-    height: 100vh;
-    width: min(86vw, 360px);
+    top: 64px;
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-height: calc(100dvh - 76px);
     margin: 0;
-    border-radius: 0 22px 22px 0;
-    transform: translateX(-110%);
-    transition: transform 0.22s ease;
+    border-radius: 14px;
+    transform: translateY(-6px) scale(0.995);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease;
     z-index: 35;
     overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: 8px;
   }
 
   .contaSidebarOpen {
-    transform: translateX(0);
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+  }
+
+  .contaRoot :global(.menuLink) {
+    min-height: 46px;
+    font-size: 0.94rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .contaRoot :global(.consoleMain) {
+    padding: 8px 6px 14px;
+  }
+
+  .mobileTopbar {
+    top: 6px;
+    border-radius: 12px;
+    padding: 9px 10px;
+  }
+
+  .mobileBrand :global(.brandMark) {
+    font-size: 1.05rem;
+  }
+
+  .mobileBrand :global(.brandSub) {
+    font-size: 0.58rem;
+    letter-spacing: 0.12rem;
+  }
+
+  .contaSidebar {
+    top: 58px;
+    left: 6px;
+    right: 6px;
+    max-height: calc(100dvh - 66px);
   }
 }

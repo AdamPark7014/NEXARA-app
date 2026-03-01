@@ -192,13 +192,13 @@ export default function BranchTicketsPage() {
         redirectTo={pathname || "/"}
         onBranchLogin={handleBranchLogin}
         title="Portal de sucursal"
-        subtitle="Acceso para levantar tickets de tu tienda"
+        subtitle="Acceso operativo para reportar solicitudes de servicio"
       />
     );
   }
 
   return (
-    <div className={consoleStyles.consoleLayout}>
+    <div className={`${consoleStyles.consoleLayout} ${styles.ticketsConsole}`}>
       <aside className={consoleStyles.sidebar}>
         <div className={consoleStyles.sidebarLogo}>
           <span className={consoleStyles.brandMark}>NEXARA</span>
@@ -209,24 +209,24 @@ export default function BranchTicketsPage() {
             <span className={consoleStyles.sidebarName}>{(profile?.name || session.branch.name).slice(0, 2).toUpperCase()}</span>
           </div>
           <div className={consoleStyles.sidebarName}>{profile?.name || session.branch.name}</div>
-          <div className={consoleStyles.sidebarEmail}>{profile?.client?.name || session.branch.clientName || "Cliente"}</div>
+          <div className={consoleStyles.sidebarEmail}>{profile?.client?.name || session.branch.clientName || "Cliente corporativo"}</div>
           <div className={consoleStyles.sidebarMeta}>
             <span className={consoleStyles.rolePill}>Sucursal</span>
           </div>
         </div>
-        <div className={consoleStyles.menuTitle}>Menu sucursal</div>
+        <div className={consoleStyles.menuTitle}>Centro operativo</div>
         <ul className={consoleStyles.sidebarMenu}>
           <li className={consoleStyles.sidebarMenuItem}>
             <button
               type="button"
               className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${consoleStyles.active}`}
             >
-              Levantar ticket
+              Nueva solicitud
             </button>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
             <button type="button" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`} onClick={handleLogout}>
-              Cerrar sesion
+              Cerrar sesión
             </button>
           </li>
         </ul>
@@ -234,14 +234,14 @@ export default function BranchTicketsPage() {
       <main className={consoleStyles.consoleMain}>
         <div className={styles.mainStack}>
           <div className={`card ${styles.cardSoft}`}>
-            <div style={{ fontWeight: 700 }}>Levantar ticket</div>
+            <p className={styles.sectionTitle}>Registrar solicitud</p>
             <div className={styles.mutedText}>
               Sucursal: {profile?.name || session.branch.name} {profile?.branchNumber ? `(${profile.branchNumber})` : ""}
             </div>
             <textarea
               className="input"
               rows={3}
-              placeholder="Descripcion del problema"
+              placeholder="Describe el problema o requerimiento"
               value={draft.description}
               onChange={(e) => setDraft((prev) => ({ ...prev, description: e.target.value }))}
             />
@@ -260,7 +260,7 @@ export default function BranchTicketsPage() {
               </div>
             </div>
             <ClientLocationPicker
-              label="Ubicacion del ticket"
+              label="Ubicación de la solicitud"
               value={{
                 address: draft.address,
                 placeId: draft.placeId,
@@ -306,7 +306,7 @@ export default function BranchTicketsPage() {
                 Seleccionar archivo
               </label>
               <div className={styles.mutedText} style={{ marginTop: 8 }}>
-                {files.length > 0 ? `${files.length} archivo(s) seleccionados` : "Ningun archivo seleccionado"}
+                {files.length > 0 ? `${files.length} archivo(s) seleccionados` : "Ningún archivo seleccionado"}
               </div>
             </div>
             {files.length > 0 && (
@@ -341,14 +341,14 @@ export default function BranchTicketsPage() {
               </div>
             )}
             <div className={styles.actionRow}>
-              <button className="button-primary" type="button" onClick={handleSubmit} disabled={loading}>Levantar ticket</button>
-              {error && <span style={{ color: "var(--danger)", fontSize: 12 }}>{error}</span>}
+              <button className="button-primary" type="button" onClick={handleSubmit} disabled={loading}>Enviar solicitud</button>
+              {error && <span className={styles.errorText}>{error}</span>}
             </div>
           </div>
 
           <div className={`card ${styles.cardSoft}`}>
-            <div style={{ fontWeight: 700 }}>Tickets enviados</div>
-            {requests.length === 0 && <div className={styles.mutedText}>No hay solicitudes aun.</div>}
+            <p className={styles.sectionTitle}>Solicitudes enviadas</p>
+            {requests.length === 0 && <div className={styles.mutedText}>No hay solicitudes registradas aún.</div>}
             {requests.map((request) => (
               <div key={request.id} className={styles.itemCard}>
                 <div className={styles.itemHeader}>

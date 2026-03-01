@@ -38,7 +38,7 @@
   --text-tertiary: #344560;
 }
 
-/* Light mode explicit (manual override - sol ☀️) */
+/* Light mode explicit override */
 body.light {
   --background: #f7f9fc;
   --foreground: #0b1220;
@@ -70,7 +70,7 @@ body.light {
   --surface-light: #eef3fb;
 }
 
-/* Dark mode explicit (manual override - luna 🌙) */
+/* Dark mode explicit override */
 body.dark {
   --background: #151518;
   --foreground: #ededed;
@@ -187,7 +187,7 @@ a {
   display: none;
 }
 
-/* Light mode explicit (switch manual - sol ☀️) */
+/* Light mode explicit switch */
 body.light .imgLight {
   display: unset;
 }
@@ -211,7 +211,7 @@ body.light .imgDark {
   }
 }
 
-/* Dark mode explicit (switch manual - luna 🌙) */
+/* Dark mode explicit switch */
 body.dark .imgLight {
   display: none;
 }
@@ -228,12 +228,12 @@ body.light html {
   color-scheme: light;
 }
 
-/* === MOBILE OPTIMIZATIONS - SUPER DYNAMIC === */
+/* === Mobile optimizations === */
 @media (max-width: 768px) {
   :root {
     --panel-gap: 8px;
-    --panel-padding-x: 18px;
-    --panel-padding-y: 18px;
+    --panel-padding-x: 14px;
+    --panel-padding-y: 14px;
   }
 
   /* Touch-friendly interactions */
@@ -262,35 +262,24 @@ body.light html {
 
   /* Card improvements */
   .card {
-    border-radius: 20px !important;
-    box-shadow: 0 8px 24px rgba(11, 18, 32, 0.12), 0 2px 8px rgba(11, 18, 32, 0.08) !important;
-    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
-  }
-
-  .card:active {
-    transform: scale(0.98) !important;
-    box-shadow: 0 4px 12px rgba(11, 18, 32, 0.15) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 6px 18px rgba(11, 18, 32, 0.1), 0 2px 6px rgba(11, 18, 32, 0.06) !important;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease !important;
   }
 
   /* Button improvements */
   .button,
   button:not(.unstyled) {
-    border-radius: 14px !important;
-    padding: 12px 20px !important;
+    border-radius: 12px !important;
+    padding: 11px 16px !important;
     font-size: 0.95rem !important;
     font-weight: 600 !important;
-    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
-    box-shadow: 0 4px 12px rgba(15, 106, 214, 0.15) !important;
-  }
-
-  .button:active,
-  button:not(.unstyled):active {
-    transform: translateY(2px) scale(0.98) !important;
-    box-shadow: 0 2px 6px rgba(15, 106, 214, 0.2) !important;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease !important;
+    box-shadow: 0 3px 8px rgba(15, 106, 214, 0.1) !important;
   }
 
   .button-primary {
-    background: linear-gradient(135deg, var(--primary), var(--primary-light)) !important;
+    background: var(--primary) !important;
   }
 
   .button-secondary {
@@ -302,11 +291,11 @@ body.light html {
   input,
   select,
   textarea {
-    border-radius: 12px !important;
-    padding: 12px 16px !important;
+    border-radius: 10px !important;
+    padding: 11px 14px !important;
     font-size: 0.95rem !important;
     border: 2px solid rgba(15, 106, 214, 0.2) !important;
-    transition: all 0.3s ease !important;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
   }
 
   input:focus,
@@ -314,7 +303,6 @@ body.light html {
   textarea:focus {
     border-color: var(--primary) !important;
     box-shadow: 0 0 0 4px rgba(15, 106, 214, 0.15) !important;
-    transform: scale(1.01) !important;
   }
 
   /* Table improvements */
@@ -323,21 +311,37 @@ body.light html {
   }
 
   table th {
-    padding: 12px 10px !important;
+    padding: 10px 8px !important;
     font-size: 0.85rem !important;
     position: sticky !important;
     top: 0 !important;
     z-index: 10 !important;
   }
 
-  table td {
-    padding: 10px 10px !important;
+
+@media (max-width: 480px) {
+  :root {
+    --panel-padding-x: 10px;
+    --panel-padding-y: 10px;
   }
 
-  /* Modal improvements */
-  .modal {
-    border-radius: 24px 24px 0 0 !important;
-    animation: slideUpModal 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  .card {
+    border-radius: 14px !important;
+  }
+
+  .button,
+  button:not(.unstyled) {
+    min-height: 42px !important;
+    font-size: 0.9rem !important;
+  }
+
+  table th,
+  table td {
+    padding: 9px 7px !important;
+  }
+}
+  table td {
+    padding: 10px 10px !important;
   }
 
   /* Badge improvements */
@@ -386,18 +390,6 @@ body.light html {
 
   table td {
     padding: 9px 8px !important;
-  }
-}
-
-/* Mobile Animations */
-@keyframes slideUpModal {
-  from {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
   }
 }
 

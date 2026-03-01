@@ -1,10 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-
 .page {
   display: grid;
   gap: 24px;
-  font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+  font-family: var(--font-geist-sans, "Segoe UI", sans-serif);
   padding: var(--panel-padding-y) var(--panel-padding-x);
+  width: 100%;
+  min-width: 0;
 }
 
 .header {
@@ -17,15 +17,14 @@
 
 .kicker {
   text-transform: uppercase;
-  letter-spacing: 0.32rem;
+  letter-spacing: 0.2rem;
   font-size: 0.7rem;
   color: var(--text-tertiary);
   margin: 0 0 8px;
 }
 
 .title {
-  font-family: 'Playfair Display', 'Times New Roman', serif;
-  font-size: 2.4rem;
+  font-size: clamp(1.7rem, 2.7vw, 2.35rem);
   margin: 0 0 6px;
   color: var(--foreground);
 }
@@ -40,6 +39,33 @@
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.periodButtons {
+  display: inline-flex;
+  gap: 6px;
+  border: 1px solid var(--border-color, rgba(127, 127, 127, 0.2));
+  border-radius: 999px;
+  padding: 4px;
+  background: var(--card-bg, rgba(255, 255, 255, 0.5));
+}
+
+.periodButton {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  cursor: pointer;
+  min-height: 36px;
+}
+
+.periodButtonActive {
+  background: var(--primary);
+  color: var(--button-text, #fff);
 }
 
 .filters {
@@ -60,17 +86,20 @@
   gap: 6px;
   color: var(--text-secondary);
   font-size: 0.85rem;
+  min-width: 180px;
 }
 
 .filterLabel {
   text-transform: uppercase;
-  letter-spacing: 0.18rem;
+  letter-spacing: 0.14rem;
   font-size: 0.65rem;
   color: var(--text-tertiary);
 }
 
 .primaryButton,
 .secondaryButton {
+  border: 0;
+  cursor: pointer;
   border-radius: 999px;
   padding: 10px 18px;
   font-weight: 600;
@@ -79,16 +108,29 @@
   align-items: center;
   justify-content: center;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  min-height: 42px;
+}
+
+.primaryButton:hover,
+.secondaryButton:hover {
+  transform: translateY(-1px);
+}
+
+.primaryButton:focus-visible,
+.secondaryButton:focus-visible,
+.periodButton:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .primaryButton {
-  background: linear-gradient(120deg, #0f6ad6, #16a96e);
-  color: #ffffff;
-  box-shadow: 0 12px 24px rgba(15, 106, 214, 0.3);
+  background: var(--primary);
+  color: var(--button-text, #fff);
 }
 
 .secondaryButton {
-  background: rgba(15, 106, 214, 0.12);
+  background: var(--card-bg, rgba(255, 255, 255, 0.6));
+  border: 1px solid var(--border-color, rgba(127, 127, 127, 0.2));
   color: var(--foreground);
 }
 
@@ -98,20 +140,20 @@
   gap: 16px;
 }
 
+.metricsGridCompact {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+}
+
 .metricCard {
   padding: 18px;
   border-radius: 20px;
-  border: 1px solid rgba(15, 106, 214, 0.16);
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.85), rgba(232, 241, 255, 0.95));
-  box-shadow: 0 14px 28px rgba(11, 32, 68, 0.14);
+  border: 1px solid var(--border-color, rgba(127, 127, 127, 0.2));
+  background: var(--card-bg, rgba(255, 255, 255, 0.74));
   display: grid;
   gap: 12px;
-}
-
-:global(body.dark) .metricCard {
-  background: linear-gradient(150deg, rgba(16, 22, 36, 0.95), rgba(8, 12, 22, 0.98));
-  border-color: rgba(23, 137, 252, 0.2);
-  box-shadow: 0 16px 30px rgba(3, 10, 20, 0.6);
+  min-height: 132px;
 }
 
 .metricLabel {
@@ -122,7 +164,7 @@
 }
 
 .metricValue {
-  font-size: 1.9rem;
+  font-size: clamp(1.3rem, 2.5vw, 1.8rem);
   font-weight: 700;
   margin: 0;
   color: var(--foreground);
@@ -143,15 +185,9 @@
 .panelCard {
   padding: 20px;
   border-radius: 22px;
-  border: 1px solid rgba(15, 106, 214, 0.16);
-  background: linear-gradient(170deg, rgba(255, 255, 255, 0.86), rgba(235, 243, 255, 0.95));
-  box-shadow: 0 16px 30px rgba(11, 32, 68, 0.14);
-}
-
-:global(body.dark) .panelCard {
-  background: linear-gradient(170deg, rgba(16, 22, 36, 0.96), rgba(8, 12, 22, 0.98));
-  border-color: rgba(23, 137, 252, 0.2);
-  box-shadow: 0 16px 30px rgba(3, 10, 20, 0.6);
+  border: 1px solid var(--border-color, rgba(127, 127, 127, 0.2));
+  background: var(--card-bg, rgba(255, 255, 255, 0.75));
+  min-width: 0;
 }
 
 .cardHeader {
@@ -177,7 +213,7 @@
 .badge {
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(15, 106, 214, 0.12);
+  background: var(--primary-soft, rgba(127, 127, 127, 0.12));
   color: var(--primary);
   font-size: 0.75rem;
   font-weight: 600;
@@ -194,13 +230,9 @@
   gap: 14px;
   padding: 12px 14px;
   border-radius: 16px;
-  border: 1px solid rgba(15, 106, 214, 0.12);
-  background: rgba(255, 255, 255, 0.7);
-}
-
-:global(body.dark) .activityItem {
-  background: rgba(10, 16, 26, 0.65);
-  border-color: rgba(23, 137, 252, 0.18);
+  border: 1px solid var(--border-color, rgba(127, 127, 127, 0.2));
+  background: var(--panel-bg-soft, rgba(255, 255, 255, 0.5));
+  min-width: 0;
 }
 
 .activityLabel {
@@ -220,6 +252,7 @@
   margin: 0;
   color: var(--text-secondary);
   font-size: 0.85rem;
+  word-break: break-word;
 }
 
 .miniChart {
@@ -239,18 +272,86 @@
   min-width: 80px;
 }
 
+.header > div:first-child,
+.cardHeader > div {
+  min-width: 0;
+}
+
+.title,
+.subtitle,
+.cardTitle,
+.cardSubtitle,
+.activityTitle {
+  overflow-wrap: anywhere;
+}
+
 .barTrack {
   flex: 1;
   height: 10px;
   border-radius: 999px;
-  background: rgba(15, 106, 214, 0.1);
+  background: var(--primary-soft, rgba(127, 127, 127, 0.12));
   overflow: hidden;
 }
 
 .barFill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(120deg, #0f6ad6, #16a96e);
+  background: var(--primary);
+}
+
+.sectionBlock {
+  margin-top: 16px;
+}
+
+.error {
+  margin: 0;
+  color: var(--danger, #c0392b);
+  font-size: 0.92rem;
+}
+
+.warningBox {
+  border: 1px solid var(--warning-border, rgba(235, 143, 0, 0.35));
+  background: var(--warning-bg, rgba(235, 143, 0, 0.08));
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.warningTitle {
+  margin: 0 0 6px;
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.warningList {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.integrationList {
+  display: grid;
+  gap: 10px;
+}
+
+.integrationItem {
+  border: 1px solid var(--border-color, rgba(127, 127, 127, 0.2));
+  border-radius: 14px;
+  padding: 12px;
+  background: var(--panel-bg-soft, rgba(255, 255, 255, 0.45));
+}
+
+.integrationTitle {
+  margin: 0 0 4px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.integrationMeta {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
 }
 
 @media (max-width: 1100px) {
@@ -258,13 +359,107 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .metricsGridCompact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .grid {
     grid-template-columns: 1fr;
+  }
+
+  .cardHeader {
+    align-items: flex-start;
   }
 }
 
 @media (max-width: 720px) {
+  .page {
+    gap: 16px;
+  }
+
+  .header {
+    gap: 12px;
+  }
+
+  .subtitle {
+    max-width: 100%;
+    font-size: 0.93rem;
+  }
+
+  .actions {
+    width: 100%;
+  }
+
+  .actions .primaryButton,
+  .actions .secondaryButton {
+    flex: 1;
+    min-width: 132px;
+  }
+
+  .filters {
+    align-items: stretch;
+  }
+
+  .filterMeta {
+    font-size: 0.86rem;
+  }
+
+  .periodButtons {
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .periodButton {
+    flex: 1;
+    min-width: 92px;
+  }
+
+  .filterControl {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .filterControl :global(select),
+  .filterControl :global(.input) {
+    width: 100%;
+    min-height: 42px;
+  }
+
+  .panelCard {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .cardHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .activityItem {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .activityItem > p.activityMeta {
+    align-self: flex-start;
+  }
+
+  .barLabel {
+    min-width: 72px;
+    font-size: 0.76rem;
+  }
+
+  .integrationItem {
+    padding: 10px;
+  }
+
   .metricsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .metricsGridCompact {
     grid-template-columns: 1fr;
   }
 }

@@ -15,13 +15,13 @@ export default function ContabilidadLayout({ children }: { children: React.React
   const currentPath = pathname ? pathname.replace(/\/+$/, "") : "";
 
   const navItems = [
-    { label: "Dashboard", href: "/dashboard" },
-    { label: "Viaticos", href: "/viaticos" },
-    { label: "Multas", href: "/multas" },
-    { label: "Horas", href: "/horas" },
-    { label: "Pagos", href: "/pagos" },
-    { label: "Proyectos", href: "/proyectos" },
-    { label: "Capital", href: "/capital" },
+    { label: "Resumen ejecutivo", href: "/dashboard" },
+    { label: "Viáticos", href: "/viaticos" },
+    { label: "Multas y sanciones", href: "/multas" },
+    { label: "Control de horas", href: "/horas" },
+    { label: "Pagos y dispersión", href: "/pagos" },
+    { label: "Proyectos y costos", href: "/proyectos" },
+    { label: "Capital y liquidez", href: "/capital" },
   ];
 
   useEffect(() => {
@@ -36,21 +36,22 @@ export default function ContabilidadLayout({ children }: { children: React.React
   return (
     <div className={`${consoleStyles.consoleLayout} ${styles.contaRoot}`}>
       <header className={styles.mobileTopbar}>
+        <div className={`${styles.mobileBrand} ${consoleStyles.sidebarLogo}`}>
+          <span className={consoleStyles.brandMark}>NEXARA</span>
+          <span className={consoleStyles.brandSub}>Contabilidad</span>
+        </div>
         <button
           type="button"
           className={`${consoleStyles.hamburgerButton} ${mobileMenuOpen ? consoleStyles.hamburgerActive : ""}`}
           onClick={() => setMobileMenuOpen((prev) => !prev)}
-          aria-label={mobileMenuOpen ? "Cerrar menu" : "Abrir menu"}
+          aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
           aria-expanded={mobileMenuOpen}
+          aria-controls="conta-mobile-menu"
         >
           <span className={consoleStyles.hamburgerLine} />
           <span className={consoleStyles.hamburgerLine} />
           <span className={consoleStyles.hamburgerLine} />
         </button>
-        <div className={`${styles.mobileBrand} ${consoleStyles.sidebarLogo}`}>
-          <span className={consoleStyles.brandMark}>NEXARA</span>
-          <span className={consoleStyles.brandSub}>Contabilidad</span>
-        </div>
       </header>
 
       {mobileMenuOpen && (
@@ -58,11 +59,11 @@ export default function ContabilidadLayout({ children }: { children: React.React
           type="button"
           className={styles.mobileBackdrop}
           onClick={() => setMobileMenuOpen(false)}
-          aria-label="Cerrar menu"
+          aria-label="Cerrar menú"
         />
       )}
 
-      <aside className={`${consoleStyles.sidebar} ${styles.contaSidebar} ${mobileMenuOpen ? styles.contaSidebarOpen : ""}`}>
+      <aside id="conta-mobile-menu" className={`${consoleStyles.sidebar} ${styles.contaSidebar} ${mobileMenuOpen ? styles.contaSidebarOpen : ""}`}>
         <div className={consoleStyles.sidebarLogo}>
           <span className={consoleStyles.brandMark}>NEXARA</span>
           <span className={consoleStyles.brandSub}>Contabilidad</span>
@@ -73,13 +74,13 @@ export default function ContabilidadLayout({ children }: { children: React.React
             <span className={consoleStyles.sidebarName}>CO</span>
           </div>
           <div className={consoleStyles.sidebarName}>Panel Contabilidad</div>
-          <div className={consoleStyles.sidebarEmail}>Administración financiera</div>
+          <div className={consoleStyles.sidebarEmail}>Dirección financiera corporativa</div>
           <div className={consoleStyles.sidebarMeta}>
             <span className={consoleStyles.rolePill}>Contabilidad</span>
           </div>
         </div>
 
-        <div className={consoleStyles.menuTitle}>Menu contable</div>
+        <div className={consoleStyles.menuTitle}>Centro de control</div>
         <ul className={consoleStyles.sidebarMenu}>
           {navItems.map((item, index) => {
             const itemPath = item.href.replace(/\/+$/, "");
@@ -104,7 +105,7 @@ export default function ContabilidadLayout({ children }: { children: React.React
               onClick={toggleDarkMode}
               aria-label={darkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
             >
-              {darkMode ? "☀️ Modo Claro" : "🌙 Modo Oscuro"}
+              {darkMode ? "Cambiar a vista clara" : "Cambiar a vista oscura"}
             </button>
           </li>
         </ul>

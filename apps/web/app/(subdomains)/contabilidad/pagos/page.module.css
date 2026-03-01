@@ -149,6 +149,22 @@
   min-width: 940px;
 }
 
+@media (max-width: 900px) {
+  .tableWrap :global(.table) {
+    min-width: 760px;
+  }
+}
+
+@media (max-width: 640px) {
+  .tableWrap :global(.table) {
+    min-width: 620px;
+  }
+
+  .tableCard {
+    padding: 14px;
+  }
+}
+
 .metaText {
   color: var(--text-tertiary);
   font-size: 0.8rem;

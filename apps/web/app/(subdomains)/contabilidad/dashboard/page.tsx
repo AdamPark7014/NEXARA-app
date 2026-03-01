@@ -4,58 +4,18 @@ import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
+import {
+  getUnifiedContabilidadSnapshot,
+  type AttendanceRangeSummary,
+  type ContabilidadPeriod,
+  type ExpenseRecord,
+  type FineRecord,
+  type UnifiedContabilidadSnapshot,
+  type VehiclePenaltyRecord,
+  type ViaticRecord,
+  type WorkProjectRecord,
+} from "@/lib/contabilidad-api";
 import styles from "./page.module.css";
-
-type Viatic = {
-  id: number;
-  usuarioId?: number | null;
-  montoSolicitado?: number | null;
-  estatusPago?: string | null;
-  razonGasto?: string | null;
-  createdAt?: string | null;
-  usuario?: { id?: number; nombre: string } | null;
-};
-
-type Vehicle = {
-  id: number;
-  solicitanteId?: number | null;
-  penalizacionMonto?: number | null;
-  penalizacionNotas?: string | null;
-  estatusAprobacion?: string | null;
-  fechaInicio?: string | null;
-  fechaSolicitud?: string | null;
-  createdAt?: string | null;
-  solicitante?: { id?: number; nombre: string } | null;
-  vehiculo?: { nombre?: string | null; placas?: string | null } | null;
-};
-
-type AttendanceSummary = {
-  totalMinutesAll?: number;
-  totalUsers?: number;
-  rangeEnd?: string;
-  users?: {
-    userId: number;
-    userName?: string;
-    totalMinutes?: number;
-    attendances?: { type: string; timestamp: string }[];
-  }[];
-};
-
-type Project = {
-  id: number;
-  title: string;
-  clientName?: string | null;
-  status?: string | null;
-  budgetTotal?: string | number | null;
-  budgetUsed?: string | number | null;
-  createdAt?: string | null;
-};
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(
-  /[\/.]+$/,
-  ""
-);
-const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("es-MX", {
@@ -67,32 +27,70 @@ const formatCurrency = (value: number) =>
 const formatDate = (value?: string | null) =>
   value ? new Date(value).toLocaleDateString("es-MX") : "";
 
+const getDateRange = (period: ContabilidadPeriod) => {
+  const now = new Date();
+  const start = new Date(now);
+  const end = new Date(now);
+
+  if (period === "week") {
+    const dayOfWeek = (now.getDay() + 6) % 7;
+    start.setDate(now.getDate() - dayOfWeek);
+  } else if (period === "month") {
+    start.setDate(1);
+  } else {
+    start.setMonth(0, 1);
+  }
+
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+
+  return {
+    start,
+    end,
+    from: start.toISOString().slice(0, 10),
+    to: end.toISOString().slice(0, 10),
+  };
+};
+
+const parseAmount = (value?: string | number | null) => {
+  if (value === null || value === undefined || value === "") return 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 export default function ContabilidadDashboard() {
   const { user } = useUser();
-  const [viatics, setViatics] = useState<Viatic[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [attendance, setAttendance] = useState<AttendanceSummary | null>(null);
+  const [snapshot, setSnapshot] = useState<UnifiedContabilidadSnapshot | null>(null);
+  const [period, setPeriod] = useState<ContabilidadPeriod>("month");
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [refreshSeed, setRefreshSeed] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const weekRange = useMemo(() => {
-    const now = new Date();
-    const dayOfWeek = (now.getDay() + 6) % 7;
-    const start = new Date(now);
-    start.setDate(now.getDate() - dayOfWeek);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    end.setHours(23, 59, 59, 999);
+  const range = useMemo(() => getDateRange(period), [period]);
+
+  const attendance = useMemo<AttendanceRangeSummary | null>(() => {
+    if (!snapshot?.attendance) return null;
+    if (snapshot.attendance.users?.length) return snapshot.attendance;
+    if (!user?.id) return snapshot.attendance;
+
+    const asIndividualPayload = snapshot.attendance as AttendanceRangeSummary & { totalMinutes?: number };
+    const totalMinutes = asIndividualPayload.totalMinutes || asIndividualPayload.totalMinutesAll || 0;
+
     return {
-      start,
-      end,
-      from: start.toISOString().slice(0, 10),
-      to: end.toISOString().slice(0, 10),
+      totalMinutesAll: totalMinutes,
+      totalUsers: 1,
+      rangeEnd: snapshot.attendance.rangeEnd || range.to,
+      users: [
+        {
+          userId: user.id,
+          userName: user.nombre,
+          totalMinutes,
+        },
+      ],
     };
-  }, []);
+  }, [snapshot, user?.id, user?.nombre, range.to]);
 
   useEffect(() => {
     if (user?.id && selectedUserId === null) {
@@ -107,52 +105,18 @@ export default function ContabilidadDashboard() {
       setLoading(true);
       setError(null);
       try {
-        const headers = { Authorization: `Bearer ${user.token}` };
-        const rangeParams = new URLSearchParams({
-          from: weekRange.from,
-          to: weekRange.to,
-        });
-
         const canManageAttendance = hasPermission(user, PERMISSIONS.ATTENDANCE_MANAGE);
         const canViewAttendance = hasPermission(user, PERMISSIONS.ATTENDANCE_VIEW);
 
-        const [viaticsRes, vehiclesRes, attendanceRes, projectsRes] = await Promise.all([
-          fetch(buildApiUrl("viatics"), { headers }),
-          fetch(buildApiUrl("vehicles"), { headers }),
-          canManageAttendance
-            ? fetch(buildApiUrl(`attendance/hierarchy/range?${rangeParams.toString()}`), { headers })
-            : canViewAttendance
-              ? fetch(buildApiUrl(`attendance/range?${rangeParams.toString()}`), { headers })
-              : Promise.resolve(null),
-          fetch(buildApiUrl("work-projects"), { headers }),
-        ]);
+        const data = await getUnifiedContabilidadSnapshot(user.token, {
+          from: range.from,
+          to: range.to,
+          period,
+          canManageAttendance,
+          canViewAttendance,
+        });
 
-        const viaticsData = viaticsRes.ok ? ((await viaticsRes.json()) as Viatic[]) : [];
-        const vehiclesData = vehiclesRes.ok ? ((await vehiclesRes.json()) as Vehicle[]) : [];
-        const attendancePayload = attendanceRes && attendanceRes.ok ? await attendanceRes.json() : null;
-        const projectsData = projectsRes.ok ? ((await projectsRes.json()) as Project[]) : [];
-
-        setViatics(Array.isArray(viaticsData) ? viaticsData : []);
-        setVehicles(Array.isArray(vehiclesData) ? vehiclesData : []);
-        if (canManageAttendance && attendancePayload) {
-          setAttendance(attendancePayload);
-        } else if (attendancePayload && user?.id) {
-          setAttendance({
-            totalMinutesAll: attendancePayload.totalMinutes || 0,
-            totalUsers: 1,
-            rangeEnd: weekRange.to,
-            users: [
-              {
-                userId: user.id,
-                userName: user.nombre,
-                totalMinutes: attendancePayload.totalMinutes || 0,
-              },
-            ],
-          });
-        } else {
-          setAttendance(null);
-        }
-        setProjects(Array.isArray(projectsData) ? projectsData : []);
+        setSnapshot(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Error desconocido");
       } finally {
@@ -161,7 +125,13 @@ export default function ContabilidadDashboard() {
     };
 
     fetchAll();
-  }, [user, weekRange.from, weekRange.to]);
+  }, [user, range.from, range.to, period, refreshSeed]);
+
+  const viatics = snapshot?.viatics || [];
+  const vehicles = snapshot?.vehicles || [];
+  const projects = snapshot?.workProjects || [];
+  const expenses = snapshot?.expenses || [];
+  const fines = snapshot?.fines || [];
 
   const activeUserId = selectedUserId ?? user?.id ?? null;
 
@@ -169,7 +139,7 @@ export default function ContabilidadDashboard() {
     if (!value) return false;
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return false;
-    return date >= weekRange.start && date <= weekRange.end;
+    return date >= range.start && date <= range.end;
   };
 
   const filteredViatics = useMemo(() => {
@@ -179,7 +149,7 @@ export default function ContabilidadDashboard() {
       const userId = item.usuario?.id ?? item.usuarioId ?? null;
       return userId === activeUserId;
     });
-  }, [viatics, activeUserId, weekRange.start, weekRange.end]);
+  }, [viatics, activeUserId, range.start, range.end]);
 
   const filteredVehicles = useMemo(() => {
     return vehicles.filter((item) => {
@@ -189,11 +159,19 @@ export default function ContabilidadDashboard() {
       const userId = item.solicitante?.id ?? item.solicitanteId ?? null;
       return userId === activeUserId;
     });
-  }, [vehicles, activeUserId, weekRange.start, weekRange.end]);
+  }, [vehicles, activeUserId, range.start, range.end]);
 
   const filteredProjects = useMemo(() => {
     return projects.filter((item) => isWithinWeek(item.createdAt));
-  }, [projects, weekRange.start, weekRange.end]);
+  }, [projects, range.start, range.end]);
+
+  const filteredExpenses = useMemo(() => {
+    return expenses.filter((item) => isWithinWeek(item.createdAt));
+  }, [expenses, range.start, range.end]);
+
+  const filteredFines = useMemo(() => {
+    return fines.filter((item) => isWithinWeek(item.createdAt));
+  }, [fines, range.start, range.end]);
 
   const viaticTotals = useMemo(() => {
     const total = filteredViatics.reduce((sum, item) => sum + (item.montoSolicitado || 0), 0);
@@ -202,16 +180,42 @@ export default function ContabilidadDashboard() {
     return { total, pending, approved };
   }, [filteredViatics]);
 
+  const expenseTotals = useMemo(() => {
+    const total = filteredExpenses.reduce(
+      (sum, item) => sum + parseAmount(item.amount ?? item.monto),
+      0,
+    );
+    return { total, records: filteredExpenses.length };
+  }, [filteredExpenses]);
+
   const penalties = useMemo(() => {
     const list = filteredVehicles.filter((item) => (item.penalizacionMonto || 0) > 0);
     const total = list.reduce((sum, item) => sum + (item.penalizacionMonto || 0), 0);
     return { list, total };
   }, [filteredVehicles]);
 
+  const fineTotals = useMemo(() => {
+    const total = filteredFines.reduce(
+      (sum, item) => sum + parseAmount(item.amount ?? item.monto),
+      0,
+    );
+    return { total, records: filteredFines.length };
+  }, [filteredFines]);
+
+  const projectBudget = useMemo(() => {
+    const total = filteredProjects.reduce((sum, item) => sum + parseAmount(item.budgetTotal), 0);
+    const used = filteredProjects.reduce((sum, item) => sum + parseAmount(item.budgetUsed), 0);
+    return {
+      total,
+      used,
+      utilization: total > 0 ? (used / total) * 100 : 0,
+    };
+  }, [filteredProjects]);
+
   const totalHours = useMemo(() => {
     const rangeEnd = attendance?.rangeEnd
       ? new Date(`${attendance.rangeEnd}T23:59:59`)
-      : weekRange.end;
+      : range.end;
 
     const users = attendance?.users || [];
     const scopedUsers = users.length && activeUserId
@@ -258,7 +262,69 @@ export default function ContabilidadDashboard() {
     }, 0);
 
     return Math.round((fallbackMinutes / 60) * 10) / 10;
-  }, [attendance, activeUserId, weekRange.end]);
+  }, [attendance, activeUserId, range.end]);
+
+  const commercialTotals = useMemo(() => {
+    const revenue = snapshot?.salesMetrics?.totalRevenue || 0;
+    const pipeline = snapshot?.salesMetrics?.pipelineValue || 0;
+    const margin = snapshot?.salesMetrics?.averageMargin || 0;
+    return { revenue, pipeline, margin };
+  }, [snapshot?.salesMetrics]);
+
+  const consolidatedOutflow = useMemo(() => {
+    return viaticTotals.total + penalties.total + expenseTotals.total + fineTotals.total;
+  }, [viaticTotals.total, penalties.total, expenseTotals.total, fineTotals.total]);
+
+  const executiveScore = useMemo(() => {
+    const coverage = consolidatedOutflow > 0 ? (commercialTotals.revenue / consolidatedOutflow) * 100 : 100;
+    const marginScore = Math.min(100, Math.max(0, commercialTotals.margin * 2));
+    const utilizationPenalty = Math.min(35, projectBudget.utilization * 0.35);
+    const finePenalty = Math.min(20, fineTotals.total > 0 ? (fineTotals.total / Math.max(consolidatedOutflow, 1)) * 100 : 0);
+    return Math.round(Math.max(0, Math.min(100, coverage * 0.4 + marginScore * 0.3 + (100 - utilizationPenalty) * 0.2 + (100 - finePenalty) * 0.1)));
+  }, [commercialTotals.revenue, commercialTotals.margin, consolidatedOutflow, projectBudget.utilization, fineTotals.total]);
+
+  const riskAlerts = useMemo(() => {
+    const alerts: Array<{ id: string; title: string; detail: string; level: "high" | "medium" | "low" }> = [];
+
+    if (commercialTotals.revenue > 0 && consolidatedOutflow > commercialTotals.revenue) {
+      alerts.push({
+        id: "cashflow-negative",
+        title: "Flujo operativo en presión",
+        detail: "El egreso operativo actual supera el ingreso registrado por ventas en el período.",
+        level: "high",
+      });
+    }
+
+    if (projectBudget.utilization > 85) {
+      alerts.push({
+        id: "budget-utilization",
+        title: "Uso de presupuesto elevado",
+        detail: `La utilización del presupuesto de proyectos está en ${projectBudget.utilization.toFixed(1)}%.`,
+        level: "medium",
+      });
+    }
+
+    if (viaticTotals.pending > 0) {
+      alerts.push({
+        id: "viatics-pending",
+        title: "Viáticos pendientes por validar",
+        detail: `${viaticTotals.pending} solicitudes requieren resolución para evitar arrastre de gasto.`,
+        level: "medium",
+      });
+    }
+
+    const insightsRisk = snapshot?.salesInsights?.riskAlerts || [];
+    insightsRisk.slice(0, 2).forEach((item, index) => {
+      alerts.push({
+        id: `sales-risk-${index}`,
+        title: "Riesgo comercial",
+        detail: item.message,
+        level: item.level,
+      });
+    });
+
+    return alerts.slice(0, 5);
+  }, [commercialTotals.revenue, consolidatedOutflow, projectBudget.utilization, viaticTotals.pending, snapshot?.salesInsights?.riskAlerts]);
 
   const latestViatics = useMemo(() => {
     return [...filteredViatics]
@@ -272,38 +338,89 @@ export default function ContabilidadDashboard() {
       .slice(0, 3);
   }, [filteredProjects]);
 
+  const movementFeed = useMemo(() => {
+    const viaticMovements = latestViatics.map((item) => ({
+      key: `viatic-${item.id}`,
+      kind: "Viático",
+      title: item.razonGasto || "Solicitud sin descripción",
+      meta: `${item.usuario?.nombre || "Sin usuario"} · ${formatCurrency(item.montoSolicitado || 0)}`,
+      date: item.createdAt || null,
+    }));
+
+    const penaltyMovements = penalties.list.slice(0, 2).map((item) => ({
+      key: `penalty-${item.id}`,
+      kind: "Multa vehículo",
+      title: `${item.vehiculo?.nombre || "Vehículo"}${item.vehiculo?.placas ? ` (${item.vehiculo.placas})` : ""}`,
+      meta: `${item.solicitante?.nombre || "Sin responsable"} · ${formatCurrency(item.penalizacionMonto || 0)}`,
+      date: item.fechaInicio || item.fechaSolicitud || item.createdAt || null,
+    }));
+
+    const expenseMovements = filteredExpenses.slice(0, 2).map((item) => ({
+      key: `expense-${item.id}`,
+      kind: "Gasto",
+      title: item.concepto || item.category || "Egreso operativo",
+      meta: formatCurrency(parseAmount(item.amount ?? item.monto)),
+      date: item.createdAt || null,
+    }));
+
+    return [...viaticMovements, ...penaltyMovements, ...expenseMovements]
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
+      .slice(0, 6);
+  }, [latestViatics, penalties.list, filteredExpenses]);
+
   const capitalMax = useMemo(() => {
-    return Math.max(viaticTotals.total, penalties.total, totalHours);
-  }, [viaticTotals.total, penalties.total, totalHours]);
+    return Math.max(viaticTotals.total, penalties.total, expenseTotals.total, fineTotals.total, 1);
+  }, [viaticTotals.total, penalties.total, expenseTotals.total, fineTotals.total]);
 
   const toCapitalPercent = (value: number) => {
     if (!capitalMax) return 0;
     return Math.min(100, Math.round((value / capitalMax) * 100));
   };
 
+  const periodLabel = period === "week" ? "Semana" : period === "month" ? "Mes" : "Año";
+
   return (
     <section className={styles.page}>
       <header className={styles.header}>
         <div>
-          <p className={styles.kicker}>Panel Contable</p>
-          <h1 className={styles.title}>Dashboard financiero</h1>
+          <p className={styles.kicker}>Panel Contable Corporativo</p>
+          <h1 className={styles.title}>Tablero financiero integrado</h1>
           <p className={styles.subtitle}>
-            Controla viaticos, multas, horas trabajadas y salud financiera en una sola vista.
+            Integra contabilidad, operación y ventas para decisiones financieras claras y oportunas.
           </p>
         </div>
         <div className={styles.actions}>
-          <Link className={styles.primaryButton} href="/viaticos">
-            Revisar viaticos
+          <button
+            type="button"
+            className={styles.primaryButton}
+            onClick={() => setRefreshSeed((prev) => prev + 1)}
+          >
+            Actualizar información
+          </button>
+          <Link className={styles.secondaryButton} href="/pagos">
+            Revisar pagos
           </Link>
-          <Link className={styles.secondaryButton} href="/capital">
-            Ajustar capital
+          <Link className={styles.secondaryButton} href="/proyectos">
+            Revisar proyectos
           </Link>
         </div>
       </header>
 
       <div className={styles.filters}>
         <div className={styles.filterMeta}>
-          Semana actual: {formatDate(weekRange.from)} - {formatDate(weekRange.to)}
+          {periodLabel} actual: {formatDate(range.from)} - {formatDate(range.to)} · Última actualización {formatDate(snapshot?.generatedAt)}
+        </div>
+        <div className={styles.periodButtons}>
+          {(["week", "month", "year"] as const).map((key) => (
+            <button
+              key={key}
+              type="button"
+              className={`${styles.periodButton} ${period === key ? styles.periodButtonActive : ""}`}
+              onClick={() => setPeriod(key)}
+            >
+              {key === "week" ? "Semana" : key === "month" ? "Mes" : "Año"}
+            </button>
+          ))}
         </div>
         {hasPermission(user, PERMISSIONS.ATTENDANCE_MANAGE) && attendance?.users?.length ? (
           <label className={styles.filterControl}>
@@ -323,11 +440,44 @@ export default function ContabilidadDashboard() {
         ) : null}
       </div>
 
-      {error && <p>{error}</p>}
+      {error && <p className={styles.error}>{error}</p>}
+      {!!snapshot?.warnings.length && (
+        <div className={styles.warningBox}>
+          <p className={styles.warningTitle}>Fuentes con disponibilidad parcial</p>
+          <ul className={styles.warningList}>
+            {snapshot.warnings.slice(0, 4).map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className={styles.metricsGrid}>
         <div className={styles.metricCard}>
-          <p className={styles.metricLabel}>Viaticos activos</p>
+          <p className={styles.metricLabel}>Ingresos de ventas</p>
+          <h2 className={styles.metricValue}>{formatCurrency(commercialTotals.revenue)}</h2>
+          <p className={styles.metricMeta}>Pipeline comercial: {formatCurrency(commercialTotals.pipeline)}</p>
+        </div>
+        <div className={styles.metricCard}>
+          <p className={styles.metricLabel}>Egreso consolidado</p>
+          <h2 className={styles.metricValue}>{formatCurrency(consolidatedOutflow)}</h2>
+          <p className={styles.metricMeta}>Viáticos, multas, gastos y sanciones del periodo</p>
+        </div>
+        <div className={styles.metricCard}>
+          <p className={styles.metricLabel}>Índice de salud financiera</p>
+          <h2 className={styles.metricValue}>{executiveScore}/100</h2>
+          <p className={styles.metricMeta}>Margen promedio de ventas: {commercialTotals.margin.toFixed(1)}%</p>
+        </div>
+        <div className={styles.metricCard}>
+          <p className={styles.metricLabel}>Presupuesto proyectos</p>
+          <h2 className={styles.metricValue}>{projectBudget.utilization.toFixed(1)}%</h2>
+          <p className={styles.metricMeta}>Usado {formatCurrency(projectBudget.used)} de {formatCurrency(projectBudget.total)}</p>
+        </div>
+      </div>
+
+      <div className={styles.metricsGridCompact}>
+        <div className={styles.metricCard}>
+          <p className={styles.metricLabel}>Viáticos activos</p>
           <h2 className={styles.metricValue}>{formatCurrency(viaticTotals.total)}</h2>
           <p className={styles.metricMeta}>
             {viaticTotals.pending} pendientes · {viaticTotals.approved} aprobados
@@ -336,19 +486,24 @@ export default function ContabilidadDashboard() {
         <div className={styles.metricCard}>
           <p className={styles.metricLabel}>Multas registradas</p>
           <h2 className={styles.metricValue}>{formatCurrency(penalties.total)}</h2>
-          <p className={styles.metricMeta}>{penalties.list.length} cargos recientes</p>
+          <p className={styles.metricMeta}>{penalties.list.length} cargos recientes de vehículos</p>
+        </div>
+        <div className={styles.metricCard}>
+          <p className={styles.metricLabel}>Gasto operativo</p>
+          <h2 className={styles.metricValue}>{formatCurrency(expenseTotals.total)}</h2>
+          <p className={styles.metricMeta}>{expenseTotals.records} movimientos registrados</p>
+        </div>
+        <div className={styles.metricCard}>
+          <p className={styles.metricLabel}>Multas generales</p>
+          <h2 className={styles.metricValue}>{formatCurrency(fineTotals.total)}</h2>
+          <p className={styles.metricMeta}>{fineTotals.records} incidencias económicas</p>
         </div>
         <div className={styles.metricCard}>
           <p className={styles.metricLabel}>Horas trabajadas</p>
           <h2 className={styles.metricValue}>{totalHours} h</h2>
           <p className={styles.metricMeta}>
-            {attendance?.users?.length ? `${attendance.users.length} usuarios` : "Sin permisos"}
+            {attendance?.users?.length ? `${attendance.users.length} colaboradores` : "Sin permisos de asistencia"}
           </p>
-        </div>
-        <div className={styles.metricCard}>
-          <p className={styles.metricLabel}>Proyectos activos</p>
-          <h2 className={styles.metricValue}>{filteredProjects.length}</h2>
-          <p className={styles.metricMeta}>En seguimiento contable</p>
         </div>
       </div>
 
@@ -356,41 +511,25 @@ export default function ContabilidadDashboard() {
         <div className={styles.panelCard}>
           <div className={styles.cardHeader}>
             <div>
-              <h3 className={styles.cardTitle}>Movimientos recientes</h3>
+              <h3 className={styles.cardTitle}>Movimientos consolidados</h3>
               <p className={styles.cardSubtitle}>
-                Lo ultimo en viaticos y multas para reaccionar rapido.
+                Eventos consolidados entre contabilidad operativa, multas y gastos.
               </p>
             </div>
-            <span className={styles.badge}>{latestViatics.length + penalties.list.length} items</span>
+            <span className={styles.badge}>{movementFeed.length} eventos</span>
           </div>
           <div className={styles.activityList}>
-            {latestViatics.map((item) => (
-              <div key={`viatic-${item.id}`} className={styles.activityItem}>
+            {movementFeed.map((item) => (
+              <div key={item.key} className={styles.activityItem}>
                 <div>
-                  <span className={styles.activityLabel}>Viatico</span>
-                  <p className={styles.activityTitle}>{item.razonGasto || "Sin descripcion"}</p>
-                  <p className={styles.activityMeta}>
-                    {item.usuario?.nombre || "Sin usuario"} · {formatCurrency(item.montoSolicitado || 0)}
-                  </p>
+                  <span className={styles.activityLabel}>{item.kind}</span>
+                  <p className={styles.activityTitle}>{item.title}</p>
+                  <p className={styles.activityMeta}>{item.meta}</p>
                 </div>
-                <p className={styles.activityMeta}>{formatDate(item.createdAt)}</p>
+                <p className={styles.activityMeta}>{formatDate(item.date)}</p>
               </div>
             ))}
-            {penalties.list.slice(0, 2).map((item) => (
-              <div key={`penalty-${item.id}`} className={styles.activityItem}>
-                <div>
-                  <span className={styles.activityLabel}>Multa</span>
-                  <p className={styles.activityTitle}>
-                    {item.vehiculo?.nombre || "Vehiculo"} {item.vehiculo?.placas ? `(${item.vehiculo?.placas})` : ""}
-                  </p>
-                  <p className={styles.activityMeta}>
-                    {item.solicitante?.nombre || "Sin asignar"} · {formatCurrency(item.penalizacionMonto || 0)}
-                  </p>
-                </div>
-                <p className={styles.activityMeta}>{formatDate(item.fechaInicio)}</p>
-              </div>
-            ))}
-            {!loading && latestViatics.length === 0 && penalties.list.length === 0 && (
+            {!loading && movementFeed.length === 0 && (
               <p className={styles.activityMeta}>Sin movimientos recientes.</p>
             )}
           </div>
@@ -399,8 +538,8 @@ export default function ContabilidadDashboard() {
         <div className={styles.panelCard}>
           <div className={styles.cardHeader}>
             <div>
-              <h3 className={styles.cardTitle}>Mapa de capital</h3>
-              <p className={styles.cardSubtitle}>Distribucion rapida del gasto operativo.</p>
+              <h3 className={styles.cardTitle}>Mapa de egresos</h3>
+              <p className={styles.cardSubtitle}>Distribución ejecutiva por rubro financiero.</p>
             </div>
           </div>
           <div className={styles.miniChart}>
@@ -423,16 +562,25 @@ export default function ContabilidadDashboard() {
               </div>
             </div>
             <div className={styles.barRow}>
-              <span className={styles.barLabel}>Horas</span>
+              <span className={styles.barLabel}>Gastos</span>
               <div className={styles.barTrack}>
                 <div
                   className={styles.barFill}
-                  style={{ width: `${toCapitalPercent(totalHours)}%` }}
+                  style={{ width: `${toCapitalPercent(expenseTotals.total)}%` }}
+                />
+              </div>
+            </div>
+            <div className={styles.barRow}>
+              <span className={styles.barLabel}>Sanciones</span>
+              <div className={styles.barTrack}>
+                <div
+                  className={styles.barFill}
+                  style={{ width: `${toCapitalPercent(fineTotals.total)}%` }}
                 />
               </div>
             </div>
           </div>
-          <div style={{ marginTop: 16 }}>
+          <div className={styles.sectionBlock}>
             <h4 className={styles.cardTitle}>Proyectos prioritarios</h4>
             <div className={styles.activityList}>
               {latestProjects.map((project) => (
@@ -448,8 +596,63 @@ export default function ContabilidadDashboard() {
                 </div>
               ))}
               {!loading && latestProjects.length === 0 && (
-                <p className={styles.activityMeta}>No hay proyectos registrados.</p>
+                <p className={styles.activityMeta}>No hay proyectos prioritarios en el periodo.</p>
               )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.grid}>
+        <div className={styles.panelCard}>
+          <div className={styles.cardHeader}>
+            <div>
+              <h3 className={styles.cardTitle}>Alertas y conciliación</h3>
+              <p className={styles.cardSubtitle}>Riesgos detectados al consolidar ventas y contabilidad.</p>
+            </div>
+            <span className={styles.badge}>{riskAlerts.length} alertas</span>
+          </div>
+          <div className={styles.activityList}>
+            {riskAlerts.map((alert) => (
+              <div key={alert.id} className={styles.activityItem}>
+                <div>
+                  <span className={styles.activityLabel}>{alert.level.toUpperCase()}</span>
+                  <p className={styles.activityTitle}>{alert.title}</p>
+                  <p className={styles.activityMeta}>{alert.detail}</p>
+                </div>
+              </div>
+            ))}
+            {!loading && riskAlerts.length === 0 && (
+              <p className={styles.activityMeta}>Sin alertas críticas para este período.</p>
+            )}
+          </div>
+        </div>
+
+        <div className={styles.panelCard}>
+          <div className={styles.cardHeader}>
+            <div>
+              <h3 className={styles.cardTitle}>Estado de integración</h3>
+              <p className={styles.cardSubtitle}>Conexión entre paneles y cobertura de datos.</p>
+            </div>
+          </div>
+          <div className={styles.integrationList}>
+            <div className={styles.integrationItem}>
+              <p className={styles.integrationTitle}>Consola operativa</p>
+              <p className={styles.integrationMeta}>
+                Actividades: {snapshot?.consoleStats?.actividades?.total || 0} · Viáticos: {snapshot?.consoleStats?.viaticos?.total || 0}
+              </p>
+            </div>
+            <div className={styles.integrationItem}>
+              <p className={styles.integrationTitle}>Ventas</p>
+              <p className={styles.integrationMeta}>
+                Ingreso: {formatCurrency(commercialTotals.revenue)} · Margen: {commercialTotals.margin.toFixed(1)}%
+              </p>
+            </div>
+            <div className={styles.integrationItem}>
+              <p className={styles.integrationTitle}>Contabilidad</p>
+              <p className={styles.integrationMeta}>
+                Proyectos activos: {filteredProjects.length} · Horas operativas: {totalHours}
+              </p>
             </div>
           </div>
         </div>

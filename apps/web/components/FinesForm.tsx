@@ -210,7 +210,7 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
 
   if (!permisoSi) {
     return (
-      <div className="card" style={{ maxWidth: 600, marginBottom: 24 }}>
+      <div className="card" style={{ width: '100%', maxWidth: 'min(760px, 100%)', marginBottom: 24 }}>
         <h3 style={{ marginBottom: 16, color: 'var(--primary)' }}>Gestión de Multas</h3>
         <div style={{ padding: 24, textAlign: 'center', color: 'var(--danger)' }}>
           ⛔ No tienes permisos para crear multas
@@ -220,7 +220,7 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card" style={{ maxWidth: 600, marginBottom: 24 }}>
+    <form onSubmit={handleSubmit} className="card" style={{ width: '100%', maxWidth: 'min(760px, 100%)', marginBottom: 24 }}>
       <h3 style={{ marginBottom: 16, color: 'var(--primary)' }}>Nueva Multa</h3>
       
       <div style={{ display: 'grid', gap: 12 }}>
