@@ -54,7 +54,7 @@ export default function Sidebar() {
   }, [isMenuOpen, isMobile]);
 
   const toggleMenu = () => {
-    setIsMenuOpen(!isMenuOpen);
+    setIsMenuOpen((prev) => !prev);
   };
 
   const closeMenu = () => {
@@ -169,7 +169,7 @@ export default function Sidebar() {
     : (user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nombre)}&background=0D8ABC&color=fff&size=96`);
 
   return (
-    <aside className={styles.sidebar} data-mobile={isMobile ? 'true' : 'false'} data-open={isMenuOpen ? 'true' : 'false'}>
+    <aside className={`${styles.sidebar} ${isMenuOpen && isMobile ? styles.sidebarOpen : ''}`} data-mobile={isMobile ? 'true' : 'false'} data-open={isMenuOpen ? 'true' : 'false'}>
       {/* Header del Sidebar con Logo y Hamburguesa */}
       <div className={styles.sidebarHeader}>
         <div className={styles.sidebarLogo}>
@@ -178,7 +178,7 @@ export default function Sidebar() {
         </div>
         {isMobile && (
           <button
-            className={styles.hamburgerButton}
+            className={`${styles.hamburgerButton} ${isMenuOpen ? styles.hamburgerActive : ''}`}
             onClick={toggleMenu}
             aria-label={isMenuOpen ? "Cerrar menú" : "Abrir menú"}
             aria-expanded={isMenuOpen}
@@ -198,7 +198,7 @@ export default function Sidebar() {
       )}
 
       {/* Contenedor del menú que se desplaza en móvil */}
-      <div className={styles.sidebarContent} id="sidebar-menu" data-open={isMenuOpen ? 'true' : 'false'}>
+      <div className={`${styles.sidebarContent} ${isMenuOpen && isMobile ? styles.sidebarContentOpen : ''}`} id="sidebar-menu" data-open={isMenuOpen ? 'true' : 'false'}>
         <div className={styles.sidebarUser}>
           <div className={styles.sidebarAvatar}>
             <Image 
