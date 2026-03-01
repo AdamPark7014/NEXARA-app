@@ -218,3 +218,73 @@
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 900px) {
+  .page {
+    gap: 14px;
+    padding: 8px 0 22px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .title {
+    font-size: 1.45rem;
+  }
+
+  .subtitle {
+    font-size: 0.92rem;
+  }
+
+  .periodButtons {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .periodBtn {
+    flex: 1 1 110px;
+    text-align: center;
+  }
+
+  .kpiGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpiCard,
+  .card,
+  .lockedCard,
+  .error {
+    padding: 12px;
+  }
+
+  .kpiCard h3 {
+    font-size: 1.25rem;
+  }
+
+  .table {
+    min-width: 560px;
+  }
+
+  .table th,
+  .table td {
+    padding: 8px;
+    font-size: 0.82rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .kpiGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .periodBtn {
+    flex: 1 1 100%;
+  }
+
+  .table {
+    min-width: 500px;
+  }
+}

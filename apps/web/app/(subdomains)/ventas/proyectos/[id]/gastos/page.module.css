@@ -601,3 +601,89 @@
   background: #1e1e1e;
   border-color: #333;
 }
+
+@media (max-width: 900px) {
+  .container {
+    padding: 16px 0 22px;
+  }
+
+  .header {
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 1.25rem;
+  }
+
+  .header h1 {
+    font-size: 1.55rem;
+  }
+
+  .budgetOverview,
+  .viaticosSection,
+  .modalBody,
+  .modalHeader,
+  .modalFooter {
+    padding: 1rem;
+  }
+
+  .amount {
+    font-size: 1.6rem;
+  }
+
+  .costsGrid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .sectionHeader {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .addBtn {
+    width: 100%;
+  }
+
+  .viaticItem {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .viaticInfo {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .viaticDetail {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .viaticAmount,
+  .viaticStatus {
+    min-width: 0;
+    text-align: left;
+  }
+
+  .removeBtn {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 520px) {
+  .barContainer {
+    height: 26px;
+  }
+
+  .barSegment {
+    font-size: 0.68rem;
+  }
+
+  .modalContent {
+    width: 96%;
+    max-height: 86vh;
+  }
+
+  .modalFooter {
+    flex-direction: column;
+  }
+}
