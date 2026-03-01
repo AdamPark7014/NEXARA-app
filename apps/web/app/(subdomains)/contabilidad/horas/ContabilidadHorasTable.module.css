@@ -165,7 +165,9 @@
 .tableWrap {
   border-radius: 18px;
   border: 1px solid rgba(15, 106, 214, 0.16);
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
   background: linear-gradient(160deg, rgba(12, 22, 40, 0.85), rgba(9, 16, 30, 0.92));
 }
 
@@ -297,7 +299,9 @@
   border-radius: 16px;
   border: 1px solid rgba(15, 106, 214, 0.16);
   background: rgba(9, 16, 30, 0.88);
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .detailTable {

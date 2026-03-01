@@ -4,6 +4,7 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import PanelLogin from "@/components/PanelLogin";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
 import consoleStyles from "../../console/console.module.css";
+import styles from "../tickets.module.css";
 
 type BranchSession = {
   token: string;
@@ -231,10 +232,10 @@ export default function BranchTicketsPage() {
         </ul>
       </aside>
       <main className={consoleStyles.consoleMain}>
-        <div style={{ display: "grid", gap: 16 }}>
-          <div className="card" style={{ display: "grid", gap: 12 }}>
+        <div className={styles.mainStack}>
+          <div className={`card ${styles.cardSoft}`}>
             <div style={{ fontWeight: 700 }}>Levantar ticket</div>
-            <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+            <div className={styles.mutedText}>
               Sucursal: {profile?.name || session.branch.name} {profile?.branchNumber ? `(${profile.branchNumber})` : ""}
             </div>
             <textarea
@@ -244,7 +245,7 @@ export default function BranchTicketsPage() {
               value={draft.description}
               onChange={(e) => setDraft((prev) => ({ ...prev, description: e.target.value }))}
             />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+            <div className={styles.grid200}>
               <div>
                 <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Urgencia</label>
                 <select className="input" value={draft.urgency} onChange={(e) => setDraft((prev) => ({ ...prev, urgency: e.target.value }))}>
@@ -287,13 +288,7 @@ export default function BranchTicketsPage() {
                 setIsDragging(false);
                 handleFileSelect(Array.from(event.dataTransfer.files || []));
               }}
-              style={{
-                border: `2px dashed ${isDragging ? "var(--primary)" : "var(--muted)"}`,
-                background: isDragging ? "rgba(15, 106, 214, 0.08)" : "var(--surface-light)",
-                borderRadius: 12,
-                padding: 16,
-                textAlign: "center",
-              }}
+              className={`${styles.dropzone} ${isDragging ? styles.dropzoneActive : ""}`}
             >
               <input
                 id="branch-evidence-file"
@@ -304,21 +299,24 @@ export default function BranchTicketsPage() {
                 onChange={(e) => handleFileSelect(Array.from(e.target.files || []))}
                 style={{ display: "none" }}
               />
-              <div style={{ color: "var(--text-secondary)", marginBottom: 8 }}>
+              <div className={styles.mutedText} style={{ marginBottom: 8 }}>
                 Arrastra tus archivos aqui o
               </div>
               <label htmlFor="branch-evidence-file" className="button-secondary" style={{ cursor: "pointer" }}>
                 Seleccionar archivo
               </label>
-              <div style={{ marginTop: 8, color: "var(--text-secondary)", fontSize: 12 }}>
+              <div className={styles.mutedText} style={{ marginTop: 8 }}>
                 {files.length > 0 ? `${files.length} archivo(s) seleccionados` : "Ningun archivo seleccionado"}
               </div>
             </div>
             {files.length > 0 && (
-              <div style={{ display: "grid", gap: 10 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
+              <div className={styles.cardSoft} style={{ gap: 10 }}>
+                <div className={styles.previewGrid}>
                   {files.map((entry, index) => (
-                    <div key={`${entry.file.name}-${index}`} style={{ position: "relative", borderRadius: 12, border: "1px solid rgba(255,255,255,0.12)", overflow: "hidden", background: "rgba(15, 106, 214, 0.08)", minHeight: entry.kind === "pdf" ? 180 : 110, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <div
+                      key={`${entry.file.name}-${index}`}
+                      className={`${styles.previewTile} ${entry.kind === "pdf" ? styles.previewTilePdf : ""}`}
+                    >
                       {entry.kind === "image" ? (
                         <img src={entry.url} alt={entry.file.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       ) : (
@@ -333,7 +331,7 @@ export default function BranchTicketsPage() {
                       <button
                         type="button"
                         onClick={() => removeFile(index)}
-                        style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.6)", color: "#fff", border: "none", width: 24, height: 24, borderRadius: "50%", cursor: "pointer" }}
+                        className={styles.previewDelete}
                       >
                         x
                       </button>
@@ -342,33 +340,33 @@ export default function BranchTicketsPage() {
                 </div>
               </div>
             )}
-            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <div className={styles.actionRow}>
               <button className="button-primary" type="button" onClick={handleSubmit} disabled={loading}>Levantar ticket</button>
               {error && <span style={{ color: "var(--danger)", fontSize: 12 }}>{error}</span>}
             </div>
           </div>
 
-          <div className="card" style={{ display: "grid", gap: 12 }}>
+          <div className={`card ${styles.cardSoft}`}>
             <div style={{ fontWeight: 700 }}>Tickets enviados</div>
-            {requests.length === 0 && <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>No hay solicitudes aun.</div>}
+            {requests.length === 0 && <div className={styles.mutedText}>No hay solicitudes aun.</div>}
             {requests.map((request) => (
-              <div key={request.id} style={{ display: "grid", gap: 6, padding: 12, borderRadius: 12, border: "1px solid rgba(15, 106, 214, 0.15)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+              <div key={request.id} className={styles.itemCard}>
+                <div className={styles.itemHeader}>
                   <strong>Ticket #{request.id}</strong>
                   <span className="badge">{request.status}</span>
                 </div>
-                <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{request.description}</div>
-                <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>Urgencia: {request.urgency}</div>
+                <div className={styles.mutedText}>{request.description}</div>
+                <div className={styles.mutedText}>Urgencia: {request.urgency}</div>
                 {Array.isArray(request.evidenceUrls) && request.evidenceUrls.length > 0 && (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
+                  <div className={styles.grid120}>
                     {request.evidenceUrls.map((url, idx) => (
-                      <div key={`${request.id}-${idx}`} style={{ borderRadius: 10, overflow: "hidden", border: "1px solid rgba(255,255,255,0.12)", background: "rgba(15, 106, 214, 0.08)" }}>
+                      <div key={`${request.id}-${idx}`} className={styles.mediaTile}>
                         {url.toLowerCase().endsWith(".pdf") ? (
                           <object data={getAssetUrl(url)} type="application/pdf" width="100%" height="120">
                             <embed src={getAssetUrl(url)} type="application/pdf" />
                           </object>
                         ) : (
-                          <img src={getAssetUrl(url)} alt="evidencia" style={{ width: "100%", height: 120, objectFit: "cover" }} />
+                          <img src={getAssetUrl(url)} alt="evidencia" className={styles.mediaImg} />
                         )}
                       </div>
                     ))}

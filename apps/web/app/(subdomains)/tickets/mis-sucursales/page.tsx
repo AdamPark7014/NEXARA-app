@@ -4,6 +4,7 @@ import { io, Socket } from "socket.io-client";
 import PanelLogin from "@/components/PanelLogin";
 import BranchesForm, { Branch } from "../../../../components/BranchesForm";
 import consoleStyles from "../../console/console.module.css";
+import styles from "../tickets.module.css";
 
 type ClientSession = {
   token: string;
@@ -110,7 +111,7 @@ export default function MyBranchesPage() {
 
   if (!session) {
     return (
-      <div style={{ display: "grid", gap: 16 }}>
+      <div className={styles.authWrap}>
         <PanelLogin
           mode="client"
           redirectTo="mis-sucursales"
@@ -184,31 +185,21 @@ export default function MyBranchesPage() {
 
       {/* Main Content */}
       <main className={consoleStyles.consoleMain}>
-        <div style={{ display: "grid", gap: 24 }}>
+        <div className={styles.sectionStack} style={{ gap: 24 }}>
           {/* Header Card */}
-          <div className="card" style={{ display: "grid", gap: 12, background: "linear-gradient(140deg, rgba(31,137,252,0.12), rgba(20,162,133,0.08))" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+          <div className={`card ${styles.gradientHeader}`}>
+            <div className={styles.headerSplit}>
               <div>
                 <h1 style={{ margin: "0 0 4px 0", fontSize: 28, fontWeight: 700, color: "var(--primary)" }}>Mis sucursales</h1>
-                <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
+                <p className={styles.mutedText} style={{ margin: 0, fontSize: 13 }}>
                   Administra todas las sucursales de tu empresa en un solo lugar
                 </p>
               </div>
               {profile && (
-                <div
-                  style={{
-                    display: "grid",
-                    gap: 8,
-                    padding: 16,
-                    background: "var(--surface)",
-                    borderRadius: 12,
-                    border: "1px solid var(--border)",
-                    minWidth: 200,
-                  }}
-                >
-                  <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>Empresa</div>
+                <div className={styles.companyBox}>
+                  <div className={styles.mutedText}>Empresa</div>
                   <div style={{ fontWeight: 600, fontSize: 14 }}>{profile.name}</div>
-                  <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                  <div className={styles.mutedText}>
                     Contacto: {profile.contactName || "-"}
                   </div>
                 </div>
