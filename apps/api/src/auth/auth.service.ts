@@ -77,7 +77,17 @@ export class AuthService {
     }
     if (role?.accesoGestionTienda) permissions.push(PERMISSIONS.PANEL_TIENDA);
     if (role?.accesoGestionWeb) permissions.push(PERMISSIONS.PANEL_WEB);
-    if (role?.accesoPanelVentas) permissions.push(PERMISSIONS.PANEL_VENTAS);
+    if (role?.accesoPanelVentas) {
+      permissions.push(
+        PERMISSIONS.PANEL_VENTAS,
+        PERMISSIONS.SALES_VIEW,
+        PERMISSIONS.SALES_MANAGE,
+        PERMISSIONS.SALES_REPORTS_VIEW,
+        PERMISSIONS.SALES_REPORTS_EXPORT,
+        PERMISSIONS.SALES_TEMPLATES_MANAGE,
+        PERMISSIONS.SALES_AUDIT_VIEW,
+      );
+    }
     if (role?.accesoContabilidad) {
       permissions.push(
         PERMISSIONS.CONTABILIDAD_VIEW,

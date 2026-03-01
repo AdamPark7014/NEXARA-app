@@ -6,34 +6,56 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { VentasService } from './ventas.service.js';
 
+const SALES_REPORT_VIEW_ACCESS = [PERMISSIONS.SALES_REPORTS_VIEW, PERMISSIONS.SALES_VIEW, PERMISSIONS.PANEL_VENTAS];
+const SALES_REPORT_EXPORT_ACCESS = [PERMISSIONS.SALES_REPORTS_EXPORT, PERMISSIONS.SALES_MANAGE, PERMISSIONS.PANEL_VENTAS];
+const SALES_AUDIT_ACCESS = [PERMISSIONS.SALES_AUDIT_VIEW, PERMISSIONS.SALES_REPORTS_VIEW, PERMISSIONS.PANEL_VENTAS];
+
 @Controller('ventas/reportes')
 export class VentasReportesController {
   constructor(private readonly ventasService: VentasService) {}
 
   @Get('resumen')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.PANEL_VENTAS] })
+  @RBAC({ anyPermissions: SALES_REPORT_VIEW_ACCESS })
   async summary(@Query('start') start: string, @Query('end') end: string, @CurrentUser() user: any) {
     return this.ventasService.buildReportSummary({ start, end }, user);
   }
 
   @Get('metricas')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.PANEL_VENTAS] })
+  @RBAC({ anyPermissions: SALES_REPORT_VIEW_ACCESS })
   async metrics(@Query('period') period: 'week' | 'month' | 'year' = 'month', @CurrentUser() user: any) {
     return this.ventasService.getMetricsByPeriod(period, user);
   }
 
   @Get('vendedores')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.PANEL_VENTAS] })
+  @RBAC({ anyPermissions: SALES_REPORT_VIEW_ACCESS })
   async vendorStats(@Query('period') period: 'week' | 'month' | 'year' = 'month', @CurrentUser() user: any) {
     return this.ventasService.getVendorStatsByPeriod(period, user);
   }
 
+  @Get('insights')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: SALES_REPORT_VIEW_ACCESS })
+  async insights(@Query('period') period: 'week' | 'month' | 'year' = 'month', @CurrentUser() user: any) {
+    return this.ventasService.getExecutiveInsights(period, user);
+  }
+
+  @Get('auditoria')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: SALES_AUDIT_ACCESS })
+  async audit(
+    @Query('period') period: 'week' | 'month' | 'year' = 'month',
+    @Query('limit') limit = '50',
+    @CurrentUser() user: any,
+  ) {
+    return this.ventasService.listAuditEvents(period, Number(limit) || 50, user);
+  }
+
   @Get('pdf')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.PANEL_VENTAS] })
+  @RBAC({ anyPermissions: SALES_REPORT_EXPORT_ACCESS })
   async pdf(
     @Query('start') start: string,
     @Query('end') end: string,
@@ -41,6 +63,12 @@ export class VentasReportesController {
     @Res() res: Response,
   ) {
     const { pdf } = await this.ventasService.generateReportPdf({ start, end }, user);
+    await this.ventasService.createAuditEvent({
+      action: 'report.pdf.export',
+      entityType: 'report',
+      actorId: user?.id,
+      metadata: { start, end, mode: 'range' },
+    });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename=reporte-ventas.pdf');
     res.send(pdf);
@@ -48,13 +76,19 @@ export class VentasReportesController {
 
   @Post('generar-pdf')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.PANEL_VENTAS] })
+  @RBAC({ anyPermissions: SALES_REPORT_EXPORT_ACCESS })
   async generatePdf(
     @Body() dto: { period: 'week' | 'month' | 'year'; includeVendorStats?: boolean; logoUrl?: string },
     @CurrentUser() user: any,
     @Res() res: Response,
   ) {
     const pdfBuffer = await this.ventasService.generateDynamicReportPdf(dto.period, user, dto.includeVendorStats, dto.logoUrl);
+    await this.ventasService.createAuditEvent({
+      action: 'report.pdf.generate',
+      entityType: 'report',
+      actorId: user?.id,
+      metadata: { period: dto.period, includeVendorStats: Boolean(dto.includeVendorStats) },
+    });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=reporte-ventas-${dto.period}-${new Date().toISOString().slice(0, 10)}.pdf`);
     res.send(pdfBuffer);

@@ -1,29 +1,17 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useUser } from './UserContext';
 import PDFViewer from './PDFViewer';
+import {
+  getSalesAuditEvents,
+  getSalesExecutiveInsights,
+  getSalesMetrics,
+  getSalesVendorStats,
+  type SalesAuditEvent,
+  type SalesExecutiveInsights,
+  type SalesMetrics,
+  type SalesVendorStats,
+} from '@/lib/sales-api';
 import styles from './SalesReportsDashboard.module.css';
-
-interface SalesMetrics {
-  totalRevenue: number;
-  opportunityCount: number;
-  projectCount: number;
-  averageMargin: number;
-  conversionRate: number;
-  pipelineValue: number;
-  closedProjects: number;
-  activeClients: number;
-}
-
-interface VendorStats {
-  userId: number;
-  userName: string;
-  revenue: number;
-  opportunities: number;
-  projects: number;
-  margin: number;
-  conversionRate: number;
-  performance: number; // 0-100
-}
 
 interface SalesReportsDashboardProps {
   apiUrl: string;
@@ -38,7 +26,9 @@ export default function SalesReportsDashboard({
 }: SalesReportsDashboardProps) {
   const { user } = useUser();
   const [metrics, setMetrics] = useState<SalesMetrics | null>(null);
-  const [vendorStats, setVendorStats] = useState<VendorStats[]>([]);
+  const [vendorStats, setVendorStats] = useState<SalesVendorStats[]>([]);
+  const [insights, setInsights] = useState<SalesExecutiveInsights | null>(null);
+  const [auditEvents, setAuditEvents] = useState<SalesAuditEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPeriod, setCurrentPeriod] = useState<'week' | 'month' | 'year'>(period);
@@ -51,20 +41,17 @@ export default function SalesReportsDashboard({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${apiUrl}/ventas/reportes/metricas?period=${currentPeriod}`, {
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-      if (!res.ok) throw new Error('Error al cargar métricas');
-      const data = await res.json();
-      setMetrics(data);
+      const [metricsData, vendorData, insightsData, auditData] = await Promise.all([
+        getSalesMetrics(user.token, currentPeriod),
+        getSalesVendorStats(user.token, currentPeriod),
+        getSalesExecutiveInsights(user.token, currentPeriod),
+        getSalesAuditEvents(user.token, currentPeriod, 20),
+      ]);
 
-      const vendorsRes = await fetch(`${apiUrl}/ventas/reportes/vendedores?period=${currentPeriod}`, {
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-      if (vendorsRes.ok) {
-        const vendorsData = await vendorsRes.json();
-        setVendorStats(Array.isArray(vendorsData) ? vendorsData : []);
-      }
+      setMetrics(metricsData);
+      setVendorStats(vendorData);
+      setInsights(insightsData);
+      setAuditEvents(auditData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
@@ -294,6 +281,71 @@ export default function SalesReportsDashboard({
               />
             </div>
           </div>
+
+          {/* Executive Insights */}
+          {insights && (
+            <div className={styles.vendorSection}>
+              <h3 className={styles.sectionTitle}>Insights Ejecutivos</h3>
+              <div className={styles.vendorGrid}>
+                <div className={styles.vendorCard}>
+                  <div className={styles.vendorHeader}>
+                    <h4 className={styles.vendorName}>Forecast ponderado</h4>
+                  </div>
+                  <div className={styles.vendorMetrics}>
+                    <div className={styles.vendorMetricItem}>
+                      <span>Forecast:</span>
+                      <strong>{formatMoney(insights.forecast.weightedForecast)}</strong>
+                    </div>
+                    <div className={styles.vendorMetricItem}>
+                      <span>Cobertura:</span>
+                      <strong>{insights.forecast.forecastCoverage.toFixed(1)}%</strong>
+                    </div>
+                    <div className={styles.vendorMetricItem}>
+                      <span>Ciclo promedio:</span>
+                      <strong>{insights.efficiency.avgCycleDays.toFixed(1)} días</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.vendorCard}>
+                  <div className={styles.vendorHeader}>
+                    <h4 className={styles.vendorName}>Distribución por etapa</h4>
+                  </div>
+                  <div className={styles.vendorMetrics}>
+                    {Object.entries(insights.stageDistribution)
+                      .sort(([, a], [, b]) => Number(b) - Number(a))
+                      .map(([stage, count]) => (
+                        <div key={stage} className={styles.vendorMetricItem}>
+                          <span>{stage}:</span>
+                          <strong>{count}</strong>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Audit Feed */}
+          {auditEvents.length > 0 && (
+            <div className={styles.vendorSection}>
+              <h3 className={styles.sectionTitle}>Auditoría Comercial Reciente</h3>
+              <div className={styles.vendorGrid}>
+                <div className={styles.vendorCard} style={{ gridColumn: '1 / -1' }}>
+                  <div className={styles.vendorMetrics}>
+                    {auditEvents.slice(0, 12).map((event) => (
+                      <div key={event.id} className={styles.vendorMetricItem}>
+                        <span>
+                          {new Date(event.createdAt).toLocaleString('es-MX')} · {event.action}
+                        </span>
+                        <strong>{event.actor?.nombre || 'Sistema'}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
 

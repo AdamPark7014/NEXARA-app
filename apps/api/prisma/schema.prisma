@@ -323,6 +323,7 @@ model User {
   salesOpportunityQuotes SalesOpportunityQuote[] @relation("SalesOpportunityQuoteCreator")
   salesProjectOrdersCreated SalesProjectOrder[] @relation("SalesProjectOrderCreator")
   orderTemplates   OrderTemplate[]             @relation("OrderTemplateCreator")
+  salesAuditEvents SalesAuditEvent[]           @relation("SalesAuditActor")
   notifications    Notification[]
   notificationsTriggered Notification[]  @relation("NotificationTriggeredBy")
   reviewedEvidences ActivityEvidence[]  // Evidencias revisadas por este usuario
@@ -1124,6 +1125,21 @@ model SalesProjectOrder {
   createdBy       User?          @relation("SalesProjectOrderCreator", fields: [createdById], references: [id])
 
   @@map("sales_project_orders")
+}
+
+model SalesAuditEvent {
+  id          Int      @id @default(autoincrement())
+  action      String   @db.VarChar(80)
+  entityType  String   @db.VarChar(80)
+  entityId    Int?
+  actorId     Int?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  actor       User?    @relation("SalesAuditActor", fields: [actorId], references: [id])
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+  @@map("sales_audit_events")
 }
 
 model OrderTemplate {

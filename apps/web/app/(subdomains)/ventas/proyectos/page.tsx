@@ -1,34 +1,26 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import ProjectCostTracker from "@/components/ProjectCostTracker";
+import {
+  closeSalesProject,
+  createSalesProject,
+  getSalesProjectOrder,
+  listSalesProjects,
+  type SalesProjectDetail,
+  type SalesProjectOrder,
+} from "@/lib/sales-api";
+import { getApiBase } from "@/lib/api-base";
 import styles from "./page.module.css";
 
-type SalesProject = {
-  id: number;
-  name: string;
-  budget: number;
-  costProducts: number;
-  costViaticos: number;
-  costOperativo: number;
-  margin: number;
-  status: string;
-  opportunity?: { id: number; title: string } | null;
-};
-
-type SalesProjectOrder = {
-  id: number;
-  orderId: string;
-  orderPdfUrl: string;
-  status: string;
-  createdAt: string;
-};
+type SalesProject = SalesProjectDetail;
 
 export default function VentasProyectosPage() {
   const { user } = useUser();
   const router = useRouter();
+  const apiOrigin = getApiBase().replace(/\/+api\/?$/, "");
   const [projects, setProjects] = useState<SalesProject[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -45,36 +37,20 @@ export default function VentasProyectosPage() {
     status: "PLANNED",
   });
 
-  const apiUrl = useMemo(() => {
-    const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
-    return base.replace(/[/.]+$/, "");
-  }, []);
-
   const fetchProjects = async () => {
     if (!user?.token) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${apiUrl}/ventas/proyectos`, {
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-      if (!res.ok) throw new Error("No se pudieron cargar los proyectos");
-      const data = await res.json();
-      setProjects(Array.isArray(data) ? data : []);
+      const data = await listSalesProjects(user.token);
+      setProjects(data);
 
       // Fetch orders for each project
       const newOrders: { [key: number]: SalesProjectOrder } = {};
       for (const project of data) {
         try {
-          const orderRes = await fetch(`${apiUrl}/ventas/proyectos/${project.id}/orden`, {
-            headers: { Authorization: `Bearer ${user.token}` },
-          });
-          if (orderRes.ok) {
-            const order = await orderRes.json();
-            if (order && order.id) {
-              newOrders[project.id] = order;
-            }
-          }
+          const order = await getSalesProjectOrder(user.token, project.id);
+          if (order?.id) newOrders[project.id] = order;
         } catch (e) {
           // Order not found, it's okay
         }
@@ -117,15 +93,7 @@ export default function VentasProyectosPage() {
         costOperativo: form.costOperativo,
         status: form.status,
       };
-      const res = await fetch(`${apiUrl}/ventas/proyectos`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${user.token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error("No se pudo crear el proyecto");
+      await createSalesProject(user.token, payload);
       setForm({
         opportunityId: "",
         name: "",
@@ -148,15 +116,7 @@ export default function VentasProyectosPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${apiUrl}/ventas/proyectos/${projectId}/close`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${user.token}`,
-        },
-      });
-      if (!res.ok) throw new Error("No se pudo cerrar el proyecto");
-      const order = await res.json();
+      const order = await closeSalesProject(user.token, projectId);
       setOrders((prev) => ({ ...prev, [projectId]: order }));
       await fetchProjects();
       setCloseModal(null);
@@ -175,7 +135,9 @@ export default function VentasProyectosPage() {
     }
     try {
       const link = document.createElement("a");
-      link.href = `${apiUrl}${order.orderPdfUrl}`;
+      link.href = order.orderPdfUrl.startsWith("http")
+        ? order.orderPdfUrl
+        : `${apiOrigin}${order.orderPdfUrl.startsWith("/") ? "" : "/"}${order.orderPdfUrl}`;
       link.download = `orden-${order.orderId}.pdf`;
       document.body.appendChild(link);
       link.click();

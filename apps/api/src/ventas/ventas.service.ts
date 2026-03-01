@@ -61,6 +61,63 @@ export class VentasService {
     return user?.id ? { opportunity: { ownerId: user.id } } : {};
   }
 
+  private getPeriodStart(period: 'week' | 'month' | 'year') {
+    const now = new Date();
+    const startDate = new Date(now);
+    if (period === 'week') {
+      startDate.setDate(now.getDate() - now.getDay());
+    } else if (period === 'month') {
+      startDate.setDate(1);
+    } else if (period === 'year') {
+      startDate.setMonth(0, 1);
+    }
+    startDate.setHours(0, 0, 0, 0);
+    return startDate;
+  }
+
+  async createAuditEvent(payload: {
+    action: string;
+    entityType: string;
+    entityId?: number | null;
+    actorId?: number | null;
+    metadata?: unknown;
+  }) {
+    const salesAuditEvent = (this.prisma as any).salesAuditEvent;
+    return salesAuditEvent.create({
+      data: {
+        action: payload.action,
+        entityType: payload.entityType,
+        entityId: payload.entityId ?? null,
+        actorId: payload.actorId ?? null,
+        metadata: payload.metadata as any,
+      },
+    });
+  }
+
+  async listAuditEvents(period: 'week' | 'month' | 'year' = 'month', limit = 50, user?: any) {
+    const startDate = this.getPeriodStart(period);
+    const safeLimit = Math.min(Math.max(limit || 50, 1), 300);
+    const where = {
+      createdAt: { gte: startDate },
+      ...(this.isSuperAdminUser(user) ? {} : user?.id ? { actorId: user.id } : {}),
+    };
+    const salesAuditEvent = (this.prisma as any).salesAuditEvent;
+    return salesAuditEvent.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: safeLimit,
+      include: {
+        actor: {
+          select: {
+            id: true,
+            nombre: true,
+            email: true,
+          },
+        },
+      },
+    });
+  }
+
   async createClient(dto: CreateSalesClientDto, user?: any) {
     const ownerId = this.resolveOwnerForWrite(dto.ownerId, user);
     return this.prisma.salesClient.create({
@@ -1297,6 +1354,82 @@ export class VentasService {
     );
 
     return vendorStats.sort((a, b) => b.revenue - a.revenue);
+  }
+
+  async getExecutiveInsights(period: 'week' | 'month' | 'year', user?: any) {
+    const startDate = this.getPeriodStart(period);
+    const ownerFilter = !this.isSuperAdminUser(user) && user?.id ? { ownerId: user.id } : undefined;
+
+    const [metrics, opportunities, auditEventsRaw] = await Promise.all([
+      this.getMetricsByPeriod(period, user),
+      this.prisma.salesOpportunity.findMany({
+        where: {
+          createdAt: { gte: startDate },
+          ...(ownerFilter || {}),
+        },
+        select: {
+          id: true,
+          stage: true,
+          value: true,
+          probability: true,
+          createdAt: true,
+          closedAt: true,
+        },
+      }),
+      (this.prisma as any).salesAuditEvent.groupBy({
+        by: ['action'],
+        where: {
+          createdAt: { gte: startDate },
+          ...(this.isSuperAdminUser(user) ? {} : user?.id ? { actorId: user.id } : {}),
+        },
+        _count: { action: true },
+      }),
+    ]);
+
+    const auditEvents = (auditEventsRaw ?? []) as Array<{ action: string; _count: { action: number } }>;
+
+    const stageDistribution = opportunities.reduce<Record<string, number>>((acc, opportunity) => {
+      const key = opportunity.stage || 'UNKNOWN';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+
+    const weightedForecast = opportunities
+      .filter((opportunity) => opportunity.stage !== 'WON' && opportunity.stage !== 'LOST')
+      .reduce((sum, opportunity) => {
+        const value = Number(opportunity.value || 0);
+        const probability = Number(opportunity.probability || 0);
+        return sum + value * (probability / 100);
+      }, 0);
+
+    const closed = opportunities.filter((opportunity) => Boolean(opportunity.closedAt));
+    const avgCycleDays = closed.length
+      ? closed.reduce((sum, opportunity) => {
+          const diff = new Date(opportunity.closedAt as Date).getTime() - new Date(opportunity.createdAt).getTime();
+          return sum + diff / (1000 * 60 * 60 * 24);
+        }, 0) / closed.length
+      : 0;
+
+    const forecastCoverage = metrics.pipelineValue > 0
+      ? (weightedForecast / metrics.pipelineValue) * 100
+      : 0;
+
+    return {
+      forecast: {
+        weightedForecast: Number(weightedForecast.toFixed(2)),
+        forecastCoverage: Number(forecastCoverage.toFixed(2)),
+      },
+      efficiency: {
+        avgCycleDays: Number(avgCycleDays.toFixed(2)),
+        conversionRate: Number(metrics.conversionRate || 0),
+        averageMargin: Number(metrics.averageMargin || 0),
+      },
+      stageDistribution,
+      topActions: auditEvents
+        .map((entry) => ({ action: entry.action, count: entry._count.action }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 8),
+    };
   }
 
   async generateDynamicReportPdf(period: 'week' | 'month' | 'year', user?: any, includeVendorStats = false, logoUrl?: string) {

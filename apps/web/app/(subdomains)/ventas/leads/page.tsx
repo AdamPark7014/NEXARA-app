@@ -1,20 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
+import { createSalesLead, listSalesLeads, type SalesLead } from "@/lib/sales-api";
 import styles from "./page.module.css";
-
-type SalesLead = {
-  id: number;
-  name?: string | null;
-  company?: string | null;
-  email?: string | null;
-  phone?: string | null;
-  source?: string | null;
-  status: string;
-  score: number;
-  notes?: string | null;
-};
 
 export default function VentasLeadsPage() {
   const { user } = useUser();
@@ -32,22 +21,13 @@ export default function VentasLeadsPage() {
     notes: "",
   });
 
-  const apiUrl = useMemo(() => {
-    const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
-    return base.replace(/[/.]+$/, "");
-  }, []);
-
   const fetchLeads = async () => {
     if (!user?.token) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${apiUrl}/ventas/leads`, {
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-      if (!res.ok) throw new Error("No se pudieron cargar los leads");
-      const data = await res.json();
-      setLeads(Array.isArray(data) ? data : []);
+      const data = await listSalesLeads(user.token);
+      setLeads(data);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error inesperado");
     } finally {
@@ -69,15 +49,7 @@ export default function VentasLeadsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${apiUrl}/ventas/leads`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${user.token}`,
-        },
-        body: JSON.stringify(form),
-      });
-      if (!res.ok) throw new Error("No se pudo crear el lead");
+      await createSalesLead(user.token, form);
       setForm({
         name: "",
         company: "",

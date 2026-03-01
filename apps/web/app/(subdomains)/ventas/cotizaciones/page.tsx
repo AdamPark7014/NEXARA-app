@@ -1,21 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import QuoteGenerator from "@/components/QuoteGenerator";
+import { buildApiUrl } from "@/lib/api-base";
+import { linkSalesQuoteToOpportunity, listSalesQuotes, type SalesQuote } from "@/lib/sales-api";
 import styles from "./page.module.css";
 
-type Cotizacion = {
-  id: number;
-  quoteNumber: string;
-  clientName?: string;
-  clientCompany?: string;
-  projectName?: string;
-  total: string;
-  status: string;
-  issueDate: string;
-  items: Array<{ id: number; name: string; qty: number }>;
-};
+type Cotizacion = SalesQuote;
 
 type LinkState = {
   cotizacionId: number;
@@ -34,27 +26,17 @@ export default function VentasCotizacionesPage() {
   const [linkModal, setLinkModal] = useState<LinkState | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
-  const apiUrl = useMemo(() => {
-    const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
-    return base.replace(/[/.]+$/, "");
-  }, []);
-
   const fetchCotizaciones = async () => {
     if (!user?.token) return;
     setLoading(true);
     setError(null);
     try {
-      const url = new URL(`${apiUrl}/ventas/cotizaciones`);
-      if (searchClient) url.searchParams.append("clientName", searchClient);
-      if (filterStatus) url.searchParams.append("status", filterStatus);
-
-      const res = await fetch(url.toString(), {
-        headers: { Authorization: `Bearer ${user.token}` },
+      const data = await listSalesQuotes(user.token, {
+        clientName: searchClient || undefined,
+        status: filterStatus || undefined,
       });
-      if (!res.ok) throw new Error("No se pudieron cargar las cotizaciones");
-      const data = await res.json();
-      setCotizaciones(Array.isArray(data) ? data : []);
-      setFilteredCotizaciones(Array.isArray(data) ? data : []);
+      setCotizaciones(data);
+      setFilteredCotizaciones(data);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error inesperado");
     } finally {
@@ -77,22 +59,12 @@ export default function VentasCotizacionesPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(
-        `${apiUrl}/ventas/cotizaciones/${linkModal.cotizacionId}/link/${Number(linkModal.opportunityId)}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${user.token}`,
-          },
-          body: JSON.stringify({
-            versionLabel: linkModal.versionLabel || `v${Date.now()}`,
-          }),
-        }
+      await linkSalesQuoteToOpportunity(
+        user.token,
+        linkModal.cotizacionId,
+        Number(linkModal.opportunityId),
+        linkModal.versionLabel || `v${Date.now()}`,
       );
-
-      if (!res.ok) throw new Error("No se pudo vincular la cotización");
-      const quote = await res.json();
       setLinkModal(null);
       await fetchCotizaciones();
     } catch (err: unknown) {
@@ -104,7 +76,7 @@ export default function VentasCotizacionesPage() {
 
   const handleDownloadPdf = (cotizacionId: number) => {
     const link = document.createElement("a");
-    link.href = `${apiUrl}/cotizaciones/${cotizacionId}/pdf`;
+    link.href = buildApiUrl(`cotizaciones/${cotizacionId}/pdf`);
     link.download = `cotizacion-${cotizacionId}.pdf`;
     document.body.appendChild(link);
     link.click();
