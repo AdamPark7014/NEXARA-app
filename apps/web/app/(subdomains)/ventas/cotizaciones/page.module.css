@@ -23,6 +23,20 @@
   margin: 0;
 }
 
+.generatorWrapper {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid rgba(15, 106, 214, 0.12);
+  box-shadow: 0 10px 24px rgba(11, 32, 68, 0.1);
+}
+
+:global(body.dark) .generatorWrapper {
+  background: rgba(15, 22, 36, 0.75);
+  border-color: rgba(31, 137, 252, 0.2);
+}
+
 .filters {
   display: grid;
   grid-template-columns: 1fr 180px;

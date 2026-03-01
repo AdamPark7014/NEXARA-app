@@ -198,6 +198,17 @@
   background: #0b1220;
 }
 
+.avatarImageLogo {
+  border-radius: 14px;
+  object-fit: contain;
+  background: #ffffff;
+  padding: 6px;
+}
+
+:global(body.dark) .avatarImageLogo {
+  background: rgba(255, 255, 255, 0.95);
+}
+
 .sidebarName {
   font-weight: 600;
   font-size: 1.05rem;

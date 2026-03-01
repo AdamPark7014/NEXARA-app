@@ -66,8 +66,10 @@ export default function Sidebar() {
     { label: "Cotizaciones", href: "/cotizaciones", permissions: [PERMISSIONS.COTIZACIONES_ACCESS] },
   ];
 
-  // Avatar: usa user.avatarUrl si existe, si no, usa un avatar generado por ui-avatars.com
-  const avatarUrl = user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nombre)}&background=0D8ABC&color=fff&size=96`;
+  // Superadmin: mostrar logo Nexara en lugar de foto
+  const avatarUrl = user.isSuperAdmin
+    ? "/logo-nexara.png"
+    : (user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nombre)}&background=0D8ABC&color=fff&size=96`);
 
   return (
     <aside className={`${styles.sidebar} ${isMenuOpen && isMobile ? styles.sidebarOpen : ''}`}>
@@ -96,7 +98,14 @@ export default function Sidebar() {
       <div className={styles.sidebarContent} id="sidebar-menu">
       <div className={styles.sidebarUser}>
         <div className={styles.sidebarAvatar}>
-          <Image className={styles.avatarImage} src={avatarUrl} alt={user.nombre} width={64} height={64} unoptimized />
+          <Image
+            className={`${styles.avatarImage} ${user.isSuperAdmin ? styles.avatarImageLogo : ""}`}
+            src={avatarUrl}
+            alt={user.isSuperAdmin ? "NEXARA" : user.nombre}
+            width={64}
+            height={64}
+            unoptimized
+          />
         </div>
         <div className={styles.sidebarName}>{user.nombre}</div>
         <div className={styles.sidebarEmail}>{user.email}</div>
