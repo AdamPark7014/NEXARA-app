@@ -322,7 +322,3 @@ export default function MyBranchesPage() {
     </div>
   );
 }
-        </ul>
-
-        <div className={consoleStyles.menuTitle}>Sesión</div>
-        <ul className={consoleStyles.sidebarMenu}>
