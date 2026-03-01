@@ -75,6 +75,7 @@ export default function Sidebar() {
     <aside className={styles.sidebar} data-mobile={isMobile ? 'true' : 'false'} data-open={isMenuOpen ? 'true' : 'false'}>
       <div className={styles.sidebarHeader}>
         <div className={styles.sidebarLogo}>
+          <img src="/logo-nexara.png" alt="NEXARA" className={styles.brandLogo} />
           <span className={styles.brandMark}>NEXARA</span>
           <span className={styles.brandSub}>Console</span>
         </div>

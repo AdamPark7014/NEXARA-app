@@ -98,8 +98,11 @@ export default function ContabilidadLayout({ children }: { children: React.React
     <div className={`${consoleStyles.consoleLayout} ${styles.contaRoot}`}>
       <header className={styles.mobileTopbar}>
         <div className={`${styles.mobileBrand} ${consoleStyles.sidebarLogo}`}>
-          <span className={consoleStyles.brandMark}>NEXARA</span>
-          <span className={consoleStyles.brandSub}>Contabilidad</span>
+          <img src="/logo-nexara.png" alt="NEXARA" className={styles.mobileBrandLogo} />
+          <div className={styles.mobileBrandText}>
+            <span className={consoleStyles.brandMark}>NEXARA</span>
+            <span className={consoleStyles.brandSub}>Contabilidad</span>
+          </div>
         </div>
         <button
           type="button"

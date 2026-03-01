@@ -173,6 +173,7 @@ export default function Sidebar() {
       {/* Header del Sidebar con Logo y Hamburguesa */}
       <div className={styles.sidebarHeader}>
         <div className={styles.sidebarLogo}>
+          <img src="/logo-nexara.png" alt="NEXARA" className={styles.brandLogo} />
           <span className={styles.brandMark}>NEXARA</span>
           {isMobile && <span className={styles.brandSub}>Consola</span>}
         </div>
