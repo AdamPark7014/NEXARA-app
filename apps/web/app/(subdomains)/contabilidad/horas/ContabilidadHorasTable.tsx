@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
+import { canViewContabilidadTarget } from "@/lib/contabilidad-visibility";
 import styles from "./ContabilidadHorasTable.module.css";
 
 type AttendanceEvent = { type: string; timestamp: string };
@@ -39,6 +40,7 @@ type UserAttendanceStats = {
     accesoContabilidad: boolean;
   };
   isSuperAdmin: boolean;
+  permissions?: string[];
   productivity: {
     avgScore: number;
     level: string;
@@ -256,21 +258,16 @@ const ContabilidadHorasTable = () => {
 
   const visibleUsers = useMemo(() => {
     if (!data?.users) return [];
-    return data.users.filter((item) => {
-      const role = item.roleFlags || {
-        accesoConsole: false,
-        accesoConsoleAdmin: false,
-        accesoGestionUsuarios: false,
-        accesoGestionTienda: false,
-        accesoGestionWeb: false,
-        accesoContabilidad: false,
-      };
-      const hasPanelAccess = role.accesoGestionUsuarios || role.accesoGestionWeb || role.accesoGestionTienda;
-      const hasConsoleAccess = role.accesoConsole || role.accesoConsoleAdmin;
-      const isBlocked = role.accesoContabilidad || item.isSuperAdmin;
-      return (hasPanelAccess || hasConsoleAccess) && !isBlocked;
-    });
-  }, [data]);
+    return data.users.filter((item) =>
+      canViewContabilidadTarget(user, {
+        id: item.userId,
+        isSuperAdmin: item.isSuperAdmin,
+        roleName: item.roleName,
+        roleFlags: item.roleFlags,
+        permissions: item.permissions,
+      }),
+    );
+  }, [data, user]);
 
   const summary = useMemo(() => {
     const totalUsers = visibleUsers.length;

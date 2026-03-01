@@ -4,6 +4,7 @@ import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
+import { canViewContabilidadTarget } from "@/lib/contabilidad-visibility";
 import {
   getUnifiedContabilidadSnapshot,
   type AttendanceRangeSummary,
@@ -92,11 +93,39 @@ export default function ContabilidadDashboard() {
     };
   }, [snapshot, user?.id, user?.nombre, range.to]);
 
+  const visibleAttendanceUsers = useMemo(() => {
+    if (!attendance?.users?.length) return [];
+    return attendance.users.filter((item) =>
+      canViewContabilidadTarget(user, {
+        id: item.userId,
+        isSuperAdmin: item.isSuperAdmin,
+        roleName: item.roleName,
+        roleFlags: item.roleFlags,
+        permissions: item.permissions,
+      }),
+    );
+  }, [attendance?.users, user]);
+
+  const visibleAttendanceUserIdSet = useMemo(
+    () => new Set(visibleAttendanceUsers.map((item) => item.userId)),
+    [visibleAttendanceUsers],
+  );
+
   useEffect(() => {
-    if (user?.id && selectedUserId === null) {
-      setSelectedUserId(user.id);
+    if (!visibleAttendanceUsers.length) {
+      if (selectedUserId !== null) {
+        setSelectedUserId(null);
+      }
+      return;
     }
-  }, [user?.id, selectedUserId]);
+
+    const selectedStillVisible =
+      selectedUserId !== null && visibleAttendanceUsers.some((item) => item.userId === selectedUserId);
+
+    if (!selectedStillVisible) {
+      setSelectedUserId(visibleAttendanceUsers[0].userId);
+    }
+  }, [visibleAttendanceUsers, selectedUserId]);
 
   useEffect(() => {
     if (!user?.token) return;
@@ -133,7 +162,7 @@ export default function ContabilidadDashboard() {
   const expenses = snapshot?.expenses || [];
   const fines = snapshot?.fines || [];
 
-  const activeUserId = selectedUserId ?? user?.id ?? null;
+  const activeUserId = selectedUserId ?? null;
 
   const isWithinWeek = (value?: string | null) => {
     if (!value) return false;
@@ -145,21 +174,27 @@ export default function ContabilidadDashboard() {
   const filteredViatics = useMemo(() => {
     return viatics.filter((item) => {
       if (!isWithinWeek(item.createdAt)) return false;
-      if (!activeUserId) return true;
       const userId = item.usuario?.id ?? item.usuarioId ?? null;
+      if (userId !== null && visibleAttendanceUserIdSet.size > 0 && !visibleAttendanceUserIdSet.has(userId)) {
+        return false;
+      }
+      if (!activeUserId) return true;
       return userId === activeUserId;
     });
-  }, [viatics, activeUserId, range.start, range.end]);
+  }, [viatics, activeUserId, range.start, range.end, visibleAttendanceUserIdSet]);
 
   const filteredVehicles = useMemo(() => {
     return vehicles.filter((item) => {
       const dateRef = item.fechaInicio || item.fechaSolicitud || item.createdAt || null;
       if (!isWithinWeek(dateRef)) return false;
-      if (!activeUserId) return true;
       const userId = item.solicitante?.id ?? item.solicitanteId ?? null;
+      if (userId !== null && visibleAttendanceUserIdSet.size > 0 && !visibleAttendanceUserIdSet.has(userId)) {
+        return false;
+      }
+      if (!activeUserId) return true;
       return userId === activeUserId;
     });
-  }, [vehicles, activeUserId, range.start, range.end]);
+  }, [vehicles, activeUserId, range.start, range.end, visibleAttendanceUserIdSet]);
 
   const filteredProjects = useMemo(() => {
     return projects.filter((item) => isWithinWeek(item.createdAt));
@@ -217,7 +252,7 @@ export default function ContabilidadDashboard() {
       ? new Date(`${attendance.rangeEnd}T23:59:59`)
       : range.end;
 
-    const users = attendance?.users || [];
+    const users = visibleAttendanceUsers;
     const scopedUsers = users.length && activeUserId
       ? users.filter((item) => item.userId === activeUserId)
       : users;
@@ -262,7 +297,7 @@ export default function ContabilidadDashboard() {
     }, 0);
 
     return Math.round((fallbackMinutes / 60) * 10) / 10;
-  }, [attendance, activeUserId, range.end]);
+  }, [visibleAttendanceUsers, attendance?.rangeEnd, activeUserId, range.end]);
 
   const commercialTotals = useMemo(() => {
     const revenue = snapshot?.salesMetrics?.totalRevenue || 0;
@@ -422,7 +457,7 @@ export default function ContabilidadDashboard() {
             </button>
           ))}
         </div>
-        {hasPermission(user, PERMISSIONS.ATTENDANCE_MANAGE) && attendance?.users?.length ? (
+        {hasPermission(user, PERMISSIONS.ATTENDANCE_MANAGE) && visibleAttendanceUsers.length ? (
           <label className={styles.filterControl}>
             <span className={styles.filterLabel}>Usuario</span>
             <select
@@ -430,7 +465,7 @@ export default function ContabilidadDashboard() {
               value={activeUserId ?? ""}
               onChange={(event) => setSelectedUserId(Number(event.target.value))}
             >
-              {attendance.users.map((item) => (
+              {visibleAttendanceUsers.map((item) => (
                 <option key={item.userId} value={item.userId}>
                   {item.userName || `Usuario ${item.userId}`}
                 </option>
@@ -502,7 +537,7 @@ export default function ContabilidadDashboard() {
           <p className={styles.metricLabel}>Horas trabajadas</p>
           <h2 className={styles.metricValue}>{totalHours} h</h2>
           <p className={styles.metricMeta}>
-            {attendance?.users?.length ? `${attendance.users.length} colaboradores` : "Sin permisos de asistencia"}
+            {visibleAttendanceUsers.length ? `${visibleAttendanceUsers.length} colaboradores` : "Sin permisos de asistencia"}
           </p>
         </div>
       </div>

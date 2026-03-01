@@ -2,12 +2,17 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useUser } from "@/components/UserContext";
+import { canViewContabilidadTarget } from "@/lib/contabilidad-visibility";
 import styles from "./page.module.css";
 
 interface PaymentUser {
   id: number;
   nombre: string;
   email: string;
+  roleName?: string;
+  roleFlags?: { accesoConsoleAdmin?: boolean } | null;
+  isSuperAdmin?: boolean;
+  permissions?: string[];
   department?: { nombre: string } | null;
 }
 
@@ -29,6 +34,10 @@ interface AttendanceRangeUser {
   userId: number;
   userName: string;
   email: string;
+  roleName?: string;
+  roleFlags?: { accesoConsoleAdmin?: boolean } | null;
+  isSuperAdmin?: boolean;
+  permissions?: string[];
   department?: string | null;
 }
 
@@ -98,13 +107,46 @@ export default function ContabilidadPagos() {
     fetchEmployees();
   }, [user?.token, rangeFrom, rangeTo]);
 
+  const visibleEmployees = useMemo(() => {
+    return employees.filter((employee) =>
+      canViewContabilidadTarget(user, {
+        id: employee.userId,
+        isSuperAdmin: employee.isSuperAdmin,
+        roleName: employee.roleName,
+        roleFlags: employee.roleFlags,
+        permissions: employee.permissions,
+      }),
+    );
+  }, [employees, user]);
+
+  const visibleEmployeesById = useMemo(() => {
+    return new Map(visibleEmployees.map((employee) => [employee.userId, employee]));
+  }, [visibleEmployees]);
+
+  const visiblePayments = useMemo(() => {
+    return payments.filter((payment) => {
+      const employee = visibleEmployeesById.get(payment.userId);
+      if (employee) {
+        return true;
+      }
+
+      return canViewContabilidadTarget(user, {
+        id: payment.user?.id ?? payment.userId,
+        isSuperAdmin: payment.user?.isSuperAdmin,
+        roleName: payment.user?.roleName,
+        roleFlags: payment.user?.roleFlags,
+        permissions: payment.user?.permissions,
+      });
+    });
+  }, [payments, user, visibleEmployeesById]);
+
   const totalPaid = useMemo(() => {
-    return payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
-  }, [payments]);
+    return visiblePayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+  }, [visiblePayments]);
 
   const uniqueEmployees = useMemo(() => {
-    return new Set(payments.map((payment) => payment.userId)).size;
-  }, [payments]);
+    return new Set(visiblePayments.map((payment) => payment.userId)).size;
+  }, [visiblePayments]);
 
   const formatMoney = (value: number) =>
     value.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
@@ -124,6 +166,10 @@ export default function ContabilidadPagos() {
     if (!user?.token) return;
     if (!selectedUser || !amount) {
       setError("Selecciona un empleado y define el monto.");
+      return;
+    }
+    if (!visibleEmployeesById.has(Number(selectedUser))) {
+      setError("No puedes registrar pagos para ese usuario.");
       return;
     }
     setSaving(true);
@@ -203,7 +249,7 @@ export default function ContabilidadPagos() {
       <div className={styles.metrics}>
         <div className={styles.metricCard}>
           <span>Pagos registrados</span>
-          <strong>{payments.length}</strong>
+          <strong>{visiblePayments.length}</strong>
         </div>
         <div className={styles.metricCard}>
           <span>Total pagado</span>
@@ -229,7 +275,7 @@ export default function ContabilidadPagos() {
                 onChange={(e) => setSelectedUser(e.target.value ? Number(e.target.value) : "")}
               >
                 <option value="">Selecciona empleado</option>
-                {employees.map((emp) => (
+                {visibleEmployees.map((emp) => (
                   <option key={emp.userId} value={emp.userId}>
                     {emp.userName}
                   </option>
@@ -314,7 +360,7 @@ export default function ContabilidadPagos() {
                 </tr>
               </thead>
               <tbody>
-                {payments.map((payment) => (
+                {visiblePayments.map((payment) => (
                   <tr key={payment.id}>
                     <td>
                       <strong>{payment.user?.nombre}</strong>
@@ -341,7 +387,7 @@ export default function ContabilidadPagos() {
                     </td>
                   </tr>
                 ))}
-                {!loading && payments.length === 0 && (
+                {!loading && visiblePayments.length === 0 && (
                   <tr>
                     <td colSpan={6} className={styles.emptyState}>
                       No hay pagos en este rango.

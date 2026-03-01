@@ -3,10 +3,19 @@
 import React, { useEffect, useMemo, useState } from "react";
 import ContabilidadViaticTable from "./ContabilidadViaticTable";
 import { useUser } from "@/components/UserContext";
+import { canViewContabilidadTarget } from "@/lib/contabilidad-visibility";
 import styles from "./page.module.css";
 
 type Viatic = {
   id: number;
+  usuarioId?: number | null;
+  usuario?: {
+    id?: number;
+    roleName?: string;
+    roleFlags?: { accesoConsoleAdmin?: boolean } | null;
+    isSuperAdmin?: boolean;
+    permissions?: string[];
+  } | null;
   montoSolicitado?: number | null;
   estatusPago?: string | null;
 };
@@ -38,12 +47,24 @@ export default function ContabilidadViatics() {
       .catch(() => setViatics([]));
   }, [user]);
 
+  const visibleViatics = useMemo(() => {
+    return viatics.filter((item) =>
+      canViewContabilidadTarget(user, {
+        id: item.usuario?.id ?? item.usuarioId,
+        isSuperAdmin: item.usuario?.isSuperAdmin,
+        roleName: item.usuario?.roleName,
+        roleFlags: item.usuario?.roleFlags,
+        permissions: item.usuario?.permissions,
+      }),
+    );
+  }, [viatics, user]);
+
   const totals = useMemo(() => {
-    const total = viatics.reduce((sum, item) => sum + (item.montoSolicitado || 0), 0);
-    const pending = viatics.filter((item) => item.estatusPago === "Pendiente").length;
-    const approved = viatics.filter((item) => item.estatusPago === "Aprobado").length;
+    const total = visibleViatics.reduce((sum, item) => sum + (item.montoSolicitado || 0), 0);
+    const pending = visibleViatics.filter((item) => item.estatusPago === "Pendiente").length;
+    const approved = visibleViatics.filter((item) => item.estatusPago === "Aprobado").length;
     return { total, pending, approved };
-  }, [viatics]);
+  }, [visibleViatics]);
 
   return (
     <section className={styles.page}>

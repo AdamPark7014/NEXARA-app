@@ -32,6 +32,19 @@ export type AttendanceRangeSummary = {
   users?: {
     userId: number;
     userName?: string;
+    email?: string;
+    department?: string | null;
+    roleName?: string;
+    roleFlags?: {
+      accesoConsole?: boolean;
+      accesoConsoleAdmin?: boolean;
+      accesoGestionUsuarios?: boolean;
+      accesoGestionTienda?: boolean;
+      accesoGestionWeb?: boolean;
+      accesoContabilidad?: boolean;
+    };
+    isSuperAdmin?: boolean;
+    permissions?: string[];
     totalMinutes?: number;
     attendances?: { type: string; timestamp: string }[];
   }[];
