@@ -30,6 +30,7 @@ const LunchBreaksTable: React.FC = () => {
   const [expandedPhotoId, setExpandedPhotoId] = useState<number | null>(null);
   const [expandedPhotoUrl, setExpandedPhotoUrl] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState('');
+  const [isMobile, setIsMobile] = useState(false);
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
@@ -85,6 +86,13 @@ const LunchBreaksTable: React.FC = () => {
     };
   }, [user?.token]);
 
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 900);
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   const openPhotoGallery = (photoUrl: string) => {
     setExpandedPhotoUrl(photoUrl);
   };
@@ -103,19 +111,19 @@ const LunchBreaksTable: React.FC = () => {
 
         {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}
 
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'auto auto 1fr', gap: 12, alignItems: 'center' }}>
           <input
             type="date"
             className="input"
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
-            style={{ maxWidth: 200 }}
+            style={{ maxWidth: isMobile ? '100%' : 200, width: '100%' }}
           />
           {dateFilter && (
             <button
               className="button-secondary"
               onClick={() => setDateFilter('')}
-              style={{ padding: '8px 12px', fontSize: 13 }}
+              style={{ padding: '8px 12px', fontSize: 13, width: isMobile ? '100%' : 'auto' }}
             >
               Limpiar
             </button>
@@ -130,136 +138,220 @@ const LunchBreaksTable: React.FC = () => {
             No hay registros de horas de comida
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--muted)' }}>
-                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                    Usuario
-                  </th>
-                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                    Fecha
-                  </th>
-                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                    Entrada a Comida
-                  </th>
-                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                    Regreso al Trabajo
-                  </th>
-                  <th style={{ padding: 12, textAlign: 'center', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                    Fotos
-                  </th>
-                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                    Estado
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {lunchBreaks.map((lunch) => (
-                  <tr key={lunch.id} style={{ borderBottom: '1px solid var(--muted)' }}>
-                    <td style={{ padding: 12 }}>
-                      <div style={{ fontWeight: 500 }}>{lunch.user.nombre}</div>
-                      <div style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
-                        {lunch.user.email}
-                      </div>
-                    </td>
-                    <td style={{ padding: 12, color: 'var(--text-secondary)', fontSize: 12 }}>
-                      {new Date(lunch.date).toLocaleDateString('es-MX')}
-                    </td>
-                    <td style={{ padding: 12 }}>
-                      <div style={{ fontWeight: 500, fontSize: 12 }}>
-                        {new Date(lunch.checkinTime).toLocaleTimeString('es-MX', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </div>
-                      {lunch.isCheckinLate && (
-                        <div style={{ color: 'var(--warning)', fontSize: 11 }}>
-                          ⚠️ Fuera de horario
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ padding: 12 }}>
-                      {lunch.checkoutTime ? (
-                        <>
+          <>
+            {!isMobile && (
+              <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', border: '1px solid var(--muted)', borderRadius: 12 }}>
+                <table style={{ width: '100%', minWidth: 860, borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--muted)' }}>
+                      <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        Usuario
+                      </th>
+                      <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        Fecha
+                      </th>
+                      <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        Entrada a Comida
+                      </th>
+                      <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        Regreso al Trabajo
+                      </th>
+                      <th style={{ padding: 12, textAlign: 'center', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        Fotos
+                      </th>
+                      <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        Estado
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lunchBreaks.map((lunch) => (
+                      <tr key={lunch.id} style={{ borderBottom: '1px solid var(--muted)' }}>
+                        <td style={{ padding: 12 }}>
+                          <div style={{ fontWeight: 500 }}>{lunch.user.nombre}</div>
+                          <div style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
+                            {lunch.user.email}
+                          </div>
+                        </td>
+                        <td style={{ padding: 12, color: 'var(--text-secondary)', fontSize: 12 }}>
+                          {new Date(lunch.date).toLocaleDateString('es-MX')}
+                        </td>
+                        <td style={{ padding: 12 }}>
                           <div style={{ fontWeight: 500, fontSize: 12 }}>
-                            {new Date(lunch.checkoutTime).toLocaleTimeString('es-MX', {
+                            {new Date(lunch.checkinTime).toLocaleTimeString('es-MX', {
                               hour: '2-digit',
                               minute: '2-digit',
                             })}
                           </div>
-                          {lunch.isCheckoutLate && (
-                            <div style={{ color: 'var(--danger)', fontSize: 11 }}>
-                              ⚠️ Pasó de hora
+                          {lunch.isCheckinLate && (
+                            <div style={{ color: 'var(--warning)', fontSize: 11 }}>
+                              ⚠️ Fuera de horario
                             </div>
                           )}
-                        </>
-                      ) : (
-                        <span style={{ color: 'var(--text-secondary)' }}>—</span>
-                      )}
-                    </td>
-                    <td style={{ padding: 12, textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-                        {lunch.checkinPhotoUrl && (
-                          <button
+                        </td>
+                        <td style={{ padding: 12 }}>
+                          {lunch.checkoutTime ? (
+                            <>
+                              <div style={{ fontWeight: 500, fontSize: 12 }}>
+                                {new Date(lunch.checkoutTime).toLocaleTimeString('es-MX', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </div>
+                              {lunch.isCheckoutLate && (
+                                <div style={{ color: 'var(--danger)', fontSize: 11 }}>
+                                  ⚠️ Pasó de hora
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <span style={{ color: 'var(--text-secondary)' }}>—</span>
+                          )}
+                        </td>
+                        <td style={{ padding: 12, textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                            {lunch.checkinPhotoUrl && (
+                              <button
+                                style={{
+                                  padding: '4px 8px',
+                                  fontSize: 11,
+                                  background: 'var(--info)',
+                                  color: '#fff',
+                                  border: 'none',
+                                  borderRadius: 4,
+                                  cursor: 'pointer',
+                                }}
+                                onClick={() => openPhotoGallery(lunch.checkinPhotoUrl)}
+                              >
+                                📷 Entrada
+                              </button>
+                            )}
+                            {lunch.checkoutPhotoUrl && (
+                              <button
+                                style={{
+                                  padding: '4px 8px',
+                                  fontSize: 11,
+                                  background: 'var(--success)',
+                                  color: '#fff',
+                                  border: 'none',
+                                  borderRadius: 4,
+                                  cursor: 'pointer',
+                                }}
+                                onClick={() => openPhotoGallery(lunch.checkoutPhotoUrl!)}
+                              >
+                                📷 Salida
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td style={{ padding: 12 }}>
+                          <div
                             style={{
+                              display: 'inline-block',
                               padding: '4px 8px',
-                              fontSize: 11,
-                              background: 'var(--info)',
-                              color: '#fff',
-                              border: 'none',
                               borderRadius: 4,
-                              cursor: 'pointer',
-                            }}
-                            onClick={() => openPhotoGallery(lunch.checkinPhotoUrl)}
-                          >
-                            📷 Entrada
-                          </button>
-                        )}
-                        {lunch.checkoutPhotoUrl && (
-                          <button
-                            style={{
-                              padding: '4px 8px',
+                              background:
+                                lunch.status === 'COMPLETED'
+                                  ? 'var(--success)20'
+                                  : 'var(--warning)20',
+                              color:
+                                lunch.status === 'COMPLETED'
+                                  ? 'var(--success)'
+                                  : 'var(--warning)',
+                              fontWeight: 500,
                               fontSize: 11,
-                              background: 'var(--success)',
-                              color: '#fff',
-                              border: 'none',
-                              borderRadius: 4,
-                              cursor: 'pointer',
                             }}
-                            onClick={() => openPhotoGallery(lunch.checkoutPhotoUrl!)}
                           >
-                            📷 Salida
-                          </button>
-                        )}
+                            {lunch.status === 'COMPLETED' ? '✓ Completada' : '⏳ En Progreso'}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {isMobile && (
+              <div style={{ display: 'grid', gap: 12 }}>
+                {lunchBreaks.map((lunch) => (
+                  <div key={lunch.id} className="card" style={{ border: '1px solid var(--muted)', padding: 12, display: 'grid', gap: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 600 }}>{lunch.user.nombre}</div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: 12, wordBreak: 'break-word' }}>{lunch.user.email}</div>
                       </div>
-                    </td>
-                    <td style={{ padding: 12 }}>
                       <div
                         style={{
                           display: 'inline-block',
                           padding: '4px 8px',
                           borderRadius: 4,
-                          background:
-                            lunch.status === 'COMPLETED'
-                              ? 'var(--success)20'
-                              : 'var(--warning)20',
-                          color:
-                            lunch.status === 'COMPLETED'
-                              ? 'var(--success)'
-                              : 'var(--warning)',
-                          fontWeight: 500,
+                          background: lunch.status === 'COMPLETED' ? 'var(--success)20' : 'var(--warning)20',
+                          color: lunch.status === 'COMPLETED' ? 'var(--success)' : 'var(--warning)',
+                          fontWeight: 600,
                           fontSize: 11,
+                          whiteSpace: 'nowrap',
                         }}
                       >
                         {lunch.status === 'COMPLETED' ? '✓ Completada' : '⏳ En Progreso'}
                       </div>
-                    </td>
-                  </tr>
+                    </div>
+
+                    <div style={{ display: 'grid', gap: 4, fontSize: 13 }}>
+                      <div><strong>Fecha:</strong> {new Date(lunch.date).toLocaleDateString('es-MX')}</div>
+                      <div>
+                        <strong>Entrada:</strong>{' '}
+                        {new Date(lunch.checkinTime).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+                        {lunch.isCheckinLate ? ' · ⚠️ Fuera de horario' : ''}
+                      </div>
+                      <div>
+                        <strong>Regreso:</strong>{' '}
+                        {lunch.checkoutTime
+                          ? new Date(lunch.checkoutTime).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+                          : '—'}
+                        {lunch.checkoutTime && lunch.isCheckoutLate ? ' · ⚠️ Pasó de hora' : ''}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <button
+                        style={{
+                          padding: '10px 8px',
+                          fontSize: 12,
+                          background: 'var(--info)',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: 8,
+                          cursor: lunch.checkinPhotoUrl ? 'pointer' : 'not-allowed',
+                          opacity: lunch.checkinPhotoUrl ? 1 : 0.6,
+                        }}
+                        disabled={!lunch.checkinPhotoUrl}
+                        onClick={() => lunch.checkinPhotoUrl && openPhotoGallery(lunch.checkinPhotoUrl)}
+                      >
+                        📷 Entrada
+                      </button>
+                      <button
+                        style={{
+                          padding: '10px 8px',
+                          fontSize: 12,
+                          background: 'var(--success)',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: 8,
+                          cursor: lunch.checkoutPhotoUrl ? 'pointer' : 'not-allowed',
+                          opacity: lunch.checkoutPhotoUrl ? 1 : 0.6,
+                        }}
+                        disabled={!lunch.checkoutPhotoUrl}
+                        onClick={() => lunch.checkoutPhotoUrl && openPhotoGallery(lunch.checkoutPhotoUrl)}
+                      >
+                        📷 Salida
+                      </button>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
