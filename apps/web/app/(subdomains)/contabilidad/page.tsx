@@ -7,7 +7,7 @@ export default function ContabilidadIndex() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace("/login");
+    router.replace("/dashboard");
   }, [router]);
 
   return null;
