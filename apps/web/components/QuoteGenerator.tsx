@@ -10,7 +10,7 @@ interface Quote {
   opportunity?: { id: number; title: string; description: string };
   client?: { id: number; name: string };
   quoteNumber?: string;
-  total?: number;
+  total?: number | string;
   pdfUrl?: string;
 }
 
@@ -177,7 +177,7 @@ export default function QuoteGenerator({ onQuoteGenerated }: QuoteGeneratorProps
                 <option value="">Selecciona una cotización...</option>
                 {quotes.map((quote) => (
                   <option key={quote.id} value={quote.id}>
-                    {`${quote.quoteNumber || `COT-${quote.id}`} - $${quote.total?.toFixed(2)}`}
+                    {`${quote.quoteNumber || `COT-${quote.id}`} - $${Number(quote.total || 0).toFixed(2)}`}
                   </option>
                 ))}
               </select>
