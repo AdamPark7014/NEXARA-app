@@ -139,12 +139,12 @@
 .avatarImageLogo {
   border-radius: 14px;
   object-fit: contain;
-  background: rgba(255, 255, 255, 0.96);
-  padding: 6px;
+  background: transparent;
+  padding: 0;
 }
 
 :global(body.dark) .avatarImageLogo {
-  background: rgba(255, 255, 255, 0.96);
+  background: transparent;
 }
 
 .sidebarName {
