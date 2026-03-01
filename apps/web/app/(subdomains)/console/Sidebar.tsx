@@ -65,31 +65,70 @@ export default function Sidebar() {
     anyPermissions?: string[];
   };
 
-  // Menú por permisos
-  const menu: MenuItem[] = [
+  type MenuGroup = {
+    id: string;
+    title: string;
+    items: MenuItem[];
+  };
+
+  const canAccessItem = (item: MenuItem) => {
+    if (item.permissions && !item.permissions.every((permission) => hasPermission(user, permission))) {
+      return false;
+    }
+    if (item.anyPermissions && !hasAnyPermission(user, item.anyPermissions)) {
+      return false;
+    }
+    return true;
+  };
+
+  const profileItems: MenuItem[] = [
+    { label: "Mi perfil", href: "/my-profile", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+  ];
+
+  const userItems: MenuItem[] = [
     { label: "Resumen ejecutivo", href: "/dashboard", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
     { label: "Operación: actividades", href: "/activities", permissions: [PERMISSIONS.CONSOLE_ACCESS] },
     { label: "Evidencias de servicio", href: "/evidences", permissions: [PERMISSIONS.CONSOLE_ACCESS] },
     { label: "Viáticos operativos", href: "/viatics", permissions: [PERMISSIONS.CONSOLE_ACCESS] },
     { label: "Control vehicular", href: "/vehicles", permissions: [PERMISSIONS.CONSOLE_ACCESS] },
-    { label: "Clientes corporativos", href: "/clients", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Gestión de usuarios", href: "/users", permissions: [PERMISSIONS.USERS_MANAGE] },
-    { label: "Mi perfil", href: "/my-profile", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
     { label: "Asistencia", href: "/attendance", permissions: [PERMISSIONS.ATTENDANCE_VIEW] },
     { label: "Monitoreo GPS", href: "/gps", permissions: [PERMISSIONS.GPS_VIEW] },
     { label: "Cotizaciones", href: "/cotizaciones", permissions: [PERMISSIONS.COTIZACIONES_ACCESS] },
   ];
 
-  // Solo admin y superadmin ven multas globales
-  if (isAdmin || isSuperAdmin) {
-    menu.push({ label: "Multas y sanciones", href: "/fines", anyPermissions: [PERMISSIONS.CONSOLE_ADMIN] });
-    menu.push({ label: "Gestión comercial", href: "/gestion-vendedores", anyPermissions: [PERMISSIONS.CONSOLE_ADMIN] });
-  }
+  const adminItems: MenuItem[] = [
+    { label: "Clientes corporativos", href: "/clients", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Multas y sanciones", href: "/fines", anyPermissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Gestión comercial", href: "/gestion-vendedores", anyPermissions: [PERMISSIONS.CONSOLE_ADMIN] },
+  ];
 
-  // Usuarios de consola (incluyendo no admin) ven la sección de herramientas
-  if (isConsoleUser) {
-    menu.push({ label: "Herramientas internas", href: "/tools", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] });
-  }
+  const superAdminItems: MenuItem[] = [
+    { label: "Gestión de usuarios", href: "/users", permissions: [PERMISSIONS.USERS_MANAGE] },
+    { label: "Herramientas internas", href: "/tools", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+  ];
+
+  const groups: MenuGroup[] = [
+    {
+      id: "profile",
+      title: "Tu cuenta",
+      items: profileItems,
+    },
+    {
+      id: "user",
+      title: "Acceso usuario",
+      items: [...userItems, ...(isAdmin || isSuperAdmin ? [] : isConsoleUser ? [{ label: "Herramientas internas", href: "/tools", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] }] : [])],
+    },
+    {
+      id: "admin",
+      title: "Acceso administrador",
+      items: [...adminItems, ...(!isSuperAdmin && isAdmin ? [{ label: "Gestión de usuarios", href: "/users", permissions: [PERMISSIONS.USERS_MANAGE] }, ...(isConsoleUser ? [{ label: "Herramientas internas", href: "/tools", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] }] : [])] : [])],
+    },
+    {
+      id: "superadmin",
+      title: "Acceso superadmin",
+      items: isSuperAdmin ? superAdminItems : [],
+    },
+  ].filter((group) => group.items.some(canAccessItem));
 
   // Avatar: usa user.avatarUrl si existe, si no, usa un avatar generado por ui-avatars.com
   const avatarUrl = user.isSuperAdmin
@@ -146,32 +185,27 @@ export default function Sidebar() {
             {user.isSuperAdmin && <span className={styles.levelPill}>Superadmin</span>}
           </div>
         </div>
-        <div className={styles.menuTitle}>Centro de operaciones</div>
-        <ul className={styles.sidebarMenu}>
-          {menu.filter(item => {
-            if (item.permissions && !item.permissions.every((permission) => hasPermission(user, permission))) {
-              return false;
-            }
-            if (item.anyPermissions && !hasAnyPermission(user, item.anyPermissions)) {
-              return false;
-            }
-            return true;
-          }).map((item) => (
-            <li key={item.href} className={styles.sidebarMenuItem}>
-              <Link
-                href={item.href}
-                className={
-                  pathname && pathname === item.href
-                    ? `${styles.menuLink} ${styles.active}`
-                    : styles.menuLink
-                }
-                onClick={closeMenu}
-              >
-                {item.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        {groups.map((group) => (
+          <div key={group.id}>
+            <div className={styles.menuTitle}>{group.title}</div>
+            <ul className={styles.sidebarMenu}>
+              {group.items.filter(canAccessItem).map((item) => {
+                const isItemActive = pathname === item.href || (pathname?.startsWith(`${item.href}/`) ?? false);
+                return (
+                  <li key={`${group.id}-${item.href}`} className={styles.sidebarMenuItem}>
+                    <Link
+                      href={item.href}
+                      className={isItemActive ? `${styles.menuLink} ${styles.active}` : styles.menuLink}
+                      onClick={closeMenu}
+                    >
+                      {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
         <div className={styles.sidebarFooter}>
           <button
             onClick={toggleDarkMode}
