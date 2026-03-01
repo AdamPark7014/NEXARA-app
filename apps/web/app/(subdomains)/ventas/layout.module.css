@@ -94,6 +94,49 @@
   }
 }
 
+@media (max-width: 900px) {
+  .salesMain {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .salesMain :global(.tableWrapper),
+  .salesMain :global(.tableContainer),
+  .salesMain :global(.tableScroll),
+  .salesMain :global([class*="tableWrapper"]),
+  .salesMain :global([class*="tableContainer"]) {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .salesMain :global(table),
+  .salesMain :global(.table) {
+    width: max-content;
+    min-width: 100%;
+    max-width: none;
+  }
+
+  .salesMain :global(img),
+  .salesMain :global(svg),
+  .salesMain :global(canvas),
+  .salesMain :global(iframe),
+  .salesMain :global(video) {
+    max-width: 100%;
+  }
+
+  .salesMain :global(p),
+  .salesMain :global(h1),
+  .salesMain :global(h2),
+  .salesMain :global(h3),
+  .salesMain :global(h4),
+  .salesMain :global(span),
+  .salesMain :global(a),
+  .salesMain :global(li) {
+    overflow-wrap: anywhere;
+  }
+}
+
 @media (max-width: 768px) {
   .salesRoot {
     gap: 0;

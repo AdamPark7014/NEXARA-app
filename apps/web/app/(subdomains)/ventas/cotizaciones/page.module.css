@@ -462,11 +462,19 @@
     grid-template-columns: 1fr;
   }
 
+  .cardHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
   .cardMeta {
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
     text-align: left;
+    min-width: 0;
+    width: 100%;
   }
 
   .detailsGrid {
@@ -480,5 +488,11 @@
   .modalContent {
     width: 95%;
     padding: 20px;
+  }
+}
+
+@media (max-width: 520px) {
+  .detailsGrid {
+    grid-template-columns: 1fr;
   }
 }
