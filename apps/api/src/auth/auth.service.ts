@@ -13,7 +13,7 @@ export class AuthService {
   ) {}
 
   private isSuperAdmin(email: string) {
-    return ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'].includes(email.toLowerCase());
+    return ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'].includes(email.trim().toLowerCase());
   }
 
   private buildPermissions(role: any) {
@@ -109,8 +109,14 @@ export class AuthService {
   }
 
   async validateUser(email: string, password: string) {
-    const user = await this.prisma['user'].findUnique({
-      where: { email },
+    const normalizedEmail = email.trim();
+    const user = await this.prisma['user'].findFirst({
+      where: {
+        email: {
+          equals: normalizedEmail,
+          mode: 'insensitive',
+        },
+      },
       include: { role: true, department: true },
     });
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
