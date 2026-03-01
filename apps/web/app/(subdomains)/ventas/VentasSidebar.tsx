@@ -6,6 +6,7 @@ import styles from "./VentasSidebar.module.css";
 import { useUser } from "@/components/UserContext";
 import { useTheme } from "@/components/ThemeContext";
 import { useState, useMemo } from "react";
+import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions";
 
 interface MenuItem {
   label: string;
@@ -43,14 +44,39 @@ export default function VentasSidebar() {
   const { darkMode, toggleDarkMode } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  const canManageSellers = hasAnyPermission(user, [
+    PERMISSIONS.CONSOLE_ADMIN,
+    PERMISSIONS.SALES_MANAGE,
+    PERMISSIONS.ATTENDANCE_MANAGE,
+    PERMISSIONS.USERS_MANAGE,
+    PERMISSIONS.PANEL_VENTAS,
+  ]);
+
+  const userRoleLabel = user?.isSuperAdmin
+    ? "Super Admin"
+    : canManageSellers
+      ? "Admin Comercial"
+      : "Vendedor";
+
   const isActive = (href: string) => {
     if (!pathname) return false;
     return pathname.startsWith(href);
   };
 
   const groupedItems = useMemo(() => {
+    const items = [...menuItems];
+    if (canManageSellers) {
+      items.push({
+        label: "Gestión Vendedores",
+        icon: "🧠",
+        href: "/gestion-vendedores",
+        section: "Análisis",
+        description: "Control ejecutivo y productividad diaria",
+      });
+    }
+
     const groups: { [key: string]: MenuItem[] } = {};
-    menuItems.forEach((item) => {
+    items.forEach((item) => {
       const section = item.section || "Principal";
       if (!groups[section]) {
         groups[section] = [];
@@ -59,7 +85,7 @@ export default function VentasSidebar() {
     });
 
     return groups;
-  }, []);
+  }, [canManageSellers]);
 
   if (!user) return null;
 
@@ -89,8 +115,8 @@ export default function VentasSidebar() {
           </div>
           <div className={styles.userInfo}>
             <p className={styles.userName}>{user.nombre}</p>
-            <p className={styles.userRole}>Vendedor</p>
-            {user.isSuperAdmin && <span className={styles.badgeAdmin}>Admin</span>}
+            <p className={styles.userRole}>{userRoleLabel}</p>
+            {canManageSellers && <span className={styles.badgeAdmin}>Admin</span>}
           </div>
         </div>
       )}
