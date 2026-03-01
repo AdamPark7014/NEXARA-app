@@ -84,6 +84,7 @@ export default function Sidebar() {
   // Solo admin y superadmin ven multas globales
   if (isAdmin || isSuperAdmin) {
     menu.push({ label: "Multas", href: "/fines", anyPermissions: [PERMISSIONS.CONSOLE_ADMIN] });
+    menu.push({ label: "Gestión Vendedores", href: "/gestion-vendedores", anyPermissions: [PERMISSIONS.CONSOLE_ADMIN] });
   }
 
   // Usuarios de consola (incluyendo no admin) ven la sección de herramientas
