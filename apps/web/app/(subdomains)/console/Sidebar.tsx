@@ -67,29 +67,29 @@ export default function Sidebar() {
 
   // Menú por permisos
   const menu: MenuItem[] = [
-    { label: "Dashboard", href: "/dashboard", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Actividades", href: "/activities", permissions: [PERMISSIONS.CONSOLE_ACCESS] },
-    { label: "Evidencias", href: "/evidences", permissions: [PERMISSIONS.CONSOLE_ACCESS] },
-    { label: "Viáticos", href: "/viatics", permissions: [PERMISSIONS.CONSOLE_ACCESS] },
-    { label: "Vehículos", href: "/vehicles", permissions: [PERMISSIONS.CONSOLE_ACCESS] },
-    { label: "Clientes", href: "/clients", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Tickets clientes", href: "/client-tickets", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Usuarios", href: "/users", permissions: [PERMISSIONS.USERS_MANAGE] },
-    { label: "Mi Perfil", href: "/my-profile", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Entradas/Salidas", href: "/attendance", permissions: [PERMISSIONS.ATTENDANCE_VIEW] },
-    { label: "Mapa GPS", href: "/gps", permissions: [PERMISSIONS.GPS_VIEW] },
+    { label: "Resumen ejecutivo", href: "/dashboard", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Operación: actividades", href: "/activities", permissions: [PERMISSIONS.CONSOLE_ACCESS] },
+    { label: "Evidencias de servicio", href: "/evidences", permissions: [PERMISSIONS.CONSOLE_ACCESS] },
+    { label: "Viáticos operativos", href: "/viatics", permissions: [PERMISSIONS.CONSOLE_ACCESS] },
+    { label: "Control vehicular", href: "/vehicles", permissions: [PERMISSIONS.CONSOLE_ACCESS] },
+    { label: "Clientes corporativos", href: "/clients", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Tickets de clientes", href: "/client-tickets", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Gestión de usuarios", href: "/users", permissions: [PERMISSIONS.USERS_MANAGE] },
+    { label: "Mi perfil", href: "/my-profile", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Asistencia", href: "/attendance", permissions: [PERMISSIONS.ATTENDANCE_VIEW] },
+    { label: "Monitoreo GPS", href: "/gps", permissions: [PERMISSIONS.GPS_VIEW] },
     { label: "Cotizaciones", href: "/cotizaciones", permissions: [PERMISSIONS.COTIZACIONES_ACCESS] },
   ];
 
   // Solo admin y superadmin ven multas globales
   if (isAdmin || isSuperAdmin) {
-    menu.push({ label: "Multas", href: "/fines", anyPermissions: [PERMISSIONS.CONSOLE_ADMIN] });
-    menu.push({ label: "Gestión Vendedores", href: "/gestion-vendedores", anyPermissions: [PERMISSIONS.CONSOLE_ADMIN] });
+    menu.push({ label: "Multas y sanciones", href: "/fines", anyPermissions: [PERMISSIONS.CONSOLE_ADMIN] });
+    menu.push({ label: "Gestión comercial", href: "/gestion-vendedores", anyPermissions: [PERMISSIONS.CONSOLE_ADMIN] });
   }
 
   // Usuarios de consola (incluyendo no admin) ven la sección de herramientas
   if (isConsoleUser) {
-    menu.push({ label: "Herramientas", href: "/tools", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] });
+    menu.push({ label: "Herramientas internas", href: "/tools", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] });
   }
 
   // Avatar: usa user.avatarUrl si existe, si no, usa un avatar generado por ui-avatars.com
@@ -103,7 +103,7 @@ export default function Sidebar() {
       <div className={styles.sidebarHeader}>
         <div className={styles.sidebarLogo}>
           <span className={styles.brandMark}>NEXARA</span>
-          {isMobile && <span className={styles.brandSub}>Console</span>}
+          {isMobile && <span className={styles.brandSub}>Consola</span>}
         </div>
         {isMobile && (
           <button
@@ -147,7 +147,7 @@ export default function Sidebar() {
             {user.isSuperAdmin && <span className={styles.levelPill}>Superadmin</span>}
           </div>
         </div>
-        <div className={styles.menuTitle}>Menu principal</div>
+        <div className={styles.menuTitle}>Centro de operaciones</div>
         <ul className={styles.sidebarMenu}>
           {menu.filter(item => {
             if (item.permissions && !item.permissions.every((permission) => hasPermission(user, permission))) {
@@ -180,8 +180,8 @@ export default function Sidebar() {
             aria-label={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
             title={darkMode ? 'Modo claro' : 'Modo oscuro'}
           >
-            <span className={styles.themeIcon}>{darkMode ? '🌙' : '☀️'}</span>
-            <span className={styles.themeLabel}>{darkMode ? 'Oscuro' : 'Claro'}</span>
+            <span className={styles.themeIcon} aria-hidden="true">●</span>
+            <span className={styles.themeLabel}>{darkMode ? 'Vista oscura' : 'Vista clara'}</span>
           </button>
         </div>
       </div>

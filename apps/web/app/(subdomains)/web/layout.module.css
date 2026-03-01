@@ -281,6 +281,8 @@
 @media (max-width: 960px) {
   .webPanelRoot {
     flex-direction: column;
+    gap: 10px;
+    padding: 12px;
   }
 
   .webPanelSidebar {
@@ -288,13 +290,34 @@
     min-height: auto;
     position: relative;
     margin: 0;
+    border-radius: 18px;
+    padding: 16px 14px;
   }
 
   .webPanelNav {
+    display: grid;
     grid-auto-flow: column;
     grid-auto-columns: minmax(140px, 1fr);
     overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    gap: 8px;
     padding-bottom: 6px;
+  }
+
+  .navLink {
+    min-height: 44px;
+    padding: 12px 14px;
+    transform: none;
+    box-shadow: none;
+    animation: none;
+    opacity: 1;
+    scroll-snap-align: start;
+  }
+
+  .navLink:hover {
+    transform: none;
+    box-shadow: 0 4px 10px rgba(15, 106, 214, 0.14);
   }
 
   .webPanelFooter {
@@ -302,6 +325,45 @@
   }
 
   .webPanelMain {
-    padding: var(--panel-padding-y) var(--panel-padding-x);
+    padding: 14px 12px 18px;
+  }
+}
+
+@media (max-width: 640px) {
+  .webPanelRoot {
+    padding: 8px;
+  }
+
+  .webPanelSidebar {
+    border-radius: 14px;
+    padding: 12px;
+  }
+
+  .brandMark {
+    font-size: 1.45rem;
+    letter-spacing: 0.12rem;
+  }
+
+  .brandSub {
+    font-size: 0.72rem;
+    letter-spacing: 0.2rem;
+  }
+
+  .webPanelMenuTitle {
+    letter-spacing: 0.2rem;
+    font-size: 0.65rem;
+    margin: 4px 8px 0;
+  }
+
+  .webPanelNav {
+    grid-auto-columns: minmax(120px, 1fr);
+  }
+
+  .navLabel {
+    font-size: 0.9rem;
+  }
+
+  .webPanelMain {
+    padding: 12px 8px 16px;
   }
 }

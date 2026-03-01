@@ -552,8 +552,8 @@ export default function ClientTicketsPage() {
             mode="client"
             redirectTo="/"
             onClientLogin={handleClientLogin}
-            title="Portal de Tickets"
-            subtitle="Ingresa con tu cuenta de cliente"
+            title="Portal de atención corporativa"
+            subtitle="Ingresa con tu cuenta de cliente para dar seguimiento a tus servicios"
           />
         ) : (
           <PanelLogin
@@ -561,7 +561,7 @@ export default function ClientTicketsPage() {
             redirectTo="/"
             onBranchLogin={handleBranchLogin}
             title="Portal de sucursal"
-            subtitle="Acceso para levantar tickets de tu tienda"
+            subtitle="Acceso operativo para reportar solicitudes de servicio"
           />
         )}
       </div>
@@ -569,7 +569,7 @@ export default function ClientTicketsPage() {
   }
 
   return (
-    <div className={consoleStyles.consoleLayout}>
+    <div className={`${consoleStyles.consoleLayout} ${styles.ticketsConsole}`}>
       <aside className={consoleStyles.sidebar}>
         <div className={consoleStyles.sidebarLogo}>
           <span className={consoleStyles.brandMark}>NEXARA</span>
@@ -584,12 +584,12 @@ export default function ClientTicketsPage() {
             )}
           </div>
           <div className={consoleStyles.sidebarName}>{session.client.name}</div>
-          <div className={consoleStyles.sidebarEmail}>Portal de tickets Nexara</div>
+          <div className={consoleStyles.sidebarEmail}>Seguimiento de servicio y soporte</div>
           <div className={consoleStyles.sidebarMeta}>
             <span className={consoleStyles.rolePill}>Cliente</span>
           </div>
         </div>
-        <div className={consoleStyles.menuTitle}>Menu cliente</div>
+        <div className={consoleStyles.menuTitle}>Centro de servicio</div>
         <ul className={consoleStyles.sidebarMenu}>
           <li className={consoleStyles.sidebarMenuItem}>
             <button
@@ -597,7 +597,7 @@ export default function ClientTicketsPage() {
               className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "tickets" ? consoleStyles.active : ""}`}
               onClick={() => setActiveTab("tickets")}
             >
-              Tickets
+              Estado de tickets
             </button>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
@@ -606,7 +606,7 @@ export default function ClientTicketsPage() {
               className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "nuevo" ? consoleStyles.active : ""}`}
               onClick={() => setActiveTab("nuevo")}
             >
-              Levantar ticket
+              Nueva solicitud
             </button>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
@@ -615,7 +615,7 @@ export default function ClientTicketsPage() {
               className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "perfil" ? consoleStyles.active : ""}`}
               onClick={() => setActiveTab("perfil")}
             >
-              Perfil
+              Perfil corporativo
             </button>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
@@ -623,7 +623,7 @@ export default function ClientTicketsPage() {
               href="mis-sucursales"
               className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
             >
-              Mis sucursales
+              Gestión de sucursales
             </a>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
@@ -632,7 +632,7 @@ export default function ClientTicketsPage() {
               className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
               onClick={handleLogout}
             >
-              Cerrar sesion
+              Cerrar sesión
             </button>
           </li>
         </ul>
@@ -644,8 +644,8 @@ export default function ClientTicketsPage() {
               {pendingFeedback.length > 0 && (
                 <div className={`card ${styles.cardPanel}`}>
                   <div>
-                    <div style={{ fontWeight: 700 }}>Confirma tu servicio</div>
-                    <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>Ayudanos a validar que todo quedo resuelto.</div>
+                    <p className={styles.sectionTitle}>Confirmación de servicio</p>
+                    <p className={styles.sectionSubtitle}>Ayúdanos a validar la calidad del servicio recibido.</p>
                   </div>
                   <div className={styles.listStack}>
                     {pendingFeedback.map((activity) => (
@@ -676,7 +676,7 @@ export default function ClientTicketsPage() {
                           </div>
                           {[
                             { key: "wasOnTime", label: "Llego a tiempo" },
-                            { key: "wasFriendly", label: "Atencion amable" },
+                            { key: "wasFriendly", label: "Atención amable" },
                             { key: "wasSolved", label: "Problema resuelto" },
                           ].map((item) => (
                             <div key={item.key}>
@@ -709,7 +709,7 @@ export default function ClientTicketsPage() {
                         />
                         <div className={styles.actionRow}>
                           <button className="button-primary" type="button" onClick={() => handleFeedbackSubmit(activity.id)}>
-                            Enviar encuesta
+                            Enviar evaluación
                           </button>
                         </div>
                       </div>
@@ -720,8 +720,8 @@ export default function ClientTicketsPage() {
               <div className={`card ${styles.cardSoft}`}>
                 <div className={styles.itemHeader}>
                   <div>
-                    <div style={{ fontWeight: 700 }}>Tickets activos</div>
-                    <div className={styles.mutedText}>Actualiza en tiempo real conforme se suben evidencias.</div>
+                    <p className={styles.sectionTitle}>Tickets activos</p>
+                    <p className={styles.sectionSubtitle}>Seguimiento en tiempo real de avances y evidencias.</p>
                   </div>
                   <div className={styles.mutedText}>{loading ? "Sincronizando..." : "Actualizado"}</div>
                 </div>
@@ -730,8 +730,8 @@ export default function ClientTicketsPage() {
                     <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Rango del reporte</label>
                     <select className="input" value={reportRange} onChange={(e) => setReportRange(e.target.value as typeof reportRange)}>
                       <option value="today">Hoy</option>
-                      <option value="7d">Ultimos 7 dias</option>
-                      <option value="30d">Ultimos 30 dias</option>
+                      <option value="7d">Últimos 7 días</option>
+                      <option value="30d">Últimos 30 días</option>
                       <option value="custom">Rango personalizado</option>
                     </select>
                   </div>
@@ -757,11 +757,11 @@ export default function ClientTicketsPage() {
                   </div>
                   <div className={styles.actionRow}>
                     <button className="button-primary" onClick={handleReportDownload} disabled={loading}>
-                      Descargar reporte
+                      Descargar reporte consolidado
                     </button>
                   </div>
                 </div>
-                {error && <div style={{ color: "var(--danger)", fontSize: 12 }}>{error}</div>}
+                {error && <div className={styles.errorText}>{error}</div>}
               </div>
               {loading && <div>cargando...</div>}
               {sortedTickets.map((ticket) => (
@@ -792,7 +792,7 @@ export default function ClientTicketsPage() {
                       </a>
                     )}
                     <button className="button-secondary" type="button" onClick={() => handleTicketReport(ticket.id)}>
-                      Reporte del ticket (PDF)
+                      Exportar ticket (PDF)
                     </button>
                   </div>
                   <div className={styles.grid140}>
@@ -826,8 +826,8 @@ export default function ClientTicketsPage() {
           {activeTab === "nuevo" && (
             <div className={styles.sectionStack}>
               <div className={`card ${styles.cardSoft}`}>
-                <div style={{ fontWeight: 700 }}>Levantar ticket</div>
-                <div className={styles.mutedText}>Describe el problema y selecciona la ubicacion.</div>
+                <p className={styles.sectionTitle}>Nueva solicitud</p>
+                <p className={styles.sectionSubtitle}>Describe la solicitud y selecciona la ubicación del servicio.</p>
                 <div className={styles.grid200}>
                   <div>
                     <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Sucursal existente</label>
@@ -836,7 +836,7 @@ export default function ClientTicketsPage() {
                       value={requestDraft.branchId}
                       onChange={(e) => handleRequestBranchSelect(e.target.value)}
                     >
-                      <option value="">Selecciona</option>
+                      <option value="">Selecciona una sucursal</option>
                       {branches.map((branch) => (
                         <option key={branch.id} value={branch.id}>{branch.name}</option>
                       ))}
@@ -922,13 +922,13 @@ export default function ClientTicketsPage() {
                   }
                 />
                 <div className={styles.actionRow}>
-                  <button className="button-primary" type="button" onClick={handleRequestSubmit}>Levantar ticket</button>
-                  {error && <span style={{ color: "var(--danger)", fontSize: 12 }}>{error}</span>}
+                  <button className="button-primary" type="button" onClick={handleRequestSubmit}>Enviar solicitud</button>
+                  {error && <span className={styles.errorText}>{error}</span>}
                 </div>
               </div>
               <div className={`card ${styles.cardSoft}`}>
-                <div style={{ fontWeight: 700 }}>Tickets levantados</div>
-                {requests.length === 0 && <div className={styles.mutedText}>No hay solicitudes aun.</div>}
+                <p className={styles.sectionTitle}>Solicitudes registradas</p>
+                {requests.length === 0 && <div className={styles.mutedText}>No hay solicitudes registradas aún.</div>}
                 {requests.map((request) => (
                   <div key={request.id} className={styles.itemCard}>
                     <div className={styles.itemHeader}>
@@ -973,7 +973,7 @@ export default function ClientTicketsPage() {
                         <button className="button-secondary" type="button" onClick={() => handleRequestClose(request.id)}>Cerrar solicitud</button>
                         {request.status === "NEW" && (
                           <>
-                            <button className="button-primary" type="button" onClick={() => handleDecision(request.id, "APPROVED")}>Aprobar</button>
+                            <button className="button-primary" type="button" onClick={() => handleDecision(request.id, "APPROVED")}>Autorizar</button>
                             <button className="button-secondary" type="button" onClick={() => handleDecision(request.id, "REJECTED")}>Rechazar</button>
                           </>
                         )}
@@ -992,26 +992,26 @@ export default function ClientTicketsPage() {
                 )}
                 <div>
                   <h3 style={{ margin: 0 }}>{session.client.name}</h3>
-                  <p className={styles.mutedText} style={{ margin: 0 }}>Acceso exclusivo para consultar tickets y reportes.</p>
+                  <p className={styles.mutedText} style={{ margin: 0 }}>Acceso para consulta de tickets, reportes y seguimiento de sucursales.</p>
                 </div>
               </div>
               <div className={`card ${styles.cardSoft}`}>
-                <div style={{ fontWeight: 700 }}>Datos de contacto</div>
+                <p className={styles.sectionTitle}>Datos de contacto corporativo</p>
                 <div className={styles.grid200}>
                   <input className="input" placeholder="Contacto" value={profileDraft.contactName} onChange={(e) => setProfileDraft((prev) => ({ ...prev, contactName: e.target.value }))} />
-                  <input className="input" placeholder="Email" value={profileDraft.contactEmail} onChange={(e) => setProfileDraft((prev) => ({ ...prev, contactEmail: e.target.value }))} />
-                  <input className="input" placeholder="Telefono" value={profileDraft.contactPhone} onChange={(e) => setProfileDraft((prev) => ({ ...prev, contactPhone: e.target.value }))} />
-                  <input className="input" placeholder="Direccion" value={profileDraft.address} onChange={(e) => setProfileDraft((prev) => ({ ...prev, address: e.target.value }))} />
+                  <input className="input" placeholder="Correo electrónico" value={profileDraft.contactEmail} onChange={(e) => setProfileDraft((prev) => ({ ...prev, contactEmail: e.target.value }))} />
+                  <input className="input" placeholder="Teléfono" value={profileDraft.contactPhone} onChange={(e) => setProfileDraft((prev) => ({ ...prev, contactPhone: e.target.value }))} />
+                  <input className="input" placeholder="Dirección" value={profileDraft.address} onChange={(e) => setProfileDraft((prev) => ({ ...prev, address: e.target.value }))} />
                   <input className="input" placeholder="Ciudad" value={profileDraft.city} onChange={(e) => setProfileDraft((prev) => ({ ...prev, city: e.target.value }))} />
                   <input className="input" placeholder="Estado" value={profileDraft.state} onChange={(e) => setProfileDraft((prev) => ({ ...prev, state: e.target.value }))} />
-                  <input className="input" placeholder="Pais" value={profileDraft.country} onChange={(e) => setProfileDraft((prev) => ({ ...prev, country: e.target.value }))} />
+                  <input className="input" placeholder="País" value={profileDraft.country} onChange={(e) => setProfileDraft((prev) => ({ ...prev, country: e.target.value }))} />
                 </div>
                 <div className={styles.actionRow}>
-                  <button className="button-primary" type="button" onClick={handleProfileSave}>Guardar perfil</button>
+                  <button className="button-primary" type="button" onClick={handleProfileSave}>Guardar cambios</button>
                 </div>
               </div>
               <div className={`card ${styles.cardSoft}`}>
-                <div style={{ fontWeight: 700 }}>Gestión de sucursales</div>
+                <p className={styles.sectionTitle}>Gestión de sucursales</p>
                 <p className={styles.mutedText} style={{ margin: 0 }}>
                   Para crear, editar o eliminar sucursales y configurar su logo, dirígete a la sección Mis sucursales en el menú.
                 </p>

@@ -1,6 +1,75 @@
+.ticketsConsole {
+  min-height: 100vh;
+}
+
+.ticketsConsole :global(.consoleMain) {
+  width: 100%;
+  min-width: 0;
+}
+
+.ticketsConsole :global(.card) {
+  background: var(--card-bg, rgba(255, 255, 255, 0.82));
+  border: 1px solid var(--border-color, rgba(127, 127, 127, 0.2));
+  border-radius: 18px;
+  box-shadow: 0 8px 18px rgba(11, 32, 68, 0.08);
+}
+
+.ticketsConsole :global(.input),
+.ticketsConsole :global(input),
+.ticketsConsole :global(select),
+.ticketsConsole :global(textarea) {
+  border-radius: 12px;
+  border: 1px solid var(--border-color, rgba(127, 127, 127, 0.25));
+  background: var(--surface-light);
+}
+
+.ticketsConsole :global(.input:focus),
+.ticketsConsole :global(input:focus),
+.ticketsConsole :global(select:focus),
+.ticketsConsole :global(textarea:focus) {
+  box-shadow: 0 0 0 3px rgba(15, 106, 214, 0.14);
+  border-color: var(--primary);
+}
+
+.ticketsConsole :global(.button-primary),
+.ticketsConsole :global(.button-secondary) {
+  min-height: 42px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.ticketsConsole :global(.button-secondary) {
+  background: var(--card-bg, rgba(255, 255, 255, 0.65));
+}
+
+.ticketsConsole :global(.badge) {
+  font-size: 0.76rem;
+  padding: 6px 10px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 1.04rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.sectionSubtitle {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+}
+
+.errorText {
+  color: var(--danger);
+  font-size: 0.8rem;
+}
+
 .authWrap {
   display: grid;
   gap: 16px;
+  max-width: 560px;
+  margin: 0 auto;
 }
 
 .authSwitch {
@@ -13,22 +82,32 @@
 .mainStack {
   display: grid;
   gap: 16px;
+  max-width: 1280px;
 }
 
 .sectionStack {
   display: grid;
   gap: 16px;
+  min-width: 0;
 }
 
 .cardPanel {
   display: grid;
   gap: 12px;
-  border: 1px solid rgba(31, 107, 186, 0.2);
+  border: 1px solid var(--border-color, rgba(31, 107, 186, 0.2));
+  background: var(--card-bg, rgba(255, 255, 255, 0.75));
+  border-radius: 16px;
+  padding: 14px;
 }
 
 .cardSoft {
   display: grid;
   gap: 12px;
+  background: var(--card-bg, rgba(255, 255, 255, 0.7));
+  border: 1px solid var(--border-color, rgba(127, 127, 127, 0.2));
+  border-radius: 14px;
+  padding: 14px;
+  min-width: 0;
 }
 
 .listStack {
@@ -41,7 +120,9 @@
   gap: 10px;
   padding: 12px;
   border-radius: 12px;
-  border: 1px solid rgba(15, 106, 214, 0.12);
+  border: 1px solid var(--border-color, rgba(15, 106, 214, 0.12));
+  background: var(--panel-bg-soft, rgba(255, 255, 255, 0.45));
+  min-width: 0;
 }
 
 .itemHeader {
@@ -49,11 +130,13 @@
   justify-content: space-between;
   gap: 10px;
   flex-wrap: wrap;
+  align-items: center;
 }
 
 .mutedText {
   font-size: 12px;
   color: var(--text-secondary);
+  overflow-wrap: anywhere;
 }
 
 .metaGrid {
@@ -61,6 +144,7 @@
   gap: 4px;
   font-size: 12px;
   color: var(--text-secondary);
+  min-width: 0;
 }
 
 .grid180 {
@@ -94,11 +178,16 @@
   flex-wrap: wrap;
 }
 
+.actionRow :global(.button-primary),
+.actionRow :global(.button-secondary) {
+  min-height: 40px;
+}
+
 .mediaTile {
   border-radius: 10px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(15, 106, 214, 0.08);
+  border: 1px solid var(--border-color, rgba(127, 127, 127, 0.2));
+  background: var(--card-bg, rgba(255, 255, 255, 0.55));
 }
 
 .mediaImg {
@@ -133,7 +222,10 @@
 .gradientHeader {
   display: grid;
   gap: 12px;
-  background: linear-gradient(140deg, rgba(31, 137, 252, 0.12), rgba(20, 162, 133, 0.08));
+  background: var(--card-bg, rgba(255, 255, 255, 0.82));
+  border-radius: 14px;
+  border: 1px solid var(--border-color, rgba(127, 127, 127, 0.18));
+  padding: 12px;
 }
 
 .headerSplit {
@@ -142,6 +234,10 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
+}
+
+.headerSplit > div {
+  min-width: 0;
 }
 
 .companyBox {
@@ -159,7 +255,8 @@
   border-radius: 12px;
   padding: 16px;
   text-align: center;
-  background: var(--surface-light);
+  background: var(--card-bg, rgba(255, 255, 255, 0.5));
+  transition: border-color 0.2s ease, background 0.2s ease;
 }
 
 .dropzoneActive {
@@ -202,10 +299,62 @@
   cursor: pointer;
 }
 
+.previewDelete:hover {
+  background: rgba(0, 0, 0, 0.78);
+}
+
 @media (max-width: 768px) {
   .mainStack,
   .sectionStack {
     gap: 12px;
+  }
+
+  .ticketsConsole :global(.consoleMain) {
+    padding: 12px 10px 16px;
+  }
+
+  .authWrap {
+    max-width: 100%;
+    padding: 0 4px;
+  }
+
+  .cardSoft,
+  .cardPanel {
+    padding: 10px;
+    border-radius: 12px;
+  }
+
+  .itemHeader {
+    align-items: flex-start;
+  }
+
+  .actionRow {
+    width: 100%;
+  }
+
+  .actionRow :global(.button-primary),
+  .actionRow :global(.button-secondary) {
+    flex: 1;
+    min-width: 120px;
+  }
+
+  .grid200,
+  .grid180,
+  .grid140,
+  .grid120 {
+    grid-template-columns: 1fr;
+  }
+
+  .sectionTitle {
+    font-size: 0.94rem;
+  }
+
+  .sectionSubtitle {
+    font-size: 0.78rem;
+  }
+
+  .previewTilePdf {
+    min-height: 140px;
   }
 
   .heroRow {
@@ -215,5 +364,50 @@
   .companyBox {
     min-width: 0;
     width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  .ticketsConsole :global(.consoleMain) {
+    padding: 10px 6px 14px;
+  }
+
+  .mainStack,
+  .sectionStack,
+  .listStack {
+    gap: 10px;
+  }
+
+  .cardSoft,
+  .cardPanel,
+  .itemCard,
+  .gradientHeader {
+    border-radius: 10px;
+    padding: 9px;
+  }
+
+  .heroRow {
+    gap: 10px;
+  }
+
+  .heroLogo {
+    width: 58px;
+    height: 58px;
+    border-radius: 12px;
+  }
+
+  .actionRow {
+    gap: 8px;
+  }
+
+  .actionRow :global(.button-primary),
+  .actionRow :global(.button-secondary) {
+    min-height: 40px;
+    font-size: 0.85rem;
+  }
+
+  .ticketsConsole :global(.badge) {
+    font-size: 0.72rem;
+    padding: 5px 8px;
   }
 }

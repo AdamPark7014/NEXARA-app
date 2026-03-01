@@ -209,25 +209,33 @@
 }
 
 .statusBadge {
-  font-size: 12px;
-  padding: 4px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  padding: 6px 12px;
   border-radius: 999px;
   font-weight: 600;
+  border: 1px solid transparent;
+  line-height: 1;
 }
 
 .statusOnTrack {
-  background: rgba(25, 135, 84, 0.15);
-  color: #198754;
+  background: rgba(22, 169, 110, 0.14);
+  color: var(--success, #16a96a);
+  border-color: rgba(22, 169, 110, 0.28);
 }
 
 .statusRisk {
   background: rgba(15, 106, 214, 0.12);
-  color: #0f6ad6;
+  color: var(--primary);
+  border-color: rgba(15, 106, 214, 0.3);
 }
 
 .statusOffTrack {
-  background: rgba(220, 53, 69, 0.15);
-  color: #dc3545;
+  background: rgba(214, 69, 69, 0.14);
+  color: var(--danger, #d64545);
+  border-color: rgba(214, 69, 69, 0.3);
 }
 
 .spacingTop {

@@ -83,14 +83,14 @@
   }
 
   .salesMain {
-    padding: 24px 20px;
-    animation: fadeInSlideUp 0.5s ease-out 0.2s both;
+    padding: 18px 14px 20px;
+    animation: none;
     min-height: calc(100vh - 200px);
   }
 
   .lockedCard {
     margin: 60px auto 0;
-    animation: scaleIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both;
+    animation: none;
   }
 }
 
@@ -144,15 +144,15 @@
   }
 
   .salesMain {
-    padding: 20px 18px;
+    padding: 16px 12px 18px;
     border-radius: 0;
   }
 
   .lockedCard {
-    margin: 50px 20px 0;
-    padding: 28px;
-    border-radius: 22px;
-    box-shadow: 0 20px 40px rgba(11, 32, 68, 0.2), 0 8px 16px rgba(11, 32, 68, 0.12);
+    margin: 44px 14px 0;
+    padding: 22px;
+    border-radius: 16px;
+    box-shadow: 0 12px 24px rgba(11, 32, 68, 0.14), 0 4px 10px rgba(11, 32, 68, 0.08);
   }
 
   .lockedKicker {
@@ -174,13 +174,13 @@
 
 @media (max-width: 480px) {
   .salesMain {
-    padding: 18px 16px;
+    padding: 12px 8px 16px;
   }
 
   .lockedCard {
-    margin: 40px 16px 0;
-    padding: 24px 20px;
-    border-radius: 20px;
+    margin: 34px 8px 0;
+    padding: 18px 14px;
+    border-radius: 14px;
   }
 
   .lockedKicker {
