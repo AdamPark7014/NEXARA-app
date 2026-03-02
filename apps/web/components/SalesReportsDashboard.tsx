@@ -710,16 +710,22 @@ function MetricCard({ title, value, icon, trend }: any) {
 }
 
 function SimpleBarChart({ data }: any) {
-  const maxValue = Math.max(...data.map((d: any) => d.value));
+  const normalizedData = Array.isArray(data)
+    ? data.map((item: any) => ({
+        ...item,
+        value: Number.isFinite(Number(item?.value)) ? Number(item.value) : 0,
+      }))
+    : [];
+  const maxValue = Math.max(0, ...normalizedData.map((d: any) => d.value));
   return (
     <div className={styles.barChart}>
-      {data.map((item: any, i: number) => (
+      {normalizedData.map((item: any, i: number) => (
         <div key={i} className={styles.barItem}>
           <div className={styles.barLabel}>{item.label}</div>
           <div className={styles.barContainer}>
             <div
               className={styles.bar}
-              style={{ width: `${(item.value / maxValue) * 100}%` }}
+              style={{ width: `${maxValue > 0 ? (item.value / maxValue) * 100 : 0}%` }}
             />
           </div>
           <div className={styles.barValue}>
@@ -736,13 +742,41 @@ function SimpleBarChart({ data }: any) {
 }
 
 function SimplePieChart({ data }: any) {
-  const total = data.reduce((sum: number, d: any) => sum + d.value, 0);
+  const normalizedData = Array.isArray(data)
+    ? data.map((item: any) => ({
+        ...item,
+        value: Number.isFinite(Number(item?.value)) ? Number(item.value) : 0,
+      }))
+    : [];
+  const total = normalizedData.reduce((sum: number, d: any) => sum + d.value, 0);
   let cumulativePercent = 0;
+
+  if (total <= 0) {
+    return (
+      <div className={styles.pieChart}>
+        <svg viewBox="0 0 100 100" className={styles.pieSvg}>
+          <circle cx="50" cy="50" r="40" fill="#e9ecef" />
+        </svg>
+        <div className={styles.pieLegend}>
+          {normalizedData.map((item: any, i: number) => (
+            <div key={i} className={styles.legendItem}>
+              <span
+                className={styles.legendColor}
+                style={{ backgroundColor: item.color }}
+              />
+              <span className={styles.legendLabel}>{item.label}</span>
+              <span className={styles.legendValue}>0%</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.pieChart}>
       <svg viewBox="0 0 100 100" className={styles.pieSvg}>
-        {data.map((item: any, i: number) => {
+        {normalizedData.map((item: any, i: number) => {
           const startAngle = (cumulativePercent / 100) * 360;
           const endAngle = ((cumulativePercent + (item.value / total) * 100) / 100) * 360;
           cumulativePercent += (item.value / total) * 100;
@@ -771,7 +805,7 @@ function SimplePieChart({ data }: any) {
       </svg>
 
       <div className={styles.pieLegend}>
-        {data.map((item: any, i: number) => (
+        {normalizedData.map((item: any, i: number) => (
           <div key={i} className={styles.legendItem}>
             <span
               className={styles.legendColor}
