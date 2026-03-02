@@ -36,20 +36,40 @@ import { CvsService } from './cvs.service.js';
 @UseGuards(AuthGuard('jwt'), RbacGuard)
 export class CvsController {
   private readonly cvsUploadDir = getCvsUploadDir(__dirname);
+  private readonly allowedImageExtensions = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.svg', '.avif'];
 
   constructor(private readonly cvsService: CvsService) {}
+
+  private isAllowedCvFile(file: any) {
+    const lowerName = String(file?.originalname || '').toLowerCase();
+    const mimeType = String(file?.mimetype || '').toLowerCase();
+    const isPdf = mimeType.includes('pdf') || lowerName.endsWith('.pdf');
+    const isImage = mimeType.startsWith('image/') || this.allowedImageExtensions.some((ext) => lowerName.endsWith(ext));
+    return isPdf || isImage;
+  }
+
+  private getContentType(fileName: string) {
+    const lowerName = String(fileName || '').toLowerCase();
+    if (lowerName.endsWith('.pdf')) return 'application/pdf';
+    if (lowerName.endsWith('.png')) return 'image/png';
+    if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) return 'image/jpeg';
+    if (lowerName.endsWith('.webp')) return 'image/webp';
+    if (lowerName.endsWith('.gif')) return 'image/gif';
+    if (lowerName.endsWith('.bmp')) return 'image/bmp';
+    if (lowerName.endsWith('.svg')) return 'image/svg+xml';
+    if (lowerName.endsWith('.avif')) return 'image/avif';
+    return 'application/octet-stream';
+  }
 
   @Post()
   @RBAC({ anyPermissions: [PERMISSIONS.CVS_MANAGE, PERMISSIONS.CVS_ADMIN_REVIEW, PERMISSIONS.CONSOLE_ADMIN] })
   @UseInterceptors(FileInterceptor('file', { dest: getCvsUploadDir(__dirname) }))
   async create(@CurrentUser() user: any, @Body() body: CreateCvDto, @UploadedFile() file?: any) {
     if (!file) {
-      throw new BadRequestException('Debes subir un archivo PDF de CV');
+      throw new BadRequestException('Debes subir un archivo de CV (PDF o imagen)');
     }
-    const lowerName = String(file.originalname || '').toLowerCase();
-    const isPdf = String(file.mimetype || '').includes('pdf') || lowerName.endsWith('.pdf');
-    if (!isPdf) {
-      throw new BadRequestException('Solo se permiten archivos PDF');
+    if (!this.isAllowedCvFile(file)) {
+      throw new BadRequestException('Solo se permiten archivos PDF o imagen');
     }
 
     const tags = Array.isArray(body.tags)
@@ -137,7 +157,7 @@ export class CvsController {
       throw new BadRequestException('El archivo no existe en almacenamiento');
     }
 
-    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Type', this.getContentType(fileName));
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
     createReadStream(absolutePath).pipe(res);
   }
@@ -153,7 +173,7 @@ export class CvsController {
       throw new BadRequestException('El archivo no existe en almacenamiento');
     }
 
-    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Type', this.getContentType(fileName));
     res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
     createReadStream(absolutePath).pipe(res);
   }
