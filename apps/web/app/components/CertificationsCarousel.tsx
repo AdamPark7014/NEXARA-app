@@ -19,7 +19,7 @@ export default function CertificationsCarousel() {
     { id: 9, file: 'certificaciones-08.png', alt: 'Mimosa' },
     { id: 10, file: 'certificaciones-09.png.jpeg', alt: 'Jalala' },
   ];
-  const duplicatedCerts = [...certifications, ...certifications];
+  const duplicatedCerts = [...certifications, ...certifications, ...certifications];
 
   return (
     <section className={styles.certificationsSection}>
