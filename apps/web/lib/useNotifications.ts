@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { getSocketBaseUrl } from './api-base';
 
 export function useNotifications(callback?: (payload: any) => void) {
   useEffect(() => {
     if (!callback) return;
-    const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, {
       transports: ['polling'],
       upgrade: false,

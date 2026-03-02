@@ -4,6 +4,19 @@ const ensureApiBase = (value: string) => {
   return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
 };
 
+const normalizeSocketOrigin = (baseUrl: string) => {
+  try {
+    const parsed = new URL(baseUrl);
+    const host = parsed.hostname.toLowerCase();
+    if (host === 'nexara.com.mx' || host === 'www.nexara.com.mx') {
+      return `${parsed.protocol}//api.nexara.com.mx`;
+    }
+    return parsed.origin;
+  } catch {
+    return baseUrl;
+  }
+};
+
 export const getApiBase = () => {
   const envBase = process.env.NEXT_PUBLIC_API_URL;
   if (envBase && envBase.trim()) {
@@ -22,4 +35,12 @@ export const buildApiUrl = (path: string) => {
   return `${base}/${path.replace(/^\/+/, "")}`;
 };
 
-export const getSocketBaseUrl = () => getApiBase().replace(/\/+api\/?$/, "");
+export const getSocketBaseUrl = () => {
+  const envSocket = process.env.NEXT_PUBLIC_SOCKET_URL;
+  if (envSocket && envSocket.trim()) {
+    return normalizeSocketOrigin(envSocket.trim().replace(/\/+$/, ''));
+  }
+
+  const fromApi = getApiBase().replace(/\/+api\/?$/, "");
+  return normalizeSocketOrigin(fromApi);
+};
