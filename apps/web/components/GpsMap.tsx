@@ -32,6 +32,7 @@ const GpsMap = () => {
   const [error, setError] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [mapsReady, setMapsReady] = useState(false);
+  const [mapCtor, setMapCtor] = useState<any>(null);
   const isAdmin = hasPermission(user, PERMISSIONS.GPS_MANAGE);
   const isHighLevel = Boolean(user?.isSuperAdmin || hasPermission(user, PERMISSIONS.CONSOLE_ADMIN));
 
@@ -50,6 +51,17 @@ const GpsMap = () => {
   const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
   const canUseMaps = useMemo(() => Boolean(googleMapsKey), [googleMapsKey]);
+
+  const resolveMapCtor = async () => {
+    const mapsAny = window.google?.maps as any;
+    if (!mapsAny) return null;
+    if (typeof mapsAny.Map === 'function') return mapsAny.Map;
+    if (typeof mapsAny.importLibrary === 'function') {
+      const mapsLibrary = await mapsAny.importLibrary('maps');
+      if (mapsLibrary?.Map) return mapsLibrary.Map;
+    }
+    return null;
+  };
 
   const loadGoogleMaps = () => {
     if (!canUseMaps) return Promise.reject(new Error('API key no configurada'));
@@ -260,7 +272,8 @@ const GpsMap = () => {
     if (!user?.token) return;
     const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, {
-      transports: ['websocket', 'polling'],
+      transports: ['polling'],
+      upgrade: false,
       timeout: 20000,
       reconnectionAttempts: 8,
     });
@@ -289,14 +302,21 @@ const GpsMap = () => {
   useEffect(() => {
     if (!canUseMaps) return;
     loadGoogleMaps()
-      .then(() => setMapsReady(true))
+      .then(async () => {
+        const ctor = await resolveMapCtor();
+        if (!ctor) {
+          throw new Error('Google Maps Map constructor no disponible');
+        }
+        setMapCtor(() => ctor);
+        setMapsReady(true);
+      })
       .catch((err) => setError(err.message));
   }, [canUseMaps]);
 
   useEffect(() => {
-    if (!mapsReady || !window.google?.maps) return;
+    if (!mapsReady || !window.google?.maps || !mapCtor) return;
     if (myMapRef.current && !myMapInstance.current) {
-      myMapInstance.current = new window.google.maps.Map(myMapRef.current, {
+      myMapInstance.current = new mapCtor(myMapRef.current, {
         center: { lat: 19.4326, lng: -99.1332 },
         zoom: 14,
         zoomControl: false,
@@ -306,7 +326,7 @@ const GpsMap = () => {
       });
     }
     if (teamMapRef.current && !teamMapInstance.current) {
-      teamMapInstance.current = new window.google.maps.Map(teamMapRef.current, {
+      teamMapInstance.current = new mapCtor(teamMapRef.current, {
         center: { lat: 19.4326, lng: -99.1332 },
         zoom: 12,
         zoomControl: false,
@@ -315,7 +335,7 @@ const GpsMap = () => {
         streetViewControl: false,
       });
     }
-  }, [mapsReady]);
+  }, [mapsReady, mapCtor]);
 
   useEffect(() => {
     if (!myMapInstance.current || !myLocation || !window.google?.maps) return;
