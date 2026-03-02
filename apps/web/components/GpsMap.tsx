@@ -75,9 +75,19 @@ const GpsMap = () => {
       }
       const script = document.createElement('script');
       script.id = 'google-maps-script';
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsKey}&v=weekly&libraries=places,marker&loading=async`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsKey}&v=weekly&libraries=places,marker`;
       script.async = true;
-      script.onload = () => resolve();
+      script.defer = true;
+      script.onload = () => {
+        // Espera a que google.maps esté completamente inicializado
+        setTimeout(() => {
+          if (window.google?.maps) {
+            resolve();
+          } else {
+            reject(new Error('Google Maps no se inicializó correctamente'));
+          }
+        }, 100);
+      };
       script.onerror = () => reject(new Error('Error al cargar Google Maps'));
       document.body.appendChild(script);
     });

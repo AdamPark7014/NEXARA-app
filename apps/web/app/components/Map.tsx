@@ -111,21 +111,42 @@ export default function Map() {
     }
 
     // Evita cargar el script de Google Maps más de una vez
-    if (!document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]')) {
+    const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
+    if (!existingScript) {
       const script = document.createElement("script");
-      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDOJ7TFUE5F1vD_qVh9ofKOSS5gd2mbnyE&v=weekly&libraries=marker&loading=async`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDOJ7TFUE5F1vD_qVh9ofKOSS5gd2mbnyE&v=weekly&libraries=marker`;
       script.async = true;
       script.defer = true;
       script.onload = () => {
-        initMapCallback();
+        // Espera un breve momento para asegurar que google.maps esté completamente inicializado
+        setTimeout(() => {
+          if (window.google?.maps) {
+            initMapCallback();
+          } else {
+            setError("Google Maps no se inicializó correctamente");
+          }
+        }, 100);
       };
       script.onerror = () => {
         setError("Error al cargar Google Maps API");
       };
       document.head.appendChild(script);
-    } else if (window.google?.maps) {
-      // Si el script ya está cargado, inicializa el mapa directamente
-      initMapCallback();
+    } else {
+      // Si el script ya existe, espera a que google.maps esté disponible
+      const checkGoogleMaps = setInterval(() => {
+        if (window.google?.maps) {
+          clearInterval(checkGoogleMaps);
+          initMapCallback();
+        }
+      }, 100);
+      
+      // Timeout después de 10 segundos
+      setTimeout(() => {
+        clearInterval(checkGoogleMaps);
+        if (!window.google?.maps) {
+          setError("Timeout esperando Google Maps API");
+        }
+      }, 10000);
     }
 
     return () => {

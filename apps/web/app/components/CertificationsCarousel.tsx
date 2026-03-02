@@ -7,7 +7,17 @@ import styles from '../page.module.css';
 export default function CertificationsCarousel() {
   const trackRef = useRef<HTMLDivElement>(null);
 
-  const certifications = [1, 2, 3, 4, 5, 6, 7, 8];
+  const certifications = [
+    { id: 1, file: 'certificaciones-01.png', alt: 'Linksys' },
+    { id: 2, file: 'certificaciones-02.png', alt: 'Belden' },
+    { id: 3, file: 'certificaciones-03.png', alt: 'Intellinet' },
+    { id: 4, file: 'certificaciones-04.png', alt: 'Lenovo SEG Silver Partner' },
+    { id: 5, file: 'certificaciones-04.1.png.webp', alt: 'Lenovo SEG Authorized Solutions' },
+    { id: 6, file: 'certificaciones-05.png.jpeg', alt: 'Grandstream' },
+    { id: 7, file: 'certificaciones-06.png', alt: 'HikVision' },
+    { id: 8, file: 'certificaciones-07.png', alt: 'Sophos' },
+    { id: 9, file: 'certificaciones-08.png', alt: 'Mimosa' },
+  ];
   const duplicatedCerts = [...certifications, ...certifications];
 
   return (
@@ -22,15 +32,15 @@ export default function CertificationsCarousel() {
 
       <div className={styles.carouselContainer}>
         <div className={styles.carouselTrack} ref={trackRef}>
-          {duplicatedCerts.map((num, idx) => (
-            <div key={`${num}-${idx}`} className={styles.carouselSlide}>
+          {duplicatedCerts.map((cert, idx) => (
+            <div key={`${cert.id}-${idx}`} className={styles.carouselSlide}>
               <Image
-                src={`/certificaciones/certificaciones-0${num}.png`}
-                alt={`Certificación ${num}`}
+                src={`/certificaciones/${cert.file}`}
+                alt={cert.alt}
                 width={200}
                 height={200}
                 className={styles.certificationImage}
-                priority={num <= 4}
+                priority={cert.id <= 4}
               />
             </div>
           ))}
