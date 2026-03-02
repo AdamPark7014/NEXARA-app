@@ -59,14 +59,16 @@ const FinesTable: React.FC<FinesTableProps> = ({
   const [loading, setLoading] = useState(true);
   const [estatusPago, setEstatusPago] = useState('');
   const [usuarioFiltro, setUsuarioFiltro] = useState<string>(usuarioIdProp ? String(usuarioIdProp) : '');
-  const [tipoFiltro, setTipoFiltro] = useState(tipoProp || '');  const [isMobile, setIsMobile] = useState(false);
+  const [tipoFiltro, setTipoFiltro] = useState(tipoProp || '');
+  const [isMobile, setIsMobile] = useState(false);
+  const MOBILE_BREAKPOINT = 1024;
 
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 900);
+    const handleResize = () => setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT);
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  }, [MOBILE_BREAKPOINT]);
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(
     /[\/.]+$/,
     ''
