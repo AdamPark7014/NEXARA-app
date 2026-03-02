@@ -734,8 +734,20 @@ export class ToolRequestsService {
     }
 
     if (!isSuperAdmin) {
-      whereUser.role = { accesoConsoleAdmin: false };
-      whereUser.email = { notIn: this.superAdminEmails };
+      if (userId && userId !== currentUser.id) {
+        whereUser.role = { accesoConsoleAdmin: false };
+        whereUser.email = { notIn: this.superAdminEmails };
+      } else if (!userId) {
+        whereUser.OR = [
+          { id: currentUser.id },
+          {
+            AND: [
+              { role: { accesoConsoleAdmin: false } },
+              { email: { notIn: this.superAdminEmails } },
+            ],
+          },
+        ];
+      }
     }
 
     const assignments = await (this.prisma as any).toolKitAssignment.findMany({
@@ -788,12 +800,18 @@ export class ToolRequestsService {
       const target = await (this.prisma as any).user.findUnique({
         where: { id: data.userId },
         select: {
+          id: true,
           email: true,
           role: { select: { accesoConsoleAdmin: true } },
         },
       });
 
-      if (!target || target.role?.accesoConsoleAdmin || this.superAdminEmails.includes(String(target.email).toLowerCase())) {
+      const isSelfTarget = target?.id === currentUser.id;
+      if (
+        !target ||
+        (!isSelfTarget &&
+          (target.role?.accesoConsoleAdmin || this.superAdminEmails.includes(String(target.email).toLowerCase())))
+      ) {
         throw new Error('Como admin solo puedes asignar a usuarios normales');
       }
     }
@@ -857,7 +875,8 @@ export class ToolRequestsService {
 
     if (isAdmin && !isSuperAdmin) {
       const targetEmail = String(assignment.user?.email || '').toLowerCase();
-      if (assignment.user?.role?.accesoConsoleAdmin || this.superAdminEmails.includes(targetEmail)) {
+      const isSelfTarget = assignment.userId === currentUser.id;
+      if (!isSelfTarget && (assignment.user?.role?.accesoConsoleAdmin || this.superAdminEmails.includes(targetEmail))) {
         throw new Error('Como admin solo puedes gestionar herramientas de usuarios normales');
       }
     }
@@ -918,9 +937,10 @@ export class ToolRequestsService {
 
     if (!isSuperAdmin) {
       const targetEmail = String(event.assignment.user?.email || '').toLowerCase();
+      const isSelfTarget = event.assignment.user?.id === currentUser.id;
       if (
-        event.assignment.user?.role?.accesoConsoleAdmin ||
-        this.superAdminEmails.includes(targetEmail)
+        !isSelfTarget &&
+        (event.assignment.user?.role?.accesoConsoleAdmin || this.superAdminEmails.includes(targetEmail))
       ) {
         throw new Error('Como admin solo puedes gestionar kits de usuarios normales');
       }
