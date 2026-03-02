@@ -4,6 +4,7 @@ import { CreateAttendanceDto } from './dto/create-attendance.dto';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service';
 import { PERMISSIONS } from '../common/permissions.js';
+import { detectDeviceFromUserAgent } from '../common/device-detector.js';
 
 @Injectable()
 export class AttendanceService {
@@ -182,14 +183,17 @@ export class AttendanceService {
       attendances: attendances.map((att) => ({
         type: att.type,
         timestamp: att.timestamp.toISOString(),
+        deviceInfo: att.deviceInfo || null,
       })),
     };
   }
 
-  async register(dto: CreateAttendanceDto, userId: number) {
+  async register(dto: CreateAttendanceDto, userId: number, req?: any) {
     if (!userId) throw new BadRequestException('Usuario no autenticado');
     const now = dto.timestamp ? new Date(dto.timestamp) : new Date();
     const today = this.getDateOnly(now);
+    const userAgent = req?.headers?.['user-agent'] || req?.headers?.['User-Agent'];
+    const deviceInfo = detectDeviceFromUserAgent(userAgent);
 
     // Determinar si es entrada o salida para guardar coordenadas correctas
     const isEntry = dto.type === 'entrada';
@@ -215,6 +219,7 @@ export class AttendanceService {
         userId,
         type: dto.type,
         timestamp: now,
+        deviceInfo,
         photoUrl: dto.photoBase64 || null,
         // Guardar coordenadas en los campos apropiados según si es entrada o salida
         ...(isEntry && {
@@ -646,6 +651,7 @@ export class AttendanceService {
           attendances: attendances.map((att) => ({
             type: att.type,
             timestamp: att.timestamp.toISOString(),
+            deviceInfo: att.deviceInfo || null,
             photoUrl: att.photoUrl || undefined,
             entryLatitude: att.entryLatitude || undefined,
             entryLongitude: att.entryLongitude || undefined,

@@ -72,10 +72,15 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         avatarUrl: data.user.avatarUrl || "",
         permissions: data.user.permissions || [],
         isSuperAdmin: data.user.isSuperAdmin || false,
+        loginDevice: data.loginDevice || data.user.loginDevice,
       };
 
       if (requiredPermission && !hasPermission(userData, requiredPermission)) {
         throw new Error("No tienes permisos para acceder a este panel");
+      }
+
+      if (typeof window !== 'undefined' && data.loginGreeting) {
+        window.sessionStorage.setItem('nexara_login_greeting', data.loginGreeting);
       }
 
       setUser(userData);

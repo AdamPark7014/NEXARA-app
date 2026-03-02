@@ -4,6 +4,8 @@ import { JwtService } from '@nestjs/jwt';
 import { LoginDto } from './dto/login.dto.js';
 import * as bcrypt from 'bcryptjs';
 import { PERMISSIONS } from '../common/permissions.js';
+import { NotificationType } from '@prisma/client';
+import { detectDeviceFromUserAgent } from '../common/device-detector.js';
 
 @Injectable()
 export class AuthService {
@@ -138,10 +140,12 @@ export class AuthService {
     return user;
   }
 
-  async login(loginDto: LoginDto) {
+  async login(loginDto: LoginDto, req?: any) {
     const user = await this.validateUser(loginDto.email, loginDto.password);
     const isSuperAdmin = this.isSuperAdmin(user.email);
     const permissions = this.buildPermissions(user.role, isSuperAdmin);
+    const userAgent = req?.headers?.['user-agent'] || req?.headers?.['User-Agent'];
+    const detectedDevice = detectDeviceFromUserAgent(userAgent);
 
     if (loginDto.panel === 'ventas' && !isSuperAdmin && !permissions.includes(PERMISSIONS.PANEL_VENTAS)) {
       throw new UnauthorizedException('Tu usuario no tiene acceso al panel de ventas');
@@ -153,8 +157,23 @@ export class AuthService {
       permissions,
       isSuperAdmin,
     };
+
+    await this.prisma.notification.create({
+      data: {
+        userId: user.id,
+        type: NotificationType.ATTENDANCE_UPDATE,
+        category: 'security',
+        title: 'Nuevo acceso detectado',
+        message: `Se inició sesión desde ${detectedDevice}.`,
+        entityType: 'auth',
+        priority: 'normal',
+      },
+    });
+
     return {
       access_token: this.jwtService.sign(payload),
+      loginDevice: detectedDevice,
+      loginGreeting: `Hola ${user.nombre}, bienvenido de nuevo. Accediste desde ${detectedDevice}.`,
       user: {
         id: user.id,
         nombre: user.nombre,
@@ -166,6 +185,7 @@ export class AuthService {
         permissions,
         isSuperAdmin,
         avatarUrl: user.avatarUrl,
+        loginDevice: detectedDevice,
       },
     };
   }

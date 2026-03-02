@@ -32,7 +32,7 @@ const AttendanceForm = () => {
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [elapsed, setElapsed] = useState<number>(0);
   const [totalMinutes, setTotalMinutes] = useState<number>(0);
-  const [history, setHistory] = useState<{ type: string; timestamp: string; photoUrl?: string }[]>([]);
+  const [history, setHistory] = useState<{ type: string; timestamp: string; photoUrl?: string; deviceInfo?: string | null }[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(() => toLocalDateInput(new Date()));
   const [rangeFrom, setRangeFrom] = useState<string>(() => getWeekRange().from);
   const [rangeTo, setRangeTo] = useState<string>(() => getWeekRange().to);
@@ -729,6 +729,9 @@ const AttendanceForm = () => {
               {history.map((item, index) => (
                 <div key={`${item.type}-${item.timestamp}-${index}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text)', flexWrap: 'wrap', gap: 8 }}>
                   <span style={{ textTransform: 'capitalize' }}>{item.type}</span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: 12, minWidth: 190 }}>
+                    {item.deviceInfo || 'Dispositivo no disponible'}
+                  </span>
                   <span style={{ color: 'var(--muted)' }}>{formatTime(item.timestamp)}</span>
                   {item.photoUrl && (
                     <img 

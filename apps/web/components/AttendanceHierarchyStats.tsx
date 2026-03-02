@@ -14,7 +14,7 @@ interface UserAttendanceStats {
   workDays: number;
   avgMinutesPerDay: number;
   days: { date: string; totalMinutes: number; isOpen: boolean }[];
-  attendances: { type: string; timestamp: string }[];
+  attendances: { type: string; timestamp: string; deviceInfo?: string | null }[];
   productivity: {
     avgScore: number;
     level: string;
@@ -112,7 +112,7 @@ const AttendanceHierarchyStats: React.FC = () => {
   };
 
   const getLatestTimeByType = (
-    list: { type: string; timestamp: string }[],
+    list: { type: string; timestamp: string; deviceInfo?: string | null }[],
     type: 'entrada' | 'salida'
   ) => {
     const filtered = list.filter((item) => item.type === type);
@@ -121,6 +121,17 @@ const AttendanceHierarchyStats: React.FC = () => {
       item.timestamp > max.timestamp ? item : max
     );
     return latest.timestamp;
+  };
+
+  const getLatestAttendanceByType = (
+    list: { type: string; timestamp: string; deviceInfo?: string | null }[],
+    type: 'entrada' | 'salida',
+  ) => {
+    const filtered = list.filter((item) => item.type === type);
+    if (filtered.length === 0) return null;
+    return filtered.reduce((max, item) =>
+      item.timestamp > max.timestamp ? item : max
+    );
   };
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
@@ -421,7 +432,9 @@ const AttendanceHierarchyStats: React.FC = () => {
                   <th>Rol</th>
                   <th style={{ textAlign: 'center' }}>Dias Trabajados</th>
                   <th style={{ textAlign: 'center' }}>Hora Entrada</th>
+                  <th style={{ textAlign: 'center' }}>Dispositivo Entrada</th>
                   <th style={{ textAlign: 'center' }}>Hora Salida</th>
+                  <th style={{ textAlign: 'center' }}>Dispositivo Salida</th>
                   <th style={{ textAlign: 'center' }}>Promedio Diario</th>
                   <th style={{ textAlign: 'center' }}>Productividad</th>
                   <th style={{ textAlign: 'center' }}>Acciones</th>
@@ -443,8 +456,14 @@ const AttendanceHierarchyStats: React.FC = () => {
                       <td style={{ textAlign: 'center' }}>
                         {formatTimeOnly(getLatestTimeByType(userStat.attendances, 'entrada'))}
                       </td>
+                      <td style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-secondary)' }}>
+                        {getLatestAttendanceByType(userStat.attendances, 'entrada')?.deviceInfo || '-'}
+                      </td>
                       <td style={{ textAlign: 'center' }}>
                         {formatTimeOnly(getLatestTimeByType(userStat.attendances, 'salida'))}
+                      </td>
+                      <td style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-secondary)' }}>
+                        {getLatestAttendanceByType(userStat.attendances, 'salida')?.deviceInfo || '-'}
                       </td>
                       <td style={{ textAlign: 'center' }}>
                         {formatTime(userStat.avgMinutesPerDay)}
@@ -468,7 +487,7 @@ const AttendanceHierarchyStats: React.FC = () => {
                     {/* Detalle expandido */}
                     {expandedUsers.has(userStat.userId) && (
                       <tr style={{ backgroundColor: 'var(--surface-light)' }}>
-                        <td colSpan={9} style={{ padding: '15px' }}>
+                        <td colSpan={11} style={{ padding: '15px' }}>
                           <div style={{ display: 'grid', gap: 16 }}>
                             <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
                               <div className="card" style={{ padding: 14 }}>
@@ -670,6 +689,7 @@ const AttendanceHierarchyStats: React.FC = () => {
                                     <tr>
                                       <th>Tipo</th>
                                       <th>Fecha y Hora</th>
+                                      <th>Dispositivo</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -681,6 +701,7 @@ const AttendanceHierarchyStats: React.FC = () => {
                                           </span>
                                         </td>
                                         <td>{formatDateTime(att.timestamp)}</td>
+                                        <td>{att.deviceInfo || '-'}</td>
                                       </tr>
                                     ))}
                                   </tbody>
