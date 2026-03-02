@@ -74,9 +74,14 @@ export interface AssignKitItemDto {
 
 export interface ReportKitEventDto {
   description: string;
-  resolution?: 'PENDING' | 'USER_MISUSE' | 'EQUIPMENT_FAILURE';
+}
+
+export interface ResolveKitEventDto {
+  resolution: 'USER_MISUSE' | 'EQUIPMENT_FAILURE';
+  notes?: string;
+  fineAmount?: number;
+  fineReason?: string;
   replacementItemId?: number;
-  fineId?: number;
 }
 
 @Injectable()
@@ -96,6 +101,10 @@ export class ToolRequestsService {
 
       if (!inventoryItem) {
         throw new Error('La herramienta seleccionada no existe en inventario');
+      }
+
+      if (inventoryItem.status !== 'AVAILABLE') {
+        throw new Error('La herramienta seleccionada no está disponible en inventario');
       }
 
       data.toolName = inventoryItem.toolName;
@@ -422,43 +431,85 @@ export class ToolRequestsService {
   }
 
   async deliver(id: number) {
-    return this.prisma.toolRequest.update({
+    const request = await this.prisma.toolRequest.findUnique({
       where: { id },
-      data: {
-        status: 'IN_USE',
-        deliveryDate: new Date(),
-      },
-      include: {
-        usuario: {
-          select: {
-            id: true,
-            nombre: true,
-            email: true,
+      select: { id: true, inventoryItemId: true },
+    });
+
+    if (!request) {
+      throw new Error('Solicitud no encontrada');
+    }
+
+    return (this.prisma as any).$transaction(async (tx: any) => {
+      const updatedRequest = await tx.toolRequest.update({
+        where: { id },
+        data: {
+          status: 'IN_USE',
+          deliveryDate: new Date(),
+        },
+        include: {
+          usuario: {
+            select: {
+              id: true,
+              nombre: true,
+              email: true,
+            },
           },
         },
-      },
+      });
+
+      if (request.inventoryItemId) {
+        await tx.toolInventoryItem.update({
+          where: { id: request.inventoryItemId },
+          data: { status: 'ASSIGNED' },
+        });
+      }
+
+      return updatedRequest;
     });
   }
 
   async return(id: number, damageDescription?: string, damagePhotoUrl?: string) {
     const status = damageDescription ? 'DAMAGED' : 'RETURNED';
-    return this.prisma.toolRequest.update({
+    const request = await this.prisma.toolRequest.findUnique({
       where: { id },
-      data: {
-        status,
-        returnDate: new Date(),
-        damageDescription,
-        damagePhotoUrl,
-      },
-      include: {
-        usuario: {
-          select: {
-            id: true,
-            nombre: true,
-            email: true,
+      select: { id: true, inventoryItemId: true },
+    });
+
+    if (!request) {
+      throw new Error('Solicitud no encontrada');
+    }
+
+    return (this.prisma as any).$transaction(async (tx: any) => {
+      const updatedRequest = await tx.toolRequest.update({
+        where: { id },
+        data: {
+          status,
+          returnDate: new Date(),
+          damageDescription,
+          damagePhotoUrl,
+        },
+        include: {
+          usuario: {
+            select: {
+              id: true,
+              nombre: true,
+              email: true,
+            },
           },
         },
-      },
+      });
+
+      if (request.inventoryItemId) {
+        await tx.toolInventoryItem.update({
+          where: { id: request.inventoryItemId },
+          data: {
+            status: damageDescription ? 'IN_REPAIR' : 'AVAILABLE',
+          },
+        });
+      }
+
+      return updatedRequest;
     });
   }
 
@@ -558,7 +609,7 @@ export class ToolRequestsService {
 
     return (this.prisma as any).toolInventoryItem.findMany({
       where: {
-        status: { in: ['AVAILABLE', 'ASSIGNED'] },
+        status: 'AVAILABLE',
         OR: [
           { toolName: { contains: q, mode: 'insensitive' } },
           { model: { contains: q, mode: 'insensitive' } },
@@ -634,7 +685,6 @@ export class ToolRequestsService {
         data: {
           isActive: false,
           returnedAt: new Date(),
-          replacementCount: { increment: 1 },
         },
       });
 
@@ -817,12 +867,159 @@ export class ToolRequestsService {
         assignmentId,
         reportedById: currentUser.id,
         description: data.description,
-        resolution: data.resolution || 'PENDING',
-        replacementItemId: data.replacementItemId,
-        fineId: data.fineId,
-        resolvedById: data.resolution && data.resolution !== 'PENDING' ? currentUser.id : undefined,
-        resolvedAt: data.resolution && data.resolution !== 'PENDING' ? new Date() : undefined,
+        resolution: 'PENDING',
       },
+    });
+  }
+
+  async resolveKitEvent(
+    eventId: number,
+    data: ResolveKitEventDto,
+    currentUser: { id: number; isSuperAdmin?: boolean; permissions?: string[] },
+  ) {
+    const isSuperAdmin = await this.isSuperAdminByEmail(currentUser.id, currentUser);
+    const isAdmin = Boolean(currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN));
+
+    if (!isSuperAdmin && !isAdmin) {
+      throw new Error('No tienes permisos para resolver incidentes de kit');
+    }
+
+    const event = await (this.prisma as any).toolKitEvent.findUnique({
+      where: { id: eventId },
+      include: {
+        assignment: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                role: { select: { accesoConsoleAdmin: true } },
+              },
+            },
+            inventoryItem: {
+              select: {
+                id: true,
+                toolName: true,
+                model: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!event) {
+      throw new Error('Incidente no encontrado');
+    }
+
+    if (event.resolution !== 'PENDING') {
+      throw new Error('Este incidente ya fue resuelto');
+    }
+
+    if (!isSuperAdmin) {
+      const targetEmail = String(event.assignment.user?.email || '').toLowerCase();
+      if (
+        event.assignment.user?.role?.accesoConsoleAdmin ||
+        this.superAdminEmails.includes(targetEmail)
+      ) {
+        throw new Error('Como admin solo puedes gestionar kits de usuarios normales');
+      }
+    }
+
+    return (this.prisma as any).$transaction(async (tx: any) => {
+      let replacementItemId = data.replacementItemId;
+
+      if (!replacementItemId && data.resolution === 'EQUIPMENT_FAILURE') {
+        const autoReplacement = await tx.toolInventoryItem.findFirst({
+          where: {
+            status: 'AVAILABLE',
+            toolName: event.assignment.inventoryItem.toolName,
+            model: event.assignment.inventoryItem.model,
+            id: { not: event.assignment.inventoryItem.id },
+          },
+          orderBy: { createdAt: 'asc' },
+        });
+        replacementItemId = autoReplacement?.id;
+      }
+
+      let fineId: number | null = null;
+      if (data.resolution === 'USER_MISUSE') {
+        const fineAmount = Number(data.fineAmount || 0);
+        if (fineAmount <= 0) {
+          throw new Error('Debes indicar un monto válido para multa por mal uso');
+        }
+
+        const fine = await tx.fine.create({
+          data: {
+            usuarioId: event.assignment.userId,
+            tipo: 'herramienta',
+            razon: data.fineReason || 'Mal uso de herramienta de kit',
+            descripcion: data.notes || event.description,
+            monto: fineAmount,
+            referenciaId: event.assignmentId,
+            estatusPago: 'Pendiente',
+          },
+        });
+        fineId = fine.id;
+      }
+
+      if (replacementItemId) {
+        const replacement = await tx.toolInventoryItem.findUnique({
+          where: { id: replacementItemId },
+        });
+        if (!replacement || replacement.status !== 'AVAILABLE') {
+          throw new Error('La herramienta de reemplazo no está disponible');
+        }
+
+        await tx.toolKitAssignment.update({
+          where: { id: event.assignmentId },
+          data: {
+            isActive: false,
+            returnedAt: new Date(),
+            replacementCount: {
+              increment: 1,
+            },
+          },
+        });
+
+        await tx.toolKitAssignment.create({
+          data: {
+            inventoryItemId: replacementItemId,
+            userId: event.assignment.userId,
+            assignmentType: event.assignment.assignmentType,
+            assignedById: currentUser.id,
+            isActive: true,
+            notes: data.notes || `Reemplazo por incidente #${event.id}`,
+          },
+        });
+
+        await tx.toolInventoryItem.update({
+          where: { id: replacementItemId },
+          data: { status: 'ASSIGNED', updatedById: currentUser.id },
+        });
+
+        await tx.toolInventoryItem.update({
+          where: { id: event.assignment.inventoryItemId },
+          data: { status: 'IN_REPAIR', updatedById: currentUser.id },
+        });
+      } else {
+        await tx.toolInventoryItem.update({
+          where: { id: event.assignment.inventoryItemId },
+          data: { status: 'IN_REPAIR', updatedById: currentUser.id },
+        });
+      }
+
+      return tx.toolKitEvent.update({
+        where: { id: eventId },
+        data: {
+          resolution: data.resolution,
+          resolvedById: currentUser.id,
+          resolvedAt: new Date(),
+          fineId,
+          replacementItemId: replacementItemId || null,
+          description: data.notes ? `${event.description}\n\nResolución: ${data.notes}` : event.description,
+        },
+      });
     });
   }
 

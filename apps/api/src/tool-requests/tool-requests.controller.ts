@@ -8,9 +8,12 @@ import {
   Param,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFiles,
   UnauthorizedException,
   ForbiddenException,
 } from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { PERMISSIONS } from '../common/permissions.js';
@@ -23,7 +26,12 @@ import {
   ReplaceInventoryItemDto,
   AssignKitItemDto,
   ReportKitEventDto,
+  ResolveKitEventDto,
 } from './tool-requests.service.js';
+
+interface MulterFile {
+  filename: string;
+}
 
 @Controller('tool-requests')
 @UseGuards(RbacGuard)
@@ -49,28 +57,104 @@ export class ToolRequestsController {
 
   @Post('inventory')
   @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
-  async createInventoryItem(@CurrentUser() user: any, @Body() data: CreateInventoryItemDto) {
-    return this.toolRequestsService.createInventoryItem(data, user.id);
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'panoramicPhoto', maxCount: 1 },
+      { name: 'serialPhoto', maxCount: 1 },
+    ], { dest: 'uploads/tools' }),
+  )
+  async createInventoryItem(
+    @CurrentUser() user: any,
+    @Body() data: Partial<CreateInventoryItemDto>,
+    @UploadedFiles() files?: { panoramicPhoto?: MulterFile[]; serialPhoto?: MulterFile[] },
+  ) {
+    const panoramicPhotoUrl = files?.panoramicPhoto?.[0]?.filename
+      ? `/uploads/tools/${files.panoramicPhoto[0].filename}`
+      : data.panoramicPhotoUrl;
+    const serialPhotoUrl = files?.serialPhoto?.[0]?.filename
+      ? `/uploads/tools/${files.serialPhoto[0].filename}`
+      : data.serialPhotoUrl;
+
+    if (!panoramicPhotoUrl || !serialPhotoUrl) {
+      throw new ForbiddenException('Las fotos panorámica y de serie son obligatorias');
+    }
+
+    return this.toolRequestsService.createInventoryItem(
+      {
+        toolName: String(data.toolName || ''),
+        model: String(data.model || ''),
+        serialNumber: String(data.serialNumber || ''),
+        panoramicPhotoUrl,
+        serialPhotoUrl,
+      },
+      user.id,
+    );
   }
 
   @Put('inventory/:id')
   @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'panoramicPhoto', maxCount: 1 },
+      { name: 'serialPhoto', maxCount: 1 },
+    ], { dest: 'uploads/tools' }),
+  )
   async updateInventoryItem(
     @CurrentUser() user: any,
     @Param('id') id: string,
     @Body() data: UpdateInventoryItemDto,
+    @UploadedFiles() files?: { panoramicPhoto?: MulterFile[]; serialPhoto?: MulterFile[] },
   ) {
-    return this.toolRequestsService.updateInventoryItem(parseInt(id, 10), data, user.id);
+    const patch: UpdateInventoryItemDto = {
+      ...data,
+      panoramicPhotoUrl: files?.panoramicPhoto?.[0]?.filename
+        ? `/uploads/tools/${files.panoramicPhoto[0].filename}`
+        : data.panoramicPhotoUrl,
+      serialPhotoUrl: files?.serialPhoto?.[0]?.filename
+        ? `/uploads/tools/${files.serialPhoto[0].filename}`
+        : data.serialPhotoUrl,
+    };
+
+    return this.toolRequestsService.updateInventoryItem(parseInt(id, 10), patch, user.id);
   }
 
   @Post('inventory/:id/replace')
   @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'panoramicPhoto', maxCount: 1 },
+      { name: 'serialPhoto', maxCount: 1 },
+    ], { dest: 'uploads/tools' }),
+  )
   async replaceInventoryItem(
     @CurrentUser() user: any,
     @Param('id') id: string,
-    @Body() data: ReplaceInventoryItemDto,
+    @Body() data: Partial<ReplaceInventoryItemDto>,
+    @UploadedFiles() files?: { panoramicPhoto?: MulterFile[]; serialPhoto?: MulterFile[] },
   ) {
-    return this.toolRequestsService.replaceInventoryItem(parseInt(id, 10), data, user.id);
+    const panoramicPhotoUrl = files?.panoramicPhoto?.[0]?.filename
+      ? `/uploads/tools/${files.panoramicPhoto[0].filename}`
+      : data.panoramicPhotoUrl;
+    const serialPhotoUrl = files?.serialPhoto?.[0]?.filename
+      ? `/uploads/tools/${files.serialPhoto[0].filename}`
+      : data.serialPhotoUrl;
+
+    if (!panoramicPhotoUrl || !serialPhotoUrl) {
+      throw new ForbiddenException('Las fotos panorámica y de serie del reemplazo son obligatorias');
+    }
+
+    return this.toolRequestsService.replaceInventoryItem(
+      parseInt(id, 10),
+      {
+        toolName: String(data.toolName || ''),
+        model: String(data.model || ''),
+        serialNumber: String(data.serialNumber || ''),
+        panoramicPhotoUrl,
+        serialPhotoUrl,
+        retiredReason: data.retiredReason,
+      },
+      user.id,
+    );
   }
 
   // ===== KIT / QUID =====
@@ -119,6 +203,24 @@ export class ToolRequestsController {
   ) {
     return this.toolRequestsService.reportKitEvent(
       parseInt(assignmentId, 10),
+      data,
+      {
+        id: user.id,
+        isSuperAdmin: user.isSuperAdmin,
+        permissions: user.permissions,
+      },
+    );
+  }
+
+  @Post('kits/events/:eventId/resolve')
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
+  async resolveKitEvent(
+    @CurrentUser() user: any,
+    @Param('eventId') eventId: string,
+    @Body() data: ResolveKitEventDto,
+  ) {
+    return this.toolRequestsService.resolveKitEvent(
+      parseInt(eventId, 10),
       data,
       {
         id: user.id,

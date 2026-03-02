@@ -63,9 +63,6 @@ const ToolMyKitPanel: React.FC = () => {
     const description = window.prompt('Describe el daño o incidente de esta herramienta');
     if (!description || description.trim().length < 5) return;
 
-    const misuse = window.confirm('¿Detectaste mal uso del equipo? (Aceptar = Sí, Cancelar = No)');
-    const resolution = misuse ? 'USER_MISUSE' : 'EQUIPMENT_FAILURE';
-
     try {
       const response = await fetch(buildApiUrl(`tool-requests/kits/${assignmentId}/report`), {
         method: 'POST',
@@ -73,7 +70,7 @@ const ToolMyKitPanel: React.FC = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${user.token}`,
         },
-        body: JSON.stringify({ description, resolution }),
+        body: JSON.stringify({ description }),
       });
 
       if (!response.ok) {
