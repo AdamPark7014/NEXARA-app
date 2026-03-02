@@ -7,11 +7,11 @@ import {
 } from '../common/security/security.utils';
 
 const wsConnectionGuard = createInMemoryWsConnectionGuard(
-  Number(process.env['WS_MAX_CONNECTIONS_PER_IP'] || 5),
+  Number(process.env['WS_MAX_CONNECTIONS_PER_IP'] || 50),
 );
 
 @WebSocketGateway({
-  transports: ['websocket'],
+  transports: ['websocket', 'polling'],
   allowEIO3: false,
   maxHttpBufferSize: Number(process.env['WS_MAX_HTTP_BUFFER_SIZE'] || 1_000_000),
   perMessageDeflate: false,
