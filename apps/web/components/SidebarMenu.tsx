@@ -48,18 +48,9 @@ const SidebarMenu = () => {
           <li className="menu-item"><Link href="/console/gps">Mapa GPS</Link></li>
         )}
 
-        {/* Herramientas - Solo vista para usuarios normales que pueden solicitar */}
-        {hasPermission(user, PERMISSIONS.TOOLS_REQUEST) && !hasPermission(user, PERMISSIONS.TOOLS_MANAGE) && (
-          <li className="menu-item"><Link href="/console/my-tools">Mis Herramientas</Link></li>
-        )}
-
-        {/* Herramientas - Vistas para admins y Super admin */}
-        {hasPermission(user, PERMISSIONS.TOOLS_MANAGE) && (
-          <>
-            <li className="menu-item"><Link href="/console/tools">Solicitudes de Herramientas</Link></li>
-            <li className="menu-item"><Link href="/console/tools/renewals">Renovaciones</Link></li>
-            <li className="menu-item"><Link href="/console/my-tools">Mis Herramientas</Link></li>
-          </>
+        {/* Herramientas - Sección unificada con vistas internas por rol */}
+        {(hasPermission(user, PERMISSIONS.TOOLS_REQUEST) || hasPermission(user, PERMISSIONS.TOOLS_MANAGE)) && (
+          <li className="menu-item"><Link href="/console/tools">Herramientas</Link></li>
         )}
       </ul>
     </aside>

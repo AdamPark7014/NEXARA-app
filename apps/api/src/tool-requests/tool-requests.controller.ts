@@ -41,7 +41,7 @@ export class ToolRequestsController {
   // ===== INVENTARIO INTELIGENTE =====
 
   @Get('inventory/search')
-  @RBAC({ permissions: [PERMISSIONS.TOOLS_REQUEST] })
+  @RBAC({ anyPermissions: [PERMISSIONS.TOOLS_REQUEST, PERMISSIONS.TOOLS_MANAGE] })
   async searchInventory(@Query('q') q: string) {
     return this.toolRequestsService.searchInventoryOptions(q || '');
   }
