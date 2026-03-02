@@ -109,16 +109,9 @@ const MyProfileForm: React.FC = () => {
   const [profileNotes, setProfileNotes] = useState<string>('');
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const isSuperAdmin = Boolean(user?.isSuperAdmin);
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
-  const getAssetUrl = (url?: string | null) => {
-    if (!url) return '';
-    if (url.startsWith('http')) return url;
-    const base = API_URL.replace(/\/+api\/?$/, '');
-    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
-  };
 
   const normalizedDocs = useMemo(() => {
     const map = new Map<string, DocumentItem>();
@@ -141,14 +134,6 @@ const MyProfileForm: React.FC = () => {
     return map;
   }, [documents]);
 
-  const getDocExtension = (url: string) => {
-    const clean = url.split('?')[0].split('#')[0];
-    const parts = clean.split('.');
-    return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '';
-  };
-
-  const isPdf = (url: string) => getDocExtension(url) === 'pdf';
-  const isImage = (url: string) => ['png', 'jpg', 'jpeg', 'webp'].includes(getDocExtension(url));
   const isSupportedFile = (file: File) => file.type.startsWith('image/') || file.type === 'application/pdf';
 
   useEffect(() => {
@@ -292,6 +277,36 @@ const MyProfileForm: React.FC = () => {
     }
   };
 
+  const handleDocumentAction = async (docId: number, mode: 'view' | 'download') => {
+    if (!user?.token) return;
+    setError(null);
+    try {
+      const res = await fetch(buildApiUrl(`users/documents/${docId}/download`), {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'No fue posible abrir el documento');
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      if (mode === 'download') {
+        link.download = `documento-${docId}.pdf`;
+      } else {
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+      }
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'No fue posible abrir el documento');
+    }
+  };
+
   if (loading) return <div>Cargando perfil...</div>;
 
   return (
@@ -354,258 +369,131 @@ const MyProfileForm: React.FC = () => {
       </div>
 
       <div className="card" style={{ background: 'var(--surface-light)', padding: 12 }}>
-          <h3 style={{ marginBottom: 4 }}>Documentos obligatorios (PDF)</h3>
-          <p style={{ color: 'var(--text-secondary)', marginTop: 0 }}>
-            Todos los documentos deben cargarse en PDF. Elige el tipo y sube el archivo correspondiente.
-          </p>
-          <div style={{ display: 'grid', gap: 12, marginBottom: 12 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-              <select className="input" value={docType} onChange={(e) => setDocType(e.target.value)}>
-                {requiredDocuments.map((doc) => (
-                  <option key={doc.key} value={doc.key}>{doc.key}</option>
-                ))}
-              </select>
-              <div
-                onDragEnter={() => setDragActive(true)}
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  setDragActive(true);
-                }}
-                onDragLeave={() => setDragActive(false)}
-                onDrop={handleDrop}
-                style={{
-                  border: `1px dashed ${dragActive ? 'var(--primary)' : 'var(--border)'}`,
-                  borderRadius: 12,
-                  padding: 12,
-                  background: dragActive ? 'rgba(0,0,0,0.02)' : 'transparent',
-                  display: 'grid',
-                  gap: 6,
-                  alignContent: 'center'
-                }}
+        <h3 style={{ marginBottom: 4 }}>Documentacion del perfil</h3>
+        <p style={{ color: 'var(--text-secondary)', marginTop: 0 }}>
+          Sube tus documentos y consulta su estatus de revision en un solo panel.
+        </p>
+        <div style={{ display: 'grid', gap: 12, marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+            <select className="input" value={docType} onChange={(e) => setDocType(e.target.value)}>
+              {requiredDocuments.map((doc) => (
+                <option key={doc.key} value={doc.key}>{doc.key}</option>
+              ))}
+            </select>
+            <div
+              onDragEnter={() => setDragActive(true)}
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setDragActive(true);
+              }}
+              onDragLeave={() => setDragActive(false)}
+              onDrop={handleDrop}
+              style={{
+                border: `1px dashed ${dragActive ? 'var(--primary)' : 'var(--border)'}`,
+                borderRadius: 12,
+                padding: 12,
+                background: dragActive ? 'rgba(0,0,0,0.02)' : 'transparent',
+                display: 'grid',
+                gap: 6,
+                alignContent: 'center'
+              }}
+            >
+              <div style={{ fontWeight: 600 }}>Arrastra y suelta el documento aqui</div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                O selecciona el archivo manualmente.
+              </div>
+              <button
+                className="button-secondary"
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
               >
-                <div style={{ fontWeight: 600 }}>Arrastra y suelta el PDF aqui</div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-                  O selecciona el archivo manualmente. Solo PDF.
-                </div>
-                <button
-                  className="button-secondary"
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  Seleccionar archivo
-                </button>
-                <input
-                  ref={fileInputRef}
-                  className="input"
-                  type="file"
-                  accept="application/pdf"
-                  multiple
-                  style={{ display: 'none' }}
-                  onChange={(e) => handleSelectFiles(e.target.files || [])}
-                />
-              </div>
-              <button className="button-primary" type="button" onClick={handleUploadDocs} disabled={saving || docFiles.length === 0}>
-                Subir documentos
+                Seleccionar archivo
               </button>
+              <input
+                ref={fileInputRef}
+                className="input"
+                type="file"
+                accept="application/pdf,image/*"
+                multiple
+                style={{ display: 'none' }}
+                onChange={(e) => handleSelectFiles(e.target.files || [])}
+              />
             </div>
-            {docPreviews.length > 0 && (
-              <div style={{ display: 'grid', gap: 8 }}>
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Archivos listos para subir</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
-                  {docPreviews.map((entry) => (
-                    <div key={entry.file.name} style={{ borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden', background: 'var(--surface)', position: 'relative' }}>
-                      <button
-                        type="button"
-                        onClick={clearDocSelection}
-                        style={{
-                          position: 'absolute',
-                          top: 8,
-                          right: 8,
-                          width: 26,
-                          height: 26,
-                          borderRadius: '50%',
-                          border: 'none',
-                          background: 'rgba(0,0,0,0.6)',
-                          color: '#fff',
-                          cursor: 'pointer',
-                          zIndex: 1,
-                        }}
-                      >
-                        x
-                      </button>
-                      {entry.kind === 'pdf' ? (
-                        <object data={entry.url} type="application/pdf" width="100%" height="180" aria-label="Vista previa PDF">
-                          <embed src={entry.url} type="application/pdf" />
-                        </object>
-                      ) : (
-                        <img src={entry.url} alt={entry.file.name} style={{ width: '100%', height: 180, objectFit: 'cover' }} />
-                      )}
-                      <div style={{ padding: 8, fontSize: 12 }}>{entry.file.name}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <button className="button-primary" type="button" onClick={handleUploadDocs} disabled={saving || docFiles.length === 0}>
+              Subir documentos
+            </button>
           </div>
-
-          <div style={{ display: 'grid', gap: 8 }}>
-            {requiredDocuments.map((doc) => {
-              const current = normalizedDocs.get(doc.key.toLowerCase().trim());
-              const status = current?.estatus || 'Pendiente';
-              return (
-                <div key={doc.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{doc.label}</div>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{doc.description}</div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                    <span className={`badge ${status === 'Aprobado' ? 'approved' : status === 'Rechazado' ? 'rejected' : 'pending'}`}>
-                      {status}
-                    </span>
-                    {current?.archivoUrl && (
-                      <a className="link" href={current.archivoUrl} target="_blank" rel="noopener noreferrer">Ver</a>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-      {isSuperAdmin && (
-        <div className="card" style={{ background: 'var(--surface-light)', padding: 12 }}>
-          <h3 style={{ marginBottom: 4 }}>Documentos rapidos</h3>
-          <p style={{ color: 'var(--text-secondary)', marginTop: 0 }}>
-            Acceso directo a tus documentos con vista previa y descarga.
-          </p>
-          <div style={{ display: 'grid', gap: 12, marginBottom: 12 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-              <select className="input" value={docType} onChange={(e) => setDocType(e.target.value)}>
-                {requiredDocuments.map((doc) => (
-                  <option key={doc.key} value={doc.key}>{doc.key}</option>
-                ))}
-              </select>
-              <div
-                onDragEnter={() => setDragActive(true)}
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  setDragActive(true);
-                }}
-                onDragLeave={() => setDragActive(false)}
-                onDrop={handleDrop}
-                style={{
-                  border: `1px dashed ${dragActive ? 'var(--primary)' : 'var(--border)'}`,
-                  borderRadius: 12,
-                  padding: 12,
-                  background: dragActive ? 'rgba(0,0,0,0.02)' : 'transparent',
-                  display: 'grid',
-                  gap: 6,
-                  alignContent: 'center'
-                }}
-              >
-                <div style={{ fontWeight: 600 }}>Arrastra y suelta el PDF aqui</div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-                  O selecciona el archivo manualmente. Solo PDF.
-                </div>
-                <button
-                  className="button-secondary"
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  Seleccionar archivo
-                </button>
-                <input
-                  ref={fileInputRef}
-                  className="input"
-                  type="file"
-                  accept="application/pdf"
-                  multiple
-                  style={{ display: 'none' }}
-                  onChange={(e) => handleSelectFiles(e.target.files || [])}
-                />
-              </div>
-              <button className="button-primary" type="button" onClick={handleUploadDocs} disabled={saving || docFiles.length === 0}>
-                Subir documentos
-              </button>
-            </div>
-            {docPreviews.length > 0 && (
-              <div style={{ display: 'grid', gap: 8 }}>
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Archivos listos para subir</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
-                  {docPreviews.map((entry) => (
-                    <div key={entry.file.name} style={{ borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden', background: 'var(--surface)', position: 'relative' }}>
-                      <button
-                        type="button"
-                        onClick={clearDocSelection}
-                        style={{
-                          position: 'absolute',
-                          top: 8,
-                          right: 8,
-                          width: 26,
-                          height: 26,
-                          borderRadius: '50%',
-                          border: 'none',
-                          background: 'rgba(0,0,0,0.6)',
-                          color: '#fff',
-                          cursor: 'pointer',
-                          zIndex: 1,
-                        }}
-                      >
-                        x
-                      </button>
-                      {entry.kind === 'pdf' ? (
-                        <object data={entry.url} type="application/pdf" width="100%" height="180" aria-label="Vista previa PDF">
-                          <embed src={entry.url} type="application/pdf" />
-                        </object>
-                      ) : (
-                        <img src={entry.url} alt={entry.file.name} style={{ width: '100%', height: 180, objectFit: 'cover' }} />
-                      )}
-                      <div style={{ padding: 8, fontSize: 12 }}>{entry.file.name}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-          {documents.length === 0 && (
-            <p style={{ color: 'var(--text-tertiary)' }}>No hay documentos cargados.</p>
-          )}
-          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-            {documents.map((doc) => (
-              <div key={doc.id} className="card" style={{ padding: 10, display: 'grid', gap: 8 }}>
-                <div style={{ fontWeight: 600 }}>{doc.tipo}</div>
-                {doc.archivoUrl ? (
-                  <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--muted)', background: 'var(--surface)' }}>
-                    {isPdf(doc.archivoUrl) ? (
-                      <object data={getAssetUrl(doc.archivoUrl)} type="application/pdf" width="100%" height="180" aria-label="Vista previa PDF">
-                        <embed src={getAssetUrl(doc.archivoUrl)} type="application/pdf" />
+          {docPreviews.length > 0 && (
+            <div style={{ display: 'grid', gap: 8 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Archivos listos para subir</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+                {docPreviews.map((entry) => (
+                  <div key={entry.file.name} style={{ borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden', background: 'var(--surface)', position: 'relative' }}>
+                    <button
+                      type="button"
+                      onClick={clearDocSelection}
+                      style={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
+                        width: 26,
+                        height: 26,
+                        borderRadius: '50%',
+                        border: 'none',
+                        background: 'rgba(0,0,0,0.6)',
+                        color: '#fff',
+                        cursor: 'pointer',
+                        zIndex: 1,
+                      }}
+                    >
+                      x
+                    </button>
+                    {entry.kind === 'pdf' ? (
+                      <object data={entry.url} type="application/pdf" width="100%" height="180" aria-label="Vista previa PDF">
+                        <embed src={entry.url} type="application/pdf" />
                       </object>
-                    ) : isImage(doc.archivoUrl) ? (
-                      <img src={getAssetUrl(doc.archivoUrl)} alt={doc.tipo} style={{ width: '100%', height: 180, objectFit: 'cover' }} />
                     ) : (
-                      <div style={{ padding: 12, color: 'var(--text-tertiary)' }}>Formato no soportado</div>
+                      <img src={entry.url} alt={entry.file.name} style={{ width: '100%', height: 180, objectFit: 'cover' }} />
                     )}
+                    <div style={{ padding: 8, fontSize: 12 }}>{entry.file.name}</div>
                   </div>
-                ) : (
-                  <div style={{ color: 'var(--text-tertiary)' }}>Sin archivo</div>
-                )}
-                {doc.archivoUrl && (
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <a className="button-secondary" href={getAssetUrl(doc.archivoUrl)} target="_blank" rel="noopener noreferrer">
-                      Ver
-                    </a>
-                    <a className="button-primary" href={getAssetUrl(doc.archivoUrl)} download>
-                      Descargar
-                    </a>
-                  </div>
-                )}
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
-      )}
+
+        <div style={{ display: 'grid', gap: 8 }}>
+          {requiredDocuments.map((doc) => {
+            const current = normalizedDocs.get(doc.key.toLowerCase().trim());
+            const status = current?.estatus || 'Pendiente';
+            return (
+              <div key={doc.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                <div>
+                  <div style={{ fontWeight: 600 }}>{doc.label}</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{doc.description}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <span className={`badge ${status === 'Aprobado' ? 'approved' : status === 'Rechazado' ? 'rejected' : 'pending'}`}>
+                    {status}
+                  </span>
+                  {current?.id && (
+                    <>
+                      <button className="button-secondary" type="button" onClick={() => handleDocumentAction(current.id, 'view')}>
+                        Ver
+                      </button>
+                      <button className="button-primary" type="button" onClick={() => handleDocumentAction(current.id, 'download')}>
+                        Descargar
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
         <button className="button-primary" type="button" onClick={handleSave} disabled={saving}>Guardar perfil</button>

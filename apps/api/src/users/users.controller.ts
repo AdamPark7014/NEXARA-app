@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, ForbiddenException, UploadedFile, UploadedFiles, UseInterceptors, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, ForbiddenException, UploadedFile, UploadedFiles, UseInterceptors, BadRequestException, NotFoundException, Res } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
@@ -8,6 +8,9 @@ import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { getUsersUploadDir, getUserDocsUploadDir } from '../common/upload-paths.js';
+import { createReadStream, existsSync } from 'node:fs';
+import { basename, join } from 'node:path';
+import { Response } from 'express';
 
 @Controller('users')
 export class UsersController {
@@ -162,6 +165,28 @@ export class UsersController {
       aprobadoPorId: user.id,
       revisadoEn: new Date(),
     });
+  }
+
+  @Get('documents/:id/download')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.USERS_REVIEW, PERMISSIONS.USERS_MANAGE] })
+  async downloadDocument(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const document = await this.usersService.getAuthorizedDocument(+id, user);
+    const fileName = basename(document.archivoUrl || 'documento.pdf');
+    const absolutePath = join(this.userDocsUploadDir, fileName);
+
+    if (!existsSync(absolutePath)) {
+      throw new NotFoundException('Archivo no encontrado');
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+    const stream = createReadStream(absolutePath);
+    stream.pipe(res);
   }
 
   @Get(':id')
