@@ -41,6 +41,7 @@ const AttendanceForm = () => {
   
   // Camera states
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [cameraType, setCameraType] = useState<'entrada' | 'salida' | null>(null);
   const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -80,6 +81,14 @@ const AttendanceForm = () => {
         localStorage.removeItem(STORAGE_KEY);
       }
     }
+  }, []);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 900px)');
+    const sync = () => setIsMobile(mediaQuery.matches);
+    sync();
+    mediaQuery.addEventListener('change', sync);
+    return () => mediaQuery.removeEventListener('change', sync);
   }, []);
 
   // Actualizar contador cada segundo si hay entrada activa
@@ -644,7 +653,7 @@ const AttendanceForm = () => {
       )}
 
       {/* Formulario Principal */}
-      <div className="card" style={{ maxWidth: 400 }}>
+      <div className="card" style={{ maxWidth: 400, width: '100%' }}>
         <h2 style={{ color: 'var(--primary)', marginBottom: 12 }}>Registro de Entrada/Salida</h2>
         <div style={{ marginBottom: 12 }}>
           <label style={{ color: 'var(--muted)', fontSize: 13, display: 'block', marginBottom: 6 }}>Dia</label>
@@ -665,7 +674,7 @@ const AttendanceForm = () => {
             title={isToday(selectedDate) ? 'No puedes cambiar la fecha de hoy' : ''}
           />
         </div>
-        <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
           {/* Botón entrada - deshabilitado si ya hay entrada o si no es hoy */}
           <button 
             className="button-secondary" 
@@ -718,7 +727,7 @@ const AttendanceForm = () => {
             <div style={{ color: 'var(--muted)', marginBottom: 6 }}><strong>Historial del dia</strong></div>
             <div style={{ display: 'grid', gap: 6 }}>
               {history.map((item, index) => (
-                <div key={`${item.type}-${item.timestamp}-${index}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text)' }}>
+                <div key={`${item.type}-${item.timestamp}-${index}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text)', flexWrap: 'wrap', gap: 8 }}>
                   <span style={{ textTransform: 'capitalize' }}>{item.type}</span>
                   <span style={{ color: 'var(--muted)' }}>{formatTime(item.timestamp)}</span>
                   {item.photoUrl && (
@@ -739,7 +748,7 @@ const AttendanceForm = () => {
             <button className="button-secondary" type="button" onClick={() => { const r = getWeekRange(); setRangeFrom(r.from); setRangeTo(r.to); }}>Semana actual</button>
             <button className="button-secondary" type="button" onClick={() => { const r = getMonthRange(); setRangeFrom(r.from); setRangeTo(r.to); }}>Mes actual</button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8, marginBottom: 8 }}>
             <input
               type="date"
               value={rangeFrom}

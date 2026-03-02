@@ -527,7 +527,7 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
           placeholder="Buscar en historial"
           value={historyQuery}
           onChange={(e) => setHistoryQuery(e.target.value)}
-          style={{ minWidth: 180 }}
+          style={{ minWidth: isCompact ? 0 : 180, width: isCompact ? '100%' : undefined }}
         />
       </div>
 
@@ -586,7 +586,7 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
 
       <div style={{ borderTop: "1px solid var(--border)", paddingTop: 10, display: "grid", gap: 10 }}>
         <strong>{selectedInventoryId ? `Editar inventario INV-${selectedInventoryId}` : "Nuevo inventario"}</strong>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}>
           <input className="input" placeholder="Buscar equipo en formulario" value={itemQuery} onChange={(e) => setItemQuery(e.target.value)} />
           <select className="input" value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)}>
             <option value="ALL">Todos los grupos</option>
@@ -613,7 +613,7 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
             </button>
           ))}
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isCompact ? '1fr' : "repeat(auto-fit, minmax(220px, 1fr))", gap: 8 }}>
           <input className="input" placeholder="Título del inventario" value={title} onChange={(e) => setTitle(e.target.value)} />
           <input className="input" placeholder="Notas generales" value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
@@ -681,7 +681,7 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
               </div>
             ) : (
               <>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isCompact ? '1fr' : "repeat(auto-fit, minmax(170px, 1fr))", gap: 8 }}>
               <input className="input" placeholder="Apartado" value={item.sectionName} onChange={(e) => updateItem(index, { sectionName: e.target.value })} />
               <select className="input" value={item.groupName} onChange={(e) => updateItem(index, { groupName: e.target.value })}>
                 {GROUP_OPTIONS.map((group) => <option key={group} value={group}>{group}</option>)}
@@ -695,7 +695,7 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
               <input className="input" placeholder="Comentario técnico" value={item.maintenanceComments} onChange={(e) => updateItem(index, { maintenanceComments: e.target.value })} />
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isCompact ? '1fr' : "repeat(auto-fit, minmax(170px, 1fr))", gap: 8 }}>
               {[
                 ["beforePanoramicPhotoUrl", "Foto panorámica ANTES"],
                 ["beforeCloseupPhotoUrl", "Foto serie/modelo ANTES"],
@@ -747,7 +747,7 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
           <button className="button-secondary" type="button" onClick={addItem}>+ Agregar equipo</button>
           <button className="button-secondary" type="button" onClick={() => saveInventory(false)} disabled={saving}>{saving ? "Guardando..." : "Guardar borrador"}</button>
           <button className="button-primary" type="button" onClick={() => saveInventory(true)} disabled={saving}>{saving ? "Guardando..." : "Guardar y completar"}</button>
-          <div style={{ display: 'flex', alignItems: 'center', fontSize: 12, color: 'var(--text-secondary)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', fontSize: 12, color: 'var(--text-secondary)', width: isCompact ? '100%' : 'auto' }}>
             Completos: {completionCount}/{items.length}
           </div>
         </div>

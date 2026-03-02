@@ -363,7 +363,7 @@ const MyActivitiesTable: React.FC = () => {
                     </div>
 
                     {/* Info Grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 13 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, fontSize: 13 }}>
                       <div>
                         <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginBottom: 2 }}>Sucursal</div>
                         <div style={{ fontWeight: 500 }}>{[a.branchName, a.branchCity].filter(Boolean).join(', ') || '-'}</div>
@@ -410,7 +410,7 @@ const MyActivitiesTable: React.FC = () => {
                           className="button-secondary"
                           style={{ 
                             flex: 1,
-                            minWidth: 140,
+                            minWidth: 0,
                             padding: '10px 16px',
                             textDecoration: 'none',
                             textAlign: 'center',
@@ -427,7 +427,7 @@ const MyActivitiesTable: React.FC = () => {
                           onClick={() => setReviewModal({ activityId: a.id, activityNumber: a.anNumber })}
                           style={{
                             flex: 1,
-                            minWidth: 140,
+                            minWidth: 0,
                             padding: '10px 16px',
                             fontSize: 13
                           }}
@@ -442,7 +442,7 @@ const MyActivitiesTable: React.FC = () => {
                           className="button-primary"
                           style={{
                             flex: 1,
-                            minWidth: 140,
+                            minWidth: 0,
                             padding: '10px 16px',
                             backgroundColor: '#ef4444',
                             textDecoration: 'none',

@@ -628,7 +628,7 @@ export default function UserForm({
 
         .cropModal {
           background: var(--surface);
-          padding: 24px;
+          padding: clamp(12px, 3vw, 24px);
           border-radius: 16px;
           max-width: 480px;
           width: calc(100vw - 40px);

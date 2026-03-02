@@ -314,7 +314,7 @@ const MyToolsTable: React.FC = () => {
                     </div>
 
                     {/* Info Grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 13 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, fontSize: 13 }}>
                       <div>
                         <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginBottom: 2 }}>Fecha Inicio</div>
                         <div style={{ fontWeight: 500 }}>

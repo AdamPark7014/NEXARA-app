@@ -1,7 +1,7 @@
 export default function PrivacidadPage() {
   return (
-    <main style={{ maxWidth: 900, margin: "0 auto", padding: "48px 20px", color: "var(--text-primary)" }}>
-      <h1 style={{ fontSize: 32, marginBottom: 12 }}>Aviso de Privacidad</h1>
+    <main style={{ maxWidth: 900, margin: "0 auto", padding: "clamp(20px, 6vw, 48px) clamp(14px, 4vw, 20px)", color: "var(--text-primary)" }}>
+      <h1 style={{ fontSize: "clamp(1.75rem, 5.5vw, 2rem)", marginBottom: 12, lineHeight: 1.2 }}>Aviso de Privacidad</h1>
       <p style={{ color: "var(--text-secondary)", marginBottom: 24 }}>Última actualización: 2 de marzo de 2026</p>
       <p style={{ lineHeight: 1.7, marginBottom: 16 }}>
         En NEXARA tratamos tus datos personales conforme a la legislación aplicable y únicamente para fines

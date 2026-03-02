@@ -191,7 +191,7 @@ export default function FirmarCotizacionPage() {
           background: rgba(12, 28, 52, 0.95);
           border: 1px solid rgba(90, 140, 210, 0.25);
           border-radius: 20px;
-          padding: 24px;
+          padding: clamp(14px, 3.5vw, 24px);
           box-shadow: 0 24px 48px rgba(4, 10, 22, 0.45);
           display: grid;
           gap: 18px;

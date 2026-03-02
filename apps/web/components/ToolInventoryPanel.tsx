@@ -15,6 +15,7 @@ interface InventoryItem {
 
 const ToolInventoryPanel: React.FC = () => {
   const { user } = useUser();
+  const [isMobile, setIsMobile] = useState(false);
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [query, setQuery] = useState('');
   const [includeRetired, setIncludeRetired] = useState(false);
@@ -51,6 +52,14 @@ const ToolInventoryPanel: React.FC = () => {
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 900px)');
+    const sync = () => setIsMobile(mediaQuery.matches);
+    sync();
+    mediaQuery.addEventListener('change', sync);
+    return () => mediaQuery.removeEventListener('change', sync);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -257,7 +266,7 @@ const ToolInventoryPanel: React.FC = () => {
     <div style={{ display: 'grid', gap: 16 }}>
       <form className="card" style={{ display: 'grid', gap: 10 }} onSubmit={createItem}>
         <h3 style={{ color: 'var(--primary)', marginBottom: 0 }}>🏭 Inventario de Herramientas</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
           <input className="input" placeholder="Herramienta" value={toolName} onChange={(e) => setToolName(e.target.value)} />
           <input className="input" placeholder="Modelo" value={model} onChange={(e) => setModel(e.target.value)} />
           <input className="input" placeholder="Serie" value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} />
@@ -379,7 +388,7 @@ const ToolInventoryPanel: React.FC = () => {
             🔁 Reemplazar: {replacementTarget.toolName} · {replacementTarget.serialNumber}
           </h3>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
             <input className="input" value={replacementModel} onChange={(e) => setReplacementModel(e.target.value)} placeholder="Nuevo modelo" />
             <input className="input" value={replacementSerialNumber} onChange={(e) => setReplacementSerialNumber(e.target.value)} placeholder="Nueva serie" />
             <input className="input" value={replacementRetiredReason} onChange={(e) => setReplacementRetiredReason(e.target.value)} placeholder="Motivo de retiro" />
@@ -509,7 +518,7 @@ const ToolInventoryPanel: React.FC = () => {
             placeholder="Buscar por herramienta, modelo o serie"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            style={{ flex: 1, minWidth: 220 }}
+            style={{ flex: 1, minWidth: isMobile ? 0 : 220, width: isMobile ? '100%' : undefined }}
           />
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', fontSize: 13 }}>
             <input type="checkbox" checked={includeRetired} onChange={(e) => setIncludeRetired(e.target.checked)} />
