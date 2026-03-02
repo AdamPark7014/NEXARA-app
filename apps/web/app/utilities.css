@@ -236,6 +236,88 @@ body.light .table tbody tr:hover {
   border-color: rgba(214, 69, 69, 0.3);
 }
 
+.panel-toolbar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  align-items: end;
+}
+
+.panel-toolbar .panel-toolbar-title {
+  grid-column: 1 / -1;
+}
+
+.panel-muted {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.stat-card {
+  border: 1px solid var(--muted);
+  border-radius: 12px;
+  padding: 10px;
+  background: var(--surface);
+  min-height: 72px;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+}
+
+.list-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.record-card {
+  border: 1px solid var(--muted);
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  gap: 6px;
+  background: var(--surface);
+}
+
+.chip-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sticky-mobile-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 900px) {
+  .panel-toolbar {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .sticky-mobile-actions {
+    position: sticky;
+    bottom: 10px;
+    z-index: 10;
+    padding: 8px;
+    border-radius: 12px;
+    border: 1px solid var(--muted);
+    background: color-mix(in srgb, var(--surface) 90%, transparent);
+    backdrop-filter: blur(4px);
+  }
+
+  .sticky-mobile-actions > button {
+    flex: 1 1 180px;
+  }
+}
+
 .input,
 input,
 select,

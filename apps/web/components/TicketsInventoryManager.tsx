@@ -236,6 +236,23 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
     return () => mediaQuery.removeEventListener('change', updateMatch);
   }, []);
 
+  useEffect(() => {
+    if (!error && !success) return;
+    const timeout = window.setTimeout(() => {
+      setError(null);
+      setSuccess(null);
+    }, 4500);
+    return () => window.clearTimeout(timeout);
+  }, [error, success]);
+
+  useEffect(() => {
+    if (visibleItems.length === 0) return;
+    const hasActiveVisible = visibleItems.some(({ index }) => index === activeItemIndex);
+    if (!hasActiveVisible) {
+      setActiveItemIndex(visibleItems[0].index);
+    }
+  }, [visibleItems, activeItemIndex]);
+
   const loadDetail = async (inventoryId: number) => {
     setLoading(true);
     setError(null);
@@ -498,10 +515,10 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
 
   return (
     <div className="card" style={{ display: "grid", gap: 12 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <div>
+      <div className="panel-toolbar">
+        <div className="panel-toolbar-title">
           <p style={{ margin: 0, fontWeight: 700 }}>Inventarios y mantenimientos</p>
-          <p style={{ margin: 0, fontSize: 12, color: "var(--text-secondary)" }}>
+          <p className="panel-muted" style={{ margin: 0 }}>
             {mode === "branch"
               ? "Captura inventario completo de la sucursal con comparativo antes/después."
               : "Filtra por sucursal y administra historial de inventarios y mantenimientos."}
@@ -527,23 +544,23 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
           placeholder="Buscar en historial"
           value={historyQuery}
           onChange={(e) => setHistoryQuery(e.target.value)}
-          style={{ minWidth: isCompact ? 0 : 180, width: isCompact ? '100%' : undefined }}
+          style={{ minWidth: 0, width: '100%' }}
         />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8 }}>
-        <div className="card" style={{ padding: 10 }}><strong>{inventoryStats.total}</strong><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Historial</div></div>
-        <div className="card" style={{ padding: 10 }}><strong>{inventoryStats.pending}</strong><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Pendiente</div></div>
-        <div className="card" style={{ padding: 10 }}><strong>{inventoryStats.completed}</strong><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Realizado</div></div>
-        <div className="card" style={{ padding: 10 }}><strong>{inventoryStats.approved}</strong><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Aprobado</div></div>
-        <div className="card" style={{ padding: 10 }}><strong>{inventoryStats.rejected}</strong><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Desaprobado</div></div>
-        <div className="card" style={{ padding: 10 }}><strong>{inventoryStats.delta}</strong><div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Δ Total</div></div>
+      <div className="stat-grid">
+        <div className="stat-card"><strong>{inventoryStats.total}</strong><div className="panel-muted">Historial</div></div>
+        <div className="stat-card"><strong>{inventoryStats.pending}</strong><div className="panel-muted">Pendiente</div></div>
+        <div className="stat-card"><strong>{inventoryStats.completed}</strong><div className="panel-muted">Realizado</div></div>
+        <div className="stat-card"><strong>{inventoryStats.approved}</strong><div className="panel-muted">Aprobado</div></div>
+        <div className="stat-card"><strong>{inventoryStats.rejected}</strong><div className="panel-muted">Desaprobado</div></div>
+        <div className="stat-card"><strong>{inventoryStats.delta}</strong><div className="panel-muted">Δ Total</div></div>
       </div>
 
-      {error && <div style={{ padding: 10, borderRadius: 10, background: "rgba(220, 38, 38, 0.1)", color: "#b91c1c" }}>{error}</div>}
-      {success && <div style={{ padding: 10, borderRadius: 10, background: "rgba(22, 163, 74, 0.1)", color: "#166534" }}>{success}</div>}
+      {error && <div role="alert" style={{ padding: 10, borderRadius: 10, background: "rgba(220, 38, 38, 0.1)", color: "#b91c1c" }}>{error}</div>}
+      {success && <div role="status" style={{ padding: 10, borderRadius: 10, background: "rgba(22, 163, 74, 0.1)", color: "#166534" }}>{success}</div>}
 
-      <div style={{ display: "grid", gap: 8 }}>
+      <div className="list-stack">
         <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
           <strong>Historial ({filteredInventories.length})</strong>
           <button className="button-secondary" type="button" onClick={resetEditor}>Nuevo inventario</button>
@@ -551,7 +568,7 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
         {loading && <div style={{ color: "var(--text-secondary)" }}>Cargando inventarios...</div>}
         {!loading && filteredInventories.length === 0 && <div style={{ color: "var(--text-secondary)" }}>Sin inventarios registrados.</div>}
         {!loading && filteredInventories.map((inventory) => (
-          <div key={inventory.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 10, display: "grid", gap: 6 }}>
+          <div key={inventory.id} className="record-card">
             <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
               <strong>INV-{inventory.id} · {inventory.branch?.name || "Sucursal"}</strong>
               <span className="badge">{getStatusLabel(inventory.status)}</span>
@@ -564,7 +581,7 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
                 Actualizado: {new Date(inventory.updatedAt).toLocaleString()}
               </div>
             )}
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div className="chip-row">
               <button className="button-secondary" type="button" onClick={() => loadDetail(inventory.id)}>Ver / editar</button>
               <button className="button-secondary" type="button" onClick={() => handleReportDownload(inventory.id)}>PDF</button>
               {mode === 'branch' && (
@@ -598,7 +615,7 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
             Mostrando {visibleItems.length} de {items.length} equipo(s)
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div className="chip-row">
           <button type="button" className={groupFilter === 'ALL' ? 'button-primary' : 'button-secondary'} onClick={() => setGroupFilter('ALL')}>
             Todos
           </button>
@@ -743,7 +760,7 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
           </div>
         ))}
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", position: isCompact ? 'sticky' : 'static', bottom: isCompact ? 10 : undefined, background: isCompact ? 'var(--background)' : 'transparent', padding: isCompact ? 8 : 0, borderRadius: isCompact ? 10 : 0, border: isCompact ? '1px solid var(--border)' : 'none', zIndex: isCompact ? 10 : 1 }}>
+        <div className={isCompact ? 'sticky-mobile-actions' : 'chip-row'}>
           <button className="button-secondary" type="button" onClick={addItem}>+ Agregar equipo</button>
           <button className="button-secondary" type="button" onClick={() => saveInventory(false)} disabled={saving}>{saving ? "Guardando..." : "Guardar borrador"}</button>
           <button className="button-primary" type="button" onClick={() => saveInventory(true)} disabled={saving}>{saving ? "Guardando..." : "Guardar y completar"}</button>
