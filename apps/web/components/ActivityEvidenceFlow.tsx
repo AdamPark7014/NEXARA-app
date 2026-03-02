@@ -75,7 +75,7 @@ const ActivityEvidenceFlow = () => {
   const isInventoryFlow = selectedActivity?.workType === 'PREVENTIVE_INVENTORY';
   const actionGridStyle: React.CSSProperties = {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
     gap: 12,
     width: '100%',
   };
@@ -820,7 +820,6 @@ const ActivityEvidenceFlow = () => {
                 color: 'white',
                 border: 'none',
                 cursor: loading ? 'wait' : 'pointer',
-                gridColumn: window.innerWidth < 480 ? 'span 2' : 'span 1',
               }}
               onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
               onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
@@ -902,7 +901,7 @@ const ActivityEvidenceFlow = () => {
 
               {inventoryItems.map((item, index) => (
                 <div key={`${item.equipmentName}-${index}`} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 10, display: 'grid', gap: 8 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
                     <input className="input" placeholder="Apartado" value={item.sectionName} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, sectionName: e.target.value } : current))} />
                     <input className="input" placeholder="Grupo (servidores, scanner, impresora...)" value={item.groupName} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, groupName: e.target.value } : current))} />
                     <input className="input" placeholder="Nombre equipo" value={item.equipmentName} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, equipmentName: e.target.value } : current))} />
@@ -912,7 +911,7 @@ const ActivityEvidenceFlow = () => {
                     <input className="input" placeholder="Modelo DESPUÉS" value={item.modelAfter} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, modelAfter: e.target.value, model: e.target.value } : current))} />
                     <input className="input" placeholder="¿Qué se le hizo al equipo?" value={item.maintenanceActions} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, maintenanceActions: e.target.value } : current))} />
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
                     {[
                       ['beforePanoramicPhotoUrl', 'Panorámica ANTES'],
                       ['beforeCloseupPhotoUrl', 'Serie/modelo ANTES'],
@@ -1038,7 +1037,6 @@ const ActivityEvidenceFlow = () => {
                 border: 'none',
                 cursor: loading || (!isInventoryFlow && flowData.evidencePhotos.length >= 8) ? 'not-allowed' : 'pointer',
                 opacity: loading || (!isInventoryFlow && flowData.evidencePhotos.length >= 8) ? 0.5 : 1,
-                gridColumn: window.innerWidth < 480 ? 'span 2' : 'span 1',
               }}
               onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
               onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
@@ -1159,7 +1157,6 @@ const ActivityEvidenceFlow = () => {
                 color: 'white',
                 border: 'none',
                 cursor: loading ? 'wait' : 'pointer',
-                gridColumn: window.innerWidth < 480 ? 'span 2' : 'span 1',
               }}
               onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
               onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}

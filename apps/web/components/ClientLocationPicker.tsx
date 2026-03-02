@@ -51,12 +51,6 @@ const toNumber = (value?: number | null) => {
 };
 
 const createMapMarker = (googleMaps: any, map: any, position: { lat: number; lng: number }) => {
-  if (googleMaps?.marker?.AdvancedMarkerElement) {
-    return new googleMaps.marker.AdvancedMarkerElement({
-      map,
-      position,
-    });
-  }
   return new googleMaps.Marker({
     map,
     position,
@@ -89,11 +83,6 @@ export default function ClientLocationPicker({ label, value, onChange, height = 
       .then(async () => {
         if (!isActive || !mapRef.current || !window.google?.maps) return;
         const google = window.google as any;
-        await ensurePlacesLibrary();
-        if (!google.maps?.places) {
-          setStatus("Google Places no disponible.");
-          return;
-        }
         const center = {
           lat: toNumber(value.latitud) || 19.4326,
           lng: toNumber(value.longitud) || -99.1332,
@@ -106,6 +95,12 @@ export default function ClientLocationPicker({ label, value, onChange, height = 
           streetViewControl: false,
         });
         markerInstance.current = createMapMarker(google.maps, mapInstance.current, center);
+
+        await ensurePlacesLibrary();
+        if (!google.maps?.places) {
+          setStatus("Google Places no disponible.");
+          return;
+        }
 
         if (inputRef.current) {
           const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
@@ -135,7 +130,7 @@ export default function ClientLocationPicker({ label, value, onChange, height = 
     return () => {
       isActive = false;
     };
-  }, [apiKey, onChange, value.latitud, value.longitud]);
+  }, [apiKey]);
 
   useEffect(() => {
     if (!mapInstance.current || !markerInstance.current) return;

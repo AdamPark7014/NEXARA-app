@@ -72,7 +72,7 @@ const LunchBreaksTable: React.FC = () => {
   useEffect(() => {
     if (!user?.token) return;
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, { transports: ['websocket'] });
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
 
     socket.on('lunch_break:approaching', () => fetchLunchBreaks());
     socket.on('lunch_break:expired', () => fetchLunchBreaks());
