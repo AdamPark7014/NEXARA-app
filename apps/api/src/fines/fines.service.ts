@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
+import { PERMISSIONS } from '../common/permissions.js';
 
 export interface CreateFineDto {
   usuarioId: number;
@@ -88,7 +89,7 @@ export class FinesService {
     }
 
     // Admin solo ve multas de usuarios regulares de su departamento
-    if (currentUser?.permissions?.includes('CONSOLE_ADMIN')) {
+    if (currentUser?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
       return this.prisma.fine.findMany({
         where: {
           usuario: {

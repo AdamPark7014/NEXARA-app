@@ -26,6 +26,8 @@ const ToolInventoryPanel: React.FC = () => {
   const [serialNumber, setSerialNumber] = useState('');
   const [panoramicPhotoUrl, setPanoramicPhotoUrl] = useState('');
   const [serialPhotoUrl, setSerialPhotoUrl] = useState('');
+  const [panoramicPhotoFile, setPanoramicPhotoFile] = useState<File | null>(null);
+  const [serialPhotoFile, setSerialPhotoFile] = useState<File | null>(null);
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
@@ -62,13 +64,21 @@ const ToolInventoryPanel: React.FC = () => {
     if (!user?.token) return;
 
     try {
+      const formData = new FormData();
+      formData.append('toolName', toolName);
+      formData.append('model', model);
+      formData.append('serialNumber', serialNumber);
+      if (panoramicPhotoUrl) formData.append('panoramicPhotoUrl', panoramicPhotoUrl);
+      if (serialPhotoUrl) formData.append('serialPhotoUrl', serialPhotoUrl);
+      if (panoramicPhotoFile) formData.append('panoramicPhoto', panoramicPhotoFile);
+      if (serialPhotoFile) formData.append('serialPhoto', serialPhotoFile);
+
       const response = await fetch(buildApiUrl('tool-requests/inventory'), {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           Authorization: `Bearer ${user.token}`,
         },
-        body: JSON.stringify({ toolName, model, serialNumber, panoramicPhotoUrl, serialPhotoUrl }),
+        body: formData,
       });
 
       if (!response.ok) {
@@ -81,6 +91,8 @@ const ToolInventoryPanel: React.FC = () => {
       setSerialNumber('');
       setPanoramicPhotoUrl('');
       setSerialPhotoUrl('');
+      setPanoramicPhotoFile(null);
+      setSerialPhotoFile(null);
       await fetchItems();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
@@ -95,22 +107,24 @@ const ToolInventoryPanel: React.FC = () => {
 
     const newModel = window.prompt('Nuevo modelo (deja vacío para usar el mismo)', item.model) || item.model;
     const retiredReason = window.prompt('Motivo de reemplazo/retiro', 'Equipo dañado o no funcional') || undefined;
+    const newPanoramicPhotoUrl = window.prompt('URL foto panorámica del reemplazo (opcional)', item.panoramicPhotoUrl) || item.panoramicPhotoUrl;
+    const newSerialPhotoUrl = window.prompt('URL foto de serie del reemplazo (opcional)', item.serialPhotoUrl) || item.serialPhotoUrl;
 
     try {
+      const formData = new FormData();
+      formData.append('toolName', item.toolName);
+      formData.append('model', newModel);
+      formData.append('serialNumber', newSerial);
+      formData.append('panoramicPhotoUrl', newPanoramicPhotoUrl);
+      formData.append('serialPhotoUrl', newSerialPhotoUrl);
+      if (retiredReason) formData.append('retiredReason', retiredReason);
+
       const response = await fetch(buildApiUrl(`tool-requests/inventory/${item.id}/replace`), {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           Authorization: `Bearer ${user.token}`,
         },
-        body: JSON.stringify({
-          toolName: item.toolName,
-          model: newModel,
-          serialNumber: newSerial,
-          panoramicPhotoUrl: item.panoramicPhotoUrl,
-          serialPhotoUrl: item.serialPhotoUrl,
-          retiredReason,
-        }),
+        body: formData,
       });
 
       if (!response.ok) {
@@ -132,8 +146,10 @@ const ToolInventoryPanel: React.FC = () => {
           <input className="input" placeholder="Herramienta" value={toolName} onChange={(e) => setToolName(e.target.value)} />
           <input className="input" placeholder="Modelo" value={model} onChange={(e) => setModel(e.target.value)} />
           <input className="input" placeholder="Serie" value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} />
-          <input className="input" placeholder="URL foto panorámica" value={panoramicPhotoUrl} onChange={(e) => setPanoramicPhotoUrl(e.target.value)} />
-          <input className="input" placeholder="URL foto serie" value={serialPhotoUrl} onChange={(e) => setSerialPhotoUrl(e.target.value)} />
+          <input className="input" placeholder="URL foto panorámica (opcional)" value={panoramicPhotoUrl} onChange={(e) => setPanoramicPhotoUrl(e.target.value)} />
+          <input className="input" placeholder="URL foto serie (opcional)" value={serialPhotoUrl} onChange={(e) => setSerialPhotoUrl(e.target.value)} />
+          <input className="input" type="file" accept="image/*" onChange={(e) => setPanoramicPhotoFile(e.target.files?.[0] || null)} />
+          <input className="input" type="file" accept="image/*" onChange={(e) => setSerialPhotoFile(e.target.files?.[0] || null)} />
         </div>
         <div>
           <button className="button-primary" type="submit">Agregar herramienta</button>
