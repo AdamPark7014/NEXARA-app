@@ -106,6 +106,19 @@ const ToolInventoryPanel: React.FC = () => {
     setError(null);
   };
 
+  const getDropZoneStyle = (isActive: boolean): React.CSSProperties => ({
+    border: `1px dashed ${isActive ? 'var(--primary)' : 'var(--muted)'}`,
+    borderRadius: 10,
+    padding: 10,
+    display: 'grid',
+    gap: 8,
+    alignContent: 'start',
+    background: isActive ? 'var(--surface)' : 'var(--surface-light)',
+    boxShadow: isActive ? '0 0 0 1px var(--primary)' : 'none',
+    transition: 'all 0.2s ease',
+    cursor: 'pointer',
+  });
+
   const fetchItems = async () => {
     if (!user?.token) return;
     setLoading(true);
@@ -263,31 +276,42 @@ const ToolInventoryPanel: React.FC = () => {
               const file = e.dataTransfer.files?.[0];
               if (file) setCreateFile('panoramic', file);
             }}
-            style={{
-              border: `1px dashed ${dragOverCreate === 'panoramic' ? 'var(--primary)' : 'var(--muted)'}`,
-              borderRadius: 8,
-              padding: 8,
-              display: 'grid',
-              gap: 6,
-              alignContent: 'start',
-            }}
+            onClick={() => createPanoramicInputRef.current?.click()}
+            style={getDropZoneStyle(dragOverCreate === 'panoramic')}
           >
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Foto panorámica (drag & drop)</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>📸 Foto panorámica</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Arrastra una imagen o haz click para seleccionarla</div>
             <input
               ref={createPanoramicInputRef}
-              className="input"
               type="file"
               accept="image/*"
+              style={{ display: 'none' }}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) setCreateFile('panoramic', file);
               }}
             />
+            <button
+              className="button-secondary"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                createPanoramicInputRef.current?.click();
+              }}
+              style={{ justifySelf: 'start', padding: '6px 10px', fontSize: 12 }}
+            >
+              Seleccionar imagen
+            </button>
+            {panoramicPhotoFile && (
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                Archivo: {panoramicPhotoFile.name}
+              </div>
+            )}
             {panoramicPhotoPreview && (
               <img
                 src={panoramicPhotoPreview}
                 alt="Preview panorámica"
-                style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 6 }}
+                style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--muted)' }}
               />
             )}
           </div>
@@ -304,31 +328,42 @@ const ToolInventoryPanel: React.FC = () => {
               const file = e.dataTransfer.files?.[0];
               if (file) setCreateFile('serial', file);
             }}
-            style={{
-              border: `1px dashed ${dragOverCreate === 'serial' ? 'var(--primary)' : 'var(--muted)'}`,
-              borderRadius: 8,
-              padding: 8,
-              display: 'grid',
-              gap: 6,
-              alignContent: 'start',
-            }}
+            onClick={() => createSerialInputRef.current?.click()}
+            style={getDropZoneStyle(dragOverCreate === 'serial')}
           >
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Foto serie (drag & drop)</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>🔎 Foto de serie</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Arrastra una imagen o haz click para seleccionarla</div>
             <input
               ref={createSerialInputRef}
-              className="input"
               type="file"
               accept="image/*"
+              style={{ display: 'none' }}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) setCreateFile('serial', file);
               }}
             />
+            <button
+              className="button-secondary"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                createSerialInputRef.current?.click();
+              }}
+              style={{ justifySelf: 'start', padding: '6px 10px', fontSize: 12 }}
+            >
+              Seleccionar imagen
+            </button>
+            {serialPhotoFile && (
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                Archivo: {serialPhotoFile.name}
+              </div>
+            )}
             {serialPhotoPreview && (
               <img
                 src={serialPhotoPreview}
                 alt="Preview serie"
-                style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 6 }}
+                style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--muted)' }}
               />
             )}
           </div>
@@ -363,31 +398,42 @@ const ToolInventoryPanel: React.FC = () => {
                 const file = e.dataTransfer.files?.[0];
                 if (file) setReplacementFile('panoramic', file);
               }}
-              style={{
-                border: `1px dashed ${dragOverReplace === 'panoramic' ? 'var(--primary)' : 'var(--muted)'}`,
-                borderRadius: 8,
-                padding: 8,
-                display: 'grid',
-                gap: 6,
-                alignContent: 'start',
-              }}
+              onClick={() => replacePanoramicInputRef.current?.click()}
+              style={getDropZoneStyle(dragOverReplace === 'panoramic')}
             >
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Foto panorámica reemplazo</div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>📸 Foto panorámica reemplazo</div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Arrastra una imagen o haz click para seleccionarla</div>
               <input
                 ref={replacePanoramicInputRef}
-                className="input"
                 type="file"
                 accept="image/*"
+                style={{ display: 'none' }}
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) setReplacementFile('panoramic', file);
                 }}
               />
+              <button
+                className="button-secondary"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  replacePanoramicInputRef.current?.click();
+                }}
+                style={{ justifySelf: 'start', padding: '6px 10px', fontSize: 12 }}
+              >
+                Seleccionar imagen
+              </button>
+              {replacementPanoramicPhotoFile && (
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  Archivo: {replacementPanoramicPhotoFile.name}
+                </div>
+              )}
               {replacementPanoramicPhotoPreview && (
                 <img
                   src={replacementPanoramicPhotoPreview}
                   alt="Preview panorámica reemplazo"
-                  style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 6 }}
+                  style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--muted)' }}
                 />
               )}
             </div>
@@ -404,31 +450,42 @@ const ToolInventoryPanel: React.FC = () => {
                 const file = e.dataTransfer.files?.[0];
                 if (file) setReplacementFile('serial', file);
               }}
-              style={{
-                border: `1px dashed ${dragOverReplace === 'serial' ? 'var(--primary)' : 'var(--muted)'}`,
-                borderRadius: 8,
-                padding: 8,
-                display: 'grid',
-                gap: 6,
-                alignContent: 'start',
-              }}
+              onClick={() => replaceSerialInputRef.current?.click()}
+              style={getDropZoneStyle(dragOverReplace === 'serial')}
             >
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Foto serie reemplazo</div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>🔎 Foto de serie reemplazo</div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Arrastra una imagen o haz click para seleccionarla</div>
               <input
                 ref={replaceSerialInputRef}
-                className="input"
                 type="file"
                 accept="image/*"
+                style={{ display: 'none' }}
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) setReplacementFile('serial', file);
                 }}
               />
+              <button
+                className="button-secondary"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  replaceSerialInputRef.current?.click();
+                }}
+                style={{ justifySelf: 'start', padding: '6px 10px', fontSize: 12 }}
+              >
+                Seleccionar imagen
+              </button>
+              {replacementSerialPhotoFile && (
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  Archivo: {replacementSerialPhotoFile.name}
+                </div>
+              )}
               {replacementSerialPhotoPreview && (
                 <img
                   src={replacementSerialPhotoPreview}
                   alt="Preview serie reemplazo"
-                  style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 6 }}
+                  style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--muted)' }}
                 />
               )}
             </div>

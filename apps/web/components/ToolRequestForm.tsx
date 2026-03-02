@@ -228,6 +228,19 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
     if (file) applyPhotoFile(type, file);
   };
 
+  const getDropZoneStyle = (isActive: boolean): React.CSSProperties => ({
+    border: `1px dashed ${isActive ? 'var(--primary)' : 'var(--muted)'}`,
+    borderRadius: 12,
+    padding: 16,
+    background: isActive ? 'var(--surface)' : 'var(--surface-light)',
+    display: 'grid',
+    gap: 8,
+    textAlign: 'center',
+    boxShadow: isActive ? '0 0 0 1px var(--primary)' : 'none',
+    transition: 'all 0.2s ease',
+    cursor: 'pointer',
+  });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSuccess(null);
@@ -432,18 +445,11 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
             }}
             onDragLeave={() => setDragOverPhoto((current) => (current === 'general' ? null : current))}
             onDrop={(e) => handleDropPhoto('general', e)}
-            style={{
-              border: `1px dashed ${dragOverPhoto === 'general' ? 'var(--primary)' : 'var(--muted)'}`,
-              borderRadius: 12,
-              padding: 16,
-              background: 'var(--surface-light)',
-              display: 'grid',
-              gap: 6,
-              textAlign: 'center',
-            }}
+            onClick={() => generalFileInputRef.current?.click()}
+            style={getDropZoneStyle(dragOverPhoto === 'general')}
           >
             <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-              Arrastra y suelta una imagen aquí o usa los botones
+              📸 Foto panorámica — arrastra una imagen o haz click para seleccionarla
             </div>
             <input
               ref={generalFileInputRef}
@@ -455,21 +461,32 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
             <button
               className="button-secondary"
               type="button"
-              onClick={() => generalFileInputRef.current?.click()}
-              style={{ justifySelf: 'center' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                generalFileInputRef.current?.click();
+              }}
+              style={{ justifySelf: 'center', padding: '6px 12px', fontSize: 12 }}
               disabled={!!photoStep}
             >
-              📁 Seleccionar archivo
+              Seleccionar imagen
             </button>
             <button
               className="button-secondary"
               type="button"
-              onClick={() => startCamera('general')}
-              style={{ justifySelf: 'center' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                startCamera('general');
+              }}
+              style={{ justifySelf: 'center', padding: '6px 12px', fontSize: 12 }}
               disabled={!!photoStep}
             >
               {generalPhoto ? '📷 Retomar foto' : '📷 Tomar foto'}
             </button>
+            {generalPhoto && (
+              <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                Archivo: {generalPhoto.name}
+              </div>
+            )}
           </div>
           {generalPhotoPreview && (
             <div
@@ -477,7 +494,7 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
                 width: '100%',
                 height: 200,
                 borderRadius: 12,
-                border: '1px solid rgba(255,255,255,0.12)',
+                border: '1px solid var(--muted)',
                 overflow: 'hidden',
                 display: 'flex',
                 alignItems: 'center',
@@ -502,18 +519,11 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
             }}
             onDragLeave={() => setDragOverPhoto((current) => (current === 'specifications' ? null : current))}
             onDrop={(e) => handleDropPhoto('specifications', e)}
-            style={{
-              border: `1px dashed ${dragOverPhoto === 'specifications' ? 'var(--primary)' : 'var(--muted)'}`,
-              borderRadius: 12,
-              padding: 16,
-              background: 'var(--surface-light)',
-              display: 'grid',
-              gap: 6,
-              textAlign: 'center',
-            }}
+            onClick={() => specificationsFileInputRef.current?.click()}
+            style={getDropZoneStyle(dragOverPhoto === 'specifications')}
           >
             <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-              Arrastra y suelta una imagen aquí o usa los botones
+              🔎 Foto de serie/modelo — arrastra una imagen o haz click para seleccionarla
             </div>
             <input
               ref={specificationsFileInputRef}
@@ -525,21 +535,32 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
             <button
               className="button-secondary"
               type="button"
-              onClick={() => specificationsFileInputRef.current?.click()}
-              style={{ justifySelf: 'center' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                specificationsFileInputRef.current?.click();
+              }}
+              style={{ justifySelf: 'center', padding: '6px 12px', fontSize: 12 }}
               disabled={!!photoStep}
             >
-              📁 Seleccionar archivo
+              Seleccionar imagen
             </button>
             <button
               className="button-secondary"
               type="button"
-              onClick={() => startCamera('specifications')}
-              style={{ justifySelf: 'center' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                startCamera('specifications');
+              }}
+              style={{ justifySelf: 'center', padding: '6px 12px', fontSize: 12 }}
               disabled={!!photoStep}
             >
               {specificationsPhoto ? '📷 Retomar foto' : '📷 Tomar foto'}
             </button>
+            {specificationsPhoto && (
+              <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                Archivo: {specificationsPhoto.name}
+              </div>
+            )}
           </div>
           {specificationsPhotoPreview && (
             <div
@@ -547,7 +568,7 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
                 width: '100%',
                 height: 200,
                 borderRadius: 12,
-                border: '1px solid rgba(255,255,255,0.12)',
+                border: '1px solid var(--muted)',
                 overflow: 'hidden',
                 display: 'flex',
                 alignItems: 'center',
