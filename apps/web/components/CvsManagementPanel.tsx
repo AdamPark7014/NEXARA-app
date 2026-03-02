@@ -119,6 +119,7 @@ export default function CvsManagementPanel() {
     recruiterNotes: "",
   });
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadDropActive, setUploadDropActive] = useState(false);
 
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
   const [dragged, setDragged] = useState<{ id: number; fromStage: CvRow["stage"] } | null>(null);
@@ -338,7 +339,7 @@ export default function CvsManagementPanel() {
 
   const onUpload = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!uploadFile) return setError("Debes seleccionar un PDF");
+    if (!uploadFile) return setError("Debes seleccionar un archivo PDF o imagen");
     if (!upload.fullName.trim() || !upload.category.trim()) {
       return setError("Nombre y categoría son requeridos");
     }
@@ -383,6 +384,41 @@ export default function CvsManagementPanel() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const handleUploadCandidateFile = (file?: File | null) => {
+    if (!file) {
+      setUploadFile(null);
+      return;
+    }
+
+    const lowerName = String(file.name || "").toLowerCase();
+    const isPdf = file.type.includes("pdf") || lowerName.endsWith(".pdf");
+    const isImage = file.type.startsWith("image/") || /\.(png|jpe?g|webp|gif|bmp|svg|avif)$/.test(lowerName);
+    if (!isPdf && !isImage) {
+      setError("Solo se permiten archivos PDF o imagen");
+      return;
+    }
+
+    setError("");
+    setUploadFile(file);
+  };
+
+  const previewSelectedUpload = () => {
+    if (!uploadFile) return;
+    const kind = getFileKind(uploadFile.name, uploadFile.type);
+    const src = URL.createObjectURL(uploadFile);
+    setPreview((current) => {
+      if (current?.src) {
+        URL.revokeObjectURL(current.src);
+      }
+      return {
+        src,
+        title: "Archivo por subir",
+        fileName: uploadFile.name,
+        kind,
+      };
+    });
   };
 
   const closePreview = () => {
@@ -535,7 +571,7 @@ export default function CvsManagementPanel() {
 
       {canRecruiter && (
         <form onSubmit={onUpload} style={cardStyle}>
-          <h3 style={{ margin: 0 }}>Alta de candidato (PDF)</h3>
+          <h3 style={{ margin: 0 }}>Alta de candidato (PDF/Imagen)</h3>
           <div style={filterGrid}>
             <input value={upload.fullName} onChange={(event) => setUpload((prev) => ({ ...prev, fullName: event.target.value }))} placeholder="Nombre completo" style={inputStyle} required />
             <input value={upload.email} onChange={(event) => setUpload((prev) => ({ ...prev, email: event.target.value }))} placeholder="Email" style={inputStyle} />
@@ -576,14 +612,42 @@ export default function CvsManagementPanel() {
               id={fileInputId}
               type="file"
               accept="application/pdf,image/png,image/jpeg,image/webp,image/gif,image/bmp,image/svg+xml,image/avif"
-              onChange={(event) => setUploadFile(event.target.files?.[0] || null)}
+              onChange={(event) => handleUploadCandidateFile(event.target.files?.[0] || null)}
               required
               style={hiddenInputStyle}
             />
-            <label htmlFor={fileInputId} style={filePickerStyle}>
-              <span style={filePickerButtonStyle}>Seleccionar archivo</span>
-              <span style={filePickerNameStyle}>{uploadFile?.name || "Ningún archivo seleccionado"}</span>
-            </label>
+            <div
+              style={{
+                ...fileDropZoneStyle,
+                ...(uploadDropActive ? fileDropZoneActiveStyle : null),
+              }}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setUploadDropActive(true);
+              }}
+              onDragLeave={(event) => {
+                event.preventDefault();
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                  setUploadDropActive(false);
+                }
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                setUploadDropActive(false);
+                handleUploadCandidateFile(event.dataTransfer.files?.[0] || null);
+              }}
+            >
+              <label htmlFor={fileInputId} style={filePickerStyle}>
+                <span style={filePickerButtonStyle}>Seleccionar archivo</span>
+                <span style={filePickerNameStyle}>{uploadFile?.name || "Ningún archivo seleccionado"}</span>
+              </label>
+              <span style={fileDropHintStyle}>o arrastra y suelta aquí</span>
+            </div>
+            {uploadFile ? (
+              <button type="button" style={buttonGhost} onClick={previewSelectedUpload}>
+                Ver preview
+              </button>
+            ) : null}
             <button type="submit" style={buttonPrimary} disabled={busy}>
               Subir CV
             </button>
@@ -809,6 +873,14 @@ function getImageMime(fileName: string) {
   return "image/jpeg";
 }
 
+function getFileKind(fileName: string, mimeType?: string): "pdf" | "image" {
+  const lowerName = String(fileName || "").toLowerCase();
+  if (String(mimeType || "").startsWith("image/") || /\.(png|jpe?g|webp|gif|bmp|svg|avif)$/.test(lowerName)) {
+    return "image";
+  }
+  return "pdf";
+}
+
 function Metric({ title, value }: { title: string; value: number }) {
   return (
     <div style={{ ...cardStyle, minHeight: 76, justifyContent: "center" }}>
@@ -931,11 +1003,11 @@ const hiddenInputStyle: React.CSSProperties = {
 };
 
 const filePickerStyle: React.CSSProperties = {
-  border: "1px solid rgba(59, 130, 246, 0.32)",
-  borderRadius: 10,
-  background: "var(--background)",
-  minWidth: 320,
-  maxWidth: 520,
+  border: "1px solid rgba(59, 130, 246, 0.35)",
+  borderRadius: 9,
+  background: "rgba(15, 23, 42, 0.35)",
+  minWidth: 300,
+  maxWidth: 540,
   width: "100%",
   display: "flex",
   alignItems: "center",
@@ -961,6 +1033,29 @@ const filePickerNameStyle: React.CSSProperties = {
   overflow: "hidden",
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
+};
+
+const fileDropZoneStyle: React.CSSProperties = {
+  border: "1px dashed rgba(59, 130, 246, 0.45)",
+  borderRadius: 10,
+  padding: 8,
+  minWidth: 320,
+  maxWidth: 560,
+  width: "100%",
+  display: "grid",
+  gap: 6,
+  background: "rgba(15, 23, 42, 0.22)",
+};
+
+const fileDropZoneActiveStyle: React.CSSProperties = {
+  border: "1px solid var(--primary)",
+  transform: "translateY(-1px)",
+};
+
+const fileDropHintStyle: React.CSSProperties = {
+  fontSize: 11,
+  opacity: 0.78,
+  paddingLeft: 4,
 };
 
 const chipStyle: React.CSSProperties = {
