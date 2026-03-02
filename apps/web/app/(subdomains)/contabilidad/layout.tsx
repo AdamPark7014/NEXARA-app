@@ -17,6 +17,7 @@ export default function ContabilidadLayout({ children }: { children: React.React
   const { user, logout } = useUser();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [workspaceDateLabel, setWorkspaceDateLabel] = useState("");
 
   const currentPath = pathname ? pathname.replace(/\/+$/, "") : "";
   const userName = user?.nombre || "Panel Contabilidad";
@@ -108,6 +109,10 @@ export default function ContabilidadLayout({ children }: { children: React.React
       document.body.style.overflow = "";
     };
   }, [mobileMenuOpen, isMobile]);
+
+  useEffect(() => {
+    setWorkspaceDateLabel(new Date().toLocaleDateString("es-MX"));
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -249,7 +254,7 @@ export default function ContabilidadLayout({ children }: { children: React.React
               </p>
             </div>
             <div className={styles.workspaceMeta}>
-              <span className={styles.workspaceMetaPill}>{new Date().toLocaleDateString()}</span>
+              <span className={styles.workspaceMetaPill}>{workspaceDateLabel}</span>
               <span className={styles.workspaceMetaPill}>{userRole}</span>
             </div>
           </div>

@@ -2,7 +2,7 @@
 import styles from "./console.module.css";
 import Sidebar from "./Sidebar";
 import { usePathname } from "next/navigation";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const formatConsoleTitle = (pathname: string) => {
   const normalized = pathname.replace(/^\/+/, "").split("?")[0];
@@ -32,10 +32,12 @@ const formatConsoleTitle = (pathname: string) => {
 
 export default function ConsoleLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [viewSubtitle, setViewSubtitle] = useState("Consola NEXARA");
   const viewTitle = useMemo(() => formatConsoleTitle(pathname || "console"), [pathname]);
-  const viewSubtitle = useMemo(() => {
+
+  useEffect(() => {
     const now = new Date();
-    return `Consola NEXARA · ${now.toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" })}`;
+    setViewSubtitle(`Consola NEXARA · ${now.toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" })}`);
   }, []);
   // Si estamos en /dashboard/login o /login, no renderizar el layout del dashboard
   if (pathname && (pathname.includes("/login") || pathname.includes("/auth"))) {

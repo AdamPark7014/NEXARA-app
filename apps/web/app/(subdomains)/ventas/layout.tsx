@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import VentasSidebar from "./VentasSidebar";
@@ -10,6 +10,7 @@ import { useUser } from "@/components/UserContext";
 export default function VentasLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user } = useUser();
+  const [workspaceDateLabel, setWorkspaceDateLabel] = useState("");
   const currentPath = pathname ? pathname.replace(/\/+$/, "") : "";
 
   const quickLinks = [
@@ -26,6 +27,10 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
     const itemPath = item.href.replace(/\/+$/, "");
     return currentPath === itemPath || currentPath.endsWith(itemPath);
   })?.label || "Panel comercial";
+
+  useEffect(() => {
+    setWorkspaceDateLabel(new Date().toLocaleDateString("es-MX"));
+  }, []);
   
   // Si estamos en login, no renderizar el sidebar
   if (pathname && pathname.includes("/login")) {
@@ -47,7 +52,7 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
             </div>
             <div className={styles.salesWorkspaceMeta}>
               <span className={styles.salesWorkspacePill}>{user?.nombre || "Equipo comercial"}</span>
-              <span className={styles.salesWorkspacePill}>{new Date().toLocaleDateString()}</span>
+              <span className={styles.salesWorkspacePill}>{workspaceDateLabel}</span>
             </div>
           </div>
 
