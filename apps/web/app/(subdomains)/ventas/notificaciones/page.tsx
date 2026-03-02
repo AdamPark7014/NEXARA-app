@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useUser } from '@/components/UserContext';
+import { hasAnyPermission, PERMISSIONS } from '@/lib/permissions';
 import styles from './page.module.css';
 
 type Notification = {
@@ -30,6 +31,9 @@ export default function VentasNotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
+  const canAccessSalesPanel = hasAnyPermission(user, [PERMISSIONS.PANEL_VENTAS, PERMISSIONS.SALES_VIEW]);
+  const isSalesAdminOrSuperAdmin = Boolean(user?.isSuperAdmin) || hasAnyPermission(user, [PERMISSIONS.CONSOLE_ADMIN]);
+
   const apiUrl = useMemo(() => {
     const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
     return base.replace(/[/.]+$/, '');
@@ -38,7 +42,7 @@ export default function VentasNotificationsPage() {
   const fetchNotifications = async () => {
     if (!user?.token) return;
     try {
-      const res = await fetch(`${apiUrl}/notifications?limit=50`, {
+      const res = await fetch(`${apiUrl}/ventas/reportes/notificaciones?limit=50`, {
         headers: { Authorization: `Bearer ${user.token}` },
       });
       if (res.ok) {
@@ -59,7 +63,7 @@ export default function VentasNotificationsPage() {
 
   const handleMarkAsRead = async (notificationId: number) => {
     if (!user?.token) return;
-    await fetch(`${apiUrl}/notifications/${notificationId}/read`, {
+    await fetch(`${apiUrl}/ventas/reportes/notificaciones/${notificationId}/read`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${user.token}` },
     });
@@ -68,7 +72,7 @@ export default function VentasNotificationsPage() {
 
   const handleMarkAllAsRead = async () => {
     if (!user?.token) return;
-    await fetch(`${apiUrl}/notifications/read/all`, {
+    await fetch(`${apiUrl}/ventas/reportes/notificaciones/read/all`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${user.token}` },
     });
@@ -77,7 +81,7 @@ export default function VentasNotificationsPage() {
 
   const handleDelete = async (notificationId: number) => {
     if (!user?.token) return;
-    await fetch(`${apiUrl}/notifications/${notificationId}`, {
+    await fetch(`${apiUrl}/ventas/reportes/notificaciones/${notificationId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${user.token}` },
     });
@@ -87,6 +91,10 @@ export default function VentasNotificationsPage() {
   const filteredNotifications = notifications.filter((n) => (filter === 'unread' ? !n.isRead : true));
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
+  if (!canAccessSalesPanel) {
+    return <div className={styles.loading}>No tienes permisos para ver notificaciones de ventas.</div>;
+  }
+
   if (loading) return <div className={styles.loading}>Cargando notificaciones...</div>;
 
   return (
@@ -94,7 +102,9 @@ export default function VentasNotificationsPage() {
       <header className={styles.header}>
         <div>
           <h1>Notificaciones de ventas</h1>
-          <p>{unreadCount} sin leer</p>
+          <p>
+            {unreadCount} sin leer · {isSalesAdminOrSuperAdmin ? 'Vista admin/superadmin (equipo vendedor)' : 'Vista vendedor (solo tus notificaciones)'}
+          </p>
         </div>
         {unreadCount > 0 && (
           <button className={styles.button} onClick={handleMarkAllAsRead}>

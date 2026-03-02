@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Query, Body, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Query, Body, Res, UseGuards, Patch, Delete, Param, ParseIntPipe } from '@nestjs/common';
 import type { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { VentasService } from './ventas.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 
 const SALES_REPORT_VIEW_ACCESS = [PERMISSIONS.SALES_REPORTS_VIEW, PERMISSIONS.SALES_VIEW, PERMISSIONS.PANEL_VENTAS];
 const SALES_REPORT_EXPORT_ACCESS = [PERMISSIONS.SALES_REPORTS_EXPORT, PERMISSIONS.SALES_MANAGE, PERMISSIONS.PANEL_VENTAS];
@@ -13,7 +14,50 @@ const SALES_QUOTA_MANAGE_ACCESS = [PERMISSIONS.SALES_MANAGE, PERMISSIONS.PANEL_V
 
 @Controller('ventas/reportes')
 export class VentasReportesController {
-  constructor(private readonly ventasService: VentasService) {}
+  constructor(
+    private readonly ventasService: VentasService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
+
+  @Get('notificaciones')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: SALES_REPORT_VIEW_ACCESS })
+  async salesNotifications(
+    @CurrentUser() user: any,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    const limitNum = limit ? parseInt(limit, 10) : 50;
+    const offsetNum = offset ? parseInt(offset, 10) : 0;
+    return this.notificationsService.getSalesPanelNotifications(user, limitNum, offsetNum);
+  }
+
+  @Patch('notificaciones/:id/read')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: SALES_REPORT_VIEW_ACCESS })
+  async markSalesNotificationAsRead(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) notificationId: number,
+  ) {
+    return this.notificationsService.markSalesNotificationAsRead(user, notificationId);
+  }
+
+  @Patch('notificaciones/read/all')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: SALES_REPORT_VIEW_ACCESS })
+  async markAllSalesNotificationsAsRead(@CurrentUser() user: any) {
+    return this.notificationsService.markAllSalesNotificationsAsRead(user);
+  }
+
+  @Delete('notificaciones/:id')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: SALES_REPORT_VIEW_ACCESS })
+  async deleteSalesNotification(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) notificationId: number,
+  ) {
+    return this.notificationsService.deleteSalesNotification(user, notificationId);
+  }
 
   @Get('resumen')
   @UseGuards(AuthGuard('jwt'), RbacGuard)

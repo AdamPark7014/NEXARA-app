@@ -1,7 +1,8 @@
-import { Injectable, Logger, Inject, Optional } from '@nestjs/common';
+import { Injectable, Logger, Inject, Optional, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationType } from '@prisma/client';
 import { Cron } from '@nestjs/schedule';
+import { PERMISSIONS } from '../common/permissions.js';
 
 export interface INotificationPayload {
   userId: number;
@@ -19,6 +20,7 @@ export interface INotificationPayload {
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
+  private readonly protectedSalesEmails = ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'];
 
   constructor(
     private readonly prisma: PrismaService,
@@ -42,6 +44,135 @@ export class NotificationsService {
       take: limit,
       skip: offset,
     });
+  }
+
+  private isSalesAdminUser(user?: any) {
+    const permissions = Array.isArray(user?.permissions) ? user.permissions : [];
+    return Boolean(user?.isSuperAdmin) || permissions.includes(PERMISSIONS.CONSOLE_ADMIN);
+  }
+
+  private async getSellerUserIds() {
+    const sellers = await this.prisma.user.findMany({
+      where: {
+        role: { accesoPanelVentas: true },
+        NOT: { role: { accesoConsoleAdmin: true } },
+        email: { notIn: this.protectedSalesEmails },
+      },
+      select: { id: true },
+    });
+    return sellers.map((item) => Number(item.id)).filter((id) => Number.isFinite(id) && id > 0);
+  }
+
+  async getSalesPanelNotifications(user: any, limit: number = 50, offset: number = 0) {
+    const userId = Number(user?.id || 0);
+    if (!userId) return [];
+
+    const sellerIds = await this.getSellerUserIds();
+    if (!sellerIds.length) return [];
+
+    const isSalesAdmin = this.isSalesAdminUser(user);
+    if (!isSalesAdmin && !sellerIds.includes(userId)) {
+      return [];
+    }
+
+    return this.prisma.notification.findMany({
+      where: isSalesAdmin
+        ? { userId: { in: sellerIds } }
+        : { userId },
+      include: {
+        triggerUser: {
+          select: {
+            id: true,
+            nombre: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip: offset,
+    });
+  }
+
+  private async assertSalesNotificationAccess(user: any, notificationId: number) {
+    const notification = await this.prisma.notification.findUnique({
+      where: { id: notificationId },
+    });
+
+    if (!notification) {
+      throw new NotFoundException('Notificación no encontrada');
+    }
+
+    const userId = Number(user?.id || 0);
+    const sellerIds = await this.getSellerUserIds();
+    const isSalesAdmin = this.isSalesAdminUser(user);
+
+    if (isSalesAdmin) {
+      if (!sellerIds.includes(notification.userId)) {
+        throw new ForbiddenException('No puedes gestionar esta notificación de ventas');
+      }
+      return notification;
+    }
+
+    if (notification.userId !== userId || !sellerIds.includes(userId)) {
+      throw new ForbiddenException('No puedes gestionar esta notificación de ventas');
+    }
+
+    return notification;
+  }
+
+  async markSalesNotificationAsRead(user: any, notificationId: number) {
+    await this.assertSalesNotificationAccess(user, notificationId);
+
+    const notification = await this.prisma.notification.update({
+      where: { id: notificationId },
+      data: { isRead: true, readAt: new Date() },
+      include: { triggerUser: true },
+    });
+
+    this.gateway?.notifyUser(notification.userId, {
+      event: 'notification:read',
+      notificationId,
+    });
+
+    return notification;
+  }
+
+  async markAllSalesNotificationsAsRead(user: any) {
+    const userId = Number(user?.id || 0);
+    if (!userId) return { updatedCount: 0 };
+
+    const sellerIds = await this.getSellerUserIds();
+    if (!sellerIds.length) return { updatedCount: 0 };
+
+    const isSalesAdmin = this.isSalesAdminUser(user);
+    if (!isSalesAdmin && !sellerIds.includes(userId)) {
+      return { updatedCount: 0 };
+    }
+
+    const targetUserIds = isSalesAdmin ? sellerIds : [userId];
+
+    const result = await this.prisma.notification.updateMany({
+      where: {
+        userId: { in: targetUserIds },
+        isRead: false,
+      },
+      data: { isRead: true, readAt: new Date() },
+    });
+
+    targetUserIds.forEach((targetUserId) => {
+      this.gateway?.notifyUser(targetUserId, {
+        event: 'notifications:read-all',
+      });
+    });
+
+    return { updatedCount: result.count };
+  }
+
+  async deleteSalesNotification(user: any, notificationId: number) {
+    await this.assertSalesNotificationAccess(user, notificationId);
+    return this.prisma.notification.delete({ where: { id: notificationId } });
   }
 
   async getUnreadCount(userId: number) {
