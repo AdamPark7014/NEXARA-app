@@ -13,6 +13,7 @@ export interface User {
 	avatarUrl?: string;
 	permissions: string[];
 	isSuperAdmin?: boolean;
+	loginDevice?: string;
 }
 
 interface UserContextType {
@@ -44,6 +45,7 @@ const normalizeUser = (value: unknown): User | null => {
 			? candidate.permissions.filter((item): item is string => typeof item === 'string')
 			: [],
 		isSuperAdmin: Boolean(candidate.isSuperAdmin),
+		loginDevice: candidate.loginDevice,
 	};
 };
 

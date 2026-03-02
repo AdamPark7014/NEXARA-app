@@ -880,6 +880,7 @@ model Attendance {
   userId           Int
   type             String   // 'entrada' o 'salida'
   timestamp        DateTime @default(now())
+  deviceInfo       String?
   photoUrl         String?  // URL de la foto capturada desde la cámara
   entryLatitude    Float?   // Ubicación GPS al registrar entrada
   entryLongitude   Float?  // Ubicación GPS al registrar entrada

@@ -14,7 +14,7 @@ export class AttendanceController {
   @Post()
   async register(@Body() dto: CreateAttendanceDto, @Req() req: any) {
     // req.user.id debe estar disponible si usas JWT
-    return this.attendanceService.register(dto, req.user?.id);
+    return this.attendanceService.register(dto, req.user?.id, req);
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)

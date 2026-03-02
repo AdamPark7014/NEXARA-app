@@ -32,9 +32,13 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Login fallido");
+      if (typeof window !== 'undefined' && data.loginGreeting) {
+        window.sessionStorage.setItem('nexara_login_greeting', data.loginGreeting);
+      }
       setUser({
         ...data.user,
         token: data.access_token,
+        loginDevice: data.loginDevice || data.user?.loginDevice,
       });
       router.push("/dashboard");
     } catch (err: unknown) {
