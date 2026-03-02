@@ -87,7 +87,7 @@ export default function ContactosWeb() {
 
   useEffect(() => {
     const socket = io(getSocketBaseUrl(), {
-      transports: ["websocket"],
+      transports: ["polling", "websocket"],
     });
     socket.on("contacts:changed", () => {
       fetchMessages();
