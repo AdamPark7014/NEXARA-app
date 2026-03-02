@@ -58,7 +58,29 @@ const buildDefaultAllowedHostPatterns = (): RegExp[] => {
 
 const buildCsp = () => {
   const isDev = process.env.NODE_ENV !== 'production';
-  const scriptSrc = isDev ? "'self' 'unsafe-inline' 'unsafe-eval'" : "'self' 'unsafe-inline'";
+  
+  // Permitir scripts de servicios externos con API keys
+  const externalScriptSources = [
+    'https://maps.googleapis.com',
+    'https://maps.google.com',
+    'https://www.google.com',
+    'https://api.brevo.com',
+    'https://sibautomation.com',
+    'https://js.stripe.com',
+  ].join(' ');
+  
+  const scriptSrc = isDev 
+    ? `'self' 'unsafe-inline' 'unsafe-eval' ${externalScriptSources}` 
+    : `'self' 'unsafe-inline' ${externalScriptSources}`;
+
+  // Permitir conexiones a APIs externas
+  const externalConnectSources = [
+    'https://maps.googleapis.com',
+    'https://api.brevo.com',
+    'https://api.sendinblue.com',
+    'https://in-automate.brevo.com',
+    'https://api.stripe.com',
+  ].join(' ');
 
   return [
     "default-src 'self'",
@@ -66,7 +88,7 @@ const buildCsp = () => {
     "style-src 'self' 'unsafe-inline' https:",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data: https:",
-    "connect-src 'self' https: wss: http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:*",
+    `connect-src 'self' https: wss: http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:* ${externalConnectSources}`,
     "media-src 'self' blob: https:",
     "object-src 'none'",
     "base-uri 'self'",
@@ -82,7 +104,7 @@ const applySecurityHeaders = (response: NextResponse) => {
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('X-DNS-Prefetch-Control', 'off');
   response.headers.set('X-Permitted-Cross-Domain-Policies', 'none');
-  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=()');
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=(self)');
   response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
   response.headers.set('Cross-Origin-Resource-Policy', 'same-site');
   response.headers.set('Cross-Origin-Embedder-Policy', 'credentialless');
