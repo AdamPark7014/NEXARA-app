@@ -27,7 +27,7 @@ export type UserFormInitialUser = {
   nombre?: string;
   email?: string;
   role?: UserRole;
-  department?: { nombre: string };
+  department?: { id?: number; nombre: string };
   avatarUrl?: string;
 };
 
@@ -58,6 +58,7 @@ export default function UserForm({
     nombre: initialUser?.nombre || "",
     email: initialUser?.email || "",
     password: "",
+    departmentId: initialUser?.department?.id ? String(initialUser.department.id) : "",
     department: initialUser?.department?.nombre || "",
     avatarUrl: initialUser?.avatarUrl || "",
     // Rol personalizado
@@ -92,6 +93,9 @@ export default function UserForm({
     const nextValue = type === "checkbox" ? target.checked : value;
     setForm((prev) => {
       const nextForm = { ...prev, [name]: nextValue };
+      if (name === "department") {
+        nextForm.departmentId = "";
+      }
       if (name === "accesoConsoleAdmin" && target.checked) {
         nextForm.accesoConsole = true;
       }
@@ -263,7 +267,8 @@ export default function UserForm({
       data.append("email", form.email);
       if (form.password) data.append("password", form.password);
       data.append("roleId", String(roleId));
-      data.append("departmentId", form.department);
+      const resolvedDepartment = (form.departmentId || "").trim() || (form.department || "").trim();
+      data.append("departmentId", resolvedDepartment);
       if (avatarFile) {
         data.append("avatar", avatarFile);
       }
@@ -277,6 +282,7 @@ export default function UserForm({
           nombre: "",
           email: "",
           password: "",
+          departmentId: "",
           department: "",
           avatarUrl: "",
           roleNombre: "",

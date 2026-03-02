@@ -274,7 +274,19 @@ export default function ListUsers() {
       setEditing(null);
       fetchUsers();
     } else {
-      alert("Error al actualizar usuario");
+      const text = await res.text();
+      let message = "Error al actualizar usuario";
+      try {
+        const data = JSON.parse(text);
+        if (Array.isArray(data?.message) && data.message.length) {
+          message = String(data.message[0]);
+        } else if (typeof data?.message === "string" && data.message.trim()) {
+          message = data.message;
+        }
+      } catch {
+        if (text?.trim()) message = text;
+      }
+      alert(message);
     }
   };
 
