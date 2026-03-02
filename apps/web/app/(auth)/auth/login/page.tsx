@@ -1,37 +1,57 @@
 "use client"
 
 import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import styles from './login.module.css'
 import Link from 'next/link'
+import { useUser } from '../../../../components/UserContext'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const router = useRouter()
+  const { setUser } = useUser()
+
+  const buildApiUrl = (path: string) => {
+    const envBase = process.env.NEXT_PUBLIC_API_URL?.trim()
+    const fallback = typeof window !== 'undefined' ? `${window.location.origin}/api` : 'http://localhost:3001/api'
+    const base = (envBase && envBase.length > 0 ? envBase : fallback).replace(/\/+$/, '')
+    return `${base}/${path.replace(/^\/+/, '')}`
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(buildApiUrl('auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       })
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        const j = await res.json().catch(() => ({}))
-        setError(j?.message || 'Credenciales inválidas')
+        setError(data?.message || data?.error || 'Credenciales inválidas')
         setLoading(false)
         return
       }
-      // redirect to console dashboard on success
-      window.location.href = '/dashboard'
+
+      if (typeof window !== 'undefined' && data.loginGreeting) {
+        window.sessionStorage.setItem('nexara_login_greeting', data.loginGreeting)
+      }
+
+      setUser({
+        ...data.user,
+        token: data.access_token,
+        loginDevice: data.loginDevice || data.user?.loginDevice,
+      })
+      router.push('/dashboard')
     } catch (err) {
       setError('Error de red, intente de nuevo')
-      setLoading(false)
     }
+    setLoading(false)
   }
 
   return (
