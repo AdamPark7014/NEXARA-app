@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "@/components/ThemeContext";
 import { useUser } from "@/components/UserContext";
@@ -61,6 +61,14 @@ export default function ContabilidadLayout({ children }: { children: React.React
       ],
     },
   ];
+
+  const flatNavItems = useMemo(() => navGroups.flatMap((group) => group.items), []);
+  const activeNavItem = useMemo(() => {
+    return flatNavItems.find((item) => {
+      const itemPath = item.href.replace(/\/+$/, "");
+      return currentPath === itemPath || currentPath.endsWith(itemPath);
+    });
+  }, [flatNavItems, currentPath]);
 
   useEffect(() => {
     setMobileMenuOpen(false);
@@ -230,7 +238,37 @@ export default function ContabilidadLayout({ children }: { children: React.React
         </ul>
       </aside>
       )}
-      <main className={consoleStyles.consoleMain}>{children}</main>
+      <main className={consoleStyles.consoleMain}>
+        <section className={styles.workspaceShell}>
+          <div className={styles.workspaceHeader}>
+            <div>
+              <p className={styles.workspaceKicker}>Panel contabilidad</p>
+              <h1 className={styles.workspaceTitle}>{activeNavItem?.label || "Resumen ejecutivo"}</h1>
+              <p className={styles.workspaceSubtitle}>
+                Control operativo-financiero con seguimiento en tiempo real para decisiones más rápidas.
+              </p>
+            </div>
+            <div className={styles.workspaceMeta}>
+              <span className={styles.workspaceMetaPill}>{new Date().toLocaleDateString()}</span>
+              <span className={styles.workspaceMetaPill}>{userRole}</span>
+            </div>
+          </div>
+
+          <div className={styles.quickLinksRow}>
+            {flatNavItems.map((item) => {
+              const itemPath = item.href.replace(/\/+$/, "");
+              const isActive = currentPath === itemPath || currentPath.endsWith(itemPath);
+              return (
+                <Link key={`quick-${item.href}`} href={item.href} className={`${styles.quickLink} ${isActive ? styles.quickLinkActive : ""}`}>
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+
+          <div className={styles.workspaceContent}>{children}</div>
+        </section>
+      </main>
     </div>
   );
 }

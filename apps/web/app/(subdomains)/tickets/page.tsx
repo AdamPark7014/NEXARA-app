@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import PanelLogin from "@/components/PanelLogin";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
+import TicketsInventoryManager from "@/components/TicketsInventoryManager";
 import consoleStyles from "../console/console.module.css";
 import styles from "./tickets.module.css";
 
@@ -67,6 +68,7 @@ type TicketRequest = {
   description: string;
   urgency: string;
   status: string;
+  requestType?: "ISSUE" | "PREVENTIVE_INVENTORY";
   dueAt?: string | null;
   branchName?: string | null;
   branchNumber?: string | null;
@@ -105,7 +107,7 @@ export default function ClientTicketsPage() {
   const [error, setError] = useState<string | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"tickets" | "nuevo" | "perfil">("tickets");
+  const [activeTab, setActiveTab] = useState<"tickets" | "nuevo" | "inventarios" | "perfil">("tickets");
   const [reportRange, setReportRange] = useState<"today" | "7d" | "30d" | "custom">("7d");
   const [reportStart, setReportStart] = useState("");
   const [reportEnd, setReportEnd] = useState("");
@@ -130,6 +132,7 @@ export default function ClientTicketsPage() {
     country: "",
   });
   const [requestDraft, setRequestDraft] = useState({
+    requestType: "ISSUE" as "ISSUE" | "PREVENTIVE_INVENTORY",
     branchId: "",
     branchName: "",
     branchNumber: "",
@@ -171,6 +174,8 @@ export default function ClientTicketsPage() {
         setActiveTab("tickets");
       } else if (tabParam === "new-ticket") {
         setActiveTab("nuevo");
+      } else if (tabParam === "inventories") {
+        setActiveTab("inventarios");
       } else if (tabParam === "profile") {
         setActiveTab("perfil");
       }
@@ -294,6 +299,16 @@ export default function ClientTicketsPage() {
     });
   }, [tickets]);
 
+  const ticketStats = useMemo(() => {
+    const normalized = sortedTickets.map((ticket) => String(ticket.estatus || "").toUpperCase());
+    return {
+      total: sortedTickets.length,
+      pending: normalized.filter((status) => status.includes("PEND") || status.includes("ASIGN") || status.includes("PROCES")).length,
+      closed: normalized.filter((status) => status.includes("FINAL") || status.includes("CERR") || status.includes("COMPLET")).length,
+      requests: requests.length,
+    };
+  }, [sortedTickets, requests.length]);
+
   const resolveReportRange = () => {
     const now = new Date();
     if (reportRange === "today") {
@@ -386,10 +401,11 @@ export default function ClientTicketsPage() {
   const handleRequestSubmit = async () => {
     if (!session?.token) return;
     if (!requestDraft.description.trim()) {
-      setError("Describe el problema para levantar el ticket");
+      setError(requestDraft.requestType === "PREVENTIVE_INVENTORY" ? "Describe el alcance del mantenimiento e inventario" : "Describe el problema para levantar el ticket");
       return;
     }
     const payload = {
+      requestType: requestDraft.requestType,
       branchId: requestDraft.branchId ? Number(requestDraft.branchId) : undefined,
       branchName: requestDraft.branchName || undefined,
       branchNumber: requestDraft.branchNumber || undefined,
@@ -414,6 +430,7 @@ export default function ClientTicketsPage() {
       return;
     }
     setRequestDraft({
+      requestType: "ISSUE",
       branchId: "",
       branchName: "",
       branchNumber: "",
@@ -729,6 +746,18 @@ export default function ClientTicketsPage() {
               Nueva solicitud
             </button>
           </li>
+          <li className={consoleStyles.sidebarMenuItem}>
+            <button
+              type="button"
+              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "inventarios" ? consoleStyles.active : ""}`}
+              onClick={() => {
+                setActiveTab("inventarios");
+                setMobileMenuOpen(false);
+              }}
+            >
+              Inventarios
+            </button>
+          </li>
         </ul>
 
         <div className={consoleStyles.menuTitle}>Sesión</div>
@@ -748,6 +777,26 @@ export default function ClientTicketsPage() {
       </aside>
       <main className={consoleStyles.consoleMain}>
         <div className={styles.mainStack}>
+          <div className={`card ${styles.panelHero}`}>
+            <p className={styles.panelHeroTitle}>Panel de tickets corporativo</p>
+            <p className={styles.panelHeroMeta}>
+              Cliente: {session.client.name} · Administra solicitudes, inventarios y seguimiento en un solo flujo.
+            </p>
+            <div className={styles.panelKpis}>
+              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{ticketStats.total}</span><span className={styles.panelKpiLabel}>Tickets</span></div>
+              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{ticketStats.pending}</span><span className={styles.panelKpiLabel}>En proceso</span></div>
+              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{ticketStats.closed}</span><span className={styles.panelKpiLabel}>Cerrados</span></div>
+              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{ticketStats.requests}</span><span className={styles.panelKpiLabel}>Solicitudes</span></div>
+            </div>
+          </div>
+
+          <div className={styles.panelTabs}>
+            <button type="button" className={`${styles.panelTab} ${activeTab === "tickets" ? styles.panelTabActive : ""}`} onClick={() => setActiveTab("tickets")}>Estado</button>
+            <button type="button" className={`${styles.panelTab} ${activeTab === "nuevo" ? styles.panelTabActive : ""}`} onClick={() => setActiveTab("nuevo")}>Nueva solicitud</button>
+            <button type="button" className={`${styles.panelTab} ${activeTab === "inventarios" ? styles.panelTabActive : ""}`} onClick={() => setActiveTab("inventarios")}>Inventarios</button>
+            <button type="button" className={`${styles.panelTab} ${activeTab === "perfil" ? styles.panelTabActive : ""}`} onClick={() => setActiveTab("perfil")}>Perfil</button>
+          </div>
+
           {activeTab === "tickets" && (
             <div className={styles.sectionStack}>
               {pendingFeedback.length > 0 && (
@@ -936,7 +985,20 @@ export default function ClientTicketsPage() {
             <div className={styles.sectionStack}>
               <div className={`card ${styles.cardSoft}`}>
                 <p className={styles.sectionTitle}>Nueva solicitud</p>
-                <p className={styles.sectionSubtitle}>Describe la solicitud y selecciona la ubicación del servicio.</p>
+                <p className={styles.sectionSubtitle}>Elige el tipo de flujo y selecciona la ubicación del servicio.</p>
+                <div className={styles.grid200}>
+                  <div>
+                    <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Tipo de solicitud</label>
+                    <select
+                      className="input"
+                      value={requestDraft.requestType}
+                      onChange={(e) => setRequestDraft((prev) => ({ ...prev, requestType: e.target.value as "ISSUE" | "PREVENTIVE_INVENTORY" }))}
+                    >
+                      <option value="ISSUE">Ticket por problema</option>
+                      <option value="PREVENTIVE_INVENTORY">Mantenimiento preventivo e inventario</option>
+                    </select>
+                  </div>
+                </div>
                 <div className={styles.grid200}>
                   <div>
                     <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Sucursal existente</label>
@@ -1008,7 +1070,7 @@ export default function ClientTicketsPage() {
                 <textarea
                   className="input"
                   rows={3}
-                  placeholder="Descripcion del problema"
+                  placeholder={requestDraft.requestType === "PREVENTIVE_INVENTORY" ? "Descripcion del mantenimiento e inventario a ejecutar" : "Descripcion del problema"}
                   value={requestDraft.description}
                   onChange={(e) => setRequestDraft((prev) => ({ ...prev, description: e.target.value }))}
                 />
@@ -1043,6 +1105,9 @@ export default function ClientTicketsPage() {
                     <div className={styles.itemHeader}>
                       <strong>{request.branchName || "Ticket"}</strong>
                       <span className="badge">{request.status}</span>
+                    </div>
+                    <div className={styles.mutedText}>
+                      Flujo: {request.requestType === "PREVENTIVE_INVENTORY" ? "Mantenimiento e inventario" : "Ticket por problema"}
                     </div>
                     <div className={styles.mutedText}>{request.description}</div>
                     <div className={styles.mutedText}>Urgencia: {request.urgency}</div>
@@ -1092,6 +1157,18 @@ export default function ClientTicketsPage() {
                 ))}
               </div>
             </div>
+          )}
+          {activeTab === "inventarios" && session?.token && (
+            <TicketsInventoryManager
+              token={session.token}
+              apiUrl={API_URL}
+              mode="client"
+              branches={branches.map((branch) => ({
+                id: branch.id,
+                name: branch.name,
+                branchNumber: branch.branchNumber,
+              }))}
+            />
           )}
           {activeTab === "perfil" && (
             <div className={styles.sectionStack}>

@@ -1,12 +1,14 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, Res, UseGuards, BadRequestException } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, Res, UseGuards, BadRequestException, UploadedFiles, UseInterceptors } from '@nestjs/common';
 import { ClientTicketStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { Response } from 'express';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ClientPortalGuard } from './client-portal.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { ServiceClientsService } from '../service-clients/service-clients.service.js';
 import { ActivitiesService } from '../activities/activities.service.js';
+import { InventoriesService } from '../inventories/inventories.service.js';
 
 @Controller('client-portal')
 @UseGuards(ClientPortalGuard)
@@ -15,6 +17,7 @@ export class ClientPortalController {
     private readonly prisma: PrismaService,
     private readonly serviceClientsService: ServiceClientsService,
     private readonly activitiesService: ActivitiesService,
+    private readonly inventoriesService: InventoriesService,
   ) {}
 
   @Get('profile')
@@ -273,6 +276,8 @@ export class ClientPortalController {
         : 'MEDIUM';
 
     const dueAt = body.dueAt ? new Date(body.dueAt) : undefined;
+    const requestTypeRaw = String(body.requestType || '').toUpperCase();
+    const requestType = requestTypeRaw === 'PREVENTIVE_INVENTORY' ? 'PREVENTIVE_INVENTORY' : 'ISSUE';
 
     return this.prisma['clientTicketRequest'].create({
       data: {
@@ -285,6 +290,7 @@ export class ClientPortalController {
         state: branchData?.state || body.state?.trim() || null,
         country: branchData?.country || body.country?.trim() || null,
         description,
+        requestType,
         urgency,
         dueAt: dueAt && !Number.isNaN(dueAt.getTime()) ? dueAt : null,
         placeId: body.placeId?.trim() || branchData?.placeId || null,
@@ -334,6 +340,84 @@ export class ClientPortalController {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=reporte-ticket-${id}.pdf`);
     res.send(result.pdf);
+  }
+
+  @Get('inventories')
+  async inventories(@CurrentUser() user: any, @Query('branchId') branchId?: string) {
+    return this.inventoriesService.list({
+      clientId: user.clientId,
+      branchId: branchId ? Number(branchId) : undefined,
+    });
+  }
+
+  @Post('inventories/upload')
+  @UseInterceptors(FilesInterceptor('files', 30, { dest: 'apps/api/uploads/inventory-media' }))
+  async uploadInventoryMedia(@UploadedFiles() files: any[]) {
+    const urls = Array.isArray(files)
+      ? files.map((file) => `/uploads/inventory-media/${file.filename}`)
+      : [];
+    return { urls };
+  }
+
+  @Post('inventories/sync')
+  async syncInventory(@CurrentUser() user: any, @Body() body: any) {
+    const branchId = body?.branchId ? Number(body.branchId) : undefined;
+    if (!branchId || Number.isNaN(branchId)) {
+      throw new BadRequestException('branchId requerido');
+    }
+
+    return this.inventoriesService.syncManualSnapshot(
+      {
+        clientId: user.clientId,
+        branchId,
+        createdByType: 'CLIENT',
+      },
+      body || {},
+      user.clientId,
+    );
+  }
+
+  @Put('inventories/:id/decision')
+  async decideInventory(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { decision?: string },
+  ) {
+    const detail = await this.inventoriesService.detail(id);
+    if (detail.clientId !== user.clientId) {
+      throw new BadRequestException('Inventario no pertenece al cliente');
+    }
+    const decision = String(body?.decision || '').toUpperCase();
+    if (!['APPROVED', 'REJECTED'].includes(decision)) {
+      throw new BadRequestException('Decision invalida');
+    }
+    return this.inventoriesService.updateStatus(id, decision);
+  }
+
+  @Get('inventories/:id')
+  async inventoryDetail(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number) {
+    const detail = await this.inventoriesService.detail(id);
+    if (detail.clientId !== user.clientId) {
+      throw new BadRequestException('Inventario no pertenece al cliente');
+    }
+    return detail;
+  }
+
+  @Get('inventories/:id/report')
+  async inventoryReport(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+  ) {
+    const detail = await this.inventoriesService.detail(id);
+    if (detail.clientId !== user.clientId) {
+      throw new BadRequestException('Inventario no pertenece al cliente');
+    }
+    const result = await this.inventoriesService.generateReport(id);
+    if (!result) return res.status(404).send('Inventario no encontrado');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=inventario-${id}.pdf`);
+    return res.send(result.pdf);
   }
 
   @Get('report')

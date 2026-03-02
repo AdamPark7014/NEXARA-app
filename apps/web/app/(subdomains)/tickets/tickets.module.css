@@ -236,6 +236,83 @@
   max-width: 1280px;
 }
 
+.panelHero {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border-color, rgba(31, 107, 186, 0.2));
+  border-radius: 14px;
+  background: var(--card-bg, rgba(255, 255, 255, 0.8));
+}
+
+.panelHeroTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.panelHeroMeta {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+}
+
+.panelKpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.panelKpi {
+  border: 1px solid var(--border-color, rgba(127, 127, 127, 0.2));
+  border-radius: 12px;
+  padding: 10px;
+  background: var(--surface-light);
+  display: grid;
+  gap: 4px;
+}
+
+.panelKpiValue {
+  font-size: 1.08rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.panelKpiLabel {
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+}
+
+.panelTabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  position: sticky;
+  top: 66px;
+  z-index: 80;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color, rgba(31, 107, 186, 0.2));
+  background: var(--card-bg, rgba(255, 255, 255, 0.86));
+}
+
+.panelTab {
+  border: 1px solid var(--border-color, rgba(127, 127, 127, 0.24));
+  border-radius: 10px;
+  background: var(--surface-light);
+  color: var(--foreground);
+  min-height: 38px;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.panelTabActive {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
 .sectionStack {
   display: grid;
   gap: 16px;
@@ -473,6 +550,23 @@
   .mainStack,
   .sectionStack {
     gap: 12px;
+  }
+
+  .panelHero {
+    padding: 10px;
+    border-radius: 12px;
+  }
+
+  .panelHeroTitle {
+    font-size: 0.96rem;
+  }
+
+  .panelHeroMeta {
+    font-size: 0.76rem;
+  }
+
+  .panelTabs {
+    top: 60px;
   }
 
   .ticketsConsole :global(.consoleMain) {

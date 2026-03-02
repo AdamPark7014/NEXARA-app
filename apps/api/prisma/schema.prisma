@@ -454,6 +454,7 @@ model Activity {
   estatus              String             @default("Pendiente") @db.VarChar(50)
   prioridad            String?            @db.VarChar(20)
   ticketType           TicketType?        @default(PREVENTIVO)
+  workType             ActivityWorkType   @default(ISSUE)
   clientId             Int?
   branchName           String?            @db.VarChar(160)
   branchNumber         String?            @db.VarChar(60)
@@ -488,6 +489,12 @@ model Activity {
   locations            LocationTracking[]
   vehicleControls      VehicleControl[]
   Viatico              Viatico[]
+  inventorySnapshot    InventorySnapshot?
+}
+
+enum ActivityWorkType {
+  ISSUE
+  PREVENTIVE_INVENTORY
 }
 
 enum TicketType {
@@ -522,6 +529,7 @@ model ServiceClient {
   ticketRequests     ClientTicketRequest[]
   feedbacks          ClientActivityFeedback[]
   salesClients       SalesClient[]
+  inventorySnapshots InventorySnapshot[]
 
   @@map("service_clients")
 }
@@ -560,6 +568,7 @@ model ServiceClientBranch {
   updatedAt    DateTime  @updatedAt
   client       ServiceClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
   ticketRequests ClientTicketRequest[]
+  inventorySnapshots InventorySnapshot[]
 
   @@unique([clientId, branchNumber])
   @@map("service_client_branches")
@@ -576,6 +585,7 @@ model ClientTicketRequest {
   state         String?   @db.VarChar(120)
   country       String?   @db.VarChar(80)
   description   String    @db.Text
+  requestType   ActivityWorkType @default(ISSUE)
   urgency       ClientTicketUrgency @default(MEDIUM)
   dueAt         DateTime?
   status        ClientTicketStatus @default(NEW)
@@ -589,10 +599,77 @@ model ClientTicketRequest {
   client        ServiceClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
   branch        ServiceClientBranch? @relation(fields: [branchId], references: [id])
   activity      Activity? @relation(fields: [activityId], references: [id])
+  inventorySnapshot InventorySnapshot?
 
   @@index([clientId])
   @@index([status])
   @@map("client_ticket_requests")
+}
+
+model InventorySnapshot {
+  id             Int       @id @default(autoincrement())
+  clientId       Int
+  branchId       Int
+  requestId      Int?      @unique
+  activityId     Int?      @unique
+  title          String?   @db.VarChar(180)
+  notes          String?
+  status         String    @default("PENDING") @db.VarChar(30)
+  previousCount  Int?
+  currentCount   Int?
+  deltaCount     Int?
+  reportUrl      String?   @db.VarChar(500)
+  completedAt    DateTime?
+  approvedAt     DateTime?
+  createdByType  String    @default("CLIENT") @db.VarChar(30)
+  createdById    Int?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  client         ServiceClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  branch         ServiceClientBranch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  request        ClientTicketRequest? @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  activity       Activity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  items          InventoryItem[]
+
+  @@index([clientId])
+  @@index([branchId])
+  @@index([status])
+  @@map("inventory_snapshots")
+}
+
+model InventoryItem {
+  id                Int       @id @default(autoincrement())
+  snapshotId        Int
+  sectionName       String?   @db.VarChar(120)
+  groupName         String    @default("GENERAL") @db.VarChar(120)
+  equipmentName     String    @db.VarChar(180)
+  serialNumber      String?   @db.VarChar(180)
+  model             String?   @db.VarChar(180)
+  panoramicPhotoUrl String?   @db.VarChar(500)
+  closeupPhotoUrl   String?   @db.VarChar(500)
+  stickerPhotoUrl   String?   @db.VarChar(500)
+  serialBefore      String?   @db.VarChar(180)
+  serialAfter       String?   @db.VarChar(180)
+  modelBefore       String?   @db.VarChar(180)
+  modelAfter        String?   @db.VarChar(180)
+  beforePanoramicPhotoUrl String? @db.VarChar(500)
+  beforeCloseupPhotoUrl   String? @db.VarChar(500)
+  afterPanoramicPhotoUrl  String? @db.VarChar(500)
+  afterCloseupPhotoUrl    String? @db.VarChar(500)
+  maintenanceStickerPhotoUrl String? @db.VarChar(500)
+  maintenanceActions String?
+  maintenanceComments String?
+  itemStatus        String    @default("ACTIVE") @db.VarChar(30)
+  compareState      String    @default("UNCHANGED") @db.VarChar(30)
+  notes             String?
+  sortOrder         Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  snapshot          InventorySnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId])
+  @@index([groupName])
+  @@map("inventory_items")
 }
 
 model ClientActivityFeedback {
