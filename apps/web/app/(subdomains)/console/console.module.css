@@ -482,6 +482,28 @@
     padding: 0;
   }
 
+  .consoleMain {
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .consoleTopbar,
+  .consoleContent {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .consoleContent > * {
+    min-width: 0;
+  }
+
+  .consoleContent :global(.card),
+  .consoleContent :global(.table) {
+    max-width: 100%;
+  }
+
   .consoleLayout .sidebar {
     top: 0;
     max-height: none;

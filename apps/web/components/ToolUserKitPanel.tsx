@@ -34,6 +34,7 @@ interface UserKitRow {
 
 const ToolUserKitPanel: React.FC = () => {
   const { user } = useUser();
+  const [isMobile, setIsMobile] = useState(false);
   const [rows, setRows] = useState<UserKitRow[]>([]);
   const [users, setUsers] = useState<AssignableUser[]>([]);
   const [inventoryQuery, setInventoryQuery] = useState('');
@@ -52,6 +53,14 @@ const ToolUserKitPanel: React.FC = () => {
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 900px)');
+    const sync = () => setIsMobile(mediaQuery.matches);
+    sync();
+    mediaQuery.addEventListener('change', sync);
+    return () => mediaQuery.removeEventListener('change', sync);
+  }, []);
 
   const fetchRows = async () => {
     if (!user?.token) return;
@@ -230,7 +239,7 @@ const ToolUserKitPanel: React.FC = () => {
       <form className="card" style={{ display: 'grid', gap: 10 }} onSubmit={assign}>
         <h3 style={{ color: 'var(--primary)', marginBottom: 0 }}>👥 Gestión de Herramientas por Usuario</h3>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr auto', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 2fr 1fr auto', gap: 8 }}>
           <div style={{ display: 'grid', gap: 6 }}>
             <input
               className="input"

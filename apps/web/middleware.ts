@@ -104,7 +104,7 @@ const applySecurityHeaders = (response: NextResponse) => {
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('X-DNS-Prefetch-Control', 'off');
   response.headers.set('X-Permitted-Cross-Domain-Policies', 'none');
-  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=(self)');
+  response.headers.set('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(self), payment=(self)');
   response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
   response.headers.set('Cross-Origin-Resource-Policy', 'same-site');
   response.headers.set('Cross-Origin-Embedder-Policy', 'credentialless');

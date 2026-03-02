@@ -10,6 +10,7 @@ interface ActivityOption {
 }
 
 export default function ServiceSheetForm() {
+  const [isMobile, setIsMobile] = useState(false);
   const { user } = useUser();
   const [activityId, setActivityId] = useState<number | ''>('');
   const [activities, setActivities] = useState<ActivityOption[]>([]);
@@ -118,8 +119,16 @@ export default function ServiceSheetForm() {
     link.click();
   };
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 900px)');
+    const sync = () => setIsMobile(mediaQuery.matches);
+    sync();
+    mediaQuery.addEventListener('change', sync);
+    return () => mediaQuery.removeEventListener('change', sync);
+  }, []);
+
   return (
-    <div className="card" style={{ display: 'grid', gap: 12, maxWidth: 780 }}>
+    <div className="card" style={{ display: 'grid', gap: 12, maxWidth: 780, width: '100%' }}>
       <h2 style={{ margin: 0, color: 'var(--primary)' }}>Hoja de servicio</h2>
       <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Llena los datos para generar el PDF del ticket.</div>
       <select className="input" value={activityId} onChange={(e) => setActivityId(e.target.value ? Number(e.target.value) : '')}>
@@ -130,7 +139,7 @@ export default function ServiceSheetForm() {
           </option>
         ))}
       </select>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
         <input className="input" placeholder="Gerente / Encargado" value={managerName} onChange={(e) => setManagerName(e.target.value)} />
         <input className="input" placeholder="Cargo" value={managerRole} onChange={(e) => setManagerRole(e.target.value)} />
       </div>
@@ -138,7 +147,7 @@ export default function ServiceSheetForm() {
       <div style={{ display: 'grid', gap: 10 }}>
         <div style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Equipos atendidos</div>
         {equipmentItems.map((item, index) => (
-          <div key={index} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
+          <div key={index} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
             <input
               className="input"
               placeholder="Equipo"
@@ -210,7 +219,7 @@ export default function ServiceSheetForm() {
           { key: 'solutionSatisfied', label: 'Satisfecho con la solucion' },
         ].map((item) => (
           <div key={item.key} style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-            <span style={{ minWidth: 220, color: 'var(--text-secondary)' }}>{item.label}</span>
+            <span style={{ minWidth: isMobile ? 0 : 220, color: 'var(--text-secondary)', width: isMobile ? '100%' : 'auto' }}>{item.label}</span>
             <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <input
                 type="radio"
@@ -241,7 +250,7 @@ export default function ServiceSheetForm() {
           onChange={(e) => setSurvey((prev) => ({ ...prev, notes: e.target.value }))}
         />
       </div>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <button className="button-primary" type="button" onClick={handleSave}>Guardar hoja</button>
         <button className="button-secondary" type="button" onClick={handlePdf}>Ver PDF</button>
         {message && <span style={{ color: message.startsWith('No') ? 'var(--danger)' : 'var(--accent)' }}>{message}</span>}

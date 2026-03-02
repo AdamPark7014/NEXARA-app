@@ -427,4 +427,25 @@
   .controls {
     align-items: stretch;
   }
+
+  .detailTableWrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .detailTable {
+    min-width: 0;
+  }
+
+  .detailTable th,
+  .detailTable td {
+    padding: 10px 8px;
+    font-size: 0.82rem;
+    word-break: break-word;
+  }
+
+  .detailTable img {
+    width: 36px !important;
+    height: 36px !important;
+  }
 }

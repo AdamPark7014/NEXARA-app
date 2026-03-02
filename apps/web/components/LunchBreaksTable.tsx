@@ -117,7 +117,7 @@ const LunchBreaksTable: React.FC = () => {
           display: none;
         }
 
-        @media (max-width: 900px) {
+        @media (max-width: 1100px) {
           .lunch-filter-row {
             grid-template-columns: 1fr;
           }
@@ -141,6 +141,10 @@ const LunchBreaksTable: React.FC = () => {
         @media (max-width: 520px) {
           .mobile-photo-actions {
             grid-template-columns: 1fr;
+          }
+
+          .lunch-filter-row {
+            gap: 8px;
           }
         }
       `}</style>

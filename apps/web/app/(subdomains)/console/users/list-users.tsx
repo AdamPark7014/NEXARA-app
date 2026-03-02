@@ -293,6 +293,7 @@ export default function ListUsers() {
   const tableWrapStyle: React.CSSProperties = {
     width: "100%",
     overflowX: "auto",
+    WebkitOverflowScrolling: "touch",
     marginTop: 32,
     borderRadius: 16,
     border: "1px solid var(--muted)",
@@ -303,7 +304,7 @@ export default function ListUsers() {
   return (
     <>
       <div style={tableWrapStyle}>
-        <table className="table" style={{ minWidth: 760 }}>
+        <table className="table" style={{ minWidth: 680 }}>
           <thead>
             <tr>
               <th>Foto</th>
@@ -413,7 +414,7 @@ export default function ListUsers() {
       )}
       {profileModalOpen && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", background: "#0008", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div style={{ background: "var(--surface)", padding: 24, borderRadius: 16, width: "min(980px, 94vw)", position: "relative", maxHeight: "90vh", overflowY: "auto" }}>
+          <div style={{ background: "var(--surface)", padding: "clamp(12px, 3vw, 24px)", borderRadius: 16, width: "min(980px, 94vw)", position: "relative", maxHeight: "90vh", overflowY: "auto" }}>
             <button onClick={() => setProfileModalOpen(false)} style={{ position: "absolute", top: 8, right: 8 }}>✕</button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
               {profileUser?.avatarUrl ? (
@@ -580,7 +581,7 @@ export default function ListUsers() {
           align-items: center;
           justify-content: center;
           z-index: 1000;
-          padding: 24px;
+          padding: clamp(12px, 3vw, 24px);
         }
 
         .editModal {
