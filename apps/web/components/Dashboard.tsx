@@ -149,6 +149,7 @@ const buildMinutesFromAttendances = (
 
 export default function Dashboard() {
   const { user } = useUser();
+  const [isMounted, setIsMounted] = useState(false);
   const [viatics, setViatics] = useState<Viatic[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRange | null>(null);
@@ -160,6 +161,10 @@ export default function Dashboard() {
   const normalizedUserId = user?.id ? Number(user.id) : null;
 
   const weekRange = useMemo(() => getWeekRange(new Date()), []);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const availableUsers = useMemo(() => {
     const list = attendance?.users || [];
@@ -275,6 +280,7 @@ export default function Dashboard() {
     fetchAll();
   }, [user, weekRange.from, weekRange.to]);
 
+  if (!isMounted) return <div className="loadingCard">Cargando dashboard...</div>;
   if (loading) return <div className="loadingCard">Cargando dashboard...</div>;
   if (error) return <div className="errorCard">{error}</div>;
   if (!user) return null;

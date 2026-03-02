@@ -103,12 +103,18 @@ const seedItems: QuoteItem[] = [
   },
 ];
 
-const todayInput = () => new Date().toLocaleDateString("sv-SE");
+const todayInput = () => new Date().toISOString().slice(0, 10);
+
+const buildQuoteNumber = () => {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(now.getUTCDate()).padStart(2, "0");
+  return `Q-${year}-${month}${day}`;
+};
 
 const emptyMeta: QuoteMeta = {
-  quoteNumber: `Q-${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}${String(
-    new Date().getDate(),
-  ).padStart(2, "0")}`,
+  quoteNumber: buildQuoteNumber(),
   issueDate: todayInput(),
   clientName: "",
   clientCompany: "",

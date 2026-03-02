@@ -43,6 +43,7 @@ export default function OpportunitiesKanban({
     opportunity: KanbanOpportunity;
     sourceStage: string;
   } | null>(null);
+  const [nowMs, setNowMs] = useState<number | null>(null);
 
   // Initialize stage columns
   useEffect(() => {
@@ -89,6 +90,10 @@ export default function OpportunitiesKanban({
   useEffect(() => {
     fetchOpportunities();
   }, [fetchOpportunities]);
+
+  useEffect(() => {
+    setNowMs(Date.now());
+  }, []);
 
   const handleDragStart = (e: React.DragEvent, opp: KanbanOpportunity, stage: string) => {
     setDraggedOpportunity({ opportunity: opp, sourceStage: stage });
@@ -187,7 +192,7 @@ export default function OpportunitiesKanban({
                   onClick={() => onSelectOpportunity?.(opp)}
                   data-stage={stage.id}
                 >
-                  {opp.expectedCloseDate && new Date(opp.expectedCloseDate).getTime() < Date.now() && stage.id !== 'WON' && stage.id !== 'LOST' && (
+                  {opp.expectedCloseDate && nowMs !== null && new Date(opp.expectedCloseDate).getTime() < nowMs && stage.id !== 'WON' && stage.id !== 'LOST' && (
                     <div className={styles.overdueAction}>
                       Próxima acción vencida
                     </div>

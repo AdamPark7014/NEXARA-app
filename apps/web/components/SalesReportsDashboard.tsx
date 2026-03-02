@@ -37,6 +37,7 @@ export default function SalesReportsDashboard({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPeriod, setCurrentPeriod] = useState<'week' | 'month' | 'year'>(period);
+  const [periodLabel, setPeriodLabel] = useState('');
   const [generatePdfLoading, setGeneratePdfLoading] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [showPdfViewer, setShowPdfViewer] = useState(false);
@@ -154,19 +155,23 @@ export default function SalesReportsDashboard({
       maximumFractionDigits: 0,
     }).format(value || 0);
 
-  const getPeriodLabel = () => {
+  useEffect(() => {
     const today = new Date();
     switch (currentPeriod) {
       case 'week':
-        return `Semana del ${today.toLocaleDateString('es-MX')}`;
+        setPeriodLabel(`Semana del ${today.toLocaleDateString('es-MX')}`);
+        break;
       case 'month':
-        return today.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+        setPeriodLabel(today.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }));
+        break;
       case 'year':
-        return today.getFullYear().toString();
+        setPeriodLabel(today.getFullYear().toString());
+        break;
       default:
-        return '';
+        setPeriodLabel('');
+        break;
     }
-  };
+  }, [currentPeriod]);
 
   if (loading) return <div className={styles.loading}>Cargando reportes...</div>;
 
@@ -175,7 +180,7 @@ export default function SalesReportsDashboard({
       <div className={styles.header}>
         <div>
           <h2 className={styles.title}>Reportes de Ventas</h2>
-          <p className={styles.period}>{getPeriodLabel()}</p>
+          <p className={styles.period}>{periodLabel}</p>
         </div>
 
         <div className={styles.controls}>
@@ -668,7 +673,7 @@ export default function SalesReportsDashboard({
         <div className={styles.pdfModal} onClick={() => setShowPdfViewer(false)}>
           <div className={styles.pdfModalContent} onClick={(e) => e.stopPropagation()}>
             <div className={styles.pdfModalHeader}>
-              <h3>Reporte de Ventas - {getPeriodLabel()}</h3>
+              <h3>Reporte de Ventas - {periodLabel}</h3>
               <div className={styles.pdfModalActions}>
                 <button className={styles.pdfDownloadBtn} onClick={handleDownloadPdf}>
                   📥 Descargar

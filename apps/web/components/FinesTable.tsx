@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { useUser } from './UserContext';
+import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 
 interface Fine {
   id: number;
@@ -76,16 +77,37 @@ const FinesTable: React.FC<FinesTableProps> = ({
   useEffect(() => {
     if (!user?.token) return;
 
+    if (!showUser || Boolean(usuarioIdProp)) {
+      setUsuarios([]);
+      return;
+    }
+
     const headers = { Authorization: `Bearer ${user.token}` };
+    const canUseAssignable =
+      hasPermission(user, PERMISSIONS.USERS_MANAGE) ||
+      hasPermission(user, PERMISSIONS.CONSOLE_ADMIN);
+    const canUseHierarchy = hasPermission(user, PERMISSIONS.ATTENDANCE_MANAGE);
 
     const loadUsers = async () => {
-      try {
-        const assignableRes = await fetch(buildApiUrl('users/assignable'), { headers });
-        const assignableData = assignableRes.ok ? await assignableRes.json() : [];
-        const assignableUsers = Array.isArray(assignableData) ? assignableData : [];
+      if (!canUseAssignable && !canUseHierarchy) {
+        setUsuarios([]);
+        return;
+      }
 
-        if (assignableUsers.length > 0) {
-          setUsuarios(assignableUsers);
+      try {
+        if (canUseAssignable) {
+          const assignableRes = await fetch(buildApiUrl('users/assignable'), { headers });
+          const assignableData = assignableRes.ok ? await assignableRes.json() : [];
+          const assignableUsers = Array.isArray(assignableData) ? assignableData : [];
+
+          if (assignableUsers.length > 0) {
+            setUsuarios(assignableUsers);
+            return;
+          }
+        }
+
+        if (!canUseHierarchy) {
+          setUsuarios([]);
           return;
         }
 
@@ -110,7 +132,7 @@ const FinesTable: React.FC<FinesTableProps> = ({
     };
 
     loadUsers();
-  }, [user?.token]);
+  }, [user, user?.token, showUser, usuarioIdProp]);
 
   // Función para cargar multas
   const loadFines = async () => {

@@ -63,7 +63,7 @@ const GpsMap = () => {
       }
       const script = document.createElement('script');
       script.id = 'google-maps-script';
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsKey}&libraries=places`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsKey}&v=weekly&libraries=places,marker&loading=async`;
       script.async = true;
       script.onload = () => resolve();
       script.onerror = () => reject(new Error('Error al cargar Google Maps'));
@@ -81,6 +81,39 @@ const GpsMap = () => {
     if (value === null || value === undefined) return null;
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const createMapMarker = (mapsLib: any, map: any, position: { lat: number; lng: number }, label?: string) => {
+    if (mapsLib?.marker?.AdvancedMarkerElement) {
+      return new mapsLib.marker.AdvancedMarkerElement({
+        map,
+        position,
+        title: label,
+      });
+    }
+    return new mapsLib.Marker({
+      map,
+      position,
+      label,
+    } as any);
+  };
+
+  const setMapMarkerPosition = (marker: any, position: { lat: number; lng: number }) => {
+    if (!marker) return;
+    if (typeof marker.setPosition === 'function') {
+      marker.setPosition(position);
+      return;
+    }
+    marker.position = position;
+  };
+
+  const setMapMarkerInstanceMap = (marker: any, map: any) => {
+    if (!marker) return;
+    if (typeof marker.setMap === 'function') {
+      marker.setMap(map);
+      return;
+    }
+    marker.map = map;
   };
 
   const refreshMe = async () => {
@@ -226,7 +259,11 @@ const GpsMap = () => {
   useEffect(() => {
     if (!user?.token) return;
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, { transports: ['websocket'] });
+    const socket: Socket = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+      timeout: 20000,
+      reconnectionAttempts: 8,
+    });
 
     socket.on('entity:updated', (payload: { model?: string }) => {
       if (payload?.model === 'LocationTracking' || payload?.model === 'User') {
@@ -289,14 +326,10 @@ const GpsMap = () => {
     const markerKey = 'me';
     const marker = myMarkersRef.current.get(markerKey);
     if (!marker) {
-      const nextMarker = new mapsLib.Marker({
-        map: myMapInstance.current as unknown,
-        position: { lat, lng },
-        label: 'Yo',
-      } as any);
+      const nextMarker = createMapMarker(mapsLib, myMapInstance.current as unknown, { lat, lng }, 'Yo');
       myMarkersRef.current.set(markerKey, nextMarker);
     } else {
-      marker.setPosition({ lat, lng });
+      setMapMarkerPosition(marker, { lat, lng });
     }
     myMapInstance.current.setCenter({ lat, lng });
   }, [myLocation]);
@@ -313,20 +346,16 @@ const GpsMap = () => {
       activeKeys.add(key);
       const existing = teamMarkersRef.current.get(key);
       if (!existing) {
-        const marker = new mapsLib.Marker({
-          map: teamMapInstance.current,
-          position: { lat, lng },
-          label: getInitials(location.usuario?.nombre),
-        } as any);
+        const marker = createMapMarker(mapsLib, teamMapInstance.current, { lat, lng }, getInitials(location.usuario?.nombre));
         teamMarkersRef.current.set(key, marker);
       } else {
-        existing.setPosition({ lat, lng });
+        setMapMarkerPosition(existing, { lat, lng });
       }
     });
 
     teamMarkersRef.current.forEach((marker, key) => {
       if (!activeKeys.has(key)) {
-        marker.setMap(null);
+        setMapMarkerInstanceMap(marker, null);
         teamMarkersRef.current.delete(key);
       }
     });

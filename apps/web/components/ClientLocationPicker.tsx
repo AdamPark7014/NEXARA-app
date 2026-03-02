@@ -27,7 +27,7 @@ const loadGoogleMaps = (apiKey: string) => {
     }
     const script = document.createElement("script");
     script.id = "google-maps-script";
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=weekly&libraries=places,marker&loading=async`;
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () => reject(new Error("Error al cargar Google Maps"));
@@ -48,6 +48,28 @@ const toNumber = (value?: number | null) => {
   if (value === null || value === undefined) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+};
+
+const createMapMarker = (googleMaps: any, map: any, position: { lat: number; lng: number }) => {
+  if (googleMaps?.marker?.AdvancedMarkerElement) {
+    return new googleMaps.marker.AdvancedMarkerElement({
+      map,
+      position,
+    });
+  }
+  return new googleMaps.Marker({
+    map,
+    position,
+  });
+};
+
+const setMapMarkerPosition = (marker: any, position: { lat: number; lng: number }) => {
+  if (!marker) return;
+  if (typeof marker.setPosition === "function") {
+    marker.setPosition(position);
+    return;
+  }
+  marker.position = position;
 };
 
 export default function ClientLocationPicker({ label, value, onChange, height = 220 }: ClientLocationPickerProps) {
@@ -83,10 +105,7 @@ export default function ClientLocationPicker({ label, value, onChange, height = 
           fullscreenControl: false,
           streetViewControl: false,
         });
-        markerInstance.current = new google.maps.Marker({
-          map: mapInstance.current,
-          position: center,
-        });
+        markerInstance.current = createMapMarker(google.maps, mapInstance.current, center);
 
         if (inputRef.current) {
           const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
@@ -102,7 +121,10 @@ export default function ClientLocationPicker({ label, value, onChange, height = 
               longitud: place.geometry.location.lng(),
             };
             onChange(next);
-            markerInstance.current?.setPosition(place.geometry.location);
+            setMapMarkerPosition(markerInstance.current, {
+              lat: place.geometry.location.lat(),
+              lng: place.geometry.location.lng(),
+            });
             mapInstance.current?.setCenter(place.geometry.location);
             setStatus("Ubicacion actualizada");
           });
@@ -121,7 +143,7 @@ export default function ClientLocationPicker({ label, value, onChange, height = 
     const lng = toNumber(value.longitud);
     if (lat === null || lng === null) return;
     const pos = { lat, lng };
-    markerInstance.current.setPosition(pos);
+    setMapMarkerPosition(markerInstance.current, pos);
     mapInstance.current.setCenter(pos);
   }, [value.latitud, value.longitud]);
 

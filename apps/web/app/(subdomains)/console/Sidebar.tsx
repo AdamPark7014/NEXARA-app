@@ -16,8 +16,6 @@ export default function Sidebar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
-  if (!user) return null;
-
   // Detectar si es móvil
   useEffect(() => {
     const checkMobile = () => {
@@ -60,6 +58,8 @@ export default function Sidebar() {
   const closeMenu = () => {
     setIsMenuOpen(false);
   };
+
+  if (!user) return null;
 
   const isSuperAdmin = user.isSuperAdmin;
 
