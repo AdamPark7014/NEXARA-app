@@ -121,6 +121,15 @@ export default function CvsManagementPanel() {
 
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
   const [dragged, setDragged] = useState<{ id: number; fromStage: CvRow["stage"] } | null>(null);
+  const [dragOverStage, setDragOverStage] = useState<CvRow["stage"] | null>(null);
+  const [dragOverCardId, setDragOverCardId] = useState<number | null>(null);
+  const [previewLoadingId, setPreviewLoadingId] = useState<number | null>(null);
+  const [preview, setPreview] = useState<{
+    src: string;
+    title: string;
+    fileName: string;
+    kind: "pdf" | "image";
+  } | null>(null);
 
   const canRecruiter = Boolean(user && (user.isSuperAdmin || hasPermission(user, PERMISSIONS.CVS_MANAGE)));
   const canAdmin = Boolean(user && (user.isSuperAdmin || hasPermission(user, PERMISSIONS.CVS_ADMIN_REVIEW) || hasPermission(user, PERMISSIONS.CONSOLE_ADMIN)));
@@ -131,6 +140,14 @@ export default function CvsManagementPanel() {
     () => ({ Authorization: `Bearer ${user?.token || ""}` }),
     [user?.token],
   );
+
+  useEffect(() => {
+    return () => {
+      if (preview?.src) {
+        URL.revokeObjectURL(preview.src);
+      }
+    };
+  }, [preview]);
 
   const categoryOptions = useMemo(() => {
     const observed = Array.from(new Set(rows.map((row) => row.category).filter(Boolean)));
@@ -367,8 +384,50 @@ export default function CvsManagementPanel() {
     }
   };
 
-  const openPreview = (id: number) => {
-    window.open(toApi(`cvs/${id}/preview`), "_blank", "noopener,noreferrer");
+  const closePreview = () => {
+    setPreview((current) => {
+      if (current?.src) {
+        URL.revokeObjectURL(current.src);
+      }
+      return null;
+    });
+  };
+
+  const openPreview = async (row: CvRow) => {
+    setError("");
+    setPreviewLoadingId(row.id);
+    try {
+      const response = await fetch(toApi(`cvs/${row.id}/download`), { headers });
+      if (!response.ok) {
+        throw new Error("No se pudo cargar el archivo para preview");
+      }
+
+      const originalBlob = await response.blob();
+      const fileName = String(row.cvFileUrl || `cv-${row.id}`).split("/").pop() || `cv-${row.id}`;
+      const cleanFileName = fileName.split("?")[0].toLowerCase();
+      const isImage = /\.(png|jpe?g|webp|gif|bmp|svg|avif)$/.test(cleanFileName);
+
+      const blob = isImage
+        ? new Blob([await originalBlob.arrayBuffer()], { type: getImageMime(cleanFileName) })
+        : originalBlob;
+      const src = URL.createObjectURL(blob);
+
+      setPreview((current) => {
+        if (current?.src) {
+          URL.revokeObjectURL(current.src);
+        }
+        return {
+          src,
+          title: row.fullName,
+          fileName,
+          kind: isImage ? "image" : "pdf",
+        };
+      });
+    } catch (err: any) {
+      setError(err?.message || "No se pudo abrir el preview");
+    } finally {
+      setPreviewLoadingId(null);
+    }
   };
 
   const downloadCv = async (id: number) => {
@@ -529,13 +588,29 @@ export default function CvsManagementPanel() {
           return (
             <section
               key={stageKey}
-              style={columnStyle}
+              style={{
+                ...columnStyle,
+                ...(dragOverStage === stageKey ? columnActiveStyle : null),
+                ...(dragged?.fromStage === stageKey ? columnSourceStyle : null),
+              }}
               onDragOver={(event) => event.preventDefault()}
+              onDragEnter={(event) => {
+                event.preventDefault();
+                setDragOverStage(stageKey);
+              }}
+              onDragLeave={(event) => {
+                event.preventDefault();
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                  setDragOverStage((current) => (current === stageKey ? null : current));
+                }
+              }}
               onDrop={(event) => {
                 event.preventDefault();
                 if (!dragged) return;
                 const stageItems = grouped.get(stageKey) || [];
                 const orderedIds = [...stageItems.map((item) => item.id), dragged.id];
+                setDragOverStage(null);
+                setDragOverCardId(null);
                 moveCard(dragged.id, stageKey, Array.from(new Set(orderedIds)));
               }}
             >
@@ -543,6 +618,8 @@ export default function CvsManagementPanel() {
                 <strong style={{ fontSize: 13 }}>{STAGE_LABELS[stageKey]}</strong>
                 <span style={{ fontSize: 12, opacity: 0.75 }}>{cards.length}</span>
               </header>
+
+              {dragged ? <div style={dropHintStyle}>Arrastra y suelta aquí</div> : null}
 
               {cards.map((row) => {
                 const recruiterNoteKey = `recruiter:${row.id}`;
@@ -552,13 +629,38 @@ export default function CvsManagementPanel() {
                 return (
                   <article
                     key={row.id}
-                    style={rowCardStyle}
+                    style={{
+                      ...rowCardStyle,
+                      ...(dragged?.id === row.id ? rowDraggingStyle : null),
+                      ...(dragOverCardId === row.id ? rowDropTargetStyle : null),
+                    }}
                     draggable={canRecruiter || canAdmin || canSuperadmin}
-                    onDragStart={() => setDragged({ id: row.id, fromStage: row.stage })}
+                    onDragStart={() => {
+                      setDragged({ id: row.id, fromStage: row.stage });
+                    }}
+                    onDragEnd={() => {
+                      setDragged(null);
+                      setDragOverStage(null);
+                      setDragOverCardId(null);
+                    }}
                     onDragOver={(event) => event.preventDefault()}
+                    onDragEnter={(event) => {
+                      event.preventDefault();
+                      if (dragged?.id !== row.id) {
+                        setDragOverCardId(row.id);
+                      }
+                    }}
+                    onDragLeave={(event) => {
+                      event.preventDefault();
+                      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                        setDragOverCardId((current) => (current === row.id ? null : current));
+                      }
+                    }}
                     onDrop={(event) => {
                       event.preventDefault();
                       if (!dragged) return;
+                      setDragOverCardId(null);
+                      setDragOverStage(null);
                       if (dragged.fromStage === stageKey) {
                         reorderInsideStage(stageKey, dragged.id, row.id);
                       } else {
@@ -585,8 +687,8 @@ export default function CvsManagementPanel() {
                     </div>
 
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      <button type="button" style={buttonGhost} onClick={() => openPreview(row.id)}>
-                        Preview PDF
+                      <button type="button" style={buttonGhost} onClick={() => openPreview(row)} disabled={previewLoadingId === row.id}>
+                        {previewLoadingId === row.id ? "Abriendo..." : "Preview archivo"}
                       </button>
                       <button type="button" style={buttonGhost} onClick={() => downloadCv(row.id)}>
                         Redescargar
@@ -656,8 +758,43 @@ export default function CvsManagementPanel() {
           );
         })}
       </div>
+
+      {preview ? (
+        <div style={previewBackdropStyle} onClick={closePreview}>
+          <div style={previewModalStyle} onClick={(event) => event.stopPropagation()}>
+            <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <div style={{ display: "grid", gap: 2 }}>
+                <strong style={{ fontSize: 14 }}>Vista previa: {preview.title}</strong>
+                <span style={{ fontSize: 12, opacity: 0.75 }}>{preview.fileName}</span>
+              </div>
+              <button type="button" style={buttonGhost} onClick={closePreview}>
+                Cerrar
+              </button>
+            </header>
+
+            <div style={previewBodyStyle}>
+              {preview.kind === "image" ? (
+                <img src={preview.src} alt={`Vista previa de ${preview.title}`} style={previewImageStyle} />
+              ) : (
+                <iframe src={preview.src} title={`Preview ${preview.title}`} style={previewFrameStyle} />
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
+}
+
+function getImageMime(fileName: string) {
+  if (fileName.endsWith(".png")) return "image/png";
+  if (fileName.endsWith(".jpg") || fileName.endsWith(".jpeg")) return "image/jpeg";
+  if (fileName.endsWith(".webp")) return "image/webp";
+  if (fileName.endsWith(".gif")) return "image/gif";
+  if (fileName.endsWith(".bmp")) return "image/bmp";
+  if (fileName.endsWith(".svg")) return "image/svg+xml";
+  if (fileName.endsWith(".avif")) return "image/avif";
+  return "image/jpeg";
 }
 
 function Metric({ title, value }: { title: string; value: number }) {
@@ -701,6 +838,15 @@ const columnStyle: React.CSSProperties = {
   minHeight: 180,
 };
 
+const columnSourceStyle: React.CSSProperties = {
+  opacity: 0.92,
+};
+
+const columnActiveStyle: React.CSSProperties = {
+  border: "1px dashed var(--primary)",
+  transform: "translateY(-1px)",
+};
+
 const rowCardStyle: React.CSSProperties = {
   border: "1px solid rgba(148, 163, 184, 0.2)",
   borderRadius: 10,
@@ -708,6 +854,18 @@ const rowCardStyle: React.CSSProperties = {
   padding: 10,
   display: "grid",
   gap: 6,
+  cursor: "grab",
+  transition: "transform 0.15s ease, border-color 0.15s ease, opacity 0.15s ease",
+};
+
+const rowDraggingStyle: React.CSSProperties = {
+  opacity: 0.6,
+  border: "1px solid var(--primary)",
+};
+
+const rowDropTargetStyle: React.CSSProperties = {
+  border: "1px solid var(--primary)",
+  transform: "translateY(-1px)",
 };
 
 const filterGrid: React.CSSProperties = {
@@ -758,4 +916,55 @@ const chipStyle: React.CSSProperties = {
   fontSize: 12,
   padding: "6px 12px",
   cursor: "pointer",
+};
+
+const dropHintStyle: React.CSSProperties = {
+  border: "1px dashed rgba(148, 163, 184, 0.45)",
+  borderRadius: 8,
+  padding: "6px 8px",
+  fontSize: 11,
+  opacity: 0.75,
+  textAlign: "center",
+};
+
+const previewBackdropStyle: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(2, 6, 23, 0.72)",
+  display: "grid",
+  placeItems: "center",
+  zIndex: 1200,
+  padding: 16,
+};
+
+const previewModalStyle: React.CSSProperties = {
+  width: "min(1100px, 96vw)",
+  height: "min(82vh, 860px)",
+  border: "1px solid rgba(148, 163, 184, 0.35)",
+  borderRadius: 12,
+  background: "var(--surface)",
+  padding: 12,
+  display: "grid",
+  gap: 10,
+};
+
+const previewBodyStyle: React.CSSProperties = {
+  border: "1px solid rgba(148, 163, 184, 0.28)",
+  borderRadius: 10,
+  overflow: "hidden",
+  background: "var(--background)",
+  height: "100%",
+};
+
+const previewFrameStyle: React.CSSProperties = {
+  width: "100%",
+  height: "100%",
+  border: "none",
+};
+
+const previewImageStyle: React.CSSProperties = {
+  width: "100%",
+  height: "100%",
+  objectFit: "contain",
+  display: "block",
 };
