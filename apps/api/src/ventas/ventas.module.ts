@@ -11,9 +11,10 @@ import { VentasProyectosController } from './ventas-proyectos.controller.js';
 import { VentasReportesController } from './ventas-reportes.controller.js';
 import { VentasCotizacionesController } from './ventas-cotizaciones.controller.js';
 import { VentasOrderTemplatesController } from './ventas-order-templates.controller.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule, CotizacionesModule],
+  imports: [PrismaModule, AuthModule, CotizacionesModule, NotificationsModule],
   providers: [VentasService, PdfGeneratorService],
   controllers: [VentasClientesController, VentasLeadsController, VentasOportunidadesController, VentasProyectosController, VentasReportesController, VentasCotizacionesController, VentasOrderTemplatesController],
 })
