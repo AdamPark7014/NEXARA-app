@@ -31,10 +31,22 @@ type CvRow = {
   cvFileUrl: string;
   createdAt: string;
   updatedAt: string;
-  createdBy?: { nombre?: string | null; email?: string | null } | null;
-  recruiterReviewedBy?: { nombre?: string | null; email?: string | null } | null;
-  adminReviewedBy?: { nombre?: string | null; email?: string | null } | null;
-  superadminReviewedBy?: { nombre?: string | null; email?: string | null } | null;
+  createdBy?: { id?: number; nombre?: string | null; email?: string | null } | null;
+  recruiterReviewedBy?: { id?: number; nombre?: string | null; email?: string | null } | null;
+  adminReviewedBy?: { id?: number; nombre?: string | null; email?: string | null } | null;
+  superadminReviewedBy?: { id?: number; nombre?: string | null; email?: string | null } | null;
+};
+
+type Summary = {
+  totals: {
+    all: number;
+    recruiterApproved: number;
+    adminApproved: number;
+    superadminApproved: number;
+    rejected: number;
+  };
+  byStage: Record<string, number>;
+  byCategory: Record<string, number>;
 };
 
 const STAGE_LABELS: Record<CvRow["stage"], string> = {
@@ -43,15 +55,9 @@ const STAGE_LABELS: Record<CvRow["stage"], string> = {
   RECRUITER_REJECTED: "Descartados RRHH",
   ADMIN_SHORTLIST: "Preselección Admin",
   ADMIN_REJECTED: "Descartados Admin",
-  SUPERADMIN_SHORTLIST: "En revisión final",
+  SUPERADMIN_SHORTLIST: "En revisión Dirección",
   SUPERADMIN_REJECTED: "Descartados Dirección",
-  APPROVED: "Aprobados",
-};
-
-const EMPLOYMENT_LABELS: Record<CvRow["employmentStatus"], string> = {
-  NEW_CANDIDATE: "Candidato nuevo",
-  CURRENT_EMPLOYEE: "Ya trabaja con nosotros",
-  FORMER_EMPLOYEE: "Trabajó con nosotros",
+  APPROVED: "Aprobados finales",
 };
 
 const STAGE_ORDER: CvRow["stage"][] = [
@@ -65,6 +71,23 @@ const STAGE_ORDER: CvRow["stage"][] = [
   "SUPERADMIN_REJECTED",
 ];
 
+const EMPLOYMENT_LABELS: Record<CvRow["employmentStatus"], string> = {
+  NEW_CANDIDATE: "Candidato nuevo",
+  CURRENT_EMPLOYEE: "Ya trabaja con nosotros",
+  FORMER_EMPLOYEE: "Trabajó con nosotros",
+};
+
+const DEFAULT_CATEGORIES = [
+  "Finanzas",
+  "RRHH",
+  "Arquitectura",
+  "Ingeniería en Sistemas",
+  "Instalación CCTV",
+  "Administrativos",
+  "Operaciones",
+  "Soporte Técnico",
+];
+
 const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 const toApi = (path: string) => `${apiBase}/${path.replace(/^\/+/, "")}`;
 
@@ -73,6 +96,7 @@ export default function CvsManagementPanel() {
   const router = useRouter();
 
   const [rows, setRows] = useState<CvRow[]>([]);
+  const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -82,6 +106,7 @@ export default function CvsManagementPanel() {
   const [stage, setStage] = useState("");
   const [employmentStatus, setEmploymentStatus] = useState("");
   const [onlyMine, setOnlyMine] = useState(false);
+  const [decisionFilter, setDecisionFilter] = useState<"ALL" | "POTENTIAL" | "REJECTED">("ALL");
 
   const [upload, setUpload] = useState({
     fullName: "",
@@ -94,72 +119,210 @@ export default function CvsManagementPanel() {
   });
   const [uploadFile, setUploadFile] = useState<File | null>(null);
 
-  const canRecruiter = Boolean(user && (user.isSuperAdmin || hasPermission(user, PERMISSIONS.CVS_MANAGE) || hasPermission(user, PERMISSIONS.CONSOLE_ADMIN)));
+  const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
+  const [dragged, setDragged] = useState<{ id: number; fromStage: CvRow["stage"] } | null>(null);
+
+  const canRecruiter = Boolean(user && (user.isSuperAdmin || hasPermission(user, PERMISSIONS.CVS_MANAGE)));
   const canAdmin = Boolean(user && (user.isSuperAdmin || hasPermission(user, PERMISSIONS.CVS_ADMIN_REVIEW) || hasPermission(user, PERMISSIONS.CONSOLE_ADMIN)));
   const canSuperadmin = Boolean(user?.isSuperAdmin || (user && hasPermission(user, PERMISSIONS.CVS_SUPERADMIN_REVIEW)));
   const canUsersManage = Boolean(user && hasPermission(user, PERMISSIONS.USERS_MANAGE));
 
   const headers = useMemo(
-    () => ({
-      Authorization: `Bearer ${user?.token || ""}`,
-    }),
+    () => ({ Authorization: `Bearer ${user?.token || ""}` }),
     [user?.token],
   );
 
-  const categories = useMemo(() => {
-    const all = rows.map((row) => row.category).filter(Boolean);
-    return Array.from(new Set(all)).sort((left, right) => left.localeCompare(right));
+  const categoryOptions = useMemo(() => {
+    const observed = Array.from(new Set(rows.map((row) => row.category).filter(Boolean)));
+    const merged = Array.from(new Set([...DEFAULT_CATEGORIES, ...observed]));
+    return merged.sort((a, b) => a.localeCompare(b));
   }, [rows]);
 
-  const fetchRows = async () => {
+  const loadAll = async () => {
     if (!user?.token) return;
     setLoading(true);
     setError("");
     try {
-      const params = new URLSearchParams();
-      if (search.trim()) params.set("search", search.trim());
-      if (category) params.set("category", category);
-      if (stage) params.set("stage", stage);
-      if (employmentStatus) params.set("employmentStatus", employmentStatus);
-      if (onlyMine) params.set("onlyMine", "true");
+      const [rowsRes, summaryRes] = await Promise.all([
+        fetch(toApi("cvs"), { headers }),
+        fetch(toApi("cvs/summary/stats"), { headers }),
+      ]);
 
-      const response = await fetch(toApi(`cvs?${params.toString()}`), { headers });
-      if (!response.ok) {
-        throw new Error("No se pudo cargar la base de CVs");
+      if (!rowsRes.ok) throw new Error("No se pudo cargar la base de CVs");
+      const rowData = await rowsRes.json();
+      setRows(Array.isArray(rowData) ? rowData : []);
+
+      if (summaryRes.ok) {
+        const summaryData = await summaryRes.json();
+        setSummary(summaryData || null);
+      } else {
+        setSummary(null);
       }
-      const data = await response.json();
-      setRows(Array.isArray(data) ? data : []);
     } catch (err: any) {
       setError(err?.message || "Error cargando CVs");
       setRows([]);
+      setSummary(null);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchRows();
+    loadAll();
   }, [user?.token]);
+
+  const filteredRows = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return rows.filter((row) => {
+      if (term) {
+        const bag = [row.fullName, row.email || "", row.whatsapp || "", row.category, row.tags?.join(" ") || ""].join(" ").toLowerCase();
+        if (!bag.includes(term)) return false;
+      }
+
+      if (category && row.category !== category) return false;
+      if (stage && row.stage !== stage) return false;
+      if (employmentStatus && row.employmentStatus !== employmentStatus) return false;
+
+      if (onlyMine) {
+        const mine = [row.createdBy?.id, row.recruiterReviewedBy?.id, row.adminReviewedBy?.id, row.superadminReviewedBy?.id].some(
+          (id) => id && id === user?.id,
+        );
+        if (!mine) return false;
+      }
+
+      if (decisionFilter === "POTENTIAL") {
+        const isPotential = row.recruiterDecision === "APPROVED" || row.adminDecision === "APPROVED" || row.stage === "APPROVED";
+        if (!isPotential) return false;
+      }
+      if (decisionFilter === "REJECTED" && !row.stage.includes("REJECTED")) return false;
+
+      return true;
+    });
+  }, [rows, search, category, stage, employmentStatus, onlyMine, decisionFilter, user?.id]);
 
   const grouped = useMemo(() => {
     const map = new Map<CvRow["stage"], CvRow[]>();
-    STAGE_ORDER.forEach((key) => map.set(key, []));
-    rows.forEach((row) => {
+    STAGE_ORDER.forEach((value) => map.set(value, []));
+    filteredRows.forEach((row) => {
       if (!map.has(row.stage)) map.set(row.stage, []);
       map.get(row.stage)?.push(row);
     });
+    map.forEach((items, key) => {
+      items.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      map.set(key, items);
+    });
     return map;
-  }, [rows]);
+  }, [filteredRows]);
+
+  const callReview = async (
+    row: CvRow,
+    lane: "recruiter" | "admin" | "superadmin",
+    decision: "APPROVED" | "REJECTED" | "PENDING",
+  ) => {
+    setBusy(true);
+    setError("");
+    try {
+      const noteKey = `${lane}:${row.id}`;
+      const notes = (reviewNotes[noteKey] || "").trim();
+      const endpoint = lane === "recruiter" ? "recruiter-review" : lane === "admin" ? "admin-review" : "superadmin-review";
+      const payload: Record<string, any> = { decision, notes };
+
+      if (lane === "recruiter") {
+        payload.category = row.category;
+        payload.tags = row.tags || [];
+        payload.employmentStatus = row.employmentStatus;
+      }
+
+      const response = await fetch(toApi(`cvs/${row.id}/${endpoint}`), {
+        method: "PATCH",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "No se pudo actualizar la revisión");
+      }
+
+      await loadAll();
+    } catch (err: any) {
+      setError(err?.message || "No se pudo actualizar la revisión");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const moveCard = async (cvId: number, targetStage: CvRow["stage"], reorderIds?: number[]) => {
+    setBusy(true);
+    setError("");
+    try {
+      const moveRes = await fetch(toApi(`cvs/${cvId}/move`), {
+        method: "PATCH",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ stage: targetStage }),
+      });
+      if (!moveRes.ok) {
+        const text = await moveRes.text();
+        throw new Error(text || "No se pudo mover el CV");
+      }
+
+      if (reorderIds?.length) {
+        const reorderRes = await fetch(toApi("cvs/reorder/stage"), {
+          method: "PATCH",
+          headers: { ...headers, "Content-Type": "application/json" },
+          body: JSON.stringify({ stage: targetStage, orderedIds: reorderIds }),
+        });
+        if (!reorderRes.ok) {
+          const text = await reorderRes.text();
+          throw new Error(text || "No se pudo reordenar la columna");
+        }
+      }
+
+      await loadAll();
+    } catch (err: any) {
+      setError(err?.message || "No se pudo mover el CV");
+    } finally {
+      setBusy(false);
+      setDragged(null);
+    }
+  };
+
+  const reorderInsideStage = async (stageValue: CvRow["stage"], sourceId: number, targetId: number) => {
+    const sourceList = [...(grouped.get(stageValue) || [])];
+    const sourceIndex = sourceList.findIndex((item) => item.id === sourceId);
+    const targetIndex = sourceList.findIndex((item) => item.id === targetId);
+    if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return;
+
+    const [moved] = sourceList.splice(sourceIndex, 1);
+    sourceList.splice(targetIndex, 0, moved);
+
+    const orderedIds = sourceList.map((item) => item.id);
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch(toApi("cvs/reorder/stage"), {
+        method: "PATCH",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ stage: stageValue, orderedIds }),
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "No se pudo reordenar la etapa");
+      }
+      await loadAll();
+    } catch (err: any) {
+      setError(err?.message || "No se pudo reordenar la etapa");
+    } finally {
+      setBusy(false);
+      setDragged(null);
+    }
+  };
 
   const onUpload = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!uploadFile) {
-      setError("Debes seleccionar un PDF");
-      return;
-    }
+    if (!uploadFile) return setError("Debes seleccionar un PDF");
     if (!upload.fullName.trim() || !upload.category.trim()) {
-      setError("Nombre y categoría son requeridos");
-      return;
+      return setError("Nombre y categoría son requeridos");
     }
 
     setBusy(true);
@@ -182,8 +345,8 @@ export default function CvsManagementPanel() {
       });
 
       if (!response.ok) {
-        const responseText = await response.text();
-        throw new Error(responseText || "No se pudo subir el CV");
+        const text = await response.text();
+        throw new Error(text || "No se pudo subir el CV");
       }
 
       setUpload({
@@ -196,63 +359,9 @@ export default function CvsManagementPanel() {
         recruiterNotes: "",
       });
       setUploadFile(null);
-      await fetchRows();
+      await loadAll();
     } catch (err: any) {
       setError(err?.message || "No se pudo subir el CV");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const runReview = async (
-    id: number,
-    lane: "recruiter" | "admin" | "superadmin",
-    decision: "APPROVED" | "REJECTED" | "PENDING",
-  ) => {
-    setBusy(true);
-    setError("");
-    try {
-      const endpoint = lane === "recruiter" ? "recruiter-review" : lane === "admin" ? "admin-review" : "superadmin-review";
-      const response = await fetch(toApi(`cvs/${id}/${endpoint}`), {
-        method: "PATCH",
-        headers: {
-          ...headers,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ decision }),
-      });
-      if (!response.ok) {
-        const responseText = await response.text();
-        throw new Error(responseText || "No se pudo actualizar la revisión");
-      }
-      await fetchRows();
-    } catch (err: any) {
-      setError(err?.message || "No se pudo actualizar la revisión");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const moveToStage = async (id: number, targetStage: CvRow["stage"]) => {
-    if (!canRecruiter && !canAdmin) return;
-    setBusy(true);
-    setError("");
-    try {
-      const response = await fetch(toApi(`cvs/${id}/move`), {
-        method: "PATCH",
-        headers: {
-          ...headers,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ stage: targetStage }),
-      });
-      if (!response.ok) {
-        const responseText = await response.text();
-        throw new Error(responseText || "No se pudo mover el CV");
-      }
-      await fetchRows();
-    } catch (err: any) {
-      setError(err?.message || "No se pudo mover el CV");
     } finally {
       setBusy(false);
     }
@@ -269,19 +378,19 @@ export default function CvsManagementPanel() {
       return;
     }
     const blob = await response.blob();
-    const objectUrl = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
-    anchor.href = objectUrl;
+    anchor.href = url;
     anchor.download = `cv-${id}.pdf`;
     anchor.click();
-    URL.revokeObjectURL(objectUrl);
+    URL.revokeObjectURL(url);
   };
 
   const openWhatsapp = (phone?: string | null) => {
     if (!phone) return;
-    const normalized = phone.replace(/[^\d]/g, "");
-    if (!normalized) return;
-    window.open(`https://wa.me/${normalized}`, "_blank", "noopener,noreferrer");
+    const digits = String(phone).replace(/[^\d]/g, "");
+    if (!digits) return;
+    window.open(`https://wa.me/${digits}`, "_blank", "noopener,noreferrer");
   };
 
   const openEmail = (email?: string | null) => {
@@ -289,18 +398,18 @@ export default function CvsManagementPanel() {
     window.open(`mailto:${email}`, "_self");
   };
 
-  const handleCreateUser = async (id: number) => {
+  const goCreateUser = async (id: number) => {
     try {
       const response = await fetch(toApi(`cvs/${id}/user-prefill`), { headers });
       if (!response.ok) {
-        const responseText = await response.text();
-        throw new Error(responseText || "No autorizado para crear usuario");
+        const text = await response.text();
+        throw new Error(text || "No autorizado para crear usuario");
       }
       const payload = await response.json();
       const params = new URLSearchParams({
         prefillName: payload.fullName || "",
         prefillEmail: payload.suggestedEmail || "",
-        prefillRoleName: `Colaborador ${payload.category || "Operativo"}`,
+        prefillRoleName: `Gestión ${payload.category || "Operativo"}`,
       });
       router.push(`/users?${params.toString()}`);
     } catch (err: any) {
@@ -309,24 +418,23 @@ export default function CvsManagementPanel() {
   };
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
-      <h2 style={{ fontSize: "2rem", color: "var(--primary)", marginBottom: 0 }}>Gestión corporativa de CVs</h2>
+    <div style={{ display: "grid", gap: 14 }}>
+      <h2 style={{ fontSize: "2rem", color: "var(--primary)", margin: 0 }}>Ecosistema corporativo de CVs</h2>
 
-      <div
-        style={{
-          border: "1px solid rgba(148, 163, 184, 0.3)",
-          borderRadius: 12,
-          padding: 12,
-          background: "var(--surface)",
-          display: "grid",
-          gap: 10,
-        }}
-      >
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar nombre/email/whatsapp" style={inputStyle} />
+      <div style={metricsGrid}>
+        <Metric title="Total CVs" value={summary?.totals?.all ?? rows.length} />
+        <Metric title="Aptos RRHH" value={summary?.totals?.recruiterApproved ?? rows.filter((row) => row.recruiterDecision === "APPROVED").length} />
+        <Metric title="Aptos Admin" value={summary?.totals?.adminApproved ?? rows.filter((row) => row.adminDecision === "APPROVED").length} />
+        <Metric title="Aprobados Final" value={summary?.totals?.superadminApproved ?? rows.filter((row) => row.superadminDecision === "APPROVED").length} />
+        <Metric title="Rechazados" value={summary?.totals?.rejected ?? rows.filter((row) => row.stage.includes("REJECTED")).length} />
+      </div>
+
+      <div style={cardStyle}>
+        <div style={filterGrid}>
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nombre, email, whatsapp, tags" style={inputStyle} />
           <select value={category} onChange={(event) => setCategory(event.target.value)} style={inputStyle}>
             <option value="">Todas las categorías</option>
-            {categories.map((item) => (
+            {categoryOptions.map((item) => (
               <option key={item} value={item}>
                 {item}
               </option>
@@ -334,9 +442,9 @@ export default function CvsManagementPanel() {
           </select>
           <select value={stage} onChange={(event) => setStage(event.target.value)} style={inputStyle}>
             <option value="">Todas las etapas</option>
-            {STAGE_ORDER.map((item) => (
-              <option key={item} value={item}>
-                {STAGE_LABELS[item]}
+            {STAGE_ORDER.map((key) => (
+              <option key={key} value={key}>
+                {STAGE_LABELS[key]}
               </option>
             ))}
           </select>
@@ -348,37 +456,32 @@ export default function CvsManagementPanel() {
               </option>
             ))}
           </select>
+          <select value={decisionFilter} onChange={(event) => setDecisionFilter(event.target.value as any)} style={inputStyle}>
+            <option value="ALL">Todos</option>
+            <option value="POTENTIAL">Potenciales</option>
+            <option value="REJECTED">Descartados</option>
+          </select>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <label style={{ display: "inline-flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13 }}>
             <input type="checkbox" checked={onlyMine} onChange={(event) => setOnlyMine(event.target.checked)} />
             Solo CVs gestionados por mí
           </label>
-          <button type="button" onClick={fetchRows} style={buttonPrimary} disabled={loading || busy}>
-            Aplicar filtros
+          <button type="button" style={buttonGhost} onClick={loadAll} disabled={busy || loading}>
+            Refrescar
           </button>
         </div>
       </div>
 
       {canRecruiter && (
-        <form
-          onSubmit={onUpload}
-          style={{
-            border: "1px solid rgba(148, 163, 184, 0.3)",
-            borderRadius: 12,
-            padding: 12,
-            background: "var(--surface)",
-            display: "grid",
-            gap: 10,
-          }}
-        >
-          <h3 style={{ margin: 0 }}>Alta de CV (PDF)</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
+        <form onSubmit={onUpload} style={cardStyle}>
+          <h3 style={{ margin: 0 }}>Alta de candidato (PDF)</h3>
+          <div style={filterGrid}>
             <input value={upload.fullName} onChange={(event) => setUpload((prev) => ({ ...prev, fullName: event.target.value }))} placeholder="Nombre completo" style={inputStyle} required />
             <input value={upload.email} onChange={(event) => setUpload((prev) => ({ ...prev, email: event.target.value }))} placeholder="Email" style={inputStyle} />
             <input value={upload.whatsapp} onChange={(event) => setUpload((prev) => ({ ...prev, whatsapp: event.target.value }))} placeholder="WhatsApp" style={inputStyle} />
-            <input value={upload.category} onChange={(event) => setUpload((prev) => ({ ...prev, category: event.target.value }))} placeholder="Categoría (Finanzas, RRHH...)" style={inputStyle} required />
-            <input value={upload.tags} onChange={(event) => setUpload((prev) => ({ ...prev, tags: event.target.value }))} placeholder="Tags separados por coma" style={inputStyle} />
+            <input value={upload.category} onChange={(event) => setUpload((prev) => ({ ...prev, category: event.target.value }))} placeholder="Categoría" style={inputStyle} required />
+            <input value={upload.tags} onChange={(event) => setUpload((prev) => ({ ...prev, tags: event.target.value }))} placeholder="Tags (coma)" style={inputStyle} />
             <select value={upload.employmentStatus} onChange={(event) => setUpload((prev) => ({ ...prev, employmentStatus: event.target.value }))} style={inputStyle}>
               {Object.entries(EMPLOYMENT_LABELS).map(([key, label]) => (
                 <option key={key} value={key}>
@@ -387,139 +490,168 @@ export default function CvsManagementPanel() {
               ))}
             </select>
           </div>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {categoryOptions.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                style={{ ...chipStyle, opacity: upload.category === preset ? 1 : 0.7 }}
+                onClick={() => setUpload((prev) => ({ ...prev, category: preset }))}
+              >
+                {preset}
+              </button>
+            ))}
+          </div>
+
           <textarea
             value={upload.recruiterNotes}
             onChange={(event) => setUpload((prev) => ({ ...prev, recruiterNotes: event.target.value }))}
-            placeholder="Notas iniciales"
-            style={{ ...inputStyle, minHeight: 80, resize: "vertical" }}
+            placeholder="Notas iniciales de reclutamiento"
+            style={{ ...inputStyle, minHeight: 88, resize: "vertical" }}
           />
-          <input type="file" accept="application/pdf" onChange={(event) => setUploadFile(event.target.files?.[0] || null)} required />
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <button type="submit" disabled={busy} style={buttonPrimary}>
+
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+            <input type="file" accept="application/pdf" onChange={(event) => setUploadFile(event.target.files?.[0] || null)} required />
+            <button type="submit" style={buttonPrimary} disabled={busy}>
               Subir CV
             </button>
           </div>
         </form>
       )}
 
-      {error && <div style={{ color: "#ef4444", fontSize: 13 }}>{error}</div>}
+      {error ? <div style={{ color: "#ef4444", fontSize: 13 }}>{error}</div> : null}
       {loading ? <div>Cargando CVs...</div> : null}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, alignItems: "start" }}>
+      <div style={boardGrid}>
         {STAGE_ORDER.map((stageKey) => {
           const cards = grouped.get(stageKey) || [];
           return (
             <section
               key={stageKey}
-              onDragOver={(event) => {
-                event.preventDefault();
-              }}
+              style={columnStyle}
+              onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => {
-                const raw = event.dataTransfer.getData("text/plain");
-                const id = Number(raw);
-                if (Number.isFinite(id)) {
-                  moveToStage(id, stageKey);
-                }
-              }}
-              style={{
-                border: "1px solid rgba(148, 163, 184, 0.28)",
-                borderRadius: 12,
-                padding: 10,
-                background: "var(--surface)",
-                minHeight: 180,
-                display: "grid",
-                gap: 8,
+                event.preventDefault();
+                if (!dragged) return;
+                const stageItems = grouped.get(stageKey) || [];
+                const orderedIds = [...stageItems.map((item) => item.id), dragged.id];
+                moveCard(dragged.id, stageKey, Array.from(new Set(orderedIds)));
               }}
             >
-              <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <strong style={{ fontSize: 14 }}>{STAGE_LABELS[stageKey]}</strong>
-                <span style={{ fontSize: 12, opacity: 0.7 }}>{cards.length}</span>
+              <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                <strong style={{ fontSize: 13 }}>{STAGE_LABELS[stageKey]}</strong>
+                <span style={{ fontSize: 12, opacity: 0.75 }}>{cards.length}</span>
               </header>
 
-              {cards.map((row) => (
-                <article
-                  key={row.id}
-                  draggable={canRecruiter || canAdmin}
-                  onDragStart={(event) => event.dataTransfer.setData("text/plain", String(row.id))}
-                  style={{
-                    border: "1px solid rgba(148, 163, 184, 0.25)",
-                    borderRadius: 10,
-                    padding: 10,
-                    background: "var(--background)",
-                    display: "grid",
-                    gap: 6,
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                    <strong style={{ fontSize: 14 }}>{row.fullName}</strong>
-                    <span style={{ fontSize: 11, opacity: 0.7 }}>{EMPLOYMENT_LABELS[row.employmentStatus]}</span>
-                  </div>
-                  <div style={{ fontSize: 12, opacity: 0.9 }}>{row.category}</div>
-                  {row.tags?.length ? <div style={{ fontSize: 12, opacity: 0.8 }}>{row.tags.join(" · ")}</div> : null}
+              {cards.map((row) => {
+                const recruiterNoteKey = `recruiter:${row.id}`;
+                const adminNoteKey = `admin:${row.id}`;
+                const superadminNoteKey = `superadmin:${row.id}`;
 
-                  <div style={{ display: "grid", gap: 2, fontSize: 12 }}>
-                    <span>RRHH: {row.recruiterReviewedBy?.nombre || "-"}</span>
-                    <span>Admin: {row.adminReviewedBy?.nombre || "-"}</span>
-                    <span>Dirección: {row.superadminReviewedBy?.nombre || "-"}</span>
-                  </div>
+                return (
+                  <article
+                    key={row.id}
+                    style={rowCardStyle}
+                    draggable={canRecruiter || canAdmin || canSuperadmin}
+                    onDragStart={() => setDragged({ id: row.id, fromStage: row.stage })}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      if (!dragged) return;
+                      if (dragged.fromStage === stageKey) {
+                        reorderInsideStage(stageKey, dragged.id, row.id);
+                      } else {
+                        const stageItems = grouped.get(stageKey) || [];
+                        const targetIndex = stageItems.findIndex((item) => item.id === row.id);
+                        const ids = stageItems.map((item) => item.id);
+                        ids.splice(Math.max(targetIndex, 0), 0, dragged.id);
+                        moveCard(dragged.id, stageKey, Array.from(new Set(ids)));
+                      }
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                      <strong style={{ fontSize: 14 }}>{row.fullName}</strong>
+                      <span style={{ fontSize: 11, opacity: 0.78 }}>{EMPLOYMENT_LABELS[row.employmentStatus]}</span>
+                    </div>
 
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    <button type="button" onClick={() => openPreview(row.id)} style={buttonGhost}>
-                      Preview PDF
-                    </button>
-                    <button type="button" onClick={() => downloadCv(row.id)} style={buttonGhost}>
-                      Descargar
-                    </button>
-                    <button type="button" onClick={() => openWhatsapp(row.whatsapp)} style={buttonGhost} disabled={!row.whatsapp}>
-                      WhatsApp
-                    </button>
-                    <button type="button" onClick={() => openEmail(row.email)} style={buttonGhost} disabled={!row.email}>
-                      Email
-                    </button>
-                  </div>
+                    <div style={{ fontSize: 12, opacity: 0.92 }}>{row.category}</div>
+                    {row.tags?.length ? <div style={{ fontSize: 12, opacity: 0.78 }}>{row.tags.join(" · ")}</div> : null}
 
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <div style={{ display: "grid", gap: 2, fontSize: 12 }}>
+                      <span>Filtró RRHH: {row.recruiterReviewedBy?.nombre || row.createdBy?.nombre || "-"}</span>
+                      <span>Filtró Admin: {row.adminReviewedBy?.nombre || "-"}</span>
+                      <span>Decisión final: {row.superadminReviewedBy?.nombre || "-"}</span>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <button type="button" style={buttonGhost} onClick={() => openPreview(row.id)}>
+                        Preview PDF
+                      </button>
+                      <button type="button" style={buttonGhost} onClick={() => downloadCv(row.id)}>
+                        Redescargar
+                      </button>
+                      <button type="button" style={buttonGhost} disabled={!row.whatsapp} onClick={() => openWhatsapp(row.whatsapp)}>
+                        WhatsApp
+                      </button>
+                      <button type="button" style={buttonGhost} disabled={!row.email} onClick={() => openEmail(row.email)}>
+                        Email
+                      </button>
+                    </div>
+
                     {canRecruiter && (
                       <>
-                        <button type="button" onClick={() => runReview(row.id, "recruiter", "APPROVED")} style={buttonPrimary}>
-                          RRHH aprueba
-                        </button>
-                        <button type="button" onClick={() => runReview(row.id, "recruiter", "REJECTED")} style={buttonGhost}>
-                          RRHH descarta
-                        </button>
+                        <textarea
+                          value={reviewNotes[recruiterNoteKey] ?? row.recruiterNotes ?? ""}
+                          onChange={(event) => setReviewNotes((prev) => ({ ...prev, [recruiterNoteKey]: event.target.value }))}
+                          placeholder="Notas RRHH"
+                          style={{ ...inputStyle, minHeight: 52, resize: "vertical" }}
+                        />
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <button type="button" style={buttonPrimary} onClick={() => callReview(row, "recruiter", "APPROVED")}>RRHH aprueba</button>
+                          <button type="button" style={buttonGhost} onClick={() => callReview(row, "recruiter", "REJECTED")}>RRHH descarta</button>
+                        </div>
                       </>
                     )}
 
                     {canAdmin && (
                       <>
-                        <button type="button" onClick={() => runReview(row.id, "admin", "APPROVED")} style={buttonPrimary}>
-                          Admin recomienda
-                        </button>
-                        <button type="button" onClick={() => runReview(row.id, "admin", "REJECTED")} style={buttonGhost}>
-                          Admin descarta
-                        </button>
+                        <textarea
+                          value={reviewNotes[adminNoteKey] ?? row.adminNotes ?? ""}
+                          onChange={(event) => setReviewNotes((prev) => ({ ...prev, [adminNoteKey]: event.target.value }))}
+                          placeholder="Notas Admin"
+                          style={{ ...inputStyle, minHeight: 52, resize: "vertical" }}
+                        />
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <button type="button" style={buttonPrimary} onClick={() => callReview(row, "admin", "APPROVED")}>Admin recomienda</button>
+                          <button type="button" style={buttonGhost} onClick={() => callReview(row, "admin", "REJECTED")}>Admin descarta</button>
+                        </div>
                       </>
                     )}
 
                     {canSuperadmin && (
                       <>
-                        <button type="button" onClick={() => runReview(row.id, "superadmin", "APPROVED")} style={buttonPrimary}>
-                          Dirección aprueba
-                        </button>
-                        <button type="button" onClick={() => runReview(row.id, "superadmin", "REJECTED")} style={buttonGhost}>
-                          Dirección descarta
-                        </button>
+                        <textarea
+                          value={reviewNotes[superadminNoteKey] ?? row.superadminNotes ?? ""}
+                          onChange={(event) => setReviewNotes((prev) => ({ ...prev, [superadminNoteKey]: event.target.value }))}
+                          placeholder="Notas Dirección"
+                          style={{ ...inputStyle, minHeight: 52, resize: "vertical" }}
+                        />
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <button type="button" style={buttonPrimary} onClick={() => callReview(row, "superadmin", "APPROVED")}>Dirección aprueba</button>
+                          <button type="button" style={buttonGhost} onClick={() => callReview(row, "superadmin", "REJECTED")}>Dirección descarta</button>
+                        </div>
                       </>
                     )}
 
                     {(canUsersManage || canSuperadmin) && row.stage === "APPROVED" && (
-                      <button type="button" onClick={() => handleCreateUser(row.id)} style={buttonPrimary}>
+                      <button type="button" style={buttonPrimary} onClick={() => goCreateUser(row.id)}>
                         Crear usuario
                       </button>
                     )}
-                  </div>
-                </article>
-              ))}
+                  </article>
+                );
+              })}
             </section>
           );
         })}
@@ -527,6 +659,62 @@ export default function CvsManagementPanel() {
     </div>
   );
 }
+
+function Metric({ title, value }: { title: string; value: number }) {
+  return (
+    <div style={{ ...cardStyle, minHeight: 76, justifyContent: "center" }}>
+      <span style={{ fontSize: 12, opacity: 0.8 }}>{title}</span>
+      <strong style={{ fontSize: 22, color: "var(--primary)" }}>{value}</strong>
+    </div>
+  );
+}
+
+const metricsGrid: React.CSSProperties = {
+  display: "grid",
+  gap: 10,
+  gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+};
+
+const cardStyle: React.CSSProperties = {
+  border: "1px solid rgba(148, 163, 184, 0.28)",
+  borderRadius: 12,
+  background: "var(--surface)",
+  padding: 12,
+  display: "grid",
+  gap: 10,
+};
+
+const boardGrid: React.CSSProperties = {
+  display: "grid",
+  gap: 10,
+  alignItems: "start",
+  gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+};
+
+const columnStyle: React.CSSProperties = {
+  border: "1px solid rgba(148, 163, 184, 0.25)",
+  borderRadius: 12,
+  background: "var(--surface)",
+  padding: 10,
+  display: "grid",
+  gap: 8,
+  minHeight: 180,
+};
+
+const rowCardStyle: React.CSSProperties = {
+  border: "1px solid rgba(148, 163, 184, 0.2)",
+  borderRadius: 10,
+  background: "var(--background)",
+  padding: 10,
+  display: "grid",
+  gap: 6,
+};
+
+const filterGrid: React.CSSProperties = {
+  display: "grid",
+  gap: 8,
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+};
 
 const inputStyle: React.CSSProperties = {
   border: "1px solid rgba(148, 163, 184, 0.4)",
@@ -536,6 +724,7 @@ const inputStyle: React.CSSProperties = {
   fontSize: 13,
   padding: "10px 12px",
   width: "100%",
+  boxSizing: "border-box",
 };
 
 const buttonPrimary: React.CSSProperties = {
@@ -557,5 +746,16 @@ const buttonGhost: React.CSSProperties = {
   fontWeight: 500,
   fontSize: 12,
   padding: "8px 10px",
+  cursor: "pointer",
+};
+
+const chipStyle: React.CSSProperties = {
+  border: "1px solid rgba(148, 163, 184, 0.35)",
+  borderRadius: 999,
+  background: "transparent",
+  color: "var(--foreground)",
+  fontWeight: 500,
+  fontSize: 12,
+  padding: "6px 12px",
   cursor: "pointer",
 };

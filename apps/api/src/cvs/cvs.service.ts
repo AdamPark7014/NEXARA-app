@@ -8,6 +8,16 @@ type CurrentUser = {
   permissions?: string[];
 };
 
+type CvStageValue =
+  | 'INBOX'
+  | 'RECRUITER_SHORTLIST'
+  | 'RECRUITER_REJECTED'
+  | 'ADMIN_SHORTLIST'
+  | 'ADMIN_REJECTED'
+  | 'SUPERADMIN_SHORTLIST'
+  | 'SUPERADMIN_REJECTED'
+  | 'APPROVED';
+
 @Injectable()
 export class CvsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -36,6 +46,31 @@ export class CvsService {
   private ensureSuperadminAccess(user: CurrentUser) {
     if (user.isSuperAdmin) return;
     throw new ForbiddenException('Solo superadmin puede realizar esta acción');
+  }
+
+  private resolveTier(user: CurrentUser): 'superadmin' | 'admin' | 'recruiter' {
+    if (user.isSuperAdmin) return 'superadmin';
+    if (this.isAdmin(user) || user.permissions?.includes(PERMISSIONS.CVS_ADMIN_REVIEW)) return 'admin';
+    return 'recruiter';
+  }
+
+  private getAllowedStagesByTier(tier: 'superadmin' | 'admin' | 'recruiter'): CvStageValue[] {
+    if (tier === 'superadmin') {
+      return [
+        'INBOX',
+        'RECRUITER_SHORTLIST',
+        'RECRUITER_REJECTED',
+        'ADMIN_SHORTLIST',
+        'ADMIN_REJECTED',
+        'SUPERADMIN_SHORTLIST',
+        'SUPERADMIN_REJECTED',
+        'APPROVED',
+      ];
+    }
+    if (tier === 'admin') {
+      return ['ADMIN_SHORTLIST', 'ADMIN_REJECTED', 'SUPERADMIN_SHORTLIST'];
+    }
+    return ['INBOX', 'RECRUITER_SHORTLIST', 'RECRUITER_REJECTED'];
   }
 
   async create(
@@ -120,6 +155,52 @@ export class CvsService {
     return rows;
   }
 
+  async summary(user: CurrentUser) {
+    this.ensureRecruiterAccess(user);
+    const rows: Array<{
+      stage: string;
+      category: string | null;
+      employmentStatus: string;
+      recruiterDecision: string;
+      adminDecision: string;
+      superadminDecision: string;
+    }> = await this.cv.findMany({
+      select: {
+        stage: true,
+        category: true,
+        employmentStatus: true,
+        recruiterDecision: true,
+        adminDecision: true,
+        superadminDecision: true,
+      },
+    });
+
+    const byStage: Record<string, number> = rows.reduce((accumulator: Record<string, number>, row) => {
+      accumulator[row.stage] = (accumulator[row.stage] || 0) + 1;
+      return accumulator;
+    }, {});
+
+    const byCategory: Record<string, number> = rows.reduce((accumulator: Record<string, number>, row) => {
+      const key = row.category || 'Sin categoría';
+      accumulator[key] = (accumulator[key] || 0) + 1;
+      return accumulator;
+    }, {});
+
+    const totals = {
+      all: rows.length,
+      recruiterApproved: rows.filter((row) => row.recruiterDecision === 'APPROVED').length,
+      adminApproved: rows.filter((row) => row.adminDecision === 'APPROVED').length,
+      superadminApproved: rows.filter((row) => row.superadminDecision === 'APPROVED').length,
+      rejected: rows.filter((row) => row.stage.includes('REJECTED')).length,
+    };
+
+    return {
+      totals,
+      byStage,
+      byCategory,
+    };
+  }
+
   async recruiterReview(
     user: CurrentUser,
     id: number,
@@ -187,8 +268,14 @@ export class CvsService {
     });
   }
 
-  async move(user: CurrentUser, id: number, stage: string, sortOrder?: number) {
+  async move(user: CurrentUser, id: number, stage: CvStageValue, sortOrder?: number) {
     this.ensureRecruiterAccess(user);
+
+    const tier = this.resolveTier(user);
+    const allowedStages = this.getAllowedStagesByTier(tier);
+    if (!allowedStages.includes(stage)) {
+      throw new ForbiddenException('No tienes permisos para mover CVs a esa etapa');
+    }
 
     const target = await this.cv.findUnique({ where: { id } });
     if (!target) throw new NotFoundException('CV no encontrado');
@@ -202,8 +289,14 @@ export class CvsService {
     });
   }
 
-  async reorder(user: CurrentUser, stage: string, orderedIds: number[]) {
+  async reorder(user: CurrentUser, stage: CvStageValue, orderedIds: number[]) {
     this.ensureRecruiterAccess(user);
+
+    const tier = this.resolveTier(user);
+    const allowedStages = this.getAllowedStagesByTier(tier);
+    if (!allowedStages.includes(stage)) {
+      throw new ForbiddenException('No tienes permisos para ordenar esa etapa');
+    }
 
     await this.prisma.$transaction(
       orderedIds.map((cvId, index) =>
