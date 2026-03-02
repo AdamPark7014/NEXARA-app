@@ -84,6 +84,12 @@ export class CvsController {
     return this.cvsService.list(user, { search, category, stage, employmentStatus, onlyMine });
   }
 
+  @Get('summary/stats')
+  @RBAC({ anyPermissions: [PERMISSIONS.CVS_MANAGE, PERMISSIONS.CVS_ADMIN_REVIEW, PERMISSIONS.CONSOLE_ADMIN] })
+  summary(@CurrentUser() user: any) {
+    return this.cvsService.summary(user);
+  }
+
   @Get(':id')
   @RBAC({ anyPermissions: [PERMISSIONS.CVS_MANAGE, PERMISSIONS.CVS_ADMIN_REVIEW, PERMISSIONS.CONSOLE_ADMIN] })
   getOne(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number) {

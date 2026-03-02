@@ -33,6 +33,20 @@ export class UsersController {
     const targetRole = await this.usersService.getRoleById(createUserDto.roleId);
     if (!targetRole) throw new ForbiddenException('Rol destino no encontrado');
 
+    const cvManagerWithAdminFlags = Boolean(
+      targetRole.accesoGestionCvs &&
+      (
+        targetRole.accesoConsoleAdmin ||
+        targetRole.accesoGestionUsuarios ||
+        targetRole.accesoGestionTienda ||
+        targetRole.accesoGestionWeb ||
+        targetRole.accesoContabilidad
+      ),
+    );
+    if (cvManagerWithAdminFlags) {
+      throw new ForbiddenException('Rol inválido: Gestión CVs no puede combinarse con permisos administrativos');
+    }
+
     if (!u.isSuperAdmin) {
       const hasAdminFlags = Boolean(
         targetRole.accesoConsoleAdmin ||
