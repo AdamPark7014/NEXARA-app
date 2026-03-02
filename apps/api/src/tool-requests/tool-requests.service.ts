@@ -37,17 +37,78 @@ export interface CreateRenewalDto {
   renewalReason?: string;
 }
 
+export interface CreateInventoryItemDto {
+  toolName: string;
+  model: string;
+  serialNumber: string;
+  panoramicPhotoUrl: string;
+  serialPhotoUrl: string;
+}
+
+export interface UpdateInventoryItemDto {
+  toolName?: string;
+  model?: string;
+  serialNumber?: string;
+  panoramicPhotoUrl?: string;
+  serialPhotoUrl?: string;
+  status?: 'AVAILABLE' | 'ASSIGNED' | 'IN_REPAIR' | 'RETIRED';
+  retiredReason?: string;
+}
+
+export interface ReplaceInventoryItemDto {
+  toolName: string;
+  model: string;
+  serialNumber: string;
+  panoramicPhotoUrl: string;
+  serialPhotoUrl: string;
+  retiredReason?: string;
+}
+
+export interface AssignKitItemDto {
+  inventoryItemId: number;
+  userId: number;
+  assignmentType: 'KIT' | 'LOAN';
+  dueReturnDate?: Date;
+  notes?: string;
+}
+
+export interface ReportKitEventDto {
+  description: string;
+  resolution?: 'PENDING' | 'USER_MISUSE' | 'EQUIPMENT_FAILURE';
+  replacementItemId?: number;
+  fineId?: number;
+}
+
 @Injectable()
 export class ToolRequestsService {
+  private readonly superAdminEmails = ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'];
+
   constructor(
     private prisma: PrismaService,
     private notificationHierarchy: NotificationHierarchyService,
   ) {}
 
   async create(data: CreateToolRequestDto) {
+    if ((data as any).inventoryItemId) {
+      const inventoryItem = await (this.prisma as any).toolInventoryItem.findUnique({
+        where: { id: Number((data as any).inventoryItemId) },
+      });
+
+      if (!inventoryItem) {
+        throw new Error('La herramienta seleccionada no existe en inventario');
+      }
+
+      data.toolName = inventoryItem.toolName;
+      data.model = inventoryItem.model;
+      data.serialNumber = inventoryItem.serialNumber;
+      data.generalPhotoUrl = data.generalPhotoUrl || inventoryItem.panoramicPhotoUrl;
+      data.specificationsPhotoUrl = data.specificationsPhotoUrl || inventoryItem.serialPhotoUrl;
+    }
+
     const toolRequest = await this.prisma.toolRequest.create({
       data: {
         usuarioId: data.usuarioId,
+        inventoryItemId: (data as any).inventoryItemId ? Number((data as any).inventoryItemId) : undefined,
         toolName: data.toolName,
         model: data.model,
         serialNumber: data.serialNumber,
@@ -450,6 +511,319 @@ export class ToolRequestsService {
       damaged,
       total: inUse + pending + returned + damaged,
     };
+  }
+
+  async getInventory(search?: string, includeRetired = false) {
+    const where: any = {};
+
+    if (!includeRetired) {
+      where.status = { not: 'RETIRED' };
+    }
+
+    if (search && search.trim()) {
+      const q = search.trim();
+      where.OR = [
+        { toolName: { contains: q, mode: 'insensitive' } },
+        { model: { contains: q, mode: 'insensitive' } },
+        { serialNumber: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+
+    return (this.prisma as any).toolInventoryItem.findMany({
+      where,
+      include: {
+        replacementOf: {
+          select: {
+            id: true,
+            serialNumber: true,
+          },
+        },
+        replacements: {
+          select: {
+            id: true,
+            serialNumber: true,
+            status: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+      orderBy: [{ toolName: 'asc' }, { model: 'asc' }, { serialNumber: 'asc' }],
+    });
+  }
+
+  async searchInventoryOptions(search: string) {
+    const q = (search || '').trim();
+    if (!q) return [];
+
+    return (this.prisma as any).toolInventoryItem.findMany({
+      where: {
+        status: { in: ['AVAILABLE', 'ASSIGNED'] },
+        OR: [
+          { toolName: { contains: q, mode: 'insensitive' } },
+          { model: { contains: q, mode: 'insensitive' } },
+          { serialNumber: { contains: q, mode: 'insensitive' } },
+        ],
+      },
+      select: {
+        id: true,
+        toolName: true,
+        model: true,
+        serialNumber: true,
+        status: true,
+      },
+      take: 15,
+      orderBy: [{ toolName: 'asc' }, { model: 'asc' }],
+    });
+  }
+
+  async createInventoryItem(data: CreateInventoryItemDto, currentUserId: number) {
+    return (this.prisma as any).toolInventoryItem.create({
+      data: {
+        toolName: data.toolName,
+        model: data.model,
+        serialNumber: data.serialNumber,
+        panoramicPhotoUrl: data.panoramicPhotoUrl,
+        serialPhotoUrl: data.serialPhotoUrl,
+        createdById: currentUserId,
+        updatedById: currentUserId,
+      },
+    });
+  }
+
+  async updateInventoryItem(id: number, data: UpdateInventoryItemDto, currentUserId: number) {
+    return (this.prisma as any).toolInventoryItem.update({
+      where: { id },
+      data: {
+        ...data,
+        updatedById: currentUserId,
+      },
+    });
+  }
+
+  async replaceInventoryItem(id: number, data: ReplaceInventoryItemDto, currentUserId: number) {
+    const current = await (this.prisma as any).toolInventoryItem.findUnique({ where: { id } });
+    if (!current) throw new Error('Herramienta no encontrada');
+
+    return (this.prisma as any).$transaction(async (tx: any) => {
+      const replacement = await tx.toolInventoryItem.create({
+        data: {
+          toolName: data.toolName,
+          model: data.model,
+          serialNumber: data.serialNumber,
+          panoramicPhotoUrl: data.panoramicPhotoUrl,
+          serialPhotoUrl: data.serialPhotoUrl,
+          replacementOfId: id,
+          createdById: currentUserId,
+          updatedById: currentUserId,
+          status: 'AVAILABLE',
+        },
+      });
+
+      await tx.toolInventoryItem.update({
+        where: { id },
+        data: {
+          status: 'RETIRED',
+          retiredReason: data.retiredReason || 'Reemplazada por nuevo equipo',
+          updatedById: currentUserId,
+        },
+      });
+
+      await tx.toolKitAssignment.updateMany({
+        where: { inventoryItemId: id, isActive: true },
+        data: {
+          isActive: false,
+          returnedAt: new Date(),
+          replacementCount: { increment: 1 },
+        },
+      });
+
+      return replacement;
+    });
+  }
+
+  private async isSuperAdminByEmail(userId: number, currentUser?: { isSuperAdmin?: boolean }) {
+    if (currentUser?.isSuperAdmin) return true;
+
+    const dbUser = await (this.prisma as any).user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+
+    return Boolean(dbUser?.email && this.superAdminEmails.includes(String(dbUser.email).toLowerCase()));
+  }
+
+  async getMyKit(userId: number) {
+    return (this.prisma as any).toolKitAssignment.findMany({
+      where: { userId, isActive: true },
+      include: {
+        inventoryItem: true,
+        events: {
+          orderBy: { reportedAt: 'desc' },
+          take: 20,
+        },
+      },
+      orderBy: { assignedAt: 'desc' },
+    });
+  }
+
+  async getUsersKit(
+    currentUser: { id: number; isSuperAdmin?: boolean; permissions?: string[] },
+    userId?: number,
+  ) {
+    const isSuperAdmin = await this.isSuperAdminByEmail(currentUser.id, currentUser);
+    const isAdmin = Boolean(currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN));
+
+    if (!isSuperAdmin && !isAdmin) {
+      return [];
+    }
+
+    const whereUser: any = {};
+    if (userId) {
+      whereUser.id = userId;
+    }
+
+    if (!isSuperAdmin) {
+      whereUser.role = { accesoConsoleAdmin: false };
+      whereUser.email = { notIn: this.superAdminEmails };
+    }
+
+    const assignments = await (this.prisma as any).toolKitAssignment.findMany({
+      where: {
+        ...(userId ? { userId } : {}),
+        user: whereUser,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            nombre: true,
+            email: true,
+            role: {
+              select: {
+                nombre: true,
+                accesoConsoleAdmin: true,
+              },
+            },
+          },
+        },
+        inventoryItem: true,
+        events: {
+          orderBy: { reportedAt: 'desc' },
+        },
+      },
+      orderBy: [{ userId: 'asc' }, { assignedAt: 'desc' }],
+    });
+
+    return assignments;
+  }
+
+  async assignKitItem(
+    data: AssignKitItemDto,
+    currentUser: { id: number; isSuperAdmin?: boolean; permissions?: string[] },
+  ) {
+    const inventoryItem = await (this.prisma as any).toolInventoryItem.findUnique({
+      where: { id: data.inventoryItemId },
+    });
+    if (!inventoryItem) throw new Error('Herramienta de inventario no encontrada');
+
+    const isSuperAdmin = await this.isSuperAdminByEmail(currentUser.id, currentUser);
+    const isAdmin = Boolean(currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN));
+
+    if (!isSuperAdmin && !isAdmin) {
+      throw new Error('No tienes permisos para asignar herramientas');
+    }
+
+    if (!isSuperAdmin) {
+      const target = await (this.prisma as any).user.findUnique({
+        where: { id: data.userId },
+        select: {
+          email: true,
+          role: { select: { accesoConsoleAdmin: true } },
+        },
+      });
+
+      if (!target || target.role?.accesoConsoleAdmin || this.superAdminEmails.includes(String(target.email).toLowerCase())) {
+        throw new Error('Como admin solo puedes asignar a usuarios normales');
+      }
+    }
+
+    return (this.prisma as any).$transaction(async (tx: any) => {
+      const assignment = await tx.toolKitAssignment.create({
+        data: {
+          inventoryItemId: data.inventoryItemId,
+          userId: data.userId,
+          assignmentType: data.assignmentType,
+          dueReturnDate: data.dueReturnDate,
+          notes: data.notes,
+          assignedById: currentUser.id,
+          isActive: true,
+        },
+        include: {
+          user: { select: { id: true, nombre: true, email: true } },
+          inventoryItem: true,
+        },
+      });
+
+      await tx.toolInventoryItem.update({
+        where: { id: data.inventoryItemId },
+        data: {
+          status: 'ASSIGNED',
+          updatedById: currentUser.id,
+        },
+      });
+
+      return assignment;
+    });
+  }
+
+  async reportKitEvent(
+    assignmentId: number,
+    data: ReportKitEventDto,
+    currentUser: { id: number; isSuperAdmin?: boolean; permissions?: string[] },
+  ) {
+    const assignment = await (this.prisma as any).toolKitAssignment.findUnique({
+      where: { id: assignmentId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            role: { select: { accesoConsoleAdmin: true } },
+          },
+        },
+      },
+    });
+
+    if (!assignment) throw new Error('Asignación no encontrada');
+
+    const isSuperAdmin = await this.isSuperAdminByEmail(currentUser.id, currentUser);
+    const isAdmin = Boolean(currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN));
+    const isOwner = assignment.userId === currentUser.id;
+
+    if (!isOwner && !isAdmin && !isSuperAdmin) {
+      throw new Error('No tienes permisos para reportar este evento');
+    }
+
+    if (isAdmin && !isSuperAdmin) {
+      const targetEmail = String(assignment.user?.email || '').toLowerCase();
+      if (assignment.user?.role?.accesoConsoleAdmin || this.superAdminEmails.includes(targetEmail)) {
+        throw new Error('Como admin solo puedes gestionar herramientas de usuarios normales');
+      }
+    }
+
+    return (this.prisma as any).toolKitEvent.create({
+      data: {
+        assignmentId,
+        reportedById: currentUser.id,
+        description: data.description,
+        resolution: data.resolution || 'PENDING',
+        replacementItemId: data.replacementItemId,
+        fineId: data.fineId,
+        resolvedById: data.resolution && data.resolution !== 'PENDING' ? currentUser.id : undefined,
+        resolvedAt: data.resolution && data.resolution !== 'PENDING' ? new Date() : undefined,
+      },
+    });
   }
 
   // Renovaciones (Extensions)
