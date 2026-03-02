@@ -115,6 +115,7 @@ export default function ClientLocationPicker({ label, value, onChange, height = 
         if (inputRef.current) {
           const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
             fields: ["formatted_address", "geometry", "place_id"],
+            types: ["geocode"],
           });
           autocomplete.addListener("place_changed", () => {
             const place = autocomplete.getPlace();

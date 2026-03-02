@@ -65,7 +65,7 @@ const ContabilidadViaticTable = () => {
   useEffect(() => {
     if (!user?.token) return;
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, { transports: ["websocket"] });
+    const socket: Socket = io(socketUrl, { transports: ["polling", "websocket"] });
 
     socket.on("entity:updated", (payload: { model?: string }) => {
       if (payload?.model === "Viatico") {

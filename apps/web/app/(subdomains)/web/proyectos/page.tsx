@@ -116,7 +116,7 @@ export default function ProyectosWeb() {
 
   useEffect(() => {
     const socket = io(getSocketBaseUrl(), {
-      transports: ["websocket"],
+      transports: ["polling", "websocket"],
     });
     socket.on("projects:changed", () => {
       fetchProjects();

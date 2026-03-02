@@ -99,7 +99,7 @@ export default function MyBranchesPage() {
   useEffect(() => {
     if (!session?.token) return undefined;
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, { transports: ["websocket"] });
+    const socket: Socket = io(socketUrl, { transports: ["polling", "websocket"] });
     socket.on("entity:updated", (payload: { model?: string }) => {
       if (payload?.model === "ServiceClientBranch" || payload?.model === "ServiceClient") {
         fetchProfile(session.token);
