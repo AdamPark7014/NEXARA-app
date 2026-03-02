@@ -45,15 +45,16 @@ const MyActivitiesTable: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [reviewModal, setReviewModal] = useState<{ activityId: number; activityNumber: string } | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const MOBILE_BREAKPOINT = 1024;
 
   const isAdmin = user?.permissions?.includes('CONSOLE_ADMIN') || false;
 
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth <= 900);
+    const checkMobile = () => setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  }, [MOBILE_BREAKPOINT]);
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
