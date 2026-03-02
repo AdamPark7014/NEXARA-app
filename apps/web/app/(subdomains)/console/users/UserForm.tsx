@@ -3,6 +3,7 @@ import React, { useRef, useState } from "react";
 import Cropper from "react-easy-crop";
 import Slider from "@mui/material/Slider";
 import Modal from "@mui/material/Modal";
+import { useSearchParams } from "next/navigation";
 import getCroppedImg from "./cropImageUtil";
 import Image from "next/image";
 import { useUser } from '@/components/UserContext';
@@ -17,6 +18,7 @@ export type UserRole = {
   accesoConsole?: boolean;
   accesoConsoleAdmin?: boolean;
   accesoGestionWeb?: boolean;
+  accesoGestionCvs?: boolean;
   accesoPanelVentas?: boolean;
   accesoContabilidad?: boolean;
   accesoCotizaciones?: boolean;
@@ -43,6 +45,7 @@ export default function UserForm({
   isEdit?: boolean;
 }) {
   const { user } = useUser();
+  const searchParams = useSearchParams();
   let API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
   API_URL = API_URL.replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
@@ -54,18 +57,23 @@ export default function UserForm({
     return url.startsWith('/') ? url : `/${url}`;
   };
 
+  const prefillName = searchParams.get('prefillName') || '';
+  const prefillEmail = searchParams.get('prefillEmail') || '';
+  const prefillRole = searchParams.get('prefillRoleName') || '';
+
   const [form, setForm] = useState({
-    nombre: initialUser?.nombre || "",
-    email: initialUser?.email || "",
+    nombre: initialUser?.nombre || (!isEdit ? prefillName : ""),
+    email: initialUser?.email || (!isEdit ? prefillEmail : ""),
     password: "",
     departmentId: initialUser?.department?.id ? String(initialUser.department.id) : "",
     department: initialUser?.department?.nombre || "",
     avatarUrl: initialUser?.avatarUrl || "",
     // Rol personalizado
-    roleNombre: initialUser?.role?.nombre || "",
+    roleNombre: initialUser?.role?.nombre || (!isEdit ? prefillRole : ""),
     accesoConsole: initialUser?.role?.accesoConsole || false,
     accesoConsoleAdmin: initialUser?.role?.accesoConsoleAdmin || false,
     accesoGestionWeb: initialUser?.role?.accesoGestionWeb || false,
+    accesoGestionCvs: initialUser?.role?.accesoGestionCvs || false,
     accesoPanelVentas: initialUser?.role?.accesoPanelVentas || false,
     accesoContabilidad: initialUser?.role?.accesoContabilidad || false,
     accesoCotizaciones: initialUser?.role?.accesoCotizaciones || false,
@@ -98,6 +106,11 @@ export default function UserForm({
       }
       if (name === "accesoConsoleAdmin" && target.checked) {
         nextForm.accesoConsole = true;
+        nextForm.accesoGestionCvs = false;
+      }
+      if (name === 'accesoGestionCvs' && target.checked) {
+        nextForm.accesoConsole = true;
+        nextForm.accesoConsoleAdmin = false;
       }
       return nextForm;
     });
@@ -160,7 +173,7 @@ export default function UserForm({
     e.preventDefault();
     setLoading(true);
     try {
-      const isConsoleUser = form.accesoConsole || form.accesoConsoleAdmin;
+      const isConsoleUser = form.accesoConsole || form.accesoConsoleAdmin || form.accesoGestionCvs;
       const isConsoleAdmin = form.accesoConsoleAdmin;
       const enableConsoleModules = isConsoleUser || isConsoleAdmin;
       const rolePayload = {
@@ -175,6 +188,7 @@ export default function UserForm({
         accesoGps: enableConsoleModules,
         accesoGestionUsuarios: isConsoleAdmin,
         accesoGestionWeb: form.accesoGestionWeb,
+        accesoGestionCvs: form.accesoGestionCvs,
         accesoPanelVentas: form.accesoPanelVentas,
         accesoContabilidad: form.accesoContabilidad,
         accesoCotizaciones: form.accesoCotizaciones,
@@ -289,6 +303,7 @@ export default function UserForm({
           accesoConsole: false,
           accesoConsoleAdmin: false,
           accesoGestionWeb: false,
+          accesoGestionCvs: false,
           accesoPanelVentas: false,
           accesoContabilidad: false,
           accesoCotizaciones: false,
@@ -368,6 +383,7 @@ export default function UserForm({
           <label className="checkboxItem"><input type="checkbox" name="accesoConsole" checked={form.accesoConsole} onChange={handleChange} /> Consola usuario</label>
           {user?.isSuperAdmin && <label className="checkboxItem"><input type="checkbox" name="accesoConsoleAdmin" checked={form.accesoConsoleAdmin} onChange={handleChange} /> Consola admin</label>}
           <label className="checkboxItem"><input type="checkbox" name="accesoGestionWeb" checked={form.accesoGestionWeb} onChange={handleChange} /> Panel Web</label>
+          <label className="checkboxItem"><input type="checkbox" name="accesoGestionCvs" checked={form.accesoGestionCvs} onChange={handleChange} /> Gestión de CVs</label>
           <label className="checkboxItem"><input type="checkbox" name="accesoPanelVentas" checked={form.accesoPanelVentas} onChange={handleChange} /> Panel Ventas</label>
           {user?.isSuperAdmin && <label className="checkboxItem"><input type="checkbox" name="accesoContabilidad" checked={form.accesoContabilidad} onChange={handleChange} /> Panel Contabilidad</label>}
           <label className="checkboxItem"><input type="checkbox" name="accesoCotizaciones" checked={form.accesoCotizaciones} onChange={handleChange} /> Panel Cotizaciones</label>

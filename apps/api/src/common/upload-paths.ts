@@ -37,3 +37,8 @@ export function getClientDocsUploadDir(dirname: string): string {
   const projectRoot = resolveProjectRoot(dirname);
   return path.join(projectRoot, 'uploads', 'clients');
 }
+
+export function getCvsUploadDir(dirname: string): string {
+  const projectRoot = resolveProjectRoot(dirname);
+  return path.join(projectRoot, 'uploads', 'cvs');
+}

@@ -51,6 +51,10 @@ export class CreateRoleDto {
 
   @IsBoolean()
   @IsOptional()
+  accesoGestionCvs?: boolean = false;
+
+  @IsBoolean()
+  @IsOptional()
   accesoPanelVentas?: boolean = false;
 
   @IsBoolean()

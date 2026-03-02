@@ -16,7 +16,7 @@ export class AuthService {
     return ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'].includes(email.trim().toLowerCase());
   }
 
-  private buildPermissions(role: any) {
+  private buildPermissions(role: any, isSuperAdmin = false) {
     const permissions: string[] = [];
     const isConsoleUser = Boolean(role?.accesoConsole);
     const isConsoleAdmin = Boolean(role?.accesoConsoleAdmin);
@@ -76,6 +76,7 @@ export class AuthService {
         PERMISSIONS.SALES_REPORTS_EXPORT,
         PERMISSIONS.SALES_TEMPLATES_MANAGE,
         PERMISSIONS.SALES_AUDIT_VIEW,
+        PERMISSIONS.CVS_ADMIN_REVIEW,
       );
     }
 
@@ -84,6 +85,7 @@ export class AuthService {
     }
     if (role?.accesoGestionTienda) permissions.push(PERMISSIONS.PANEL_TIENDA);
     if (role?.accesoGestionWeb) permissions.push(PERMISSIONS.PANEL_WEB);
+    if (role?.accesoGestionCvs) permissions.push(PERMISSIONS.CVS_MANAGE);
     if (role?.accesoPanelVentas) {
       permissions.push(
         PERMISSIONS.PANEL_VENTAS,
@@ -112,6 +114,10 @@ export class AuthService {
       permissions.push(PERMISSIONS.ATTENDANCE_VIEW);
     }
 
+    if (isSuperAdmin) {
+      permissions.push(PERMISSIONS.CVS_SUPERADMIN_REVIEW, PERMISSIONS.CVS_ADMIN_REVIEW, PERMISSIONS.CVS_MANAGE);
+    }
+
     return Array.from(new Set(permissions));
   }
 
@@ -134,8 +140,8 @@ export class AuthService {
 
   async login(loginDto: LoginDto) {
     const user = await this.validateUser(loginDto.email, loginDto.password);
-    const permissions = this.buildPermissions(user.role);
     const isSuperAdmin = this.isSuperAdmin(user.email);
+    const permissions = this.buildPermissions(user.role, isSuperAdmin);
 
     if (loginDto.panel === 'ventas' && !isSuperAdmin && !permissions.includes(PERMISSIONS.PANEL_VENTAS)) {
       throw new UnauthorizedException('Tu usuario no tiene acceso al panel de ventas');
