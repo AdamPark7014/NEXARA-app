@@ -1,5 +1,5 @@
 "use client";
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 function BackupRestorePanel() {
@@ -91,6 +91,30 @@ export default function Header() {
     setMobileMenuOpen(false);
   };
 
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) {
+      document.body.style.overflow = '';
+      return;
+    }
+
+    document.body.style.overflow = 'hidden';
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = '';
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [mobileMenuOpen]);
+
   return (
     <header className={`${styles.header} ${isConsole ? styles.consoleHeader : ''}`}>
       <div className={styles.headerInner}>
@@ -125,6 +149,8 @@ export default function Header() {
             className={`${styles.mobileMenuButton} ${mobileMenuOpen ? styles.active : ''}`}
             onClick={toggleMobileMenu}
             aria-label="Menú"
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-main-menu"
           >
             <span className={styles.hamburgerLine}></span>
             <span className={styles.hamburgerLine}></span>
@@ -136,7 +162,7 @@ export default function Header() {
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
         <div className={styles.mobileMenuOverlay} onClick={closeMobileMenu}>
-          <nav className={styles.mobileMenu} onClick={(e) => e.stopPropagation()}>
+          <nav id="mobile-main-menu" className={styles.mobileMenu} onClick={(e) => e.stopPropagation()}>
             {navLinks.map((link) => (
               <Link 
                 key={link.name} 
