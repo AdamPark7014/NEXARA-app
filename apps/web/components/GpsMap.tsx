@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
+import { getSocketBaseUrl } from '@/lib/api-base';
 
 type GpsUser = {
   id: number;
@@ -47,7 +48,6 @@ const GpsMap = () => {
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
-  const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, '');
   const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
   const canUseMaps = useMemo(() => Boolean(googleMapsKey), [googleMapsKey]);

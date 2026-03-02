@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useUser } from './UserContext';
 import { io, Socket } from 'socket.io-client';
+import { getSocketBaseUrl } from '@/lib/api-base';
 
 interface Notification {
   id: number;
@@ -91,7 +92,6 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const notificationTimers = useRef<Map<number, NodeJS.Timeout>>(new Map());
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-  const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, '');
 
   // Conectar WebSocket
   useEffect(() => {
