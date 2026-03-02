@@ -56,6 +56,7 @@ export default function Sidebar() {
     { label: "Clientes", href: "/clients", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
     { label: "Tickets clientes", href: "/client-tickets", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
     { label: "Usuarios", href: "/users", permissions: [PERMISSIONS.USERS_MANAGE] },
+    { label: "Gestión CVs", href: "/cvs", anyPermissions: [PERMISSIONS.CVS_MANAGE, PERMISSIONS.CVS_ADMIN_REVIEW, PERMISSIONS.CONSOLE_ADMIN] },
     { label: "Mis Actividades", href: "/my-activities", permissions: [PERMISSIONS.CONSOLE_ACCESS], hideForAdmins: true },
     { label: "Mi Perfil", href: "/my-profile", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
     { label: "Mis Evidencias", href: "/my-evidences", permissions: [PERMISSIONS.CONSOLE_ACCESS], hideForAdmins: true },

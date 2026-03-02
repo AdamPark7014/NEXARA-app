@@ -270,6 +270,7 @@ model Role {
   accesoGestionUsuarios  Boolean @default(false)
   accesoGestionTienda    Boolean @default(false)
   accesoGestionWeb       Boolean @default(false)
+  accesoGestionCvs       Boolean @default(false)
   accesoPanelVentas      Boolean @default(false)
   accesoContabilidad     Boolean @default(false)
   accesoCotizaciones     Boolean @default(false)
@@ -338,6 +339,69 @@ model User {
   toolKitAssignmentsCreated ToolKitAssignment[] @relation("ToolKitAssignedBy")
   toolKitEventsReported ToolKitEvent[] @relation("ToolKitEventReportedBy")
   toolKitEventsResolved ToolKitEvent[] @relation("ToolKitEventResolvedBy")
+  cvsCreated      CvCandidate[]     @relation("CvCreatedBy")
+  cvsRecruiterReviewed CvCandidate[] @relation("CvRecruiterReviewedBy")
+  cvsAdminReviewed CvCandidate[]    @relation("CvAdminReviewedBy")
+  cvsSuperadminReviewed CvCandidate[] @relation("CvSuperadminReviewedBy")
+}
+
+enum CvEmploymentStatus {
+  NEW_CANDIDATE
+  CURRENT_EMPLOYEE
+  FORMER_EMPLOYEE
+}
+
+enum CvStage {
+  INBOX
+  RECRUITER_SHORTLIST
+  RECRUITER_REJECTED
+  ADMIN_SHORTLIST
+  ADMIN_REJECTED
+  SUPERADMIN_SHORTLIST
+  SUPERADMIN_REJECTED
+  APPROVED
+}
+
+enum CvDecision {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model CvCandidate {
+  id                   Int                @id @default(autoincrement())
+  fullName             String             @db.VarChar(180)
+  email                String?            @db.VarChar(200)
+  whatsapp             String?            @db.VarChar(60)
+  category             String             @db.VarChar(120)
+  tags                 String[]
+  employmentStatus     CvEmploymentStatus @default(NEW_CANDIDATE)
+  stage                CvStage            @default(INBOX)
+  recruiterDecision    CvDecision         @default(PENDING)
+  adminDecision        CvDecision         @default(PENDING)
+  superadminDecision   CvDecision         @default(PENDING)
+  recruiterNotes       String?
+  adminNotes           String?
+  superadminNotes      String?
+  cvFileUrl            String             @db.VarChar(500)
+  sortOrder            Int                @default(0)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  createdById          Int
+  recruiterReviewedById Int?
+  adminReviewedById    Int?
+  superadminReviewedById Int?
+  recruiterReviewedAt  DateTime?
+  adminReviewedAt      DateTime?
+  superadminReviewedAt DateTime?
+  createdBy            User               @relation("CvCreatedBy", fields: [createdById], references: [id])
+  recruiterReviewedBy  User?              @relation("CvRecruiterReviewedBy", fields: [recruiterReviewedById], references: [id])
+  adminReviewedBy      User?              @relation("CvAdminReviewedBy", fields: [adminReviewedById], references: [id])
+  superadminReviewedBy User?              @relation("CvSuperadminReviewedBy", fields: [superadminReviewedById], references: [id])
+
+  @@index([stage, category, sortOrder])
+  @@index([employmentStatus])
+  @@index([createdById])
 }
 
 model UserProfile {

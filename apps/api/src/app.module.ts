@@ -41,6 +41,7 @@ import { ActivityEvidenceModule } from './activity-evidence/activity-evidence.mo
 import { FinesModule } from './fines/fines.module.js';
 import { ToolRequestsModule } from './tool-requests/tool-requests.module.js';
 import { LunchBreaksModule } from './lunch-breaks/lunch-breaks.module.js';
+import { CvsModule } from './cvs/cvs.module.js';
 
 @Module({
   imports: [
@@ -77,6 +78,7 @@ import { LunchBreaksModule } from './lunch-breaks/lunch-breaks.module.js';
     FinesModule,
     ToolRequestsModule,
     LunchBreaksModule,
+    CvsModule,
   ],
   controllers: [AppController, ExcelExportController, ExcelImportController],
   providers: [

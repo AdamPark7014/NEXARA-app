@@ -265,9 +265,11 @@ async function bootstrap() {
 
   const uploadsPath = path.join(projectRoot, 'uploads');
   const clientsPath = path.join(uploadsPath, 'clients');
+  const cvsPath = path.join(uploadsPath, 'cvs');
   
   console.error(`[DEBUG] Calculated uploads path: ${uploadsPath}`);
   console.error(`[DEBUG] Calculated clients path: ${clientsPath}`);
+  console.error(`[DEBUG] Calculated cvs path: ${cvsPath}`);
   
   try {
     // Asegurar que el directorio uploads existe
@@ -284,6 +286,14 @@ async function bootstrap() {
       console.error(`✅ Created clients directory: ${clientsPath}`);
     } else {
       console.error(`✅ Clients directory exists: ${clientsPath}`);
+    }
+
+    // Asegurar que el subdirectorio cvs existe
+    if (!fs.existsSync(cvsPath)) {
+      fs.mkdirSync(cvsPath, { recursive: true });
+      console.error(`✅ Created cvs directory: ${cvsPath}`);
+    } else {
+      console.error(`✅ Cvs directory exists: ${cvsPath}`);
     }
     
     // Verificar que realmente existe antes de servir
