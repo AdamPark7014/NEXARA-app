@@ -304,6 +304,55 @@
   font-size: 16px;
 }
 
+:global(body.light) .kanbanContainer {
+  background: #f8f9fa;
+}
+
+:global(body.dark) .kanbanContainer {
+  background: rgba(24, 35, 53, 0.5);
+}
+
+:global(body.dark) .column,
+:global(body.dark) .card,
+:global(body.dark) .summary {
+  background: rgba(24, 35, 53, 0.82);
+  border-color: rgba(31, 137, 252, 0.24);
+}
+
+:global(body.dark) .columnHeader,
+:global(body.dark) .cardClient,
+:global(body.dark) .board::-webkit-scrollbar-track {
+  background: rgba(31, 44, 66, 0.74);
+}
+
+:global(body.dark) .columnTitle,
+:global(body.dark) .cardTitle {
+  color: var(--foreground);
+}
+
+:global(body.dark) .columnTotal,
+:global(body.dark) .cardDesc,
+:global(body.dark) .cardDate,
+:global(body.dark) .cardClient,
+:global(body.dark) .summaryItem span,
+:global(body.dark) .loading {
+  color: var(--text-secondary);
+}
+
+:global(body.dark) .cardFooter {
+  border-top-color: rgba(31, 137, 252, 0.18);
+}
+
+:global(body.dark) .cardCount {
+  background: rgba(31, 137, 252, 0.22);
+  color: #d7e8ff;
+}
+
+:global(body.dark) .probability {
+  background: rgba(15, 106, 214, 0.2);
+  color: #a9ceff;
+}
+
 @media (max-width: 1200px) {
   .column {
     flex: 0 0 280px;

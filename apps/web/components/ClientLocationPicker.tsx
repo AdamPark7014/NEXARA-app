@@ -27,7 +27,7 @@ const loadGoogleMaps = (apiKey: string) => {
     }
     const script = document.createElement("script");
     script.id = "google-maps-script";
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=weekly&libraries=places,marker`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=weekly&libraries=places,marker&loading=async`;
     script.async = true;
     script.defer = true;
     script.onload = () => {

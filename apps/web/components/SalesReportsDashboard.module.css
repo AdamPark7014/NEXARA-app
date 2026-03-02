@@ -520,3 +520,52 @@
   overflow: hidden;
   background: #f8f9fa;
 }
+
+:global(body.dark) .dashboardContainer {
+  background: rgba(24, 35, 53, 0.5);
+}
+
+:global(body.dark) .header,
+:global(body.dark) .metricCard,
+:global(body.dark) .vendorSection,
+:global(body.dark) .chart,
+:global(body.dark) .pdfModalContent {
+  background: rgba(24, 35, 53, 0.82);
+  border-color: rgba(31, 137, 252, 0.24);
+}
+
+:global(body.dark) .periodButtons,
+:global(body.dark) .vendorCard,
+:global(body.dark) .barContainer,
+:global(body.dark) .pdfModalHeader,
+:global(body.dark) .pdfViewerContainer {
+  background: rgba(31, 44, 66, 0.74);
+  border-color: rgba(31, 137, 252, 0.2);
+}
+
+:global(body.dark) .title,
+:global(body.dark) .metricValue,
+:global(body.dark) .sectionTitle,
+:global(body.dark) .vendorName,
+:global(body.dark) .chartTitle,
+:global(body.dark) .pdfModalHeader h3 {
+  color: var(--foreground);
+}
+
+:global(body.dark) .period,
+:global(body.dark) .metricTitle,
+:global(body.dark) .vendorMetricItem span,
+:global(body.dark) .barLabel,
+:global(body.dark) .legendLabel,
+:global(body.dark) .loading {
+  color: var(--text-secondary);
+}
+
+:global(body.dark) .vendorMetricItem,
+:global(body.dark) .pdfModalHeader {
+  border-color: rgba(31, 137, 252, 0.18);
+}
+
+:global(body.dark) .periodBtn.active {
+  background: rgba(15, 106, 214, 0.22);
+}

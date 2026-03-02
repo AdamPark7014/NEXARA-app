@@ -181,24 +181,10 @@ export default function Home() {
         </p>
       ));
 
-  // Fondo del hero (usa una imagen pública si existe)
-  const heroBgSrc = versionedPublicSrc("hero-bg.jpg");
   return (
     <div className={styles.page}>
       <main className={styles.main}>
         <div className={styles.heroWrapper}>
-          {heroBgSrc && (
-            <div className={styles.heroBg}>
-              <Image
-                src={heroBgSrc}
-                alt="Fondo del hero"
-                fill
-                priority
-                className={styles.heroBgImage}
-              />
-              <div className={styles.heroBgOverlay} />
-            </div>
-          )}
           <section className={styles.hero}>
             <h1 className={styles.heroTitle}>
               Expertos en Soluciones Tecnológicas para tu Empresa
