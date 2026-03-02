@@ -64,12 +64,19 @@ export default function Map() {
         });
 
         const currentMap = mapInstance.current;
-        const marker = new window.google.maps.Marker({
-          position: location,
-          map: currentMap,
-          title: "NEXARA",
-          animation: window.google.maps.Animation.DROP,
-        });
+        const mapsAny = window.google.maps as any;
+        const marker = mapsAny?.marker?.AdvancedMarkerElement
+          ? new mapsAny.marker.AdvancedMarkerElement({
+              position: location,
+              map: currentMap,
+              title: "NEXARA",
+            })
+          : new mapsAny.Marker({
+              position: location,
+              map: currentMap,
+              title: "NEXARA",
+              animation: mapsAny.Animation?.DROP,
+            });
 
         const infoWindow = new window.google.maps.InfoWindow({
           content: `
@@ -106,7 +113,7 @@ export default function Map() {
     // Evita cargar el script de Google Maps más de una vez
     if (!document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]')) {
       const script = document.createElement("script");
-      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDOJ7TFUE5F1vD_qVh9ofKOSS5gd2mbnyE`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDOJ7TFUE5F1vD_qVh9ofKOSS5gd2mbnyE&v=weekly&libraries=marker&loading=async`;
       script.async = true;
       script.defer = true;
       script.onload = () => {

@@ -98,18 +98,34 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
 
   // Cargar lista de usuarios asignables según jerarquía
   useEffect(() => {
-    if (!user?.token) return;
+    if (!user?.token || !permisoSi) return;
 
     const headers = { Authorization: `Bearer ${user.token}` };
+    const canUseAssignable =
+      hasPermission(user, PERMISSIONS.USERS_MANAGE) ||
+      hasPermission(user, PERMISSIONS.CONSOLE_ADMIN);
+    const canUseHierarchy = hasPermission(user, PERMISSIONS.ATTENDANCE_MANAGE);
 
     const loadUsers = async () => {
-      try {
-        const assignableRes = await fetch(buildApiUrl('users/assignable'), { headers });
-        const assignableData = assignableRes.ok ? await assignableRes.json() : [];
-        const assignableUsers = Array.isArray(assignableData) ? assignableData : [];
+      if (!canUseAssignable && !canUseHierarchy) {
+        setUsuarios([]);
+        return;
+      }
 
-        if (assignableUsers.length > 0) {
-          setUsuarios(assignableUsers);
+      try {
+        if (canUseAssignable) {
+          const assignableRes = await fetch(buildApiUrl('users/assignable'), { headers });
+          const assignableData = assignableRes.ok ? await assignableRes.json() : [];
+          const assignableUsers = Array.isArray(assignableData) ? assignableData : [];
+
+          if (assignableUsers.length > 0) {
+            setUsuarios(assignableUsers);
+            return;
+          }
+        }
+
+        if (!canUseHierarchy) {
+          setUsuarios([]);
           return;
         }
 
@@ -135,7 +151,7 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
     };
 
     loadUsers();
-  }, [user?.token]);
+  }, [user, user?.token, permisoSi]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

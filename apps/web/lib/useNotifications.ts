@@ -6,7 +6,11 @@ export function useNotifications(callback?: (payload: any) => void) {
     if (!callback) return;
     const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
     const socketUrl = API_URL.replace(/\/+api\/?$/, '');
-    const socket: Socket = io(socketUrl, { transports: ['websocket'] });
+    const socket: Socket = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+      timeout: 20000,
+      reconnectionAttempts: 8,
+    });
 
     socket.on('notification', (payload) => {
       callback(payload);

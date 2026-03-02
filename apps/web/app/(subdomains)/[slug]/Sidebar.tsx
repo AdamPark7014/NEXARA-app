@@ -14,7 +14,6 @@ export default function Sidebar() {
   const { darkMode, toggleDarkMode } = useTheme();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  if (!user) return null;
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth <= 900);
@@ -44,6 +43,7 @@ export default function Sidebar() {
     return () => window.removeEventListener("keydown", handleEscape);
   }, [isMenuOpen]);
 
+  if (!user) return null;
   const closeMenu = () => setIsMenuOpen(false);
 
   // Menú por permisos

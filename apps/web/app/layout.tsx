@@ -1,12 +1,9 @@
-"use client";
-// Habilita el contexto de React en todo el layout
 import localFont from "next/font/local";
 
 import "./globals.css";
 import "./utilities.css";
-import { ThemeProvider } from "../components/ThemeContext";
 import ClientLayout from "./ClientLayout";
-import { UserProvider } from "../components/UserContext";
+import Providers from "./providers";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -24,15 +21,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <UserProvider>
-          <ThemeProvider>
-            <ClientLayout>
-              {children}
-            </ClientLayout>
-          </ThemeProvider>
-        </UserProvider>
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
+        <Providers>
+          <ClientLayout>
+            {children}
+          </ClientLayout>
+        </Providers>
       </body>
     </html>
   );

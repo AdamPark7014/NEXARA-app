@@ -201,7 +201,7 @@ export default function Footer() {
 
       <div className={styles.bottomBar}>
         <div className={styles.legalLeft}>
-          © {new Date().getFullYear()} Nexara. Todos los derechos reservados. • Developed by Nexara
+          © {new Date().getUTCFullYear()} Nexara. Todos los derechos reservados. • Developed by Nexara
         </div>
         <div className={styles.legalRight}>
           <Link href="/legal/privacidad">Privacidad</Link>

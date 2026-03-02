@@ -99,7 +99,9 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
     const socketUrl = getSocketBaseUrl();
     socketRef.current = io(socketUrl, {
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'],
+      timeout: 20000,
+      reconnectionAttempts: 8,
       auth: {
         token: user.token,
       },
