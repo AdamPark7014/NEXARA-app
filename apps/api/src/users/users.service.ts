@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
@@ -7,6 +7,8 @@ import { PERMISSIONS } from '../common/permissions.js';
 
 @Injectable()
 export class UsersService {
+  private readonly superAdminEmails = ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'];
+
   // Obtener un rol por ID
   async getRoleById(roleId: unknown) {
     const resolvedRoleId = await this.resolveRoleId(roleId);
@@ -20,9 +22,14 @@ export class UsersService {
     );
   }
 
+  private isProtectedSuperAdminEmail(email?: string | null) {
+    const normalized = String(email || '').toLowerCase();
+    return this.superAdminEmails.includes(normalized);
+  }
+
   findAllVisible(currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean }) {
     const excludeSuperAdmins = {
-      NOT: { email: { in: ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'] } },
+      NOT: { email: { in: this.superAdminEmails } },
     };
 
     // SuperAdmin ve todos excepto superadmins
@@ -112,7 +119,7 @@ export class UsersService {
   async findAssignableUsers(currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean; role?: any }) {
     try {
       // SuperAdmin emails (siempre excluir)
-      const superAdminEmails = ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'];
+      const superAdminEmails = this.superAdminEmails;
 
       // Cargar usuario actual de la BD para obtener rol actual
       const userInDb = await this.prisma['user'].findUnique({
@@ -192,6 +199,66 @@ export class UsersService {
         department: true,
       },
     });
+  }
+
+  async getAuthorizedDocument(documentId: number, currentUser: { id: number; permissions?: string[]; isSuperAdmin?: boolean }) {
+    const document = await this.prisma['userDocument'].findUnique({
+      where: { id: documentId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            role: { select: { accesoConsoleAdmin: true } },
+          },
+        },
+      },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Documento no encontrado');
+    }
+
+    if (currentUser.id === document.userId) {
+      return document;
+    }
+
+    if (currentUser.isSuperAdmin) {
+      return document;
+    }
+
+    const requester = await this.prisma['user'].findUnique({
+      where: { id: currentUser.id },
+      select: {
+        email: true,
+        role: { select: { accesoConsoleAdmin: true } },
+      },
+    });
+
+    if (!requester) {
+      throw new ForbiddenException('No autorizado para descargar este documento');
+    }
+
+    if (this.isProtectedSuperAdminEmail(requester.email)) {
+      return document;
+    }
+
+    const requesterIsAdmin =
+      this.canManageUsers(currentUser) ||
+      Boolean(requester.role?.accesoConsoleAdmin);
+
+    if (!requesterIsAdmin) {
+      throw new ForbiddenException('No autorizado para descargar este documento');
+    }
+
+    const ownerIsSuperAdmin = this.isProtectedSuperAdminEmail(document.user?.email);
+    const ownerIsAdmin = Boolean(document.user?.role?.accesoConsoleAdmin);
+
+    if (ownerIsSuperAdmin || ownerIsAdmin) {
+      throw new ForbiddenException('No autorizado para descargar este documento');
+    }
+
+    return document;
   }
 
   async upsertProfile(userId: number, data: any) {

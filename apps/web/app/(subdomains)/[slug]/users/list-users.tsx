@@ -135,22 +135,34 @@ export default function ListUsers() {
     return baseKey;
   };
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-  const getAssetUrl = (url?: string | null) => {
-    if (!url) return '';
-    if (url.startsWith('http')) return url;
-    const base = API_URL.replace(/\/+api\/?$/, '');
-    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+  const handleSecureDocumentAction = async (documentId: number, mode: 'view' | 'download') => {
+    if (!user?.token) return;
+    try {
+      const res = await fetch(buildApiUrl(`users/documents/${documentId}/download`), {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'No se pudo abrir el documento');
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      if (mode === 'download') {
+        link.download = `documento-${documentId}.pdf`;
+      } else {
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+      }
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'No se pudo abrir el documento');
+    }
   };
-
-  const getDocExtension = (url: string) => {
-    const clean = url.split('?')[0].split('#')[0];
-    const parts = clean.split('.');
-    return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '';
-  };
-
-  const isPdf = (url: string) => getDocExtension(url) === 'pdf';
-  const isImage = (url: string) => ['png', 'jpg', 'jpeg', 'webp'].includes(getDocExtension(url));
 
   const fetchUsers = () => {
     setLoading(true);
@@ -497,20 +509,16 @@ export default function ListUsers() {
                             <span className={`badge ${status === 'Aprobado' ? 'approved' : status === 'Rechazado' ? 'rejected' : 'pending'}`}>
                               {status}
                             </span>
-                            {match?.archivoUrl ? (
+                            {match?.id ? (
                               <div style={{ display: 'grid', gap: 8 }}>
-                                <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--surface)', width: 200 }}>
-                                  {isPdf(match.archivoUrl) ? (
-                                    <object data={getAssetUrl(match.archivoUrl)} type="application/pdf" width="100%" height="140" aria-label="Vista previa PDF">
-                                      <embed src={getAssetUrl(match.archivoUrl)} type="application/pdf" />
-                                    </object>
-                                  ) : isImage(match.archivoUrl) ? (
-                                    <img src={getAssetUrl(match.archivoUrl)} alt={doc.label} style={{ width: '100%', height: 140, objectFit: 'cover' }} />
-                                  ) : (
-                                    <div style={{ padding: 12, color: 'var(--text-secondary)', fontSize: 12 }}>Formato no soportado</div>
-                                  )}
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                  <button className="button-secondary" type="button" onClick={() => handleSecureDocumentAction(match.id, 'view')}>
+                                    Ver documento
+                                  </button>
+                                  <button className="button-primary" type="button" onClick={() => handleSecureDocumentAction(match.id, 'download')}>
+                                    Descargar
+                                  </button>
                                 </div>
-                                <a className="link" href={getAssetUrl(match.archivoUrl)} target="_blank" rel="noopener noreferrer">Ver documento</a>
                               </div>
                             ) : (
                               <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>No cargado</span>
@@ -533,21 +541,15 @@ export default function ListUsers() {
                               <div style={{ fontWeight: 600 }}>{doc.tipo}</div>
                               <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Estatus: {doc.estatus || 'Pendiente'}</div>
                             </div>
-                            <a className="link" href={getAssetUrl(doc.archivoUrl)} target="_blank" rel="noopener noreferrer">Ver documento</a>
-                          </div>
-                          {doc.archivoUrl && (
-                            <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--surface)' }}>
-                              {isPdf(doc.archivoUrl) ? (
-                                <object data={getAssetUrl(doc.archivoUrl)} type="application/pdf" width="100%" height="180" aria-label="Vista previa PDF">
-                                  <embed src={getAssetUrl(doc.archivoUrl)} type="application/pdf" />
-                                </object>
-                              ) : isImage(doc.archivoUrl) ? (
-                                <img src={getAssetUrl(doc.archivoUrl)} alt={doc.tipo} style={{ width: '100%', height: 180, objectFit: 'cover' }} />
-                              ) : (
-                                <div style={{ padding: 12, color: 'var(--text-secondary)', fontSize: 12 }}>Formato no soportado</div>
-                              )}
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                              <button className="button-secondary" type="button" onClick={() => handleSecureDocumentAction(doc.id, 'view')}>
+                                Ver documento
+                              </button>
+                              <button className="button-primary" type="button" onClick={() => handleSecureDocumentAction(doc.id, 'download')}>
+                                Descargar
+                              </button>
                             </div>
-                          )}
+                          </div>
                           <textarea
                             className="input"
                             rows={2}
