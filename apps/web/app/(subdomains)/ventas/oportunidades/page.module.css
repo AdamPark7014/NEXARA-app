@@ -7,15 +7,19 @@
 }
 
 .card {
-  background: rgba(255, 255, 255, 0.9);
   border-radius: 20px;
   padding: 18px;
   border: 1px solid rgba(15, 106, 214, 0.12);
   box-shadow: 0 12px 24px rgba(11, 32, 68, 0.12);
 }
 
+:global(body.light) .card {
+  background: rgba(255, 255, 255, 0.9);
+}
+
 :global(body.dark) .card {
-  background: rgba(15, 22, 36, 0.75);
+  background: rgba(24, 35, 53, 0.78);
+  border-color: rgba(31, 137, 252, 0.2);
 }
 
 .formGrid {
@@ -129,8 +133,16 @@
   border-radius: 10px;
   overflow: hidden;
   border: 1px solid rgba(15, 106, 214, 0.12);
-  background: rgba(255, 255, 255, 0.5);
   position: relative;
+}
+
+:global(body.light) .preview {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+:global(body.dark) .preview {
+  background: rgba(24, 35, 53, 0.5);
+  border-color: rgba(31, 137, 252, 0.15);
 }
 
 .previewMeta {
@@ -151,4 +163,183 @@
 .error {
   color: #d64545;
   font-size: 0.9rem;
+}
+
+/* Missing classes */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--foreground);
+}
+
+.subtitle {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  margin: 4px 0 0;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+}
+
+.viewBtn {
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(15, 106, 214, 0.25);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+:global(body.light) .viewBtn {
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--foreground);
+}
+
+:global(body.dark) .viewBtn {
+  background: rgba(24, 35, 53, 0.6);
+  color: var(--foreground);
+  border-color: rgba(31, 137, 252, 0.3);
+}
+
+.viewBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(15, 106, 214, 0.2);
+}
+
+.viewBtn.active {
+  background: linear-gradient(135deg, #0f6ad6, #16a96e);
+  color: #fff;
+  border-color: transparent;
+}
+
+.tableView {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: 1fr;
+}
+
+.createCard {
+  border-radius: 20px;
+  padding: 20px;
+  border: 1px solid rgba(15, 106, 214, 0.12);
+}
+
+:global(body.light) .createCard {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+:global(body.dark) .createCard {
+  background: rgba(24, 35, 53, 0.78);
+  border-color: rgba(31, 137, 252, 0.2);
+}
+
+.detailCard {
+  position: relative;
+  border-radius: 20px;
+  padding: 20px;
+  border: 1px solid rgba(15, 106, 214, 0.12);
+}
+
+:global(body.light) .detailCard {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+:global(body.dark) .detailCard {
+  background: rgba(24, 35, 53, 0.78);
+  border-color: rgba(31, 137, 252, 0.2);
+}
+
+.closeBtn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+:global(body.light) .closeBtn {
+  background: rgba(214, 69, 69, 0.1);
+  color: #d64545;
+}
+
+:global(body.dark) .closeBtn {
+  background: rgba(214, 69, 69, 0.2);
+  color: #ff6b6b;
+}
+
+.closeBtn:hover {
+  transform: scale(1.1);
+}
+
+.description {
+  margin: 12px 0;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+:global(body.light) .description {
+  background: rgba(15, 106, 214, 0.05);
+  color: var(--foreground);
+}
+
+:global(body.dark) .description {
+  background: rgba(31, 137, 252, 0.1);
+  color: var(--foreground);
+}
+
+.section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(15, 106, 214, 0.15);
+}
+
+:global(body.dark) .section {
+  border-top-color: rgba(31, 137, 252, 0.2);
+}
+
+.noteItem {
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+:global(body.light) .noteItem {
+  background: rgba(15, 106, 214, 0.05);
+}
+
+:global(body.dark) .noteItem {
+  background: rgba(31, 137, 252, 0.1);
+}
+
+.noteItem p {
+  margin: 0 0 4px;
+  font-size: 0.9rem;
+}
+
+.noteItem small {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
 }

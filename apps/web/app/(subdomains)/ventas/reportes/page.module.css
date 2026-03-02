@@ -61,15 +61,19 @@
 }
 
 .card {
-  background: rgba(255, 255, 255, 0.9);
   border-radius: 18px;
   padding: 16px;
   border: 1px solid rgba(15, 106, 214, 0.12);
   box-shadow: 0 12px 24px rgba(11, 32, 68, 0.08);
 }
 
+:global(body.light) .card {
+  background: rgba(255, 255, 255, 0.9);
+}
+
 :global(body.dark) .card {
-  background: rgba(15, 22, 36, 0.78);
+  background: rgba(24, 35, 53, 0.78);
+  border-color: rgba(31, 137, 252, 0.2);
 }
 
 .cardTitle {
@@ -89,11 +93,19 @@
 }
 
 .chartCard {
-  background: rgba(255, 255, 255, 0.9);
   border-radius: 18px;
   padding: 16px;
   border: 1px solid rgba(15, 106, 214, 0.12);
   min-height: 300px;
+}
+
+:global(body.light) .chartCard {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+:global(body.dark) .chartCard {
+  background: rgba(24, 35, 53, 0.78);
+  border-color: rgba(31, 137, 252, 0.2);
 }
 
 .sectionTitle {

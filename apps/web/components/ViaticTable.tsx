@@ -29,6 +29,7 @@ const ViaticTable = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const MOBILE_BREAKPOINT = 1024;
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
@@ -47,7 +48,7 @@ const ViaticTable = () => {
   useEffect(() => {
     if (!user?.token) return;
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, { transports: ['websocket'] });
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
 
     socket.on('entity:updated', (payload: { model?: string }) => {
       if (payload?.model === 'Viatico') {
@@ -65,11 +66,11 @@ const ViaticTable = () => {
   }, [user?.token]);
 
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth <= 900);
+    const onResize = () => setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT);
     onResize();
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, []);
+  }, [MOBILE_BREAKPOINT]);
 
   // Filtering
   useEffect(() => {

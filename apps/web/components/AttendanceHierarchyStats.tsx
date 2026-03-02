@@ -241,7 +241,7 @@ const AttendanceHierarchyStats: React.FC = () => {
     if (!hasPermission(user, PERMISSIONS.ATTENDANCE_MANAGE)) return;
 
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, { transports: ['websocket'] });
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
 
     socket.on('attendance:updated', () => {
       fetchStats();

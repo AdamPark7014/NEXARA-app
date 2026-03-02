@@ -43,6 +43,7 @@ const VehicleTable = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [isMobile, setIsMobile] = useState(false);
+  const MOBILE_BREAKPOINT = 1024;
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
@@ -97,7 +98,7 @@ const VehicleTable = () => {
   useEffect(() => {
     if (!user?.token) return;
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, { transports: ['websocket'] });
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
 
     socket.on('entity:updated', (payload: { model?: string }) => {
       if (payload?.model === 'VehicleControl') {
@@ -114,11 +115,11 @@ const VehicleTable = () => {
   }, [user?.token]);
 
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth <= 900);
+    const onResize = () => setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT);
     onResize();
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, []);
+  }, [MOBILE_BREAKPOINT]);
 
   useEffect(() => {
     let data = vehicles;
