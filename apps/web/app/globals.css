@@ -9,23 +9,23 @@
   --panel-padding-x: clamp(16px, 3vw, 32px);
   --panel-padding-y: clamp(16px, 3vw, 32px);
   --panel-sidebar-width: clamp(240px, 22vw, 300px);
-  --background: #f4f8ff;
-  --foreground: #0b1220;
+  --background: #f8fcff;
+  --foreground: #0a1628;
   --primary: #0f6ad6; /* azul rey */
-  --primary-light: #3a8efb;
-  --secondary: #16a96e; /* verde limpio */
-  --accent: #20b981;
+  --primary-light: #56a6ff;
+  --secondary: #10b57a; /* verde limpio */
+  --accent: #2acb97;
   --purple: #6f6ee8;
   --danger: #d64545;
   --info: #1f8df2;
   --surface: #ffffff;
-  --muted: #d7e4f6;
+  --muted: #ddeaff;
   --link: #0f6ad6;
   --shadow: rgba(21, 106, 214, 0.18);
   /* Extra blues for light mode */
   --blue-1: #0f6ad6;
   --blue-2: #1e88f5;
-  --blue-3: #9dd5ff;
+  --blue-3: #86c7ff;
   /* Footer specific colors */
   --gray-alpha-200: rgba(11, 18, 32, 0.08);
   --phone-color: #3b82f6;
@@ -34,31 +34,31 @@
   --email-color-dark: #dc2626;
   --whatsapp-color: #25D366;
   --whatsapp-color-dark: #128C7E;
-  --text-secondary: #1d2f4d;
-  --text-tertiary: #2d4264;
-  --surface-light: #eaf2ff;
+  --text-secondary: #233a5d;
+  --text-tertiary: #1a2f4f;
+  --surface-light: #edf6ff;
   --focus-ring: rgba(15, 106, 214, 0.35);
 }
 
 /* Light mode explicit override */
 body.light {
-  --background: #f4f8ff;
-  --foreground: #0b1220;
+  --background: #f8fcff;
+  --foreground: #0a1628;
   --primary: #0f6ad6;
-  --primary-light: #3a8efb;
-  --secondary: #16a96e;
-  --accent: #20b981;
+  --primary-light: #56a6ff;
+  --secondary: #10b57a;
+  --accent: #2acb97;
   --purple: #6f6ee8;
   --danger: #d64545;
   --info: #1f8df2;
   --surface: #ffffff;
-  --muted: #d7e4f6;
+  --muted: #ddeaff;
   --link: #0f6ad6;
   --shadow: rgba(21, 106, 214, 0.18);
   /* Extra blues for light mode */
   --blue-1: #0f6ad6;
   --blue-2: #1e88f5;
-  --blue-3: #9dd5ff;
+  --blue-3: #86c7ff;
   /* Footer specific colors */
   --gray-alpha-200: rgba(11, 18, 32, 0.08);
   --phone-color: #3b82f6;
@@ -67,42 +67,42 @@ body.light {
   --email-color-dark: #dc2626;
   --whatsapp-color: #25D366;
   --whatsapp-color-dark: #128C7E;
-  --text-secondary: #1d2f4d;
-  --text-tertiary: #2d4264;
-  --surface-light: #eaf2ff;
+  --text-secondary: #233a5d;
+  --text-tertiary: #1a2f4f;
+  --surface-light: #edf6ff;
 }
 
 /* Dark mode explicit override */
 body.dark {
-  --background: #151518;
-  --foreground: #ededed;
-  --primary: #1789FC;
-  --primary-light: #3EC6E0;
-  --secondary: #F18B1F;
-  --accent: #FBC51F;
-  --purple: #AA539A;
-  --danger: #5C1917;
-  --info: #6FC6D9;
-  --surface: #23272f;
-  --muted: #23272f;
-  --link: #6FC6D9;
-  --shadow: rgba(23, 137, 252, 0.12);
+  --background: #0c1220;
+  --foreground: #eaf2ff;
+  --primary: #39a0ff;
+  --primary-light: #73c3ff;
+  --secondary: #22c08a;
+  --accent: #59d8ac;
+  --purple: #a57cff;
+  --danger: #b43a3a;
+  --info: #71ccff;
+  --surface: #151f33;
+  --muted: #1c2942;
+  --link: #79ccff;
+  --shadow: rgba(57, 160, 255, 0.24);
   /* Extra blues for dark mode */
-  --blue-1: #0A4D68;
-  --blue-2: #1789FC;
-  --blue-3: #14A285;
+  --blue-1: #102a4f;
+  --blue-2: #2f8fff;
+  --blue-3: #23b989;
   /* Footer specific colors */
-  --gray-alpha-200: rgba(23, 137, 252, 0.16);
+  --gray-alpha-200: rgba(121, 184, 255, 0.24);
   --phone-color: #3b82f6;
   --phone-color-dark: #2563eb;
   --email-color: #ef4444;
   --email-color-dark: #dc2626;
   --whatsapp-color: #25D366;
   --whatsapp-color-dark: #128C7E;
-  --text-secondary: #a0aec0;
-  --text-tertiary: #cbd5e0;
-  --surface-dark: rgba(35, 39, 47, 0.85);
-  --surface-light: #23272f;
+  --text-secondary: #bbd0ee;
+  --text-tertiary: #d8e6fb;
+  --surface-dark: rgba(21, 31, 51, 0.92);
+  --surface-light: #1c2942;
 }
 
 
@@ -177,9 +177,17 @@ body {
 
 body.light {
   background:
-    radial-gradient(circle at 12% 8%, rgba(15, 106, 214, 0.1), transparent 44%),
-    radial-gradient(circle at 88% 0%, rgba(22, 169, 110, 0.12), transparent 46%),
-    linear-gradient(180deg, #f5f9ff 0%, #edf4ff 100%) !important;
+    radial-gradient(circle at 10% 8%, rgba(15, 106, 214, 0.2), transparent 43%),
+    radial-gradient(circle at 88% 0%, rgba(16, 181, 122, 0.18), transparent 45%),
+    radial-gradient(circle at 56% 0%, rgba(86, 166, 255, 0.12), transparent 38%),
+    linear-gradient(180deg, #fbfdff 0%, #edf6ff 100%) !important;
+}
+
+body.dark {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(57, 160, 255, 0.2), transparent 42%),
+    radial-gradient(circle at 88% 0%, rgba(34, 192, 138, 0.16), transparent 46%),
+    linear-gradient(180deg, #0a1120 0%, #0f1729 100%) !important;
 }
 
 * {
