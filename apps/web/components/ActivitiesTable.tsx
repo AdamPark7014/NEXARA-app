@@ -29,6 +29,7 @@ const ActivitiesTable: React.FC = () => {
     estatus: string;
     prioridad: string;
     ticketType?: string;
+    workType?: 'ISSUE' | 'PREVENTIVE_INVENTORY';
     client?: { id: number; name: string; logoUrl?: string | null } | null;
     branchName?: string;
     branchNumber?: string;
@@ -47,9 +48,13 @@ const ActivitiesTable: React.FC = () => {
       id: number;
       status: string;
       entryPhotoUrl?: string;
+      entryLatitude?: number;
+      entryLongitude?: number;
       evidencePhotos: string[];
       serviceSheetPdfUrl?: string;
       exitPhotoUrl?: string;
+      exitLatitude?: number;
+      exitLongitude?: number;
       completedAt?: string;
     } | null;
     // Agrega más campos según tu modelo real
@@ -69,6 +74,7 @@ const ActivitiesTable: React.FC = () => {
     latitud?: number | null;
     longitud?: number | null;
     activityId?: number | null;
+    requestType?: 'ISSUE' | 'PREVENTIVE_INVENTORY';
   }
   const [activities, setActivities] = useState<Activity[]>([]);
   const [ticketRequests, setTicketRequests] = useState<ClientTicketRequest[]>([]);
@@ -112,6 +118,7 @@ const ActivitiesTable: React.FC = () => {
     fechaEntregaEsperada: '',
     clientId: '',
     ticketType: 'PREVENTIVO',
+    workType: 'ISSUE',
     branchName: '',
     branchNumber: '',
     branchCity: '',
@@ -252,10 +259,15 @@ const ActivitiesTable: React.FC = () => {
   };
 
   const prefillFromRequest = (request: ClientTicketRequest) => {
+    const isPreventiveInventory = request.requestType === 'PREVENTIVE_INVENTORY';
     setPendingRequestId(request.id);
     setNewActivity((prev) => ({
       ...prev,
-      titulo: request.branchName ? `Ticket ${request.branchName}` : 'Ticket cliente',
+      titulo: request.branchName
+        ? `${isPreventiveInventory ? 'Mantenimiento e inventario' : 'Ticket'} ${request.branchName}`
+        : isPreventiveInventory
+          ? 'Mantenimiento e inventario cliente'
+          : 'Ticket cliente',
       descripcion: request.description || prev.descripcion,
       prioridad: request.urgency === 'HIGH' ? 'Alta' : request.urgency === 'LOW' ? 'Baja' : 'Media',
       clientId: request.client?.id ? String(request.client.id) : prev.clientId,
@@ -264,7 +276,8 @@ const ActivitiesTable: React.FC = () => {
       branchCity: request.city || prev.branchCity,
       branchState: request.state || prev.branchState,
       branchAddress: request.address || prev.branchAddress,
-      ticketType: 'CORRECTIVO',
+      ticketType: isPreventiveInventory ? 'PREVENTIVO' : 'CORRECTIVO',
+      workType: isPreventiveInventory ? 'PREVENTIVE_INVENTORY' : 'ISSUE',
     }));
     setFormSuccess('Solicitud precargada en el formulario');
   };
@@ -299,6 +312,7 @@ const ActivitiesTable: React.FC = () => {
       prioridad: newActivity.prioridad,
       estatus: newActivity.estatus,
       ticketType: newActivity.ticketType,
+      workType: newActivity.workType,
       clientId: newActivity.clientId ? Number(newActivity.clientId) : undefined,
       branchName: newActivity.branchName || undefined,
       branchNumber: newActivity.branchNumber || undefined,
@@ -357,6 +371,7 @@ const ActivitiesTable: React.FC = () => {
       fechaEntregaEsperada: '',
       clientId: '',
       ticketType: 'PREVENTIVO',
+      workType: 'ISSUE',
       branchName: '',
       branchNumber: '',
       branchCity: '',
@@ -542,6 +557,9 @@ const ActivitiesTable: React.FC = () => {
                     Urgencia: {request.urgency} · Limite: {formatDateTime(request.dueAt || undefined)}
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                    Flujo: {request.requestType === 'PREVENTIVE_INVENTORY' ? 'Mantenimiento e inventario' : 'Ticket por problema'}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                     {request.address || '-'} {request.city || ''} {request.state || ''}
                   </div>
                   {request.latitud && request.longitud && (
@@ -586,6 +604,10 @@ const ActivitiesTable: React.FC = () => {
                 <option value="EMERGENCIA">Emergencia</option>
                 <option value="INSTALACION">Instalacion</option>
                 <option value="OTRO">Otro</option>
+              </select>
+              <select className="input" value={newActivity.workType} onChange={(e) => setNewActivity({ ...newActivity, workType: e.target.value })}>
+                <option value="ISSUE">Flujo: Ticket por problema</option>
+                <option value="PREVENTIVE_INVENTORY">Flujo: Mantenimiento e inventario</option>
               </select>
               <select className="input" value={newActivity.responsableId} onChange={(e) => setNewActivity({ ...newActivity, responsableId: e.target.value })}>
                 <option value="">Responsable</option>
@@ -699,6 +721,7 @@ const ActivitiesTable: React.FC = () => {
                   <th>Cliente</th>
                   <th>Sucursal</th>
                   <th>Tipo</th>
+                  <th>Flujo</th>
                   <th>Estatus</th>
                   <th>Responsable</th>
                   <th>Prioridad</th>
@@ -732,6 +755,7 @@ const ActivitiesTable: React.FC = () => {
                       <td>{a.client?.name || 'Interna'}</td>
                       <td>{a.branchName || '-'}</td>
                       <td>{a.ticketType || '-'}</td>
+                      <td>{a.workType === 'PREVENTIVE_INVENTORY' ? 'Inventario/Mantenimiento' : 'Problema'}</td>
                       <td><span className={`badge ${a.estatus === 'Aprobada' ? 'approved' : a.estatus === 'Pendiente' ? 'pending' : ''}`}>{a.estatus}</span></td>
                       <td>{a.responsable?.nombre}</td>
                       <td>{a.prioridad}</td>
@@ -747,6 +771,36 @@ const ActivitiesTable: React.FC = () => {
                         }}>
                           {getEvidenceStatus(a)}
                         </span>
+                        {(a.activityEvidence?.entryLatitude && a.activityEvidence?.entryLongitude) && (
+                          <div style={{ marginTop: 6 }}>
+                            <a href={getMapsUrl(a.activityEvidence.entryLatitude, a.activityEvidence.entryLongitude)} target="_blank" rel="noreferrer" style={{ fontSize: 11 }}>
+                              Ubicación entrada
+                            </a>
+                          </div>
+                        )}
+                        {(a.activityEvidence?.exitLatitude && a.activityEvidence?.exitLongitude) && (
+                          <div style={{ marginTop: 4 }}>
+                            <a href={getMapsUrl(a.activityEvidence.exitLatitude, a.activityEvidence.exitLongitude)} target="_blank" rel="noreferrer" style={{ fontSize: 11 }}>
+                              Ubicación salida
+                            </a>
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                          {a.activityEvidence?.entryPhotoUrl && (
+                            <img
+                              src={a.activityEvidence.entryPhotoUrl}
+                              alt="entrada"
+                              style={{ width: 36, height: 36, borderRadius: 4, objectFit: 'cover', border: '1px solid var(--muted)' }}
+                            />
+                          )}
+                          {a.activityEvidence?.exitPhotoUrl && (
+                            <img
+                              src={a.activityEvidence.exitPhotoUrl}
+                              alt="salida"
+                              style={{ width: 36, height: 36, borderRadius: 4, objectFit: 'cover', border: '1px solid var(--muted)' }}
+                            />
+                          )}
+                        </div>
                       </td>
                       <td>{formatDateTime(a.fechaInicio)}</td>
                       <td>{formatDateTime(a.fechaEntregaEsperada)}</td>
@@ -798,6 +852,7 @@ const ActivitiesTable: React.FC = () => {
                       <div style={mobileMetaItemStyle}><strong>Cliente:</strong> {a.client?.name || 'Interna'}</div>
                       <div style={mobileMetaItemStyle}><strong>Sucursal:</strong> {a.branchName || '-'}</div>
                       <div style={mobileMetaItemStyle}><strong>Tipo:</strong> {a.ticketType || '-'}</div>
+                      <div style={mobileMetaItemStyle}><strong>Flujo:</strong> {a.workType === 'PREVENTIVE_INVENTORY' ? 'Inventario/Mantenimiento' : 'Problema'}</div>
                       <div style={mobileMetaItemStyle}><strong>Prioridad:</strong> {a.prioridad}</div>
                       <div style={mobileMetaItemStyle}><strong>Responsable:</strong> {a.responsable?.nombre || '-'}</div>
                       <div style={mobileMetaItemStyle}><strong>Estimado/Max:</strong> {a.tiempoEstimadoMin || 0}/{a.tiempoMaximoMin || 0} min</div>
@@ -816,6 +871,29 @@ const ActivitiesTable: React.FC = () => {
                       }}>
                         Evidencias: {getEvidenceStatus(a)}
                       </span>
+                      {(a.activityEvidence?.entryLatitude && a.activityEvidence?.entryLongitude) && (
+                        <div style={{ marginTop: 6 }}>
+                          <a href={getMapsUrl(a.activityEvidence.entryLatitude, a.activityEvidence.entryLongitude)} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
+                            Ver ubicación entrada
+                          </a>
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                        {a.activityEvidence?.entryPhotoUrl && (
+                          <img
+                            src={a.activityEvidence.entryPhotoUrl}
+                            alt="entrada"
+                            style={{ width: 44, height: 44, borderRadius: 6, objectFit: 'cover', border: '1px solid var(--muted)' }}
+                          />
+                        )}
+                        {a.activityEvidence?.exitPhotoUrl && (
+                          <img
+                            src={a.activityEvidence.exitPhotoUrl}
+                            alt="salida"
+                            style={{ width: 44, height: 44, borderRadius: 6, objectFit: 'cover', border: '1px solid var(--muted)' }}
+                          />
+                        )}
+                      </div>
                     </div>
 
                     <div style={{ fontSize: 12, color: 'var(--text-secondary)', wordBreak: 'break-word', overflowWrap: 'break-word', minWidth: 0 }}>

@@ -108,6 +108,11 @@ export default function CvsManagementPanel() {
   const [employmentStatus, setEmploymentStatus] = useState("");
   const [onlyMine, setOnlyMine] = useState(false);
   const [decisionFilter, setDecisionFilter] = useState<"ALL" | "POTENTIAL" | "REJECTED">("ALL");
+  const [viewMode, setViewMode] = useState<"board" | "list">("board");
+  const [focusStage, setFocusStage] = useState<"ALL" | CvRow["stage"]>("ALL");
+  const [isCompact, setIsCompact] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(true);
+  const [expandedCardId, setExpandedCardId] = useState<number | null>(null);
 
   const [upload, setUpload] = useState({
     fullName: "",
@@ -190,6 +195,14 @@ export default function CvsManagementPanel() {
     loadAll();
   }, [user?.token]);
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 920px)");
+    const update = () => setIsCompact(mediaQuery.matches);
+    update();
+    mediaQuery.addEventListener("change", update);
+    return () => mediaQuery.removeEventListener("change", update);
+  }, []);
+
   const filteredRows = useMemo(() => {
     const term = search.trim().toLowerCase();
     return rows.filter((row) => {
@@ -232,6 +245,26 @@ export default function CvsManagementPanel() {
     });
     return map;
   }, [filteredRows]);
+
+  const stageCounters = useMemo(() => {
+    return STAGE_ORDER.reduce<Record<CvRow["stage"], number>>((acc, stageKey) => {
+      acc[stageKey] = grouped.get(stageKey)?.length || 0;
+      return acc;
+    }, {} as Record<CvRow["stage"], number>);
+  }, [grouped]);
+
+  const visibleStageOrder = useMemo(() => {
+    if (focusStage === "ALL") return STAGE_ORDER;
+    return STAGE_ORDER.filter((stageKey) => stageKey === focusStage);
+  }, [focusStage]);
+
+  const orderedListRows = useMemo(() => {
+    const list: CvRow[] = [];
+    visibleStageOrder.forEach((stageKey) => {
+      list.push(...(grouped.get(stageKey) || []));
+    });
+    return list;
+  }, [grouped, visibleStageOrder]);
 
   const callReview = async (
     row: CvRow,
@@ -515,7 +548,40 @@ export default function CvsManagementPanel() {
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      <h2 style={{ fontSize: "2rem", color: "var(--primary)", margin: 0 }}>Ecosistema corporativo de CVs</h2>
+      <div style={{ ...cardStyle, gap: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <div style={{ display: "grid", gap: 4 }}>
+            <h2 style={{ fontSize: "2rem", color: "var(--primary)", margin: 0 }}>Ecosistema corporativo de CVs</h2>
+            <span style={{ fontSize: 13, opacity: 0.82 }}>
+              Flujo completo de reclutamiento, revisión por etapas y conversión directa a usuario.
+            </span>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" style={viewMode === "board" ? buttonPrimary : buttonGhost} onClick={() => setViewMode("board")}>Tablero</button>
+            <button type="button" style={viewMode === "list" ? buttonPrimary : buttonGhost} onClick={() => setViewMode("list")}>Lista</button>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            style={focusStage === "ALL" ? buttonPrimary : buttonGhost}
+            onClick={() => setFocusStage("ALL")}
+          >
+            Todas ({filteredRows.length})
+          </button>
+          {STAGE_ORDER.map((stageKey) => (
+            <button
+              key={`stage-filter-${stageKey}`}
+              type="button"
+              style={focusStage === stageKey ? buttonPrimary : buttonGhost}
+              onClick={() => setFocusStage(stageKey)}
+            >
+              {STAGE_LABELS[stageKey]} ({stageCounters[stageKey] || 0})
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div style={metricsGrid}>
         <Metric title="Total CVs" value={summary?.totals?.all ?? rows.length} />
@@ -563,6 +629,21 @@ export default function CvsManagementPanel() {
             <input type="checkbox" checked={onlyMine} onChange={(event) => setOnlyMine(event.target.checked)} />
             Solo CVs gestionados por mí
           </label>
+          <button
+            type="button"
+            style={buttonGhost}
+            onClick={() => {
+              setSearch("");
+              setCategory("");
+              setStage("");
+              setEmploymentStatus("");
+              setOnlyMine(false);
+              setDecisionFilter("ALL");
+              setFocusStage("ALL");
+            }}
+          >
+            Limpiar filtros
+          </button>
           <button type="button" style={buttonGhost} onClick={loadAll} disabled={busy || loading}>
             Refrescar
           </button>
@@ -571,7 +652,14 @@ export default function CvsManagementPanel() {
 
       {canRecruiter && (
         <form onSubmit={onUpload} style={cardStyle}>
-          <h3 style={{ margin: 0 }}>Alta de candidato (PDF/Imagen)</h3>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <h3 style={{ margin: 0 }}>Alta de candidato (PDF/Imagen)</h3>
+            <button type="button" style={buttonGhost} onClick={() => setUploadOpen((current) => !current)}>
+              {uploadOpen ? "Contraer" : "Expandir"}
+            </button>
+          </div>
+          {uploadOpen ? (
+            <>
           <div style={filterGrid}>
             <input value={upload.fullName} onChange={(event) => setUpload((prev) => ({ ...prev, fullName: event.target.value }))} placeholder="Nombre completo" style={inputStyle} required />
             <input value={upload.email} onChange={(event) => setUpload((prev) => ({ ...prev, email: event.target.value }))} placeholder="Email" style={inputStyle} />
@@ -652,14 +740,17 @@ export default function CvsManagementPanel() {
               Subir CV
             </button>
           </div>
+            </>
+          ) : null}
         </form>
       )}
 
       {error ? <div style={{ color: "#ef4444", fontSize: 13 }}>{error}</div> : null}
       {loading ? <div>Cargando CVs...</div> : null}
 
+      {viewMode === "board" ? (
       <div style={boardGrid}>
-        {STAGE_ORDER.map((stageKey) => {
+        {visibleStageOrder.map((stageKey) => {
           const cards = grouped.get(stageKey) || [];
           return (
             <section
@@ -753,6 +844,20 @@ export default function CvsManagementPanel() {
                       <span style={{ fontSize: 11, opacity: 0.78 }}>{EMPLOYMENT_LABELS[row.employmentStatus]}</span>
                     </div>
 
+                    {isCompact ? (
+                      <button type="button" style={buttonGhost} onClick={() => setExpandedCardId((current) => (current === row.id ? null : row.id))}>
+                        {expandedCardId === row.id ? "Contraer" : "Expandir"}
+                      </button>
+                    ) : null}
+
+                    {isCompact && expandedCardId !== row.id ? (
+                      <div style={{ display: "grid", gap: 4, fontSize: 12, opacity: 0.86 }}>
+                        <span>{row.category}</span>
+                        <span>{row.tags?.length ? row.tags.join(" · ") : "Sin tags"}</span>
+                      </div>
+                    ) : (
+                      <>
+
                     <div style={{ fontSize: 12, opacity: 0.92 }}>{row.category}</div>
                     {row.tags?.length ? <div style={{ fontSize: 12, opacity: 0.78 }}>{row.tags.join(" · ")}</div> : null}
 
@@ -827,6 +932,8 @@ export default function CvsManagementPanel() {
                         Crear usuario
                       </button>
                     )}
+                      </>
+                    )}
                   </article>
                 );
               })}
@@ -834,6 +941,41 @@ export default function CvsManagementPanel() {
           );
         })}
       </div>
+      ) : (
+        <div style={{ ...cardStyle, gap: 8 }}>
+          <div style={{ fontSize: 13, opacity: 0.82 }}>
+            Mostrando {orderedListRows.length} CV(s) en vista lista.
+          </div>
+          {orderedListRows.length === 0 ? (
+            <div style={{ fontSize: 13, opacity: 0.82 }}>No hay CVs que coincidan con tus filtros actuales.</div>
+          ) : (
+            orderedListRows.map((row) => (
+              <article key={`list-${row.id}`} style={{ ...rowCardStyle, cursor: "default" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                  <strong style={{ fontSize: 14 }}>{row.fullName}</strong>
+                  <span style={{ fontSize: 12, opacity: 0.82 }}>{STAGE_LABELS[row.stage]}</span>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 12, opacity: 0.9 }}>
+                  <span>{row.category}</span>
+                  <span>{EMPLOYMENT_LABELS[row.employmentStatus]}</span>
+                  <span>{row.tags?.length ? row.tags.join(" · ") : "Sin tags"}</span>
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <button type="button" style={buttonGhost} onClick={() => openPreview(row)} disabled={previewLoadingId === row.id}>
+                    {previewLoadingId === row.id ? "Abriendo..." : "Preview"}
+                  </button>
+                  <button type="button" style={buttonGhost} onClick={() => downloadCv(row.id)}>Descargar</button>
+                  <button type="button" style={buttonGhost} disabled={!row.whatsapp} onClick={() => openWhatsapp(row.whatsapp)}>WhatsApp</button>
+                  <button type="button" style={buttonGhost} disabled={!row.email} onClick={() => openEmail(row.email)}>Email</button>
+                  {(canUsersManage || canSuperadmin) && row.stage === "APPROVED" ? (
+                    <button type="button" style={buttonPrimary} onClick={() => goCreateUser(row.id)}>Crear usuario</button>
+                  ) : null}
+                </div>
+              </article>
+            ))
+          )}
+        </div>
+      )}
 
       {preview ? (
         <div style={previewBackdropStyle} onClick={closePreview}>

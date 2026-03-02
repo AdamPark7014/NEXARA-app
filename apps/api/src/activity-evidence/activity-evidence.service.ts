@@ -68,17 +68,28 @@ export class ActivityEvidenceService {
    */
   async saveEvidencePhotos(activityId: number, photoUrls: string[]) {
     const evidence = await this.getOrCreateActivityEvidence(activityId);
+    const activity = await this.prisma.activity.findUnique({
+      where: { id: activityId },
+      select: { workType: true },
+    });
+    const isInventoryFlow = activity?.workType === 'PREVENTIVE_INVENTORY';
 
     if (evidence.status !== 'EVIDENCE_PHOTOS') {
       throw new BadRequestException('No estás en el paso correcto para guardar evidencias');
     }
 
-    if (photoUrls.length < 4) {
-      throw new BadRequestException('Mínimo 4 fotos de evidencia son requeridas');
-    }
+    if (isInventoryFlow) {
+      if (photoUrls.length < 1) {
+        throw new BadRequestException('Para mantenimiento e inventario se requiere al menos 1 evidencia visual');
+      }
+    } else {
+      if (photoUrls.length < 4) {
+        throw new BadRequestException('Mínimo 4 fotos de evidencia son requeridas');
+      }
 
-    if (photoUrls.length > 8) {
-      throw new BadRequestException('Máximo 8 fotos de evidencia permitidas');
+      if (photoUrls.length > 8) {
+        throw new BadRequestException('Máximo 8 fotos de evidencia permitidas');
+      }
     }
 
     return this.prisma.activityEvidence.update({
@@ -358,7 +369,17 @@ export class ActivityEvidenceService {
         break;
 
       case 'EVIDENCE_PHOTOS':
-        if (data.photoUrls.length < 4 || data.photoUrls.length > 8) {
+        const activity = await this.prisma.activity.findUnique({
+          where: { id: activityId },
+          select: { workType: true },
+        });
+        const isInventoryFlow = activity?.workType === 'PREVENTIVE_INVENTORY';
+
+        if (isInventoryFlow) {
+          if (!Array.isArray(data.photoUrls) || data.photoUrls.length < 1) {
+            throw new BadRequestException('Requiere al menos 1 evidencia visual');
+          }
+        } else if (data.photoUrls.length < 4 || data.photoUrls.length > 8) {
           throw new BadRequestException('Requiere entre 4-8 fotos de evidencia');
         }
         updateData = {

@@ -320,6 +320,70 @@
   /* min-height: 100vh; */
 }
 
+.consoleTopbar {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  margin-bottom: 14px;
+  background: var(--surface);
+}
+
+.consoleEyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.18rem;
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.consoleTopbarRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.consoleViewTitle {
+  margin: 0;
+  font-size: clamp(1.04rem, 2.1vw, 1.36rem);
+  color: var(--foreground);
+  font-weight: 700;
+}
+
+.consoleViewMeta {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.consoleContent {
+  display: grid;
+  gap: 14px;
+}
+
+.consoleMain :global(.table) {
+  overflow: auto;
+  display: block;
+  border-radius: 14px;
+}
+
+.consoleMain :global(.table th) {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.consoleMain :global(.card) {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.consoleMain :global(.card:hover) {
+  border-color: rgba(15, 106, 214, 0.28);
+}
+
 :global(body.light) .consoleMain {
   background:
     radial-gradient(circle at 12% 0%, rgba(15, 106, 214, 0.07), transparent 40%),
@@ -829,6 +893,23 @@
 
   .sidebarMenu::-webkit-scrollbar-thumb:hover {
     background: rgba(15, 106, 214, 0.5);
+  }
+
+  .consoleMain {
+    padding: 10px 8px 16px;
+  }
+
+  .consoleTopbar {
+    position: sticky;
+    top: 66px;
+    z-index: 100;
+    margin-bottom: 10px;
+    padding: 10px;
+    border-radius: 12px;
+  }
+
+  .consoleViewMeta {
+    font-size: 0.75rem;
   }
 }
 

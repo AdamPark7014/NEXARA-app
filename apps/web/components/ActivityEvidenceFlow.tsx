@@ -1,11 +1,12 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useUser } from './UserContext';
 
 interface ActivityOption {
   id: number;
   anNumber: string;
   titulo?: string;
+  workType?: 'ISSUE' | 'PREVENTIVE_INVENTORY';
 }
 
 interface EvidenceFlowData {
@@ -25,6 +26,30 @@ interface EvidenceFlowData {
   exitLongitude?: number;
 }
 
+interface InventoryDraftItem {
+  sectionName: string;
+  groupName: string;
+  equipmentName: string;
+  serialNumber: string;
+  model: string;
+  panoramicPhotoUrl: string;
+  closeupPhotoUrl: string;
+  stickerPhotoUrl: string;
+  serialBefore: string;
+  serialAfter: string;
+  modelBefore: string;
+  modelAfter: string;
+  beforePanoramicPhotoUrl: string;
+  beforeCloseupPhotoUrl: string;
+  afterPanoramicPhotoUrl: string;
+  afterCloseupPhotoUrl: string;
+  maintenanceStickerPhotoUrl: string;
+  maintenanceActions: string;
+  maintenanceComments: string;
+  itemStatus: string;
+  notes: string;
+}
+
 const ActivityEvidenceFlow = () => {
   const { user } = useUser();
   const [actividades, setActividades] = useState<ActivityOption[]>([]);
@@ -35,11 +60,19 @@ const ActivityEvidenceFlow = () => {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
+  const [inventoryItems, setInventoryItems] = useState<InventoryDraftItem[]>([]);
+  const [inventoryNotes, setInventoryNotes] = useState('');
+  const [inventoryPreviousCount, setInventoryPreviousCount] = useState(0);
+  const [inventoryUploadingKey, setInventoryUploadingKey] = useState<string | null>(null);
+  const [pdfDragging, setPdfDragging] = useState(false);
+  const inventoryFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/\.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
 
   const isCorrection = flowData?.reviewStatus === 'REJECTED';
+  const selectedActivity = actividades.find((activity) => activity.id === Number(selectedActivityId || flowData?.activityId));
+  const isInventoryFlow = selectedActivity?.workType === 'PREVENTIVE_INVENTORY';
   const actionGridStyle: React.CSSProperties = {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
@@ -94,6 +127,9 @@ const ActivityEvidenceFlow = () => {
     setLoading(true);
     setError(null);
     setSuccessMsg(null);
+    setInventoryItems([]);
+    setInventoryNotes('');
+    setInventoryPreviousCount(0);
 
     try {
       const res = await fetch(buildApiUrl(`activity-evidence/${activityId}`), {
@@ -118,6 +154,41 @@ const ActivityEvidenceFlow = () => {
           exitLatitude: data.exitLatitude,
           exitLongitude: data.exitLongitude,
         });
+
+        if ((data.activity?.workType || selectedActivity?.workType) === 'PREVENTIVE_INVENTORY') {
+          const invRes = await fetch(buildApiUrl(`inventories/activity/${activityId}`), {
+            headers: { Authorization: `Bearer ${user!.token}` },
+          });
+          const invData = invRes.ok ? await invRes.json() : null;
+          const incoming = Array.isArray(invData?.items) ? invData.items : [];
+          setInventoryItems(
+            incoming.map((item: any) => ({
+              sectionName: item.sectionName || '',
+              groupName: item.groupName || 'GENERAL',
+              equipmentName: item.equipmentName || '',
+              serialNumber: item.serialAfter || item.serialNumber || item.serialBefore || '',
+              model: item.modelAfter || item.model || item.modelBefore || '',
+              panoramicPhotoUrl: item.afterPanoramicPhotoUrl || item.panoramicPhotoUrl || item.beforePanoramicPhotoUrl || '',
+              closeupPhotoUrl: item.afterCloseupPhotoUrl || item.closeupPhotoUrl || item.beforeCloseupPhotoUrl || '',
+              stickerPhotoUrl: item.maintenanceStickerPhotoUrl || item.stickerPhotoUrl || '',
+              serialBefore: item.serialBefore || item.serialNumber || '',
+              serialAfter: item.serialAfter || item.serialNumber || '',
+              modelBefore: item.modelBefore || item.model || '',
+              modelAfter: item.modelAfter || item.model || '',
+              beforePanoramicPhotoUrl: item.beforePanoramicPhotoUrl || item.panoramicPhotoUrl || '',
+              beforeCloseupPhotoUrl: item.beforeCloseupPhotoUrl || item.closeupPhotoUrl || '',
+              afterPanoramicPhotoUrl: item.afterPanoramicPhotoUrl || item.panoramicPhotoUrl || '',
+              afterCloseupPhotoUrl: item.afterCloseupPhotoUrl || item.closeupPhotoUrl || '',
+              maintenanceStickerPhotoUrl: item.maintenanceStickerPhotoUrl || item.stickerPhotoUrl || '',
+              maintenanceActions: item.maintenanceActions || '',
+              maintenanceComments: item.maintenanceComments || '',
+              itemStatus: item.itemStatus || 'ACTIVE',
+              notes: item.notes || '',
+            })),
+          );
+          setInventoryNotes(invData?.notes || '');
+          setInventoryPreviousCount(Number(invData?.previousCount || 0));
+        }
       } else {
         // Crear nuevo flujo
         setFlowData({
@@ -125,6 +196,9 @@ const ActivityEvidenceFlow = () => {
           step: 'ENTRY_PHOTO',
           evidencePhotos: [],
         });
+        setInventoryItems([]);
+        setInventoryNotes('');
+        setInventoryPreviousCount(0);
       }
     } catch (err) {
       setError('Error al cargar evidencias');
@@ -178,6 +252,65 @@ const ActivityEvidenceFlow = () => {
         { enableHighAccuracy: true, timeout: 5000 },
       );
     });
+  };
+
+  const getAssetUrl = (url?: string | null) => {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    const base = API_URL.replace(/\/+api\/?$/, '');
+    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+  };
+
+  const uploadInventoryImage = async (file: File) => {
+    const formData = new FormData();
+    formData.append('files', file);
+    const res = await fetch(buildApiUrl('inventories/upload'), {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${user!.token}` },
+      body: formData,
+    });
+    if (!res.ok) throw new Error('No se pudo subir la imagen de inventario');
+    const payload = await res.json().catch(() => ({}));
+    const url = Array.isArray(payload?.urls) ? payload.urls[0] : null;
+    if (!url) throw new Error('No se recibió URL de imagen');
+    return url as string;
+  };
+
+  const setInventoryImageField = async (
+    index: number,
+    field:
+      | 'beforePanoramicPhotoUrl'
+      | 'beforeCloseupPhotoUrl'
+      | 'afterPanoramicPhotoUrl'
+      | 'afterCloseupPhotoUrl'
+      | 'maintenanceStickerPhotoUrl',
+    file?: File | null,
+  ) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    setInventoryUploadingKey(`${index}-${field}`);
+    setError(null);
+    try {
+      const url = await uploadInventoryImage(file);
+      setInventoryItems((prev) =>
+        prev.map((current, itemIndex) => {
+          if (itemIndex !== index) return current;
+          if (field === 'afterPanoramicPhotoUrl') {
+            return { ...current, afterPanoramicPhotoUrl: url, panoramicPhotoUrl: url };
+          }
+          if (field === 'afterCloseupPhotoUrl') {
+            return { ...current, afterCloseupPhotoUrl: url, closeupPhotoUrl: url };
+          }
+          if (field === 'maintenanceStickerPhotoUrl') {
+            return { ...current, maintenanceStickerPhotoUrl: url, stickerPhotoUrl: url };
+          }
+          return { ...current, [field]: url };
+        }),
+      );
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : 'No se pudo subir imagen');
+    } finally {
+      setInventoryUploadingKey(null);
+    }
   };
 
   // Paso 1: Foto de entrada
@@ -266,15 +399,53 @@ const ActivityEvidenceFlow = () => {
 
   // Guardar todas las fotos de evidencia y avanzar
   const handleSaveEvidencePhotos = async () => {
-    if (!flowData || flowData.evidencePhotos.length < 4) {
+    if (!flowData) return;
+    if (!isInventoryFlow && flowData.evidencePhotos.length < 4) {
       setError(`Mínimo 4 fotos requeridas (tienes ${flowData?.evidencePhotos.length || 0})`);
       return;
+    }
+    if (isInventoryFlow && flowData.evidencePhotos.length < 1) {
+      setError('Para mantenimiento e inventario se requiere al menos 1 evidencia visual');
+      return;
+    }
+    if (isInventoryFlow && inventoryItems.length < 1) {
+      setError('Captura al menos 1 equipo en el inventario comparativo');
+      return;
+    }
+    if (isInventoryFlow) {
+      const invalidIndex = inventoryItems.findIndex((item) => {
+        const hasCore = item.equipmentName.trim() && item.groupName.trim();
+        const hasBefore = item.serialBefore.trim() && item.modelBefore.trim() && item.beforePanoramicPhotoUrl.trim() && item.beforeCloseupPhotoUrl.trim();
+        const hasAfter = item.serialAfter.trim() && item.modelAfter.trim() && item.afterPanoramicPhotoUrl.trim() && item.afterCloseupPhotoUrl.trim();
+        const hasMaintenance = item.maintenanceStickerPhotoUrl.trim() && item.maintenanceComments.trim();
+        return !(hasCore && hasBefore && hasAfter && hasMaintenance);
+      });
+      if (invalidIndex >= 0) {
+        setError(`Completa datos antes/después y comentario de mantenimiento en el equipo #${invalidIndex + 1}`);
+        return;
+      }
     }
 
     setLoading(true);
     setError(null);
 
     try {
+      if (isInventoryFlow) {
+        await fetch(buildApiUrl(`inventories/activity/${flowData.activityId}/sync`), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${user!.token}`,
+          },
+          body: JSON.stringify({
+            title: `Inventario comparativo ${selectedActivity?.anNumber || flowData.activityId}`,
+            notes: inventoryNotes,
+            completed: false,
+            items: inventoryItems,
+          }),
+        });
+      }
+
       const endpoint = isCorrection
         ? `activity-evidence/${flowData.activityId}/resubmit`
         : `activity-evidence/${flowData.activityId}/evidence-photos`;
@@ -316,7 +487,15 @@ const ActivityEvidenceFlow = () => {
   // Paso 3: Cargar PDF
   const handleServiceSheetPdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    await handleServiceSheetPdfFile(file);
+  };
+
+  const handleServiceSheetPdfFile = async (file?: File | null) => {
     if (!file || !flowData) return;
+    if (file.type !== 'application/pdf') {
+      setError('Solo se permite archivo PDF');
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -421,6 +600,41 @@ const ActivityEvidenceFlow = () => {
     setError(null);
 
     try {
+      if (isInventoryFlow) {
+        const delta = inventoryItems.length - inventoryPreviousCount;
+        if (delta !== 0) {
+          const proceed = window.confirm(
+            `Se detectaron ${Math.abs(delta)} equipos ${delta > 0 ? 'de más' : 'de menos'} vs inventario previo. ¿Deseas guardar de todos modos?`,
+          );
+          if (!proceed) {
+            setLoading(false);
+            return;
+          }
+        }
+
+        const syncRes = await fetch(buildApiUrl(`inventories/activity/${flowData.activityId}/sync`), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${user!.token}`,
+          },
+          body: JSON.stringify({
+            title: `Inventario comparativo ${selectedActivity?.anNumber || flowData.activityId}`,
+            notes: inventoryNotes,
+            completed: true,
+            confirmDifference: true,
+            items: inventoryItems,
+          }),
+        });
+
+        if (!syncRes.ok) {
+          const syncError = await syncRes.json().catch(() => ({}));
+          setError(syncError.message || 'No se pudo guardar el inventario final');
+          setLoading(false);
+          return;
+        }
+      }
+
       const photoUrl = await capturePhoto();
       const { latitude, longitude } = await getGeolocation();
 
@@ -635,10 +849,129 @@ const ActivityEvidenceFlow = () => {
       {/* PASO 2: Fotos de Evidencia */}
       {flowData.step === 'EVIDENCE_PHOTOS' && (
         <div style={{ padding: 20, border: '2px solid var(--accent)', borderRadius: 8 }}>
-          <h3 style={{ marginBottom: 12, color: 'var(--accent)' }}>📷 Paso 2: Evidencias ({flowData.evidencePhotos.length}/4-8)</h3>
+          <h3 style={{ marginBottom: 12, color: 'var(--accent)' }}>
+            {isInventoryFlow
+              ? `🗂️ Paso 2: Inventario comparativo + evidencias (${flowData.evidencePhotos.length} foto${flowData.evidencePhotos.length === 1 ? '' : 's'})`
+              : `📷 Paso 2: Evidencias (${flowData.evidencePhotos.length}/4-8)`}
+          </h3>
           <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
-            Toma fotos de evidencia. Mínimo 4, máximo 8 fotos.
+            {isInventoryFlow
+              ? 'Actualiza equipos por grupo, serie, modelo y al menos una foto de evidencia/sticker por mantenimiento.'
+              : 'Toma fotos de evidencia. Mínimo 4, máximo 8 fotos.'}
           </p>
+
+          {isInventoryFlow && (
+            <div style={{ display: 'grid', gap: 10, marginBottom: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <strong>Equipos de sucursal ({inventoryItems.length})</strong>
+                <button
+                  type="button"
+                  className="button-secondary"
+                  onClick={() =>
+                    setInventoryItems((prev) => [
+                      ...prev,
+                      {
+                        sectionName: '',
+                        groupName: 'GENERAL',
+                        equipmentName: '',
+                        serialNumber: '',
+                        model: '',
+                        panoramicPhotoUrl: '',
+                        closeupPhotoUrl: '',
+                        stickerPhotoUrl: '',
+                        serialBefore: '',
+                        serialAfter: '',
+                        modelBefore: '',
+                        modelAfter: '',
+                        beforePanoramicPhotoUrl: '',
+                        beforeCloseupPhotoUrl: '',
+                        afterPanoramicPhotoUrl: '',
+                        afterCloseupPhotoUrl: '',
+                        maintenanceStickerPhotoUrl: '',
+                        maintenanceActions: '',
+                        maintenanceComments: '',
+                        itemStatus: 'ACTIVE',
+                        notes: '',
+                      },
+                    ])
+                  }
+                >
+                  + Agregar equipo
+                </button>
+              </div>
+
+              {inventoryItems.map((item, index) => (
+                <div key={`${item.equipmentName}-${index}`} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 10, display: 'grid', gap: 8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+                    <input className="input" placeholder="Apartado" value={item.sectionName} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, sectionName: e.target.value } : current))} />
+                    <input className="input" placeholder="Grupo (servidores, scanner, impresora...)" value={item.groupName} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, groupName: e.target.value } : current))} />
+                    <input className="input" placeholder="Nombre equipo" value={item.equipmentName} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, equipmentName: e.target.value } : current))} />
+                    <input className="input" placeholder="Serie ANTES" value={item.serialBefore} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, serialBefore: e.target.value, serialNumber: e.target.value } : current))} />
+                    <input className="input" placeholder="Modelo ANTES" value={item.modelBefore} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, modelBefore: e.target.value, model: e.target.value } : current))} />
+                    <input className="input" placeholder="Serie DESPUÉS" value={item.serialAfter} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, serialAfter: e.target.value, serialNumber: e.target.value } : current))} />
+                    <input className="input" placeholder="Modelo DESPUÉS" value={item.modelAfter} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, modelAfter: e.target.value, model: e.target.value } : current))} />
+                    <input className="input" placeholder="¿Qué se le hizo al equipo?" value={item.maintenanceActions} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, maintenanceActions: e.target.value } : current))} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+                    {[
+                      ['beforePanoramicPhotoUrl', 'Panorámica ANTES'],
+                      ['beforeCloseupPhotoUrl', 'Serie/modelo ANTES'],
+                      ['afterPanoramicPhotoUrl', 'Panorámica DESPUÉS'],
+                      ['afterCloseupPhotoUrl', 'Serie/modelo DESPUÉS'],
+                      ['maintenanceStickerPhotoUrl', 'Sticker mantenimiento'],
+                    ].map(([fieldName, label]) => {
+                      const field = fieldName as
+                        | 'beforePanoramicPhotoUrl'
+                        | 'beforeCloseupPhotoUrl'
+                        | 'afterPanoramicPhotoUrl'
+                        | 'afterCloseupPhotoUrl'
+                        | 'maintenanceStickerPhotoUrl';
+                      const fileKey = `${index}-${field}`;
+                      const imageUrl = item[field];
+                      return (
+                        <div
+                          key={fileKey}
+                          style={{ border: '1px dashed var(--border)', borderRadius: 8, padding: 8, display: 'grid', gap: 8 }}
+                          onDragOver={(event) => event.preventDefault()}
+                          onDrop={(event) => {
+                            event.preventDefault();
+                            setInventoryImageField(index, field, event.dataTransfer.files?.[0]);
+                          }}
+                        >
+                          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{label}</div>
+                          <input
+                            ref={(element) => {
+                              inventoryFileRefs.current[fileKey] = element;
+                            }}
+                            type="file"
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            onChange={(event) => setInventoryImageField(index, field, event.target.files?.[0])}
+                          />
+                          <button type="button" className="button-secondary" onClick={() => inventoryFileRefs.current[fileKey]?.click()}>
+                            {inventoryUploadingKey === fileKey ? 'Subiendo...' : 'Cargar / arrastrar imagen'}
+                          </button>
+                          {imageUrl ? (
+                            <img src={getAssetUrl(imageUrl)} alt={label} style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 8 }} />
+                          ) : (
+                            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Sin imagen</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                    <input className="input" placeholder="Comentario técnico de mantenimiento" value={item.maintenanceComments} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, maintenanceComments: e.target.value, notes: e.target.value } : current))} />
+                    <button type="button" className="button-secondary" onClick={() => setInventoryItems((prev) => prev.filter((_, itemIndex) => itemIndex !== index))}>
+                      Eliminar
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              <textarea className="input" rows={2} placeholder="Notas globales del inventario y mantenimiento" value={inventoryNotes} onChange={(e) => setInventoryNotes(e.target.value)} />
+            </div>
+          )}
 
           {/* Grid de fotos */}
           {flowData.evidencePhotos.length > 0 && (
@@ -697,14 +1030,14 @@ const ActivityEvidenceFlow = () => {
           <div style={{ ...actionGridStyle, marginBottom: 20 }}>
             <button
               onClick={handleAddEvidencePhoto}
-              disabled={loading || flowData.evidencePhotos.length >= 8}
+              disabled={loading || (!isInventoryFlow && flowData.evidencePhotos.length >= 8)}
               style={{
                 ...actionPrimaryStyle,
                 backgroundColor: 'var(--accent)',
                 color: 'white',
                 border: 'none',
-                cursor: loading || flowData.evidencePhotos.length >= 8 ? 'not-allowed' : 'pointer',
-                opacity: loading || flowData.evidencePhotos.length >= 8 ? 0.5 : 1,
+                cursor: loading || (!isInventoryFlow && flowData.evidencePhotos.length >= 8) ? 'not-allowed' : 'pointer',
+                opacity: loading || (!isInventoryFlow && flowData.evidencePhotos.length >= 8) ? 0.5 : 1,
                 gridColumn: window.innerWidth < 480 ? 'span 2' : 'span 1',
               }}
               onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
@@ -727,7 +1060,7 @@ const ActivityEvidenceFlow = () => {
             >
               🔄 {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
             </button>
-            {flowData.evidencePhotos.length >= 4 && (
+            {(isInventoryFlow ? flowData.evidencePhotos.length >= 1 : flowData.evidencePhotos.length >= 4) && (
               <button
                 onClick={handleSaveEvidencePhotos}
                 disabled={loading}
@@ -751,22 +1084,48 @@ const ActivityEvidenceFlow = () => {
         <div style={{ padding: 20, border: '2px solid #f90', borderRadius: 8 }}>
           <h3 style={{ marginBottom: 12, color: '#f90' }}>📄 Paso 3: Hoja de Servicio (PDF)</h3>
           <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
-            Carga el PDF de la hoja de servicio. Este campo es obligatorio.
+            Carga el PDF de la hoja de servicio con arrastrar y soltar o selección manual.
           </p>
-          <input
-            type="file"
-            accept=".pdf"
-            onChange={handleServiceSheetPdfUpload}
-            disabled={loading}
-            style={{
-              display: 'block',
-              marginBottom: 16,
-              cursor: loading ? 'wait' : 'pointer',
+          <div
+            onDragOver={(event) => {
+              event.preventDefault();
+              setPdfDragging(true);
             }}
-          />
+            onDragLeave={() => setPdfDragging(false)}
+            onDrop={(event) => {
+              event.preventDefault();
+              setPdfDragging(false);
+              handleServiceSheetPdfFile(event.dataTransfer.files?.[0]);
+            }}
+            style={{
+              border: `2px dashed ${pdfDragging ? 'var(--primary)' : 'var(--border)'}`,
+              borderRadius: 8,
+              padding: 12,
+              marginBottom: 16,
+              background: pdfDragging ? 'rgba(15, 106, 214, 0.08)' : 'transparent',
+            }}
+          >
+            <input
+              type="file"
+              accept=".pdf,application/pdf"
+              onChange={handleServiceSheetPdfUpload}
+              disabled={loading}
+              style={{
+                display: 'block',
+                marginBottom: 8,
+                cursor: loading ? 'wait' : 'pointer',
+              }}
+            />
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              Arrastra el PDF aquí para cargarlo con preview embebido.
+            </div>
+          </div>
           {flowData.serviceSheetPdfUrl && (
-            <div style={{ padding: 12, backgroundColor: 'var(--bg-secondary)', borderRadius: 4, marginBottom: 16 }}>
-              ✅ PDF cargado correctamente
+            <div style={{ padding: 12, backgroundColor: 'var(--bg-secondary)', borderRadius: 4, marginBottom: 16, display: 'grid', gap: 8 }}>
+              <div>✅ PDF cargado correctamente</div>
+              <object data={flowData.serviceSheetPdfUrl} type="application/pdf" width="100%" height="280">
+                <embed src={flowData.serviceSheetPdfUrl} type="application/pdf" />
+              </object>
             </div>
           )}
         </div>

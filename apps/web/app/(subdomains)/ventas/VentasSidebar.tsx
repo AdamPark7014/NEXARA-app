@@ -49,6 +49,7 @@ export default function VentasSidebar() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [navQuery, setNavQuery] = useState("");
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT);
@@ -121,8 +122,16 @@ export default function VentasSidebar() {
       });
     }
 
+    const normalizedQuery = navQuery.trim().toLowerCase();
+    const filteredItems = normalizedQuery
+      ? items.filter((item) => {
+          const haystack = `${item.label} ${item.section || ""} ${item.description || ""}`.toLowerCase();
+          return haystack.includes(normalizedQuery);
+        })
+      : items;
+
     const groups: { [key: string]: MenuItem[] } = {};
-    items.forEach((item) => {
+    filteredItems.forEach((item) => {
       const section = item.section || "Principal";
       if (!groups[section]) {
         groups[section] = [];
@@ -136,7 +145,7 @@ export default function VentasSidebar() {
         acc[section] = groups[section];
         return acc;
       }, {} as { [key: string]: MenuItem[] });
-  }, [canManageSellers]);
+  }, [canManageSellers, navQuery]);
 
   if (!user) return null;
 
@@ -224,6 +233,20 @@ export default function VentasSidebar() {
         </div>
       )}
 
+      {showExpandedContent && (
+        <div className={styles.navSearchWrap}>
+          <input
+            className={styles.navSearchInput}
+            placeholder="Buscar sección o módulo"
+            value={navQuery}
+            onChange={(event) => setNavQuery(event.target.value)}
+          />
+          {navQuery && (
+            <button type="button" className={styles.navSearchClear} onClick={() => setNavQuery("")}>Limpiar</button>
+          )}
+        </div>
+      )}
+
       {/* Navigation */}
       <nav className={styles.navContainer}>
         {Object.entries(groupedItems).map(([section, items]) => (
@@ -258,6 +281,10 @@ export default function VentasSidebar() {
             </ul>
           </div>
         ))}
+
+        {showExpandedContent && Object.keys(groupedItems).length === 0 && (
+          <div className={styles.navEmpty}>No hay resultados para la búsqueda actual.</div>
+        )}
       </nav>
 
       {/* Botón de tema */}

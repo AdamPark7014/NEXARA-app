@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import PanelLogin from "@/components/PanelLogin";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
+import TicketsInventoryManager from "@/components/TicketsInventoryManager";
 import consoleStyles from "../../console/console.module.css";
 import styles from "../tickets.module.css";
 
@@ -30,6 +31,7 @@ type BranchRequest = {
   description: string;
   urgency: string;
   status: string;
+  requestType?: "ISSUE" | "PREVENTIVE_INVENTORY";
   dueAt?: string | null;
   evidenceUrls?: string[];
 };
@@ -42,9 +44,11 @@ export default function BranchTicketsPage() {
   const [requests, setRequests] = useState<BranchRequest[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"request" | "inventories">("request");
   const [files, setFiles] = useState<{ file: File; url: string; kind: "image" | "pdf" }[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [draft, setDraft] = useState({
+    requestType: "ISSUE" as "ISSUE" | "PREVENTIVE_INVENTORY",
     description: "",
     urgency: "Media",
     dueAt: "",
@@ -53,6 +57,19 @@ export default function BranchTicketsPage() {
     longitud: null as number | null,
     address: "",
   });
+
+  const requestStats = {
+    total: requests.length,
+    pending: requests.filter((item) => {
+      const status = String(item.status || '').toUpperCase();
+      return status.includes('PEND') || status.includes('PROCES') || status.includes('ASIGN');
+    }).length,
+    completed: requests.filter((item) => {
+      const status = String(item.status || '').toUpperCase();
+      return status.includes('FINAL') || status.includes('CERR') || status.includes('COMPLET');
+    }).length,
+    evidences: requests.reduce((acc, item) => acc + (Array.isArray(item.evidenceUrls) ? item.evidenceUrls.length : 0), 0),
+  };
   const pathname = usePathname();
   const router = useRouter();
   const params = useParams();
@@ -90,8 +107,10 @@ export default function BranchTicketsPage() {
     };
   }, [isMobile, mobileMenuOpen]);
 
-  useEffect(() => () => {
-    files.forEach((entry) => URL.revokeObjectURL(entry.url));
+  useEffect(() => {
+    return () => {
+      files.forEach((entry) => URL.revokeObjectURL(entry.url));
+    };
   }, [files]);
 
   const fetchProfile = async (token: string) => {
@@ -166,7 +185,7 @@ export default function BranchTicketsPage() {
   const handleSubmit = async () => {
     if (!session?.token) return;
     if (!draft.description.trim()) {
-      setError("Describe el problema para levantar el ticket");
+      setError(draft.requestType === "PREVENTIVE_INVENTORY" ? "Describe el alcance del mantenimiento e inventario" : "Describe el problema para levantar el ticket");
       return;
     }
     setLoading(true);
@@ -175,6 +194,7 @@ export default function BranchTicketsPage() {
     const formData = new FormData();
     files.forEach((entry) => formData.append("files", entry.file));
     formData.append("description", draft.description);
+    formData.append("requestType", draft.requestType);
     formData.append("urgency", draft.urgency);
     if (draft.dueAt) formData.append("dueAt", draft.dueAt);
     if (draft.placeId) formData.append("placeId", draft.placeId);
@@ -195,7 +215,7 @@ export default function BranchTicketsPage() {
 
     files.forEach((entry) => URL.revokeObjectURL(entry.url));
     setFiles([]);
-    setDraft((prev) => ({ ...prev, description: "", urgency: "Media", dueAt: "" }));
+    setDraft((prev) => ({ ...prev, requestType: "ISSUE", description: "", urgency: "Media", dueAt: "" }));
     await fetchRequests(session.token);
     setLoading(false);
   };
@@ -294,10 +314,25 @@ export default function BranchTicketsPage() {
           <li className={consoleStyles.sidebarMenuItem}>
             <button
               type="button"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${consoleStyles.active}`}
-              onClick={() => setMobileMenuOpen(false)}
+              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "request" ? consoleStyles.active : ""}`}
+              onClick={() => {
+                setActiveTab("request");
+                setMobileMenuOpen(false);
+              }}
             >
               Nueva solicitud
+            </button>
+          </li>
+          <li className={consoleStyles.sidebarMenuItem}>
+            <button
+              type="button"
+              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "inventories" ? consoleStyles.active : ""}`}
+              onClick={() => {
+                setActiveTab("inventories");
+                setMobileMenuOpen(false);
+              }}
+            >
+              Inventarios
             </button>
           </li>
         </ul>
@@ -315,6 +350,39 @@ export default function BranchTicketsPage() {
       </aside>
       <main className={consoleStyles.consoleMain}>
         <div className={styles.mainStack}>
+          <div className={`card ${styles.panelHero}`}>
+            <p className={styles.panelHeroTitle}>Portal de tickets de sucursal</p>
+            <p className={styles.panelHeroMeta}>
+              Sucursal: {profile?.name || session.branch.name} · Registra solicitudes y da seguimiento al inventario de mantenimiento.
+            </p>
+            <div className={styles.panelKpis}>
+              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{requestStats.total}</span><span className={styles.panelKpiLabel}>Solicitudes</span></div>
+              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{requestStats.pending}</span><span className={styles.panelKpiLabel}>En proceso</span></div>
+              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{requestStats.completed}</span><span className={styles.panelKpiLabel}>Completadas</span></div>
+              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{requestStats.evidences}</span><span className={styles.panelKpiLabel}>Evidencias</span></div>
+            </div>
+          </div>
+
+          <div className={styles.panelTabs}>
+            <button type="button" className={`${styles.panelTab} ${activeTab === "request" ? styles.panelTabActive : ""}`} onClick={() => setActiveTab("request")}>Nueva solicitud</button>
+            <button type="button" className={`${styles.panelTab} ${activeTab === "inventories" ? styles.panelTabActive : ""}`} onClick={() => setActiveTab("inventories")}>Inventarios</button>
+          </div>
+
+          {activeTab === "inventories" && session?.token && (
+            <TicketsInventoryManager
+              token={session.token}
+              apiUrl={API_URL}
+              mode="branch"
+              fixedBranch={{
+                id: session.branch.id,
+                name: profile?.name || session.branch.name,
+                branchNumber: profile?.branchNumber || session.branch.branchNumber,
+              }}
+            />
+          )}
+
+          {activeTab === "request" && (
+          <>
           <div className={`card ${styles.cardSoft}`}>
             <p className={styles.sectionTitle}>Registrar solicitud</p>
             <div className={styles.mutedText}>
@@ -323,11 +391,18 @@ export default function BranchTicketsPage() {
             <textarea
               className="input"
               rows={3}
-              placeholder="Describe el problema o requerimiento"
+              placeholder={draft.requestType === "PREVENTIVE_INVENTORY" ? "Describe el alcance del mantenimiento e inventario" : "Describe el problema o requerimiento"}
               value={draft.description}
               onChange={(e) => setDraft((prev) => ({ ...prev, description: e.target.value }))}
             />
             <div className={styles.grid200}>
+              <div>
+                <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Tipo de solicitud</label>
+                <select className="input" value={draft.requestType} onChange={(e) => setDraft((prev) => ({ ...prev, requestType: e.target.value as "ISSUE" | "PREVENTIVE_INVENTORY" }))}>
+                  <option value="ISSUE">Ticket por problema</option>
+                  <option value="PREVENTIVE_INVENTORY">Mantenimiento e inventario</option>
+                </select>
+              </div>
               <div>
                 <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Urgencia</label>
                 <select className="input" value={draft.urgency} onChange={(e) => setDraft((prev) => ({ ...prev, urgency: e.target.value }))}>
@@ -437,6 +512,9 @@ export default function BranchTicketsPage() {
                   <strong>Ticket #{request.id}</strong>
                   <span className="badge">{request.status}</span>
                 </div>
+                <div className={styles.mutedText}>
+                  Flujo: {request.requestType === "PREVENTIVE_INVENTORY" ? "Mantenimiento e inventario" : "Ticket por problema"}
+                </div>
                 <div className={styles.mutedText}>{request.description}</div>
                 <div className={styles.mutedText}>Urgencia: {request.urgency}</div>
                 {Array.isArray(request.evidenceUrls) && request.evidenceUrls.length > 0 && (
@@ -457,6 +535,8 @@ export default function BranchTicketsPage() {
               </div>
             ))}
           </div>
+          </>
+          )}
         </div>
       </main>
     </div>

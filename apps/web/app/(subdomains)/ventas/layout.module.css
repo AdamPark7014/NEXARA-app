@@ -36,6 +36,111 @@
   min-width: 0;
 }
 
+.salesWorkspace {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.salesWorkspaceHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1px solid rgba(15, 106, 214, 0.2);
+  border-radius: 14px;
+  padding: 14px;
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.8), rgba(227, 240, 255, 0.74));
+}
+
+:global(body.dark) .salesWorkspaceHeader {
+  background: linear-gradient(155deg, rgba(24, 35, 53, 0.78), rgba(18, 27, 43, 0.74));
+  border-color: rgba(31, 137, 252, 0.25);
+}
+
+.salesWorkspaceKicker {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.2rem;
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+}
+
+.salesWorkspaceTitle {
+  margin: 4px 0;
+  font-size: 1.55rem;
+  line-height: 1.2;
+}
+
+.salesWorkspaceSubtitle {
+  margin: 0;
+  color: var(--text-secondary);
+  max-width: 64ch;
+  font-size: 0.92rem;
+}
+
+.salesWorkspaceMeta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.salesWorkspacePill {
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 106, 214, 0.24);
+  background: rgba(255, 255, 255, 0.78);
+  font-size: 0.76rem;
+}
+
+:global(body.dark) .salesWorkspacePill {
+  background: rgba(24, 35, 53, 0.9);
+  border-color: rgba(31, 137, 252, 0.3);
+}
+
+.salesQuickLinks {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.salesQuickLink {
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid rgba(15, 106, 214, 0.2);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+:global(body.dark) .salesQuickLink {
+  background: rgba(24, 35, 53, 0.85);
+  border-color: rgba(31, 137, 252, 0.28);
+}
+
+.salesQuickLinkActive {
+  border-color: rgba(15, 106, 214, 0.45);
+  background: rgba(15, 106, 214, 0.14);
+}
+
+.salesWorkspaceContent {
+  min-width: 0;
+}
+
+.salesWorkspaceContent :global(.card),
+.salesWorkspaceContent :global([class*="card"]),
+.salesWorkspaceContent :global([class*="panel"]) {
+  border-radius: 12px;
+}
+
+.salesWorkspaceContent :global(input),
+.salesWorkspaceContent :global(select),
+.salesWorkspaceContent :global(textarea),
+.salesWorkspaceContent :global(button) {
+  min-height: 38px;
+}
+
 :global(body.light) .salesMain {
   background: linear-gradient(180deg, rgba(250, 253, 255, 0.8), rgba(238, 247, 255, 0.72));
   border-radius: 20px;
@@ -104,6 +209,18 @@
   .lockedCard {
     margin: 60px auto 0;
     animation: none;
+  }
+
+  .salesWorkspaceHeader {
+    padding: 12px;
+  }
+
+  .salesWorkspaceTitle {
+    font-size: 1.3rem;
+  }
+
+  .salesWorkspaceSubtitle {
+    font-size: 0.86rem;
   }
 }
 
@@ -182,6 +299,15 @@
   .lockedText {
     font-size: 0.95rem;
     line-height: 1.5;
+  }
+
+  .salesWorkspaceMeta {
+    width: 100%;
+  }
+
+  .salesQuickLink {
+    font-size: 0.76rem;
+    padding: 5px 10px;
   }
 }
 

@@ -266,6 +266,62 @@
   z-index: 1;
 }
 
+.navSearchWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+.navSearchInput {
+  width: 100%;
+  min-height: 38px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 106, 214, 0.24);
+  background: rgba(255, 255, 255, 0.76);
+  color: inherit;
+  padding: 8px 12px;
+  font-size: 0.86rem;
+}
+
+:global(body.dark) .navSearchInput {
+  background: rgba(24, 35, 53, 0.9);
+  border-color: rgba(31, 137, 252, 0.28);
+  color: #e7eefc;
+}
+
+.navSearchClear {
+  border: 1px solid rgba(15, 106, 214, 0.24);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.74);
+  color: inherit;
+  min-height: 38px;
+  padding: 8px 10px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+:global(body.dark) .navSearchClear {
+  background: rgba(24, 35, 53, 0.9);
+  border-color: rgba(31, 137, 252, 0.28);
+}
+
+.navEmpty {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px dashed rgba(15, 106, 214, 0.28);
+  border-radius: 10px;
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+  background: rgba(255, 255, 255, 0.52);
+}
+
+:global(body.dark) .navEmpty {
+  background: rgba(24, 35, 53, 0.72);
+}
+
 .navSection {
   margin-bottom: 12px;
 }

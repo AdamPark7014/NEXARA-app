@@ -42,6 +42,7 @@ import { FinesModule } from './fines/fines.module.js';
 import { ToolRequestsModule } from './tool-requests/tool-requests.module.js';
 import { LunchBreaksModule } from './lunch-breaks/lunch-breaks.module.js';
 import { CvsModule } from './cvs/cvs.module.js';
+import { InventoriesModule } from './inventories/inventories.module.js';
 
 @Module({
   imports: [
@@ -79,6 +80,7 @@ import { CvsModule } from './cvs/cvs.module.js';
     ToolRequestsModule,
     LunchBreaksModule,
     CvsModule,
+    InventoriesModule,
   ],
   controllers: [AppController, ExcelExportController, ExcelImportController],
   providers: [
