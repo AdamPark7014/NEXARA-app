@@ -2012,6 +2012,32 @@
   overflow: hidden;
   justify-self: stretch;
   align-self: stretch;
+  background:
+    radial-gradient(circle at 14% 18%, rgba(15, 106, 214, 0.16), transparent 36%),
+    radial-gradient(circle at 84% 12%, rgba(22, 169, 110, 0.18), transparent 40%),
+    radial-gradient(circle at 50% 100%, rgba(245, 158, 11, 0.12), transparent 46%),
+    linear-gradient(160deg, rgba(235, 246, 255, 0.94) 0%, rgba(230, 252, 242, 0.92) 42%, rgba(224, 242, 255, 0.94) 100%);
+  transition: background 0.35s ease;
+}
+
+.heroWrapper::before,
+.heroWrapper::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.heroWrapper::before {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.08) 48%, rgba(255, 255, 255, 0.16) 100%);
+}
+
+.heroWrapper::after {
+  background-image:
+    linear-gradient(rgba(15, 106, 214, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 106, 214, 0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(circle at center, black 52%, transparent 100%);
 }
 
 @media (max-width: 768px) {
@@ -2053,7 +2079,7 @@
   backdrop-filter: blur(6px);
   transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 @media (max-width: 768px) {
@@ -2198,6 +2224,32 @@
   background: linear-gradient(180deg, rgba(21, 21, 24, 0.78), rgba(21, 21, 24, 0.92));
   border-color: rgba(23, 137, 252, 0.16);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35), 0 6px 18px rgba(23, 137, 252, 0.18);
+}
+
+:global(body.light) .heroWrapper {
+  background:
+    radial-gradient(circle at 14% 18%, rgba(15, 106, 214, 0.16), transparent 36%),
+    radial-gradient(circle at 84% 12%, rgba(22, 169, 110, 0.18), transparent 40%),
+    radial-gradient(circle at 50% 100%, rgba(245, 158, 11, 0.12), transparent 46%),
+    linear-gradient(160deg, rgba(235, 246, 255, 0.94) 0%, rgba(230, 252, 242, 0.92) 42%, rgba(224, 242, 255, 0.94) 100%);
+}
+
+:global(body.dark) .heroWrapper {
+  background:
+    radial-gradient(circle at 14% 16%, rgba(31, 137, 252, 0.2), transparent 38%),
+    radial-gradient(circle at 82% 10%, rgba(22, 169, 110, 0.18), transparent 42%),
+    radial-gradient(circle at 52% 102%, rgba(245, 158, 11, 0.14), transparent 48%),
+    linear-gradient(160deg, rgba(7, 12, 24, 0.98) 0%, rgba(8, 24, 30, 0.96) 42%, rgba(8, 16, 34, 0.98) 100%);
+}
+
+:global(body.dark) .heroWrapper::before {
+  background: linear-gradient(180deg, rgba(2, 6, 16, 0.34) 0%, rgba(2, 6, 16, 0.18) 48%, rgba(2, 6, 16, 0.28) 100%);
+}
+
+:global(body.dark) .heroWrapper::after {
+  background-image:
+    linear-gradient(rgba(31, 137, 252, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(31, 137, 252, 0.08) 1px, transparent 1px);
 }
 
 .main ol {
@@ -2561,53 +2613,6 @@ button.secondary {
 /* Dark mode logo explicit (switch manual - luna) */
 :global(body.dark) .logo {
   filter: invert();
-}
-
-/* Hero background layer - Full width desktop */
-.heroBg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 0;
-  overflow: hidden;
-  border-radius: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.heroBgImage {
-  object-fit: cover;
-  width: 100%;
-  height: 100%;
-  transform: scale(1.02);
-  filter: saturate(110%) contrast(108%) brightness(102%);
-}
-
-/* En desktop, la imagen ocupa todo el ancho sin restricciones */
-@media (min-width: 769px) {
-  .heroBgImage {
-    object-fit: cover;
-    object-position: center;
-  }
-}
-.heroBgOverlay {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.3));
-}
-@media (prefers-color-scheme: dark) {
-  .heroBgOverlay {
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.4));
-  }
-}
-:global(body.dark) .heroBgOverlay {
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.4));
-}
-:global(body.light) .heroBgOverlay {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.25));
 }
 
 /* Why Nexara Section */
@@ -4352,14 +4357,6 @@ button.secondary {
     margin-top: 0;
     min-height: auto;
     padding: calc(var(--header-offset) + 12px) 0 20px;
-  }
-
-  .heroBg {
-    border-radius: 0 0 28px 28px;
-  }
-
-  .heroBgImage {
-    object-position: center;
   }
 
   .hero {

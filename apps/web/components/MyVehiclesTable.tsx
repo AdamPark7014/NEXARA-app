@@ -61,7 +61,12 @@ const MyVehiclesTable: React.FC = () => {
   useEffect(() => {
     if (!user?.token) return;
     const socketUrl = getSocketBaseUrl();
-    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    const socket: Socket = io(socketUrl, {
+      transports: ['polling'],
+      upgrade: false,
+      timeout: 20000,
+      reconnectionAttempts: 8,
+    });
 
     socket.on('entity:updated', (payload: { model?: string }) => {
       if (payload?.model === 'VehicleControl') {

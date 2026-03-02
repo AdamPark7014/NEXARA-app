@@ -114,7 +114,7 @@ export default function Map() {
     const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
     if (!existingScript) {
       const script = document.createElement("script");
-      script.src = `https://maps.googleapis.com/maps/api/js?key=***QUITADO***&v=weekly&libraries=marker`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=***QUITADO***&v=weekly&libraries=marker&loading=async`;
       script.async = true;
       script.defer = true;
       script.onload = () => {

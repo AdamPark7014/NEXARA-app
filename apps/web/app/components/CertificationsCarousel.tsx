@@ -17,6 +17,7 @@ export default function CertificationsCarousel() {
     { id: 7, file: 'certificaciones-06.png', alt: 'HikVision' },
     { id: 8, file: 'certificaciones-07.png', alt: 'Sophos' },
     { id: 9, file: 'certificaciones-08.png', alt: 'Mimosa' },
+    { id: 10, file: 'certificaciones-09.png.jpeg', alt: 'Jalala' },
   ];
   const duplicatedCerts = [...certifications, ...certifications];
 
