@@ -214,6 +214,10 @@ export function middleware(request: NextRequest) {
   if (subdomain && SUBDOMAIN_MAP[subdomain]) {
     const internalSlug = SUBDOMAIN_MAP[subdomain];
     const pathname = request.nextUrl.pathname;
+
+    if (pathname === '/api' || pathname.startsWith('/api/') || pathname === '/socket.io' || pathname.startsWith('/socket.io/')) {
+      return applySecurityHeaders(NextResponse.next());
+    }
     
     // NO reescribir archivos estáticos (imágenes, fuentes, etc.)
     // Permitir que Next.js los sirva directamente desde /public
