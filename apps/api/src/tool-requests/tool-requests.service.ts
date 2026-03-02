@@ -95,8 +95,9 @@ export class ToolRequestsService {
 
   async create(data: CreateToolRequestDto) {
     if ((data as any).inventoryItemId) {
+      const inventoryItemId = Number((data as any).inventoryItemId);
       const inventoryItem = await (this.prisma as any).toolInventoryItem.findUnique({
-        where: { id: Number((data as any).inventoryItemId) },
+        where: { id: inventoryItemId },
       });
 
       if (!inventoryItem) {
@@ -105,6 +106,18 @@ export class ToolRequestsService {
 
       if (inventoryItem.status !== 'AVAILABLE') {
         throw new Error('La herramienta seleccionada no está disponible en inventario');
+      }
+
+      const activeRequest = await this.prisma.toolRequest.findFirst({
+        where: {
+          inventoryItemId,
+          status: { in: ['PENDING', 'APPROVED', 'IN_USE'] },
+        },
+        select: { id: true },
+      });
+
+      if (activeRequest) {
+        throw new Error('La herramienta ya tiene una solicitud activa y no puede duplicarse');
       }
 
       data.toolName = inventoryItem.toolName;
@@ -441,6 +454,17 @@ export class ToolRequestsService {
     }
 
     return (this.prisma as any).$transaction(async (tx: any) => {
+      if (request.inventoryItemId) {
+        const inventoryItem = await tx.toolInventoryItem.findUnique({
+          where: { id: request.inventoryItemId },
+          select: { status: true },
+        });
+
+        if (!inventoryItem || inventoryItem.status !== 'AVAILABLE') {
+          throw new Error('La herramienta ya no está disponible para entrega');
+        }
+      }
+
       const updatedRequest = await tx.toolRequest.update({
         where: { id },
         data: {
@@ -788,6 +812,21 @@ export class ToolRequestsService {
       where: { id: data.inventoryItemId },
     });
     if (!inventoryItem) throw new Error('Herramienta de inventario no encontrada');
+    if (inventoryItem.status !== 'AVAILABLE') {
+      throw new Error('La herramienta seleccionada no está disponible para asignación');
+    }
+
+    const activeAssignment = await (this.prisma as any).toolKitAssignment.findFirst({
+      where: {
+        inventoryItemId: data.inventoryItemId,
+        isActive: true,
+      },
+      select: { id: true },
+    });
+
+    if (activeAssignment) {
+      throw new Error('La herramienta ya está asignada a otro usuario');
+    }
 
     const isSuperAdmin = await this.isSuperAdminByEmail(currentUser.id, currentUser);
     const isAdmin = Boolean(currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN));
