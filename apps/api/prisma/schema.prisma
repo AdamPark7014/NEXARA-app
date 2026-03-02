@@ -332,6 +332,12 @@ model User {
   approvedToolRequests ToolRequest[]   @relation("AdminApprovals")
   toolRenewalsApproved ToolRenewal[]    @relation("AdminRenewals")
   toolNotifications ToolRequestNotification[] @relation("ToolNotifications")
+  toolInventoryCreated ToolInventoryItem[] @relation("ToolInventoryCreatedBy")
+  toolInventoryUpdated ToolInventoryItem[] @relation("ToolInventoryUpdatedBy")
+  toolKitAssignments ToolKitAssignment[] @relation("ToolKitUserAssignments")
+  toolKitAssignmentsCreated ToolKitAssignment[] @relation("ToolKitAssignedBy")
+  toolKitEventsReported ToolKitEvent[] @relation("ToolKitEventReportedBy")
+  toolKitEventsResolved ToolKitEvent[] @relation("ToolKitEventResolvedBy")
 }
 
 model UserProfile {
@@ -1298,9 +1304,28 @@ enum RenewalStatus {
   REJECTED     // Renovación rechazada
 }
 
+enum ToolInventoryStatus {
+  AVAILABLE
+  ASSIGNED
+  IN_REPAIR
+  RETIRED
+}
+
+enum ToolAssignmentType {
+  KIT
+  LOAN
+}
+
+enum ToolKitEventResolution {
+  PENDING
+  USER_MISUSE
+  EQUIPMENT_FAILURE
+}
+
 model ToolRequest {
   id                    Int                 @id @default(autoincrement())
   usuarioId             Int
+  inventoryItemId       Int?
   toolName              String              @db.VarChar(200)      // Nombre de la herramienta
   model                 String              @db.VarChar(200)      // Modelo
   serialNumber          String              @db.VarChar(200)      // Número de serie
@@ -1325,14 +1350,93 @@ model ToolRequest {
   updatedAt             DateTime            @updatedAt
   
   usuario               User                @relation("UserToolRequests", fields: [usuarioId], references: [id], onDelete: Cascade)
+  inventoryItem         ToolInventoryItem?  @relation("ToolInventoryToolRequests", fields: [inventoryItemId], references: [id], onDelete: SetNull)
   approver              User?               @relation("AdminApprovals", fields: [approvedBy], references: [id])
   renewals              ToolRenewal[]       @relation("ToolRequestRenewals")
   notifications         ToolRequestNotification[] @relation("ToolRequestNotifications")
 
   @@index([usuarioId, status])
+  @@index([inventoryItemId])
   @@index([status, requestDate])
   @@index([expectedReturnDate])
   @@map("tool_requests")
+}
+
+model ToolInventoryItem {
+  id                    Int                 @id @default(autoincrement())
+  toolName              String              @db.VarChar(200)
+  model                 String              @db.VarChar(200)
+  serialNumber          String              @unique @db.VarChar(200)
+  panoramicPhotoUrl     String              @db.VarChar(500)
+  serialPhotoUrl        String              @db.VarChar(500)
+  status                ToolInventoryStatus @default(AVAILABLE)
+  createdById           Int?
+  updatedById           Int?
+  replacementOfId       Int?
+  retiredReason         String?             @db.Text
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  createdBy             User?               @relation("ToolInventoryCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy             User?               @relation("ToolInventoryUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  replacementOf         ToolInventoryItem?  @relation("ToolInventoryReplacements", fields: [replacementOfId], references: [id], onDelete: SetNull)
+  replacements          ToolInventoryItem[] @relation("ToolInventoryReplacements")
+  kitAssignments        ToolKitAssignment[] @relation("ToolInventoryAssignments")
+  toolRequests          ToolRequest[]       @relation("ToolInventoryToolRequests")
+  replacementEvents     ToolKitEvent[]      @relation("ToolKitEventReplacementItem")
+
+  @@index([status])
+  @@index([toolName, model])
+  @@index([replacementOfId])
+  @@map("tool_inventory_items")
+}
+
+model ToolKitAssignment {
+  id                    Int                 @id @default(autoincrement())
+  inventoryItemId       Int
+  userId                Int
+  assignmentType        ToolAssignmentType  @default(KIT)
+  assignedById          Int?
+  assignedAt            DateTime            @default(now())
+  dueReturnDate         DateTime?
+  returnedAt            DateTime?
+  isActive              Boolean             @default(true)
+  replacementCount      Int                 @default(0)
+  notes                 String?             @db.Text
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  inventoryItem         ToolInventoryItem   @relation("ToolInventoryAssignments", fields: [inventoryItemId], references: [id], onDelete: Cascade)
+  user                  User                @relation("ToolKitUserAssignments", fields: [userId], references: [id], onDelete: Cascade)
+  assignedBy            User?               @relation("ToolKitAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  events                ToolKitEvent[]      @relation("ToolKitAssignmentEvents")
+
+  @@index([userId, isActive])
+  @@index([inventoryItemId, isActive])
+  @@map("tool_kit_assignments")
+}
+
+model ToolKitEvent {
+  id                    Int                    @id @default(autoincrement())
+  assignmentId          Int
+  reportedById          Int
+  resolvedById          Int?
+  fineId                Int?
+  replacementItemId     Int?
+  description           String                 @db.Text
+  resolution            ToolKitEventResolution @default(PENDING)
+  reportedAt            DateTime               @default(now())
+  resolvedAt            DateTime?
+  createdAt             DateTime               @default(now())
+
+  assignment            ToolKitAssignment      @relation("ToolKitAssignmentEvents", fields: [assignmentId], references: [id], onDelete: Cascade)
+  reportedBy            User                   @relation("ToolKitEventReportedBy", fields: [reportedById], references: [id], onDelete: Cascade)
+  resolvedBy            User?                  @relation("ToolKitEventResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+  replacementItem       ToolInventoryItem?     @relation("ToolKitEventReplacementItem", fields: [replacementItemId], references: [id], onDelete: SetNull)
+
+  @@index([assignmentId, reportedAt])
+  @@index([resolution])
+  @@map("tool_kit_events")
 }
 
 model ToolRenewal {

@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   UnauthorizedException,
   ForbiddenException,
@@ -13,12 +14,119 @@ import {
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { PERMISSIONS } from '../common/permissions.js';
-import { ToolRequestsService, CreateToolRequestDto, UpdateToolRequestDto } from './tool-requests.service.js';
+import {
+  ToolRequestsService,
+  CreateToolRequestDto,
+  UpdateToolRequestDto,
+  CreateInventoryItemDto,
+  UpdateInventoryItemDto,
+  ReplaceInventoryItemDto,
+  AssignKitItemDto,
+  ReportKitEventDto,
+} from './tool-requests.service.js';
 
 @Controller('tool-requests')
 @UseGuards(RbacGuard)
 export class ToolRequestsController {
   constructor(private readonly toolRequestsService: ToolRequestsService) {}
+
+  // ===== INVENTARIO INTELIGENTE =====
+
+  @Get('inventory/search')
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_REQUEST] })
+  async searchInventory(@Query('q') q: string) {
+    return this.toolRequestsService.searchInventoryOptions(q || '');
+  }
+
+  @Get('inventory')
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
+  async getInventory(
+    @Query('q') q?: string,
+    @Query('includeRetired') includeRetired?: string,
+  ) {
+    return this.toolRequestsService.getInventory(q, includeRetired === 'true');
+  }
+
+  @Post('inventory')
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
+  async createInventoryItem(@CurrentUser() user: any, @Body() data: CreateInventoryItemDto) {
+    return this.toolRequestsService.createInventoryItem(data, user.id);
+  }
+
+  @Put('inventory/:id')
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
+  async updateInventoryItem(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() data: UpdateInventoryItemDto,
+  ) {
+    return this.toolRequestsService.updateInventoryItem(parseInt(id, 10), data, user.id);
+  }
+
+  @Post('inventory/:id/replace')
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
+  async replaceInventoryItem(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() data: ReplaceInventoryItemDto,
+  ) {
+    return this.toolRequestsService.replaceInventoryItem(parseInt(id, 10), data, user.id);
+  }
+
+  // ===== KIT / QUID =====
+
+  @Get('kits/my')
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_VIEW] })
+  async getMyKit(@CurrentUser() user: any) {
+    return this.toolRequestsService.getMyKit(user.id);
+  }
+
+  @Get('kits/users')
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
+  async getUsersKit(@CurrentUser() user: any, @Query('userId') userId?: string) {
+    return this.toolRequestsService.getUsersKit(
+      {
+        id: user.id,
+        isSuperAdmin: user.isSuperAdmin,
+        permissions: user.permissions,
+      },
+      userId ? parseInt(userId, 10) : undefined,
+    );
+  }
+
+  @Post('kits/assign')
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
+  async assignKitItem(@CurrentUser() user: any, @Body() data: AssignKitItemDto) {
+    return this.toolRequestsService.assignKitItem(
+      {
+        ...data,
+        dueReturnDate: data.dueReturnDate ? new Date(data.dueReturnDate) : undefined,
+      },
+      {
+        id: user.id,
+        isSuperAdmin: user.isSuperAdmin,
+        permissions: user.permissions,
+      },
+    );
+  }
+
+  @Post('kits/:assignmentId/report')
+  @RBAC({ permissions: [PERMISSIONS.TOOLS_VIEW] })
+  async reportKitEvent(
+    @CurrentUser() user: any,
+    @Param('assignmentId') assignmentId: string,
+    @Body() data: ReportKitEventDto,
+  ) {
+    return this.toolRequestsService.reportKitEvent(
+      parseInt(assignmentId, 10),
+      data,
+      {
+        id: user.id,
+        isSuperAdmin: user.isSuperAdmin,
+        permissions: user.permissions,
+      },
+    );
+  }
 
   // Crear solicitud de herramienta
   @Post()

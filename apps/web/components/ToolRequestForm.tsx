@@ -6,11 +6,23 @@ interface ToolRequestFormProps {
   onSuccess?: () => void;
 }
 
+interface InventoryOption {
+  id: number;
+  toolName: string;
+  model: string;
+  serialNumber: string;
+  status: 'AVAILABLE' | 'ASSIGNED' | 'IN_REPAIR' | 'RETIRED';
+}
+
 const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
   const { user } = useUser();
   const [toolName, setToolName] = useState('');
   const [model, setModel] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
+  const [selectedInventoryItem, setSelectedInventoryItem] = useState<InventoryOption | null>(null);
+  const [inventoryQuery, setInventoryQuery] = useState('');
+  const [inventoryOptions, setInventoryOptions] = useState<InventoryOption[]>([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
   const [reason, setReason] = useState('');
   const [startDate, setStartDate] = useState('');
   const [expectedReturnDate, setExpectedReturnDate] = useState('');
@@ -36,6 +48,38 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
       }
     };
   }, [generalPhotoPreview, specificationsPhotoPreview]);
+
+  useEffect(() => {
+    if (!user?.token || inventoryQuery.trim().length < 2) {
+      setInventoryOptions([]);
+      return;
+    }
+
+    const timeout = setTimeout(async () => {
+      try {
+        setInventoryLoading(true);
+        const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
+        const params = new URLSearchParams({ q: inventoryQuery.trim() });
+        const response = await fetch(`${API_URL}/tool-requests/inventory/search?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+          },
+        });
+
+        if (!response.ok) {
+          setInventoryOptions([]);
+          return;
+        }
+
+        const payload = await response.json();
+        setInventoryOptions(Array.isArray(payload) ? payload : []);
+      } finally {
+        setInventoryLoading(false);
+      }
+    }, 280);
+
+    return () => clearTimeout(timeout);
+  }, [inventoryQuery, user?.token]);
 
   const validate = () => {
     if (!toolName || toolName.length < 3) {
@@ -177,6 +221,9 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
       formData.append('toolName', toolName);
       formData.append('model', model);
       formData.append('serialNumber', serialNumber);
+      if (selectedInventoryItem) {
+        formData.append('inventoryItemId', String(selectedInventoryItem.id));
+      }
       formData.append('reason', reason);
       formData.append('startDate', new Date(startDate).toISOString());
       formData.append('expectedReturnDate', new Date(expectedReturnDate).toISOString());
@@ -198,6 +245,9 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
       setToolName('');
       setModel('');
       setSerialNumber('');
+      setSelectedInventoryItem(null);
+      setInventoryQuery('');
+      setInventoryOptions([]);
       setReason('');
       setStartDate('');
       setExpectedReturnDate('');
@@ -227,14 +277,69 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 12 }}>
         <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
-          Nombre de la herramienta *
+          Herramienta del inventario *
           <input
             className="input"
             type="text"
-            value={toolName}
-            onChange={(e) => setToolName(e.target.value)}
-            placeholder="Ej. Taladro, Destornillador, Sierra"
+            value={inventoryQuery}
+            onChange={(e) => {
+              setToolName(e.target.value);
+              setInventoryQuery(e.target.value);
+              if (selectedInventoryItem) {
+                setSelectedInventoryItem(null);
+                setToolName('');
+                setModel('');
+                setSerialNumber('');
+              }
+            }}
+            placeholder="Busca por nombre, modelo o serie"
           />
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+            {selectedInventoryItem
+              ? `Seleccionada: ${selectedInventoryItem.toolName} · ${selectedInventoryItem.model} · ${selectedInventoryItem.serialNumber}`
+              : 'Empieza a escribir para filtrar herramientas disponibles'}
+          </div>
+          {inventoryLoading && (
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Buscando herramientas...</div>
+          )}
+          {!selectedInventoryItem && inventoryOptions.length > 0 && (
+            <div
+              style={{
+                border: '1px solid var(--muted)',
+                borderRadius: 10,
+                maxHeight: 180,
+                overflow: 'auto',
+                background: 'var(--surface-light)',
+              }}
+            >
+              {inventoryOptions.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedInventoryItem(option);
+                    setToolName(option.toolName);
+                    setModel(option.model);
+                    setSerialNumber(option.serialNumber);
+                    setInventoryQuery(`${option.toolName} · ${option.model} · ${option.serialNumber}`);
+                    setInventoryOptions([]);
+                  }}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '9px 10px',
+                    border: 'none',
+                    borderBottom: '1px solid var(--muted)',
+                    background: 'transparent',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {option.toolName} · {option.model} · {option.serialNumber}
+                </button>
+              ))}
+            </div>
+          )}
         </label>
         <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
           Modelo *
@@ -244,6 +349,7 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
             value={model}
             onChange={(e) => setModel(e.target.value)}
             placeholder="Ej. BOSCH GSR 120-LI"
+            readOnly={Boolean(selectedInventoryItem)}
           />
         </label>
         <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
@@ -254,6 +360,7 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
             value={serialNumber}
             onChange={(e) => setSerialNumber(e.target.value)}
             placeholder="Ej. SN123456789"
+            readOnly={Boolean(selectedInventoryItem)}
           />
         </label>
       </div>
