@@ -16,6 +16,8 @@ interface InventoryOption {
 
 const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
   const { user } = useUser();
+  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
+  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
   const [toolName, setToolName] = useState('');
   const [model, setModel] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
@@ -37,7 +39,30 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const generalFileInputRef = useRef<HTMLInputElement>(null);
+  const specificationsFileInputRef = useRef<HTMLInputElement>(null);
   const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
+  const [dragOverPhoto, setDragOverPhoto] = useState<'general' | 'specifications' | null>(null);
+
+  const applyPhotoFile = (type: 'general' | 'specifications', file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setError('Solo se permiten imágenes');
+      return;
+    }
+
+    const preview = URL.createObjectURL(file);
+    if (type === 'general') {
+      if (generalPhotoPreview) URL.revokeObjectURL(generalPhotoPreview);
+      setGeneralPhoto(file);
+      setGeneralPhotoPreview(preview);
+    } else {
+      if (specificationsPhotoPreview) URL.revokeObjectURL(specificationsPhotoPreview);
+      setSpecificationsPhoto(file);
+      setSpecificationsPhotoPreview(preview);
+    }
+
+    setError(null);
+  };
 
   useEffect(() => {
     return () => {
@@ -58,9 +83,8 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
     const timeout = setTimeout(async () => {
       try {
         setInventoryLoading(true);
-        const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
         const params = new URLSearchParams({ q: inventoryQuery.trim() });
-        const response = await fetch(`${API_URL}/tool-requests/inventory/search?${params.toString()}`, {
+        const response = await fetch(buildApiUrl(`tool-requests/inventory/search?${params.toString()}`), {
           headers: {
             Authorization: `Bearer ${user.token}`,
           },
@@ -186,21 +210,22 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
 
       const fileName = `${photoStep}-${Date.now()}.jpg`;
       const file = new File([blob], fileName, { type: 'image/jpeg' });
-      const preview = URL.createObjectURL(file);
-
-      if (photoStep === 'general') {
-        if (generalPhotoPreview) URL.revokeObjectURL(generalPhotoPreview);
-        setGeneralPhoto(file);
-        setGeneralPhotoPreview(preview);
-      } else {
-        if (specificationsPhotoPreview) URL.revokeObjectURL(specificationsPhotoPreview);
-        setSpecificationsPhoto(file);
-        setSpecificationsPhotoPreview(preview);
-      }
+      applyPhotoFile(photoStep, file);
 
       stopCamera();
       setError(null);
     }, 'image/jpeg', 0.9);
+  };
+
+  const handleDropPhoto = (type: 'general' | 'specifications', e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragOverPhoto(null);
+    const file = e.dataTransfer.files?.[0];
+    if (file) applyPhotoFile(type, file);
+  };
+
+  const handleFileChange = (type: 'general' | 'specifications', file?: File | null) => {
+    if (file) applyPhotoFile(type, file);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -230,7 +255,7 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
       formData.append('generalPhoto', generalPhoto!);
       formData.append('specificationsPhoto', specificationsPhoto!);
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tool-requests`, {
+      const res = await fetch(buildApiUrl('tool-requests'), {
         method: 'POST',
         headers: { Authorization: `Bearer ${user.token}` },
         body: formData,
@@ -401,8 +426,14 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
         <div style={{ display: 'grid', gap: 10 }}>
           <div style={{ fontWeight: 600 }}>Foto Panorámica *</div>
           <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOverPhoto('general');
+            }}
+            onDragLeave={() => setDragOverPhoto((current) => (current === 'general' ? null : current))}
+            onDrop={(e) => handleDropPhoto('general', e)}
             style={{
-              border: '1px dashed var(--muted)',
+              border: `1px dashed ${dragOverPhoto === 'general' ? 'var(--primary)' : 'var(--muted)'}`,
               borderRadius: 12,
               padding: 16,
               background: 'var(--surface-light)',
@@ -412,8 +443,24 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
             }}
           >
             <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-              Vista general de la herramienta
+              Arrastra y suelta una imagen aquí o usa los botones
             </div>
+            <input
+              ref={generalFileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={(e) => handleFileChange('general', e.target.files?.[0])}
+            />
+            <button
+              className="button-secondary"
+              type="button"
+              onClick={() => generalFileInputRef.current?.click()}
+              style={{ justifySelf: 'center' }}
+              disabled={!!photoStep}
+            >
+              📁 Seleccionar archivo
+            </button>
             <button
               className="button-secondary"
               type="button"
@@ -449,8 +496,14 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
         <div style={{ display: 'grid', gap: 10 }}>
           <div style={{ fontWeight: 600 }}>Foto de Especificaciones *</div>
           <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOverPhoto('specifications');
+            }}
+            onDragLeave={() => setDragOverPhoto((current) => (current === 'specifications' ? null : current))}
+            onDrop={(e) => handleDropPhoto('specifications', e)}
             style={{
-              border: '1px dashed var(--muted)',
+              border: `1px dashed ${dragOverPhoto === 'specifications' ? 'var(--primary)' : 'var(--muted)'}`,
               borderRadius: 12,
               padding: 16,
               background: 'var(--surface-light)',
@@ -460,8 +513,24 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
             }}
           >
             <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-              Modelo, serie y detalles visibles
+              Arrastra y suelta una imagen aquí o usa los botones
             </div>
+            <input
+              ref={specificationsFileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={(e) => handleFileChange('specifications', e.target.files?.[0])}
+            />
+            <button
+              className="button-secondary"
+              type="button"
+              onClick={() => specificationsFileInputRef.current?.click()}
+              style={{ justifySelf: 'center' }}
+              disabled={!!photoStep}
+            >
+              📁 Seleccionar archivo
+            </button>
             <button
               className="button-secondary"
               type="button"
@@ -515,6 +584,8 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
             if (specificationsPhotoPreview) URL.revokeObjectURL(specificationsPhotoPreview);
             setGeneralPhotoPreview(null);
             setSpecificationsPhotoPreview(null);
+            if (generalFileInputRef.current) generalFileInputRef.current.value = '';
+            if (specificationsFileInputRef.current) specificationsFileInputRef.current.value = '';
             stopCamera();
             setError(null);
             setSuccess(null);

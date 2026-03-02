@@ -44,6 +44,11 @@ const ToolUserKitPanel: React.FC = () => {
   const [filterUserId, setFilterUserId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [resolvingEventId, setResolvingEventId] = useState<number | null>(null);
+  const [resolutionType, setResolutionType] = useState<'USER_MISUSE' | 'EQUIPMENT_FAILURE'>('EQUIPMENT_FAILURE');
+  const [resolutionNotes, setResolutionNotes] = useState('');
+  const [resolutionFineAmount, setResolutionFineAmount] = useState<string>('500');
+  const [resolvingSubmit, setResolvingSubmit] = useState(false);
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
@@ -72,11 +77,18 @@ const ToolUserKitPanel: React.FC = () => {
       const response = await fetch(buildApiUrl('users/assignable'), {
         headers: { Authorization: `Bearer ${user.token}` },
       });
-      if (!response.ok) return;
+      if (!response.ok) {
+        setUsers(user?.id ? [{ id: user.id, nombre: user.nombre || 'Mi usuario', email: user.email || '' }] : []);
+        return;
+      }
       const payload = await response.json();
-      setUsers(Array.isArray(payload) ? payload : []);
+      const parsed = Array.isArray(payload) ? payload : [];
+      if (user?.id && !parsed.some((target) => target.id === user.id)) {
+        parsed.push({ id: user.id, nombre: user.nombre || 'Mi usuario', email: user.email || '' });
+      }
+      setUsers(parsed);
     } catch {
-      setUsers([]);
+      setUsers(user?.id ? [{ id: user.id, nombre: user.nombre || 'Mi usuario', email: user.email || '' }] : []);
     }
   };
 
@@ -123,23 +135,34 @@ const ToolUserKitPanel: React.FC = () => {
     return grouped.filter((group) => group.user.id === Number(filterUserId));
   }, [rows, filterUserId]);
 
+  const openResolveForm = (eventId: number) => {
+    setResolvingEventId(eventId);
+    setResolutionType('EQUIPMENT_FAILURE');
+    setResolutionNotes('');
+    setResolutionFineAmount('500');
+    setError(null);
+  };
+
+  const cancelResolveForm = () => {
+    setResolvingEventId(null);
+    setResolutionNotes('');
+    setResolutionFineAmount('500');
+    setResolvingSubmit(false);
+  };
+
   const resolveEvent = async (eventId: number) => {
     if (!user?.token) return;
 
-    const misuse = window.confirm('Resolver como MAL USO del usuario? (Aceptar = Sí / Cancelar = Falla de equipo)');
-    const resolution = misuse ? 'USER_MISUSE' : 'EQUIPMENT_FAILURE';
-    const notes = window.prompt('Notas de resolución (opcional)') || undefined;
-
-    let fineAmount: number | undefined;
-    if (resolution === 'USER_MISUSE') {
-      const amountInput = window.prompt('Monto de multa (MXN)', '500');
-      fineAmount = Number(amountInput);
-      if (!fineAmount || fineAmount <= 0) {
+    let fineAmount: number | undefined = undefined;
+    if (resolutionType === 'USER_MISUSE') {
+      fineAmount = Number(resolutionFineAmount);
+      if (!fineAmount || fineAmount <= 0 || Number.isNaN(fineAmount)) {
         setError('Debes indicar un monto válido para multa por mal uso');
         return;
       }
     }
 
+    setResolvingSubmit(true);
     try {
       const response = await fetch(buildApiUrl(`tool-requests/kits/events/${eventId}/resolve`), {
         method: 'POST',
@@ -147,7 +170,11 @@ const ToolUserKitPanel: React.FC = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${user.token}`,
         },
-        body: JSON.stringify({ resolution, notes, fineAmount }),
+        body: JSON.stringify({
+          resolution: resolutionType,
+          notes: resolutionNotes.trim() || undefined,
+          fineAmount,
+        }),
       });
 
       if (!response.ok) {
@@ -157,8 +184,11 @@ const ToolUserKitPanel: React.FC = () => {
 
       await fetchRows();
       setError(null);
+      cancelResolveForm();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
+    } finally {
+      setResolvingSubmit(false);
     }
   };
 
@@ -297,13 +327,67 @@ const ToolUserKitPanel: React.FC = () => {
                             </div>
                             <div style={{ fontSize: 12 }}>{event.description}</div>
                             {event.resolution === 'PENDING' && (
-                              <button
-                                className="button-secondary"
-                                style={{ marginTop: 6, padding: '4px 8px', fontSize: 11 }}
-                                onClick={() => resolveEvent(event.id)}
-                              >
-                                Resolver incidente
-                              </button>
+                              <div style={{ marginTop: 6, display: 'grid', gap: 8 }}>
+                                {resolvingEventId !== event.id ? (
+                                  <button
+                                    className="button-secondary"
+                                    style={{ padding: '4px 8px', fontSize: 11, justifySelf: 'start' }}
+                                    onClick={() => openResolveForm(event.id)}
+                                  >
+                                    Resolver incidente
+                                  </button>
+                                ) : (
+                                  <div style={{ display: 'grid', gap: 8, border: '1px solid var(--muted)', borderRadius: 8, padding: 8 }}>
+                                    <select
+                                      className="input"
+                                      value={resolutionType}
+                                      onChange={(e) => setResolutionType(e.target.value as 'USER_MISUSE' | 'EQUIPMENT_FAILURE')}
+                                    >
+                                      <option value="EQUIPMENT_FAILURE">Falla de equipo (reemplazo / reparación)</option>
+                                      <option value="USER_MISUSE">Mal uso del usuario (genera multa)</option>
+                                    </select>
+
+                                    {resolutionType === 'USER_MISUSE' && (
+                                      <input
+                                        className="input"
+                                        type="number"
+                                        min="1"
+                                        step="0.01"
+                                        value={resolutionFineAmount}
+                                        onChange={(e) => setResolutionFineAmount(e.target.value)}
+                                        placeholder="Monto de multa"
+                                      />
+                                    )}
+
+                                    <textarea
+                                      className="input"
+                                      style={{ minHeight: 70, resize: 'vertical' }}
+                                      value={resolutionNotes}
+                                      onChange={(e) => setResolutionNotes(e.target.value)}
+                                      placeholder="Notas de resolución (opcional)"
+                                    />
+
+                                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                      <button
+                                        className="button-primary"
+                                        style={{ padding: '4px 10px', fontSize: 11 }}
+                                        onClick={() => resolveEvent(event.id)}
+                                        disabled={resolvingSubmit}
+                                      >
+                                        {resolvingSubmit ? 'Resolviendo...' : 'Guardar resolución'}
+                                      </button>
+                                      <button
+                                        className="button-secondary"
+                                        style={{ padding: '4px 10px', fontSize: 11 }}
+                                        onClick={cancelResolveForm}
+                                        disabled={resolvingSubmit}
+                                      >
+                                        Cancelar
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             )}
                           </div>
                         ))}
