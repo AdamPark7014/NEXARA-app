@@ -94,6 +94,7 @@ const toApi = (path: string) => `${apiBase}/${path.replace(/^\/+/, "")}`;
 export default function CvsManagementPanel() {
   const { user } = useUser();
   const router = useRouter();
+  const fileInputId = "cv-upload-file";
 
   const [rows, setRows] = useState<CvRow[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -571,7 +572,18 @@ export default function CvsManagementPanel() {
           />
 
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
-            <input type="file" accept="application/pdf" onChange={(event) => setUploadFile(event.target.files?.[0] || null)} required />
+            <input
+              id={fileInputId}
+              type="file"
+              accept="application/pdf,image/png,image/jpeg,image/webp,image/gif,image/bmp,image/svg+xml,image/avif"
+              onChange={(event) => setUploadFile(event.target.files?.[0] || null)}
+              required
+              style={hiddenInputStyle}
+            />
+            <label htmlFor={fileInputId} style={filePickerStyle}>
+              <span style={filePickerButtonStyle}>Seleccionar archivo</span>
+              <span style={filePickerNameStyle}>{uploadFile?.name || "Ningún archivo seleccionado"}</span>
+            </label>
             <button type="submit" style={buttonPrimary} disabled={busy}>
               Subir CV
             </button>
@@ -897,14 +909,58 @@ const buttonPrimary: React.CSSProperties = {
 };
 
 const buttonGhost: React.CSSProperties = {
-  border: "1px solid rgba(148, 163, 184, 0.35)",
+  border: "1px solid rgba(59, 130, 246, 0.42)",
   borderRadius: 8,
-  background: "transparent",
+  background: "rgba(15, 23, 42, 0.45)",
   color: "var(--foreground)",
   fontWeight: 500,
   fontSize: 12,
   padding: "8px 10px",
   cursor: "pointer",
+};
+
+const hiddenInputStyle: React.CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  border: 0,
+};
+
+const filePickerStyle: React.CSSProperties = {
+  border: "1px solid rgba(59, 130, 246, 0.32)",
+  borderRadius: 10,
+  background: "var(--background)",
+  minWidth: 320,
+  maxWidth: 520,
+  width: "100%",
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  padding: 6,
+  cursor: "pointer",
+};
+
+const filePickerButtonStyle: React.CSSProperties = {
+  borderRadius: 7,
+  background: "var(--primary)",
+  color: "white",
+  fontWeight: 600,
+  fontSize: 12,
+  padding: "8px 12px",
+  whiteSpace: "nowrap",
+};
+
+const filePickerNameStyle: React.CSSProperties = {
+  fontSize: 12,
+  color: "var(--foreground)",
+  opacity: 0.9,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
 };
 
 const chipStyle: React.CSSProperties = {
