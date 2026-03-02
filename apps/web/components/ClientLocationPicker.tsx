@@ -1,6 +1,8 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 
+const GOOGLE_MAPS_SCRIPT_ID = "google-maps-script";
+
 export type ClientLocationValue = {
   address?: string;
   placeId?: string;
@@ -18,30 +20,63 @@ type ClientLocationPickerProps = {
 const loadGoogleMaps = (apiKey: string) => {
   if (!apiKey) return Promise.reject(new Error("API key no configurada"));
   if (window.google?.maps) return Promise.resolve();
+
+  const injectScript = () =>
+    new Promise<void>((resolve, reject) => {
+      const script = document.createElement("script");
+      script.id = GOOGLE_MAPS_SCRIPT_ID;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=weekly&libraries=places,marker&loading=async`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        window.setTimeout(() => {
+          if (window.google?.maps) {
+            resolve();
+          } else {
+            reject(new Error("Google Maps no se inicializó correctamente"));
+          }
+        }, 120);
+      };
+      script.onerror = () => reject(new Error("Error al cargar Google Maps"));
+      document.body.appendChild(script);
+    });
+
+  const removeExistingScript = () => {
+    const stale = document.getElementById(GOOGLE_MAPS_SCRIPT_ID);
+    stale?.parentElement?.removeChild(stale);
+  };
+
   return new Promise<void>((resolve, reject) => {
-    const existing = document.getElementById("google-maps-script");
+    const existing = document.getElementById(GOOGLE_MAPS_SCRIPT_ID);
     if (existing) {
-      existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => reject(new Error("Error al cargar Google Maps")));
+      if (window.google?.maps) {
+        resolve();
+        return;
+      }
+
+      const start = Date.now();
+      const checkGoogle = window.setInterval(() => {
+        if (window.google?.maps) {
+          window.clearInterval(checkGoogle);
+          resolve();
+          return;
+        }
+
+        if (Date.now() - start > 12000) {
+          window.clearInterval(checkGoogle);
+          removeExistingScript();
+          injectScript().then(resolve).catch(reject);
+        }
+      }, 120);
+
+      existing.addEventListener("error", () => {
+        window.clearInterval(checkGoogle);
+        removeExistingScript();
+        injectScript().then(resolve).catch(reject);
+      }, { once: true });
       return;
     }
-    const script = document.createElement("script");
-    script.id = "google-maps-script";
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&v=weekly&libraries=places,marker&loading=async`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-      // Espera a que google.maps esté completamente inicializado
-      setTimeout(() => {
-        if (window.google?.maps) {
-          resolve();
-        } else {
-          reject(new Error("Google Maps no se inicializó correctamente"));
-        }
-      }, 100);
-    };
-    script.onerror = () => reject(new Error("Error al cargar Google Maps"));
-    document.body.appendChild(script);
+    injectScript().then(resolve).catch(reject);
   });
 };
 
@@ -52,6 +87,15 @@ const ensurePlacesLibrary = async () => {
   if (typeof google.maps.importLibrary === "function") {
     await google.maps.importLibrary("places");
   }
+};
+
+const resolveMapCtor = async (mapsApi: any) => {
+  if (typeof mapsApi?.Map === "function") return mapsApi.Map;
+  if (typeof mapsApi?.importLibrary === "function") {
+    const mapsLibrary = await mapsApi.importLibrary("maps");
+    if (typeof mapsLibrary?.Map === "function") return mapsLibrary.Map;
+  }
+  return null;
 };
 
 const toNumber = (value?: number | null) => {
@@ -93,11 +137,21 @@ export default function ClientLocationPicker({ label, value, onChange, height = 
       .then(async () => {
         if (!isActive || !mapRef.current || !window.google?.maps) return;
         const google = window.google as any;
+        let mapCtor: any = null;
+        for (let attempt = 0; attempt < 25; attempt += 1) {
+          mapCtor = await resolveMapCtor(google.maps);
+          if (mapCtor) break;
+          await new Promise((resolve) => window.setTimeout(resolve, 120));
+        }
+        if (!mapCtor) {
+          setStatus("Google Maps Map constructor no disponible.");
+          return;
+        }
         const center = {
           lat: toNumber(value.latitud) || 19.4326,
           lng: toNumber(value.longitud) || -99.1332,
         };
-        mapInstance.current = new google.maps.Map(mapRef.current, {
+        mapInstance.current = new mapCtor(mapRef.current, {
           center,
           zoom: 13,
           mapTypeControl: false,

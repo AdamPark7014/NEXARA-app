@@ -10,6 +10,7 @@ import styles from "./ConsoleAttendanceTable.module.css";
 type AttendanceEvent = { 
   type: string; 
   timestamp: string; 
+  deviceInfo?: string;
   photoUrl?: string;
   entryLatitude?: number;
   entryLongitude?: number;
@@ -105,6 +106,11 @@ const formatDateLabel = (dateKey: string) => {
   return date.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
 };
 
+const formatDeviceInfo = (deviceInfo?: string | null) => {
+  const normalized = String(deviceInfo || "").trim();
+  return normalized || "Sin dispositivo";
+};
+
 const getMinutesFromMidnight = (iso: string) => {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
@@ -168,8 +174,8 @@ const groupDailyDetails = (
   const dailyMap = new Map<
     string,
     { 
-      entries: { time: string; photoUrl?: string; latitude?: number; longitude?: number }[]; 
-      exits: { time: string; photoUrl?: string; latitude?: number; longitude?: number }[]; 
+      entries: { time: string; deviceInfo?: string; photoUrl?: string; latitude?: number; longitude?: number }[]; 
+      exits: { time: string; deviceInfo?: string; photoUrl?: string; latitude?: number; longitude?: number }[]; 
       activities: Activity[] 
     }
   >();
@@ -186,6 +192,7 @@ const groupDailyDetails = (
     if (item.type === "entrada") {
       const entryData = { 
         time: timeLabel, 
+        deviceInfo: item.deviceInfo,
         photoUrl: item.photoUrl,
         latitude: item.entryLatitude,
         longitude: item.entryLongitude,
@@ -196,6 +203,7 @@ const groupDailyDetails = (
     if (item.type === "salida") {
       const exitData = { 
         time: timeLabel, 
+        deviceInfo: item.deviceInfo,
         photoUrl: item.photoUrl,
         latitude: item.exitLatitude,
         longitude: item.exitLongitude,
@@ -560,13 +568,15 @@ const ConsoleAttendanceTable = () => {
                                       <th>Fecha</th>
                                       <th>Entradas</th>
                                       <th>Salidas</th>
+                                      <th>Dispositivo entrada</th>
+                                      <th>Dispositivo salida</th>
                                       <th>Actividades</th>
                                     </tr>
                                   </thead>
                                   <tbody>
                                     {dailyRows.length === 0 && (
                                       <tr>
-                                        <td colSpan={4} className={styles.emptyRow}>
+                                        <td colSpan={6} className={styles.emptyRow}>
                                           Sin registros en este periodo.
                                         </td>
                                       </tr>
@@ -703,6 +713,16 @@ const ConsoleAttendanceTable = () => {
                                           ) : (
                                             "-"
                                           )}
+                                        </td>
+                                        <td>
+                                          {row.entries.length
+                                            ? row.entries.map((entry) => formatDeviceInfo(entry.deviceInfo)).join(", ")
+                                            : "-"}
+                                        </td>
+                                        <td>
+                                          {row.exits.length
+                                            ? row.exits.map((exit) => formatDeviceInfo(exit.deviceInfo)).join(", ")
+                                            : "-"}
                                         </td>
                                         <td>
                                           {row.activities.length ? (

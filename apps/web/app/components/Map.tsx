@@ -56,6 +56,31 @@ export default function Map() {
       if (window.google?.maps) return Promise.resolve();
       if (!GOOGLE_MAPS_API_KEY) return Promise.reject(new Error("API key no configurada"));
 
+      const injectScript = () =>
+        new Promise<void>((resolve, reject) => {
+          const script = document.createElement("script");
+          script.id = GOOGLE_MAPS_SCRIPT_ID;
+          script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&v=weekly&libraries=places,marker&loading=async`;
+          script.async = true;
+          script.defer = true;
+          script.onload = () => {
+            window.setTimeout(() => {
+              if (window.google?.maps) {
+                resolve();
+              } else {
+                reject(new Error("Google Maps no se inicializó correctamente"));
+              }
+            }, 120);
+          };
+          script.onerror = () => reject(new Error("Error al cargar Google Maps API"));
+          document.head.appendChild(script);
+        });
+
+      const removeExistingScript = () => {
+        const stale = document.getElementById(GOOGLE_MAPS_SCRIPT_ID);
+        stale?.parentElement?.removeChild(stale);
+      };
+
       return new Promise<void>((resolve, reject) => {
         const existingScript = document.getElementById(GOOGLE_MAPS_SCRIPT_ID) as HTMLScriptElement | null;
 
@@ -75,26 +100,21 @@ export default function Map() {
 
             if (Date.now() - start > 12000) {
               window.clearInterval(checkGoogle);
-              reject(new Error("Timeout esperando Google Maps API"));
+              removeExistingScript();
+              injectScript().then(resolve).catch(reject);
             }
           }, 120);
 
           existingScript.addEventListener("error", () => {
             window.clearInterval(checkGoogle);
-            reject(new Error("Error al cargar Google Maps API"));
+            removeExistingScript();
+            injectScript().then(resolve).catch(reject);
           }, { once: true });
 
           return;
         }
 
-        const script = document.createElement("script");
-        script.id = GOOGLE_MAPS_SCRIPT_ID;
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&v=weekly&libraries=marker&loading=async`;
-        script.async = true;
-        script.defer = true;
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error("Error al cargar Google Maps API"));
-        document.head.appendChild(script);
+        injectScript().then(resolve).catch(reject);
       });
     };
 
@@ -103,6 +123,15 @@ export default function Map() {
       if (typeof maps.importLibrary === "function") {
         const mapsLibrary = await maps.importLibrary("maps");
         if (typeof mapsLibrary?.Map === "function") return mapsLibrary.Map;
+      }
+      return null;
+    };
+
+    const waitForMapConstructor = async (maps: GoogleMapsAPI) => {
+      for (let attempt = 0; attempt < 25; attempt += 1) {
+        const MapConstructor = await resolveMapConstructor(maps);
+        if (MapConstructor) return MapConstructor;
+        await new Promise((r) => window.setTimeout(r, 120));
       }
       return null;
     };
@@ -119,7 +148,7 @@ export default function Map() {
           return;
         }
 
-        const MapConstructor = await resolveMapConstructor(maps);
+        const MapConstructor = await waitForMapConstructor(maps);
         if (!MapConstructor) {
           throw new Error("Google Maps Map no disponible");
         }

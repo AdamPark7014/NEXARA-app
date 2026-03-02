@@ -6,7 +6,7 @@ import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import styles from "./ConsoleAttendanceTable.module.css";
 
-type AttendanceEvent = { type: string; timestamp: string };
+type AttendanceEvent = { type: string; timestamp: string; deviceInfo?: string };
 
 type Activity = {
   id: number;
@@ -96,6 +96,11 @@ const formatDateLabel = (dateKey: string) => {
   return date.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
 };
 
+const formatDeviceInfo = (deviceInfo?: string | null) => {
+  const normalized = String(deviceInfo || "").trim();
+  return normalized || "Sin dispositivo";
+};
+
 const getMinutesFromMidnight = (iso: string) => {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
@@ -153,7 +158,11 @@ const groupDailyDetails = (
 ) => {
   const dailyMap = new Map<
     string,
-    { entries: string[]; exits: string[]; activities: Activity[] }
+    {
+      entries: { time: string; deviceInfo?: string }[];
+      exits: { time: string; deviceInfo?: string }[];
+      activities: Activity[];
+    }
   >();
 
   attendances.forEach((item) => {
@@ -164,8 +173,8 @@ const groupDailyDetails = (
     if (timestamp < rangeStart || timestamp > rangeEnd) return;
     const entry = dailyMap.get(dateKey) || { entries: [], exits: [], activities: [] };
     const timeLabel = formatTimeOnly(item.timestamp);
-    if (item.type === "entrada") entry.entries.push(timeLabel);
-    if (item.type === "salida") entry.exits.push(timeLabel);
+    if (item.type === "entrada") entry.entries.push({ time: timeLabel, deviceInfo: item.deviceInfo });
+    if (item.type === "salida") entry.exits.push({ time: timeLabel, deviceInfo: item.deviceInfo });
     dailyMap.set(dateKey, entry);
   });
 
@@ -499,13 +508,15 @@ const ConsoleAttendanceTable = () => {
                                       <th>Fecha</th>
                                       <th>Entradas</th>
                                       <th>Salidas</th>
+                                      <th>Dispositivo entrada</th>
+                                      <th>Dispositivo salida</th>
                                       <th>Actividades</th>
                                     </tr>
                                   </thead>
                                   <tbody>
                                     {dailyRows.length === 0 && (
                                       <tr>
-                                        <td colSpan={4} className={styles.emptyRow}>
+                                        <td colSpan={6} className={styles.emptyRow}>
                                           Sin registros en este periodo.
                                         </td>
                                       </tr>
@@ -513,8 +524,18 @@ const ConsoleAttendanceTable = () => {
                                     {dailyRows.map((row) => (
                                       <tr key={row.date}>
                                         <td>{formatDateLabel(row.date)}</td>
-                                        <td>{row.entries.length ? row.entries.join(", ") : "-"}</td>
-                                        <td>{row.exits.length ? row.exits.join(", ") : "-"}</td>
+                                        <td>{row.entries.length ? row.entries.map((entry) => entry.time).join(", ") : "-"}</td>
+                                        <td>{row.exits.length ? row.exits.map((exit) => exit.time).join(", ") : "-"}</td>
+                                        <td>
+                                          {row.entries.length
+                                            ? row.entries.map((entry) => formatDeviceInfo(entry.deviceInfo)).join(", ")
+                                            : "-"}
+                                        </td>
+                                        <td>
+                                          {row.exits.length
+                                            ? row.exits.map((exit) => formatDeviceInfo(exit.deviceInfo)).join(", ")
+                                            : "-"}
+                                        </td>
                                         <td>
                                           {row.activities.length ? (
                                             <div className={styles.activityList}>

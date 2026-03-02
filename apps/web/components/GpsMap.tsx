@@ -5,6 +5,8 @@ import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import { getSocketBaseUrl } from '@/lib/api-base';
 
+const GOOGLE_MAPS_SCRIPT_ID = 'google-maps-script';
+
 type GpsUser = {
   id: number;
   nombre: string;
@@ -66,30 +68,63 @@ const GpsMap = () => {
   const loadGoogleMaps = () => {
     if (!canUseMaps) return Promise.reject(new Error('API key no configurada'));
     if (window.google?.maps) return Promise.resolve();
+
+    const injectScript = () =>
+      new Promise<void>((resolve, reject) => {
+        const script = document.createElement('script');
+        script.id = GOOGLE_MAPS_SCRIPT_ID;
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsKey}&v=weekly&libraries=places,marker&loading=async`;
+        script.async = true;
+        script.defer = true;
+        script.onload = () => {
+          window.setTimeout(() => {
+            if (window.google?.maps) {
+              resolve();
+            } else {
+              reject(new Error('Google Maps no se inicializó correctamente'));
+            }
+          }, 120);
+        };
+        script.onerror = () => reject(new Error('Error al cargar Google Maps'));
+        document.body.appendChild(script);
+      });
+
+    const removeExistingScript = () => {
+      const stale = document.getElementById(GOOGLE_MAPS_SCRIPT_ID);
+      stale?.parentElement?.removeChild(stale);
+    };
+
     return new Promise<void>((resolve, reject) => {
-      const existing = document.getElementById('google-maps-script');
+      const existing = document.getElementById(GOOGLE_MAPS_SCRIPT_ID);
       if (existing) {
-        existing.addEventListener('load', () => resolve());
-        existing.addEventListener('error', () => reject(new Error('Error al cargar Google Maps')));
+        if (window.google?.maps) {
+          resolve();
+          return;
+        }
+
+        const start = Date.now();
+        const checkGoogle = window.setInterval(() => {
+          if (window.google?.maps) {
+            window.clearInterval(checkGoogle);
+            resolve();
+            return;
+          }
+
+          if (Date.now() - start > 12000) {
+            window.clearInterval(checkGoogle);
+            removeExistingScript();
+            injectScript().then(resolve).catch(reject);
+          }
+        }, 120);
+
+        existing.addEventListener('error', () => {
+          window.clearInterval(checkGoogle);
+          removeExistingScript();
+          injectScript().then(resolve).catch(reject);
+        }, { once: true });
         return;
       }
-      const script = document.createElement('script');
-      script.id = 'google-maps-script';
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsKey}&v=weekly&libraries=places,marker&loading=async`;
-      script.async = true;
-      script.defer = true;
-      script.onload = () => {
-        // Espera a que google.maps esté completamente inicializado
-        setTimeout(() => {
-          if (window.google?.maps) {
-            resolve();
-          } else {
-            reject(new Error('Google Maps no se inicializó correctamente'));
-          }
-        }, 100);
-      };
-      script.onerror = () => reject(new Error('Error al cargar Google Maps'));
-      document.body.appendChild(script);
+      injectScript().then(resolve).catch(reject);
     });
   };
 
@@ -313,7 +348,12 @@ const GpsMap = () => {
     if (!canUseMaps) return;
     loadGoogleMaps()
       .then(async () => {
-        const ctor = await resolveMapCtor();
+        let ctor: any = null;
+        for (let attempt = 0; attempt < 25; attempt += 1) {
+          ctor = await resolveMapCtor();
+          if (ctor) break;
+          await new Promise((resolve) => window.setTimeout(resolve, 120));
+        }
         if (!ctor) {
           throw new Error('Google Maps Map constructor no disponible');
         }
@@ -325,27 +365,57 @@ const GpsMap = () => {
 
   useEffect(() => {
     if (!mapsReady || !window.google?.maps || !mapCtor) return;
+    if (typeof mapCtor !== 'function') {
+      setMapsReady(false);
+      setError('Constructor de Google Maps no disponible. Reintentando...');
+      return;
+    }
     if (myMapRef.current && !myMapInstance.current) {
-      myMapInstance.current = new mapCtor(myMapRef.current, {
-        center: { lat: 19.4326, lng: -99.1332 },
-        zoom: 14,
-        zoomControl: false,
-        mapTypeControl: false,
-        fullscreenControl: false,
-        streetViewControl: false,
-      });
+      try {
+        myMapInstance.current = new mapCtor(myMapRef.current, {
+          center: { lat: 19.4326, lng: -99.1332 },
+          zoom: 14,
+          zoomControl: false,
+          mapTypeControl: false,
+          fullscreenControl: false,
+          streetViewControl: false,
+        });
+      } catch {
+        setMapsReady(false);
+        setError('No se pudo crear el mapa personal. Reintentando...');
+        return;
+      }
     }
     if (teamMapRef.current && !teamMapInstance.current) {
-      teamMapInstance.current = new mapCtor(teamMapRef.current, {
-        center: { lat: 19.4326, lng: -99.1332 },
-        zoom: 12,
-        zoomControl: false,
-        mapTypeControl: false,
-        fullscreenControl: false,
-        streetViewControl: false,
-      });
+      try {
+        teamMapInstance.current = new mapCtor(teamMapRef.current, {
+          center: { lat: 19.4326, lng: -99.1332 },
+          zoom: 12,
+          zoomControl: false,
+          mapTypeControl: false,
+          fullscreenControl: false,
+          streetViewControl: false,
+        });
+      } catch {
+        setMapsReady(false);
+        setError('No se pudo crear el mapa de equipo. Reintentando...');
+        return;
+      }
     }
   }, [mapsReady, mapCtor]);
+
+  useEffect(() => {
+    return () => {
+      myMarkersRef.current.forEach((marker) => setMapMarkerInstanceMap(marker, null));
+      teamMarkersRef.current.forEach((marker) => setMapMarkerInstanceMap(marker, null));
+      myMarkersRef.current.clear();
+      teamMarkersRef.current.clear();
+      myMapInstance.current = null;
+      teamMapInstance.current = null;
+      setMapCtor(null);
+      setMapsReady(false);
+    };
+  }, []);
 
   useEffect(() => {
     if (!myMapInstance.current || !myLocation || !window.google?.maps) return;
