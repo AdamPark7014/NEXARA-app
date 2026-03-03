@@ -21,12 +21,12 @@
 }
 
 /* Force Google Maps InfoWindow to show full content */
-:global(.gm-style .gm-style-iw-d) {
+.mapContainer :global(.gm-style .gm-style-iw-d) {
   overflow: visible !important;
   max-height: none !important;
 }
 
-:global(.gm-style .gm-style-iw-c) {
+.mapContainer :global(.gm-style .gm-style-iw-c) {
   padding: 0 !important;
   max-width: 300px !important;
   max-height: none !important;
@@ -34,12 +34,12 @@
   box-shadow: 0 8px 32px rgba(0,0,0,0.18) !important;
 }
 
-:global(.gm-style .gm-style-iw-tc) {
+.mapContainer :global(.gm-style .gm-style-iw-tc) {
   display: none;
 }
 
 /* Global InfoWindow styles - Corporate design with theme transitions */
-:global(.nexara-map-info) {
+.mapContainer :global(.nexara-map-info) {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   text-align: center;
   padding: 8px 10px 10px;
@@ -50,7 +50,7 @@
   border-radius: 8px;
 }
 
-:global(.nexara-map-logo) {
+.mapContainer :global(.nexara-map-logo) {
   width: 24px;
   height: 24px;
   object-fit: contain;
@@ -61,7 +61,7 @@
   background: linear-gradient(135deg, rgba(37,99,235,0.1) 0%, rgba(14,165,233,0.1) 100%);
 }
 
-:global(.nexara-map-title) {
+.mapContainer :global(.nexara-map-title) {
   margin: 0 0 1px;
   font-size: 11px;
   font-weight: 700;
@@ -69,7 +69,7 @@
   letter-spacing: 0.2px;
 }
 
-:global(.nexara-map-subtitle) {
+.mapContainer :global(.nexara-map-subtitle) {
   margin: 0 0 6px;
   font-size: 8px;
   font-weight: 500;
@@ -77,7 +77,7 @@
   letter-spacing: 0.1px;
 }
 
-:global(.nexara-map-btn) {
+.mapContainer :global(.nexara-map-btn) {
   display: block;
   width: 100%;
   padding: 5px 10px;
@@ -94,43 +94,43 @@
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-:global(.nexara-map-btn:hover) {
+.mapContainer :global(.nexara-map-btn:hover) {
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(30,64,175,0.4), inset 0 1px 0 rgba(255,255,255,0.15);
 }
 
-:global(.nexara-map-btn:active) {
+.mapContainer :global(.nexara-map-btn:active) {
   transform: translateY(0);
   box-shadow: 0 2px 6px rgba(30,64,175,0.25);
 }
 
 /* Dark mode styles for Google Maps InfoWindow */
-:global(.gm-style .gm-style-iw-c) {
+.mapContainer :global(.gm-style .gm-style-iw-c) {
   transition: background-color 0.3s ease !important;
 }
 
-:global(body.dark .nexara-map-info) {
+:global(body.dark) .mapContainer :global(.nexara-map-info) {
   background: #1e293b;
 }
 
-:global(body.dark .nexara-map-logo) {
+:global(body.dark) .mapContainer :global(.nexara-map-logo) {
   background: linear-gradient(135deg, rgba(59,130,246,0.15) 0%, rgba(14,165,233,0.15) 100%);
 }
 
-:global(body.dark .nexara-map-title) {
+:global(body.dark) .mapContainer :global(.nexara-map-title) {
   color: #f1f5f9;
 }
 
-:global(body.dark .nexara-map-subtitle) {
+:global(body.dark) .mapContainer :global(.nexara-map-subtitle) {
   color: #94a3b8;
 }
 
-:global(body.dark .nexara-map-btn) {
+:global(body.dark) .mapContainer :global(.nexara-map-btn) {
   background: linear-gradient(135deg, #2563eb 0%, #3b82f6 50%, #0ea5e9 100%);
   box-shadow: 0 2px 10px rgba(59,130,246,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
 }
 
-:global(body.dark .nexara-map-btn:hover) {
+:global(body.dark) .mapContainer :global(.nexara-map-btn:hover) {
   box-shadow: 0 6px 20px rgba(59,130,246,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
 }
 
@@ -189,28 +189,28 @@
     padding: 12px;
   }
 
-  :global(.nexara-map-info) {
+  .mapContainer :global(.nexara-map-info) {
     padding: 10px 12px 12px;
     min-width: 140px;
   }
 
-  :global(.nexara-map-logo) {
+  .mapContainer :global(.nexara-map-logo) {
     width: 32px;
     height: 32px;
     margin-bottom: 6px;
   }
 
-  :global(.nexara-map-title) {
+  .mapContainer :global(.nexara-map-title) {
     font-size: 14px;
     margin-bottom: 2px;
   }
 
-  :global(.nexara-map-subtitle) {
+  .mapContainer :global(.nexara-map-subtitle) {
     font-size: 10px;
     margin-bottom: 10px;
   }
 
-  :global(.nexara-map-btn) {
+  .mapContainer :global(.nexara-map-btn) {
     padding: 8px 12px;
     font-size: 11px;
   }
@@ -222,17 +222,17 @@
     min-height: 140px;
   }
 
-  :global(.nexara-map-info) {
+  .mapContainer :global(.nexara-map-info) {
     padding: 8px 10px 10px;
     min-width: 120px;
   }
 
-  :global(.nexara-map-subtitle) {
+  .mapContainer :global(.nexara-map-subtitle) {
     font-size: 9px;
     margin-bottom: 8px;
   }
 
-  :global(.nexara-map-btn) {
+  .mapContainer :global(.nexara-map-btn) {
     padding: 7px 10px;
     font-size: 10px;
   }
