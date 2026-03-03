@@ -5,11 +5,13 @@ import styles from "./Map.module.css";
 const GOOGLE_MAPS_SCRIPT_ID = "google-maps-script";
 const GOOGLE_MAPS_API_KEY =
   process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "AIzaSyDOJ7TFUE5F1vD_qVh9ofKOSS5gd2mbnyE";
+const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || "";
 
 // Tipos para Google Maps
 interface GoogleMapsOptions {
   zoom: number;
   center: { lat: number; lng: number };
+  mapId?: string;
   mapTypeControl: boolean;
   fullscreenControl: boolean;
   streetViewControl: boolean;
@@ -161,6 +163,7 @@ export default function Map() {
         mapInstance.current = new MapConstructor(mapRef.current, {
           zoom: 18,
           center: location,
+          ...(GOOGLE_MAPS_MAP_ID ? { mapId: GOOGLE_MAPS_MAP_ID } : {}),
           mapTypeControl: true,
           fullscreenControl: true,
           streetViewControl: true,
@@ -169,7 +172,8 @@ export default function Map() {
 
         const currentMap = mapInstance.current;
         const mapsAny = window.google?.maps as any;
-        const marker = mapsAny?.marker?.AdvancedMarkerElement
+        const canUseAdvancedMarker = Boolean(GOOGLE_MAPS_MAP_ID && mapsAny?.marker?.AdvancedMarkerElement);
+        const marker = canUseAdvancedMarker
           ? new mapsAny.marker.AdvancedMarkerElement({
               position: location,
               map: currentMap,
