@@ -1,0 +1,156 @@
+.root {
+  display: grid;
+  gap: 16px;
+}
+
+.title {
+  font-size: clamp(1.5rem, 2vw, 2rem);
+  color: var(--primary);
+  margin: 0;
+}
+
+.panel,
+.uploadForm,
+.column,
+.cvCard {
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--surface);
+  display: grid;
+  gap: 10px;
+}
+
+.filterGrid,
+.uploadGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.filterActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.mineLabel {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.sectionTitle {
+  margin: 0;
+}
+
+.notesInput {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.uploadFooter {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.errorText {
+  color: var(--danger, #ef4444);
+  font-size: 13px;
+}
+
+.loadingText {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.boardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.column {
+  min-height: 180px;
+  gap: 8px;
+  border-color: rgba(148, 163, 184, 0.28);
+}
+
+.columnHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.columnTitle {
+  font-size: 14px;
+}
+
+.columnCount {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.cvCard {
+  border-color: rgba(148, 163, 184, 0.25);
+  border-radius: 10px;
+  padding: 10px;
+  background: var(--background);
+  gap: 6px;
+}
+
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cardName {
+  font-size: 14px;
+}
+
+.cardStatus {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.cardCategory {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.cardTags {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.reviewers {
+  display: grid;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.actionRow {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .uploadFooter {
+    justify-content: stretch;
+  }
+
+  .uploadFooter :global(.button-primary) {
+    width: 100%;
+  }
+
+  .filterActions :global(.button-primary),
+  .actionRow :global(.button-primary),
+  .actionRow :global(.button-secondary) {
+    width: 100%;
+  }
+}

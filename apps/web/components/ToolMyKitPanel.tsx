@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { useUser } from './UserContext';
+import styles from './ToolMyKitPanel.module.css';
 
 interface KitEvent {
   id: number;
@@ -84,51 +85,41 @@ const ToolMyKitPanel: React.FC = () => {
     }
   };
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 20 }}>Cargando mi kit...</div>;
+  if (loading) return <div className={styles.loading}>Cargando mi kit...</div>;
 
   return (
-    <div className="card" style={{ display: 'grid', gap: 16 }}>
-      <h3 style={{ color: 'var(--primary)', marginBottom: 4 }}>🧰 Mi Kit / Quid</h3>
-      {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}
+    <div className={`card ${styles.panel}`}>
+      <h3 className={styles.title}>🧰 Mi Kit / Quid</h3>
+      {error && <div className={styles.errorText}>{error}</div>}
 
       {items.length === 0 ? (
-        <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: 24 }}>
+        <div className={styles.empty}>
           No tienes herramientas de kit asignadas.
         </div>
       ) : (
-        <div style={{ display: 'grid', gap: 12 }}>
+        <div className={styles.list}>
           {items.map((item) => (
-            <div
-              key={item.id}
-              style={{
-                border: '1px solid var(--muted)',
-                borderRadius: 10,
-                padding: 12,
-                display: 'grid',
-                gap: 8,
-                background: 'var(--surface-light)',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <div style={{ fontWeight: 600 }}>
+            <div key={item.id} className={styles.itemCard}>
+              <div className={styles.itemHeader}>
+                <div className={styles.itemName}>
                   {item.inventoryItem.toolName} · {item.inventoryItem.model}
                 </div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                <div className={styles.mutedSmall}>
                   {item.assignmentType === 'KIT' ? 'Kit base' : 'Préstamo'}
                 </div>
               </div>
 
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              <div className={styles.mutedSmall}>
                 Serie: {item.inventoryItem.serialNumber} · Reemplazos: {item.replacementCount}
               </div>
 
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              <div className={styles.mutedSmall}>
                 Asignada: {new Date(item.assignedAt).toLocaleDateString('es-MX')}
                 {item.dueReturnDate ? ` · Devolver: ${new Date(item.dueReturnDate).toLocaleDateString('es-MX')}` : ''}
               </div>
 
               {item.events?.length > 0 && (
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                <div className={styles.mutedSmall}>
                   Último incidente: {item.events[0].description}
                 </div>
               )}

@@ -472,7 +472,7 @@ export default function Dashboard() {
       </div>
 
       <div className="kpiGrid">
-        <div className="kpiCard" style={{ animationDelay: '0.05s' }}>
+        <div className="kpiCard kpiDelay1">
           <div className="kpiHeader">
             <span className="kpiEyebrow">Horas trabajadas</span>
             <span className="kpiPill">Semana</span>
@@ -481,7 +481,7 @@ export default function Dashboard() {
           <div className="kpiMeta">Total semanal por usuario</div>
         </div>
 
-        <div className="kpiCard" style={{ animationDelay: '0.08s' }}>
+        <div className="kpiCard kpiDelay2">
           <div className="kpiHeader">
             <span className="kpiEyebrow">Usuarios activos</span>
             <span className="kpiPill">Hoy</span>
@@ -490,7 +490,7 @@ export default function Dashboard() {
           <div className="kpiMeta">Con entrada abierta</div>
         </div>
 
-        <div className="kpiCard" style={{ animationDelay: '0.1s' }}>
+        <div className="kpiCard kpiDelay3">
           <div className="kpiHeader">
             <span className="kpiEyebrow">Actividades</span>
             <span className="kpiPill">Semana</span>
@@ -499,7 +499,7 @@ export default function Dashboard() {
           <div className="kpiMeta">Asignadas o en proceso</div>
         </div>
 
-        <div className="kpiCard" style={{ animationDelay: '0.15s' }}>
+        <div className="kpiCard kpiDelay4">
           <div className="kpiHeader">
             <span className="kpiEyebrow">Viaticos</span>
             <span className="kpiPill">Semana</span>
@@ -508,7 +508,7 @@ export default function Dashboard() {
           <div className="kpiMeta">{viaticTotals.pending} pendientes · {viaticTotals.approved} aprobados</div>
         </div>
 
-        <div className="kpiCard" style={{ animationDelay: '0.2s' }}>
+        <div className="kpiCard kpiDelay5">
           <div className="kpiHeader">
             <span className="kpiEyebrow">Ritmo diario</span>
             <span className="kpiPill pillAccent">Promedio</span>
@@ -543,7 +543,7 @@ export default function Dashboard() {
                   <XAxis dataKey="date" stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
                   <YAxis allowDecimals={false} stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: '12px' }} />
+                  <Legend />
                   <Bar dataKey="horas" name="Horas" fill="url(#hoursFill)" radius={[8, 8, 0, 0]} barSize={28} />
                 </BarChart>
               </ResponsiveContainer>
@@ -832,6 +832,12 @@ export default function Dashboard() {
           gap: 10px;
           animation: floatUp 0.4s ease both;
         }
+
+        .kpiDelay1 { animation-delay: 0.05s; }
+        .kpiDelay2 { animation-delay: 0.08s; }
+        .kpiDelay3 { animation-delay: 0.1s; }
+        .kpiDelay4 { animation-delay: 0.15s; }
+        .kpiDelay5 { animation-delay: 0.2s; }
 
         :global(body.light) .kpiCard {
           background: linear-gradient(150deg, rgba(255, 255, 255, 0.86), rgba(235, 243, 255, 0.9));

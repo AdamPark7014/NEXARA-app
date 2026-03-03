@@ -118,6 +118,9 @@
   padding: 8px;
   border-radius: 8px;
   margin-bottom: 8px;
+  background: rgba(15, 106, 214, 0.08);
+  border-top: 4px solid #0f6ad6;
+  color: var(--foreground);
 }
 
 .previewHeader h4 {

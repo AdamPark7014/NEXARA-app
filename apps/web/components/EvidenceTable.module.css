@@ -5,6 +5,29 @@
   flex-wrap: wrap;
 }
 
+.title {
+  color: var(--primary);
+  margin-bottom: 12px;
+}
+
+.feedbackError,
+.feedbackSuccess,
+.lockedLabel {
+  font-size: 12px;
+}
+
+.feedbackError {
+  color: var(--danger);
+}
+
+.feedbackSuccess {
+  color: var(--accent);
+}
+
+.lockedLabel {
+  color: var(--text-secondary);
+}
+
 .hiddenInput {
   display: none;
 }

@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
+import styles from './FinesForm.module.css';
 
 const FINE_TYPES = {
   actividad: {
@@ -226,9 +227,9 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
 
   if (!permisoSi) {
     return (
-      <div className="card" style={{ width: '100%', maxWidth: 'min(760px, 100%)', marginBottom: 24 }}>
-        <h3 style={{ marginBottom: 16, color: 'var(--primary)' }}>Gestión de Multas</h3>
-        <div style={{ padding: 24, textAlign: 'center', color: 'var(--danger)' }}>
+      <div className={`card ${styles.container}`}>
+        <h3 className={styles.title}>Gestión de Multas</h3>
+        <div className={styles.denied}>
           ⛔ No tienes permisos para crear multas
         </div>
       </div>
@@ -236,12 +237,12 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card" style={{ width: '100%', maxWidth: 'min(760px, 100%)', marginBottom: 24 }}>
-      <h3 style={{ marginBottom: 16, color: 'var(--primary)' }}>Nueva Multa</h3>
+    <form onSubmit={handleSubmit} className={`card ${styles.container}`}>
+      <h3 className={styles.title}>Nueva Multa</h3>
       
-      <div style={{ display: 'grid', gap: 12 }}>
+      <div className={styles.grid}>
         {/* Usuario - Selector Directo */}
-        <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
+        <label className={styles.label}>
           👤 Usuario
           <select
             className="input"
@@ -261,22 +262,16 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
 
         {/* Información de usuario seleccionado */}
         {usuarioElegido && (
-          <div style={{
-            padding: 10,
-            backgroundColor: 'var(--primary)20',
-            borderRadius: 4,
-            fontSize: 12,
-            borderLeft: '3px solid var(--primary)',
-          }}>
-            <div style={{ fontWeight: 500 }}>✓ {usuarioElegido.nombre}</div>
-            <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginTop: 2 }}>
+          <div className={styles.selectedUserBox}>
+            <div className={styles.selectedUserName}>✓ {usuarioElegido.nombre}</div>
+            <div className={styles.selectedUserEmail}>
               {usuarioElegido.email}
             </div>
           </div>
         )}
 
         {/* Tipo de Multa */}
-        <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
+        <label className={styles.label}>
           📋 Tipo de Multa
           <select
             className="input"
@@ -296,7 +291,7 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
         </label>
 
         {/* Razón */}
-        <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
+        <label className={styles.label}>
           Razón
           <select
             className="input"
@@ -315,7 +310,7 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
         </label>
 
         {/* Monto */}
-        <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
+        <label className={styles.label}>
           Monto ($)
           <input
             className="input"
@@ -331,20 +326,19 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
         </label>
 
         {/* Descripción */}
-        <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
+        <label className={styles.label}>
           Descripción (Opcional)
           <textarea
-            className="input"
+            className={`input ${styles.textarea}`}
             value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)}
             placeholder="Detalles adicionales..."
             disabled={loading}
-            style={{ minHeight: 70, fontFamily: 'inherit' }}
           />
         </label>
 
         {/* Botón */}
-        <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
+        <div className={styles.actions}>
           <button 
             className="button-primary" 
             type="submit" 
@@ -355,34 +349,18 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
         </div>
       </div>
 
-      {error && <p style={{ color: 'var(--danger)', marginTop: 12, fontSize: 13 }}>⚠️ {error}</p>}
-      {success && <p style={{ color: 'var(--accent)', marginTop: 12, fontSize: 13 }}>✓ {success}</p>}
+      {error && <p className={styles.error}>⚠️ {error}</p>}
+      {success && <p className={styles.success}>✓ {success}</p>}
 
       {/* Usuarios disponibles */}
       {usuarios.length > 0 && (
-        <div style={{
-          marginTop: 16,
-          padding: 12,
-          backgroundColor: '#0f6ad620',
-          borderRadius: 4,
-          fontSize: 12,
-          color: 'var(--text-secondary)',
-          borderLeft: '2px solid #0f6ad6',
-        }}>
-          <strong style={{ color: 'var(--primary)' }}>👥 Usuarios disponibles:</strong> {usuarios.length}
+        <div className={styles.usersInfo}>
+          <strong className={styles.usersInfoTitle}>👥 Usuarios disponibles:</strong> {usuarios.length}
         </div>
       )}
 
       {usuarios.length === 0 && (
-        <div style={{
-          marginTop: 16,
-          padding: 12,
-          backgroundColor: '#ef444420',
-          borderRadius: 4,
-          fontSize: 12,
-          color: '#ef4444',
-          borderLeft: '2px solid #ef4444',
-        }}>
+        <div className={styles.usersEmpty}>
           <strong>⚠️ Sin usuarios disponibles</strong> según tu nivel jerárquico
         </div>
       )}

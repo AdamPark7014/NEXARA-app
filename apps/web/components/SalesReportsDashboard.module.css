@@ -248,13 +248,36 @@
 
 .performanceBar {
   height: 24px;
-  background: linear-gradient(90deg, #hsl(212, 98%, 45%) 0%, #198754 100%), #e0e0e0;
+  background: #e0e0e0;
   border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-size: 0% 100%;
-  background-repeat: no-repeat;
+  overflow: hidden;
+  position: relative;
+}
+
+.performanceProgress {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  background: transparent;
+}
+
+.performanceProgress::-webkit-progress-bar {
+  background: transparent;
+}
+
+.performanceProgress::-webkit-progress-value {
+  background: linear-gradient(90deg, #0f6ad6 0%, #198754 100%);
+}
+
+.performanceProgress::-moz-progress-bar {
+  background: linear-gradient(90deg, #0f6ad6 0%, #198754 100%);
 }
 
 .performanceText {
@@ -341,9 +364,26 @@
 
 .bar {
   height: 100%;
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+}
+
+.bar::-webkit-progress-bar {
+  background: transparent;
+}
+
+.bar::-webkit-progress-value {
   background: linear-gradient(90deg, #0f6ad6, #0d54a8);
   border-radius: 4px;
-  transition: width 0.3s ease;
+}
+
+.bar::-moz-progress-bar {
+  background: linear-gradient(90deg, #0f6ad6, #0d54a8);
+  border-radius: 4px;
 }
 
 .barValue {
@@ -386,6 +426,30 @@
   height: 12px;
   border-radius: 2px;
   flex-shrink: 0;
+}
+
+.legendColor0 {
+  background-color: #198754;
+}
+
+.legendColor1 {
+  background-color: #0d6efd;
+}
+
+.legendColor2 {
+  background-color: #dc3545;
+}
+
+.legendColor3 {
+  background-color: #6f42c1;
+}
+
+.legendColor4 {
+  background-color: #fd7e14;
+}
+
+.legendColor5 {
+  background-color: #20c997;
 }
 
 .legendLabel {

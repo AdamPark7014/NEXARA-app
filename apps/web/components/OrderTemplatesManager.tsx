@@ -346,14 +346,7 @@ export default function OrderTemplatesManager() {
               <p className={styles.meta}>{template.description || 'Sin descripción'}</p>
 
               <div className={styles.preview}>
-                <div
-                  className={styles.previewHeader}
-                  style={{
-                    backgroundColor: template.secondaryColor,
-                    borderTop: `4px solid ${template.primaryColor}`,
-                    color: template.textColor,
-                  }}
-                >
+                <div className={styles.previewHeader}>
                   <h4>{template.headerText || 'Propuesta Comercial'}</h4>
                   <div className={styles.previewMuted}>{template.companyName || 'Empresa'}</div>
                 </div>

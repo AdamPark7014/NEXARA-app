@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
+import styles from './LunchBreaksTable.module.css';
 
 interface LunchBreak {
   id: number;
@@ -92,178 +93,118 @@ const LunchBreaksTable: React.FC = () => {
     setExpandedPhotoUrl(null);
   };
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 20 }}>Cargando horas de comida...</div>;
+  if (loading) return <div className={styles.loading}>Cargando horas de comida...</div>;
 
   return (
-    <div style={{ display: 'grid', gap: 24 }}>
-      <style jsx>{`
-        .lunch-filter-row {
-          display: grid;
-          grid-template-columns: auto auto 1fr;
-          gap: 12px;
-          align-items: center;
-        }
+    <div className={styles.root}>
+      <div className={`card ${styles.panel}`}>
+        <h3 className={styles.title}>🍽️ Registro de Horas de Comida</h3>
 
-        .lunch-date-input {
-          max-width: 200px;
-          width: 100%;
-        }
+        {error && <div className={styles.error}>{error}</div>}
 
-        .desktop-table {
-          display: block;
-        }
-
-        .mobile-cards {
-          display: none;
-        }
-
-        @media (max-width: 1100px) {
-          .lunch-filter-row {
-            grid-template-columns: 1fr;
-          }
-
-          .lunch-date-input,
-          .lunch-clear-btn {
-            max-width: 100%;
-            width: 100%;
-          }
-
-          .desktop-table {
-            display: none;
-          }
-
-          .mobile-cards {
-            display: grid;
-            gap: 12px;
-          }
-        }
-
-        @media (max-width: 520px) {
-          .mobile-photo-actions {
-            grid-template-columns: 1fr;
-          }
-
-          .lunch-filter-row {
-            gap: 8px;
-          }
-        }
-      `}</style>
-      <div className="card" style={{ display: 'grid', gap: 16 }}>
-        <h3 style={{ color: 'var(--primary)', marginBottom: 4 }}>🍽️ Registro de Horas de Comida</h3>
-
-        {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}
-
-        <div className="lunch-filter-row">
+        <div className={styles.filterRow}>
           <input
             type="date"
-            className="input"
+            className={`input ${styles.dateInput}`}
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
-            style={{ width: '100%' }}
             data-lunch-filter="date"
           />
           {dateFilter && (
             <button
-              className="button-secondary lunch-clear-btn"
+              className={`button-secondary ${styles.clearBtn}`}
+              type="button"
               onClick={() => setDateFilter('')}
-              style={{ padding: '8px 12px', fontSize: 13 }}
             >
               Limpiar
             </button>
           )}
-          <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
+          <div className={styles.counter}>
             {lunchBreaks.length} registros
           </div>
         </div>
 
         {lunchBreaks.length === 0 ? (
-          <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: 40 }}>
+          <div className={styles.emptyState}>
             No hay registros de horas de comida
           </div>
         ) : (
           <>
-            <div className="desktop-table">
-              <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', border: '1px solid var(--muted)', borderRadius: 12 }}>
-                <table style={{ width: '100%', minWidth: 860, borderCollapse: 'collapse', fontSize: 13 }}>
+            <div className={styles.desktopTable}>
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
                   <thead>
-                    <tr style={{ borderBottom: '1px solid var(--muted)' }}>
-                      <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    <tr className={styles.rowBorder}>
+                      <th className={styles.th}>
                         Usuario
                       </th>
-                      <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      <th className={styles.th}>
                         Fecha
                       </th>
-                      <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      <th className={styles.th}>
                         Entrada a Comida
                       </th>
-                      <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      <th className={styles.th}>
                         Regreso al Trabajo
                       </th>
-                      <th style={{ padding: 12, textAlign: 'center', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      <th className={`${styles.th} ${styles.thCenter}`}>
                         Fotos
                       </th>
-                      <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      <th className={styles.th}>
                         Estado
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     {lunchBreaks.map((lunch) => (
-                      <tr key={lunch.id} style={{ borderBottom: '1px solid var(--muted)' }}>
-                        <td style={{ padding: 12 }}>
-                          <div style={{ fontWeight: 500 }}>{lunch.user.nombre}</div>
-                          <div style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
+                      <tr key={lunch.id} className={styles.rowBorder}>
+                        <td className={styles.td}>
+                          <div className={styles.userName}>{lunch.user.nombre}</div>
+                          <div className={styles.emailMuted}>
                             {lunch.user.email}
                           </div>
                         </td>
-                        <td style={{ padding: 12, color: 'var(--text-secondary)', fontSize: 12 }}>
+                        <td className={`${styles.td} ${styles.textMuted}`}>
                           {new Date(lunch.date).toLocaleDateString('es-MX')}
                         </td>
-                        <td style={{ padding: 12 }}>
-                          <div style={{ fontWeight: 500, fontSize: 12 }}>
+                        <td className={styles.td}>
+                          <div className={styles.timeStrong}>
                             {new Date(lunch.checkinTime).toLocaleTimeString('es-MX', {
                               hour: '2-digit',
                               minute: '2-digit',
                             })}
                           </div>
                           {lunch.isCheckinLate && (
-                            <div style={{ color: 'var(--warning)', fontSize: 11 }}>
+                            <div className={styles.warningText}>
                               ⚠️ Fuera de horario
                             </div>
                           )}
                         </td>
-                        <td style={{ padding: 12 }}>
+                        <td className={styles.td}>
                           {lunch.checkoutTime ? (
                             <>
-                              <div style={{ fontWeight: 500, fontSize: 12 }}>
+                              <div className={styles.timeStrong}>
                                 {new Date(lunch.checkoutTime).toLocaleTimeString('es-MX', {
                                   hour: '2-digit',
                                   minute: '2-digit',
                                 })}
                               </div>
                               {lunch.isCheckoutLate && (
-                                <div style={{ color: 'var(--danger)', fontSize: 11 }}>
+                                <div className={styles.dangerText}>
                                   ⚠️ Pasó de hora
                                 </div>
                               )}
                             </>
                           ) : (
-                            <span style={{ color: 'var(--text-secondary)' }}>—</span>
+                            <span className={styles.textMuted}>—</span>
                           )}
                         </td>
-                        <td style={{ padding: 12, textAlign: 'center' }}>
-                          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                        <td className={`${styles.td} ${styles.tdCenter}`}>
+                          <div className={styles.photoActions}>
                             {lunch.checkinPhotoUrl && (
                               <button
-                                style={{
-                                  padding: '4px 8px',
-                                  fontSize: 11,
-                                  background: 'var(--info)',
-                                  color: '#fff',
-                                  border: 'none',
-                                  borderRadius: 4,
-                                  cursor: 'pointer',
-                                }}
+                                className={`${styles.photoBtn} ${styles.btnInfo}`}
+                                type="button"
                                 onClick={() => openPhotoGallery(lunch.checkinPhotoUrl)}
                               >
                                 📷 Entrada
@@ -271,15 +212,8 @@ const LunchBreaksTable: React.FC = () => {
                             )}
                             {lunch.checkoutPhotoUrl && (
                               <button
-                                style={{
-                                  padding: '4px 8px',
-                                  fontSize: 11,
-                                  background: 'var(--success)',
-                                  color: '#fff',
-                                  border: 'none',
-                                  borderRadius: 4,
-                                  cursor: 'pointer',
-                                }}
+                                className={`${styles.photoBtn} ${styles.btnSuccess}`}
+                                type="button"
                                 onClick={() => openPhotoGallery(lunch.checkoutPhotoUrl!)}
                               >
                                 📷 Salida
@@ -287,24 +221,8 @@ const LunchBreaksTable: React.FC = () => {
                             )}
                           </div>
                         </td>
-                        <td style={{ padding: 12 }}>
-                          <div
-                            style={{
-                              display: 'inline-block',
-                              padding: '4px 8px',
-                              borderRadius: 4,
-                              background:
-                                lunch.status === 'COMPLETED'
-                                  ? 'var(--success)20'
-                                  : 'var(--warning)20',
-                              color:
-                                lunch.status === 'COMPLETED'
-                                  ? 'var(--success)'
-                                  : 'var(--warning)',
-                              fontWeight: 500,
-                              fontSize: 11,
-                            }}
-                          >
+                        <td className={styles.td}>
+                          <div className={`${styles.statusPill} ${lunch.status === 'COMPLETED' ? styles.statusCompleted : styles.statusProgress}`}>
                             {lunch.status === 'COMPLETED' ? '✓ Completada' : '⏳ En Progreso'}
                           </div>
                         </td>
@@ -315,31 +233,20 @@ const LunchBreaksTable: React.FC = () => {
               </div>
             </div>
 
-            <div className="mobile-cards">
+            <div className={styles.mobileCards}>
                 {lunchBreaks.map((lunch) => (
-                  <div key={lunch.id} className="card" style={{ border: '1px solid var(--muted)', padding: 12, display: 'grid', gap: 10, minWidth: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 600 }}>{lunch.user.nombre}</div>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: 12, wordBreak: 'break-word' }}>{lunch.user.email}</div>
+                  <div key={lunch.id} className={`card ${styles.mobileCard}`}>
+                    <div className={styles.mobileHeader}>
+                      <div className={styles.mobileUser}>
+                        <div className={styles.mobileName}>{lunch.user.nombre}</div>
+                        <div className={`${styles.mobileEmail} ${styles.textMuted}`}>{lunch.user.email}</div>
                       </div>
-                      <div
-                        style={{
-                          display: 'inline-block',
-                          padding: '4px 8px',
-                          borderRadius: 4,
-                          background: lunch.status === 'COMPLETED' ? 'var(--success)20' : 'var(--warning)20',
-                          color: lunch.status === 'COMPLETED' ? 'var(--success)' : 'var(--warning)',
-                          fontWeight: 600,
-                          fontSize: 11,
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
+                      <div className={`${styles.statusPill} ${styles.mobileStatus} ${lunch.status === 'COMPLETED' ? styles.statusCompleted : styles.statusProgress}`}>
                         {lunch.status === 'COMPLETED' ? '✓ Completada' : '⏳ En Progreso'}
                       </div>
                     </div>
 
-                    <div style={{ display: 'grid', gap: 6, fontSize: 13 }}>
+                    <div className={styles.mobileData}>
                       <div><strong>Fecha:</strong> {new Date(lunch.date).toLocaleDateString('es-MX')}</div>
                       <div>
                         <strong>Entrada:</strong>{' '}
@@ -355,34 +262,18 @@ const LunchBreaksTable: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="mobile-photo-actions" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <div className={styles.mobilePhotoActions}>
                       <button
-                        style={{
-                          padding: '10px 8px',
-                          fontSize: 12,
-                          background: 'var(--info)',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: 8,
-                          cursor: lunch.checkinPhotoUrl ? 'pointer' : 'not-allowed',
-                          opacity: lunch.checkinPhotoUrl ? 1 : 0.6,
-                        }}
+                        className={`${styles.mobilePhotoBtn} ${styles.btnInfo} ${!lunch.checkinPhotoUrl ? styles.mobilePhotoBtnDisabled : ''}`}
+                        type="button"
                         disabled={!lunch.checkinPhotoUrl}
                         onClick={() => lunch.checkinPhotoUrl && openPhotoGallery(lunch.checkinPhotoUrl)}
                       >
                         📷 Entrada
                       </button>
                       <button
-                        style={{
-                          padding: '10px 8px',
-                          fontSize: 12,
-                          background: 'var(--success)',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: 8,
-                          cursor: lunch.checkoutPhotoUrl ? 'pointer' : 'not-allowed',
-                          opacity: lunch.checkoutPhotoUrl ? 1 : 0.6,
-                        }}
+                        className={`${styles.mobilePhotoBtn} ${styles.btnSuccess} ${!lunch.checkoutPhotoUrl ? styles.mobilePhotoBtnDisabled : ''}`}
+                        type="button"
                         disabled={!lunch.checkoutPhotoUrl}
                         onClick={() => lunch.checkoutPhotoUrl && openPhotoGallery(lunch.checkoutPhotoUrl)}
                       >
@@ -398,42 +289,18 @@ const LunchBreaksTable: React.FC = () => {
 
       {/* Modal de foto expandida */}
       {expandedPhotoUrl && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.9)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 2000,
-            padding: 20,
-          }}
-          onClick={closePhotoGallery}
-        >
-          <div style={{ maxWidth: '90%', maxHeight: '90%', position: 'relative' }}>
+        <div className={styles.modalOverlay} onClick={closePhotoGallery} aria-hidden="true">
+          <div className={styles.modalContent} role="dialog" aria-modal="true" aria-label="Vista ampliada de foto de registro de comida">
             <img
               src={expandedPhotoUrl}
               alt="expanded"
-              style={{ width: '100%', height: '100%', maxHeight: '90vh', objectFit: 'contain' }}
+              className={styles.modalImage}
               onClick={(e) => e.stopPropagation()}
             />
             <button
+              type="button"
               onClick={closePhotoGallery}
-              style={{
-                position: 'absolute',
-                top: -40,
-                right: 0,
-                background: '#fff',
-                border: 'none',
-                padding: '8px 12px',
-                borderRadius: 4,
-                cursor: 'pointer',
-                fontWeight: 'bold',
-              }}
+              className={styles.closeBtn}
             >
               ✕ Cerrar
             </button>

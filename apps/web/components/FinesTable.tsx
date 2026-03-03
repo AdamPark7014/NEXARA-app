@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
+import styles from './FinesTable.module.css';
 
 interface Fine {
   id: number;
@@ -185,84 +186,27 @@ const FinesTable: React.FC<FinesTableProps> = ({
   const countByStatus = (status: string) =>
     fines.filter((f) => f.estatusPago === status).length;
 
-  if (loading) return <div style={{ padding: 12 }}>Cargando multas...</div>;
+  if (loading) return <div className={styles.loading}>Cargando multas...</div>;
 
   const usuarioActual = usuarios.find((u) => u.id === Number(usuarioFiltro));
 
-  const mobileCardListStyle: React.CSSProperties = {
-    display: "flex",
-    flexDirection: "column",
-    gap: "16px",
-    padding: "16px 12px",
-    boxSizing: "border-box",
-    width: "100%",
-  };
-
-  const mobileCardStyle: React.CSSProperties = {
-    background: "linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)",
-    borderRadius: "12px",
-    padding: "16px 14px",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-    border: "1px solid #e5e7eb",
-    boxSizing: "border-box",
-    width: "100%",
-    minWidth: 0,
-  };
-
-  const mobileMetaGridStyle: React.CSSProperties = {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "12px",
-    marginTop: "12px",
-    width: "100%",
-    minWidth: 0,
-  };
-
-  const mobileMetaItemStyle: React.CSSProperties = {
-    display: "flex",
-    flexDirection: "column",
-    gap: "4px",
-    minWidth: 0,
-    wordBreak: "break-word",
-    overflowWrap: "break-word",
-  };
-
-  const mobileMetaLabelStyle: React.CSSProperties = {
-    fontSize: "11px",
-    fontWeight: 600,
-    textTransform: "uppercase",
-    color: "#6b7280",
-    letterSpacing: "0.5px",
-    wordBreak: "break-word",
-  };
-
-  const mobileMetaValueStyle: React.CSSProperties = {
-    fontSize: "14px",
-    color: "#111827",
-    fontWeight: 500,
-    wordBreak: "break-word",
-    overflowWrap: "break-word",
-    minWidth: 0,
-  };
-
   return (
     <div className="card">
-      <div style={{ marginBottom: 16 }}>
-        <h3 style={{ marginBottom: 12, color: 'var(--primary)' }}>Multas</h3>
+      <div className={styles.header}>
+        <h3 className={styles.title}>Multas</h3>
 
         {/* Filtros - solo visible cuando showUser es true (gestión) Y no hay usuarioId específico */}
         {showUser && !usuarioIdProp && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+          <div className={styles.filtersGrid}>
             {/* Filtro de Usuario */}
-            <div style={{ display: 'grid', gap: 6 }}>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
+            <div className={styles.filterCol}>
+              <label className={styles.filterLabel}>
                 Filtrar por Usuario
               </label>
               <select
-                className="input"
+                className={`input ${styles.fullWidth}`}
                 value={usuarioFiltro}
                 onChange={(e) => setUsuarioFiltro(e.target.value)}
-                style={{ width: '100%' }}
               >
                 <option value="">Todos los usuarios</option>
                 {usuarios.map((u) => (
@@ -274,15 +218,14 @@ const FinesTable: React.FC<FinesTableProps> = ({
             </div>
 
             {/* Filtro de Tipo */}
-            <div style={{ display: 'grid', gap: 6 }}>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
+            <div className={styles.filterCol}>
+              <label className={styles.filterLabel}>
                 Filtrar por Tipo
               </label>
               <select
-                className="input"
+                className={`input ${styles.fullWidth}`}
                 value={tipoFiltro}
                 onChange={(e) => setTipoFiltro(e.target.value)}
-                style={{ width: '100%' }}
               >
                 <option value="">Todos los tipos</option>
                 <option value="actividad">Actividades</option>
@@ -293,15 +236,14 @@ const FinesTable: React.FC<FinesTableProps> = ({
             </div>
 
             {/* Filtro de Estatus */}
-            <div style={{ display: 'grid', gap: 6 }}>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500 }}>
+            <div className={styles.filterCol}>
+              <label className={styles.filterLabel}>
                 Filtrar por Estatus
               </label>
               <select
-                className="input"
+                className={`input ${styles.fullWidth}`}
                 value={estatusPago}
                 onChange={(e) => setEstatusPago(e.target.value)}
-                style={{ width: '100%' }}
               >
                 <option value="">Todos los estatus</option>
                 <option value="Pendiente">Pendiente</option>
@@ -313,112 +255,85 @@ const FinesTable: React.FC<FinesTableProps> = ({
 
         {/* Usuario seleccionado info */}
         {showUser && usuarioActual && (
-          <div style={{
-            padding: 10,
-            backgroundColor: 'var(--primary)20',
-            borderRadius: 4,
-            marginBottom: 12,
-            fontSize: 13,
-          }}>
+          <div className={styles.userInfo}>
             📌 Mostrando multas de: <strong>{usuarioActual.nombre}</strong> ({usuarioActual.email})
           </div>
         )}
 
         {/* Indicadores de estatus */}
-        <div style={{ display: 'flex', gap: 24, marginBottom: 16, flexWrap: 'wrap' }}>
-          <div style={{ fontSize: 13 }}>
-            <span style={{ color: '#22c55e', fontWeight: 'bold' }}>● </span>
+        <div className={styles.statusLegend}>
+          <div className={styles.statusLegendItem}>
+            <span className={`${styles.dot} ${styles.dotGreen}`}>● </span>
             Sin multas: {countByStatus('Pendiente') === 0 ? '✓' : countByStatus('Pendiente')}
           </div>
-          <div style={{ fontSize: 13 }}>
-            <span style={{ color: '#eab308', fontWeight: 'bold' }}>● </span>
+          <div className={styles.statusLegendItem}>
+            <span className={`${styles.dot} ${styles.dotYellow}`}>● </span>
             1-2 multas: {countByStatus('Pendiente') <= 2 && countByStatus('Pendiente') > 0 ? '✓' : '-'}
           </div>
-          <div style={{ fontSize: 13 }}>
-            <span style={{ color: '#ef4444', fontWeight: 'bold' }}>● </span>
+          <div className={styles.statusLegendItem}>
+            <span className={`${styles.dot} ${styles.dotRed}`}>● </span>
             3+ multas: {countByStatus('Pendiente') >= 3 ? '✓' : '-'}
           </div>
         </div>
       </div>
 
       {fines.length === 0 ? (
-        <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-secondary)' }}>
+        <div className={styles.empty}>
           Sin multas registradas {usuarioActual ? `para ${usuarioActual.nombre}` : ''}
         </div>
       ) : (
         <>
           {!isMobile && (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                    <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>ID</th>
+                  <tr className={styles.rowBorder}>
+                    <th className={styles.th}>ID</th>
                     {showUser && !usuarioFiltro && (
-                      <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Usuario</th>
+                      <th className={styles.th}>Usuario</th>
                     )}
-                    <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Tipo</th>
-                    <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Razón</th>
-                    <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Descripción</th>
-                    <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Monto</th>
-                    <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Estatus</th>
-                    <th style={{ padding: 12, textAlign: 'left', color: 'var(--primary)', fontSize: 12 }}>Fecha</th>
+                    <th className={styles.th}>Tipo</th>
+                    <th className={styles.th}>Razón</th>
+                    <th className={styles.th}>Descripción</th>
+                    <th className={styles.th}>Monto</th>
+                    <th className={styles.th}>Estatus</th>
+                    <th className={styles.th}>Fecha</th>
                   </tr>
                 </thead>
                 <tbody>
                   {fines.map((fine) => (
-                    <tr key={fine.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: 12, fontSize: 12 }}>{fine.id}</td>
+                    <tr key={fine.id} className={styles.rowBorder}>
+                      <td className={styles.td}>{fine.id}</td>
                       {showUser && !usuarioFiltro && (
-                        <td style={{ padding: 12, fontSize: 12 }}>{fine.usuario?.nombre || '-'}</td>
+                        <td className={styles.td}>{fine.usuario?.nombre || '-'}</td>
                       )}
-                      <td style={{ padding: 12, fontSize: 12 }}>
-                        <span
-                          style={{
-                            display: 'inline-block',
-                            padding: '4px 8px',
-                            borderRadius: 4,
-                            backgroundColor: getTipoColor(fine.tipo),
-                            color: 'white',
-                            fontWeight: 500,
-                            fontSize: 11,
-                          }}
-                        >
+                      <td className={styles.td}>
+                        <span className={`${styles.tipoBadge} ${getTipoClass(fine.tipo)}`}>
                           {getTipoLabel(fine.tipo)}
                         </span>
                       </td>
-                      <td style={{ padding: 12, fontSize: 12, fontWeight: 500 }}>{fine.razon}</td>
-                      <td style={{ padding: 12, fontSize: 12, maxWidth: 150 }}>
+                      <td className={`${styles.td} ${styles.reason}`}>{fine.razon}</td>
+                      <td className={`${styles.td} ${styles.descCell}`}>
                         {fine.descripcion ? (
                           <span title={fine.descripcion}>
                             {fine.descripcion.substring(0, 30)}
                             {fine.descripcion.length > 30 ? '...' : ''}
                           </span>
                         ) : (
-                          <span style={{ color: 'var(--text-secondary)' }}>-</span>
+                          <span className={styles.muted}>-</span>
                         )}
                       </td>
-                      <td style={{ padding: 12, fontSize: 12, fontWeight: 'bold', color: '#ef4444' }}>
+                      <td className={`${styles.td} ${styles.amount}`}>
                         ${Number(fine.monto).toFixed(2)}
                       </td>
-                      <td style={{ padding: 12, fontSize: 12 }}>
+                      <td className={styles.td}>
                         <span
-                          style={{
-                            display: 'inline-block',
-                            padding: '4px 12px',
-                            borderRadius: 4,
-                            backgroundColor:
-                              fine.estatusPago === 'Pagada'
-                                ? '#22c55e40'
-                                : '#ef444440',
-                            color: fine.estatusPago === 'Pagada' ? '#22c55e' : '#ef4444',
-                            fontSize: 11,
-                            fontWeight: 'bold',
-                          }}
+                          className={`${styles.statusBadge} ${fine.estatusPago === 'Pagada' ? styles.statusPaid : styles.statusPending}`}
                         >
                           {fine.estatusPago}
                         </span>
                       </td>
-                      <td style={{ padding: 12, fontSize: 12 }}>
+                      <td className={styles.td}>
                         {new Date(fine.fechaCreacion).toLocaleDateString('es-MX')}
                       </td>
                     </tr>
@@ -429,57 +344,35 @@ const FinesTable: React.FC<FinesTableProps> = ({
           )}
 
           {isMobile && (
-            <div style={mobileCardListStyle}>
+            <div className={styles.mobileList}>
               {fines.map((fine) => (
-                <div key={fine.id} style={mobileCardStyle}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: "13px", color: "#6b7280", marginBottom: "4px" }}>Multa #{fine.id}</div>
-                      <div style={{ fontSize: "16px", fontWeight: 700, color: "#111827" }}>{fine.razon}</div>
+                <div key={fine.id} className={styles.mobileCard}>
+                  <div className={styles.mobileTop}>
+                    <div className={styles.mobileTopMain}>
+                      <div className={styles.mobileId}>Multa #{fine.id}</div>
+                      <div className={styles.mobileReason}>{fine.razon}</div>
                     </div>
                     <span
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: 6,
-                        backgroundColor:
-                          fine.estatusPago === 'Pagada'
-                            ? '#22c55e40'
-                            : '#ef444440',
-                        color: fine.estatusPago === 'Pagada' ? '#22c55e' : '#ef4444',
-                        fontSize: 12,
-                        fontWeight: 700,
-                        whiteSpace: "nowrap",
-                      }}
+                      className={`${styles.mobileStatus} ${fine.estatusPago === 'Pagada' ? styles.statusPaid : styles.statusPending}`}
                     >
                       {fine.estatusPago}
                     </span>
                   </div>
 
-                  <div style={{ fontSize: "20px", fontWeight: 700, color: "#ef4444", marginBottom: "12px" }}>
+                  <div className={styles.mobileAmount}>
                     ${Number(fine.monto).toFixed(2)}
                   </div>
 
-                  <div style={mobileMetaGridStyle}>
-                    <div style={mobileMetaItemStyle}>
-                      <span style={mobileMetaLabelStyle}>Tipo</span>
-                      <span
-                        style={{
-                          display: 'inline-block',
-                          padding: '4px 10px',
-                          borderRadius: 6,
-                          backgroundColor: getTipoColor(fine.tipo),
-                          color: 'white',
-                          fontWeight: 600,
-                          fontSize: 12,
-                          width: "fit-content",
-                        }}
-                      >
+                  <div className={styles.mobileMetaGrid}>
+                    <div className={styles.mobileMetaItem}>
+                      <span className={styles.mobileMetaLabel}>Tipo</span>
+                      <span className={`${styles.mobileTipoBadge} ${getTipoClass(fine.tipo)}`}>
                         {getTipoLabel(fine.tipo)}
                       </span>
                     </div>
-                    <div style={mobileMetaItemStyle}>
-                      <span style={mobileMetaLabelStyle}>Fecha</span>
-                      <span style={mobileMetaValueStyle}>
+                    <div className={styles.mobileMetaItem}>
+                      <span className={styles.mobileMetaLabel}>Fecha</span>
+                      <span className={styles.mobileMetaValue}>
                         {new Date(fine.fechaCreacion).toLocaleDateString('es-MX', {
                           year: 'numeric',
                           month: 'short',
@@ -488,15 +381,15 @@ const FinesTable: React.FC<FinesTableProps> = ({
                       </span>
                     </div>
                     {showUser && !usuarioFiltro && fine.usuario?.nombre && (
-                      <div style={{ ...mobileMetaItemStyle, gridColumn: "1 / -1" }}>
-                        <span style={mobileMetaLabelStyle}>Usuario</span>
-                        <span style={mobileMetaValueStyle}>{fine.usuario.nombre}</span>
+                      <div className={`${styles.mobileMetaItem} ${styles.mobileMetaItemFull}`}>
+                        <span className={styles.mobileMetaLabel}>Usuario</span>
+                        <span className={styles.mobileMetaValue}>{fine.usuario.nombre}</span>
                       </div>
                     )}
                     {fine.descripcion && (
-                      <div style={{ ...mobileMetaItemStyle, gridColumn: "1 / -1" }}>
-                        <span style={mobileMetaLabelStyle}>Descripción</span>
-                        <span style={{ ...mobileMetaValueStyle, fontSize: "13px", color: "#6b7280" }}>
+                      <div className={`${styles.mobileMetaItem} ${styles.mobileMetaItemFull}`}>
+                        <span className={styles.mobileMetaLabel}>Descripción</span>
+                        <span className={`${styles.mobileMetaValue} ${styles.mobileDesc}`}>
                           {fine.descripcion}
                         </span>
                       </div>
@@ -512,15 +405,13 @@ const FinesTable: React.FC<FinesTableProps> = ({
   );
 };
 
-// Función auxiliar para obtener color por tipo
-function getTipoColor(tipo: string): string {
-  const colors: { [key: string]: string } = {
-    actividad: '#f59e0b',
-    vehiculo: '#ef4444',
-    asistencia: '#0f6ad6',
-    herramienta: '#8b5cf6',
-  };
-  return colors[tipo] || '#6b7280';
+function getTipoClass(tipo: string): string {
+  const normalized = String(tipo || '').toLowerCase();
+  if (normalized === 'actividad') return styles.tipoActividad;
+  if (normalized === 'vehiculo') return styles.tipoVehiculo;
+  if (normalized === 'asistencia') return styles.tipoAsistencia;
+  if (normalized === 'herramienta') return styles.tipoHerramienta;
+  return styles.tipoDefault;
 }
 
 // Función auxiliar para obtener label por tipo

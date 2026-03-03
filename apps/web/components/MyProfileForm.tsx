@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useUser } from './UserContext';
+import styles from './MyProfileForm.module.css';
 
 const requiredDocuments = [
   {
@@ -310,47 +311,47 @@ const MyProfileForm: React.FC = () => {
   if (loading) return <div>Cargando perfil...</div>;
 
   return (
-    <div className="card" style={{ display: 'grid', gap: 16 }}>
-      <h2 style={{ color: 'var(--primary)' }}>Mi perfil profesional</h2>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+    <div className={`card ${styles.root}`}>
+      <h2 className={styles.title}>Mi perfil profesional</h2>
+      <div className={styles.statusRow}>
         <span className={`badge ${profileStatus === 'Aprobado' ? 'approved' : profileStatus === 'Rechazado' ? 'rejected' : 'pending'}`}>
           {profileStatus}
         </span>
-        {profileNotes && <span style={{ color: 'var(--text-secondary)' }}>{profileNotes}</span>}
+        {profileNotes && <span className={styles.mutedText}>{profileNotes}</span>}
       </div>
-      <div className="card" style={{ background: 'var(--surface-light)', padding: 12 }}>
-        <h3 style={{ marginBottom: 8 }}>Datos personales</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+      <div className={`card ${styles.sectionCard}`}>
+        <h3 className={styles.sectionTitle}>Datos personales</h3>
+        <div className={styles.grid}>
           <div>
-            <label style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Telefono</label>
+            <label className={styles.label}>Telefono</label>
             <input className="input" value={form.telefono} onChange={(e) => handleChange('telefono', e.target.value)} />
           </div>
           <div>
-            <label style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Fecha nacimiento</label>
+            <label className={styles.label}>Fecha nacimiento</label>
             <input className="input" type="date" value={form.fechaNacimiento} onChange={(e) => handleChange('fechaNacimiento', e.target.value)} />
           </div>
           <div>
-            <label style={{ color: 'var(--text-secondary)', fontSize: 12 }}>CURP</label>
+            <label className={styles.label}>CURP</label>
             <input className="input" value={form.curp} onChange={(e) => handleChange('curp', e.target.value)} />
           </div>
           <div>
-            <label style={{ color: 'var(--text-secondary)', fontSize: 12 }}>RFC</label>
+            <label className={styles.label}>RFC</label>
             <input className="input" value={form.rfc} onChange={(e) => handleChange('rfc', e.target.value)} />
           </div>
           <div>
-            <label style={{ color: 'var(--text-secondary)', fontSize: 12 }}>INE (numero)</label>
+            <label className={styles.label}>INE (numero)</label>
             <input className="input" value={form.ineNumero} onChange={(e) => handleChange('ineNumero', e.target.value)} />
           </div>
           <div>
-            <label style={{ color: 'var(--text-secondary)', fontSize: 12 }}>NSS</label>
+            <label className={styles.label}>NSS</label>
             <input className="input" value={form.nss} onChange={(e) => handleChange('nss', e.target.value)} />
           </div>
         </div>
       </div>
 
-      <div className="card" style={{ background: 'var(--surface-light)', padding: 12 }}>
-        <h3 style={{ marginBottom: 8 }}>Direccion</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+      <div className={`card ${styles.sectionCard}`}>
+        <h3 className={styles.sectionTitle}>Direccion</h3>
+        <div className={styles.grid}>
           <input className="input" placeholder="Direccion" value={form.direccion} onChange={(e) => handleChange('direccion', e.target.value)} />
           <input className="input" placeholder="Colonia" value={form.colonia} onChange={(e) => handleChange('colonia', e.target.value)} />
           <input className="input" placeholder="Ciudad" value={form.ciudad} onChange={(e) => handleChange('ciudad', e.target.value)} />
@@ -360,21 +361,21 @@ const MyProfileForm: React.FC = () => {
         </div>
       </div>
 
-      <div className="card" style={{ background: 'var(--surface-light)', padding: 12 }}>
-        <h3 style={{ marginBottom: 8 }}>Contacto de emergencia</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+      <div className={`card ${styles.sectionCard}`}>
+        <h3 className={styles.sectionTitle}>Contacto de emergencia</h3>
+        <div className={styles.grid}>
           <input className="input" placeholder="Nombre" value={form.contactoEmergenciaNombre} onChange={(e) => handleChange('contactoEmergenciaNombre', e.target.value)} />
           <input className="input" placeholder="Telefono" value={form.contactoEmergenciaTelefono} onChange={(e) => handleChange('contactoEmergenciaTelefono', e.target.value)} />
         </div>
       </div>
 
-      <div className="card" style={{ background: 'var(--surface-light)', padding: 12 }}>
-        <h3 style={{ marginBottom: 4 }}>Documentacion del perfil</h3>
-        <p style={{ color: 'var(--text-secondary)', marginTop: 0 }}>
+      <div className={`card ${styles.sectionCard}`}>
+        <h3 className={styles.sectionTitleCompact}>Documentacion del perfil</h3>
+        <p className={styles.docIntro}>
           Sube tus documentos y consulta su estatus de revision en un solo panel.
         </p>
-        <div style={{ display: 'grid', gap: 12, marginBottom: 12 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+        <div className={styles.docWrap}>
+          <div className={styles.grid}>
             <select className="input" value={docType} onChange={(e) => setDocType(e.target.value)}>
               {requiredDocuments.map((doc) => (
                 <option key={doc.key} value={doc.key}>{doc.key}</option>
@@ -389,18 +390,10 @@ const MyProfileForm: React.FC = () => {
               }}
               onDragLeave={() => setDragActive(false)}
               onDrop={handleDrop}
-              style={{
-                border: `1px dashed ${dragActive ? 'var(--primary)' : 'var(--border)'}`,
-                borderRadius: 12,
-                padding: 12,
-                background: dragActive ? 'rgba(0,0,0,0.02)' : 'transparent',
-                display: 'grid',
-                gap: 6,
-                alignContent: 'center'
-              }}
+              className={`${styles.dropzone} ${dragActive ? styles.dropzoneActive : ''}`}
             >
-              <div style={{ fontWeight: 600 }}>Arrastra y suelta el documento aqui</div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+              <div className={styles.dropTitle}>Arrastra y suelta el documento aqui</div>
+              <div className={styles.dropHint}>
                 O selecciona el archivo manualmente.
               </div>
               <button
@@ -412,11 +405,10 @@ const MyProfileForm: React.FC = () => {
               </button>
               <input
                 ref={fileInputRef}
-                className="input"
+                className={styles.hiddenInput}
                 type="file"
                 accept="application/pdf,image/*"
                 multiple
-                style={{ display: 'none' }}
                 onChange={(e) => handleSelectFiles(e.target.files || [])}
               />
             </div>
@@ -425,27 +417,15 @@ const MyProfileForm: React.FC = () => {
             </button>
           </div>
           {docPreviews.length > 0 && (
-            <div style={{ display: 'grid', gap: 8 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Archivos listos para subir</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+            <div className={styles.previewsWrap}>
+              <div className={styles.filesLabel}>Archivos listos para subir</div>
+              <div className={styles.previewsGrid}>
                 {docPreviews.map((entry) => (
-                  <div key={entry.file.name} style={{ borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden', background: 'var(--surface)', position: 'relative' }}>
+                  <div key={entry.file.name} className={styles.previewCard}>
                     <button
                       type="button"
                       onClick={clearDocSelection}
-                      style={{
-                        position: 'absolute',
-                        top: 8,
-                        right: 8,
-                        width: 26,
-                        height: 26,
-                        borderRadius: '50%',
-                        border: 'none',
-                        background: 'rgba(0,0,0,0.6)',
-                        color: '#fff',
-                        cursor: 'pointer',
-                        zIndex: 1,
-                      }}
+                      className={styles.removeBtn}
                     >
                       x
                     </button>
@@ -454,9 +434,9 @@ const MyProfileForm: React.FC = () => {
                         <embed src={entry.url} type="application/pdf" />
                       </object>
                     ) : (
-                      <img src={entry.url} alt={entry.file.name} style={{ width: '100%', height: 180, objectFit: 'cover' }} />
+                      <img src={entry.url} alt={entry.file.name} className={styles.previewImg} />
                     )}
-                    <div style={{ padding: 8, fontSize: 12 }}>{entry.file.name}</div>
+                    <div className={styles.previewName}>{entry.file.name}</div>
                   </div>
                 ))}
               </div>
@@ -464,17 +444,17 @@ const MyProfileForm: React.FC = () => {
           )}
         </div>
 
-        <div style={{ display: 'grid', gap: 8 }}>
+        <div className={styles.docList}>
           {requiredDocuments.map((doc) => {
             const current = normalizedDocs.get(doc.key.toLowerCase().trim());
             const status = current?.estatus || 'Pendiente';
             return (
-              <div key={doc.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              <div key={doc.key} className={styles.docRow}>
                 <div>
-                  <div style={{ fontWeight: 600 }}>{doc.label}</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{doc.description}</div>
+                  <div className={styles.docLabel}>{doc.label}</div>
+                  <div className={styles.docDesc}>{doc.description}</div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <div className={styles.docActions}>
                   <span className={`badge ${status === 'Aprobado' ? 'approved' : status === 'Rechazado' ? 'rejected' : 'pending'}`}>
                     {status}
                   </span>
@@ -495,10 +475,10 @@ const MyProfileForm: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+      <div className={styles.footer}>
         <button className="button-primary" type="button" onClick={handleSave} disabled={saving}>Guardar perfil</button>
-        {error && <span style={{ color: 'var(--danger)' }}>{error}</span>}
-        {success && <span style={{ color: 'var(--accent)' }}>{success}</span>}
+        {error && <span className={styles.error}>{error}</span>}
+        {success && <span className={styles.success}>{success}</span>}
       </div>
     </div>
   );

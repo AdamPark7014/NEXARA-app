@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from 'react';
 import { useUser } from './UserContext';
+import styles from './ViaticRequestForm.module.css';
 
 
 const ViaticRequestForm = ({ actividadId }: { actividadId: number }) => {
@@ -111,16 +112,16 @@ const ViaticRequestForm = ({ actividadId }: { actividadId: number }) => {
   };
 
   return (
-    <form className="card" onSubmit={handleSubmit} style={{ maxWidth: 720, display: 'grid', gap: 16 }}>
+    <form className={`card ${styles.form}`} onSubmit={handleSubmit}>
       <div>
-        <h3 style={{ color: 'var(--primary)', marginBottom: 4 }}>Solicitar viatico</h3>
-        <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
+        <h3 className={styles.title}>Solicitar viatico</h3>
+        <div className={styles.subtitle}>
           Completa los datos y adjunta el ticket en imagen o PDF.
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-        <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
+      <div className={styles.fieldsGrid}>
+        <label className={styles.fieldLabel}>
           Monto solicitado
           <input
             className="input"
@@ -132,7 +133,7 @@ const ViaticRequestForm = ({ actividadId }: { actividadId: number }) => {
             placeholder="0.00"
           />
         </label>
-        <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
+        <label className={styles.fieldLabel}>
           Razon del gasto
           <input
             className="input"
@@ -144,8 +145,8 @@ const ViaticRequestForm = ({ actividadId }: { actividadId: number }) => {
         </label>
       </div>
 
-      <div style={{ display: 'grid', gap: 10 }}>
-        <div style={{ fontWeight: 600 }}>Adjuntar ticket</div>
+      <div className={styles.uploadSection}>
+        <div className={styles.uploadTitle}>Adjuntar ticket</div>
         <div
           onDragEnter={() => setDragActive(true)}
           onDragOver={(event) => {
@@ -155,73 +156,40 @@ const ViaticRequestForm = ({ actividadId }: { actividadId: number }) => {
           }}
           onDragLeave={() => setDragActive(false)}
           onDrop={handleDrop}
-          style={{
-            border: `1px dashed ${dragActive ? 'var(--primary)' : 'var(--muted)'}`,
-            borderRadius: 12,
-            padding: 16,
-            background: dragActive ? 'rgba(0,0,0,0.03)' : 'var(--surface-light)',
-            display: 'grid',
-            gap: 6,
-          }}
+          className={`${styles.dropzone} ${dragActive ? styles.dropzoneActive : ''}`}
         >
-          <div style={{ fontWeight: 600 }}>Arrastra y suelta tu ticket aqui</div>
-          <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+          <div className={styles.dropTitle}>Arrastra y suelta tu ticket aqui</div>
+          <div className={styles.dropHint}>
             Acepta imagenes o PDF.
           </div>
           <button
-            className="button-secondary"
+            className={`button-secondary ${styles.fileBtn}`}
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            style={{ justifySelf: 'start' }}
           >
             Seleccionar archivo
           </button>
           <input
             ref={fileInputRef}
-            className="input"
+            className={`input ${styles.hiddenInput}`}
             type="file"
             accept="image/*,application/pdf"
             onChange={(e) => handleSelectFile(e.target.files?.[0] || null)}
-            style={{ display: 'none' }}
           />
         </div>
         {ticketPreview ? (
-          <div style={{ display: 'grid', gap: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div className={styles.previewWrap}>
+            <div className={styles.previewRow}>
               {ticketPreview.kind === 'image' ? (
-                <div
-                  style={{
-                    width: 120,
-                    height: 120,
-                    borderRadius: 12,
-                    border: '1px solid rgba(255,255,255,0.12)',
-                    background: 'rgba(15, 106, 214, 0.08)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    overflow: 'hidden',
-                  }}
-                >
+                <div className={styles.imageFrame}>
                   <img
                     src={ticketPreview.url}
                     alt="Preview"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    className={styles.previewImage}
                   />
                 </div>
               ) : (
-                <div
-                  style={{
-                    width: 280,
-                    height: 200,
-                    borderRadius: 12,
-                    border: '1px solid rgba(255,255,255,0.12)',
-                    background: 'rgba(15, 106, 214, 0.08)',
-                    overflow: 'hidden',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
+                <div className={styles.pdfFrame}>
                   <object
                     data={ticketPreview.url}
                     type="application/pdf"
@@ -234,8 +202,8 @@ const ViaticRequestForm = ({ actividadId }: { actividadId: number }) => {
                   </object>
                 </div>
               )}
-              <div style={{ display: 'grid', gap: 6 }}>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+              <div className={styles.fileInfo}>
+                <div className={styles.fileMeta}>
                   {ticket ? `Archivo: ${ticket.name} (${formatBytes(ticket.size)})` : ''}
                 </div>
                 <button className="button-secondary" type="button" onClick={clearTicket}>
@@ -245,11 +213,11 @@ const ViaticRequestForm = ({ actividadId }: { actividadId: number }) => {
             </div>
           </div>
         ) : (
-          <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>No hay archivo seleccionado</div>
+          <div className={styles.emptyFile}>No hay archivo seleccionado</div>
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div className={styles.actions}>
         <button className="button-primary" type="submit" disabled={loading}>
           {loading ? 'Enviando...' : 'Solicitar viatico'}
         </button>
@@ -266,8 +234,8 @@ const ViaticRequestForm = ({ actividadId }: { actividadId: number }) => {
         >
           Limpiar
         </button>
-        {error && <span style={{ color: 'var(--danger)' }}>{error}</span>}
-        {success && <span style={{ color: 'var(--accent)' }}>{success}</span>}
+        {error && <span className={styles.errorText}>{error}</span>}
+        {success && <span className={styles.successText}>{success}</span>}
       </div>
     </form>
   );

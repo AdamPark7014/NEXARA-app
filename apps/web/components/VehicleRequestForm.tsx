@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { useUser } from './UserContext';
+import styles from './VehicleRequestForm.module.css';
 
 
 
@@ -125,15 +126,15 @@ const VehicleRequestForm: React.FC<VehicleRequestFormProps> = ({ actividadId }) 
   };
 
   return (
-    <form onSubmit={handleSubmit} className="card" style={{ maxWidth: 560 }}>
+    <form onSubmit={handleSubmit} className={`card ${styles.form}`}>
       {actividadId && <input type="hidden" name="actividadId" value={actividadId} />}
-      <h3 style={{ marginBottom: 8 }}>Solicitud de vehiculo</h3>
-      <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>
+      <h3 className={styles.title}>Solicitud de vehiculo</h3>
+      <p className={styles.subtitle}>
         Completa los datos para solicitar un vehiculo. La evidencia de entrega se sube al finalizar el uso.
       </p>
-      <div style={{ display: 'grid', gap: 12 }}>
+      <div className={styles.fieldGrid}>
         {!actividadId && (
-          <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
+          <label className={styles.fieldLabel}>
             Actividad
             <select
               className="input"
@@ -154,7 +155,7 @@ const VehicleRequestForm: React.FC<VehicleRequestFormProps> = ({ actividadId }) 
             </select>
           </label>
         )}
-        <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
+        <label className={styles.fieldLabel}>
           Vehiculo
           <select
             className="input"
@@ -171,26 +172,26 @@ const VehicleRequestForm: React.FC<VehicleRequestFormProps> = ({ actividadId }) 
             ))}
           </select>
         </label>
-        <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
+        <label className={styles.fieldLabel}>
           Motivo de uso
           <input className="input" type="text" value={motivo} onChange={e => setMotivo(e.target.value)} required disabled={loading} />
         </label>
-        <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
+        <label className={styles.fieldLabel}>
           Fecha inicio de uso
           <input className="input" type="datetime-local" value={fechaInicio} onChange={e => setFechaInicio(e.target.value)} required disabled={loading} />
         </label>
-        <label style={{ display: 'grid', gap: 6, color: 'var(--text-secondary)' }}>
+        <label className={styles.fieldLabel}>
           Fecha fin de uso
           <input className="input" type="datetime-local" value={fechaFin} onChange={e => setFechaFin(e.target.value)} required disabled={loading} />
         </label>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <div className={styles.actions}>
           <button className="button-primary" type="submit" disabled={loading}>
             {loading ? 'Enviando...' : 'Solicitar vehiculo'}
           </button>
         </div>
       </div>
-      {error && <p style={{ color: 'var(--danger)', marginTop: 12 }}>{error}</p>}
-      {success && <p style={{ color: 'var(--accent)', marginTop: 12 }}>{success}</p>}
+      {error && <p className={styles.errorText}>{error}</p>}
+      {success && <p className={styles.successText}>{success}</p>}
     </form>
   );
 };

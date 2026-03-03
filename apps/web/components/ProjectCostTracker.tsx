@@ -165,6 +165,9 @@ export default function ProjectCostTracker({
     );
   }
 
+  const budgetUsagePercentage = costs.budget > 0 ? Math.min(100, (costs.totalCost / costs.budget) * 100) : 0;
+  const budgetUsageRaw = costs.budget > 0 ? (costs.totalCost / costs.budget) * 100 : 0;
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -206,16 +209,16 @@ export default function ProjectCostTracker({
                 <span>${costs.budget.toFixed(2)}</span>
               </div>
               <div className={styles.bar}>
-                <div
-                  className={`${styles.fill} ${costs.isOverBudget ? styles.overBudget : ''}`}
-                  style={{ width: `${Math.min(100, (costs.totalCost / costs.budget) * 100)}%` }}
-                >
-                  {(costs.totalCost / costs.budget) * 100 > 20 && (
-                    <span className={styles.fillText}>
-                      {((costs.totalCost / costs.budget) * 100).toFixed(0)}%
-                    </span>
-                  )}
-                </div>
+                <progress
+                  className={`${styles.progressBar} ${costs.isOverBudget ? styles.overBudget : ''}`}
+                  value={budgetUsagePercentage}
+                  max={100}
+                />
+                {budgetUsageRaw > 20 && (
+                  <span className={styles.fillText}>
+                    {budgetUsageRaw.toFixed(0)}%
+                  </span>
+                )}
               </div>
               <div className={styles.barCaption}>
                 Usado: ${costs.totalCost.toFixed(2)} de ${costs.budget.toFixed(2)}

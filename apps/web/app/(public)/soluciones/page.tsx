@@ -82,7 +82,7 @@ export default function SolucionesPage() {
   const rectSrcB = byName("rect-b") ?? solucionesImages[4] ?? solucionesImages[1];
   return (
     <>
-    <main className={styles.container}>
+    <main className={styles.container} aria-label="Página de soluciones">
       {/* Hero */}
       <section className={styles.hero}>
         <div className={styles.heroContent}>
@@ -100,6 +100,13 @@ export default function SolucionesPage() {
         </div>
       </section>
 
+      <nav className={styles.quickNav} aria-label="Accesos rápidos">
+        <a href="#areas" className={styles.quickNavLink}>Áreas de solución</a>
+        <a href="#arrendamiento" className={styles.quickNavLink}>Arrendamiento</a>
+        <a href="#soporte" className={styles.quickNavLink}>Soporte empresarial</a>
+        <a href="#marcas" className={styles.quickNavLink}>Marcas</a>
+      </nav>
+
       {/* Espacio estratégico 1 (después del hero) */}
       <section className={styles.mediaSection}>
         <div className={styles.mediaRect}>
@@ -111,7 +118,7 @@ export default function SolucionesPage() {
                 fill
                 sizes="(min-width: 900px) 900px, 100vw"
                 quality={90}
-                style={{ objectFit: "cover" }}
+                className={styles.mediaCoverImage}
                 priority
               />
             ) : (
@@ -146,7 +153,7 @@ export default function SolucionesPage() {
       </section>
 
       {/* Áreas de solución */}
-      <section className={styles.section}>
+      <section id="areas" className={styles.section}>
         <h2 className={styles.sectionTitle}>Nuestras áreas de solución</h2>
         <div className={styles.solutionsGrid}>
           <article className={styles.solutionCard}>
@@ -255,7 +262,7 @@ export default function SolucionesPage() {
                     fill
                      sizes="(max-width: 900px) 90vw, 420px"
                     quality={90}
-                    style={{ objectFit: "cover" }}
+                    className={styles.mediaCoverImage}
                   />
                 ) : (
                   <div className={styles.squarePlaceholder}>Espacio cuadrado 1:1</div>
@@ -277,7 +284,7 @@ export default function SolucionesPage() {
                 fill
                 sizes="(min-width: 900px) 900px, 100vw"
                 quality={90}
-                style={{ objectFit: "cover" }}
+                className={styles.mediaCoverImage}
               />
             ) : (
               <div className={styles.mediaPlaceholder}>Espacio rectangular 16:9</div>
@@ -287,7 +294,7 @@ export default function SolucionesPage() {
       </section>
 
       {/* Arrendamiento */}
-      <section className={styles.section}>
+      <section id="arrendamiento" className={styles.section}>
         <div className={styles.leasingSection}>
           <div className={styles.leasingContent}>
             <div className={styles.leasingIcon}>
@@ -347,7 +354,7 @@ export default function SolucionesPage() {
       </section>
 
       {/* Consultoría y acompañamiento */}
-      <section className={styles.section}>
+      <section id="soporte" className={styles.section}>
         <div className={styles.consultingBanner}>
           <h3>Soporte Técnico Empresarial Integral</h3>
           <p>
@@ -389,22 +396,8 @@ export default function SolucionesPage() {
         </div>
       </section>
 
-      {/* Consultoría y acompañamiento */}
-      <section className={styles.section}>
-        <div className={styles.consultingBanner}>
-          <h3>Consultoría integral y acompañamiento continuo</h3>
-          <p>
-            Más que proveedores, somos <strong>socios estratégicos en tu transformación digital</strong>.
-            Desde la evaluación inicial hasta la operación diaria, te acompañamos en cada
-            etapa con experiencia técnica, metodologías comprobadas y un compromiso genuino
-            con tu éxito. Nuestro enfoque no solo busca implementar tecnología, sino
-            <strong> generar valor real</strong> para tu organización.
-          </p>
-        </div>
-      </section>
-
       {/* Marcas con las que trabajamos */}
-      <section className={styles.brandsSection}>
+      <section id="marcas" className={styles.brandsSection}>
         <div className={styles.brandsHeader}>
           <h2 className={styles.sectionTitle}>Algunas de las marcas con las que trabajamos</h2>
           <p className={styles.lead}>

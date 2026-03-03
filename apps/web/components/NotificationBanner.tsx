@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useNotifications } from '../lib/useNotifications';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '../lib/permissions';
+import styles from './NotificationBanner.module.css';
 
 export function NotificationBanner() {
   const [message, setMessage] = useState<string | null>(null);
@@ -23,22 +24,7 @@ export function NotificationBanner() {
 
   if (!message) return null;
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        background: 'var(--primary)',
-        color: 'var(--surface)',
-        padding: '12px',
-        textAlign: 'center',
-        zIndex: 1000,
-        fontWeight: 600,
-        letterSpacing: 1,
-        boxShadow: '0 2px 8px var(--shadow)',
-      }}
-    >
+    <div className={styles.banner}>
       {message}
     </div>
   );

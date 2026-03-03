@@ -38,6 +38,15 @@
   --text-tertiary: #1a2f4f;
   --surface-light: #edf6ff;
   --focus-ring: rgba(15, 106, 214, 0.35);
+  --public-font-family: var(--font-geist-sans), "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --public-title-leading: 1.12;
+  --public-body-leading: 1.72;
+  --public-title-tracking: -0.018em;
+  --public-body-size: clamp(1rem, 0.26vw + 0.95rem, 1.08rem);
+  --panel-font-family: var(--font-geist-sans), "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --panel-title-tracking: -0.012em;
+  --panel-title-leading: 1.2;
+  --panel-body-leading: 1.58;
 }
 
 /* Light mode explicit override */
@@ -170,9 +179,50 @@ main [id] {
 }
 
 body {
+  font-family: var(--panel-font-family);
   color: var(--foreground);
   background: var(--background) !important;
-  line-height: 1.45;
+  line-height: var(--panel-body-leading);
+}
+
+.public-layout-wrapper.public-friendly {
+  font-family: var(--public-font-family);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.public-layout-wrapper.public-friendly :where(main) {
+  isolation: isolate;
+}
+
+.public-layout-wrapper.public-friendly :where(h1, h2, h3) {
+  line-height: var(--public-title-leading);
+  letter-spacing: var(--public-title-tracking);
+  text-wrap: balance;
+}
+
+.public-layout-wrapper.public-friendly :where(p, li) {
+  font-size: var(--public-body-size);
+  line-height: var(--public-body-leading);
+  text-wrap: pretty;
+}
+
+.public-layout-wrapper.public-friendly :where(section p, article p) {
+  max-width: 72ch;
+}
+
+.public-layout-wrapper.public-friendly :where(a) {
+  transition: color 180ms ease, opacity 180ms ease, transform 180ms ease;
+}
+
+.public-layout-wrapper.public-friendly :where(section, article) {
+  scroll-margin-top: calc(var(--header-offset) + 16px);
+}
+
+.public-layout-wrapper.public-friendly ::selection {
+  background: color-mix(in srgb, var(--primary) 20%, white);
+  color: color-mix(in srgb, var(--foreground) 96%, black);
 }
 
 body.light {

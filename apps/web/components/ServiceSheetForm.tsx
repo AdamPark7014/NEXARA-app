@@ -1,7 +1,8 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useUser } from './UserContext';
 import PDFViewer from './PDFViewer';
+import styles from './ServiceSheetForm.module.css';
 
 interface ActivityOption {
   id: number;
@@ -31,6 +32,7 @@ export default function ServiceSheetForm() {
   const [message, setMessage] = useState<string | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [showPdfViewer, setShowPdfViewer] = useState(false);
+  const pdfModalRef = useRef<HTMLDivElement | null>(null);
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
@@ -127,11 +129,61 @@ export default function ServiceSheetForm() {
     return () => mediaQuery.removeEventListener('change', sync);
   }, []);
 
+  useEffect(() => {
+    if (!showPdfViewer) return;
+
+    const modal = pdfModalRef.current;
+    if (!modal) return;
+
+    const getFocusable = () =>
+      Array.from(
+        modal.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute('disabled') && element.tabIndex !== -1);
+
+    const initialFocusable = getFocusable();
+    initialFocusable[0]?.focus();
+
+    const handleModalKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setShowPdfViewer(false);
+        return;
+      }
+
+      if (event.key !== 'Tab') return;
+
+      const focusable = getFocusable();
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const activeElement = document.activeElement as HTMLElement | null;
+
+      if (event.shiftKey) {
+        if (!activeElement || activeElement === first || !modal.contains(activeElement)) {
+          event.preventDefault();
+          last.focus();
+        }
+        return;
+      }
+
+      if (!activeElement || activeElement === last || !modal.contains(activeElement)) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    modal.addEventListener('keydown', handleModalKeyDown);
+    return () => modal.removeEventListener('keydown', handleModalKeyDown);
+  }, [showPdfViewer]);
+
   return (
-    <div className="card" style={{ display: 'grid', gap: 12, maxWidth: 780, width: '100%' }}>
-      <h2 style={{ margin: 0, color: 'var(--primary)' }}>Hoja de servicio</h2>
-      <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Llena los datos para generar el PDF del ticket.</div>
-      <select className="input" value={activityId} onChange={(e) => setActivityId(e.target.value ? Number(e.target.value) : '')}>
+    <div className={`card ${styles.formCard}`}>
+      <h2 className={styles.title}>Hoja de servicio</h2>
+      <div className={styles.subtitle}>Llena los datos para generar el PDF del ticket.</div>
+      <select className="input" aria-label="Seleccionar actividad" value={activityId} onChange={(e) => setActivityId(e.target.value ? Number(e.target.value) : '')}>
         <option value="">Selecciona actividad</option>
         {activities.map((activity) => (
           <option key={activity.id} value={activity.id}>
@@ -139,15 +191,15 @@ export default function ServiceSheetForm() {
           </option>
         ))}
       </select>
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-        <input className="input" placeholder="Gerente / Encargado" value={managerName} onChange={(e) => setManagerName(e.target.value)} />
-        <input className="input" placeholder="Cargo" value={managerRole} onChange={(e) => setManagerRole(e.target.value)} />
+      <div className={`${styles.topGrid} ${isMobile ? styles.topGridMobile : ''}`}>
+        <input className="input" placeholder="Gerente / Encargado" aria-label="Gerente o encargado" value={managerName} onChange={(e) => setManagerName(e.target.value)} />
+        <input className="input" placeholder="Cargo" aria-label="Cargo del gerente o encargado" value={managerRole} onChange={(e) => setManagerRole(e.target.value)} />
       </div>
-      <textarea className="input" rows={3} placeholder="Trabajo realizado" value={workSummary} onChange={(e) => setWorkSummary(e.target.value)} />
-      <div style={{ display: 'grid', gap: 10 }}>
-        <div style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Equipos atendidos</div>
+      <textarea className="input" rows={3} placeholder="Trabajo realizado" aria-label="Trabajo realizado" value={workSummary} onChange={(e) => setWorkSummary(e.target.value)} />
+      <div className={styles.equipmentSection}>
+        <div className={styles.sectionTitle}>Equipos atendidos</div>
         {equipmentItems.map((item, index) => (
-          <div key={index} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
+          <div key={index} className={`${styles.equipmentRow} ${isMobile ? styles.equipmentRowMobile : ''}`}>
             <input
               className="input"
               placeholder="Equipo"
@@ -190,7 +242,7 @@ export default function ServiceSheetForm() {
             />
           </div>
         ))}
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <div className={styles.equipmentActions}>
           <button
             className="button-secondary"
             type="button"
@@ -209,18 +261,18 @@ export default function ServiceSheetForm() {
           )}
         </div>
       </div>
-      <textarea className="input" rows={3} placeholder="Observaciones" value={observations} onChange={(e) => setObservations(e.target.value)} />
-      <input className="input" placeholder="Firma digital (nombre)" value={signedName} onChange={(e) => setSignedName(e.target.value)} />
-      <div style={{ display: 'grid', gap: 10, padding: 12, borderRadius: 12, border: '1px solid rgba(31,107,186,0.2)', background: 'rgba(31,107,186,0.04)' }}>
-        <div style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Encuesta de calidad</div>
+      <textarea className="input" rows={3} placeholder="Observaciones" aria-label="Observaciones" value={observations} onChange={(e) => setObservations(e.target.value)} />
+      <input className="input" placeholder="Firma digital (nombre)" aria-label="Firma digital nombre" value={signedName} onChange={(e) => setSignedName(e.target.value)} />
+      <div className={styles.surveySection}>
+        <div className={styles.sectionTitle}>Encuesta de calidad</div>
         {[
           { key: 'engineerIdentified', label: 'El ingeniero se identifico' },
           { key: 'friendlyAttention', label: 'La atencion fue amable' },
           { key: 'solutionSatisfied', label: 'Satisfecho con la solucion' },
         ].map((item) => (
-          <div key={item.key} style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-            <span style={{ minWidth: isMobile ? 0 : 220, color: 'var(--text-secondary)', width: isMobile ? '100%' : 'auto' }}>{item.label}</span>
-            <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <div key={item.key} className={styles.questionRow}>
+            <span className={`${styles.questionText} ${isMobile ? styles.questionTextMobile : ''}`}>{item.label}</span>
+            <label className={styles.inlineLabel}>
               <input
                 type="radio"
                 name={item.key}
@@ -230,7 +282,7 @@ export default function ServiceSheetForm() {
               />
               Si
             </label>
-            <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <label className={styles.inlineLabel}>
               <input
                 type="radio"
                 name={item.key}
@@ -246,67 +298,40 @@ export default function ServiceSheetForm() {
           className="input"
           rows={2}
           placeholder="Observaciones adicionales"
+          aria-label="Observaciones adicionales de encuesta"
           value={survey.notes}
           onChange={(e) => setSurvey((prev) => ({ ...prev, notes: e.target.value }))}
         />
       </div>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div className={styles.formActions}>
         <button className="button-primary" type="button" onClick={handleSave}>Guardar hoja</button>
         <button className="button-secondary" type="button" onClick={handlePdf}>Ver PDF</button>
-        {message && <span style={{ color: message.startsWith('No') ? 'var(--danger)' : 'var(--accent)' }}>{message}</span>}
+        {message && <span className={message.startsWith('No') ? styles.messageError : styles.messageSuccess}>{message}</span>}
       </div>
 
       {/* PDF Viewer Modal */}
       {showPdfViewer && pdfUrl && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 9999,
-            padding: '20px',
-          }}
-          onClick={() => setShowPdfViewer(false)}
-        >
+        <div className={styles.modalOverlay} onClick={() => setShowPdfViewer(false)} aria-hidden="true">
           <div
-            style={{
-              backgroundColor: 'var(--surface)',
-              borderRadius: '8px',
-              maxWidth: '1200px',
-              width: '100%',
-              maxHeight: '90vh',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-            }}
+            ref={pdfModalRef}
+            className={styles.modalCard}
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Hoja de servicio ${activityId} en PDF`}
           >
-            <div 
-              style={{
-                padding: '16px 20px',
-                borderBottom: '1px solid var(--border)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <h3 style={{ margin: 0 }}>Hoja de Servicio #{activityId}</h3>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button className="button-primary" onClick={handleDownloadPdf}>
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>Hoja de Servicio #{activityId}</h3>
+              <div className={styles.modalActions}>
+                <button type="button" className="button-primary" onClick={handleDownloadPdf}>
                   📥 Descargar
                 </button>
-                <button className="button-secondary" onClick={() => setShowPdfViewer(false)}>
+                <button type="button" className="button-secondary" onClick={() => setShowPdfViewer(false)}>
                   ✕ Cerrar
                 </button>
               </div>
             </div>
-            <div style={{ flex: 1, overflow: 'hidden' }}>
+            <div className={styles.viewerWrap}>
               <PDFViewer 
                 pdfUrl={pdfUrl} 
                 fileName={`hoja-servicio-${activityId}.pdf`}

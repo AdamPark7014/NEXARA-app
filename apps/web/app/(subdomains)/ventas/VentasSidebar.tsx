@@ -288,28 +288,14 @@ export default function VentasSidebar() {
       </nav>
 
       {/* Botón de tema */}
-      <div style={{ padding: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
+      <div className={styles.themeSection}>
         <button
           onClick={toggleDarkMode}
           className={styles.themeButton}
-          style={{
-            width: '100%',
-            padding: '0.75rem',
-            borderRadius: '8px',
-            border: 'none',
-            background: 'var(--card-bg)',
-            color: 'var(--text-color)',
-            cursor: 'pointer',
-            fontSize: showExpandedContent ? '1rem' : '1.5rem',
-            transition: 'all 0.2s ease',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: showExpandedContent ? 'flex-start' : 'center',
-            gap: '0.5rem',
-          }}
+          data-collapsed={showExpandedContent ? 'false' : 'true'}
           aria-label={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
         >
-          <span style={{ fontSize: '1.5rem' }}>{darkMode ? '🌙' : '☀️'}</span>
+          <span className={styles.themeIcon}>{darkMode ? '🌙' : '☀️'}</span>
           {showExpandedContent && <span>{darkMode ? 'Modo Oscuro' : 'Modo Claro'}</span>}
         </button>
       </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useUser } from './UserContext';
 import PDFViewer from './PDFViewer';
 import {
@@ -41,6 +41,7 @@ export default function SalesReportsDashboard({
   const [generatePdfLoading, setGeneratePdfLoading] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [showPdfViewer, setShowPdfViewer] = useState(false);
+  const pdfModalRef = useRef<HTMLDivElement | null>(null);
   const [quotaForm, setQuotaForm] = useState<SalesQuotaPayload>({
     period,
     ownerId: undefined,
@@ -173,6 +174,56 @@ export default function SalesReportsDashboard({
     }
   }, [currentPeriod]);
 
+  useEffect(() => {
+    if (!showPdfViewer) return;
+
+    const modal = pdfModalRef.current;
+    if (!modal) return;
+
+    const getFocusable = () =>
+      Array.from(
+        modal.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute('disabled') && element.tabIndex !== -1);
+
+    const initialFocusable = getFocusable();
+    initialFocusable[0]?.focus();
+
+    const handleModalKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setShowPdfViewer(false);
+        return;
+      }
+
+      if (event.key !== 'Tab') return;
+
+      const focusable = getFocusable();
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const activeElement = document.activeElement as HTMLElement | null;
+
+      if (event.shiftKey) {
+        if (!activeElement || activeElement === first || !modal.contains(activeElement)) {
+          event.preventDefault();
+          last.focus();
+        }
+        return;
+      }
+
+      if (!activeElement || activeElement === last || !modal.contains(activeElement)) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    modal.addEventListener('keydown', handleModalKeyDown);
+    return () => modal.removeEventListener('keydown', handleModalKeyDown);
+  }, [showPdfViewer]);
+
   if (loading) return <div className={styles.loading}>Cargando reportes...</div>;
 
   return (
@@ -263,12 +314,8 @@ export default function SalesReportsDashboard({
                       <span className={getStatusBadgeClass(vendor.status)}>
                         {vendor.status === 'on-track' ? 'On-track' : vendor.status === 'risk' ? 'Risk' : 'Off-track'}
                       </span>
-                      <div
-                        className={styles.performanceBar}
-                        style={{
-                          backgroundSize: `${vendor.performance}% 100%`,
-                        }}
-                      >
+                      <div className={styles.performanceBar}>
+                        <progress className={styles.performanceProgress} max={100} value={Math.max(0, Math.min(100, Number(vendor.performance) || 0))} />
                         <span className={styles.performanceText}>{vendor.performance}%</span>
                       </div>
                     </div>
@@ -670,15 +717,15 @@ export default function SalesReportsDashboard({
 
       {/* PDF Viewer Modal */}
       {showPdfViewer && pdfUrl && (
-        <div className={styles.pdfModal} onClick={() => setShowPdfViewer(false)}>
-          <div className={styles.pdfModalContent} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.pdfModal} onClick={() => setShowPdfViewer(false)} aria-hidden="true">
+          <div ref={pdfModalRef} className={styles.pdfModalContent} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Visor de reporte PDF de ventas">
             <div className={styles.pdfModalHeader}>
               <h3>Reporte de Ventas - {periodLabel}</h3>
               <div className={styles.pdfModalActions}>
-                <button className={styles.pdfDownloadBtn} onClick={handleDownloadPdf}>
+                <button type="button" className={styles.pdfDownloadBtn} onClick={handleDownloadPdf}>
                   📥 Descargar
                 </button>
-                <button className={styles.pdfCloseBtn} onClick={() => setShowPdfViewer(false)}>
+                <button type="button" className={styles.pdfCloseBtn} onClick={() => setShowPdfViewer(false)}>
                   ✕ Cerrar
                 </button>
               </div>
@@ -728,10 +775,7 @@ function SimpleBarChart({ data }: any) {
         <div key={i} className={styles.barItem}>
           <div className={styles.barLabel}>{item.label}</div>
           <div className={styles.barContainer}>
-            <div
-              className={styles.bar}
-              style={{ width: `${maxValue > 0 ? (item.value / maxValue) * 100 : 0}%` }}
-            />
+            <progress className={styles.bar} max={Math.max(1, maxValue)} value={item.value} />
           </div>
           <div className={styles.barValue}>
             {new Intl.NumberFormat('es-MX', {
@@ -766,8 +810,7 @@ function SimplePieChart({ data }: any) {
           {normalizedData.map((item: any, i: number) => (
             <div key={i} className={styles.legendItem}>
               <span
-                className={styles.legendColor}
-                style={{ backgroundColor: item.color }}
+                className={`${styles.legendColor} ${styles[`legendColor${i % 6}`] || ''}`}
               />
               <span className={styles.legendLabel}>{item.label}</span>
               <span className={styles.legendValue}>0%</span>
@@ -813,8 +856,7 @@ function SimplePieChart({ data }: any) {
         {normalizedData.map((item: any, i: number) => (
           <div key={i} className={styles.legendItem}>
             <span
-              className={styles.legendColor}
-              style={{ backgroundColor: item.color }}
+              className={`${styles.legendColor} ${styles[`legendColor${i % 6}`] || ''}`}
             />
             <span className={styles.legendLabel}>{item.label}</span>
             <span className={styles.legendValue}>

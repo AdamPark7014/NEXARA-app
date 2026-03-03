@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, Suspense } from 'react';
+import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
 import '@react-pdf-viewer/core/lib/styles/index.css';
 import styles from './PDFViewer.module.css';
@@ -27,6 +27,14 @@ export default function PDFViewer({
   height = '600px',
 }: PDFViewerProps) {
   const [error, setError] = useState<string | null>(null);
+
+  const viewerHeightClass = {
+    '400px': styles.viewerH400,
+    '500px': styles.viewerH500,
+    '600px': styles.viewerH600,
+    '700px': styles.viewerH700,
+    '800px': styles.viewerH800,
+  }[height] || styles.viewerH600;
 
   const handleDownload = () => {
     const link = document.createElement('a');
@@ -70,7 +78,7 @@ export default function PDFViewer({
 
       {error && <div className={styles.error}>{error}</div>}
 
-      <div className={styles.viewer} style={{ height }}>
+      <div className={`${styles.viewer} ${viewerHeightClass}`}>
         <Worker workerUrl="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js">
           <Viewer fileUrl={pdfUrl} />
         </Worker>

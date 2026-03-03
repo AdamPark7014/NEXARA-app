@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
+import styles from './ViaticTable.module.css';
 
 interface Viatic {
   id: number;
@@ -151,8 +152,8 @@ const ViaticTable = () => {
 
   return (
     <div className="card">
-      <h2 style={{ color: 'var(--primary)', marginBottom: 12 }}>Viáticos</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 12, alignItems: 'center' }}>
+      <h2 className={styles.title}>Viáticos</h2>
+      <div className={`${styles.filtersGrid} ${isMobile ? styles.filtersGridMobile : ''}`}>
         <select className="input" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
           <option value="">Todos los estatus</option>
           <option value="Pendiente">Pendiente</option>
@@ -178,9 +179,8 @@ const ViaticTable = () => {
         </select>
       </div>
       {hasPermission(user, PERMISSIONS.VIATICS_EXPORT) && (
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'auto auto', gap: 10, marginBottom: 12, justifyContent: isMobile ? 'stretch' : 'start' }}>
+        <div className={`${styles.importActions} ${isMobile ? styles.importActionsMobile : ''}`}>
           <button
-            className="button-primary"
             onClick={async () => {
               const res = await fetch(buildApiUrl('export/viatic'));
               if (!res.ok) return alert('Error al exportar');
@@ -194,26 +194,26 @@ const ViaticTable = () => {
               a.remove();
               window.URL.revokeObjectURL(url);
             }}
-            style={{ width: isMobile ? '100%' : 'auto' }}
+            className={`button-primary ${isMobile ? styles.fullWidthBtn : ''}`}
           >
             Exportar Excel
           </button>
-          <button className="button-primary" onClick={() => fileInputRef.current?.click()} style={{ width: isMobile ? '100%' : 'auto' }}>Importar Excel</button>
+          <button className={`button-primary ${isMobile ? styles.fullWidthBtn : ''}`} onClick={() => fileInputRef.current?.click()}>Importar Excel</button>
           <input
             type="file"
             accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             ref={fileInputRef}
-            style={{ display: 'none' }}
+            className={styles.hiddenInput}
             onChange={handleImport}
           />
         </div>
       )}
       {importMsg && (
-        <div style={{ color: importMsg.startsWith('Error') ? 'var(--danger)' : 'var(--accent)' }}>{importMsg}</div>
+        <div className={importMsg.startsWith('Error') ? styles.importError : styles.importSuccess}>{importMsg}</div>
       )}
       {!isMobile && (
-        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', border: '1px solid var(--muted)', borderRadius: 12 }}>
-          <table className="table" style={{ minWidth: 840 }}>
+        <div className={styles.tableWrap}>
+          <table className={`table ${styles.tableMin}`}>
             <thead>
               <tr>
                 <th>Actividad</th>
@@ -258,36 +258,36 @@ const ViaticTable = () => {
       )}
 
       {isMobile && (
-        <div style={{ display: 'grid', gap: 12 }}>
+        <div className={styles.mobileList}>
           {paginated.map((v: Viatic) => (
-            <div key={v.id} className="card" style={{ border: '1px solid var(--muted)', padding: 12, display: 'grid', gap: 8 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 600 }}>Actividad: {v.actividad?.anNumber || '-'}</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Usuario: {v.usuario?.nombre || '-'}</div>
+            <div key={v.id} className={`card ${styles.mobileCard}`}>
+              <div className={styles.mobileHeader}>
+                <div className={styles.mobileHeaderMain}>
+                  <div className={styles.mobileActivity}>Actividad: {v.actividad?.anNumber || '-'}</div>
+                  <div className={styles.mobileUser}>Usuario: {v.usuario?.nombre || '-'}</div>
                 </div>
                 <span className={`badge ${v.estatusPago === 'Aprobado' ? 'approved' : v.estatusPago === 'Pendiente' ? 'pending' : v.estatusPago === 'Rechazado' ? 'rejected' : ''}`}>{v.estatusPago}</span>
               </div>
 
-              <div style={{ fontSize: 13 }}>
+              <div className={styles.mobileText}>
                 <strong>Monto:</strong> ${v.montoSolicitado}
               </div>
 
-              <div style={{ fontSize: 13, wordBreak: 'break-word' }}>
+              <div className={styles.mobileReason}>
                 <strong>Razón:</strong> {v.razonGasto}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: hasPermission(user, PERMISSIONS.VIATICS_MANAGE) && v.estatusPago === 'Pendiente' ? '1fr 1fr 1fr' : '1fr', gap: 8 }}>
-                <a className="button-secondary" href={v.ticketEvidenciaUrl || '#'} target="_blank" rel="noopener noreferrer" style={{ textAlign: 'center', pointerEvents: v.ticketEvidenciaUrl ? 'auto' : 'none', opacity: v.ticketEvidenciaUrl ? 1 : 0.6 }}>
+              <div className={hasPermission(user, PERMISSIONS.VIATICS_MANAGE) && v.estatusPago === 'Pendiente' ? styles.mobileActionsTriple : styles.mobileActionsSingle}>
+                <a className={`button-secondary ${styles.ticketLink} ${v.ticketEvidenciaUrl ? '' : styles.ticketLinkDisabled}`} href={v.ticketEvidenciaUrl || '#'} target="_blank" rel="noopener noreferrer">
                   Ver ticket
                 </a>
 
                 {hasPermission(user, PERMISSIONS.VIATICS_MANAGE) && v.estatusPago === 'Pendiente' && (
                   <>
-                    <button className="button-primary" onClick={() => handleApprove(v.id, 'Aprobado')} disabled={actionLoading === v.id} style={{ minHeight: 42 }}>
+                    <button className={`button-primary ${styles.actionBtn}`} onClick={() => handleApprove(v.id, 'Aprobado')} disabled={actionLoading === v.id}>
                       {actionLoading === v.id ? 'Aprobando...' : 'Aprobar'}
                     </button>
-                    <button className="button-secondary" onClick={() => handleApprove(v.id, 'Rechazado')} disabled={actionLoading === v.id} style={{ minHeight: 42 }}>
+                    <button className={`button-secondary ${styles.actionBtn}`} onClick={() => handleApprove(v.id, 'Rechazado')} disabled={actionLoading === v.id}>
                       {actionLoading === v.id ? 'Rechazando...' : 'Rechazar'}
                     </button>
                   </>
@@ -298,13 +298,13 @@ const ViaticTable = () => {
         </div>
       )}
 
-      <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+      <div className={styles.pagination}>
         <button className="button-secondary" onClick={() => setPage((p: number) => Math.max(1, p - 1))} disabled={page === 1}>Anterior</button>
         <span>Página {page} de {totalPages || 1}</span>
         <button className="button-secondary" onClick={() => setPage((p: number) => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0}>Siguiente</button>
       </div>
-      {error && <p style={{ color: 'var(--danger)' }}>{error}</p>}
-      {success && <p style={{ color: 'var(--accent)' }}>{success}</p>}
+      {error && <p className={styles.errorText}>{error}</p>}
+      {success && <p className={styles.successText}>{success}</p>}
     </div>
   );
 };

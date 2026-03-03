@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
+import styles from "./CvsManagementPanel.module.css";
 
 type CvRow = {
   id: number;
@@ -309,22 +310,13 @@ export default function CvsManagementPanel() {
   };
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
-      <h2 style={{ fontSize: "2rem", color: "var(--primary)", marginBottom: 0 }}>Gestión corporativa de CVs</h2>
+    <div className={styles.root}>
+      <h2 className={styles.title}>Gestión corporativa de CVs</h2>
 
-      <div
-        style={{
-          border: "1px solid rgba(148, 163, 184, 0.3)",
-          borderRadius: 12,
-          padding: 12,
-          background: "var(--surface)",
-          display: "grid",
-          gap: 10,
-        }}
-      >
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar nombre/email/whatsapp" style={inputStyle} />
-          <select value={category} onChange={(event) => setCategory(event.target.value)} style={inputStyle}>
+      <div className={styles.panel}>
+        <div className={styles.filterGrid}>
+          <input className="input" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar nombre/email/whatsapp" />
+          <select className="input" value={category} onChange={(event) => setCategory(event.target.value)}>
             <option value="">Todas las categorías</option>
             {categories.map((item) => (
               <option key={item} value={item}>
@@ -332,7 +324,7 @@ export default function CvsManagementPanel() {
               </option>
             ))}
           </select>
-          <select value={stage} onChange={(event) => setStage(event.target.value)} style={inputStyle}>
+          <select className="input" value={stage} onChange={(event) => setStage(event.target.value)}>
             <option value="">Todas las etapas</option>
             {STAGE_ORDER.map((item) => (
               <option key={item} value={item}>
@@ -340,7 +332,7 @@ export default function CvsManagementPanel() {
               </option>
             ))}
           </select>
-          <select value={employmentStatus} onChange={(event) => setEmploymentStatus(event.target.value)} style={inputStyle}>
+          <select className="input" value={employmentStatus} onChange={(event) => setEmploymentStatus(event.target.value)}>
             <option value="">Todos los estados laborales</option>
             {Object.entries(EMPLOYMENT_LABELS).map(([key, label]) => (
               <option key={key} value={key}>
@@ -349,37 +341,27 @@ export default function CvsManagementPanel() {
             ))}
           </select>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <label style={{ display: "inline-flex", gap: 8, alignItems: "center", fontSize: 13 }}>
+        <div className={styles.filterActions}>
+          <label className={styles.mineLabel}>
             <input type="checkbox" checked={onlyMine} onChange={(event) => setOnlyMine(event.target.checked)} />
             Solo CVs gestionados por mí
           </label>
-          <button type="button" onClick={fetchRows} style={buttonPrimary} disabled={loading || busy}>
+          <button type="button" onClick={fetchRows} className="button-primary" disabled={loading || busy}>
             Aplicar filtros
           </button>
         </div>
       </div>
 
       {canRecruiter && (
-        <form
-          onSubmit={onUpload}
-          style={{
-            border: "1px solid rgba(148, 163, 184, 0.3)",
-            borderRadius: 12,
-            padding: 12,
-            background: "var(--surface)",
-            display: "grid",
-            gap: 10,
-          }}
-        >
-          <h3 style={{ margin: 0 }}>Alta de CV (PDF)</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8 }}>
-            <input value={upload.fullName} onChange={(event) => setUpload((prev) => ({ ...prev, fullName: event.target.value }))} placeholder="Nombre completo" style={inputStyle} required />
-            <input value={upload.email} onChange={(event) => setUpload((prev) => ({ ...prev, email: event.target.value }))} placeholder="Email" style={inputStyle} />
-            <input value={upload.whatsapp} onChange={(event) => setUpload((prev) => ({ ...prev, whatsapp: event.target.value }))} placeholder="WhatsApp" style={inputStyle} />
-            <input value={upload.category} onChange={(event) => setUpload((prev) => ({ ...prev, category: event.target.value }))} placeholder="Categoría (Finanzas, RRHH...)" style={inputStyle} required />
-            <input value={upload.tags} onChange={(event) => setUpload((prev) => ({ ...prev, tags: event.target.value }))} placeholder="Tags separados por coma" style={inputStyle} />
-            <select value={upload.employmentStatus} onChange={(event) => setUpload((prev) => ({ ...prev, employmentStatus: event.target.value }))} style={inputStyle}>
+        <form onSubmit={onUpload} className={styles.uploadForm}>
+          <h3 className={styles.sectionTitle}>Alta de CV (PDF)</h3>
+          <div className={styles.uploadGrid}>
+            <input className="input" value={upload.fullName} onChange={(event) => setUpload((prev) => ({ ...prev, fullName: event.target.value }))} placeholder="Nombre completo" required />
+            <input className="input" value={upload.email} onChange={(event) => setUpload((prev) => ({ ...prev, email: event.target.value }))} placeholder="Email" />
+            <input className="input" value={upload.whatsapp} onChange={(event) => setUpload((prev) => ({ ...prev, whatsapp: event.target.value }))} placeholder="WhatsApp" />
+            <input className="input" value={upload.category} onChange={(event) => setUpload((prev) => ({ ...prev, category: event.target.value }))} placeholder="Categoría (Finanzas, RRHH...)" required />
+            <input className="input" value={upload.tags} onChange={(event) => setUpload((prev) => ({ ...prev, tags: event.target.value }))} placeholder="Tags separados por coma" />
+            <select className="input" value={upload.employmentStatus} onChange={(event) => setUpload((prev) => ({ ...prev, employmentStatus: event.target.value }))}>
               {Object.entries(EMPLOYMENT_LABELS).map(([key, label]) => (
                 <option key={key} value={key}>
                   {label}
@@ -388,24 +370,24 @@ export default function CvsManagementPanel() {
             </select>
           </div>
           <textarea
+            className={`input ${styles.notesInput}`}
             value={upload.recruiterNotes}
             onChange={(event) => setUpload((prev) => ({ ...prev, recruiterNotes: event.target.value }))}
             placeholder="Notas iniciales"
-            style={{ ...inputStyle, minHeight: 80, resize: "vertical" }}
           />
-          <input type="file" accept="application/pdf" onChange={(event) => setUploadFile(event.target.files?.[0] || null)} required />
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <button type="submit" disabled={busy} style={buttonPrimary}>
+          <input className="input" type="file" accept="application/pdf" onChange={(event) => setUploadFile(event.target.files?.[0] || null)} required />
+          <div className={styles.uploadFooter}>
+            <button type="submit" disabled={busy} className="button-primary">
               Subir CV
             </button>
           </div>
         </form>
       )}
 
-      {error && <div style={{ color: "#ef4444", fontSize: 13 }}>{error}</div>}
-      {loading ? <div>Cargando CVs...</div> : null}
+      {error && <div className={styles.errorText}>{error}</div>}
+      {loading ? <div className={styles.loadingText}>Cargando CVs...</div> : null}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, alignItems: "start" }}>
+      <div className={styles.boardGrid}>
         {STAGE_ORDER.map((stageKey) => {
           const cards = grouped.get(stageKey) || [];
           return (
@@ -421,19 +403,11 @@ export default function CvsManagementPanel() {
                   moveToStage(id, stageKey);
                 }
               }}
-              style={{
-                border: "1px solid rgba(148, 163, 184, 0.28)",
-                borderRadius: 12,
-                padding: 10,
-                background: "var(--surface)",
-                minHeight: 180,
-                display: "grid",
-                gap: 8,
-              }}
+              className={styles.column}
             >
-              <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <strong style={{ fontSize: 14 }}>{STAGE_LABELS[stageKey]}</strong>
-                <span style={{ fontSize: 12, opacity: 0.7 }}>{cards.length}</span>
+              <header className={styles.columnHeader}>
+                <strong className={styles.columnTitle}>{STAGE_LABELS[stageKey]}</strong>
+                <span className={styles.columnCount}>{cards.length}</span>
               </header>
 
               {cards.map((row) => (
@@ -441,50 +415,43 @@ export default function CvsManagementPanel() {
                   key={row.id}
                   draggable={canRecruiter || canAdmin}
                   onDragStart={(event) => event.dataTransfer.setData("text/plain", String(row.id))}
-                  style={{
-                    border: "1px solid rgba(148, 163, 184, 0.25)",
-                    borderRadius: 10,
-                    padding: 10,
-                    background: "var(--background)",
-                    display: "grid",
-                    gap: 6,
-                  }}
+                  className={styles.cvCard}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                    <strong style={{ fontSize: 14 }}>{row.fullName}</strong>
-                    <span style={{ fontSize: 11, opacity: 0.7 }}>{EMPLOYMENT_LABELS[row.employmentStatus]}</span>
+                  <div className={styles.cardTop}>
+                    <strong className={styles.cardName}>{row.fullName}</strong>
+                    <span className={styles.cardStatus}>{EMPLOYMENT_LABELS[row.employmentStatus]}</span>
                   </div>
-                  <div style={{ fontSize: 12, opacity: 0.9 }}>{row.category}</div>
-                  {row.tags?.length ? <div style={{ fontSize: 12, opacity: 0.8 }}>{row.tags.join(" · ")}</div> : null}
+                  <div className={styles.cardCategory}>{row.category}</div>
+                  {row.tags?.length ? <div className={styles.cardTags}>{row.tags.join(" · ")}</div> : null}
 
-                  <div style={{ display: "grid", gap: 2, fontSize: 12 }}>
+                  <div className={styles.reviewers}>
                     <span>RRHH: {row.recruiterReviewedBy?.nombre || "-"}</span>
                     <span>Admin: {row.adminReviewedBy?.nombre || "-"}</span>
                     <span>Dirección: {row.superadminReviewedBy?.nombre || "-"}</span>
                   </div>
 
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    <button type="button" onClick={() => openPreview(row.id)} style={buttonGhost}>
+                  <div className={styles.actionRow}>
+                    <button type="button" onClick={() => openPreview(row.id)} className="button-secondary">
                       Preview PDF
                     </button>
-                    <button type="button" onClick={() => downloadCv(row.id)} style={buttonGhost}>
+                    <button type="button" onClick={() => downloadCv(row.id)} className="button-secondary">
                       Descargar
                     </button>
-                    <button type="button" onClick={() => openWhatsapp(row.whatsapp)} style={buttonGhost} disabled={!row.whatsapp}>
+                    <button type="button" onClick={() => openWhatsapp(row.whatsapp)} className="button-secondary" disabled={!row.whatsapp}>
                       WhatsApp
                     </button>
-                    <button type="button" onClick={() => openEmail(row.email)} style={buttonGhost} disabled={!row.email}>
+                    <button type="button" onClick={() => openEmail(row.email)} className="button-secondary" disabled={!row.email}>
                       Email
                     </button>
                   </div>
 
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <div className={styles.actionRow}>
                     {canRecruiter && (
                       <>
-                        <button type="button" onClick={() => runReview(row.id, "recruiter", "APPROVED")} style={buttonPrimary}>
+                        <button type="button" onClick={() => runReview(row.id, "recruiter", "APPROVED")} className="button-primary">
                           RRHH aprueba
                         </button>
-                        <button type="button" onClick={() => runReview(row.id, "recruiter", "REJECTED")} style={buttonGhost}>
+                        <button type="button" onClick={() => runReview(row.id, "recruiter", "REJECTED")} className="button-secondary">
                           RRHH descarta
                         </button>
                       </>
@@ -492,10 +459,10 @@ export default function CvsManagementPanel() {
 
                     {canAdmin && (
                       <>
-                        <button type="button" onClick={() => runReview(row.id, "admin", "APPROVED")} style={buttonPrimary}>
+                        <button type="button" onClick={() => runReview(row.id, "admin", "APPROVED")} className="button-primary">
                           Admin recomienda
                         </button>
-                        <button type="button" onClick={() => runReview(row.id, "admin", "REJECTED")} style={buttonGhost}>
+                        <button type="button" onClick={() => runReview(row.id, "admin", "REJECTED")} className="button-secondary">
                           Admin descarta
                         </button>
                       </>
@@ -503,17 +470,17 @@ export default function CvsManagementPanel() {
 
                     {canSuperadmin && (
                       <>
-                        <button type="button" onClick={() => runReview(row.id, "superadmin", "APPROVED")} style={buttonPrimary}>
+                        <button type="button" onClick={() => runReview(row.id, "superadmin", "APPROVED")} className="button-primary">
                           Dirección aprueba
                         </button>
-                        <button type="button" onClick={() => runReview(row.id, "superadmin", "REJECTED")} style={buttonGhost}>
+                        <button type="button" onClick={() => runReview(row.id, "superadmin", "REJECTED")} className="button-secondary">
                           Dirección descarta
                         </button>
                       </>
                     )}
 
                     {(canUsersManage || canSuperadmin) && row.stage === "APPROVED" && (
-                      <button type="button" onClick={() => handleCreateUser(row.id)} style={buttonPrimary}>
+                      <button type="button" onClick={() => handleCreateUser(row.id)} className="button-primary">
                         Crear usuario
                       </button>
                     )}
@@ -527,35 +494,3 @@ export default function CvsManagementPanel() {
     </div>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  border: "1px solid rgba(148, 163, 184, 0.4)",
-  borderRadius: 8,
-  background: "var(--background)",
-  color: "var(--foreground)",
-  fontSize: 13,
-  padding: "10px 12px",
-  width: "100%",
-};
-
-const buttonPrimary: React.CSSProperties = {
-  border: "1px solid transparent",
-  borderRadius: 8,
-  background: "var(--primary)",
-  color: "white",
-  fontWeight: 600,
-  fontSize: 12,
-  padding: "8px 10px",
-  cursor: "pointer",
-};
-
-const buttonGhost: React.CSSProperties = {
-  border: "1px solid rgba(148, 163, 184, 0.35)",
-  borderRadius: 8,
-  background: "transparent",
-  color: "var(--foreground)",
-  fontWeight: 500,
-  fontSize: 12,
-  padding: "8px 10px",
-  cursor: "pointer",
-};

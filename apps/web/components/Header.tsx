@@ -46,17 +46,17 @@ function BackupRestorePanel() {
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 16 }}>
-      <button className="button-secondary" style={{ fontSize: 13 }} onClick={handleExport}>Exportar Backup</button>
-      <button className="button-primary" style={{ fontSize: 13 }} onClick={() => fileInputRef.current?.click()}>Importar Backup</button>
+    <div className={styles.backupPanel}>
+      <button type="button" className={`button-secondary ${styles.backupButton}`} onClick={handleExport}>Exportar Backup</button>
+      <button type="button" className={`button-primary ${styles.backupButton}`} onClick={() => fileInputRef.current?.click()}>Importar Backup</button>
       <input
         type="file"
         accept="application/json"
         ref={fileInputRef}
-        style={{ display: 'none' }}
+        className={styles.hiddenFileInput}
         onChange={handleImport}
       />
-      {msg && <span style={{ color: msg.startsWith('Error') ? 'var(--danger)' : 'var(--accent)', fontSize: 13 }}>{msg}</span>}
+      {msg && <span className={msg.startsWith('Error') ? styles.backupError : styles.backupSuccess}>{msg}</span>}
     </div>
   );
 }
@@ -82,6 +82,12 @@ export default function Header() {
   const pathname = usePathname();
   const isConsole = Boolean(pathname && pathname.startsWith('/console'));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const isActiveLink = (href: string) => {
+    if (!pathname) return false;
+    if (href === '/') return pathname === '/';
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen((prev) => !prev);
@@ -127,7 +133,12 @@ export default function Header() {
         {/* Desktop Navigation */}
         <nav className={styles.navLinks}>
           {navLinks.map((link) => (
-            <Link key={link.name} href={link.href} className={styles.link}>
+            <Link
+              key={link.name}
+              href={link.href}
+              className={`${styles.link} ${isActiveLink(link.href) ? styles.linkActive : ''}`}
+              aria-current={isActiveLink(link.href) ? 'page' : undefined}
+            >
               {link.name}
             </Link>
           ))}
@@ -136,6 +147,7 @@ export default function Header() {
         <div className={styles.rightSection}>
           {(pathname && pathname.startsWith('/console')) && <BackupRestorePanel />}
           <button
+            type="button"
             className={styles.switch}
             onClick={toggleDarkMode}
             aria-label={darkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
@@ -161,14 +173,15 @@ export default function Header() {
 
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
-        <div className={styles.mobileMenuOverlay} onClick={closeMobileMenu}>
-          <nav id="mobile-main-menu" className={styles.mobileMenu} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.mobileMenuOverlay} onClick={closeMobileMenu} aria-hidden="true">
+          <nav id="mobile-main-menu" className={styles.mobileMenu} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Menú principal móvil">
             {navLinks.map((link) => (
               <Link 
                 key={link.name} 
                 href={link.href} 
-                className={styles.mobileLink}
+                className={`${styles.mobileLink} ${isActiveLink(link.href) ? styles.mobileLinkActive : ''}`}
                 onClick={closeMobileMenu}
+                aria-current={isActiveLink(link.href) ? 'page' : undefined}
               >
                 {link.name}
               </Link>

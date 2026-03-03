@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from 'react';
 import { useUser } from './UserContext';
+import styles from './ActivityEvidenceFlow.module.css';
 
 interface ActivityOption {
   id: number;
@@ -73,42 +74,6 @@ const ActivityEvidenceFlow = () => {
   const isCorrection = flowData?.reviewStatus === 'REJECTED';
   const selectedActivity = actividades.find((activity) => activity.id === Number(selectedActivityId || flowData?.activityId));
   const isInventoryFlow = selectedActivity?.workType === 'PREVENTIVE_INVENTORY';
-  const actionGridStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
-    gap: 12,
-    width: '100%',
-  };
-  const actionPrimaryStyle: React.CSSProperties = {
-    minHeight: 52,
-    padding: '14px 12px',
-    borderRadius: 12,
-    fontSize: 15,
-    fontWeight: 'bold',
-    touchAction: 'manipulation',
-    WebkitAppearance: 'none',
-    cursor: 'pointer',
-    transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '6px',
-  };
-  const actionSecondaryStyle: React.CSSProperties = {
-    minHeight: 52,
-    padding: '14px 12px',
-    borderRadius: 12,
-    fontSize: 15,
-    fontWeight: 'bold',
-    touchAction: 'manipulation',
-    WebkitAppearance: 'none',
-    cursor: 'pointer',
-    transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '6px',
-  };
 
   // Cargar actividades
   useEffect(() => {
@@ -685,25 +650,16 @@ const ActivityEvidenceFlow = () => {
   // Si no ha seleccionado actividad, mostrar selector
   if (!flowData) {
     return (
-      <div className="card" style={{ marginBottom: 24 }}>
-        <h2 style={{ color: 'var(--primary)', marginBottom: 12 }}>Selecciona una Actividad</h2>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
+      <div className={`card ${styles.flowCard}`}>
+        <h2 className={styles.flowTitle}>Selecciona una Actividad</h2>
+        <p className={styles.flowSubtitle}>
           Elige la actividad para comenzar el flujo de evidencias.
         </p>
         <select
+          className={`input ${styles.activitySelect}`}
           value={selectedActivityId}
           onChange={(e) => handleActivitySelect(parseInt(e.target.value))}
           disabled={loading}
-          style={{
-            width: '100%',
-            padding: 12,
-            borderRadius: 4,
-            border: '2px solid var(--primary)',
-            backgroundColor: 'var(--bg-secondary)',
-            color: 'var(--text-primary)',
-            fontSize: 16,
-            cursor: loading ? 'wait' : 'pointer',
-          }}
         >
           <option value="">-- Selecciona una actividad --</option>
           {actividades.map((act) => (
@@ -718,37 +674,29 @@ const ActivityEvidenceFlow = () => {
 
   // Mostrar paso actual
   return (
-    <div className="card" style={{ marginBottom: 24 }}>
+    <div className={`card ${styles.flowCard}`}>
       {error && (
-        <div style={{ padding: 12, backgroundColor: '#fee', color: '#c00', borderRadius: 4, marginBottom: 12 }}>
+        <div className={styles.alertError}>
           ❌ {error}
         </div>
       )}
 
       {successMsg && (
-        <div style={{ padding: 12, backgroundColor: '#efe', color: '#060', borderRadius: 4, marginBottom: 12 }}>
+        <div className={styles.alertSuccess}>
           {successMsg}
         </div>
       )}
 
       {/* Banner de Rechazo */}
       {flowData.reviewStatus === 'REJECTED' && flowData.rejectedStep && flowData.reviewNotes && (
-        <div
-          style={{
-            padding: 20,
-            backgroundColor: '#fee2e2',
-            border: '3px solid #ef4444',
-            borderRadius: 8,
-            marginBottom: 20,
-          }}
-        >
-          <h3 style={{ margin: '0 0 12px 0', color: '#dc2626', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 24 }}>⚠️</span>
+        <div className={styles.rejectedBanner}>
+          <h3 className={styles.rejectedTitle}>
+            <span className={styles.rejectedEmoji}>⚠️</span>
             Tu evidencia fue rechazada
           </h3>
-          <div style={{ marginBottom: 12 }}>
-            <strong style={{ color: '#dc2626' }}>Paso rechazado:</strong>{' '}
-            <span style={{ color: '#991b1b' }}>
+          <div className={styles.rejectedStepRow}>
+            <strong className={styles.rejectedStrong}>Paso rechazado:</strong>{' '}
+            <span className={styles.rejectedStepText}>
               {flowData.rejectedStep === 'ENTRY_PHOTO' && '📸 Paso 1: Foto de Entrada'}
               {flowData.rejectedStep === 'EVIDENCE_PHOTOS' && '📷 Paso 2: Fotos de Evidencia'}
               {flowData.rejectedStep === 'SERVICE_SHEET_PDF' && '📄 Paso 3: PDF Hoja de Servicio'}
@@ -757,87 +705,54 @@ const ActivityEvidenceFlow = () => {
             </span>
           </div>
           <div>
-            <strong style={{ color: '#dc2626' }}>Observaciones del revisor:</strong>
-            <p
-              style={{
-                margin: '8px 0 0 0',
-                padding: 12,
-                backgroundColor: 'rgba(255,255,255,0.7)',
-                borderRadius: 4,
-                color: '#374151',
-              }}
-            >
+            <strong className={styles.rejectedStrong}>Observaciones del revisor:</strong>
+            <p className={styles.rejectedNotes}>
               {flowData.reviewNotes}
             </p>
           </div>
-          <div
-            style={{
-              marginTop: 16,
-              padding: 12,
-              backgroundColor: 'rgba(254, 243, 199, 0.5)',
-              borderRadius: 4,
-              fontSize: 14,
-              color: '#92400e',
-            }}
-          >
+          <div className={styles.rejectedHint}>
             💡 <strong>Instrucciones:</strong> Completa nuevamente el paso rechazado para enviar la corrección.
           </div>
         </div>
       )}
 
       {/* Barra de progreso */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
+      <div className={styles.progressWrap}>
+        <div className={styles.progressMeta}>
           Actividad: <strong>{actividades.find((a) => a.id === flowData.activityId)?.anNumber}</strong>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div className={styles.progressRow}>
           <ProgressStep step={1} active={flowData.step === 'ENTRY_PHOTO'} completed={flowData.entryPhotoUrl ? true : false} label="Entrada" />
-          <div style={{ flex: 1, height: 2, backgroundColor: 'var(--border)' }} />
+          <div className={styles.progressDivider} />
           <ProgressStep step={2} active={flowData.step === 'EVIDENCE_PHOTOS'} completed={flowData.evidencePhotos.length > 0} label="Evidencias" />
-          <div style={{ flex: 1, height: 2, backgroundColor: 'var(--border)' }} />
+          <div className={styles.progressDivider} />
           <ProgressStep step={3} active={flowData.step === 'SERVICE_SHEET_PDF'} completed={flowData.serviceSheetPdfUrl ? true : false} label="PDF" />
-          <div style={{ flex: 1, height: 2, backgroundColor: 'var(--border)' }} />
+          <div className={styles.progressDivider} />
           <ProgressStep step={4} active={flowData.step === 'SERVICE_SHEET_DATA'} completed={flowData.serviceSheetData ? true : false} label="Plantilla" />
-          <div style={{ flex: 1, height: 2, backgroundColor: 'var(--border)' }} />
+          <div className={styles.progressDivider} />
           <ProgressStep step={5} active={flowData.step === 'EXIT_PHOTO'} completed={flowData.exitPhotoUrl ? true : false} label="Salida" />
         </div>
       </div>
 
       {/* PASO 1: Foto de Entrada */}
       {flowData.step === 'ENTRY_PHOTO' && (
-        <div style={{ padding: 20, border: '2px solid var(--primary)', borderRadius: 8 }}>
-          <h3 style={{ marginBottom: 12, color: 'var(--primary)' }}>📸 Paso 1: Foto de Entrada</h3>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
+        <div className={`${styles.stepCard} ${styles.stepEntry}`}>
+          <h3 className={styles.stepTitle}>📸 Paso 1: Foto de Entrada</h3>
+          <p className={styles.stepDescription}>
             Toma una foto de entrada. Se guardará automáticamente con tu ubicación.
           </p>
-          <div style={actionGridStyle}>
+          <div className={styles.actionGrid}>
             <button
+              className={`${styles.actionButton} ${styles.actionPrimary} ${styles.actionEntry}`}
               onClick={handleEntryPhoto}
               disabled={loading || cameraActive}
-              style={{
-                ...actionPrimaryStyle,
-                backgroundColor: 'var(--primary)',
-                color: 'white',
-                border: 'none',
-                cursor: loading ? 'wait' : 'pointer',
-              }}
-              onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
-              onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
               {loading ? '⏳ Capturando...' : '📷 Entrada'}
             </button>
             <button
+              className={`${styles.actionButton} ${styles.actionSecondary}`}
               onClick={() => setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))}
               disabled={loading}
-              style={{
-                ...actionSecondaryStyle,
-                backgroundColor: 'var(--surface-light)',
-                color: 'var(--foreground)',
-                border: '1px solid var(--border)',
-                cursor: loading ? 'not-allowed' : 'pointer',
-              }}
-              onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
-              onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
               🔄 {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
             </button>
@@ -847,21 +762,21 @@ const ActivityEvidenceFlow = () => {
 
       {/* PASO 2: Fotos de Evidencia */}
       {flowData.step === 'EVIDENCE_PHOTOS' && (
-        <div style={{ padding: 20, border: '2px solid var(--accent)', borderRadius: 8 }}>
-          <h3 style={{ marginBottom: 12, color: 'var(--accent)' }}>
+        <div className={`${styles.stepCard} ${styles.stepEvidence}`}>
+          <h3 className={styles.stepTitle}>
             {isInventoryFlow
               ? `🗂️ Paso 2: Inventario comparativo + evidencias (${flowData.evidencePhotos.length} foto${flowData.evidencePhotos.length === 1 ? '' : 's'})`
               : `📷 Paso 2: Evidencias (${flowData.evidencePhotos.length}/4-8)`}
           </h3>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
+          <p className={styles.stepDescription}>
             {isInventoryFlow
               ? 'Actualiza equipos por grupo, serie, modelo y al menos una foto de evidencia/sticker por mantenimiento.'
               : 'Toma fotos de evidencia. Mínimo 4, máximo 8 fotos.'}
           </p>
 
           {isInventoryFlow && (
-            <div style={{ display: 'grid', gap: 10, marginBottom: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div className={styles.inventorySection}>
+              <div className={styles.inventoryHeaderRow}>
                 <strong>Equipos de sucursal ({inventoryItems.length})</strong>
                 <button
                   type="button"
@@ -900,8 +815,8 @@ const ActivityEvidenceFlow = () => {
               </div>
 
               {inventoryItems.map((item, index) => (
-                <div key={`${item.equipmentName}-${index}`} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 10, display: 'grid', gap: 8 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
+                <div key={`${item.equipmentName}-${index}`} className={styles.inventoryItemCard}>
+                  <div className={styles.inventoryFieldsGrid}>
                     <input className="input" placeholder="Apartado" value={item.sectionName} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, sectionName: e.target.value } : current))} />
                     <input className="input" placeholder="Grupo (servidores, scanner, impresora...)" value={item.groupName} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, groupName: e.target.value } : current))} />
                     <input className="input" placeholder="Nombre equipo" value={item.equipmentName} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, equipmentName: e.target.value } : current))} />
@@ -911,7 +826,7 @@ const ActivityEvidenceFlow = () => {
                     <input className="input" placeholder="Modelo DESPUÉS" value={item.modelAfter} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, modelAfter: e.target.value, model: e.target.value } : current))} />
                     <input className="input" placeholder="¿Qué se le hizo al equipo?" value={item.maintenanceActions} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, maintenanceActions: e.target.value } : current))} />
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
+                  <div className={styles.inventoryFieldsGrid}>
                     {[
                       ['beforePanoramicPhotoUrl', 'Panorámica ANTES'],
                       ['beforeCloseupPhotoUrl', 'Serie/modelo ANTES'],
@@ -930,36 +845,36 @@ const ActivityEvidenceFlow = () => {
                       return (
                         <div
                           key={fileKey}
-                          style={{ border: '1px dashed var(--border)', borderRadius: 8, padding: 8, display: 'grid', gap: 8 }}
+                          className={styles.inventoryDropzone}
                           onDragOver={(event) => event.preventDefault()}
                           onDrop={(event) => {
                             event.preventDefault();
                             setInventoryImageField(index, field, event.dataTransfer.files?.[0]);
                           }}
                         >
-                          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{label}</div>
+                          <div className={styles.inventoryDropLabel}>{label}</div>
                           <input
                             ref={(element) => {
                               inventoryFileRefs.current[fileKey] = element;
                             }}
                             type="file"
                             accept="image/*"
-                            style={{ display: 'none' }}
+                            className={styles.hiddenInput}
                             onChange={(event) => setInventoryImageField(index, field, event.target.files?.[0])}
                           />
                           <button type="button" className="button-secondary" onClick={() => inventoryFileRefs.current[fileKey]?.click()}>
                             {inventoryUploadingKey === fileKey ? 'Subiendo...' : 'Cargar / arrastrar imagen'}
                           </button>
                           {imageUrl ? (
-                            <img src={getAssetUrl(imageUrl)} alt={label} style={{ width: '100%', height: 120, objectFit: 'cover', borderRadius: 8 }} />
+                            <img src={getAssetUrl(imageUrl)} alt={label} className={styles.inventoryPreviewImage} />
                           ) : (
-                            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Sin imagen</div>
+                            <div className={styles.inventoryDropLabel}>Sin imagen</div>
                           )}
                         </div>
                       );
                     })}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                  <div className={styles.inventoryFooterRow}>
                     <input className="input" placeholder="Comentario técnico de mantenimiento" value={item.maintenanceComments} onChange={(e) => setInventoryItems((prev) => prev.map((current, itemIndex) => itemIndex === index ? { ...current, maintenanceComments: e.target.value, notes: e.target.value } : current))} />
                     <button type="button" className="button-secondary" onClick={() => setInventoryItems((prev) => prev.filter((_, itemIndex) => itemIndex !== index))}>
                       Eliminar
@@ -974,49 +889,18 @@ const ActivityEvidenceFlow = () => {
 
           {/* Grid de fotos */}
           {flowData.evidencePhotos.length > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 8 }}>
+            <div className={styles.evidenceGalleryWrap}>
+              <div className={styles.evidenceGalleryGrid}>
                 {flowData.evidencePhotos.map((photo, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      position: 'relative',
-                      width: '100%',
-                      paddingBottom: '100%',
-                      borderRadius: 4,
-                      overflow: 'hidden',
-                      border: '2px solid var(--border)',
-                    }}
-                  >
+                  <div key={idx} className={styles.evidencePhotoTile}>
                     <img
                       src={photo}
                       alt={`evidencia ${idx + 1}`}
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                      }}
+                      className={styles.evidencePhotoImg}
                     />
                     <button
+                      className={styles.removePhotoButton}
                       onClick={() => handleRemoveEvidencePhoto(idx)}
-                      style={{
-                        position: 'absolute',
-                        top: 4,
-                        right: 4,
-                        width: 28,
-                        height: 28,
-                        padding: 0,
-                        backgroundColor: 'rgba(255,0,0,0.8)',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '50%',
-                        cursor: 'pointer',
-                        fontSize: 16,
-                        fontWeight: 'bold',
-                      }}
                     >
                       ✕
                     </button>
@@ -1026,49 +910,26 @@ const ActivityEvidenceFlow = () => {
             </div>
           )}
 
-          <div style={{ ...actionGridStyle, marginBottom: 20 }}>
+          <div className={`${styles.actionGrid} ${styles.actionGridBottom}`}>
             <button
+              className={`${styles.actionButton} ${styles.actionPrimary} ${styles.actionEvidence}`}
               onClick={handleAddEvidencePhoto}
               disabled={loading || (!isInventoryFlow && flowData.evidencePhotos.length >= 8)}
-              style={{
-                ...actionPrimaryStyle,
-                backgroundColor: 'var(--accent)',
-                color: 'white',
-                border: 'none',
-                cursor: loading || (!isInventoryFlow && flowData.evidencePhotos.length >= 8) ? 'not-allowed' : 'pointer',
-                opacity: loading || (!isInventoryFlow && flowData.evidencePhotos.length >= 8) ? 0.5 : 1,
-              }}
-              onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
-              onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
               {loading ? '⏳ Capturando...' : '📷 Agregar'}
             </button>
             <button
+              className={`${styles.actionButton} ${styles.actionSecondary}`}
               onClick={() => setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))}
               disabled={loading}
-              style={{
-                ...actionSecondaryStyle,
-                backgroundColor: 'var(--surface-light)',
-                color: 'var(--foreground)',
-                border: '1px solid var(--border)',
-                cursor: loading ? 'not-allowed' : 'pointer',
-              }}
-              onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
-              onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
               🔄 {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
             </button>
             {(isInventoryFlow ? flowData.evidencePhotos.length >= 1 : flowData.evidencePhotos.length >= 4) && (
               <button
+                className={`${styles.actionButton} ${styles.actionPrimary} ${styles.actionSuccess}`}
                 onClick={handleSaveEvidencePhotos}
                 disabled={loading}
-                style={{
-                  ...actionPrimaryStyle,
-                  backgroundColor: 'var(--success)',
-                  color: 'white',
-                  border: 'none',
-                  cursor: loading ? 'wait' : 'pointer',
-                }}
               >
                 {loading ? '⏳ Guardando...' : '✓ Siguiente Paso →'}
               </button>
@@ -1079,9 +940,9 @@ const ActivityEvidenceFlow = () => {
 
       {/* PASO 3: PDF */}
       {flowData.step === 'SERVICE_SHEET_PDF' && (
-        <div style={{ padding: 20, border: '2px solid #f90', borderRadius: 8 }}>
-          <h3 style={{ marginBottom: 12, color: '#f90' }}>📄 Paso 3: Hoja de Servicio (PDF)</h3>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
+        <div className={`${styles.stepCard} ${styles.stepPdf}`}>
+          <h3 className={styles.stepTitle}>📄 Paso 3: Hoja de Servicio (PDF)</h3>
+          <p className={styles.stepDescription}>
             Carga el PDF de la hoja de servicio con arrastrar y soltar o selección manual.
           </p>
           <div
@@ -1095,31 +956,21 @@ const ActivityEvidenceFlow = () => {
               setPdfDragging(false);
               handleServiceSheetPdfFile(event.dataTransfer.files?.[0]);
             }}
-            style={{
-              border: `2px dashed ${pdfDragging ? 'var(--primary)' : 'var(--border)'}`,
-              borderRadius: 8,
-              padding: 12,
-              marginBottom: 16,
-              background: pdfDragging ? 'rgba(15, 106, 214, 0.08)' : 'transparent',
-            }}
+            className={`${styles.pdfDropzone} ${pdfDragging ? styles.pdfDropzoneDragging : ''}`}
           >
             <input
+              className={styles.pdfInput}
               type="file"
               accept=".pdf,application/pdf"
               onChange={handleServiceSheetPdfUpload}
               disabled={loading}
-              style={{
-                display: 'block',
-                marginBottom: 8,
-                cursor: loading ? 'wait' : 'pointer',
-              }}
             />
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+            <div className={styles.smallHint}>
               Arrastra el PDF aquí para cargarlo con preview embebido.
             </div>
           </div>
           {flowData.serviceSheetPdfUrl && (
-            <div style={{ padding: 12, backgroundColor: 'var(--bg-secondary)', borderRadius: 4, marginBottom: 16, display: 'grid', gap: 8 }}>
+            <div className={styles.pdfPreviewCard}>
               <div>✅ PDF cargado correctamente</div>
               <object data={flowData.serviceSheetPdfUrl} type="application/pdf" width="100%" height="280">
                 <embed src={flowData.serviceSheetPdfUrl} type="application/pdf" />
@@ -1131,9 +982,9 @@ const ActivityEvidenceFlow = () => {
 
       {/* PASO 4: Plantilla Interna */}
       {flowData.step === 'SERVICE_SHEET_DATA' && (
-        <div style={{ padding: 20, border: '2px solid #060', borderRadius: 8 }}>
-          <h3 style={{ marginBottom: 12, color: '#060' }}>📝 Paso 4: Plantilla Interna</h3>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
+        <div className={`${styles.stepCard} ${styles.stepData}`}>
+          <h3 className={styles.stepTitle}>📝 Paso 4: Plantilla Interna</h3>
+          <p className={styles.stepDescription}>
             Completa los datos requeridos de la hoja de servicio.
           </p>
           <ServiceSheetForm onSubmit={handleServiceSheetFormSubmit} loading={loading} />
@@ -1142,39 +993,23 @@ const ActivityEvidenceFlow = () => {
 
       {/* PASO 5: Foto de Salida */}
       {flowData.step === 'EXIT_PHOTO' && (
-        <div style={{ padding: 20, border: '2px solid #c00', borderRadius: 8 }}>
-          <h3 style={{ marginBottom: 12, color: '#c00' }}>🚪 Paso 5: Foto de Salida</h3>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
+        <div className={`${styles.stepCard} ${styles.stepExit}`}>
+          <h3 className={styles.stepTitle}>🚪 Paso 5: Foto de Salida</h3>
+          <p className={styles.stepDescription}>
             Toma la foto de salida. Debe ser capturada en el momento actual.
           </p>
-          <div style={actionGridStyle}>
+          <div className={styles.actionGrid}>
             <button
+              className={`${styles.actionButton} ${styles.actionPrimary} ${styles.actionExit}`}
               onClick={handleExitPhoto}
               disabled={loading}
-              style={{
-                ...actionPrimaryStyle,
-                backgroundColor: '#c00',
-                color: 'white',
-                border: 'none',
-                cursor: loading ? 'wait' : 'pointer',
-              }}
-              onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
-              onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
               {loading ? '⏳ Capturando...' : '📷 Salida'}
             </button>
             <button
+              className={`${styles.actionButton} ${styles.actionSecondary}`}
               onClick={() => setCameraFacing((prev) => (prev === 'environment' ? 'user' : 'environment'))}
               disabled={loading}
-              style={{
-                ...actionSecondaryStyle,
-                backgroundColor: 'var(--surface-light)',
-                color: 'var(--foreground)',
-                border: '1px solid var(--border)',
-                cursor: loading ? 'not-allowed' : 'pointer',
-              }}
-              onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
-              onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
               🔄 {cameraFacing === 'environment' ? 'Trasera' : 'Frontal'}
             </button>
@@ -1184,34 +1019,17 @@ const ActivityEvidenceFlow = () => {
 
       {/* COMPLETADO */}
       {flowData.step === 'COMPLETED' && (
-        <div
-          style={{
-            padding: 24,
-            backgroundColor: '#efe',
-            border: '3px solid #060',
-            borderRadius: 8,
-            textAlign: 'center',
-          }}
-        >
-          <h2 style={{ color: '#060', marginBottom: 12 }}>🎉 ¡Asignación Completada Exitosamente!</h2>
-          <p style={{ color: '#060', marginBottom: 20 }}>
+        <div className={styles.completedCard}>
+          <h2 className={styles.completedTitle}>🎉 ¡Asignación Completada Exitosamente!</h2>
+          <p className={styles.completedText}>
             Todos los pasos han sido completados correctamente. Los 5 pasos se encuentran guardados en el sistema.
           </p>
           <button
+            className={styles.completedButton}
             onClick={() => {
               setFlowData(null);
               setSelectedActivityId('');
               setSuccessMsg(null);
-            }}
-            style={{
-              padding: '12px 24px',
-              backgroundColor: '#060',
-              color: 'white',
-              border: 'none',
-              borderRadius: 4,
-              cursor: 'pointer',
-              fontSize: 16,
-              fontWeight: 'bold',
             }}
           >
             ↻ Seleccionar Otra Actividad
@@ -1224,24 +1042,11 @@ const ActivityEvidenceFlow = () => {
 
 // Componente para paso de progreso
 const ProgressStep = ({ step, active, completed, label }: { step: number; active: boolean; completed: boolean; label: string }) => (
-  <div style={{ textAlign: 'center' }}>
-    <div
-      style={{
-        width: 36,
-        height: 36,
-        borderRadius: '50%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: active ? 'var(--primary)' : completed ? 'var(--success)' : 'var(--border)',
-        color: 'white',
-        fontWeight: 'bold',
-        margin: '0 auto 4px',
-      }}
-    >
+  <div className={styles.progressStep}>
+    <div className={`${styles.progressCircle} ${active ? styles.progressCircleActive : ''} ${completed ? styles.progressCircleCompleted : ''}`}>
       {completed ? '✓' : step}
     </div>
-    <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{label}</div>
+    <div className={styles.progressLabel}>{label}</div>
   </div>
 );
 
@@ -1260,85 +1065,44 @@ const ServiceSheetForm = ({ onSubmit, loading }: { onSubmit: (data: any) => void
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
+    <form onSubmit={handleSubmit} className={styles.serviceForm}>
       <input
         type="text"
+        className="input"
         placeholder="Nombre del Gerente"
         value={data.managerName}
         onChange={(e) => setData({ ...data, managerName: e.target.value })}
         required
         disabled={loading}
-        style={{
-          padding: 10,
-          borderRadius: 4,
-          border: '1px solid var(--border)',
-          backgroundColor: 'var(--bg-secondary)',
-          color: 'var(--text-primary)',
-          cursor: loading ? 'wait' : 'text',
-        }}
       />
       <input
         type="text"
+        className="input"
         placeholder="Cargo del Gerente"
         value={data.managerRole}
         onChange={(e) => setData({ ...data, managerRole: e.target.value })}
         required
         disabled={loading}
-        style={{
-          padding: 10,
-          borderRadius: 4,
-          border: '1px solid var(--border)',
-          backgroundColor: 'var(--bg-secondary)',
-          color: 'var(--text-primary)',
-          cursor: loading ? 'wait' : 'text',
-        }}
       />
       <textarea
+        className={`input ${styles.serviceTextarea}`}
         placeholder="Resumen del trabajo realizado"
         value={data.workSummary}
         onChange={(e) => setData({ ...data, workSummary: e.target.value })}
         required
         disabled={loading}
-        style={{
-          padding: 10,
-          borderRadius: 4,
-          border: '1px solid var(--border)',
-          backgroundColor: 'var(--bg-secondary)',
-          color: 'var(--text-primary)',
-          minHeight: 100,
-          fontFamily: 'inherit',
-          cursor: loading ? 'wait' : 'text',
-        }}
       />
       <textarea
+        className={`input ${styles.serviceTextarea}`}
         placeholder="Observaciones"
         value={data.observations}
         onChange={(e) => setData({ ...data, observations: e.target.value })}
         disabled={loading}
-        style={{
-          padding: 10,
-          borderRadius: 4,
-          border: '1px solid var(--border)',
-          backgroundColor: 'var(--bg-secondary)',
-          color: 'var(--text-primary)',
-          minHeight: 100,
-          fontFamily: 'inherit',
-          cursor: loading ? 'wait' : 'text',
-        }}
       />
       <button
         type="submit"
+        className={`button-primary ${styles.serviceSubmit}`}
         disabled={loading}
-        style={{
-          padding: '12px 24px',
-          backgroundColor: '#060',
-          color: 'white',
-          border: 'none',
-          borderRadius: 4,
-          cursor: loading ? 'wait' : 'pointer',
-          fontSize: 16,
-          fontWeight: 'bold',
-        }}
       >
         {loading ? '⏳ Guardando...' : '✓ Siguiente Paso →'}
       </button>
