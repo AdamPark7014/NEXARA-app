@@ -12,6 +12,7 @@ type ContactMessage = {
   phone?: string | null;
   company?: string | null;
   subject?: string | null;
+  category?: "SOPORTE" | "VENTAS" | string;
   message: string;
   newsletter: boolean;
   source?: string | null;
@@ -34,6 +35,7 @@ export default function ContactosWeb() {
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
+  const [filterCategory, setFilterCategory] = useState<string>("ALL");
   const [search, setSearch] = useState("");
   const [responseText, setResponseText] = useState("");
   const [status, setStatus] = useState<string>("NEW");
@@ -53,7 +55,10 @@ export default function ContactosWeb() {
 
   const fetchMessages = async () => {
     try {
-      const query = filterStatus === "ALL" ? "" : `?status=${filterStatus}`;
+      const params = new URLSearchParams();
+      if (filterStatus !== "ALL") params.set("status", filterStatus);
+      if (filterCategory !== "ALL") params.set("category", filterCategory);
+      const query = params.toString() ? `?${params.toString()}` : "";
       const response = await fetch(buildApiUrl(`contact-messages${query}`), {
         cache: "no-store",
       });
@@ -77,7 +82,7 @@ export default function ContactosWeb() {
 
   useEffect(() => {
     fetchMessages();
-  }, [filterStatus]);
+  }, [filterStatus, filterCategory]);
 
   useEffect(() => {
     const socket = io(getSocketBaseUrl(), {
@@ -238,8 +243,13 @@ export default function ContactosWeb() {
           />
         </div>
         <div className={styles.filters}>
+          <select value={filterCategory} onChange={(event) => setFilterCategory(event.target.value)}>
+            <option value="ALL">Todas las categorías</option>
+            <option value="SOPORTE">Soporte y ayuda</option>
+            <option value="VENTAS">Ventas y productos</option>
+          </select>
           <select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)}>
-            <option value="ALL">Todos</option>
+            <option value="ALL">Todos los estados</option>
             {statusOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
@@ -271,6 +281,7 @@ export default function ContactosWeb() {
               <p className={styles.cardMessage}>{message.message}</p>
               <div className={styles.cardMeta}>
                 <span>{new Date(message.createdAt).toLocaleString()}</span>
+                <span>{message.category === "VENTAS" ? "Ventas" : "Soporte"}</span>
                 <span>{message.source || "formulario"}</span>
               </div>
             </button>
@@ -315,6 +326,10 @@ export default function ContactosWeb() {
                   <p>{selectedMessage.message}</p>
                 </div>
                 <div className={styles.metaGrid}>
+                  <div>
+                    <span>Categoría</span>
+                    <strong>{selectedMessage.category === "VENTAS" ? "Ventas y productos" : "Soporte y ayuda"}</strong>
+                  </div>
                   <div>
                     <span>Asunto</span>
                     <strong>{selectedMessage.subject || "Sin asunto"}</strong>

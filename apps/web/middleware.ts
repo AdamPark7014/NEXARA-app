@@ -88,7 +88,7 @@ const buildCsp = () => {
     "style-src 'self' 'unsafe-inline' https:",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data: https:",
-    `connect-src 'self' https: wss: http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:* ${externalConnectSources}`,
+    `connect-src 'self' https: wss: http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:* http://*.localhost:* ws://*.localhost:* wss://*.localhost:* ${externalConnectSources}`,
     "media-src 'self' blob: https:",
     "object-src 'none'",
     "base-uri 'self'",
@@ -215,7 +215,13 @@ export function middleware(request: NextRequest) {
     const internalSlug = SUBDOMAIN_MAP[subdomain];
     const pathname = request.nextUrl.pathname;
 
-    if (pathname === '/api' || pathname.startsWith('/api/') || pathname === '/socket.io' || pathname.startsWith('/socket.io/')) {
+    if (
+      pathname.startsWith('/_next/') ||
+      pathname === '/api' ||
+      pathname.startsWith('/api/') ||
+      pathname === '/socket.io' ||
+      pathname.startsWith('/socket.io/')
+    ) {
       return applySecurityHeaders(NextResponse.next());
     }
     
@@ -255,6 +261,6 @@ export const config = {
      * - Favicon e íconos: favicon.ico, icon.png, etc.
      * - Archivos públicos: robots.txt, sitemap.xml
      */
-    '/((?!_next/static|_next/image|favicon.ico|icon.png|robots.txt|sitemap.xml).*)',
+    '/((?!_next/static|_next/image|_next/webpack-hmr|favicon.ico|icon.png|robots.txt|sitemap.xml).*)',
   ],
 };

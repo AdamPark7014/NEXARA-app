@@ -173,7 +173,7 @@ export default function Header() {
 
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
-        <div className={styles.mobileMenuOverlay} onClick={closeMobileMenu} aria-hidden="true">
+        <div className={styles.mobileMenuOverlay} onClick={closeMobileMenu}>
           <nav id="mobile-main-menu" className={styles.mobileMenu} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Menú principal móvil">
             {navLinks.map((link) => (
               <Link 

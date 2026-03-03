@@ -33,8 +33,8 @@ export class ServiceClientsService {
   private buildTransporter() {
     const host = process.env['SMTP_HOST'];
     const port = Number(process.env['SMTP_PORT'] || 587);
-    const user = process.env['SMTP_USER'];
-    const pass = process.env['SMTP_PASS'];
+    const user = process.env['SMTP_VENTAS_USER'] || process.env['SMTP_USER'];
+    const pass = process.env['SMTP_VENTAS_PASS'] || process.env['SMTP_PASS'];
 
     if (!host || !user || !pass) {
       throw new BadRequestException('SMTP no configurado');
@@ -55,7 +55,7 @@ export class ServiceClientsService {
     portalPassword: string;
   }) {
     const transporter = this.buildTransporter();
-    const from = process.env['SMTP_FROM'] || 'no-reply@nexara.com';
+    const from = process.env['SMTP_VENTAS_USER'] || process.env['SMTP_FROM'] || 'ventas@nexara.com.mx';
     const baseUrl = (process.env['PUBLIC_WEB_URL'] || 'https://nexara.com.mx').replace(/\/+$/, '');
     const logoUrl = (process.env['EMAIL_LOGO_URL'] || `${baseUrl}/logo-nexara.png`).trim();
     const portalUrl = `${baseUrl}/panel/tickets`;

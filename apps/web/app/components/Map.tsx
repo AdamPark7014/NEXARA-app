@@ -188,25 +188,32 @@ export default function Map() {
 
         const infoWindow = new mapsAny.InfoWindow({
           content: `
-            <div style="font-family: Arial, sans-serif; text-align: center; padding: 10px; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); max-width: 220px;">
-              <img src="/logo-nexara.png" alt="NEXARA" style="width:32px;height:32px;object-fit:contain;margin-bottom:8px;" />
-              <h3 style="margin:0 0 8px 0; font-size:15px; font-weight:700; color:#1e293b;">NEXARA</h3>
-              <a href="https://maps.app.goo.gl/34XSHPwUSeMAB7x69" target="_blank" rel="noopener" style="display:inline-block;padding:7px 14px;border-radius:6px;text-decoration:none;color:#fff;font-size:13px;font-weight:600;background:#2563eb;box-shadow:0 1px 4px rgba(37,99,235,0.18);margin-top:6px;">🗺️ Cómo llegar</a>
+            <div class="nexara-map-info">
+              <img src="/logo-nexara.png" alt="NEXARA" class="nexara-map-logo" />
+              <h3 class="nexara-map-title">NEXARA</h3>
+              <p class="nexara-map-subtitle">Soluciones Tecnológicas</p>
+              <a href="https://maps.app.goo.gl/34XSHPwUSeMAB7x69" target="_blank" rel="noopener" class="nexara-map-btn">
+                Ver ubicación
+              </a>
             </div>
           `,
+          maxWidth: 280,
         });
 
-        (marker as { addListener?: (event: string, handler: () => void) => void }).addListener?.("click", () => {
+        const openInfoWindow = () => {
           (infoWindow as { open: (options: { anchor: unknown; map: unknown }) => void }).open({
             anchor: marker,
             map: currentMap,
           });
-        });
+        };
 
-        (infoWindow as { open: (options: { anchor: unknown; map: unknown }) => void }).open({
-          anchor: marker,
-          map: currentMap,
-        });
+        if (canUseAdvancedMarker && typeof (marker as { addEventListener?: (eventName: string, listener: () => void) => void }).addEventListener === "function") {
+          (marker as { addEventListener: (eventName: string, listener: () => void) => void }).addEventListener("gmp-click", openInfoWindow);
+        } else {
+          (marker as { addListener?: (event: string, handler: () => void) => void }).addListener?.("click", openInfoWindow);
+        }
+
+        openInfoWindow();
       } catch (err) {
         console.error("Error al inicializar el mapa:", err);
         setError("Error al cargar el mapa");

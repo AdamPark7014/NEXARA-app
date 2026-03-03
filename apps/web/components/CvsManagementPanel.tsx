@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
@@ -94,6 +94,42 @@ export default function CvsManagementPanel() {
     recruiterNotes: "",
   });
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = useCallback((file: File | null) => {
+    if (file && file.type !== "application/pdf") {
+      setError("Solo se aceptan archivos PDF");
+      return;
+    }
+    setUploadFile(file);
+    setError("");
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0] || null;
+    handleFileSelect(file);
+  }, [handleFileSelect]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+  }, []);
+
+  const removeFile = useCallback(() => {
+    setUploadFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, []);
 
   const canRecruiter = Boolean(user && (user.isSuperAdmin || hasPermission(user, PERMISSIONS.CVS_MANAGE) || hasPermission(user, PERMISSIONS.CONSOLE_ADMIN)));
   const canAdmin = Boolean(user && (user.isSuperAdmin || hasPermission(user, PERMISSIONS.CVS_ADMIN_REVIEW) || hasPermission(user, PERMISSIONS.CONSOLE_ADMIN)));
@@ -197,6 +233,7 @@ export default function CvsManagementPanel() {
         recruiterNotes: "",
       });
       setUploadFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       await fetchRows();
     } catch (err: any) {
       setError(err?.message || "No se pudo subir el CV");
@@ -375,7 +412,60 @@ export default function CvsManagementPanel() {
             onChange={(event) => setUpload((prev) => ({ ...prev, recruiterNotes: event.target.value }))}
             placeholder="Notas iniciales"
           />
-          <input className="input" type="file" accept="application/pdf" onChange={(event) => setUploadFile(event.target.files?.[0] || null)} required />
+
+          {/* Drop zone */}
+          <div
+            className={`${styles.dropZone} ${dragOver ? styles.dropZoneDragOver : ""} ${uploadFile ? styles.dropZoneHasFile : ""}`}
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onClick={() => fileInputRef.current?.click()}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click(); }}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf"
+              className={styles.dropZoneInput}
+              onChange={(event) => handleFileSelect(event.target.files?.[0] || null)}
+            />
+            {uploadFile ? (
+              <div className={styles.filePreview}>
+                <svg className={styles.fileIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                  <polyline points="10 9 9 9 8 9" />
+                </svg>
+                <div className={styles.fileInfo}>
+                  <span className={styles.fileName}>{uploadFile.name}</span>
+                  <span className={styles.fileSize}>{(uploadFile.size / 1024).toFixed(0)} KB</span>
+                </div>
+                <button
+                  type="button"
+                  className={styles.fileRemove}
+                  onClick={(e) => { e.stopPropagation(); removeFile(); }}
+                  title="Quitar archivo"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <div className={styles.dropZonePlaceholder}>
+                <svg className={styles.dropZoneIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                <span className={styles.dropZoneText}>Arrastra tu PDF aquí o haz clic para seleccionar</span>
+                <span className={styles.dropZoneHint}>Solo archivos PDF</span>
+              </div>
+            )}
+          </div>
+
           <div className={styles.uploadFooter}>
             <button type="submit" disabled={busy} className="button-primary">
               Subir CV

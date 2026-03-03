@@ -51,6 +51,126 @@
   resize: vertical;
 }
 
+/* ── Drop Zone ── */
+.dropZone {
+  position: relative;
+  border: 2px dashed rgba(148, 163, 184, 0.45);
+  border-radius: 12px;
+  padding: 28px 16px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+  background: var(--background);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dropZone:hover {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 4%, transparent);
+}
+
+.dropZoneDragOver {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
+}
+
+.dropZoneHasFile {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--primary) 50%, transparent);
+  padding: 14px 16px;
+}
+
+.dropZoneInput {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.dropZonePlaceholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary, #94a3b8);
+}
+
+.dropZoneIcon {
+  width: 36px;
+  height: 36px;
+  stroke: var(--primary);
+  opacity: 0.7;
+}
+
+.dropZoneText {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.dropZoneHint {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+/* ── File Preview ── */
+.filePreview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.fileIcon {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  color: var(--primary);
+}
+
+.fileInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.fileName {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #1e293b);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileSize {
+  font-size: 12px;
+  color: var(--text-secondary, #94a3b8);
+}
+
+.fileRemove {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: color-mix(in srgb, var(--danger, #ef4444) 12%, transparent);
+  color: var(--danger, #ef4444);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.fileRemove:hover {
+  background: color-mix(in srgb, var(--danger, #ef4444) 22%, transparent);
+}
+
 .uploadFooter {
   display: flex;
   justify-content: flex-end;

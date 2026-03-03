@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "dev": "next dev --turbo",
+    "dev": "next dev",
     "build": "cross-env NODE_OPTIONS=--max-old-space-size=2048 next build",
     "start": "next start"
   },

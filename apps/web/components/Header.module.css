@@ -5,8 +5,9 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
-  box-shadow: 0 2px 8px rgba(70, 130, 180, 0.08);
+  background: var(--surface);
+  box-shadow: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
   position: fixed;
   top: 0;
   left: 0;
@@ -276,13 +277,13 @@
 
 /* Light mode explicit (switch manual - sol ☀️) */
 :global(body.light) .header {
-  background: linear-gradient(120deg, color-mix(in srgb, var(--secondary) 88%, #ffffff) 0%, color-mix(in srgb, var(--primary) 92%, #ffffff) 100%);
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--primary) 24%, transparent), 0 1px 4px rgba(0, 0, 0, 0.08);
+  background: var(--surface);
+  box-shadow: none;
 }
 
 :global(body.light) .consoleHeader {
-  background: linear-gradient(120deg, color-mix(in srgb, var(--secondary) 88%, #ffffff) 0%, color-mix(in srgb, var(--primary) 92%, #ffffff) 100%);
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--primary) 24%, transparent), 0 1px 4px rgba(0, 0, 0, 0.08);
+  background: var(--surface);
+  box-shadow: none;
 }
 
 :global(body.light) .consoleHeader .link {
@@ -381,13 +382,13 @@
 
 /* Dark mode explicit (switch manual - luna 🌙) */
 :global(body.dark) .header {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--surface) 90%, #0a1120) 0%, color-mix(in srgb, var(--muted) 90%, #0a1120) 100%);
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--shadow) 70%, transparent);
+  background: var(--surface);
+  box-shadow: none;
 }
 
 :global(body.dark) .consoleHeader {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--surface) 90%, #0a1120) 0%, color-mix(in srgb, var(--muted) 90%, #0a1120) 100%);
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--shadow) 70%, transparent);
+  background: var(--surface);
+  box-shadow: none;
 }
 
 :global(body.dark) .link {
@@ -512,5 +513,117 @@
   .mobileLink {
     font-size: 1rem;
     padding: 12px 16px;
+  }
+}
+
+/* Unified corporate header style */
+.header {
+  background: var(--public-header-bg);
+  border-bottom: 1px solid var(--public-border);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--shadow) 60%, transparent);
+  backdrop-filter: blur(14px);
+}
+
+.headerInner {
+  gap: clamp(0.9rem, 1.8vw, 1.4rem);
+}
+
+.navLinks {
+  gap: clamp(0.72rem, 1.6vw, 1.22rem);
+}
+
+.link {
+  color: var(--public-nav-text);
+  font-weight: 680;
+  border-radius: 999px;
+  padding: 0.44rem 0.72rem;
+  background: transparent;
+}
+
+.link::after {
+  display: none;
+}
+
+.link:hover {
+  color: var(--public-nav-text);
+  background: var(--public-nav-pill);
+  transform: translateY(-1px);
+}
+
+.linkActive {
+  color: var(--public-nav-text);
+  background: var(--public-nav-pill-active);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 28%, transparent);
+}
+
+.switch {
+  border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--shadow) 65%, transparent);
+}
+
+.link:focus-visible,
+.mobileLink:focus-visible,
+.mobileMenuButton:focus-visible,
+.switch:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary) 62%, white 38%);
+  outline-offset: 2px;
+}
+
+.mobileMenuButton {
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  border: 1px solid var(--public-border);
+}
+
+.hamburgerLine {
+  background: color-mix(in srgb, var(--foreground) 84%, var(--primary));
+  box-shadow: none;
+}
+
+.mobileMenuOverlay {
+  background: color-mix(in srgb, #04101f 62%, transparent);
+}
+
+.mobileMenu {
+  border-top: 1px solid var(--public-border);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, var(--primary) 6%) 0%, color-mix(in srgb, var(--surface) 90%, var(--secondary) 10%) 100%);
+}
+
+.mobileLink {
+  color: var(--public-nav-text);
+  border: 1px solid transparent;
+}
+
+.mobileLink:hover,
+.mobileLink:active,
+.mobileLinkActive {
+  color: var(--public-nav-text);
+  background: var(--public-nav-pill-active);
+  border-color: color-mix(in srgb, var(--primary) 26%, transparent);
+  transform: none;
+  box-shadow: none;
+}
+
+:global(body.light) .link,
+:global(body.dark) .link,
+:global(body.light) .consoleHeader .link,
+:global(body.dark) .consoleHeader .link {
+  color: var(--public-nav-text);
+  text-shadow: none;
+}
+
+:global(body.light) .hamburgerLine,
+:global(body.dark) .hamburgerLine {
+  background: color-mix(in srgb, var(--foreground) 84%, var(--primary));
+}
+
+@media (max-width: 1100px) {
+  .headerInner {
+    padding: 0 clamp(14px, 2.2vw, 26px);
+  }
+
+  .link {
+    font-size: clamp(0.9rem, 0.36vw + 0.84rem, 0.98rem);
+    padding: 0.42rem 0.64rem;
   }
 }

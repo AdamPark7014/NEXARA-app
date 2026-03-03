@@ -945,22 +945,28 @@ enum ContactStatus {
   CLOSED
 }
 
+enum ContactCategory {
+  SOPORTE
+  VENTAS
+}
+
 model ContactMessage {
-  id              Int           @id @default(autoincrement())
-  name            String        @db.VarChar(150)
-  email           String        @db.VarChar(200)
-  phone           String?       @db.VarChar(50)
-  company         String?       @db.VarChar(200)
-  subject         String?       @db.VarChar(150)
-  message         String        @db.Text
-  newsletter      Boolean       @default(false)
-  source          String?       @db.VarChar(120)
-  pageUrl         String?       @db.VarChar(500)
-  status          ContactStatus @default(NEW)
-  responseMessage String?       @db.Text
+  id              Int              @id @default(autoincrement())
+  name            String           @db.VarChar(150)
+  email           String           @db.VarChar(200)
+  phone           String?          @db.VarChar(50)
+  company         String?          @db.VarChar(200)
+  subject         String?          @db.VarChar(150)
+  category        ContactCategory  @default(SOPORTE)
+  message         String           @db.Text
+  newsletter      Boolean          @default(false)
+  source          String?          @db.VarChar(120)
+  pageUrl         String?          @db.VarChar(500)
+  status          ContactStatus    @default(NEW)
+  responseMessage String?          @db.Text
   respondedAt     DateTime?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   @@map("contact_messages")
 }

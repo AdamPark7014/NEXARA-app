@@ -33,6 +33,7 @@ export default function FloatingContactForm() {
       phone: data.phone ? String(data.phone) : undefined,
       company: data.company ? String(data.company) : undefined,
       subject: data.subject ? String(data.subject) : undefined,
+      category: String(data.category || "SOPORTE"),
       message: String(data.message || ""),
       newsletter: Boolean(data.newsletter),
       source: "contacto-floating",
@@ -162,6 +163,20 @@ export default function FloatingContactForm() {
                     placeholder="Nombre de tu empresa"
                     disabled={loading}
                   />
+                </div>
+
+                <div className={styles.formField}>
+                  <label htmlFor="float-category">¿En qué podemos ayudarte? *</label>
+                  <select
+                    id="float-category"
+                    name="category"
+                    required
+                    disabled={loading}
+                  >
+                    <option value="">Selecciona una opción</option>
+                    <option value="SOPORTE">Soporte y ayuda</option>
+                    <option value="VENTAS">Ventas, productos o proyectos</option>
+                  </select>
                 </div>
 
                 <div className={styles.formField}>

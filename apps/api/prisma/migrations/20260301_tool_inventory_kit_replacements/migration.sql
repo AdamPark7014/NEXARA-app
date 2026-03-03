@@ -134,13 +134,49 @@ CREATE INDEX "tool_kit_events_resolution_idx" ON "tool_kit_events"("resolution")
 CREATE INDEX "tool_requests_inventoryItemId_idx" ON "tool_requests"("inventoryItemId");
 
 -- AddForeignKey
-ALTER TABLE "lunch_breaks" ADD CONSTRAINT "lunch_breaks_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'lunch_breaks_userId_fkey'
+    ) THEN
+        ALTER TABLE "lunch_breaks"
+            ADD CONSTRAINT "lunch_breaks_userId_fkey"
+            FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+    END IF;
+END
+$$;
 
 -- AddForeignKey
-ALTER TABLE "sales_audit_events" ADD CONSTRAINT "sales_audit_events_actorId_fkey" FOREIGN KEY ("actorId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'sales_audit_events_actorId_fkey'
+    ) THEN
+        ALTER TABLE "sales_audit_events"
+            ADD CONSTRAINT "sales_audit_events_actorId_fkey"
+            FOREIGN KEY ("actorId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+    END IF;
+END
+$$;
 
 -- AddForeignKey
-ALTER TABLE "notifications" ADD CONSTRAINT "notifications_triggerUserId_fkey" FOREIGN KEY ("triggerUserId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'notifications_triggerUserId_fkey'
+    ) THEN
+        ALTER TABLE "notifications"
+            ADD CONSTRAINT "notifications_triggerUserId_fkey"
+            FOREIGN KEY ("triggerUserId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+    END IF;
+END
+$$;
 
 -- AddForeignKey
 ALTER TABLE "tool_requests" ADD CONSTRAINT "tool_requests_inventoryItemId_fkey" FOREIGN KEY ("inventoryItemId") REFERENCES "tool_inventory_items"("id") ON DELETE SET NULL ON UPDATE CASCADE;

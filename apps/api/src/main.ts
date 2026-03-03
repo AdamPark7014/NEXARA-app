@@ -142,7 +142,10 @@ async function bootstrap() {
 
     if (isMutatingMethod(request.method)) {
       const fetchSite = typeof request.headers['sec-fetch-site'] === 'string' ? request.headers['sec-fetch-site'] : undefined;
-      if (!isSafeFetchSite(fetchSite)) {
+      const origin = typeof request.headers.origin === 'string' ? request.headers.origin : undefined;
+      const originAllowed = !origin || isOriginAllowed(origin);
+
+      if (!isSafeFetchSite(fetchSite) && !originAllowed) {
         ipPenaltyBox.addStrike(ip, 3);
         response.status(403).json({
           statusCode: 403,
@@ -151,7 +154,6 @@ async function bootstrap() {
         return;
       }
 
-      const origin = typeof request.headers.origin === 'string' ? request.headers.origin : undefined;
       if (origin && !isOriginAllowed(origin)) {
         ipPenaltyBox.addStrike(ip, 2);
         response.status(403).json({

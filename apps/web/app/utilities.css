@@ -2,15 +2,15 @@
   background: var(--surface);
   color: var(--foreground);
   border-radius: 12px;
-  box-shadow: 0 2px 8px var(--shadow);
+  box-shadow: 0 6px 18px var(--shadow);
   border: 1px solid var(--muted);
   padding: 16px;
 }
 
 body.light .card {
-  background: linear-gradient(165deg, rgba(255, 255, 255, 0.97), rgba(239, 246, 255, 0.95));
-  border-color: rgba(15, 106, 214, 0.16);
-  box-shadow: 0 10px 24px rgba(15, 106, 214, 0.12), 0 2px 6px rgba(15, 106, 214, 0.08);
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.98), rgba(244, 248, 253, 0.95));
+  border-color: rgba(31, 95, 191, 0.14);
+  box-shadow: 0 10px 24px rgba(18, 38, 58, 0.1), 0 2px 6px rgba(18, 38, 58, 0.06);
 }
 
 @media (max-width: 480px) {
@@ -38,17 +38,17 @@ body.light .card {
 }
 
 body.light .button-primary {
-  background: linear-gradient(135deg, #0f6ad6, #1e88f5);
-  box-shadow: 0 8px 18px rgba(15, 106, 214, 0.24);
+  background: linear-gradient(135deg, #1f5fbf, #3f7ecf);
+  box-shadow: 0 8px 18px rgba(18, 38, 58, 0.2);
 }
 
 .button-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 14px rgba(31, 137, 252, 0.24);
+  box-shadow: 0 10px 16px rgba(18, 38, 58, 0.22);
 }
 
 body.light .button-primary:hover {
-  box-shadow: 0 10px 20px rgba(15, 106, 214, 0.28);
+  box-shadow: 0 12px 22px rgba(18, 38, 58, 0.24);
 }
 
 .button-primary:active {
@@ -87,27 +87,27 @@ body.light .button-primary:hover {
 }
 
 body.light .button-secondary {
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.95), rgba(233, 243, 255, 0.9));
-  border-color: rgba(15, 106, 214, 0.26);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.95), rgba(241, 245, 250, 0.9));
+  border-color: rgba(31, 95, 191, 0.22);
 }
 
 body.dark .button-secondary {
-  background: linear-gradient(160deg, rgba(23, 50, 86, 0.88), rgba(12, 34, 66, 0.9));
-  border-color: rgba(31, 137, 252, 0.34);
+  background: linear-gradient(160deg, rgba(28, 51, 78, 0.88), rgba(18, 35, 58, 0.9));
+  border-color: rgba(143, 184, 230, 0.24);
   color: #e9f2ff;
-  box-shadow: 0 8px 16px rgba(12, 37, 74, 0.35);
+  box-shadow: 0 8px 16px rgba(6, 15, 27, 0.38);
 }
 
 .button-secondary:hover {
   background: var(--surface-light);
   transform: translateY(-1px);
-  box-shadow: 0 8px 16px rgba(31, 137, 252, 0.16);
-  border-color: rgba(31, 137, 252, 0.4);
+  box-shadow: 0 8px 16px rgba(18, 38, 58, 0.16);
+  border-color: rgba(31, 95, 191, 0.34);
 }
 
 body.dark .button-secondary:hover {
-  background: linear-gradient(160deg, rgba(28, 64, 110, 0.92), rgba(15, 45, 84, 0.94));
-  box-shadow: 0 10px 18px rgba(13, 42, 84, 0.42);
+  background: linear-gradient(160deg, rgba(35, 63, 96, 0.92), rgba(24, 48, 75, 0.94));
+  box-shadow: 0 10px 18px rgba(6, 15, 27, 0.45);
 }
 
 .button-secondary:active {
@@ -147,8 +147,8 @@ body.dark .button-secondary:disabled {
 }
 
 body.light .table {
-  background: linear-gradient(180deg, #ffffff, #f5f9ff);
-  border: 1px solid rgba(15, 106, 214, 0.12);
+  background: linear-gradient(180deg, #ffffff, #f7f9fc);
+  border: 1px solid rgba(31, 95, 191, 0.1);
 }
 
 .table th {
@@ -165,8 +165,8 @@ body.light .table {
 }
 
 body.light .table th {
-  background: linear-gradient(135deg, rgba(15, 106, 214, 0.16), rgba(22, 169, 110, 0.1));
-  color: #173057;
+  background: linear-gradient(135deg, rgba(31, 95, 191, 0.14), rgba(60, 154, 132, 0.1));
+  color: #233f5b;
 }
 
 .table td {
@@ -180,12 +180,12 @@ body.light .table th {
 }
 
 .table tbody tr:hover {
-  background: rgba(31, 137, 252, 0.05);
+  background: rgba(31, 95, 191, 0.05);
   transform: translateZ(0);
 }
 
 body.light .table tbody tr:hover {
-  background: rgba(15, 106, 214, 0.08);
+  background: rgba(31, 95, 191, 0.08);
 }
 
 @media (max-width: 900px) {

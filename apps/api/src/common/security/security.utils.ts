@@ -85,6 +85,12 @@ export const isOriginAllowed = (origin?: string | null): boolean => {
     return true;
   }
 
+  const localhostPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(?::\d+)?$/i;
+  const localhostSubdomainPattern = /^https?:\/\/[a-z0-9-]+\.localhost(?::\d+)?$/i;
+  if (localhostPattern.test(origin) || localhostSubdomainPattern.test(origin)) {
+    return true;
+  }
+
   const corsOrigins = getConfiguredCorsOrigins();
   if (corsOrigins.includes(origin)) {
     return true;
@@ -93,7 +99,7 @@ export const isOriginAllowed = (origin?: string | null): boolean => {
   const allowedSubdomains = getAllowedSubdomains().map(escapeRegex).join('|');
   const localSubdomainPattern = new RegExp(`^http:\\/\\/(${allowedSubdomains})\\.localhost:\\d+$`, 'i');
   const prodSubdomainPattern = new RegExp(`^https:\\/\\/(${allowedSubdomains})\\.nexara\\.com\\.mx$`, 'i');
-  const anyLocalSubdomainPattern = /^http:\/\/[a-z0-9-]+\.localhost:\d+$/i;
+  const anyLocalSubdomainPattern = /^https?:\/\/[a-z0-9-]+\.localhost:\d+$/i;
 
   if (localSubdomainPattern.test(origin)) {
     return true;

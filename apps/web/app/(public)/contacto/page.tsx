@@ -33,6 +33,7 @@ export default function ContactoPage() {
       phone: data.phone ? String(data.phone) : undefined,
       company: data.company ? String(data.company) : undefined,
       subject: data.subject ? String(data.subject) : undefined,
+      category: String(data.category || "SOPORTE"),
       message: String(data.message || ""),
       newsletter: Boolean(data.newsletter),
       source: "contacto-page",
@@ -229,22 +230,33 @@ export default function ContactoPage() {
               </div>
 
               <div className={styles.formField}>
-                <label htmlFor="contact-subject">
-                  Asunto <span className={styles.required}>*</span>
+                <label htmlFor="contact-category">
+                  ¿En qué podemos ayudarte? <span className={styles.required}>*</span>
                 </label>
                 <select
-                  id="contact-subject"
-                  name="subject"
+                  id="contact-category"
+                  name="category"
                   required
                   disabled={loading}
                 >
-                  <option value="">Selecciona un tema</option>
-                  <option value="cotizacion">Solicitar cotización</option>
-                  <option value="soporte">Soporte técnico</option>
-                  <option value="informacion">Información general</option>
-                  <option value="arrendamiento">Arrendamiento de equipos</option>
-                  <option value="otro">Otro</option>
+                  <option value="">Selecciona una opción</option>
+                  <option value="SOPORTE">Soporte y ayuda</option>
+                  <option value="VENTAS">Ventas, productos o proyectos</option>
                 </select>
+              </div>
+
+              <div className={styles.formField}>
+                <label htmlFor="contact-subject">
+                  Asunto <span className={styles.required}>*</span>
+                </label>
+                <input
+                  id="contact-subject"
+                  name="subject"
+                  type="text"
+                  required
+                  placeholder="Ej: Cotización de servicios, Problema con mi cuenta..."
+                  disabled={loading}
+                />
               </div>
 
               <div className={styles.formField}>

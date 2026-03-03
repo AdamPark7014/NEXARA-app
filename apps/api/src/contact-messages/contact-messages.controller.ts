@@ -38,8 +38,8 @@ export class ContactMessagesController {
   }
 
   @Get()
-  findAll(@Query('status') status?: string) {
-    return this.contactMessagesService.findAll(status);
+  findAll(@Query('status') status?: string, @Query('category') category?: string) {
+    return this.contactMessagesService.findAll(status, category);
   }
 
   @Get(':id')
