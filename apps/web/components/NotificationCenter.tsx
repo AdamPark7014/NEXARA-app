@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useUser } from './UserContext';
 import { io, Socket } from 'socket.io-client';
 import { getSocketBaseUrl } from '@/lib/api-base';
+import styles from './NotificationCenter.module.css';
 
 interface Notification {
   id: number;
@@ -48,34 +49,49 @@ const getCategoryIcon = (category: string): string => {
   return icons[category] || '📬';
 };
 
-const getPriorityColor = (priority?: string): string => {
-  switch (priority) {
-    case 'high':
-      return '#d64545'; // danger red (consola)
-    case 'low':
-      return '#a9c0ea'; // tertiary text (consola)
-    default:
-      return '#0f6ad6'; // primary blue (consola)
-  }
+const getPriorityClass = (priority?: string): string => {
+  if (priority === 'high') return styles.priorityHigh;
+  if (priority === 'low') return styles.priorityLow;
+  return styles.priorityNormal;
 };
 
-const getCategoryColors = (category: string): { bg: string; text: string } => {
-  const categoryConfig: Record<string, { bg: string; text: string }> = {
-    attendance: { bg: '#eff6ff', text: '#0f6ad6' }, // blue
-    lunch_breaks: { bg: '#f0fdf4', text: '#16a96e' }, // green
-    activities: { bg: '#fef3c7', text: '#f59e0b' }, // amber
-    evidences: { bg: '#fce7f3', text: '#ec4899' }, // pink
-    viatics: { bg: '#ecfdf5', text: '#10b981' }, // teal
-    tools: { bg: '#f3e8ff', text: '#8b5cf6' }, // purple
-    fines: { bg: '#fee2e2', text: '#ef4444' }, // red
-    profile: { bg: '#f5f3ff', text: '#6f6ee8' }, // indigo
-    vehicles: { bg: '#fef2f2', text: '#d64545' }, // dark red
-    quotes: { bg: '#f0f9ff', text: '#1f8df2' }, // info
-    orders: { bg: '#f7f9fc', text: '#23324a' }, // gray
-    projects: { bg: '#f5f7fa', text: '#344560' }, // slate
-    general: { bg: '#f9fafb', text: '#6b7280' }, // gray
-  };
-  return categoryConfig[category] || categoryConfig.general;
+const getCategoryClass = (category: string): string => {
+  const key = String(category || '').toLowerCase();
+  if (key === 'attendance') return styles.catAttendance;
+  if (key === 'lunch_breaks') return styles.catLunchBreaks;
+  if (key === 'activities') return styles.catActivities;
+  if (key === 'evidences') return styles.catEvidences;
+  if (key === 'viatics') return styles.catViatics;
+  if (key === 'tools') return styles.catTools;
+  if (key === 'fines') return styles.catFines;
+  if (key === 'profile') return styles.catProfile;
+  if (key === 'vehicles') return styles.catVehicles;
+  if (key === 'quotes') return styles.catQuotes;
+  if (key === 'orders') return styles.catOrders;
+  if (key === 'projects') return styles.catProjects;
+  return styles.catGeneral;
+};
+
+const getPositionClass = (position: NotificationCenterProps['position']) => {
+  if (position === 'top-left') return styles.posTopLeft;
+  if (position === 'bottom-right') return styles.posBottomRight;
+  if (position === 'bottom-left') return styles.posBottomLeft;
+  return styles.posTopRight;
+};
+
+const getToastAnchorClass = (position: NotificationCenterProps['position']) => {
+  const vertical = position?.startsWith('bottom') ? styles.toastBottom : styles.toastTop;
+  const horizontal = position?.endsWith('left') ? styles.toastLeft : styles.toastRight;
+  return `${vertical} ${horizontal}`;
+};
+
+const getStackClass = (index: number) => {
+  if (index <= 0) return styles.stack0;
+  if (index === 1) return styles.stack1;
+  if (index === 2) return styles.stack2;
+  if (index === 3) return styles.stack3;
+  if (index === 4) return styles.stack4;
+  return styles.stack5;
 };
 
 const NotificationCenter: React.FC<NotificationCenterProps> = ({
@@ -88,6 +104,8 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const [displayedNotifications, setDisplayedNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showPanel, setShowPanel] = useState(false);
+  const bellButtonRef = useRef<HTMLButtonElement | null>(null);
+  const sidePanelRef = useRef<HTMLDivElement | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const notificationTimers = useRef<Map<number, NodeJS.Timeout>>(new Map());
 
@@ -203,76 +221,91 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
     }
   };
 
-  // Posición del panel
-  const positionStyles: Record<string, React.CSSProperties> = {
-    'top-right': { top: 20, right: 20 },
-    'top-left': { top: 20, left: 20 },
-    'bottom-right': { bottom: 20, right: 20 },
-    'bottom-left': { bottom: 20, left: 20 },
+  const handleNotificationActivate = (notification: Notification) => {
+    if (!notification.isRead) {
+      handleMarkAsRead(notification.id);
+    }
+    if (notification.relatedUrl) {
+      window.location.href = notification.relatedUrl;
+    }
   };
+
+  const handleNotificationKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, notification: Notification) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleNotificationActivate(notification);
+    }
+  };
+
+  useEffect(() => {
+    if (!showPanel) return;
+
+    const panel = sidePanelRef.current;
+    if (!panel) return;
+
+    const getFocusable = () =>
+      Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute('disabled') && element.tabIndex !== -1);
+
+    const initialFocusable = getFocusable();
+    initialFocusable[0]?.focus();
+
+    const handlePanelKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setShowPanel(false);
+        return;
+      }
+
+      if (event.key !== 'Tab') return;
+
+      const focusable = getFocusable();
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const activeElement = document.activeElement as HTMLElement | null;
+
+      if (event.shiftKey) {
+        if (!activeElement || activeElement === first || !panel.contains(activeElement)) {
+          event.preventDefault();
+          last.focus();
+        }
+        return;
+      }
+
+      if (!activeElement || activeElement === last || !panel.contains(activeElement)) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    panel.addEventListener('keydown', handlePanelKeyDown);
+    return () => {
+      panel.removeEventListener('keydown', handlePanelKeyDown);
+      bellButtonRef.current?.focus();
+    };
+  }, [showPanel]);
 
   return (
     <>
       {/* Campana con badge */}
-      <div
-        style={{
-          position: 'fixed',
-          ...positionStyles[position],
-          zIndex: 9999,
-          cursor: 'pointer',
-        }}
-      >
+      <div className={`${styles.floatingRoot} ${getPositionClass(position)}`}>
         <button
+          ref={bellButtonRef}
+          type="button"
           onClick={() => setShowPanel(!showPanel)}
-          style={{
-            position: 'relative',
-            background: 'linear-gradient(135deg, #0f6ad6 0%, #1789FC 100%)',
-            border: '2px solid rgba(31, 141, 242, 0.3)',
-            color: '#fff',
-            padding: '12px 14px',
-            borderRadius: '12px',
-            fontSize: '20px',
-            cursor: 'pointer',
-            width: '50px',
-            height: '50px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 8px 24px rgba(15, 106, 214, 0.35), 0 2px 8px rgba(15, 106, 214, 0.2)',
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          }}
-          onMouseEnter={e => {
-            const target = e.currentTarget as HTMLButtonElement;
-            target.style.transform = 'translateY(-2px)';
-            target.style.boxShadow = '0 12px 32px rgba(15, 106, 214, 0.4), 0 4px 12px rgba(15, 106, 214, 0.25)';
-          }}
-          onMouseLeave={e => {
-            const target = e.currentTarget as HTMLButtonElement;
-            target.style.transform = 'translateY(0)';
-            target.style.boxShadow = '0 8px 24px rgba(15, 106, 214, 0.35), 0 2px 8px rgba(15, 106, 214, 0.2)';
-          }}
+          className={styles.bellBtn}
+          aria-label="Abrir panel de notificaciones"
+          aria-expanded={showPanel}
+          aria-controls="notification-side-panel"
         >
           🔔
           {unreadCount > 0 && (
-            <span
-              style={{
-                position: 'absolute',
-                top: '-5px',
-                right: '-5px',
-                background: 'linear-gradient(135deg, #d64545 0%, #ef4444 100%)',
-                color: '#fff',
-                borderRadius: '50%',
-                width: '28px',
-                height: '28px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '11px',
-                fontWeight: '700',
-                border: '2px solid #fff',
-                boxShadow: '0 4px 12px rgba(214, 69, 69, 0.4)',
-              }}
-            >
+            <span className={styles.badge}>
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
@@ -280,61 +313,34 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
       </div>
 
       {/* Panel de notificaciones mostradas */}
-      {displayedNotifications.map(notification => (
+      {displayedNotifications.map((notification, index) => (
         <div
           key={notification.id}
-          style={{
-            position: 'fixed',
-            ...positionStyles[position],
-            top: positionStyles[position].top!,
-            right: positionStyles[position].right,
-            left: positionStyles[position].left,
-            marginTop: displayedNotifications.indexOf(notification) * 80 + 'px',
-            zIndex: 10000,
-            minWidth: '350px',
-            maxWidth: '400px',
-            background: '#fff',
-            border: `3px solid ${getPriorityColor(notification.priority)}`,
-            borderRadius: '8px',
-            padding: '12px',
-            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
-            animation: 'slideIn 0.3s ease-out',
-          }}
+          className={`${styles.toast} ${getToastAnchorClass(position)} ${getStackClass(index)} ${getPriorityClass(notification.priority)}`}
         >
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <div
-              style={{
-                fontSize: '20px',
-                marginTop: '2px',
-              }}
-            >
-              {getCategoryIcon(notification.category)}
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1f2937' }}>
+          <div className={styles.toastRow}>
+            <div className={styles.toastIcon}>{getCategoryIcon(notification.category)}</div>
+            <div className={styles.toastBody}>
+              <div className={styles.toastTitle}>
                 {notification.title}
               </div>
-              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+              <div className={styles.toastMessage}>
                 {notification.message}
               </div>
               {notification.triggerUser && (
-                <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>
+                <div className={styles.toastUser}>
                   👤 {notification.triggerUser.nombre}
                 </div>
               )}
-              <div style={{ fontSize: '10px', color: '#d1d5db', marginTop: '6px' }}>
+              <div className={styles.toastTime}>
                 {new Date(notification.createdAt).toLocaleTimeString('es-MX')}
               </div>
             </div>
             <button
+              type="button"
               onClick={() => handleDeleteNotification(notification.id)}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '18px',
-                color: '#d1d5db',
-              }}
+              className={styles.toastClose}
+              aria-label="Cerrar notificación"
             >
               ✕
             </button>
@@ -343,18 +349,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
             <a
               href={notification.relatedUrl}
               onClick={() => handleMarkAsRead(notification.id)}
-              style={{
-                display: 'block',
-                marginTop: '8px',
-                padding: '6px 8px',
-                background: '#f3f4f6',
-                borderRadius: '4px',
-                textAlign: 'center',
-                fontSize: '11px',
-                color: '#3b82f6',
-                textDecoration: 'none',
-                fontWeight: '500',
-              }}
+              className={styles.toastLink}
             >
               Ver →
             </a>
@@ -364,47 +359,17 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
       {/* Panel lateral de historial */}
       {showPanel && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            right: 0,
-            width: '420px',
-            height: '100vh',
-            background: '#f7f9fc',
-            boxShadow: '-8px 0 32px rgba(15, 32, 64, 0.15), -2px 0 8px rgba(15, 32, 64, 0.08)',
-            zIndex: 9998,
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-          }}
-        >
+        <div ref={sidePanelRef} id="notification-side-panel" className={styles.sidePanel} role="dialog" aria-modal="true" aria-label="Panel de notificaciones">
           {/* Header */}
-          <div
-            style={{
-              padding: '18px 20px',
-              background: 'linear-gradient(135deg, #f7f9fc 0%, #eaf1fc 100%)',
-              borderBottom: '1px solid rgba(31, 77, 159, 0.1)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#0b1220' }}>
+          <div className={styles.panelHeader}>
+            <h2 className={styles.panelTitle}>
               🔔 Notificaciones
             </h2>
             <button
+              type="button"
               onClick={() => setShowPanel(false)}
-              style={{
-                background: 'none',
-                border: 'none',
-                fontSize: '24px',
-                cursor: 'pointer',
-                color: '#344560',
-                transition: 'color 0.2s',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.color = '#0f6ad6')}
-              onMouseLeave={e => (e.currentTarget.style.color = '#344560')}
+              className={styles.panelClose}
+              aria-label="Cerrar panel de notificaciones"
             >
               ✕
             </button>
@@ -412,41 +377,14 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
           {/* Stats */}
           {unreadCount > 0 && (
-            <div
-              style={{
-                padding: '14px 16px',
-                background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-                borderBottom: '1px solid #bfdbfe',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: '12px',
-              }}
-            >
-              <div style={{ fontSize: '13px', color: '#0f6ad6', fontWeight: '600' }}>
+            <div className={styles.statsBar}>
+              <div className={styles.statsText}>
                 📬 {unreadCount} no leída{unreadCount !== 1 ? 's' : ''}
               </div>
               <button
+                type="button"
                 onClick={handleMarkAllAsRead}
-                style={{
-                  background: 'linear-gradient(135deg, #0f6ad6 0%, #1789FC 100%)',
-                  color: '#fff',
-                  border: 'none',
-                  padding: '6px 12px',
-                  borderRadius: '6px',
-                  fontSize: '11px',
-                  cursor: 'pointer',
-                  fontWeight: '600',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(15, 106, 214, 0.3)';
-                  e.currentTarget.style.transform = 'translateY(-1px)';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.boxShadow = 'none';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                }}
+                className={styles.markAllBtn}
               >
                 Marcar todo como leído
               </button>
@@ -454,114 +392,43 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
           )}
 
           {/* Lista */}
-          <div
-            style={{
-              flex: 1,
-              overflowY: 'auto',
-              background: '#f7f9fc',
-            }}
-          >
+          <div className={styles.listWrap}>
             {notifications.length === 0 ? (
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '100%',
-                  color: '#a9c0ea',
-                  gap: '8px',
-                  padding: '20px',
-                  textAlign: 'center',
-                }}
-              >
-                <div style={{ fontSize: '42px' }}>📭</div>
-                <div style={{ fontSize: '13px', fontWeight: '500' }}>
+              <div className={styles.emptyState}>
+                <div className={styles.emptyIcon}>📭</div>
+                <div className={styles.emptyTitle}>
                   No hay notificaciones
                 </div>
-                <div style={{ fontSize: '11px', color: '#cfe0ff' }}>
+                <div className={styles.emptyHint}>
                   Aquí aparecerán tus notificaciones
                 </div>
               </div>
             ) : (
               notifications.map(notification => {
-                const colors = getCategoryColors(notification.category);
                 return (
                   <div
                     key={notification.id}
-                    onClick={() => {
-                      if (!notification.isRead) {
-                        handleMarkAsRead(notification.id);
-                      }
-                      if (notification.relatedUrl) {
-                        window.location.href = notification.relatedUrl;
-                      }
-                    }}
-                    style={{
-                      padding: '14px 16px',
-                      borderBottom: '1px solid #e1e7f1',
-                      cursor: notification.relatedUrl ? 'pointer' : 'default',
-                      background: notification.isRead ? '#fff' : colors.bg,
-                      transition: 'all 0.2s',
-                    }}
-                    onMouseEnter={e => {
-                      const div = e.currentTarget as HTMLDivElement;
-                      div.style.background = colors.bg;
-                      div.style.paddingLeft = '18px';
-                    }}
-                    onMouseLeave={e => {
-                      const div = e.currentTarget as HTMLDivElement;
-                      div.style.background = notification.isRead ? '#fff' : colors.bg;
-                      div.style.paddingLeft = '16px';
-                    }}
+                    onClick={() => handleNotificationActivate(notification)}
+                    onKeyDown={(event) => handleNotificationKeyDown(event, notification)}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Notificación: ${notification.title}`}
+                    className={`${styles.item} ${getCategoryClass(notification.category)} ${notification.isRead ? '' : styles.itemUnread} ${notification.relatedUrl ? styles.itemClickable : ''}`}
                   >
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                      <div
-                        style={{
-                          fontSize: '18px',
-                          flexShrink: 0,
-                          marginTop: '2px',
-                        }}
-                      >
-                        {getCategoryIcon(notification.category)}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            fontSize: '12px',
-                            fontWeight: notification.isRead ? '500' : '700',
-                            color: notification.isRead ? '#344560' : colors.text,
-                            marginBottom: '3px',
-                            lineHeight: '1.3',
-                          }}
-                        >
+                    <div className={styles.itemRow}>
+                      <div className={styles.itemIcon}>{getCategoryIcon(notification.category)}</div>
+                      <div className={styles.itemBody}>
+                        <div className={`${styles.itemTitle} ${notification.isRead ? '' : styles.itemTitleUnread}`}>
                           {notification.title}
                           {!notification.isRead && (
-                            <span
-                              style={{
-                                display: 'inline-block',
-                                width: '7px',
-                                height: '7px',
-                                borderRadius: '50%',
-                                background: colors.text,
-                                marginLeft: '6px',
-                                verticalAlign: 'middle',
-                              }}
-                            />
+                            <span className={styles.unreadDot} />
                           )}
                         </div>
-                        <div
-                          style={{
-                            fontSize: '11px',
-                            color: '#344560',
-                            marginBottom: '4px',
-                            lineHeight: '1.35',
-                          }}
-                        >
+                        <div className={styles.itemMessage}>
                           {notification.message.substring(0, 70)}
                           {notification.message.length > 70 ? '...' : ''}
                         </div>
-                        <div style={{ fontSize: '10px', color: '#a9c0ea' }}>
+                        <div className={styles.itemTime}>
                           {new Date(notification.createdAt).toLocaleString('es-MX', {
                             month: 'short',
                             day: 'numeric',
@@ -571,22 +438,13 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
                         </div>
                       </div>
                       <button
+                        type="button"
                         onClick={e => {
                           e.stopPropagation();
                           handleDeleteNotification(notification.id);
                         }}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#cfe0ff',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          padding: '0',
-                          transition: 'color 0.2s',
-                          flexShrink: 0,
-                        }}
-                        onMouseEnter={e => (e.currentTarget.style.color = '#d64545')}
-                        onMouseLeave={e => (e.currentTarget.style.color = '#cfe0ff')}
+                        className={styles.itemDelete}
+                        aria-label="Eliminar notificación"
                       >
                         ✕
                       </button>
@@ -601,50 +459,8 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
       {/* Overlay para cerrar panel */}
       {showPanel && (
-        <div
-          onClick={() => setShowPanel(false)}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.3)',
-            zIndex: 9997,
-          }}
-        />
+        <div onClick={() => setShowPanel(false)} className={styles.overlay} aria-hidden="true" />
       )}
-
-      <style>{`
-        @keyframes slideIn {
-          from {
-            transform: translateX(420px) scale(0.95);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0) scale(1);
-            opacity: 1;
-          }
-        }
-        
-        /* Scrollbar styling para el panel */
-        div::-webkit-scrollbar {
-          width: 6px;
-        }
-        
-        div::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        
-        div::-webkit-scrollbar-thumb {
-          background: rgba(15, 106, 214, 0.3);
-          border-radius: 3px;
-        }
-        
-        div::-webkit-scrollbar-thumb:hover {
-          background: rgba(15, 106, 214, 0.5);
-        }
-      `}</style>
     </>
   );
 };

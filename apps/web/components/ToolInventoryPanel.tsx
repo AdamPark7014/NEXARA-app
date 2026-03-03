@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from 'react';
 import { useUser } from './UserContext';
+import styles from './ToolInventoryPanel.module.css';
 
 interface InventoryItem {
   id: number;
@@ -114,19 +115,6 @@ const ToolInventoryPanel: React.FC = () => {
 
     setError(null);
   };
-
-  const getDropZoneStyle = (isActive: boolean): React.CSSProperties => ({
-    border: `1px dashed ${isActive ? 'var(--primary)' : 'var(--muted)'}`,
-    borderRadius: 10,
-    padding: 10,
-    display: 'grid',
-    gap: 8,
-    alignContent: 'start',
-    background: isActive ? 'var(--surface)' : 'var(--surface-light)',
-    boxShadow: isActive ? '0 0 0 1px var(--primary)' : 'none',
-    transition: 'all 0.2s ease',
-    cursor: 'pointer',
-  });
 
   const fetchItems = async () => {
     if (!user?.token) return;
@@ -263,10 +251,10 @@ const ToolInventoryPanel: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'grid', gap: 16 }}>
-      <form className="card" style={{ display: 'grid', gap: 10 }} onSubmit={createItem}>
-        <h3 style={{ color: 'var(--primary)', marginBottom: 0 }}>🏭 Inventario de Herramientas</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+    <div className={styles.wrapper}>
+      <form className={`card ${styles.formCard}`} onSubmit={createItem}>
+        <h3 className={styles.title}>🏭 Inventario de Herramientas</h3>
+        <div className={`${styles.fieldsGrid} ${isMobile ? styles.fieldsGridMobile : ''}`}>
           <input className="input" placeholder="Herramienta" value={toolName} onChange={(e) => setToolName(e.target.value)} />
           <input className="input" placeholder="Modelo" value={model} onChange={(e) => setModel(e.target.value)} />
           <input className="input" placeholder="Serie" value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} />
@@ -286,33 +274,32 @@ const ToolInventoryPanel: React.FC = () => {
               if (file) setCreateFile('panoramic', file);
             }}
             onClick={() => createPanoramicInputRef.current?.click()}
-            style={getDropZoneStyle(dragOverCreate === 'panoramic')}
+            className={`${styles.dropzone} ${dragOverCreate === 'panoramic' ? styles.dropzoneActive : ''}`}
           >
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>📸 Foto panorámica</div>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Arrastra una imagen o haz click para seleccionarla</div>
+            <div className={styles.dropzoneLabel}>📸 Foto panorámica</div>
+            <div className={styles.dropzoneHint}>Arrastra una imagen o haz click para seleccionarla</div>
             <input
               ref={createPanoramicInputRef}
               type="file"
               accept="image/*"
-              style={{ display: 'none' }}
+              className={styles.hiddenInput}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) setCreateFile('panoramic', file);
               }}
             />
             <button
-              className="button-secondary"
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 createPanoramicInputRef.current?.click();
               }}
-              style={{ justifySelf: 'start', padding: '6px 10px', fontSize: 12 }}
+              className={`button-secondary ${styles.selectImageBtn}`}
             >
               Seleccionar imagen
             </button>
             {panoramicPhotoFile && (
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              <div className={styles.fileName}>
                 Archivo: {panoramicPhotoFile.name}
               </div>
             )}
@@ -320,7 +307,7 @@ const ToolInventoryPanel: React.FC = () => {
               <img
                 src={panoramicPhotoPreview}
                 alt="Preview panorámica"
-                style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--muted)' }}
+                className={styles.previewImage}
               />
             )}
           </div>
@@ -338,33 +325,32 @@ const ToolInventoryPanel: React.FC = () => {
               if (file) setCreateFile('serial', file);
             }}
             onClick={() => createSerialInputRef.current?.click()}
-            style={getDropZoneStyle(dragOverCreate === 'serial')}
+            className={`${styles.dropzone} ${dragOverCreate === 'serial' ? styles.dropzoneActive : ''}`}
           >
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>🔎 Foto de serie</div>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Arrastra una imagen o haz click para seleccionarla</div>
+            <div className={styles.dropzoneLabel}>🔎 Foto de serie</div>
+            <div className={styles.dropzoneHint}>Arrastra una imagen o haz click para seleccionarla</div>
             <input
               ref={createSerialInputRef}
               type="file"
               accept="image/*"
-              style={{ display: 'none' }}
+              className={styles.hiddenInput}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) setCreateFile('serial', file);
               }}
             />
             <button
-              className="button-secondary"
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 createSerialInputRef.current?.click();
               }}
-              style={{ justifySelf: 'start', padding: '6px 10px', fontSize: 12 }}
+              className={`button-secondary ${styles.selectImageBtn}`}
             >
               Seleccionar imagen
             </button>
             {serialPhotoFile && (
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              <div className={styles.fileName}>
                 Archivo: {serialPhotoFile.name}
               </div>
             )}
@@ -372,7 +358,7 @@ const ToolInventoryPanel: React.FC = () => {
               <img
                 src={serialPhotoPreview}
                 alt="Preview serie"
-                style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--muted)' }}
+                className={styles.previewImage}
               />
             )}
           </div>
@@ -383,12 +369,12 @@ const ToolInventoryPanel: React.FC = () => {
       </form>
 
       {replacementTarget && (
-        <form className="card" style={{ display: 'grid', gap: 10 }} onSubmit={submitReplacement}>
-          <h3 style={{ color: 'var(--primary)', marginBottom: 0 }}>
+        <form className={`card ${styles.formCard}`} onSubmit={submitReplacement}>
+          <h3 className={styles.title}>
             🔁 Reemplazar: {replacementTarget.toolName} · {replacementTarget.serialNumber}
           </h3>
 
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+          <div className={`${styles.fieldsGrid} ${isMobile ? styles.fieldsGridMobile : ''}`}>
             <input className="input" value={replacementModel} onChange={(e) => setReplacementModel(e.target.value)} placeholder="Nuevo modelo" />
             <input className="input" value={replacementSerialNumber} onChange={(e) => setReplacementSerialNumber(e.target.value)} placeholder="Nueva serie" />
             <input className="input" value={replacementRetiredReason} onChange={(e) => setReplacementRetiredReason(e.target.value)} placeholder="Motivo de retiro" />
@@ -408,33 +394,32 @@ const ToolInventoryPanel: React.FC = () => {
                 if (file) setReplacementFile('panoramic', file);
               }}
               onClick={() => replacePanoramicInputRef.current?.click()}
-              style={getDropZoneStyle(dragOverReplace === 'panoramic')}
+              className={`${styles.dropzone} ${dragOverReplace === 'panoramic' ? styles.dropzoneActive : ''}`}
             >
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>📸 Foto panorámica reemplazo</div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Arrastra una imagen o haz click para seleccionarla</div>
+              <div className={styles.dropzoneLabel}>📸 Foto panorámica reemplazo</div>
+              <div className={styles.dropzoneHint}>Arrastra una imagen o haz click para seleccionarla</div>
               <input
                 ref={replacePanoramicInputRef}
                 type="file"
                 accept="image/*"
-                style={{ display: 'none' }}
+                className={styles.hiddenInput}
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) setReplacementFile('panoramic', file);
                 }}
               />
               <button
-                className="button-secondary"
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   replacePanoramicInputRef.current?.click();
                 }}
-                style={{ justifySelf: 'start', padding: '6px 10px', fontSize: 12 }}
+                className={`button-secondary ${styles.selectImageBtn}`}
               >
                 Seleccionar imagen
               </button>
               {replacementPanoramicPhotoFile && (
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                <div className={styles.fileName}>
                   Archivo: {replacementPanoramicPhotoFile.name}
                 </div>
               )}
@@ -442,7 +427,7 @@ const ToolInventoryPanel: React.FC = () => {
                 <img
                   src={replacementPanoramicPhotoPreview}
                   alt="Preview panorámica reemplazo"
-                  style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--muted)' }}
+                  className={styles.previewImage}
                 />
               )}
             </div>
@@ -460,33 +445,32 @@ const ToolInventoryPanel: React.FC = () => {
                 if (file) setReplacementFile('serial', file);
               }}
               onClick={() => replaceSerialInputRef.current?.click()}
-              style={getDropZoneStyle(dragOverReplace === 'serial')}
+              className={`${styles.dropzone} ${dragOverReplace === 'serial' ? styles.dropzoneActive : ''}`}
             >
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>🔎 Foto de serie reemplazo</div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Arrastra una imagen o haz click para seleccionarla</div>
+              <div className={styles.dropzoneLabel}>🔎 Foto de serie reemplazo</div>
+              <div className={styles.dropzoneHint}>Arrastra una imagen o haz click para seleccionarla</div>
               <input
                 ref={replaceSerialInputRef}
                 type="file"
                 accept="image/*"
-                style={{ display: 'none' }}
+                className={styles.hiddenInput}
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) setReplacementFile('serial', file);
                 }}
               />
               <button
-                className="button-secondary"
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   replaceSerialInputRef.current?.click();
                 }}
-                style={{ justifySelf: 'start', padding: '6px 10px', fontSize: 12 }}
+                className={`button-secondary ${styles.selectImageBtn}`}
               >
                 Seleccionar imagen
               </button>
               {replacementSerialPhotoFile && (
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                <div className={styles.fileName}>
                   Archivo: {replacementSerialPhotoFile.name}
                 </div>
               )}
@@ -494,13 +478,13 @@ const ToolInventoryPanel: React.FC = () => {
                 <img
                   src={replacementSerialPhotoPreview}
                   alt="Preview serie reemplazo"
-                  style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--muted)' }}
+                  className={styles.previewImage}
                 />
               )}
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div className={styles.formActions}>
             <button className="button-primary" type="submit" disabled={replacing}>
               {replacing ? 'Reemplazando...' : 'Guardar reemplazo'}
             </button>
@@ -511,48 +495,47 @@ const ToolInventoryPanel: React.FC = () => {
         </form>
       )}
 
-      <div className="card" style={{ display: 'grid', gap: 12 }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div className={`card ${styles.listCard}`}>
+        <div className={styles.topBar}>
           <input
-            className="input"
+            className={`input ${styles.searchInput} ${isMobile ? styles.searchInputMobile : ''}`}
             placeholder="Buscar por herramienta, modelo o serie"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            style={{ flex: 1, minWidth: isMobile ? 0 : 220, width: isMobile ? '100%' : undefined }}
           />
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', fontSize: 13 }}>
+          <label className={styles.checkboxLabel}>
             <input type="checkbox" checked={includeRetired} onChange={(e) => setIncludeRetired(e.target.checked)} />
             Ver retiradas
           </label>
         </div>
 
-        {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}
+        {error && <div className={styles.errorText}>{error}</div>}
         {loading ? (
-          <div style={{ textAlign: 'center', padding: 16 }}>Cargando inventario...</div>
+          <div className={styles.centerLoading}>Cargando inventario...</div>
         ) : items.length === 0 ? (
-          <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: 20 }}>No hay herramientas en inventario</div>
+          <div className={styles.centerEmpty}>No hay herramientas en inventario</div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--muted)' }}>
-                  <th style={{ textAlign: 'left', padding: 10 }}>Herramienta</th>
-                  <th style={{ textAlign: 'left', padding: 10 }}>Modelo</th>
-                  <th style={{ textAlign: 'left', padding: 10 }}>Serie</th>
-                  <th style={{ textAlign: 'left', padding: 10 }}>Estado</th>
-                  <th style={{ textAlign: 'left', padding: 10 }}>Reemplazos</th>
-                  <th style={{ textAlign: 'center', padding: 10 }}>Acción</th>
+                <tr className={styles.tableHeadRow}>
+                  <th className={styles.thLeft}>Herramienta</th>
+                  <th className={styles.thLeft}>Modelo</th>
+                  <th className={styles.thLeft}>Serie</th>
+                  <th className={styles.thLeft}>Estado</th>
+                  <th className={styles.thLeft}>Reemplazos</th>
+                  <th className={styles.thCenter}>Acción</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item) => (
-                  <tr key={item.id} style={{ borderBottom: '1px solid var(--muted)' }}>
-                    <td style={{ padding: 10 }}>{item.toolName}</td>
-                    <td style={{ padding: 10 }}>{item.model}</td>
-                    <td style={{ padding: 10 }}>{item.serialNumber}</td>
-                    <td style={{ padding: 10 }}>{item.status}</td>
-                    <td style={{ padding: 10 }}>{item.replacements?.length || 0}</td>
-                    <td style={{ padding: 10, textAlign: 'center' }}>
+                  <tr key={item.id} className={styles.tableRow}>
+                    <td className={styles.td}>{item.toolName}</td>
+                    <td className={styles.td}>{item.model}</td>
+                    <td className={styles.td}>{item.serialNumber}</td>
+                    <td className={styles.td}>{item.status}</td>
+                    <td className={styles.td}>{item.replacements?.length || 0}</td>
+                    <td className={styles.tdCenter}>
                       <button className="button-secondary" onClick={() => startReplacement(item)}>
                         Reemplazar
                       </button>

@@ -76,19 +76,19 @@ export default function FirmarCotizacionPage() {
   };
 
   if (loading) {
-    return <div className="quoteShell">Cargando cotizacion...</div>;
+    return <main className="quoteShell" aria-label="Firma de cotización">Cargando cotizacion...</main>;
   }
 
   if (error) {
-    return <div className="quoteShell">{error}</div>;
+    return <main className="quoteShell" aria-label="Firma de cotización">{error}</main>;
   }
 
   if (!quote) {
-    return <div className="quoteShell">Cotizacion no disponible.</div>;
+    return <main className="quoteShell" aria-label="Firma de cotización">Cotizacion no disponible.</main>;
   }
 
   return (
-    <section className="quoteShell">
+    <main className="quoteShell" aria-label="Firma de cotización">
       <div className="quoteCard">
         <header className="quoteHeader">
           <div>
@@ -158,16 +158,16 @@ export default function FirmarCotizacionPage() {
         <div className="signCard">
           <h2>Firma digital</h2>
           {signed ? (
-            <p>Gracias, tu firma quedo registrada.</p>
+            <p role="status" aria-live="polite">Gracias, tu firma quedo registrada.</p>
           ) : (
             <>
-              <label>
+              <label htmlFor="quote-signer-name">
                 Nombre completo
-                <input value={name} onChange={(e) => setName(e.target.value)} />
+                <input id="quote-signer-name" type="text" autoComplete="name" aria-required="true" value={name} onChange={(e) => setName(e.target.value)} />
               </label>
-              <label>
+              <label htmlFor="quote-signer-email">
                 Email
-                <input value={email} onChange={(e) => setEmail(e.target.value)} />
+                <input id="quote-signer-email" type="email" autoComplete="email" aria-required="true" value={email} onChange={(e) => setEmail(e.target.value)} />
               </label>
               <button type="button" onClick={handleSign}>Firmar cotizacion</button>
             </>
@@ -339,6 +339,6 @@ export default function FirmarCotizacionPage() {
           justify-self: start;
         }
       `}</style>
-    </section>
+    </main>
   );
 }

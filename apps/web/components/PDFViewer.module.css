@@ -138,6 +138,26 @@
   position: relative;
 }
 
+.viewerH400 {
+  height: 400px;
+}
+
+.viewerH500 {
+  height: 500px;
+}
+
+.viewerH600 {
+  height: 600px;
+}
+
+.viewerH700 {
+  height: 700px;
+}
+
+.viewerH800 {
+  height: 800px;
+}
+
 .viewer :global(.rpv-core__viewer) {
   height: 100%;
 }

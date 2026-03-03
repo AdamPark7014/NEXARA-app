@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
+import styles from "./ClientLocationPicker.module.css";
 
 const GOOGLE_MAPS_SCRIPT_ID = "google-maps-script";
 
@@ -211,9 +212,14 @@ export default function ClientLocationPicker({ label, value, onChange, height = 
     setInputValue(value.address || "");
   }, [value.address]);
 
+  useEffect(() => {
+    if (!mapRef.current) return;
+    mapRef.current.style.height = `${height}px`;
+  }, [height]);
+
   return (
-    <div style={{ display: "grid", gap: 8 }}>
-      <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>{label}</label>
+    <div className={styles.wrapper}>
+      <label className={styles.label}>{label}</label>
       <input
         ref={inputRef}
         className="input"
@@ -221,8 +227,8 @@ export default function ClientLocationPicker({ label, value, onChange, height = 
         value={inputValue}
         onChange={(event) => setInputValue(event.target.value)}
       />
-      <div ref={mapRef} style={{ height, borderRadius: 12, overflow: "hidden", border: "1px solid rgba(15, 106, 214, 0.2)" }} />
-      {status && <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>{status}</div>}
+      <div ref={mapRef} className={styles.mapContainer} />
+      {status && <div className={styles.status}>{status}</div>}
     </div>
   );
 }

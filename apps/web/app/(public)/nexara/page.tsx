@@ -11,17 +11,15 @@ export const metadata = {
 export default function NexaraPage() {
   return (
     <>
-    <main className={styles.container}>
+    <main className={styles.container} aria-label="Página sobre Nexara">
       {/* Hero */}
       <section className={styles.hero}>
         <div className={styles.heroContent}>
           <h1 className={styles.heroTitle}>Nexara</h1>
           <p className={styles.heroSubtitle}>
-            Somos expertos en venta de computadoras y accesorios, integración de
-            tecnología y servicios IT a la medida. Nuestra calidad y experiencia
-            nos han posicionado como líderes. Trabajamos con convicción para
-            entregar los mejores resultados: contigo no será la excepción. Convierte
-            a Nexara en tu nuevo aliado.
+            Integramos tecnología, equipamiento y servicios IT a la medida para que
+            tu operación crezca con continuidad. Combinamos experiencia técnica,
+            ejecución ágil y acompañamiento cercano en cada etapa.
           </p>
           <div className={styles.heroCtas}>
             <Link href="/contacto" className={styles.primaryCta}>Contactar asesor</Link>
@@ -38,14 +36,22 @@ export default function NexaraPage() {
         </div>
       </section>
 
+      <nav className={styles.quickNav} aria-label="Accesos rápidos">
+        <a href="#nosotros" className={styles.quickNavLink}>Nosotros</a>
+        <a href="#diferenciadores" className={styles.quickNavLink}>Diferenciadores</a>
+        <a href="#metodologia" className={styles.quickNavLink}>Metodología</a>
+        <a href="#metricas" className={styles.quickNavLink}>Métricas</a>
+        <a href="#cobertura" className={styles.quickNavLink}>Cobertura</a>
+        <a href="#valores" className={styles.quickNavLink}>Valores</a>
+      </nav>
+
       {/* Sobre Nexara */}
-      <section className={styles.section}>
+      <section id="nosotros" className={styles.section}>
         <h2 className={styles.sectionTitle}>Sobre Nexara</h2>
         <p className={styles.lead}>
-          En Nexara nuestra prioridad es ayudarte. Combinamos experiencia técnica
-          con una visión de servicio para brindar soluciones que realmente impactan
-          tu operación: desde equipamiento confiable hasta proyectos de integración
-          TI end-to-end con soporte cercano y oportuno.
+          Combinamos experiencia técnica y enfoque de servicio para resolver
+          necesidades reales: desde equipamiento confiable hasta integración TI
+          end-to-end con soporte oportuno.
         </p>
         <div className={styles.gridCols2}>
           <div className={styles.card}>
@@ -92,7 +98,7 @@ export default function NexaraPage() {
       </section>
 
       {/* Diferenciadores */}
-      <section className={styles.section}>
+      <section id="diferenciadores" className={styles.section}>
         <h2 className={styles.sectionTitle}>Nuestros diferenciadores</h2>
         <div className={styles.badgesGrid}>
           <div className={styles.badgeSolid}>Respuesta menor a 4h</div>
@@ -105,7 +111,7 @@ export default function NexaraPage() {
       </section>
 
       {/* Metodología */}
-      <section className={styles.section}>
+      <section id="metodologia" className={styles.section}>
         <h2 className={styles.sectionTitle}>Cómo trabajamos</h2>
         <div className={styles.methodGrid}>
           <div className={styles.methodStep}>
@@ -140,7 +146,7 @@ export default function NexaraPage() {
       </section>
 
       {/* Métricas y SLA */}
-      <section className={styles.section}>
+      <section id="metricas" className={styles.section}>
         <h2 className={styles.sectionTitle}>Números que nos respaldan</h2>
         <div className={styles.metricsGrid}>
           <div className={styles.metricCard}>
@@ -164,7 +170,7 @@ export default function NexaraPage() {
       </section>
 
       {/* Cobertura operativa */}
-      <section className={styles.section}>
+      <section id="cobertura" className={styles.section}>
         <h2 className={styles.sectionTitle}>Cobertura en México</h2>
         <p className={styles.lead}>Zonas donde operamos y atendemos proyectos.</p>
         <div className={styles.mapCard}>
@@ -185,7 +191,7 @@ export default function NexaraPage() {
       </section>
 
       {/* Valores */}
-      <section className={styles.section}>
+      <section id="valores" className={styles.section}>
         <h2 className={styles.sectionTitle}>Valores</h2>
         <div className={styles.valuesGrid}>
           <article className={styles.valueCard}>

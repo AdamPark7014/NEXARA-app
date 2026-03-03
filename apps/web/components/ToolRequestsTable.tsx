@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import FinesTable from './FinesTable';
+import styles from './ToolRequestsTable.module.css';
 
 interface ToolRequest {
   id: number;
@@ -114,75 +115,28 @@ const ToolRequestsTable: React.FC = () => {
     return labels[status] || status;
   };
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 20 }}>Cargando solicitudes...</div>;
-
-  const mobileCardListStyle: React.CSSProperties = {
-    display: "flex",
-    flexDirection: "column",
-    gap: "16px",
-    padding: "16px 12px",
-    boxSizing: "border-box",
-    width: "100%",
+  const getStatusClass = (status: ToolRequest['status']) => {
+    if (status === 'PENDING') return styles.statusPending;
+    if (status === 'APPROVED') return styles.statusApproved;
+    if (status === 'IN_USE') return styles.statusInUse;
+    if (status === 'RETURNED') return styles.statusReturned;
+    if (status === 'DAMAGED') return styles.statusDamaged;
+    if (status === 'REJECTED') return styles.statusRejected;
+    return styles.statusReturned;
   };
 
-  const mobileCardStyle: React.CSSProperties = {
-    background: "linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)",
-    borderRadius: "12px",
-    padding: "16px 14px",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-    border: "1px solid #e5e7eb",
-    boxSizing: "border-box",
-    width: "100%",
-    minWidth: 0,
-  };
-
-  const mobileMetaGridStyle: React.CSSProperties = {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "12px",
-    marginTop: "12px",
-    width: "100%",
-    minWidth: 0,
-  };
-
-  const mobileMetaItemStyle: React.CSSProperties = {
-    display: "flex",
-    flexDirection: "column",
-    gap: "4px",
-    minWidth: 0,
-    wordBreak: "break-word",
-    overflowWrap: "break-word",
-  };
-
-  const mobileMetaLabelStyle: React.CSSProperties = {
-    fontSize: "11px",
-    fontWeight: 600,
-    textTransform: "uppercase",
-    color: "#6b7280",
-    letterSpacing: "0.5px",
-    wordBreak: "break-word",
-  };
-
-  const mobileMetaValueStyle: React.CSSProperties = {
-    fontSize: "14px",
-    color: "#111827",
-    fontWeight: 500,
-    wordBreak: "break-word",
-    overflowWrap: "break-word",
-    minWidth: 0,
-  };
+  if (loading) return <div className={styles.loading}>Cargando solicitudes...</div>;
 
   return (
-    <div style={{ display: 'grid', gap: 24 }}>
-      <div className="card" style={{ display: 'grid', gap: 16 }}>
-        <h3 style={{ color: 'var(--primary)', marginBottom: 4 }}>Solicitudes de Herramientas</h3>
+    <div className={styles.root}>
+      <div className={`card ${styles.panel}`}>
+        <h3 className={styles.title}>Solicitudes de Herramientas</h3>
         
-        {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}
+        {error && <div className={styles.error}>{error}</div>}
 
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div className={styles.filterRow}>
           <select
-            className="input"
-            style={{ flex: 1, minWidth: 150 }}
+            className={`input ${styles.filterSelect}`}
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
@@ -194,86 +148,76 @@ const ToolRequestsTable: React.FC = () => {
             <option value="DAMAGED">Dañada</option>
             <option value="REJECTED">Rechazada</option>
           </select>
-          <div style={{ color: 'var(--text-secondary)', fontSize: 13, alignSelf: 'center' }}>
+          <div className={styles.counter}>
             {tools.length} solicitud(es)
           </div>
         </div>
 
         {tools.length === 0 ? (
-          <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: 40 }}>
+          <div className={styles.empty}>
             No hay solicitudes de herramientas
           </div>
         ) : (
           <>
             {!isMobile && (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
                   <thead>
-                    <tr style={{ borderBottom: '1px solid var(--muted)' }}>
-                      <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    <tr className={styles.rowBorder}>
+                      <th className={styles.th}>
                         Usuario
                       </th>
-                      <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      <th className={styles.th}>
                         Herramienta
                       </th>
-                      <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      <th className={styles.th}>
                         Modelo/Serie
                       </th>
-                      <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      <th className={styles.th}>
                         Estado
                       </th>
-                      <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      <th className={styles.th}>
                         Solicitado
                       </th>
-                      <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      <th className={styles.th}>
                         Devolución
                       </th>
-                      <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      <th className={styles.th}>
                         Aprobado Por
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     {tools.map((tool) => (
-                      <tr key={tool.id} style={{ borderBottom: '1px solid var(--muted)' }}>
-                        <td style={{ padding: 12 }}>
-                          <div style={{ fontWeight: 500 }}>{tool.requestedBy?.nombre || 'N/A'}</div>
-                          <div style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
+                      <tr key={tool.id} className={styles.rowBorder}>
+                        <td className={styles.td}>
+                          <div className={styles.userName}>{tool.requestedBy?.nombre || 'N/A'}</div>
+                          <div className={styles.smallMuted}>
                             {tool.requestedBy?.email || ''}
                           </div>
                         </td>
-                        <td style={{ padding: 12 }}>
-                          <div style={{ fontWeight: 500 }}>{tool.toolName}</div>
-                          <div style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
+                        <td className={styles.td}>
+                          <div className={styles.toolName}>{tool.toolName}</div>
+                          <div className={styles.smallMuted}>
                             {tool.reason.substring(0, 40)}...
                           </div>
                         </td>
-                        <td style={{ padding: 12, color: 'var(--text-secondary)', fontSize: 12 }}>
+                        <td className={`${styles.td} ${styles.metaText}`}>
                           {tool.model} / {tool.serialNumber.substring(0, 20)}
                         </td>
-                        <td style={{ padding: 12 }}>
-                          <div
-                            style={{
-                              display: 'inline-block',
-                              padding: '4px 8px',
-                              borderRadius: 4,
-                              background: getStatusColor(tool.status) + '20',
-                              color: getStatusColor(tool.status),
-                              fontWeight: 500,
-                              fontSize: 11,
-                            }}
-                          >
+                        <td className={styles.td}>
+                          <div className={`${styles.statusBadge} ${getStatusClass(tool.status)}`}>
                             {getStatusLabel(tool.status)}
                           </div>
                         </td>
-                        <td style={{ padding: 12, fontSize: 12, color: 'var(--text-secondary)' }}>
+                        <td className={`${styles.td} ${styles.metaText}`}>
                           {new Date(tool.requestDate).toLocaleDateString('es-MX', {
                             year: 'numeric',
                             month: 'short',
                             day: 'numeric',
                           })}
                         </td>
-                        <td style={{ padding: 12, fontSize: 12, color: 'var(--text-secondary)' }}>
+                        <td className={`${styles.td} ${styles.metaText}`}>
                           {tool.expectedReturnDate
                             ? new Date(tool.expectedReturnDate).toLocaleDateString('es-MX', {
                                 year: 'numeric',
@@ -282,7 +226,7 @@ const ToolRequestsTable: React.FC = () => {
                               })
                             : '—'}
                         </td>
-                        <td style={{ padding: 12, fontSize: 12, color: 'var(--text-secondary)' }}>
+                        <td className={`${styles.td} ${styles.metaText}`}>
                           {tool.approvedBy?.nombre || '—'}
                         </td>
                       </tr>
@@ -293,41 +237,31 @@ const ToolRequestsTable: React.FC = () => {
             )}
 
             {isMobile && (
-              <div style={mobileCardListStyle}>
+              <div className={styles.mobileList}>
                 {tools.map((tool) => (
-                  <div key={tool.id} style={mobileCardStyle}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: "16px", fontWeight: 700, color: "#111827", marginBottom: "4px" }}>{tool.toolName}</div>
-                        <div style={{ fontSize: "13px", color: "#6b7280" }}>{tool.requestedBy?.nombre || 'N/A'}</div>
+                  <div key={tool.id} className={styles.mobileCard}>
+                    <div className={styles.mobileTop}>
+                      <div className={styles.mobileTopMain}>
+                        <div className={styles.mobileToolName}>{tool.toolName}</div>
+                        <div className={styles.mobileRequester}>{tool.requestedBy?.nombre || 'N/A'}</div>
                       </div>
-                      <div
-                        style={{
-                          padding: '6px 12px',
-                          borderRadius: 6,
-                          background: getStatusColor(tool.status) + '20',
-                          color: getStatusColor(tool.status),
-                          fontWeight: 600,
-                          fontSize: 12,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
+                      <div className={`${styles.mobileStatus} ${getStatusClass(tool.status)}`}>
                         {getStatusLabel(tool.status)}
                       </div>
                     </div>
 
-                    <div style={mobileMetaGridStyle}>
-                      <div style={mobileMetaItemStyle}>
-                        <span style={mobileMetaLabelStyle}>Modelo</span>
-                        <span style={mobileMetaValueStyle}>{tool.model}</span>
+                    <div className={styles.mobileMetaGrid}>
+                      <div className={styles.mobileMetaItem}>
+                        <span className={styles.mobileMetaLabel}>Modelo</span>
+                        <span className={styles.mobileMetaValue}>{tool.model}</span>
                       </div>
-                      <div style={mobileMetaItemStyle}>
-                        <span style={mobileMetaLabelStyle}>Serie</span>
-                        <span style={mobileMetaValueStyle}>{tool.serialNumber.substring(0, 15)}</span>
+                      <div className={styles.mobileMetaItem}>
+                        <span className={styles.mobileMetaLabel}>Serie</span>
+                        <span className={styles.mobileMetaValue}>{tool.serialNumber.substring(0, 15)}</span>
                       </div>
-                      <div style={mobileMetaItemStyle}>
-                        <span style={mobileMetaLabelStyle}>Solicitado</span>
-                        <span style={mobileMetaValueStyle}>
+                      <div className={styles.mobileMetaItem}>
+                        <span className={styles.mobileMetaLabel}>Solicitado</span>
+                        <span className={styles.mobileMetaValue}>
                           {new Date(tool.requestDate).toLocaleDateString('es-MX', {
                             year: 'numeric',
                             month: 'short',
@@ -335,9 +269,9 @@ const ToolRequestsTable: React.FC = () => {
                           })}
                         </span>
                       </div>
-                      <div style={mobileMetaItemStyle}>
-                        <span style={mobileMetaLabelStyle}>Devolución</span>
-                        <span style={mobileMetaValueStyle}>
+                      <div className={styles.mobileMetaItem}>
+                        <span className={styles.mobileMetaLabel}>Devolución</span>
+                        <span className={styles.mobileMetaValue}>
                           {tool.expectedReturnDate
                             ? new Date(tool.expectedReturnDate).toLocaleDateString('es-MX', {
                                 month: 'short',
@@ -346,16 +280,16 @@ const ToolRequestsTable: React.FC = () => {
                             : '—'}
                         </span>
                       </div>
-                      <div style={{ ...mobileMetaItemStyle, gridColumn: "1 / -1" }}>
-                        <span style={mobileMetaLabelStyle}>Razón</span>
-                        <span style={{ ...mobileMetaValueStyle, fontSize: "13px", color: "#6b7280" }}>
+                      <div className={`${styles.mobileMetaItem} ${styles.mobileMetaFull}`}>
+                        <span className={styles.mobileMetaLabel}>Razón</span>
+                        <span className={`${styles.mobileMetaValue} ${styles.mobileReason}`}>
                           {tool.reason}
                         </span>
                       </div>
                       {tool.approvedBy?.nombre && (
-                        <div style={{ ...mobileMetaItemStyle, gridColumn: "1 / -1" }}>
-                          <span style={mobileMetaLabelStyle}>Aprobado por</span>
-                          <span style={mobileMetaValueStyle}>{tool.approvedBy.nombre}</span>
+                        <div className={`${styles.mobileMetaItem} ${styles.mobileMetaFull}`}>
+                          <span className={styles.mobileMetaLabel}>Aprobado por</span>
+                          <span className={styles.mobileMetaValue}>{tool.approvedBy.nombre}</span>
                         </div>
                       )}
                     </div>

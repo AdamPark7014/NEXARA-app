@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-
 /* === MAIN LAYOUT === */
 .salesRoot {
   min-height: 100vh;
@@ -61,22 +59,24 @@
 .salesWorkspaceKicker {
   margin: 0;
   text-transform: uppercase;
-  letter-spacing: 0.2rem;
+  letter-spacing: 0.16rem;
   font-size: 0.72rem;
   color: var(--text-tertiary);
 }
 
 .salesWorkspaceTitle {
   margin: 4px 0;
-  font-size: 1.55rem;
-  line-height: 1.2;
+  font-size: clamp(1.26rem, 2.2vw, 1.62rem);
+  line-height: var(--panel-title-leading);
+  letter-spacing: var(--panel-title-tracking);
 }
 
 .salesWorkspaceSubtitle {
   margin: 0;
   color: var(--text-secondary);
   max-width: 64ch;
-  font-size: 0.92rem;
+  font-size: 0.95rem;
+  line-height: 1.56;
 }
 
 .salesWorkspaceMeta {

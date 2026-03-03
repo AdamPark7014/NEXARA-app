@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { useUser } from './UserContext';
+import styles from './EvidenceUploader.module.css';
 
 interface ActivityOption {
   id: number;
@@ -127,18 +128,17 @@ const EvidenceUploader = ({ actividadId }: { actividadId?: number }) => {
   };
 
   return (
-    <form className="card" onSubmit={handleSubmit} style={{ maxWidth: 520 }}>
+    <form className={`card ${styles.form}`} onSubmit={handleSubmit}>
       {!actividadId && (
-        <label style={{ display: 'block', marginBottom: 8, color: 'var(--text-secondary)' }}>
+        <label className={styles.fieldLabel}>
           Actividad:
           <select
-            className="input"
             value={actividadSeleccionada}
             onChange={(e) => {
               const value = e.target.value;
               setActividadSeleccionada(value ? Number(value) : '');
             }}
-            style={{ marginLeft: 8 }}
+            className={`input ${styles.inlineSelect}`}
             required
           >
             <option value="">Selecciona actividad</option>
@@ -150,9 +150,9 @@ const EvidenceUploader = ({ actividadId }: { actividadId?: number }) => {
           </select>
         </label>
       )}
-      <label style={{ display: 'block', marginBottom: 8, color: 'var(--text-secondary)' }}>
+      <label className={styles.fieldLabel}>
         Tipo de evidencia:
-        <select className="input" value={tipo} onChange={e => setTipo(e.target.value)} style={{ marginLeft: 8 }}>
+        <select className={`input ${styles.inlineSelect}`} value={tipo} onChange={e => setTipo(e.target.value)}>
           <option value="Hoja de Servicio">Hoja de Servicio</option>
           <option value="Foto llegada">Foto llegada</option>
           <option value="Foto salida">Foto salida</option>
@@ -160,12 +160,11 @@ const EvidenceUploader = ({ actividadId }: { actividadId?: number }) => {
         </select>
       </label>
       <textarea
-        className="input"
         rows={3}
         placeholder="Comentarios de evidencia"
         value={comentarios}
         onChange={(e) => setComentarios(e.target.value)}
-        style={{ marginBottom: 12 }}
+        className={`input ${styles.commentInput}`}
       />
       <div
         onDragOver={(event) => {
@@ -174,54 +173,36 @@ const EvidenceUploader = ({ actividadId }: { actividadId?: number }) => {
         }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
-        style={{
-          border: `2px dashed ${isDragging ? 'var(--primary)' : 'var(--muted)'}`,
-          background: isDragging ? 'rgba(15, 106, 214, 0.08)' : 'var(--surface-light)',
-          borderRadius: 12,
-          padding: 16,
-          marginBottom: 12,
-          textAlign: 'center',
-        }}
+        className={`${styles.dropzone} ${isDragging ? styles.dropzoneDragging : ''}`}
       >
         <input
           id="evidence-file"
-          className="input"
+          className={styles.hiddenInput}
           type="file"
           accept="image/*,application/pdf"
           multiple
           onChange={(e) => handleFileSelect(Array.from(e.target.files || []))}
-          style={{ display: 'none' }}
         />
-        <div style={{ color: 'var(--text-secondary)', marginBottom: 8 }}>
+        <div className={styles.helperText}>
           Arrastra tus archivos aqui o
         </div>
-        <label htmlFor="evidence-file" className="button-secondary" style={{ cursor: 'pointer' }}>
+        <label htmlFor="evidence-file" className={`button-secondary ${styles.fileTrigger}`}>
           Seleccionar archivo
         </label>
-        <div style={{ marginTop: 8, color: 'var(--text-secondary)', fontSize: 12 }}>
+        <div className={`${styles.helperText} ${styles.helperBottom}`}>
           {files.length > 0 ? `${files.length} archivo(s) seleccionados` : 'Ningun archivo seleccionado'}
         </div>
       </div>
       {files.length > 0 && (
-        <div style={{ display: 'grid', gap: 10, marginBottom: 12 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+        <div className={styles.previewList}>
+          <div className={styles.previewGrid}>
             {files.map((entry, index) => (
               <div
                 key={`${entry.file.name}-${index}`}
-                style={{
-                  position: 'relative',
-                  borderRadius: 12,
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  overflow: 'hidden',
-                  background: 'rgba(15, 106, 214, 0.08)',
-                  minHeight: entry.kind === 'pdf' ? 180 : 110,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
+                className={`${styles.previewTile} ${entry.kind === 'pdf' ? styles.previewTilePdf : ''}`}
               >
                 {entry.kind === 'image' ? (
-                  <img src={entry.url} alt={entry.file.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={entry.url} alt={entry.file.name} className={styles.previewImage} />
                 ) : (
                   <object
                     data={entry.url}
@@ -231,27 +212,16 @@ const EvidenceUploader = ({ actividadId }: { actividadId?: number }) => {
                     aria-label="Vista previa PDF"
                   >
                     <embed src={entry.url} type="application/pdf" />
-                    <div style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: 12, padding: 12 }}>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>PDF</div>
-                      <div style={{ wordBreak: 'break-word' }}>{entry.file.name}</div>
+                    <div className={styles.pdfFallback}>
+                      <div className={styles.pdfTitle}>PDF</div>
+                      <div className={styles.pdfName}>{entry.file.name}</div>
                     </div>
                   </object>
                 )}
                 <button
                   type="button"
                   onClick={() => removeFile(index)}
-                  style={{
-                    position: 'absolute',
-                    top: 8,
-                    right: 8,
-                    background: 'rgba(0,0,0,0.6)',
-                    color: '#fff',
-                    border: 'none',
-                    width: 24,
-                    height: 24,
-                    borderRadius: '50%',
-                    cursor: 'pointer',
-                  }}
+                  className={styles.removeBtn}
                 >
                   x
                 </button>
@@ -260,11 +230,11 @@ const EvidenceUploader = ({ actividadId }: { actividadId?: number }) => {
           </div>
         </div>
       )}
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+      <div className={styles.actionsRow}>
         <button className="button-primary" type="submit" disabled={loading || files.length === 0}>Subir</button>
-        {locationError && <span style={{ color: 'var(--danger)', fontSize: 12 }}>{locationError}</span>}
-        {submitError && <span style={{ color: 'var(--danger)', fontSize: 12 }}>{submitError}</span>}
-        {statusMsg && <span style={{ color: 'var(--accent)', fontSize: 12 }}>{statusMsg}</span>}
+        {locationError && <span className={styles.msgError}>{locationError}</span>}
+        {submitError && <span className={styles.msgError}>{submitError}</span>}
+        {statusMsg && <span className={styles.msgSuccess}>{statusMsg}</span>}
         {files.length > 0 && (
           <button
             className="button-secondary"

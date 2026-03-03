@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from 'react';
 import ClientLocationPicker, { ClientLocationValue } from './ClientLocationPicker';
+import styles from './BranchesForm.module.css';
 
 export type Branch = {
   id: number;
@@ -364,93 +365,32 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
     return sortDirection === 'asc' ? ' ↑' : ' ↓';
   };
 
-  const formCardStyle: React.CSSProperties = {
-    background: 'linear-gradient(140deg, rgba(31,137,252,0.22), rgba(20,162,133,0.18)), var(--surface)',
-    border: '1px solid rgba(31,137,252,0.22)',
-    borderRadius: 16,
-    padding: 18,
-    display: 'grid',
-    gap: 12,
-    boxShadow: '0 14px 24px rgba(15,106,214,0.16)',
-  };
-
-  const formGridStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: 12,
-  };
-
-  const logoBoxStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: 12,
-    alignItems: 'start',
-  };
-
-  const defaultLogoStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'var(--surface)',
-    border: '1px dashed var(--border)',
-    borderRadius: 8,
-    padding: 12,
-    minHeight: 100,
-    fontSize: 12,
-    color: 'var(--text-secondary)',
-    textAlign: 'center',
-  };
-
-  const logoUploadStyle: React.CSSProperties = {
-    display: 'grid',
-    gap: 8,
-  };
-
-  const tableSectionStyle: React.CSSProperties = {
-    marginTop: 24,
-    display: 'grid',
-    gap: 12,
-    background: 'linear-gradient(170deg, rgba(255,255,255,0.9), rgba(235,243,255,0.95))',
-    border: '1px solid rgba(15, 106, 214, 0.16)',
-    borderRadius: 16,
-    padding: 16,
-  };
-
   return (
-    <div style={{ display: 'grid', gap: 24 }}>
+    <div className={styles.root}>
       {/* Formulario de creación/edición */}
-      <div style={formCardStyle}>
-        <h3 style={{ margin: '0 0 12px 0', color: 'var(--primary)' }}>
+      <div className={styles.formCard}>
+        <h3 className={styles.sectionTitle}>
           {editingBranchId ? 'Editar sucursal' : 'Crear nueva sucursal'}
         </h3>
 
         {error && (
-          <div
-            style={{
-              padding: 12,
-              background: 'rgba(255, 76, 76, 0.1)',
-              border: '1px solid rgba(255, 76, 76, 0.3)',
-              borderRadius: 8,
-              color: 'var(--error)',
-              fontSize: 13,
-            }}
-          >
+          <div className={styles.errorBox}>
             {error}
           </div>
         )}
 
         {/* Logo section */}
         <div>
-          <label style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
+          <label className={styles.fieldLabel}>
             Logo de la sucursal
           </label>
-          <div style={logoBoxStyle}>
+          <div className={styles.logoBox}>
             {/* Current/Default Logo */}
-            <div style={defaultLogoStyle}>
+            <div className={styles.logoPreviewWrap}>
               {logoPreview ? (
-                <img src={logoPreview} alt="Logo preview" style={{ maxHeight: '100%', maxWidth: '100%' }} />
+                <img src={logoPreview} alt="Logo preview" className={styles.logoImg} />
               ) : getDefaultLogo() ? (
-                <img src={getAssetUrl(getDefaultLogo())} alt="Default logo" style={{ maxHeight: '100%', maxWidth: '100%' }} />
+                <img src={getAssetUrl(getDefaultLogo())} alt="Default logo" className={styles.logoImg} />
               ) : (
                 <span>Sin logo (usará el logo de la empresa)</span>
               )}
@@ -458,15 +398,7 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
 
             {/* Upload Area */}
             <div
-              style={{
-                ...logoUploadStyle,
-                padding: 12,
-                background: logoDragging ? 'rgba(31,137,252,0.1)' : 'transparent',
-                border: `2px dashed ${logoDragging ? 'var(--primary)' : 'var(--border)'}`,
-                borderRadius: 8,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-              }}
+              className={`${styles.uploadArea} ${logoDragging ? styles.uploadAreaDragging : ''}`}
               onDragOver={(e) => {
                 e.preventDefault();
                 setLogoDragging(true);
@@ -475,14 +407,14 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
               onDrop={handleLogoDrop}
               onClick={() => logoInputRef.current?.click()}
             >
-              <span style={{ fontSize: 12, color: 'var(--text-secondary)', textAlign: 'center' }}>
+              <span className={styles.uploadText}>
                 Arrastra una imagen aquí o haz clic para seleccionar
               </span>
               <input
                 ref={logoInputRef}
                 type="file"
                 accept="image/*"
-                style={{ display: 'none' }}
+                className={styles.hiddenInput}
                 onChange={(e) => handleLogoSelect(e.target.files?.[0])}
               />
             </div>
@@ -490,7 +422,7 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
         </div>
 
         {/* Datos básicos */}
-        <div style={formGridStyle}>
+        <div className={styles.formGrid}>
           <input
             className="input"
             placeholder="Nombre de la sucursal"
@@ -507,7 +439,7 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
 
         {/* Ubicación */}
         <div>
-          <label style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
+          <label className={styles.fieldLabel}>
             Ubicacion de la sucursal
           </label>
           <ClientLocationPicker
@@ -523,16 +455,16 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
         </div>
 
         {/* Credenciales de acceso */}
-        <div style={{ ...formGridStyle, gridTemplateColumns: '1fr' }}>
-          <div style={{ display: 'grid', gap: 8 }}>
-            <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Perfil de sucursal</label>
-            <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0 }}>
+        <div className={`${styles.formGrid} ${styles.formGridSingle}`}>
+          <div className={styles.profileBlock}>
+            <label className={styles.fieldLabel}>Perfil de sucursal</label>
+            <p className={styles.profileHint}>
               Crea usuarios internos para cada sucursal. Usaran estas credenciales en tickets.nexara.com.mx.
             </p>
           </div>
         </div>
 
-        <div style={formGridStyle}>
+        <div className={styles.formGrid}>
           <input
             className="input"
             placeholder="Usuario acceso sucursal (email)"
@@ -540,7 +472,7 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
             onChange={(e) => setBranchDraft({ ...branchDraft, portalEmail: e.target.value })}
             type="email"
           />
-          <div style={{ position: 'relative' }}>
+          <div className={styles.passwordWrap}>
             <input
               className="input"
               type={showPassword ? 'text' : 'password'}
@@ -551,18 +483,7 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              style={{
-                position: 'absolute',
-                right: 10,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                color: 'var(--text-secondary)',
-                padding: 6,
-                fontSize: 14,
-              }}
+              className={styles.passwordToggle}
               title={showPassword ? 'Ocultar' : 'Mostrar'}
             >
               {showPassword ? '👁️' : '👁️‍🗨️'}
@@ -571,20 +492,20 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
         </div>
 
         {/* Estado activo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', margin: 0 }}>
+        <div className={styles.activeRow}>
+          <label className={styles.activeLabel}>
             <input
               type="checkbox"
               checked={branchDraft.isActive}
               onChange={(e) => setBranchDraft({ ...branchDraft, isActive: e.target.checked })}
-              style={{ cursor: 'pointer' }}
+              className={styles.checkbox}
             />
-            <span style={{ fontSize: 13 }}>Sucursal activa</span>
+            <span className={styles.activeText}>Sucursal activa</span>
           </label>
         </div>
 
         {/* Botones de acción */}
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
+        <div className={styles.actions}>
           {editingBranchId && (
             <button
               className="button-secondary"
@@ -608,188 +529,137 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
 
       {/* Tabla de sucursales con búsqueda, orden y exportación */}
       {branches.length > 0 && (
-        <div style={tableSectionStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 12 }}>
-            <h3 style={{ margin: 0, color: 'var(--primary)' }}>Mis sucursales ({sortedBranches.length})</h3>
+        <div className={styles.tableSection}>
+          <div className={styles.tableHeader}>
+            <h3 className={styles.tableTitle}>Mis sucursales ({sortedBranches.length})</h3>
             <button
-              className="button-secondary"
+              className={`button-secondary ${styles.smallBtn}`}
               onClick={handleExportCSV}
               type="button"
-              style={{ fontSize: 12, padding: '8px 12px' }}
             >
               📥 Exportar CSV
             </button>
           </div>
 
           {/* Búsqueda */}
-          <div style={{ marginBottom: 12 }}>
+          <div className={styles.searchBlock}>
             <input
-              className="input"
+              className={`input ${styles.fullWidth}`}
               placeholder="🔍 Buscar sucursal por nombre, número, ciudad, email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ width: '100%' }}
             />
             {searchTerm && (
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 6 }}>
+              <div className={styles.searchResultHint}>
                 Se encontraron {sortedBranches.length} resultado(s)
               </div>
             )}
           </div>
 
           {/* Tabla */}
-          <div style={{ overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', borderRadius: 12 }}>
-            <table
-              style={{
-                width: '100%',
-                minWidth: 980,
-                borderCollapse: 'collapse',
-                fontSize: 13,
-              }}
-            >
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
               <thead>
-                <tr style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
-                  <th style={{ padding: 12, textAlign: 'left' }}>Logo</th>
+                <tr className={styles.headerRow}>
+                  <th className={styles.th}>Logo</th>
                   <th
-                    style={{ padding: 12, textAlign: 'left', cursor: 'pointer', userSelect: 'none', fontWeight: 'bold' }}
+                    className={`${styles.th} ${styles.sortable}`}
                     onClick={() => handleSortChange('name')}
                     title="Haz clic para ordenar"
                   >
                     Sucursal{getSortIndicator('name')}
                   </th>
                   <th
-                    style={{ padding: 12, textAlign: 'left', cursor: 'pointer', userSelect: 'none', fontWeight: 'bold' }}
+                    className={`${styles.th} ${styles.sortable}`}
                     onClick={() => handleSortChange('city')}
                     title="Haz clic para ordenar"
                   >
                     Ciudad{getSortIndicator('city')}
                   </th>
                   <th
-                    style={{ padding: 12, textAlign: 'left', cursor: 'pointer', userSelect: 'none', fontWeight: 'bold' }}
+                    className={`${styles.th} ${styles.sortable}`}
                     onClick={() => handleSortChange('portalEmail')}
                     title="Haz clic para ordenar"
                   >
                     Usuario{getSortIndicator('portalEmail')}
                   </th>
                   <th
-                    style={{ padding: 12, textAlign: 'left', cursor: 'pointer', userSelect: 'none', fontWeight: 'bold' }}
+                    className={`${styles.th} ${styles.sortable}`}
                     onClick={() => handleSortChange('isActive')}
                     title="Haz clic para ordenar"
                   >
                     Estado{getSortIndicator('isActive')}
                   </th>
-                  <th style={{ padding: 12, textAlign: 'center' }}>Acciones</th>
+                  <th className={`${styles.th} ${styles.center}`}>Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {sortedBranches.map((branch) => (
-                  <tr key={branch.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: 12 }}>
+                  <tr key={branch.id} className={styles.bodyRow}>
+                    <td className={styles.td}>
                       {branch.logoUrl ? (
-                        <div
-                          style={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: 8,
-                            overflow: 'hidden',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            background: 'var(--surface)',
-                          }}
-                        >
+                        <div className={styles.logoCell}>
                           <img
                             src={getAssetUrl(branch.logoUrl)}
                             alt={branch.name}
-                            style={{ maxHeight: '100%', maxWidth: '100%' }}
+                            className={styles.logoImg}
                           />
                         </div>
                       ) : getDefaultLogo() ? (
-                        <div
-                          style={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: 8,
-                            overflow: 'hidden',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            background: 'var(--surface)',
-                          }}
-                        >
+                        <div className={styles.logoCell}>
                           <img
                             src={getAssetUrl(getDefaultLogo())}
                             alt="Default"
-                            style={{ maxHeight: '100%', maxWidth: '100%' }}
+                            className={styles.logoImg}
                           />
                         </div>
                       ) : (
-                        <div
-                          style={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: 8,
-                            background: 'var(--surface)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: 12,
-                            color: 'var(--text-secondary)',
-                          }}
-                        >
+                        <div className={`${styles.logoCell} ${styles.logoFallback}`}>
                           -
                         </div>
                       )}
                     </td>
-                    <td style={{ padding: 12 }}>
-                      <div style={{ fontWeight: 600 }}>{branch.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                    <td className={styles.td}>
+                      <div className={styles.branchName}>{branch.name}</div>
+                      <div className={styles.branchMeta}>
                         {branch.branchNumber ? `#${branch.branchNumber}` : '-'}
                       </div>
                     </td>
-                    <td style={{ padding: 12 }}>
-                      <div style={{ fontSize: 12 }}>{branch.city || '-'}</div>
+                    <td className={styles.td}>
+                      <div className={styles.cityText}>{branch.city || '-'}</div>
                       {branch.state && (
-                        <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{branch.state}</div>
+                        <div className={styles.cityMeta}>{branch.state}</div>
                       )}
                     </td>
-                    <td style={{ padding: 12 }}>
-                      <div style={{ fontSize: 11, fontFamily: 'monospace' }}>{branch.portalEmail || '-'}</div>
+                    <td className={styles.td}>
+                      <div className={styles.emailMono}>{branch.portalEmail || '-'}</div>
                     </td>
-                    <td style={{ padding: 12 }}>
+                    <td className={styles.td}>
                       <span
-                        style={{
-                          display: 'inline-block',
-                          padding: '6px 12px',
-                          borderRadius: 4,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          background: branch.isActive !== false ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255, 76, 76, 0.1)',
-                          color: branch.isActive !== false ? '#4caf50' : '#ff4c4c',
-                        }}
+                        className={`${styles.status} ${branch.isActive !== false ? styles.statusActive : styles.statusInactive}`}
                       >
                         {branch.isActive !== false ? 'Activa' : 'Inactiva'}
                       </span>
                     </td>
-                    <td style={{ padding: 12, textAlign: 'center' }}>
+                    <td className={`${styles.td} ${styles.center}`}>
+                      <div className={styles.inlineActions}>
                       <button
-                        className="button-secondary"
+                        className={`button-secondary ${styles.smallBtn}`}
                         onClick={() => handleBranchEdit(branch)}
                         disabled={saving}
                         type="button"
-                        style={{ fontSize: 12, padding: '6px 8px' }}
                       >
                         Editar
                       </button>
                       <button
-                        className="button-secondary"
+                        className={`button-secondary ${styles.smallBtn} ${styles.deleteBtn}`}
                         onClick={() => handleBranchDelete(branch.id)}
                         disabled={saving}
                         type="button"
-                        style={{ fontSize: 12, padding: '6px 8px', marginLeft: 4, color: '#ff4c4c' }}
                       >
                         Eliminar
                       </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -798,14 +668,7 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
           </div>
 
           {sortedBranches.length === 0 && searchTerm && (
-            <div
-              style={{
-                textAlign: 'center',
-                padding: 24,
-                color: 'var(--text-secondary)',
-                fontSize: 13,
-              }}
-            >
+            <div className={styles.emptyHint}>
               No se encontraron sucursales que coincidan con "{searchTerm}"
             </div>
           )}
@@ -813,14 +676,7 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
       )}
 
       {branches.length === 0 && !editingBranchId && (
-        <div
-          style={{
-            textAlign: 'center',
-            padding: 24,
-            color: 'var(--text-secondary)',
-            fontSize: 13,
-          }}
-        >
+        <div className={styles.emptyBase}>
           No tienes sucursales aún. Crea una para comenzar.
         </div>
       )}

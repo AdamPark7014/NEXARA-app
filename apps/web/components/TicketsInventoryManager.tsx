@@ -202,6 +202,7 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
   const focusItem = (index: number) => {
     setActiveItemIndex(index);
     const node = itemCardRefs.current[index];
+    node?.focus({ preventScroll: true });
     node?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
@@ -386,6 +387,44 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
     }
   };
 
+  const triggerImageInput = (refKey: string) => {
+    inputRefs.current[refKey]?.click();
+  };
+
+  const handleDropzoneKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, refKey: string) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      triggerImageInput(refKey);
+    }
+  };
+
+  const handleItemCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, index: number) => {
+    if (!isCompact || visibleItems.length === 0) return;
+
+    const currentPosition = visibleItems.findIndex((entry) => entry.index === index);
+    if (currentPosition < 0) return;
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      if (activeItemIndex !== index) {
+        event.preventDefault();
+        setActiveItemIndex(index);
+      }
+      return;
+    }
+
+    let nextPosition = currentPosition;
+    if (event.key === 'ArrowDown') nextPosition = Math.min(visibleItems.length - 1, currentPosition + 1);
+    if (event.key === 'ArrowUp') nextPosition = Math.max(0, currentPosition - 1);
+    if (event.key === 'Home') nextPosition = 0;
+    if (event.key === 'End') nextPosition = visibleItems.length - 1;
+
+    if (nextPosition === currentPosition) return;
+
+    event.preventDefault();
+    const targetIndex = visibleItems[nextPosition].index;
+    focusItem(targetIndex);
+  };
+
   const validateItems = () => {
     const invalidIndex = items.findIndex((item) => {
       const hasHeader = item.sectionName.trim() && item.groupName.trim() && item.equipmentName.trim();
@@ -514,25 +553,25 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
   };
 
   return (
-    <div className="card" style={{ display: "grid", gap: 12 }}>
+    <div className="card inventory-manager">
       <div className="panel-toolbar">
         <div className="panel-toolbar-title">
-          <p style={{ margin: 0, fontWeight: 700 }}>Inventarios y mantenimientos</p>
-          <p className="panel-muted" style={{ margin: 0 }}>
+          <p className="inventory-heading">Inventarios y mantenimientos</p>
+          <p className="panel-muted inventory-subtitle">
             {mode === "branch"
               ? "Captura inventario completo de la sucursal con comparativo antes/después."
               : "Filtra por sucursal y administra historial de inventarios y mantenimientos."}
           </p>
         </div>
         {mode === "client" && (
-          <select className="input" value={selectedBranchId} onChange={(e) => setSelectedBranchId(e.target.value)}>
+          <select className="input" value={selectedBranchId} onChange={(e) => setSelectedBranchId(e.target.value)} aria-label="Filtrar por sucursal">
             <option value="">Todas las sucursales</option>
             {branches.map((branch) => (
               <option key={branch.id} value={branch.id}>{branch.name} {branch.branchNumber ? `(${branch.branchNumber})` : ""}</option>
             ))}
           </select>
         )}
-        <select className="input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+        <select className="input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filtrar por estatus">
           <option value="all">Todos los estatus</option>
           <option value="PENDING">Pendiente</option>
           <option value="COMPLETED">Realizado</option>
@@ -540,11 +579,11 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
           <option value="REJECTED">Desaprobado</option>
         </select>
         <input
-          className="input"
+          className="input inventory-history-search"
           placeholder="Buscar en historial"
+          aria-label="Buscar en historial de inventarios"
           value={historyQuery}
           onChange={(e) => setHistoryQuery(e.target.value)}
-          style={{ minWidth: 0, width: '100%' }}
         />
       </div>
 
@@ -557,27 +596,27 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
         <div className="stat-card"><strong>{inventoryStats.delta}</strong><div className="panel-muted">Δ Total</div></div>
       </div>
 
-      {error && <div role="alert" style={{ padding: 10, borderRadius: 10, background: "rgba(220, 38, 38, 0.1)", color: "#b91c1c" }}>{error}</div>}
-      {success && <div role="status" style={{ padding: 10, borderRadius: 10, background: "rgba(22, 163, 74, 0.1)", color: "#166534" }}>{success}</div>}
+      {error && <div role="alert" className="inventory-alert inventory-alert-error">{error}</div>}
+      {success && <div role="status" className="inventory-alert inventory-alert-success">{success}</div>}
 
       <div className="list-stack">
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+        <div className="inventory-list-header">
           <strong>Historial ({filteredInventories.length})</strong>
           <button className="button-secondary" type="button" onClick={resetEditor}>Nuevo inventario</button>
         </div>
-        {loading && <div style={{ color: "var(--text-secondary)" }}>Cargando inventarios...</div>}
-        {!loading && filteredInventories.length === 0 && <div style={{ color: "var(--text-secondary)" }}>Sin inventarios registrados.</div>}
+        {loading && <div className="inventory-muted">Cargando inventarios...</div>}
+        {!loading && filteredInventories.length === 0 && <div className="inventory-muted">Sin inventarios registrados.</div>}
         {!loading && filteredInventories.map((inventory) => (
           <div key={inventory.id} className="record-card">
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+            <div className="inventory-record-top">
               <strong>INV-{inventory.id} · {inventory.branch?.name || "Sucursal"}</strong>
               <span className="badge">{getStatusLabel(inventory.status)}</span>
             </div>
-            <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+            <div className="inventory-record-meta">
               {inventory.previousCount ?? 0} previos · {inventory.currentCount ?? 0} actuales · Δ {inventory.deltaCount ?? 0}
             </div>
             {!!inventory.updatedAt && (
-              <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+              <div className="inventory-record-meta">
                 Actualizado: {new Date(inventory.updatedAt).toLocaleString()}
               </div>
             )}
@@ -601,17 +640,17 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
         ))}
       </div>
 
-      <div style={{ borderTop: "1px solid var(--border)", paddingTop: 10, display: "grid", gap: 10 }}>
+      <div className="inventory-editor">
         <strong>{selectedInventoryId ? `Editar inventario INV-${selectedInventoryId}` : "Nuevo inventario"}</strong>
-        <div style={{ display: 'grid', gridTemplateColumns: isCompact ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8 }}>
-          <input className="input" placeholder="Buscar equipo en formulario" value={itemQuery} onChange={(e) => setItemQuery(e.target.value)} />
-          <select className="input" value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)}>
+        <div className={`inventory-editor-filters ${isCompact ? 'is-compact' : ''}`}>
+          <input className="input" placeholder="Buscar equipo en formulario" aria-label="Buscar equipo en el formulario" value={itemQuery} onChange={(e) => setItemQuery(e.target.value)} />
+          <select className="input" value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} aria-label="Filtrar equipos por grupo">
             <option value="ALL">Todos los grupos</option>
             {GROUP_OPTIONS.map((group) => (
               <option key={`group-filter-${group}`} value={group}>{group}</option>
             ))}
           </select>
-          <div style={{ display: 'flex', alignItems: 'center', fontSize: 12, color: 'var(--text-secondary)' }}>
+          <div className="inventory-summary">
             Mostrando {visibleItems.length} de {items.length} equipo(s)
           </div>
         </div>
@@ -630,20 +669,18 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
             </button>
           ))}
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: isCompact ? '1fr' : "repeat(auto-fit, minmax(220px, 1fr))", gap: 8 }}>
-          <input className="input" placeholder="Título del inventario" value={title} onChange={(e) => setTitle(e.target.value)} />
-          <input className="input" placeholder="Notas generales" value={notes} onChange={(e) => setNotes(e.target.value)} />
+        <div className={`inventory-meta-grid ${isCompact ? 'is-compact' : ''}`}>
+          <input className="input" placeholder="Título del inventario" aria-label="Título del inventario" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <input className="input" placeholder="Notas generales" aria-label="Notas generales" value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
 
-        <div style={{ display: 'grid', gap: 6 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', fontSize: 12, color: 'var(--text-secondary)' }}>
+        <div className="inventory-progress">
+          <div className="inventory-progress-header">
             <span>Avance de captura</span>
             <span>{completionCount}/{items.length} completos · {completionRate}%</span>
           </div>
-          <div style={{ width: '100%', height: 8, borderRadius: 999, border: '1px solid var(--border)', overflow: 'hidden' }}>
-            <div style={{ width: `${completionRate}%`, height: '100%', background: 'var(--text-primary)' }} />
-          </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <progress className="inventory-progress-native" max={100} value={completionRate} aria-label="Avance de captura" />
+          <div className="inventory-progress-actions">
             <button type="button" className="button-secondary" onClick={() => {
               const firstPending = visibleItems.find(({ item }) => !isItemComplete(item));
               if (firstPending) focusItem(firstPending.index);
@@ -660,7 +697,7 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
         </div>
 
         {visibleItems.length === 0 && (
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>No hay equipos que coincidan con la búsqueda.</div>
+          <div className="inventory-empty-note">No hay equipos que coincidan con la búsqueda.</div>
         )}
 
         {visibleItems.map(({ item, index }) => (
@@ -669,14 +706,18 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
             ref={(element) => {
               itemCardRefs.current[index] = element;
             }}
-            style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 10, display: "grid", gap: 8 }}
+            className="inventory-item-card"
+            role="group"
+            tabIndex={0}
+            aria-label={`Equipo ${index + 1}. ${isItemComplete(item) ? 'Completo' : 'Pendiente'}. En móvil usa flechas arriba y abajo para navegar entre equipos.`}
+            onKeyDown={(event) => handleItemCardKeyDown(event, index)}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div className="inventory-item-head">
+              <div className="inventory-item-title">
                 <strong>Equipo #{index + 1}</strong>
                 <span className="badge">{isItemComplete(item) ? 'Completo' : 'Pendiente'}</span>
               </div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <div className="inventory-item-actions">
                 {isCompact && (
                   <button className="button-secondary" type="button" onClick={() => setActiveItemIndex(index)}>
                     {activeItemIndex === index ? 'Abierto' : 'Editar'}
@@ -693,26 +734,26 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
               </div>
             </div>
             {isCompact && activeItemIndex !== index ? (
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+              <div className="inventory-compact-preview">
                 {item.groupName || 'OTROS'} · {item.equipmentName || 'Sin nombre'}
               </div>
             ) : (
               <>
-            <div style={{ display: "grid", gridTemplateColumns: isCompact ? '1fr' : "repeat(auto-fit, minmax(170px, 1fr))", gap: 8 }}>
-              <input className="input" placeholder="Apartado" value={item.sectionName} onChange={(e) => updateItem(index, { sectionName: e.target.value })} />
-              <select className="input" value={item.groupName} onChange={(e) => updateItem(index, { groupName: e.target.value })}>
+            <div className={`inventory-item-fields ${isCompact ? 'is-compact' : ''}`}>
+              <input className="input" placeholder="Apartado" aria-label={`Equipo ${index + 1}: apartado`} value={item.sectionName} onChange={(e) => updateItem(index, { sectionName: e.target.value })} />
+              <select className="input" value={item.groupName} onChange={(e) => updateItem(index, { groupName: e.target.value })} aria-label={`Equipo ${index + 1}: grupo`}>
                 {GROUP_OPTIONS.map((group) => <option key={group} value={group}>{group}</option>)}
               </select>
-              <input className="input" placeholder="Nombre equipo" value={item.equipmentName} onChange={(e) => updateItem(index, { equipmentName: e.target.value })} />
-              <input className="input" placeholder="Serie ANTES" value={item.serialBefore} onChange={(e) => updateItem(index, { serialBefore: e.target.value })} />
-              <input className="input" placeholder="Modelo ANTES" value={item.modelBefore} onChange={(e) => updateItem(index, { modelBefore: e.target.value })} />
-              <input className="input" placeholder="Serie DESPUÉS" value={item.serialAfter} onChange={(e) => updateItem(index, { serialAfter: e.target.value })} />
-              <input className="input" placeholder="Modelo DESPUÉS" value={item.modelAfter} onChange={(e) => updateItem(index, { modelAfter: e.target.value })} />
-              <input className="input" placeholder="Qué se le hizo al equipo" value={item.maintenanceActions} onChange={(e) => updateItem(index, { maintenanceActions: e.target.value })} />
-              <input className="input" placeholder="Comentario técnico" value={item.maintenanceComments} onChange={(e) => updateItem(index, { maintenanceComments: e.target.value })} />
+              <input className="input" placeholder="Nombre equipo" aria-label={`Equipo ${index + 1}: nombre`} value={item.equipmentName} onChange={(e) => updateItem(index, { equipmentName: e.target.value })} />
+              <input className="input" placeholder="Serie ANTES" aria-label={`Equipo ${index + 1}: serie antes`} value={item.serialBefore} onChange={(e) => updateItem(index, { serialBefore: e.target.value })} />
+              <input className="input" placeholder="Modelo ANTES" aria-label={`Equipo ${index + 1}: modelo antes`} value={item.modelBefore} onChange={(e) => updateItem(index, { modelBefore: e.target.value })} />
+              <input className="input" placeholder="Serie DESPUÉS" aria-label={`Equipo ${index + 1}: serie después`} value={item.serialAfter} onChange={(e) => updateItem(index, { serialAfter: e.target.value })} />
+              <input className="input" placeholder="Modelo DESPUÉS" aria-label={`Equipo ${index + 1}: modelo después`} value={item.modelAfter} onChange={(e) => updateItem(index, { modelAfter: e.target.value })} />
+              <input className="input" placeholder="Qué se le hizo al equipo" aria-label={`Equipo ${index + 1}: acciones de mantenimiento`} value={item.maintenanceActions} onChange={(e) => updateItem(index, { maintenanceActions: e.target.value })} />
+              <input className="input" placeholder="Comentario técnico" aria-label={`Equipo ${index + 1}: comentario técnico`} value={item.maintenanceComments} onChange={(e) => updateItem(index, { maintenanceComments: e.target.value })} />
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: isCompact ? '1fr' : "repeat(auto-fit, minmax(170px, 1fr))", gap: 8 }}>
+            <div className={`inventory-photo-grid ${isCompact ? 'is-compact' : ''}`}>
               {[
                 ["beforePanoramicPhotoUrl", "Foto panorámica ANTES"],
                 ["beforeCloseupPhotoUrl", "Foto serie/modelo ANTES"],
@@ -727,29 +768,33 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
                   <div
                     key={refKey}
                     {...bindImageDrop(index, photoKey)}
-                    style={{ border: "1px dashed var(--border)", borderRadius: 10, padding: 8, display: "grid", gap: 6, cursor: "pointer" }}
-                    onClick={() => inputRefs.current[refKey]?.click()}
+                    className="inventory-photo-dropzone"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${label}${value ? ' (imagen cargada)' : ''}. Presiona Enter o Espacio para seleccionar imagen.`}
+                    onKeyDown={(event) => handleDropzoneKeyDown(event, refKey)}
+                    onClick={() => triggerImageInput(refKey)}
                   >
-                    <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{label}</div>
+                    <div className="inventory-photo-label">{label}</div>
                     <input
                       ref={(element) => {
                         inputRefs.current[refKey] = element;
                       }}
                       type="file"
                       accept="image/*"
-                      style={{ display: "none" }}
+                      className="inventory-file-input"
                       onChange={(event) => handleImagePick(index, photoKey, event.target.files?.[0])}
                     />
                     <button className="button-secondary" type="button" onClick={(event) => {
                       event.stopPropagation();
-                      inputRefs.current[refKey]?.click();
+                      triggerImageInput(refKey);
                     }}>
                       Cargar imagen
                     </button>
                     {value ? (
-                      <img src={getAssetUrl(value)} alt={label} style={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 8 }} />
+                      <img src={getAssetUrl(value)} alt={label} className="inventory-photo-preview" />
                     ) : (
-                      <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>Arrastra o selecciona imagen</div>
+                      <div className="inventory-photo-placeholder">Arrastra o selecciona imagen</div>
                     )}
                   </div>
                 );
@@ -764,7 +809,7 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
           <button className="button-secondary" type="button" onClick={addItem}>+ Agregar equipo</button>
           <button className="button-secondary" type="button" onClick={() => saveInventory(false)} disabled={saving}>{saving ? "Guardando..." : "Guardar borrador"}</button>
           <button className="button-primary" type="button" onClick={() => saveInventory(true)} disabled={saving}>{saving ? "Guardando..." : "Guardar y completar"}</button>
-          <div style={{ display: 'flex', alignItems: 'center', fontSize: 12, color: 'var(--text-secondary)', width: isCompact ? '100%' : 'auto' }}>
+          <div className={`inventory-footer-meta ${isCompact ? 'is-compact' : ''}`}>
             Completos: {completionCount}/{items.length}
           </div>
         </div>

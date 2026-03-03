@@ -14,7 +14,7 @@
   z-index: 1000;
   backdrop-filter: blur(12px);
   transition: all 0.3s ease;
-  height: clamp(64px, 8vh, 80px);
+  height: clamp(68px, 8vh, 84px);
 }
 
 .headerInner {
@@ -47,19 +47,21 @@
 
 .navLinks {
   display: flex;
-  gap: 2rem;
+  gap: clamp(1rem, 2vw, 1.8rem);
   flex: 1;
   justify-content: center;
 }
 
 .link {
   color: var(--primary);
-  font-weight: 600;
-  font-size: 1.05rem;
+  font-weight: 640;
+  font-size: clamp(0.96rem, 0.42vw + 0.86rem, 1.04rem);
+  letter-spacing: 0.008em;
   transition: all 0.3s ease;
   position: relative;
-  padding: 0.25rem 0;
+  padding: 0.42rem 0.18rem;
   white-space: nowrap;
+  border-radius: 10px;
 }
 
 .link::after {
@@ -83,11 +85,51 @@
   background: var(--secondary);
 }
 
+.linkActive {
+  color: var(--secondary);
+}
+
+.linkActive::after {
+  width: 100%;
+  background: var(--secondary);
+}
+
 .rightSection {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1rem;
   flex-shrink: 0;
+}
+
+.backupPanel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 14px;
+}
+
+.backupButton {
+  font-size: 0.8rem;
+  min-height: 34px;
+  padding: 8px 12px;
+}
+
+.backupSuccess,
+.backupError {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.backupSuccess {
+  color: var(--accent);
+}
+
+.backupError {
+  color: var(--danger);
+}
+
+.hiddenFileInput {
+  display: none;
 }
 
 .switch {
@@ -95,9 +137,9 @@
   color: var(--foreground);
   border: 2px solid rgba(14, 165, 114, 0.2);
   border-radius: 50%;
-  width: 2.5rem;
-  height: 2.5rem;
-  font-size: 1.3rem;
+  width: 2.4rem;
+  height: 2.4rem;
+  font-size: 1.15rem;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -135,7 +177,7 @@
 .hamburgerLine {
   width: 28px;
   height: 3px;
-  background: white;
+  background: color-mix(in srgb, #ffffff 75%, var(--primary));
   border-radius: 3px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
@@ -224,6 +266,12 @@
   transform: translateX(8px);
   border-color: var(--primary);
   box-shadow: 0 4px 12px rgba(14, 165, 114, 0.2);
+}
+
+.mobileLinkActive {
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  color: var(--primary);
+  border-color: color-mix(in srgb, var(--primary) 30%, transparent);
 }
 
 /* Light mode explicit (switch manual - sol ☀️) */
@@ -379,6 +427,10 @@
 
 /* Responsive Styles */
 @media (max-width: 900px) {
+  .backupPanel {
+    display: none;
+  }
+
   .navLinks {
     gap: 1.5rem;
   }

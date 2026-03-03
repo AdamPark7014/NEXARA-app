@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import { useUser } from './UserContext';
+import styles from './EvidenceReviewModal.module.css';
 
 interface EvidenceReviewModalProps {
   activityId: number;
@@ -86,140 +87,67 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.75)',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 10000,
-        padding: 20,
-      }}
+      className={styles.overlay}
       onClick={onClose}
     >
       <div
-        style={{
-          backgroundColor: 'var(--surface)',
-          borderRadius: 12,
-          maxWidth: 600,
-          width: '100%',
-          maxHeight: '90vh',
-          overflow: 'auto',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-        }}
+        className={styles.modal}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div
-          style={{
-            padding: '20px 24px',
-            borderBottom: '1px solid var(--border)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <h2 style={{ margin: 0, color: 'var(--primary)' }}>
+        <div className={styles.header}>
+          <h2 className={styles.title}>
             Revisar Evidencias - {activityNumber}
           </h2>
           <button
             onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: 24,
-              cursor: 'pointer',
-              color: 'var(--text-secondary)',
-              padding: 0,
-              width: 32,
-              height: 32,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
+            className={styles.closeButton}
           >
             ✕
           </button>
         </div>
 
         {/* Body */}
-        <div style={{ padding: 24 }}>
+        <div className={styles.body}>
           {error && (
-            <div
-              style={{
-                padding: 12,
-                backgroundColor: '#fee',
-                color: '#c00',
-                borderRadius: 8,
-                marginBottom: 16,
-              }}
-            >
+            <div className={styles.errorAlert}>
               ❌ {error}
             </div>
           )}
 
           {!action && (
-            <div style={{ display: 'grid', gap: 16 }}>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>
+            <div className={styles.contentGrid}>
+              <p className={styles.helperText}>
                 Selecciona una acción:
               </p>
               <button
-                className="button-primary"
+                className={`${styles.actionButton} ${styles.approveAction}`}
                 onClick={() => setAction('approve')}
-                style={{
-                  padding: '16px 24px',
-                  fontSize: 16,
-                  backgroundColor: '#10b981',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  justifyContent: 'center',
-                }}
               >
-                <span style={{ fontSize: 24 }}>✅</span>
+                <span className={styles.emoji}>✅</span>
                 Aprobar Evidencias
               </button>
               <button
-                className="button-primary"
+                className={`${styles.actionButton} ${styles.rejectAction}`}
                 onClick={() => setAction('reject')}
-                style={{
-                  padding: '16px 24px',
-                  fontSize: 16,
-                  backgroundColor: '#ef4444',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  justifyContent: 'center',
-                }}
               >
-                <span style={{ fontSize: 24 }}>❌</span>
+                <span className={styles.emoji}>❌</span>
                 Rechazar Evidencias
               </button>
             </div>
           )}
 
           {action === 'approve' && (
-            <div style={{ display: 'grid', gap: 16 }}>
-              <div
-                style={{
-                  padding: 16,
-                  backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                  borderRadius: 8,
-                  border: '2px solid #10b981',
-                }}
-              >
-                <h3 style={{ margin: '0 0 8px 0', color: '#10b981' }}>✅ Aprobar Evidencias</h3>
-                <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 14 }}>
+            <div className={styles.contentGrid}>
+              <div className={`${styles.actionPanel} ${styles.approvePanel}`}>
+                <h3 className={`${styles.panelTitle} ${styles.approveTitle}`}>✅ Aprobar Evidencias</h3>
+                <p className={styles.panelDescription}>
                   Las evidencias se marcarán como aprobadas y la actividad cambiará a estado "Aprobada".
                 </p>
               </div>
 
-              <label style={{ display: 'grid', gap: 8 }}>
-                <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
+              <label className={styles.fieldGroup}>
+                <span className={styles.fieldLabel}>
                   Observaciones (opcional)
                 </span>
                 <textarea
@@ -231,12 +159,11 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
                 />
               </label>
 
-              <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+              <div className={styles.actionsRow}>
                 <button
-                  className="button-primary"
+                  className={`button-primary ${styles.flexAction} ${styles.approveButton}`}
                   onClick={handleSubmit}
                   disabled={loading}
-                  style={{ flex: 1, backgroundColor: '#10b981' }}
                 >
                   {loading ? '⏳ Aprobando...' : 'Confirmar Aprobación'}
                 </button>
@@ -252,23 +179,16 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
           )}
 
           {action === 'reject' && (
-            <div style={{ display: 'grid', gap: 16 }}>
-              <div
-                style={{
-                  padding: 16,
-                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                  borderRadius: 8,
-                  border: '2px solid #ef4444',
-                }}
-              >
-                <h3 style={{ margin: '0 0 8px 0', color: '#ef4444' }}>❌ Rechazar Evidencias</h3>
-                <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 14 }}>
+            <div className={styles.contentGrid}>
+              <div className={`${styles.actionPanel} ${styles.rejectPanel}`}>
+                <h3 className={`${styles.panelTitle} ${styles.rejectTitle}`}>❌ Rechazar Evidencias</h3>
+                <p className={styles.panelDescription}>
                   Selecciona el paso que debe corregirse. El usuario recibirá una notificación.
                 </p>
               </div>
 
-              <label style={{ display: 'grid', gap: 8 }}>
-                <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
+              <label className={styles.fieldGroup}>
+                <span className={styles.fieldLabel}>
                   Selecciona el paso a rechazar *
                 </span>
                 <select
@@ -286,8 +206,8 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
                 </select>
               </label>
 
-              <label style={{ display: 'grid', gap: 8 }}>
-                <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
+              <label className={styles.fieldGroup}>
+                <span className={styles.fieldLabel}>
                   Observaciones / Razón del rechazo *
                 </span>
                 <textarea
@@ -300,12 +220,11 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
                 />
               </label>
 
-              <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+              <div className={styles.actionsRow}>
                 <button
-                  className="button-primary"
+                  className={`button-primary ${styles.flexAction} ${styles.rejectButton}`}
                   onClick={handleSubmit}
                   disabled={loading || !rejectedStep || !notes.trim()}
-                  style={{ flex: 1, backgroundColor: '#ef4444' }}
                 >
                   {loading ? '⏳ Rechazando...' : 'Confirmar Rechazo'}
                 </button>

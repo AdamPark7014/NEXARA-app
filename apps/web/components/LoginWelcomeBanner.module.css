@@ -1,0 +1,19 @@
+.banner {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 9999;
+  max-width: 420px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 106, 214, 0.22);
+  background: linear-gradient(135deg, rgba(15, 106, 214, 0.16), rgba(22, 169, 110, 0.14));
+  color: var(--foreground);
+  box-shadow: 0 10px 24px rgba(7, 24, 52, 0.24);
+  font-size: 13px;
+}
+
+.title {
+  display: block;
+  margin-bottom: 4px;
+}

@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
+import styles from './VehicleTable.module.css';
 
 interface Vehicle {
   id: number;
@@ -161,6 +162,12 @@ const VehicleTable = () => {
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  const getRenewBadgeClass = (status?: string | null) => {
+    if (status === 'Aprobada') return 'approved';
+    if (status === 'Pendiente') return 'pending';
+    return 'rejected';
   };
 
   const totalCount = filtered.length;
@@ -324,31 +331,31 @@ const VehicleTable = () => {
 
   return (
     <div className="card">
-      <div style={{ display: 'flex', gap: 12, alignItems: 'baseline', flexWrap: 'wrap', marginBottom: 10 }}>
-        <h2 style={{ color: 'var(--primary)', marginBottom: 0 }}>Vehículos</h2>
-        <span style={{ color: 'var(--text-secondary)' }}>Gestión y seguimiento de solicitudes</span>
+      <div className={styles.headerRow}>
+        <h2 className={styles.title}>Vehículos</h2>
+        <span className={styles.subtitle}>Gestión y seguimiento de solicitudes</span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 16 }}>
-        <div className="card" style={{ padding: 12, background: 'var(--surface-light)' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Total</div>
-          <div style={{ fontSize: 20, fontWeight: 700 }}>{totalCount}</div>
+      <div className={styles.statsGrid}>
+        <div className={`card ${styles.statCard}`}>
+          <div className={styles.statLabel}>Total</div>
+          <div className={styles.statValue}>{totalCount}</div>
         </div>
-        <div className="card" style={{ padding: 12, background: 'var(--surface-light)' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Pendientes</div>
-          <div style={{ fontSize: 20, fontWeight: 700 }}>{pendingCount}</div>
+        <div className={`card ${styles.statCard}`}>
+          <div className={styles.statLabel}>Pendientes</div>
+          <div className={styles.statValue}>{pendingCount}</div>
         </div>
-        <div className="card" style={{ padding: 12, background: 'var(--surface-light)' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Aprobados</div>
-          <div style={{ fontSize: 20, fontWeight: 700 }}>{approvedCount}</div>
+        <div className={`card ${styles.statCard}`}>
+          <div className={styles.statLabel}>Aprobados</div>
+          <div className={styles.statValue}>{approvedCount}</div>
         </div>
-        <div className="card" style={{ padding: 12, background: 'var(--surface-light)' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Rechazados</div>
-          <div style={{ fontSize: 20, fontWeight: 700 }}>{rejectedCount}</div>
+        <div className={`card ${styles.statCard}`}>
+          <div className={styles.statLabel}>Rechazados</div>
+          <div className={styles.statValue}>{rejectedCount}</div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 12 }}>
+      <div className={`${styles.filtersGrid} ${isMobile ? styles.filtersGridMobile : ''}`}>
         <select className="input" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
           <option value="">Todos los estatus</option>
           <option value="Pendiente">Pendiente</option>
@@ -374,7 +381,7 @@ const VehicleTable = () => {
         </select>
       </div>
 
-      <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+      <div className={styles.actionsRow}>
         {hasPermission(user, PERMISSIONS.VEHICLES_EXPORT) && (
           <>
             <button
@@ -400,18 +407,18 @@ const VehicleTable = () => {
               type="file"
               accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               ref={fileInputRef}
-              style={{ display: 'none' }}
+              className={styles.hiddenInput}
               onChange={handleImport}
             />
           </>
         )}
       </div>
       {importMsg && (
-        <div style={{ color: importMsg.startsWith('Error') ? 'var(--danger)' : 'var(--accent)' }}>{importMsg}</div>
+        <div className={importMsg.startsWith('Error') ? styles.importError : styles.importOk}>{importMsg}</div>
       )}
       {!isMobile && (
-        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', borderRadius: 12, border: '1px solid var(--muted)' }}>
-          <table className="table" style={{ minWidth: 980 }}>
+        <div className={styles.tableWrap}>
+          <table className={`table ${styles.tableMin}`}>
             <thead>
               <tr>
                 <th>Vehiculo</th>
@@ -426,14 +433,14 @@ const VehicleTable = () => {
               {paginated.map(vehicle => (
                 <tr key={vehicle.id}>
                   <td>
-                    <div>{vehicle.vehiculo?.nombre || vehicle.nombreVehiculo || 'Vehiculo'}</div>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{vehicle.placasVehiculo || vehicle.vehiculo?.placas || '-'}</div>
+                    <div className={styles.vehicleName}>{vehicle.vehiculo?.nombre || vehicle.nombreVehiculo || 'Vehiculo'}</div>
+                    <div className={styles.plate}>{vehicle.placasVehiculo || vehicle.vehiculo?.placas || '-'}</div>
                   </td>
                   <td>
                     <span className={`badge ${vehicle.estatusAprobacion === 'Aprobado' ? 'approved' : vehicle.estatusAprobacion === 'Pendiente' ? 'pending' : vehicle.estatusAprobacion === 'Rechazado' ? 'rejected' : ''}`}>{vehicle.estatusAprobacion}</span>
                     {vehicle.renovacionEstatus && (
-                      <div style={{ marginTop: 6 }}>
-                        <span className={`badge ${vehicle.renovacionEstatus === 'Aprobada' ? 'approved' : vehicle.renovacionEstatus === 'Pendiente' ? 'pending' : 'rejected'}`}>
+                      <div className={styles.statusRenewBlock}>
+                        <span className={`badge ${getRenewBadgeClass(vehicle.renovacionEstatus)}`}>
                           Renovacion {vehicle.renovacionEstatus}
                         </span>
                       </div>
@@ -442,8 +449,8 @@ const VehicleTable = () => {
                   <td>{vehicle.solicitante?.nombre || '-'}</td>
                   <td>
                     <div>{formatDateTime(vehicle.fechaInicioSolicitada || vehicle.fechaInicio)}</div>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{formatDateTime(vehicle.fechaFinSolicitada || vehicle.fechaFin)}</div>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                    <div className={styles.periodSub}>{formatDateTime(vehicle.fechaFinSolicitada || vehicle.fechaFin)}</div>
+                    <div className={styles.periodApproved}>
                       Aprobado: {formatDateTime(vehicle.fechaInicioAprobada)} - {formatDateTime(vehicle.fechaFinAprobada)}
                     </div>
                   </td>
@@ -452,36 +459,30 @@ const VehicleTable = () => {
                       {vehicle.evidenciaEntregaUrl ? (
                         <a className="link" href={vehicle.evidenciaEntregaUrl} target="_blank" rel="noopener noreferrer">Entrega</a>
                       ) : (
-                        <span style={{ color: 'var(--text-secondary)' }}>Entrega: -</span>
+                        <span className={styles.muted}>Entrega: -</span>
                       )}
                     </div>
                     <div>
                       {vehicle.evidenciaDevolucionUrl ? (
                         <a className="link" href={vehicle.evidenciaDevolucionUrl} target="_blank" rel="noopener noreferrer">Devolucion</a>
                       ) : (
-                        <span style={{ color: 'var(--text-secondary)' }}>Devolucion: -</span>
+                        <span className={styles.muted}>Devolucion: -</span>
                       )}
                     </div>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                    <div className={styles.evidenceMuted}>
                       Entrega fotos: {Array.isArray(vehicle.entregaFotos) ? vehicle.entregaFotos.length : 0}
                     </div>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                    <div className={styles.evidenceMuted}>
                       Entrega estatus: {vehicle.entregaEstatus || 'Pendiente'}
                     </div>
                     {Array.isArray(vehicle.entregaFotos) && vehicle.entregaFotos.length > 0 && (
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                      <div className={styles.evidenceThumbs}>
                         {vehicle.entregaFotos.slice(0, 6).map((foto, index) => (
                           <img
                             key={`${vehicle.id}-thumb-${index}`}
                             src={foto}
                             alt={`Entrega ${index + 1}`}
-                            style={{
-                              width: 48,
-                              height: 48,
-                              objectFit: 'cover',
-                              borderRadius: 8,
-                              border: '1px solid var(--muted)',
-                            }}
+                            className={styles.thumb}
                           />
                         ))}
                       </div>
@@ -490,7 +491,7 @@ const VehicleTable = () => {
                   <td>
                     {vehicle.estatusAprobacion === 'Pendiente' && hasPermission(user, PERMISSIONS.VEHICLES_REVIEW) && (
                       <>
-                        <div style={{ display: 'grid', gap: 6, marginBottom: 8 }}>
+                        <div className={styles.fieldGrid}>
                           <input
                             className="input"
                             type="datetime-local"
@@ -523,7 +524,7 @@ const VehicleTable = () => {
                       </>
                     )}
                     {hasPermission(user, PERMISSIONS.VEHICLES_REVIEW) && vehicle.entregaEstatus === 'En revision' && (
-                      <div style={{ marginTop: 8 }}>
+                      <div className={styles.sectionBlock}>
                         <textarea
                           className="input"
                           rows={2}
@@ -531,7 +532,7 @@ const VehicleTable = () => {
                           value={deliveryDrafts[vehicle.id] || ''}
                           onChange={(event) => setDeliveryDrafts((prev) => ({ ...prev, [vehicle.id]: event.target.value }))}
                         />
-                        <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                        <div className={styles.inlineActions}>
                           <button className="button-primary" onClick={() => handleDeliveryReview(vehicle.id, true)}>
                             Aprobar entrega
                           </button>
@@ -542,7 +543,7 @@ const VehicleTable = () => {
                       </div>
                     )}
                     {hasPermission(user, PERMISSIONS.VEHICLES_REVIEW) && vehicle.renovacionEstatus === 'Pendiente' && (
-                      <div style={{ marginTop: 8 }}>
+                      <div className={styles.renewActions}>
                         <button
                           className="button-primary"
                           onClick={() => handleRenewalReview(vehicle.id, true, vehicle.renovacionSolicitadaFin || null)}
@@ -558,8 +559,8 @@ const VehicleTable = () => {
                       </div>
                     )}
                     {hasPermission(user, PERMISSIONS.VEHICLES_REVIEW) && (
-                      <div style={{ marginTop: 10 }}>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: 12, marginBottom: 6 }}>Penalizacion</div>
+                      <div className={styles.penaltyBlock}>
+                        <div className={styles.penaltyLabel}>Penalizacion</div>
                         <input
                           className="input"
                           type="number"
@@ -571,7 +572,6 @@ const VehicleTable = () => {
                           }))}
                         />
                         <textarea
-                          className="input"
                           rows={2}
                           placeholder="Notas"
                           value={penaltyDrafts[vehicle.id]?.notas ?? (vehicle.penalizacionNotas || '')}
@@ -579,11 +579,10 @@ const VehicleTable = () => {
                             ...prev,
                             [vehicle.id]: { ...prev[vehicle.id], notas: event.target.value },
                           }))}
-                          style={{ marginTop: 6 }}
+                          className={`input ${styles.marginTop6}`}
                         />
                         <button
-                          className="button-secondary"
-                          style={{ marginTop: 6 }}
+                          className={`button-secondary ${styles.marginTop6}`}
                           onClick={() => handlePenaltySave(vehicle.id)}
                         >
                           Guardar penalizacion
@@ -599,53 +598,53 @@ const VehicleTable = () => {
       )}
 
       {isMobile && (
-        <div style={{ display: 'grid', gap: 12 }}>
+        <div className={styles.mobileList}>
           {paginated.map((vehicle) => (
-            <div key={vehicle.id} className="card" style={{ border: '1px solid var(--muted)', padding: 12, display: 'grid', gap: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+            <div key={vehicle.id} className={`card ${styles.mobileCard}`}>
+              <div className={styles.mobileHeader}>
                 <div>
-                  <div style={{ fontWeight: 700 }}>{vehicle.vehiculo?.nombre || vehicle.nombreVehiculo || 'Vehiculo'}</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{vehicle.placasVehiculo || vehicle.vehiculo?.placas || '-'}</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Responsable: {vehicle.solicitante?.nombre || '-'}</div>
+                  <div className={styles.mobileVehicleName}>{vehicle.vehiculo?.nombre || vehicle.nombreVehiculo || 'Vehiculo'}</div>
+                  <div className={styles.mobileTextSmall}>{vehicle.placasVehiculo || vehicle.vehiculo?.placas || '-'}</div>
+                  <div className={styles.mobileTextSmall}>Responsable: {vehicle.solicitante?.nombre || '-'}</div>
                 </div>
-                <div style={{ display: 'grid', gap: 6, justifyItems: 'end' }}>
+                <div className={styles.mobileHeaderMeta}>
                   <span className={`badge ${vehicle.estatusAprobacion === 'Aprobado' ? 'approved' : vehicle.estatusAprobacion === 'Pendiente' ? 'pending' : vehicle.estatusAprobacion === 'Rechazado' ? 'rejected' : ''}`}>{vehicle.estatusAprobacion}</span>
                   {vehicle.renovacionEstatus && (
-                    <span className={`badge ${vehicle.renovacionEstatus === 'Aprobada' ? 'approved' : vehicle.renovacionEstatus === 'Pendiente' ? 'pending' : 'rejected'}`}>
+                    <span className={`badge ${getRenewBadgeClass(vehicle.renovacionEstatus)}`}>
                       Renovacion {vehicle.renovacionEstatus}
                     </span>
                   )}
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gap: 4, fontSize: 13 }}>
+              <div className={styles.mobilePeriod}>
                 <div><strong>Solicitado:</strong> {formatDateTime(vehicle.fechaInicioSolicitada || vehicle.fechaInicio)} - {formatDateTime(vehicle.fechaFinSolicitada || vehicle.fechaFin)}</div>
-                <div style={{ color: 'var(--text-secondary)' }}><strong>Aprobado:</strong> {formatDateTime(vehicle.fechaInicioAprobada)} - {formatDateTime(vehicle.fechaFinAprobada)}</div>
+                <div className={styles.muted}><strong>Aprobado:</strong> {formatDateTime(vehicle.fechaInicioAprobada)} - {formatDateTime(vehicle.fechaFinAprobada)}</div>
               </div>
 
-              <div style={{ display: 'grid', gap: 6 }}>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  {vehicle.evidenciaEntregaUrl ? <a className="link" href={vehicle.evidenciaEntregaUrl} target="_blank" rel="noopener noreferrer">Entrega</a> : <span style={{ color: 'var(--text-secondary)' }}>Entrega: -</span>}
-                  {vehicle.evidenciaDevolucionUrl ? <a className="link" href={vehicle.evidenciaDevolucionUrl} target="_blank" rel="noopener noreferrer">Devolucion</a> : <span style={{ color: 'var(--text-secondary)' }}>Devolucion: -</span>}
+              <div className={styles.mobileList}>
+                <div className={styles.mobileEvidenceLinks}>
+                  {vehicle.evidenciaEntregaUrl ? <a className="link" href={vehicle.evidenciaEntregaUrl} target="_blank" rel="noopener noreferrer">Entrega</a> : <span className={styles.muted}>Entrega: -</span>}
+                  {vehicle.evidenciaDevolucionUrl ? <a className="link" href={vehicle.evidenciaDevolucionUrl} target="_blank" rel="noopener noreferrer">Devolucion</a> : <span className={styles.muted}>Devolucion: -</span>}
                 </div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Entrega fotos: {Array.isArray(vehicle.entregaFotos) ? vehicle.entregaFotos.length : 0} · Estatus: {vehicle.entregaEstatus || 'Pendiente'}</div>
+                <div className={styles.smallMuted}>Entrega fotos: {Array.isArray(vehicle.entregaFotos) ? vehicle.entregaFotos.length : 0} · Estatus: {vehicle.entregaEstatus || 'Pendiente'}</div>
               </div>
 
               {Array.isArray(vehicle.entregaFotos) && vehicle.entregaFotos.length > 0 && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(56px, 1fr))', gap: 6 }}>
+                <div className={styles.mobileThumbGrid}>
                   {vehicle.entregaFotos.slice(0, 8).map((foto, index) => (
                     <img
                       key={`${vehicle.id}-thumb-m-${index}`}
                       src={foto}
                       alt={`Entrega ${index + 1}`}
-                      style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 8, border: '1px solid var(--muted)' }}
+                      className={styles.mobileThumb}
                     />
                   ))}
                 </div>
               )}
 
               {vehicle.estatusAprobacion === 'Pendiente' && hasPermission(user, PERMISSIONS.VEHICLES_REVIEW) && (
-                <div style={{ display: 'grid', gap: 8, borderTop: '1px solid var(--muted)', paddingTop: 8 }}>
+                <div className={styles.mobileActionSection}>
                   <input
                     className="input"
                     type="datetime-local"
@@ -658,36 +657,36 @@ const VehicleTable = () => {
                     value={approvalDrafts[vehicle.id]?.fin || ''}
                     onChange={(event) => setApprovalDrafts((prev) => ({ ...prev, [vehicle.id]: { ...prev[vehicle.id], fin: event.target.value } }))}
                   />
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    <button className="button-primary" style={{ minHeight: 44 }} disabled={actionLoading === vehicle.id} onClick={() => handleApprove(vehicle.id, 'Aprobado')}>{actionLoading === vehicle.id ? 'Aprobando...' : 'Aprobar'}</button>
-                    <button className="button-secondary" style={{ minHeight: 44 }} disabled={actionLoading === vehicle.id} onClick={() => handleApprove(vehicle.id, 'Rechazado')}>{actionLoading === vehicle.id ? 'Rechazando...' : 'Rechazar'}</button>
+                  <div className={styles.twoColActions}>
+                    <button className={`button-primary ${styles.minHeightBtn}`} disabled={actionLoading === vehicle.id} onClick={() => handleApprove(vehicle.id, 'Aprobado')}>{actionLoading === vehicle.id ? 'Aprobando...' : 'Aprobar'}</button>
+                    <button className={`button-secondary ${styles.minHeightBtn}`} disabled={actionLoading === vehicle.id} onClick={() => handleApprove(vehicle.id, 'Rechazado')}>{actionLoading === vehicle.id ? 'Rechazando...' : 'Rechazar'}</button>
                   </div>
                 </div>
               )}
 
               {hasPermission(user, PERMISSIONS.VEHICLES_REVIEW) && vehicle.entregaEstatus === 'En revision' && (
-                <div style={{ display: 'grid', gap: 8, borderTop: '1px solid var(--muted)', paddingTop: 8 }}>
+                <div className={styles.mobileActionSection}>
                   <textarea className="input" rows={2} placeholder="Observaciones de entrega" value={deliveryDrafts[vehicle.id] || ''} onChange={(event) => setDeliveryDrafts((prev) => ({ ...prev, [vehicle.id]: event.target.value }))} />
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    <button className="button-primary" style={{ minHeight: 44 }} onClick={() => handleDeliveryReview(vehicle.id, true)}>Aprobar entrega</button>
-                    <button className="button-secondary" style={{ minHeight: 44 }} onClick={() => handleDeliveryReview(vehicle.id, false)}>Rechazar entrega</button>
+                  <div className={styles.twoColActions}>
+                    <button className={`button-primary ${styles.minHeightBtn}`} onClick={() => handleDeliveryReview(vehicle.id, true)}>Aprobar entrega</button>
+                    <button className={`button-secondary ${styles.minHeightBtn}`} onClick={() => handleDeliveryReview(vehicle.id, false)}>Rechazar entrega</button>
                   </div>
                 </div>
               )}
 
               {hasPermission(user, PERMISSIONS.VEHICLES_REVIEW) && vehicle.renovacionEstatus === 'Pendiente' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, borderTop: '1px solid var(--muted)', paddingTop: 8 }}>
-                  <button className="button-primary" style={{ minHeight: 44 }} onClick={() => handleRenewalReview(vehicle.id, true, vehicle.renovacionSolicitadaFin || null)}>Aprobar renovacion</button>
-                  <button className="button-secondary" style={{ minHeight: 44 }} onClick={() => handleRenewalReview(vehicle.id, false)}>Rechazar renovacion</button>
+                <div className={`${styles.twoColActions} ${styles.mobileActionSection}`}>
+                  <button className={`button-primary ${styles.minHeightBtn}`} onClick={() => handleRenewalReview(vehicle.id, true, vehicle.renovacionSolicitadaFin || null)}>Aprobar renovacion</button>
+                  <button className={`button-secondary ${styles.minHeightBtn}`} onClick={() => handleRenewalReview(vehicle.id, false)}>Rechazar renovacion</button>
                 </div>
               )}
 
               {hasPermission(user, PERMISSIONS.VEHICLES_REVIEW) && (
-                <div style={{ display: 'grid', gap: 8, borderTop: '1px solid var(--muted)', paddingTop: 8 }}>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Penalizacion</div>
+                <div className={styles.mobileActionSection}>
+                  <div className={styles.smallMuted}>Penalizacion</div>
                   <input className="input" type="number" placeholder="Monto" value={penaltyDrafts[vehicle.id]?.monto ?? (vehicle.penalizacionMonto ? String(vehicle.penalizacionMonto) : '')} onChange={(event) => setPenaltyDrafts((prev) => ({ ...prev, [vehicle.id]: { ...prev[vehicle.id], monto: event.target.value } }))} />
                   <textarea className="input" rows={2} placeholder="Notas" value={penaltyDrafts[vehicle.id]?.notas ?? (vehicle.penalizacionNotas || '')} onChange={(event) => setPenaltyDrafts((prev) => ({ ...prev, [vehicle.id]: { ...prev[vehicle.id], notas: event.target.value } }))} />
-                  <button className="button-secondary" style={{ minHeight: 44 }} onClick={() => handlePenaltySave(vehicle.id)}>Guardar penalizacion</button>
+                  <button className={`button-secondary ${styles.minHeightBtn}`} onClick={() => handlePenaltySave(vehicle.id)}>Guardar penalizacion</button>
                 </div>
               )}
             </div>
@@ -695,17 +694,17 @@ const VehicleTable = () => {
         </div>
       )}
 
-      <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+      <div className={styles.pagination}>
         <button className="button-secondary" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Anterior</button>
-        <span>Página {page} de {totalPages || 1}</span>
+        <span className={styles.paginationInfo}>Página {page} de {totalPages || 1}</span>
         <button className="button-secondary" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0}>Siguiente</button>
       </div>
-      {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}
-      {success && <div style={{ color: 'var(--accent)' }}>{success}</div>}
+      {error && <div className={styles.errorText}>{error}</div>}
+      {success && <div className={styles.successText}>{success}</div>}
       {hasPermission(user, PERMISSIONS.VEHICLES_INVENTORY) && (
-        <div className="card" style={{ marginTop: 20 }}>
-          <h3 style={{ marginBottom: 8 }}>Inventario de vehiculos</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 12 }}>
+        <div className={`card ${styles.inventoryCard}`}>
+          <h3 className={styles.inventoryTitle}>Inventario de vehiculos</h3>
+          <div className={styles.inventoryForm}>
             <input
               className="input"
               placeholder="Nombre del vehiculo"
@@ -720,18 +719,18 @@ const VehicleTable = () => {
             />
             <button className="button-primary" onClick={handleInventoryCreate}>Agregar</button>
           </div>
-          <div style={{ display: 'grid', gap: 8 }}>
+          <div className={styles.inventoryList}>
             {inventory.map((vehiculo) => (
-              <div key={vehiculo.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              <div key={vehiculo.id} className={styles.inventoryItem}>
                 <div>
-                  <strong>{vehiculo.nombre}</strong>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{vehiculo.placas || '-'}</div>
+                  <strong className={styles.inventoryName}>{vehiculo.nombre}</strong>
+                  <div className={styles.inventoryPlate}>{vehiculo.placas || '-'}</div>
                 </div>
                 <button className="button-secondary" onClick={() => handleInventoryDelete(vehiculo.id)}>Eliminar</button>
               </div>
             ))}
             {inventory.length === 0 && (
-              <div style={{ color: 'var(--text-secondary)' }}>Aun no hay vehiculos registrados.</div>
+              <div className={styles.inventoryEmpty}>Aun no hay vehiculos registrados.</div>
             )}
           </div>
         </div>

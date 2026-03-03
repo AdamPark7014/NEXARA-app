@@ -62,7 +62,7 @@ export default function ContactoPage() {
   };
 
   return (
-    <main className={styles.container}>
+    <main className={styles.container} aria-label="Página de contacto">
       {/* Hero Section */}
       <section className={styles.hero}>
         <div className={styles.heroContent}>

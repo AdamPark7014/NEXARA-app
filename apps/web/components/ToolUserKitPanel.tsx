@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useMemo, useState } from 'react';
 import { useUser } from './UserContext';
+import styles from './ToolUserKitPanel.module.css';
 
 interface AssignableUser {
   id: number;
@@ -235,12 +236,12 @@ const ToolUserKitPanel: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'grid', gap: 16 }}>
-      <form className="card" style={{ display: 'grid', gap: 10 }} onSubmit={assign}>
-        <h3 style={{ color: 'var(--primary)', marginBottom: 0 }}>👥 Gestión de Herramientas por Usuario</h3>
+    <div className={styles.root}>
+      <form className={`card ${styles.formCard}`} onSubmit={assign}>
+        <h3 className={styles.title}>👥 Gestión de Herramientas por Usuario</h3>
 
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 2fr 1fr auto', gap: 8 }}>
-          <div style={{ display: 'grid', gap: 6 }}>
+        <div className={`${styles.formGrid} ${isMobile ? styles.formGridMobile : ''}`}>
+          <div className={styles.searchWrap}>
             <input
               className="input"
               value={inventoryQuery}
@@ -251,7 +252,7 @@ const ToolUserKitPanel: React.FC = () => {
               placeholder="Buscar herramienta de inventario"
             />
             {!selectedInventory && inventoryOptions.length > 0 && (
-              <div style={{ border: '1px solid var(--muted)', borderRadius: 8, maxHeight: 160, overflow: 'auto' }}>
+              <div className={styles.suggestionBox}>
                 {inventoryOptions.map((option) => (
                   <button
                     key={option.id}
@@ -261,15 +262,7 @@ const ToolUserKitPanel: React.FC = () => {
                       setInventoryQuery(`${option.toolName} · ${option.model} · ${option.serialNumber}`);
                       setInventoryOptions([]);
                     }}
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      border: 'none',
-                      borderBottom: '1px solid var(--muted)',
-                      background: 'transparent',
-                      padding: '8px 10px',
-                      cursor: 'pointer',
-                    }}
+                    className={styles.suggestionItem}
                   >
                     {option.toolName} · {option.model} · {option.serialNumber}
                   </button>
@@ -294,8 +287,8 @@ const ToolUserKitPanel: React.FC = () => {
         </div>
       </form>
 
-      <div className="card" style={{ display: 'grid', gap: 12 }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div className={`card ${styles.listCard}`}>
+        <div className={styles.filterRow}>
           <select className="input" value={filterUserId} onChange={(e) => setFilterUserId(e.target.value)}>
             <option value="">Filtrar: todos los usuarios</option>
             {users.map((target) => (
@@ -304,49 +297,48 @@ const ToolUserKitPanel: React.FC = () => {
           </select>
         </div>
 
-        {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}
+        {error && <div className={styles.error}>{error}</div>}
         {loading ? (
-          <div style={{ textAlign: 'center', padding: 16 }}>Cargando asignaciones...</div>
+          <div className={styles.loading}>Cargando asignaciones...</div>
         ) : groupedByUser.length === 0 ? (
-          <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: 20 }}>
+          <div className={styles.empty}>
             No hay asignaciones registradas
           </div>
         ) : (
           groupedByUser.map((group) => (
-            <div key={group.user.id} style={{ border: '1px solid var(--muted)', borderRadius: 10, padding: 10, display: 'grid', gap: 8 }}>
-              <div style={{ fontWeight: 600 }}>{group.user.nombre}</div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{group.user.email}</div>
+            <div key={group.user.id} className={styles.userGroup}>
+              <div className={styles.userName}>{group.user.nombre}</div>
+              <div className={styles.userEmail}>{group.user.email}</div>
 
-              <div style={{ display: 'grid', gap: 6 }}>
+              <div className={styles.rowsList}>
                 {group.rows.map((row) => (
-                  <div key={row.id} style={{ background: 'var(--surface-light)', border: '1px solid var(--muted)', borderRadius: 8, padding: 8 }}>
-                    <div style={{ fontSize: 13 }}>
+                  <div key={row.id} className={styles.rowCard}>
+                    <div className={styles.rowTitle}>
                       {row.inventoryItem.toolName} · {row.inventoryItem.model} · {row.inventoryItem.serialNumber}
                     </div>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                    <div className={styles.rowMeta}>
                       {row.assignmentType === 'KIT' ? 'Kit base' : 'Préstamo'} · Reemplazos: {row.replacementCount} · {row.isActive ? 'Activa' : 'Cerrada'}
                     </div>
 
                     {row.events && row.events.length > 0 && (
-                      <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
+                      <div className={styles.eventsList}>
                         {row.events.slice(0, 3).map((event) => (
-                          <div key={event.id} style={{ border: '1px solid var(--muted)', borderRadius: 6, padding: 6, background: 'var(--surface)' }}>
-                            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                          <div key={event.id} className={styles.eventCard}>
+                            <div className={styles.eventMeta}>
                               {new Date(event.reportedAt).toLocaleDateString('es-MX')} · {event.resolution}
                             </div>
-                            <div style={{ fontSize: 12 }}>{event.description}</div>
+                            <div className={styles.eventDesc}>{event.description}</div>
                             {event.resolution === 'PENDING' && (
-                              <div style={{ marginTop: 6, display: 'grid', gap: 8 }}>
+                              <div className={styles.resolveWrap}>
                                 {resolvingEventId !== event.id ? (
                                   <button
-                                    className="button-secondary"
-                                    style={{ padding: '4px 8px', fontSize: 11, justifySelf: 'start' }}
+                                    className={`button-secondary ${styles.smallBtn}`}
                                     onClick={() => openResolveForm(event.id)}
                                   >
                                     Resolver incidente
                                   </button>
                                 ) : (
-                                  <div style={{ display: 'grid', gap: 8, border: '1px solid var(--muted)', borderRadius: 8, padding: 8 }}>
+                                  <div className={styles.resolveForm}>
                                     <select
                                       className="input"
                                       value={resolutionType}
@@ -369,25 +361,22 @@ const ToolUserKitPanel: React.FC = () => {
                                     )}
 
                                     <textarea
-                                      className="input"
-                                      style={{ minHeight: 70, resize: 'vertical' }}
+                                      className={`input ${styles.notes}`}
                                       value={resolutionNotes}
                                       onChange={(e) => setResolutionNotes(e.target.value)}
                                       placeholder="Notas de resolución (opcional)"
                                     />
 
-                                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                    <div className={styles.resolveActions}>
                                       <button
-                                        className="button-primary"
-                                        style={{ padding: '4px 10px', fontSize: 11 }}
+                                        className={`button-primary ${styles.smallBtnSecondary}`}
                                         onClick={() => resolveEvent(event.id)}
                                         disabled={resolvingSubmit}
                                       >
                                         {resolvingSubmit ? 'Resolviendo...' : 'Guardar resolución'}
                                       </button>
                                       <button
-                                        className="button-secondary"
-                                        style={{ padding: '4px 10px', fontSize: 11 }}
+                                        className={`button-secondary ${styles.smallBtnSecondary}`}
                                         onClick={cancelResolveForm}
                                         disabled={resolvingSubmit}
                                       >

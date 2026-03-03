@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { useUser } from './UserContext';
+import styles from './ToolRenewalsTable.module.css';
 
 interface ToolRenewal {
   id: number;
@@ -89,6 +90,13 @@ const ToolRenewalsTable: React.FC<ToolRenewalsTableProps> = ({ refreshTrigger = 
     return labels[status] || status;
   };
 
+  const getStatusClass = (status: ToolRenewal['status']) => {
+    if (status === 'PENDING') return styles.statusPending;
+    if (status === 'APPROVED') return styles.statusApproved;
+    if (status === 'REJECTED') return styles.statusRejected;
+    return styles.statusPending;
+  };
+
   const handleAction = async () => {
     if (!user || !selectedRenewalId || !actionType) return;
 
@@ -142,18 +150,17 @@ const ToolRenewalsTable: React.FC<ToolRenewalsTableProps> = ({ refreshTrigger = 
     return days;
   };
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 20 }}>Cargando renovaciones...</div>;
+  if (loading) return <div className={styles.loading}>Cargando renovaciones...</div>;
 
   return (
-    <div style={{ display: 'grid', gap: 20 }}>
-      <div className="card" style={{ display: 'grid', gap: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-          <h3 style={{ color: 'var(--primary)', marginBottom: 0 }}>Renovaciones de Herramientas</h3>
+    <div className={styles.root}>
+      <div className={`card ${styles.panel}`}>
+        <div className={styles.header}>
+          <h3 className={styles.title}>Renovaciones de Herramientas</h3>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="input"
-            style={{ maxWidth: 200 }}
+            className={`input ${styles.filter}`}
           >
             <option value="PENDING">Pendientes</option>
             <option value="all">Todos los estados</option>
@@ -162,36 +169,36 @@ const ToolRenewalsTable: React.FC<ToolRenewalsTableProps> = ({ refreshTrigger = 
           </select>
         </div>
 
-        {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}
+        {error && <div className={styles.error}>{error}</div>}
 
         {filteredRenewals.length === 0 ? (
-          <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: 40 }}>
+          <div className={styles.empty}>
             No hay renovaciones para mostrar
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--muted)' }}>
-                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                <tr className={styles.rowBorder}>
+                  <th className={styles.th}>
                     Usuario
                   </th>
-                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  <th className={styles.th}>
                     Herramienta
                   </th>
-                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  <th className={styles.th}>
                     Fecha Actual
                   </th>
-                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  <th className={styles.th}>
                     Nueva Fecha
                   </th>
-                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  <th className={styles.th}>
                     Días vencimiento actual
                   </th>
-                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  <th className={styles.th}>
                     Estado
                   </th>
-                  <th style={{ padding: 12, textAlign: 'center', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                  <th className={`${styles.th} ${styles.thCenter}`}>
                     Acciones
                   </th>
                 </tr>
@@ -204,81 +211,57 @@ const ToolRenewalsTable: React.FC<ToolRenewalsTableProps> = ({ refreshTrigger = 
                   return (
                     <tr
                       key={renewal.id}
-                      style={{
-                        borderBottom: '1px solid var(--muted)',
-                        background: isUrgent ? 'rgba(255, 0, 0, 0.05)' : 'transparent',
-                      }}
+                      className={`${styles.rowBorder} ${isUrgent ? styles.rowUrgent : ''}`}
                     >
-                      <td style={{ padding: 12 }}>
-                        <div style={{ fontWeight: 500 }}>{renewal.toolRequest.usuario.nombre}</div>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
+                      <td className={styles.td}>
+                        <div className={styles.userName}>{renewal.toolRequest.usuario.nombre}</div>
+                        <div className={styles.smallMuted}>
                           {renewal.toolRequest.usuario.email}
                         </div>
                       </td>
-                      <td style={{ padding: 12, fontWeight: 500 }}>
+                      <td className={`${styles.td} ${styles.toolName}`}>
                         {renewal.toolRequest.toolName}
                       </td>
-                      <td style={{ padding: 12, color: 'var(--text-secondary)' }}>
+                      <td className={`${styles.td} ${styles.dateMuted}`}>
                         {new Date(renewal.previousReturnDate).toLocaleDateString()}
                       </td>
-                      <td style={{ padding: 12, fontWeight: 500, color: 'var(--success)' }}>
+                      <td className={`${styles.td} ${styles.newDate}`}>
                         {new Date(renewal.newReturnDate).toLocaleDateString()}
                       </td>
-                      <td style={{ padding: 12, color: isUrgent ? 'var(--danger)' : 'var(--text-secondary)' }}>
-                        <div style={{ fontWeight: isUrgent ? 600 : 400 }}>
+                      <td className={`${styles.td} ${isUrgent ? styles.expiryUrgent : styles.expiryText}`}>
+                        <div className={isUrgent ? styles.expiryWeightUrgent : styles.expiryWeight}>
                           {isUrgent ? '⚠️ ' : ''}{daysUntilExpiry} días
                         </div>
                         {renewal.renewalReason && (
-                          <div style={{ fontSize: 11, marginTop: 4, color: 'var(--text-secondary)' }}>
+                          <div className={styles.reason}>
                             "{renewal.renewalReason}"
                           </div>
                         )}
                       </td>
-                      <td style={{ padding: 12 }}>
-                        <div
-                          style={{
-                            display: 'inline-block',
-                            padding: '4px 8px',
-                            borderRadius: 4,
-                            background: getStatusColor(renewal.status) + '20',
-                            color: getStatusColor(renewal.status),
-                            fontWeight: 500,
-                            fontSize: 11,
-                          }}
-                        >
+                      <td className={styles.td}>
+                        <div className={`${styles.status} ${getStatusClass(renewal.status)}`}>
                           {getStatusLabel(renewal.status)}
                         </div>
                       </td>
-                      <td
-                        style={{
-                          padding: 12,
-                          textAlign: 'center',
-                          display: 'flex',
-                          gap: 6,
-                          justifyContent: 'center',
-                          flexWrap: 'wrap',
-                        }}
-                      >
+                      <td className={styles.actionsCell}>
                         {renewal.status === 'PENDING' && (
                           <>
                             <button
-                              className="button-secondary"
+                              className={`button-secondary ${styles.smallBtn} ${styles.approveBtn}`}
                               onClick={() => openActionModal(renewal.id, 'approve')}
-                              style={{ padding: '4px 8px', fontSize: 11, background: 'var(--success)20', color: 'var(--success)' }}
                             >
                               ✓ Aprobar
                             </button>
                             <button
-                              className="button-secondary"
+                              className={`button-secondary ${styles.smallBtn} ${styles.rejectBtn}`}
                               onClick={() => openActionModal(renewal.id, 'reject')}
-                              style={{ padding: '4px 8px', fontSize: 11, background: 'var(--danger)20', color: 'var(--danger)' }}
                             >
                               ✗ Rechazar
                             </button>
                           </>
                         )}
                         {renewal.status !== 'PENDING' && (
-                          <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
+                          <span className={styles.processedText}>
                             {renewal.approver?.nombre ? `Por ${renewal.approver.nombre}` : 'Procesado'}
                           </span>
                         )}
@@ -293,30 +276,17 @@ const ToolRenewalsTable: React.FC<ToolRenewalsTableProps> = ({ refreshTrigger = 
       </div>
 
       {actionType && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'grid',
-            placeItems: 'center',
-            zIndex: 1000,
-          }}
-        >
-          <div className="card" style={{ maxWidth: 500, width: '90%' }}>
-            <h3 style={{ color: 'var(--primary)', marginBottom: 20 }}>
+        <div className={styles.modalOverlay}>
+          <div className={`card ${styles.modalCard}`}>
+            <h3 className={styles.modalTitle}>
               {actionType === 'approve' ? 'Aprobar Renovación' : 'Rechazar Renovación'}
             </h3>
 
             {actionType === 'reject' && (
-              <label style={{ display: 'grid', gap: 6, marginBottom: 16, color: 'var(--text-secondary)' }}>
+              <label className={styles.rejectField}>
                 Motivo del rechazo (Opcional)
                 <textarea
-                  className="input"
-                  style={{ minHeight: 80, resize: 'vertical' }}
+                  className={`input ${styles.rejectArea}`}
                   value={rejectionReason}
                   onChange={(e) => setRejectionReason(e.target.value)}
                   placeholder="Explica por qué se rechaza la renovación..."
@@ -324,9 +294,9 @@ const ToolRenewalsTable: React.FC<ToolRenewalsTableProps> = ({ refreshTrigger = 
               </label>
             )}
 
-            {error && <div style={{ color: 'var(--danger)', marginBottom: 12 }}>{error}</div>}
+            {error && <div className={styles.modalError}>{error}</div>}
 
-            <div style={{ display: 'flex', gap: 12 }}>
+            <div className={styles.modalActions}>
               <button
                 className="button-primary"
                 onClick={handleAction}

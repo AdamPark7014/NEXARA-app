@@ -115,22 +115,24 @@
 .workspaceKicker {
   margin: 0;
   font-size: 0.72rem;
-  letter-spacing: 0.2rem;
+  letter-spacing: 0.16rem;
   text-transform: uppercase;
   color: var(--text-secondary);
 }
 
 .workspaceTitle {
   margin: 4px 0;
-  font-size: 1.5rem;
-  line-height: 1.2;
+  font-size: clamp(1.24rem, 2.1vw, 1.58rem);
+  line-height: var(--panel-title-leading);
+  letter-spacing: var(--panel-title-tracking);
 }
 
 .workspaceSubtitle {
   margin: 0;
   color: var(--text-secondary);
   max-width: 66ch;
-  font-size: 0.92rem;
+  font-size: 0.95rem;
+  line-height: 1.56;
 }
 
 .workspaceMeta {

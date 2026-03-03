@@ -54,15 +54,15 @@ const getProjects = async (): Promise<Project[]> => {
 export default async function ProjectsPage() {
   const projects = await getProjects();
   return (
-    <main className={styles.container}>
+    <main className={styles.container} aria-label="Página de proyectos">
       <section className={styles.hero}>
         <p className={styles.kicker}>Portafolio vivo</p>
         <div className={styles.heroHeader}>
           <div>
             <h1 className={styles.heroTitle}>Proyectos recientes</h1>
             <p className={styles.heroSubtitle}>
-              Casos reales con resultados medibles. Usa esta vista para mostrar a tus
-              clientes cómo trabajamos, qué entregamos y el impacto conseguido.
+              Casos reales con resultados medibles para mostrar cómo trabajamos,
+              qué entregamos y el impacto logrado.
             </p>
             <div className={styles.heroActions}>
               <Link href="/contacto" className={styles.primaryCta}>Hablar con un asesor</Link>
@@ -86,7 +86,12 @@ export default async function ProjectsPage() {
         </div>
       </section>
 
-      <section className={styles.projectsSection}>
+      <nav className={styles.quickNav} aria-label="Accesos rápidos">
+        <a href="#casos" className={styles.quickNavLink}>Casos</a>
+        <a href="#cta" className={styles.quickNavLink}>Agendar sesión</a>
+      </nav>
+
+      <section id="casos" className={styles.projectsSection} aria-label="Casos de éxito publicados">
         {projects.map((project) => (
           <article key={project.slug} className={styles.projectCard}>
             <header className={styles.projectHeader}>
@@ -123,9 +128,9 @@ export default async function ProjectsPage() {
                   priority
                 />
               </div>
-              <div className={styles.gallery}>
+              <div className={styles.gallery} role="list" aria-label={`Galería de ${project.title}`}>
                 {(project.gallery || []).map((image, index) => (
-                  <div key={`${project.slug}-gallery-${index}`} className={styles.galleryItem}>
+                  <div key={`${project.slug}-gallery-${index}`} className={styles.galleryItem} role="listitem">
                     <Image
                       src={normalizeImageUrl(image) || "/servicios/square-1.jpg"}
                       alt={`${project.title} imagen ${index + 1}`}
@@ -157,13 +162,13 @@ export default async function ProjectsPage() {
         )}
       </section>
 
-      <section className={styles.ctaStrip}>
+      <section id="cta" className={styles.ctaStrip}>
         <div>
           <p className={styles.kicker}>¿Quieres un caso similar?</p>
           <h3>Agendemos una sesión de 20 minutos</h3>
           <p className={styles.ctaText}>
-            Te mostramos los entregables, tableros y metodología que usamos para lograr
-            estos resultados.
+            Te mostramos entregables, tableros y metodología para replicar
+            resultados en tu operación.
           </p>
         </div>
         <div className={styles.heroActions}>

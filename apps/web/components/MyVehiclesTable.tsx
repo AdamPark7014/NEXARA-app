@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
+import styles from './MyVehiclesTable.module.css';
 
 interface VehicleRequest {
   id: number;
@@ -156,43 +157,30 @@ const MyVehiclesTable: React.FC = () => {
 
   return (
     <div className="card">
-      <h2 style={{ color: 'var(--primary)', marginBottom: 12 }}>Mis solicitudes de vehiculo</h2>
+      <h2 className={styles.title}>Mis solicitudes de vehiculo</h2>
       
       {requests.length === 0 ? (
-        <div style={{ color: 'var(--text-secondary)', padding: 24, textAlign: 'center' }}>
+        <div className={styles.emptyState}>
           Aun no tienes solicitudes registradas.
         </div>
       ) : (
-        <div style={{ display: 'grid', gap: 16 }}>
+        <div className={styles.requestsGrid}>
           {requests.map((request) => (
             <div 
               key={request.id} 
-              className="card" 
-              style={{ 
-                marginBottom: 0,
-                background: 'var(--surface-light)',
-                border: '1px solid var(--border)'
-              }}
+              className={`card ${styles.requestCard}`}
             >
               {/* Header */}
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                gap: 12, 
-                flexWrap: 'wrap',
-                paddingBottom: 12,
-                borderBottom: '1px solid var(--border)',
-                marginBottom: 12
-              }}>
+              <div className={styles.cardHeader}>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>
+                  <div className={styles.vehicleName}>
                     {request.vehiculo?.nombre || request.nombreVehiculo || 'Vehiculo'}
                   </div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
+                  <div className={styles.plateText}>
                     {request.placasVehiculo || request.vehiculo?.placas || 'Sin placas'}
                   </div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 6, alignItems: 'flex-end' }}>
+                <div className={`${styles.badgeWrap} ${isMobile ? styles.badgeWrapMobile : ''}`}>
                   <span className={`badge ${request.estatusAprobacion === 'Aprobado' ? 'approved' : request.estatusAprobacion === 'Pendiente' ? 'pending' : request.estatusAprobacion === 'Rechazado' ? 'rejected' : ''}`}>
                     {request.estatusAprobacion}
                   </span>
@@ -205,68 +193,43 @@ const MyVehiclesTable: React.FC = () => {
               </div>
 
               {/* Info Grid */}
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))', 
-                gap: 16, 
-                marginBottom: 16 
-              }}>
-                <div style={{ 
-                  padding: 12, 
-                  borderRadius: 8, 
-                  background: 'var(--surface)',
-                  border: '1px solid var(--border)'
-                }}>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginBottom: 6, fontWeight: 600 }}>
+              <div className={`${styles.infoGrid} ${isMobile ? styles.infoGridMobile : ''}`}>
+                <div className={styles.infoTile}>
+                  <div className={styles.sectionLabel}>
                     📅 Periodo solicitado
                   </div>
-                  <div style={{ fontSize: 13, marginBottom: 2 }}>{formatDateTime(request.fechaInicioSolicitada)}</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{formatDateTime(request.fechaFinSolicitada)}</div>
+                  <div className={styles.metaText}>{formatDateTime(request.fechaInicioSolicitada)}</div>
+                  <div className={styles.metaText}>{formatDateTime(request.fechaFinSolicitada)}</div>
                 </div>
                 
-                <div style={{ 
-                  padding: 12, 
-                  borderRadius: 8, 
-                  background: 'var(--surface)',
-                  border: '1px solid var(--border)'
-                }}>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginBottom: 6, fontWeight: 600 }}>
+                <div className={styles.infoTile}>
+                  <div className={styles.sectionLabel}>
                     ✅ Periodo aprobado
                   </div>
-                  <div style={{ fontSize: 13, marginBottom: 2 }}>{formatDateTime(request.fechaInicioAprobada)}</div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{formatDateTime(request.fechaFinAprobada)}</div>
+                  <div className={styles.metaText}>{formatDateTime(request.fechaInicioAprobada)}</div>
+                  <div className={styles.metaText}>{formatDateTime(request.fechaFinAprobada)}</div>
                 </div>
                 
-                <div style={{ 
-                  padding: 12, 
-                  borderRadius: 8, 
-                  background: 'var(--surface)',
-                  border: '1px solid var(--border)'
-                }}>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginBottom: 6, fontWeight: 600 }}>
+                <div className={styles.infoTile}>
+                  <div className={styles.sectionLabel}>
                     📦 Entrega
                   </div>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>
+                  <div className={styles.statusText}>
                     {request.entregaEstatus || 'Pendiente'}
                   </div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                  <div className={styles.tinyMuted}>
                     {Array.isArray(request.entregaFotos) ? `${request.entregaFotos.length} foto(s)` : 'Sin fotos'}
                   </div>
                 </div>
                 
-                <div style={{ 
-                  padding: 12, 
-                  borderRadius: 8, 
-                  background: 'var(--surface)',
-                  border: '1px solid var(--border)'
-                }}>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginBottom: 6, fontWeight: 600 }}>
+                <div className={styles.infoTile}>
+                  <div className={styles.sectionLabel}>
                     💰 Penalizacion
                   </div>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2, color: request.penalizacionMonto ? 'var(--danger)' : 'var(--text-primary)' }}>
+                  <div className={`${styles.statusText} ${request.penalizacionMonto ? styles.dangerText : ''}`}>
                     {request.penalizacionMonto ? `$${request.penalizacionMonto}` : 'Sin penalizacion'}
                   </div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
+                  <div className={styles.tinyMuted}>
                     {request.penalizacionNotas || '-'}
                   </div>
                 </div>
@@ -274,28 +237,17 @@ const MyVehiclesTable: React.FC = () => {
 
               {/* Fotos de entrega */}
               {Array.isArray(request.entregaFotos) && request.entregaFotos.length > 0 && (
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: 'var(--text-secondary)' }}>
+                <div className={styles.photosSection}>
+                  <div className={styles.photosTitle}>
                     Evidencias de entrega
                   </div>
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: isMobile ? 'repeat(auto-fill, minmax(80px, 1fr))' : 'repeat(auto-fill, minmax(100px, 1fr))',
-                    gap: 8
-                  }}>
+                  <div className={`${styles.photosGrid} ${isMobile ? styles.photosGridMobile : ''}`}>
                     {request.entregaFotos.map((foto, index) => (
                       <img
                         key={`${request.id}-foto-${index}`}
                         src={foto}
                         alt={`Entrega ${index + 1}`}
-                        style={{
-                          width: '100%',
-                          aspectRatio: '1',
-                          objectFit: 'cover',
-                          borderRadius: 10,
-                          border: '1px solid var(--muted)',
-                          cursor: 'pointer'
-                        }}
+                        className={styles.photoThumb}
                         onClick={() => window.open(foto, '_blank')}
                       />
                     ))}
@@ -305,39 +257,27 @@ const MyVehiclesTable: React.FC = () => {
 
               {/* Acciones - Solo si está aprobado */}
               {request.estatusAprobacion === 'Aprobado' && (
-                <div style={{ 
-                  display: 'grid', 
-                  gap: 16, 
-                  paddingTop: 16, 
-                  borderTop: '1px solid var(--border)' 
-                }}>
+                <div className={styles.actionsSection}>
                   {/* Evidencia de entrega */}
-                  <div style={{ 
-                    padding: 12, 
-                    borderRadius: 8, 
-                    background: 'var(--surface)',
-                    border: '1px solid var(--border)'
-                  }}>
-                    <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>
+                  <div className={styles.actionTile}>
+                    <div className={styles.actionTitle}>
                       📸 Subir evidencia de entrega
                     </div>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginBottom: 8 }}>
+                    <div className={styles.uploadHint}>
                       Minimo 5 fotos del estado del vehiculo
                     </div>
                     <input
-                      className="input"
+                      className={`input ${styles.uploadInput}`}
                       type="file"
                       multiple
                       accept="image/*"
                       onChange={(event) => handleDeliverySelect(request.id, Array.from(event.target.files || []))}
-                      style={{ marginBottom: 8, fontSize: 13 }}
                     />
-                    <div style={{ color: 'var(--text-secondary)', fontSize: 12, marginBottom: 10 }}>
+                    <div className={styles.fileCount}>
                       {deliveryDrafts[request.id]?.length ? `${deliveryDrafts[request.id].length} archivo(s) seleccionados` : ''}
                     </div>
                     <button
-                      className="button-primary"
-                      style={{ width: isMobile ? '100%' : 'auto', padding: '10px 16px', fontSize: 13 }}
+                      className={`button-primary ${isMobile ? styles.fullBtn : ''}`}
                       disabled={actionLoading === request.id}
                       onClick={() => handleSubmitDelivery(request.id)}
                     >
@@ -346,55 +286,42 @@ const MyVehiclesTable: React.FC = () => {
                   </div>
 
                   {/* Solicitar renovacion */}
-                  <div style={{ 
-                    padding: 12, 
-                    borderRadius: 8, 
-                    background: 'var(--surface)',
-                    border: '1px solid var(--border)'
-                  }}>
-                    <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 13 }}>
+                  <div className={styles.actionTile}>
+                    <div className={styles.actionTitle}>
                       🔄 Solicitar renovacion
                     </div>
-                    <div style={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-                      gap: 8, 
-                      marginBottom: 10 
-                    }}>
+                    <div className={`${styles.dateGrid} ${isMobile ? styles.dateGridMobile : ''}`}>
                       <div>
-                        <label style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4, display: 'block' }}>
+                        <label className={styles.dateLabel}>
                           Fecha inicio
                         </label>
                         <input
-                          className="input"
+                          className={`input ${styles.dateInput}`}
                           type="datetime-local"
                           value={renewalDrafts[request.id]?.inicio || ''}
                           onChange={(event) => setRenewalDrafts((prev) => ({
                             ...prev,
                             [request.id]: { ...prev[request.id], inicio: event.target.value },
                           }))}
-                          style={{ fontSize: 13 }}
                         />
                       </div>
                       <div>
-                        <label style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4, display: 'block' }}>
+                        <label className={styles.dateLabel}>
                           Fecha fin
                         </label>
                         <input
-                          className="input"
+                          className={`input ${styles.dateInput}`}
                           type="datetime-local"
                           value={renewalDrafts[request.id]?.fin || ''}
                           onChange={(event) => setRenewalDrafts((prev) => ({
                             ...prev,
                             [request.id]: { ...prev[request.id], fin: event.target.value },
                           }))}
-                          style={{ fontSize: 13 }}
                         />
                       </div>
                     </div>
                     <button
-                      className="button-secondary"
-                      style={{ width: isMobile ? '100%' : 'auto', padding: '10px 16px', fontSize: 13 }}
+                      className={`button-secondary ${isMobile ? styles.fullBtn : ''}`}
                       disabled={actionLoading === request.id}
                       onClick={() => handleRenewalRequest(request.id)}
                     >
@@ -409,15 +336,7 @@ const MyVehiclesTable: React.FC = () => {
       )}
       
       {error && (
-        <div style={{ 
-          color: 'var(--danger)', 
-          marginTop: 16, 
-          padding: 12, 
-          borderRadius: 8, 
-          background: 'var(--danger)10',
-          border: '1px solid var(--danger)30',
-          fontSize: 13
-        }}>
+        <div className={styles.errorBox}>
           {error}
         </div>
       )}

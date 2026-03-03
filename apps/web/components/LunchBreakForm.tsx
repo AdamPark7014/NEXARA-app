@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useUser } from './UserContext';
 import { useLunchBreakNotifications } from '@/lib/notifications';
+import styles from './LunchBreakForm.module.css';
 
 interface LunchBreakFormProps {
   onSuccess?: () => void;
@@ -156,15 +157,15 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
   const lunchEmoji = isCheckin ? '🍽️ Entrada' : '✅ Regreso';
 
   return (
-    <div className="card" style={{ maxWidth: 680, width: '100%', margin: '0 auto', padding: isMobile ? 12 : 'clamp(16px, 3vw, 24px)', boxSizing: 'border-box' }}>
-      <h2 style={{ color: 'var(--primary)', marginBottom: 20, textAlign: 'center' }}>
+    <div className={`card ${styles.cardWrap} ${isMobile ? styles.cardWrapMobile : ''}`}>
+      <h2 className={styles.title}>
         {lunchEmoji} - Hora de Comida
       </h2>
 
       {step === 'camera' ? (
         <>
-          <div style={{ marginBottom: 16 }}>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: 12, textAlign: 'center' }}>
+          <div className={styles.cameraSection}>
+            <p className={styles.subtitle}>
               {isCheckin
                 ? 'Tómate una foto clara mostrando tu escritorio limpio y listo para el descanso'
                 : 'Tómate una foto mostrando que comenzaste a laborar nuevamente'}
@@ -175,87 +176,32 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
               autoPlay
               playsInline
               muted
-              style={{
-                width: '100%',
-                height: isMobile ? 'auto' : 'min(58vh, 420px)',
-                maxHeight: isMobile ? '52vh' : undefined,
-                aspectRatio: isMobile ? '3 / 4' : undefined,
-                borderRadius: 14,
-                background: '#000',
-                border: '1px solid rgba(31,137,252,0.18)',
-                marginBottom: 16,
-                objectFit: isMobile ? 'contain' : 'cover',
-                display: 'block',
-              }}
+              className={`${styles.video} ${isMobile ? styles.videoMobile : ''}`}
             />
 
             <canvas
               ref={canvasRef}
               width={640}
               height={480}
-              style={{ display: 'none' }}
+              className={styles.hiddenCanvas}
             />
 
-            {error && <div style={{ color: 'var(--danger)', marginBottom: 16 }}>{error}</div>}
+            {error && <div className={styles.errorText}>{error}</div>}
 
             <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: isSmallMobile ? '1fr' : isMobile ? '1fr 1fr' : 'repeat(2, minmax(0, 1fr))',
-                gap: 12,
-                position: 'relative',
-                zIndex: 2,
-              }}
+              className={`${styles.captureActions} ${isMobile ? styles.captureActionsMobile : ''} ${isSmallMobile ? styles.captureActionsSmall : ''}`}
             >
               <button
-                className="button-primary"
+                className={`button-primary ${styles.captureBtn} ${isMobile ? styles.captureBtnMobile : ''} ${isSmallMobile ? styles.captureBtnSmall : ''}`}
                 type="button"
                 onClick={capturePhoto}
-                style={{
-                  width: '100%',
-                  minHeight: isSmallMobile ? 56 : isMobile ? 54 : 52,
-                  padding: isMobile ? '16px 14px' : '14px 12px',
-                  borderRadius: 12,
-                  fontWeight: 700,
-                  touchAction: 'manipulation',
-                  WebkitAppearance: 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                  fontSize: isMobile ? 15 : 15,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  pointerEvents: 'auto',
-                }}
-                onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
-                onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
               >
                 📷 Capturar Foto
               </button>
               <button
-                className="button-secondary"
+                className={`button-secondary ${styles.captureBtn} ${isMobile ? styles.captureBtnMobile : ''} ${isSmallMobile ? styles.captureBtnSmall : ''}`}
                 type="button"
                 onClick={flipCamera}
-                style={{
-                  width: '100%',
-                  minHeight: isSmallMobile ? 56 : isMobile ? 54 : 52,
-                  padding: isMobile ? '16px 14px' : '14px 12px',
-                  borderRadius: 12,
-                  fontWeight: 700,
-                  touchAction: 'manipulation',
-                  WebkitAppearance: 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                  fontSize: isMobile ? 15 : 15,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  pointerEvents: 'auto',
-                }}
-                onTouchStart={(e) => (e.currentTarget.style.transform = 'scale(0.96)')}
-                onTouchEnd={(e) => (e.currentTarget.style.transform = 'scale(1)')}
               >
                 🔄 Voltear
               </button>
@@ -264,20 +210,20 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
         </>
       ) : (
         <>
-          <div style={{ marginBottom: 20 }}>
-            <h3 style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>Vista Previa</h3>
+          <div className={styles.previewSection}>
+            <h3 className={styles.previewTitle}>Vista Previa</h3>
             {photoPreview && (
               <img
                 src={photoPreview}
                 alt="preview"
-                style={{ width: '100%', borderRadius: 8, marginBottom: 16 }}
+                className={styles.previewImage}
               />
             )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
+          <div className={`${styles.confirmActions} ${isMobile ? styles.confirmActionsMobile : ''}`}>
             <button
-              className="button-secondary"
+              className={`button-secondary ${styles.confirmBtn} ${isMobile ? styles.confirmBtnMobile : ''}`}
               type="button"
               onClick={() => {
                 setStep('camera');
@@ -286,17 +232,15 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
                 setTimeout(() => initCamera(cameraFacing), 100);
               }}
               disabled={loading}
-              style={{ minHeight: isMobile ? 54 : 50, borderRadius: 12, fontWeight: 700, touchAction: 'manipulation' }}
             >
               ↻ Nueva Foto
             </button>
 
             <button
-              className="button-primary"
+              className={`button-primary ${styles.confirmBtn} ${isMobile ? styles.confirmBtnMobile : ''}`}
               type="button"
               onClick={handleSubmit}
               disabled={loading}
-              style={{ minHeight: isMobile ? 54 : 50, borderRadius: 12, fontWeight: 700, touchAction: 'manipulation' }}
             >
               {loading ? 'Registrando...' : '✓ Confirmar'}
             </button>

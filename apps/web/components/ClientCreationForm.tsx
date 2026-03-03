@@ -1,6 +1,7 @@
 "use client";
 import React, { useRef, useState, useEffect } from 'react';
 import { useUser } from './UserContext';
+import styles from './ClientCreationForm.module.css';
 
 interface ClientCreationFormProps {
   onClientCreated?: () => void;
@@ -117,43 +118,15 @@ export default function ClientCreationForm({ onClientCreated }: ClientCreationFo
     }
   };
 
-  const formCardStyle: React.CSSProperties = {
-    background: 'linear-gradient(140deg, rgba(31,137,252,0.22), rgba(20,162,133,0.18)), var(--surface)',
-    border: '1px solid rgba(31,137,252,0.22)',
-    borderRadius: 16,
-    padding: 18,
-    display: 'grid',
-    gap: 12,
-    boxShadow: '0 14px 24px rgba(15,106,214,0.16)',
-  };
-
-  const helperTextStyle: React.CSSProperties = {
-    color: 'var(--text-secondary)',
-    fontSize: 12,
-  };
-
-  const formGridStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: 12,
-  };
-
-  const formFooterStyle: React.CSSProperties = {
-    display: 'flex',
-    gap: 12,
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  };
-
   return (
-    <div style={formCardStyle}>
-      <div style={{ display: 'grid', gap: 12, padding: 12, borderRadius: 12, background: 'rgba(15, 106, 214, 0.08)', border: '1px dashed rgba(15, 106, 214, 0.3)' }}>
+    <div className={styles.outerCard}>
+      <div className={styles.panel}>
         <div>
-          <h3 style={{ marginBottom: 4 }}>Crear nuevo cliente</h3>
-          <div style={helperTextStyle}>Completa la información del cliente y su acceso al portal de tickets.</div>
+          <h3 className={styles.panelTitle}>Crear nuevo cliente</h3>
+          <div className={styles.helperText}>Completa la información del cliente y su acceso al portal de tickets.</div>
         </div>
         
-        <div style={formGridStyle}>
+        <div className={styles.grid}>
           <input 
             className="input" 
             placeholder="Nombre del cliente *" 
@@ -186,14 +159,13 @@ export default function ClientCreationForm({ onClientCreated }: ClientCreationFo
             value={newClient.portalEmail} 
             onChange={(e) => setNewClient({ ...newClient, portalEmail: e.target.value })} 
           />
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div className={styles.passwordRow}>
             <input
-              className="input"
+              className={`input ${styles.passwordInput}`}
               type={showClientPassword ? 'text' : 'password'}
               placeholder="Contraseña para portal"
               value={newClient.portalPassword}
               onChange={(e) => setNewClient({ ...newClient, portalPassword: e.target.value })}
-              style={{ flex: 1 }}
             />
             <button
               className="button-secondary"
@@ -212,23 +184,12 @@ export default function ClientCreationForm({ onClientCreated }: ClientCreationFo
             }}
             onDragLeave={() => setClientLogoDragging(false)}
             onDrop={handleLogoDrop}
-            style={{
-              gridColumn: '1 / -1',
-              borderRadius: 16,
-              padding: 16,
-              border: `2px dashed ${clientLogoDragging ? 'rgba(31,107,186,0.8)' : 'rgba(31,107,186,0.4)'}`,
-              background: clientLogoDragging
-                ? 'linear-gradient(135deg, rgba(31,107,186,0.2), rgba(18,133,98,0.18))'
-                : 'linear-gradient(135deg, rgba(31,107,186,0.12), rgba(18,133,98,0.12))',
-              display: 'grid',
-              gap: 10,
-              alignItems: 'center',
-            }}
+            className={`${styles.logoDropzone} ${clientLogoDragging ? styles.logoDropzoneActive : ''}`}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <div className={styles.logoTop}>
               <div>
-                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Logo del cliente</div>
-                <div style={helperTextStyle}>Arrastra la imagen aquí o súbela manualmente. Se mostrará en el portal de tickets.</div>
+                <div className={styles.logoTitle}>Logo del cliente</div>
+                <div className={styles.logoHint}>Arrastra la imagen aquí o súbela manualmente. Se mostrará en el portal de tickets.</div>
               </div>
               <button
                 className="button-secondary"
@@ -243,57 +204,46 @@ export default function ClientCreationForm({ onClientCreated }: ClientCreationFo
               type="file"
               accept="image/*"
               onChange={(e) => handleLogoSelect(e.target.files?.[0] || null)}
-              style={{ display: 'none' }}
+              className={styles.hiddenInput}
             />
             {clientLogoPreview ? (
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <div className={styles.logoPreview}>
                 <img
                   src={clientLogoPreview}
                   alt="Preview logo"
-                  style={{ width: 72, height: 72, borderRadius: 14, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.4)' }}
+                  className={styles.logoImage}
                 />
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{clientLogo?.name}</div>
+                <div className={styles.logoName}>{clientLogo?.name}</div>
               </div>
             ) : (
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>No hay logo seleccionado.</div>
+              <div className={styles.logoEmpty}>No hay logo seleccionado.</div>
             )}
           </div>
         </div>
         
         {/* Credentials Display */}
         {createdClientCredentials && (createdClientCredentials.email || createdClientCredentials.password) && (
-          <div style={{
-            marginTop: 8,
-            padding: 12,
-            borderRadius: 12,
-            border: '1px solid rgba(31,107,186,0.25)',
-            background: 'rgba(31,107,186,0.08)',
-            display: 'grid',
-            gap: 6,
-          }}>
-            <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>✅ Credenciales del portal de tickets</div>
+          <div className={styles.credentialsCard}>
+            <div className={styles.credentialTitle}>✅ Credenciales del portal de tickets</div>
             {createdClientCredentials.email && (
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>📧 Usuario: {createdClientCredentials.email}</div>
+              <div className={styles.credentialMeta}>📧 Usuario: {createdClientCredentials.email}</div>
             )}
             {createdClientCredentials.password && (
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>🔑 Contraseña: {createdClientCredentials.password}</div>
+              <div className={styles.credentialMeta}>🔑 Contraseña: {createdClientCredentials.password}</div>
             )}
-            <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4 }}>
+            <div className={styles.credentialNote}>
               ⚠️ Guarda estas credenciales. El cliente las usará en tickets.nexara.com.mx
             </div>
           </div>
         )}
         
         {/* Submit Button */}
-        <div style={formFooterStyle}>
+        <div className={styles.footer}>
           <button className="button-primary" onClick={handleCreateClient}>
             Crear cliente
           </button>
           {clientFormMessage && (
-            <span style={{ 
-              color: clientFormMessage.includes('exitosamente') ? 'var(--accent)' : 'var(--danger)',
-              fontSize: 14,
-            }}>
+            <span className={`${styles.message} ${clientFormMessage.includes('exitosamente') ? styles.messageSuccess : styles.messageError}`}>
               {clientFormMessage}
             </span>
           )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import CertificationsCarousel from "../components/CertificationsCarousel";
 import BrandsCarousel from "../components/BrandsCarousel";
@@ -70,6 +70,8 @@ export default function Home() {
   const [activeNews, setActiveNews] = useState(0);
   const [selectedNews, setSelectedNews] = useState<NewsPost | null>(null);
   const [selectedImage, setSelectedImage] = useState(0);
+  const newsModalRef = useRef<HTMLDivElement | null>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     fetchClients();
@@ -85,14 +87,67 @@ export default function Home() {
   }, [news.length]);
 
   useEffect(() => {
-    if (selectedNews) {
-      document.body.style.overflow = "hidden";
+    if (!selectedNews) {
+      document.body.style.overflow = "";
+      return undefined;
+    }
+
+    document.body.style.overflow = "hidden";
+    const modal = newsModalRef.current;
+
+    if (!modal) {
       return () => {
         document.body.style.overflow = "";
+        previousFocusRef.current?.focus();
       };
     }
-    document.body.style.overflow = "";
-    return undefined;
+
+    const getFocusable = () =>
+      Array.from(
+        modal.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute("disabled") && element.tabIndex !== -1);
+
+    const initialFocusable = getFocusable();
+    initialFocusable[0]?.focus();
+
+    const handleModalKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeNewsModal();
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+
+      const focusable = getFocusable();
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const activeElement = document.activeElement as HTMLElement | null;
+
+      if (event.shiftKey) {
+        if (!activeElement || activeElement === first || !modal.contains(activeElement)) {
+          event.preventDefault();
+          last.focus();
+        }
+        return;
+      }
+
+      if (!activeElement || activeElement === last || !modal.contains(activeElement)) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    modal.addEventListener("keydown", handleModalKeyDown);
+    return () => {
+      modal.removeEventListener("keydown", handleModalKeyDown);
+      document.body.style.overflow = "";
+      previousFocusRef.current?.focus();
+    };
   }, [selectedNews]);
 
   const fetchNews = async () => {
@@ -163,6 +218,7 @@ export default function Home() {
 
   const activeNewsItem = news[activeNews];
   const openNewsModal = (item: NewsPost) => {
+    previousFocusRef.current = document.activeElement as HTMLElement | null;
     setSelectedNews(item);
     setSelectedImage(0);
   };
@@ -183,7 +239,7 @@ export default function Home() {
 
   return (
     <div className={styles.page}>
-      <main className={styles.main}>
+      <main className={styles.main} aria-label="Inicio Nexara">
         <div className={styles.heroWrapper}>
           <section className={styles.hero}>
             <h1 className={styles.heroTitle}>
@@ -203,11 +259,19 @@ export default function Home() {
           </section>
         </div>
 
-        <section className={styles.newsSection}>
+        <nav className={styles.quickNav} aria-label="Accesos rápidos">
+          <a href="#noticias" className={styles.quickNavLink}>Noticias</a>
+          <a href="#por-que" className={styles.quickNavLink}>Por qué Nexara</a>
+          <a href="#soluciones" className={styles.quickNavLink}>Soluciones</a>
+          <a href="#clientes" className={styles.quickNavLink}>Clientes</a>
+          <a href="#faq" className={styles.quickNavLink}>FAQ</a>
+        </nav>
+
+        <section id="noticias" className={styles.newsSection} aria-labelledby="noticias-heading">
           <div className={styles.newsHeader}>
             <span className={styles.newsBadge}>NEXARA NEWS</span>
             <div>
-              <h2 className={styles.newsTitle}>Noticias que impulsan tu tecnologia</h2>
+              <h2 id="noticias-heading" className={styles.newsTitle}>Noticias que impulsan tu tecnologia</h2>
               <p className={styles.newsSubtitle}>
                 Descubre alianzas, casos de exito y lanzamientos que te mantienen un paso adelante.
               </p>
@@ -215,15 +279,17 @@ export default function Home() {
           </div>
 
           {activeNewsItem ? (
-            <div className={styles.newsCarousel}>
+            <div className={styles.newsCarousel} role="region" aria-roledescription="carrusel" aria-label="Carrusel de noticias destacadas">
               <button
+                type="button"
                 className={styles.newsNav}
                 onClick={() => setActiveNews((prev) => (prev - 1 + news.length) % news.length)}
                 aria-label="Noticia anterior"
+                aria-controls="news-active-slide"
               >
                 ‹
               </button>
-              <div key={activeNewsItem.id} className={styles.newsSlide}>
+              <div id="news-active-slide" key={activeNewsItem.id} className={styles.newsSlide} aria-live="polite">
                 <div className={styles.newsImageWrap}>
                   <img
                     src={
@@ -248,10 +314,11 @@ export default function Home() {
                     >
                       Ver mas
                     </button>
-                    <div className={styles.newsDots}>
+                    <div className={styles.newsDots} role="group" aria-label="Selector de noticias">
                       {news.map((item, index) => (
                         <button
                           key={item.id}
+                          type="button"
                           className={
                             index === activeNews
                               ? styles.newsDotActive
@@ -259,6 +326,7 @@ export default function Home() {
                           }
                           onClick={() => setActiveNews(index)}
                           aria-label={`Ir a noticia ${index + 1}`}
+                          aria-pressed={index === activeNews}
                         />
                       ))}
                     </div>
@@ -266,9 +334,11 @@ export default function Home() {
                 </div>
               </div>
               <button
+                type="button"
                 className={styles.newsNav}
                 onClick={() => setActiveNews((prev) => (prev + 1) % news.length)}
                 aria-label="Siguiente noticia"
+                aria-controls="news-active-slide"
               >
                 ›
               </button>
@@ -278,14 +348,14 @@ export default function Home() {
           )}
         </section>
 
-        <section className={styles.whyNexara}>
+        <section id="por-que" className={styles.whyNexara} aria-labelledby="por-que-heading">
           <div className={styles.whyBadge}>CONFIANZA Y EXPERIENCIA</div>
-          <h2 className={styles.whyTitle}>¿Por qué Nexara?</h2>
+          <h2 id="por-que-heading" className={styles.whyTitle}>¿Por qué Nexara?</h2>
           <p className={styles.whyDescription}>
             En Nexara, combinamos experiencia, calidad y atención personalizada para ofrecerte soluciones tecnológicas que impulsan tu negocio. Somos líderes en venta de equipos, integración de sistemas y soporte especializado.
           </p>
           <div className={styles.advantagesGrid}>
-            <div className={styles.advantageCard} style={{ animationDelay: '0.1s' }}>
+            <div className={`${styles.advantageCard} ${styles.advantageDelay1}`}>
               <div className={styles.advantageNumber}>01</div>
               <div className={styles.advantageIcon}>
                 <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -296,7 +366,7 @@ export default function Home() {
               <h3 className={styles.advantageTitle}>+10 años de experiencia</h3>
               <p className={styles.advantageText}>Respaldados por una década sirviendo a empresas con excelencia.</p>
             </div>
-            <div className={styles.advantageCard} style={{ animationDelay: '0.2s' }}>
+            <div className={`${styles.advantageCard} ${styles.advantageDelay2}`}>
               <div className={styles.advantageNumber}>02</div>
               <div className={styles.advantageIcon}>
                 <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -306,7 +376,7 @@ export default function Home() {
               <h3 className={styles.advantageTitle}>Soporte especializado</h3>
               <p className={styles.advantageText}>Equipo técnico disponible 24/7 para resolver tus dudas.</p>
             </div>
-            <div className={styles.advantageCard} style={{ animationDelay: '0.3s' }}>
+            <div className={`${styles.advantageCard} ${styles.advantageDelay3}`}>
               <div className={styles.advantageNumber}>03</div>
               <div className={styles.advantageIcon}>
                 <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -316,7 +386,7 @@ export default function Home() {
               <h3 className={styles.advantageTitle}>Marcas líderes</h3>
               <p className={styles.advantageText}>Productos de fabricantes reconocidos mundialmente.</p>
             </div>
-            <div className={styles.advantageCard} style={{ animationDelay: '0.4s' }}>
+            <div className={`${styles.advantageCard} ${styles.advantageDelay4}`}>
               <div className={styles.advantageNumber}>04</div>
               <div className={styles.advantageIcon}>
                 <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -330,13 +400,14 @@ export default function Home() {
           </div>
         </section>
 
-        <section className={styles.servicesSection}>
+        <section id="soluciones" className={styles.servicesSection} aria-labelledby="soluciones-heading">
+          <h2 id="soluciones-heading" className={styles.newsTitle}>Soluciones destacadas</h2>
           <div className={styles.serviceCard}>
             <div className={styles.serviceContent}>
               <div className={styles.serviceBadge}>ADECUADO A TUS NECESIDADES</div>
               <h3 className={styles.serviceTitle}>Soluciones Personalizadas</h3>
               <p className={styles.serviceDescription}>
-                Brindamos soluciones tecnológicas personalizadas a tus necesidades en los sectores empresarial y gubernamental, desde la implementación de infraestructura, energía, centros de datos, hasta ciberseguridad.
+                Diseñamos soluciones TI a la medida para empresas y gobierno: infraestructura, energía, centros de datos y ciberseguridad con acompañamiento de punta a punta.
               </p>
             </div>
             <div className={styles.serviceImageWrapper}>
@@ -355,7 +426,7 @@ export default function Home() {
               <div className={styles.serviceBadge}>EQUIPOS DE VANGUARDIA</div>
               <h3 className={styles.serviceTitle}>Ventas</h3>
               <p className={styles.serviceDescription}>
-                ¿Estás buscando equipos tecnológicos de última generación que no solo cumplan, sino que superen tus expectativas? ¡No busques más! En NEXARA, te ofrecemos una amplia gama de productos de las mejores y más reconocidas marcas.
+                Te ayudamos a elegir equipos de última generación de marcas líderes, con asesoría clara para que compres justo lo que tu operación necesita.
               </p>
             </div>
             <div className={styles.serviceImageWrapper}>
@@ -374,10 +445,10 @@ export default function Home() {
         <BrandsCarousel />
 
         {/* Clientes satisfechos */}
-        <section className={styles.clientsSection}>
+        <section id="clientes" className={styles.clientsSection} aria-labelledby="clientes-heading">
           <div className={styles.clientsHeader}>
             <div className={styles.clientsBadge}>RESULTADOS QUE RESPALDAN</div>
-            <h2 className={styles.clientsTitle}>Clientes satisfechos</h2>
+            <h2 id="clientes-heading" className={styles.clientsTitle}>Clientes satisfechos</h2>
             <p className={styles.clientsSubtitle}>
               Empresas que confían en nosotros para impulsar su tecnología.
             </p>
@@ -395,7 +466,7 @@ export default function Home() {
                     height={120}
                     quality={95}
                     sizes="120px"
-                    style={{ objectFit: 'cover', objectPosition: 'center' }}
+                    className={styles.clientLogoImage}
                     unoptimized
                   />
                 </div>
@@ -410,20 +481,22 @@ export default function Home() {
         </section>
 
         <ContactFormToggle />
-        <FAQ />
+        <section id="faq">
+          <FAQ />
+        </section>
       </main>
       <FloatingContactForm />
 
       {selectedNews && (
-        <div className={styles.newsModalOverlay} onClick={closeNewsModal}>
-          <div className={styles.newsModal} onClick={(event) => event.stopPropagation()}>
-            <button className={styles.newsClose} onClick={closeNewsModal} aria-label="Cerrar">
+        <div className={styles.newsModalOverlay} onClick={closeNewsModal} aria-hidden="true">
+          <div ref={newsModalRef} className={styles.newsModal} onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="news-modal-title">
+            <button type="button" className={styles.newsClose} onClick={closeNewsModal} aria-label="Cerrar">
               ✕
             </button>
             <div className={styles.newsModalContent}>
               <div className={styles.newsModalText}>
                 <span className={styles.newsModalBadge}>Noticia</span>
-                <h3>{selectedNews.title}</h3>
+                <h3 id="news-modal-title">{selectedNews.title}</h3>
                 <p className={styles.newsModalSummary}>
                   {selectedNews.summary || "Actualizacion destacada de Nexara."}
                 </p>
@@ -449,6 +522,7 @@ export default function Home() {
                     .map((image, index) => (
                       <button
                         key={`${selectedNews.id}-${index}`}
+                        type="button"
                         className={
                           index === selectedImage
                             ? styles.newsGalleryActive
@@ -456,6 +530,7 @@ export default function Home() {
                         }
                         onClick={() => setSelectedImage(index)}
                         aria-label={`Ver imagen ${index + 1}`}
+                        aria-pressed={index === selectedImage}
                       >
                         <img src={normalizeNewsImageUrl(image || undefined) || "/soluciones/rect-c.jpg"} alt="" />
                       </button>

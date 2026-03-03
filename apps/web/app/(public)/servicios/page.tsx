@@ -82,7 +82,7 @@ export default function ServiciosPage() {
   const rectSrcB = byName("rect-2") ?? serviciosImages[3] ?? serviciosImages[1];
   return (
     <>
-    <main className={styles.container}>
+    <main className={styles.container} aria-label="Página de servicios">
       {/* Hero */}
       <section className={styles.hero}>
         <div className={styles.heroContent}>
@@ -104,6 +104,13 @@ export default function ServiciosPage() {
         </div>
       </section>
 
+      <nav className={styles.quickNav} aria-label="Accesos rápidos">
+        <a href="#sectores" className={styles.quickNavLink}>Sectores</a>
+        <a href="#servicios-principales" className={styles.quickNavLink}>Servicios</a>
+        <a href="#por-que" className={styles.quickNavLink}>Por qué elegirnos</a>
+        <a href="#contacto" className={styles.quickNavLink}>Contacto</a>
+      </nav>
+
       {/* Espacio estratégico 1 (rectangular, después del hero) */}
       <section className={styles.mediaSection}>
         <div className={styles.mediaRect}>
@@ -115,7 +122,7 @@ export default function ServiciosPage() {
                 fill
                    sizes="(min-width: 900px) 900px, 100vw"
                 quality={90}
-                style={{ objectFit: "cover" }}
+                className={styles.mediaCoverImage}
                 priority
               />
             ) : (
@@ -126,7 +133,7 @@ export default function ServiciosPage() {
       </section>
 
       {/* Sectores que atendemos */}
-      <section className={styles.section}>
+      <section id="sectores" className={styles.section}>
         <div className={styles.sectionHeader}>
           <h2 className={styles.sectionTitle}>Sectores que atendemos</h2>
           <p className={styles.sectionLead}>
@@ -243,7 +250,7 @@ export default function ServiciosPage() {
                     fill
                     sizes="(max-width: 900px) 90vw, 420px"
                     quality={90}
-                    style={{ objectFit: "cover" }}
+                    className={styles.mediaCoverImage}
                   />
                 ) : (
                   <div className={styles.squarePlaceholder}>Espacio cuadrado 1:1</div>
@@ -255,16 +262,15 @@ export default function ServiciosPage() {
       </section>
 
       {/* Servicios principales */}
-      <section className={styles.section}>
+      <section id="servicios-principales" className={styles.section}>
         <div className={styles.sectionHeader}>
           <h2 className={styles.sectionTitle}>Nuestros servicios principales</h2>
           <p className={styles.sectionLead}>
-            Soluciones tecnológicas completas respaldadas por marcas líderes y
-            atención profesional personalizada.
+            Servicios clave para equipar, proteger y mantener tu operación sin fricción.
           </p>
         </div>
 
-        <div className={styles.servicesGrid}>
+        <div className={styles.servicesGrid} aria-label="Listado de servicios principales">
           <article className={styles.serviceCard}>
             <div className={styles.serviceNumber}>01</div>
             <div className={styles.serviceIcon}>
@@ -277,17 +283,14 @@ export default function ServiciosPage() {
             <div className={styles.serviceContent}>
               <h3>Venta de computadoras</h3>
               <p>
-                Amplio catálogo de equipos de cómputo para todas las necesidades:
-                laptops, desktops, workstations, servidores y equipos All-in-One
-                de las marcas más confiables del mercado.
+                Equipos de cómputo para oficina, operación y alto rendimiento,
+                seleccionados según tu presupuesto y objetivos.
               </p>
               <ul className={styles.serviceFeatures}>
                 <li>Laptops empresariales y personales</li>
                 <li>Desktops personalizadas según requerimientos</li>
                 <li>Workstations para diseño y renderizado</li>
-                <li>Servidores Dell, HP, Lenovo</li>
-                <li>Equipos gaming y multimedia</li>
-                <li>Garantía extendida y soporte técnico</li>
+                <li>Servidores de marcas líderes</li>
               </ul>
             </div>
           </article>
@@ -305,17 +308,14 @@ export default function ServiciosPage() {
             <div className={styles.serviceContent}>
               <h3>Accesorios y periféricos</h3>
               <p>
-                Todo lo que necesitas para complementar tu equipo: desde teclados
-                y ratones hasta soluciones de almacenamiento, impresoras y
-                dispositivos de red empresariales.
+                Complementamos tu operación con periféricos y accesorios confiables
+                para productividad, conectividad y respaldo.
               </p>
               <ul className={styles.serviceFeatures}>
                 <li>Teclados mecánicos y ergonómicos</li>
                 <li>Monitores profesionales y gaming</li>
                 <li>Impresoras láser y multifuncionales</li>
-                <li>Discos duros externos y SSD</li>
-                <li>Routers, switches y access points</li>
-                <li>UPS y reguladores de voltaje</li>
+                <li>Almacenamiento SSD y respaldo externo</li>
               </ul>
             </div>
           </article>
@@ -331,17 +331,14 @@ export default function ServiciosPage() {
             <div className={styles.serviceContent}>
               <h3>Videovigilancia y seguridad</h3>
               <p>
-                Sistemas de CCTV profesionales para proteger tu negocio o residencia.
-                Instalación, configuración y soporte de cámaras IP, DVR/NVR y
-                sistemas de acceso.
+                Implementamos CCTV y control de acceso para proteger tu operación
+                con monitoreo en tiempo real.
               </p>
               <ul className={styles.serviceFeatures}>
                 <li>Cámaras IP de alta resolución 4K</li>
                 <li>Sistemas DVR/NVR con almacenamiento</li>
                 <li>Monitoreo remoto desde dispositivos móviles</li>
-                <li>Cámaras térmicas y analíticas</li>
                 <li>Control de acceso biométrico</li>
-                <li>Instalación y mantenimiento profesional</li>
               </ul>
             </div>
           </article>
@@ -358,17 +355,14 @@ export default function ServiciosPage() {
             <div className={styles.serviceContent}>
               <h3>Redes y conectividad</h3>
               <p>
-                Diseño, instalación y configuración de redes empresariales: cableado
-                estructurado, redes inalámbricas, VPN y optimización de conectividad
-                para tu operación.
+                Diseñamos y optimizamos redes empresariales para estabilidad,
+                cobertura y seguridad en todas tus sucursales.
               </p>
               <ul className={styles.serviceFeatures}>
                 <li>Cableado estructurado certificado</li>
                 <li>Redes WiFi 6 de alto rendimiento</li>
                 <li>Configuración de switches y routers</li>
                 <li>VPN y acceso remoto seguro</li>
-                <li>Análisis y optimización de red</li>
-                <li>Soporte técnico y monitoreo 24/7</li>
               </ul>
             </div>
           </article>
@@ -383,18 +377,14 @@ export default function ServiciosPage() {
             <div className={styles.serviceContent}>
               <h3>Soporte Técnico Empresarial</h3>
               <p>
-                Servicio integral de resolución técnica para operaciones empresariales.
-                Nuestro equipo de ingenieros certificados se asigna exclusivamente a tu
-                organización para resolver incidencias en equipos y sistemas de múltiples
-                sucursales, garantizando continuidad operacional.
+                Soporte técnico empresarial con ingenieros asignados, seguimiento de
+                tickets y cobertura en múltiples ubicaciones.
               </p>
               <ul className={styles.serviceFeatures}>
                 <li>Resolución de incidencias en equipos de punto de venta (cajas registradoras, scanners)</li>
                 <li>Soporte en múltiples sucursales y ubicaciones geográficas</li>
                 <li>Ingenieros especializados asignados a tu cuenta</li>
-                <li>Cobertura de gastos de traslado y viáticos para soporte en sitio</li>
-                <li>Prioridad en atención con RTAs reducidos (menor a 4 horas hábiles)</li>
-                <li>Seguimiento integral desde apertura hasta cierre de cada ticket técnico</li>
+                <li>RTA prioritario menor a 4 horas hábiles</li>
               </ul>
             </div>
           </article>
@@ -409,17 +399,14 @@ export default function ServiciosPage() {
             <div className={styles.serviceContent}>
               <h3>Mantenimiento y soporte</h3>
               <p>
-                Servicios de mantenimiento preventivo y correctivo para equipos de
-                cómputo, servidores y redes. Soporte técnico profesional para
-                mantener tu operación funcionando sin interrupciones.
+                Mantenimiento preventivo y correctivo para reducir incidencias y
+                mantener continuidad operativa.
               </p>
               <ul className={styles.serviceFeatures}>
                 <li>Mantenimiento preventivo programado</li>
                 <li>Reparación y diagnóstico de equipos</li>
                 <li>Soporte técnico remoto y en sitio</li>
                 <li>Actualización de hardware y software</li>
-                <li>Limpieza y optimización de sistemas</li>
-                <li>Contratos de soporte 24/7</li>
               </ul>
             </div>
           </article>
@@ -436,20 +423,29 @@ export default function ServiciosPage() {
             <div className={styles.serviceContent}>
               <h3>Licenciamiento de software</h3>
               <p>
-                Venta de licencias originales y asesoría en el cumplimiento legal
-                de software: Microsoft, Adobe, Autodesk, antivirus empresariales y
-                más. Renovaciones y actualizaciones.
+                Licencias originales y asesoría de cumplimiento para operar con
+                software legal, actualizado y seguro.
               </p>
               <ul className={styles.serviceFeatures}>
                 <li>Microsoft Office 365 y Windows</li>
                 <li>Licencias Adobe Creative Cloud</li>
                 <li>Antivirus corporativos (Kaspersky, ESET)</li>
-                <li>Software de diseño (AutoCAD, SolidWorks)</li>
-                <li>Sistemas operativos para servidores</li>
                 <li>Asesoría en licenciamiento empresarial</li>
               </ul>
             </div>
           </article>
+        </div>
+
+        <div className={styles.servicesCtaBar}>
+          <p className={styles.servicesCtaText}>
+            ¿Quieres una recomendación rápida para tu empresa?
+          </p>
+          <div className={styles.heroCtas}>
+            <Link href="/contacto" className={styles.primaryCta}>Cotización express</Link>
+            <Link href="https://wa.me/525536505044" className={styles.secondaryCta} target="_blank" rel="noopener noreferrer">
+              Hablar por WhatsApp
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -464,7 +460,7 @@ export default function ServiciosPage() {
                 fill
                    sizes="(min-width: 900px) 900px, 100vw"
                 quality={90}
-                style={{ objectFit: "cover" }}
+                className={styles.mediaCoverImage}
               />
             ) : (
               <div className={styles.mediaPlaceholder}>Espacio rectangular 16:9</div>
@@ -474,7 +470,7 @@ export default function ServiciosPage() {
       </section>
 
       {/* Por qué elegirnos */}
-      <section className={styles.section}>
+      <section id="por-que" className={styles.section}>
         <div className={styles.whyUsSection}>
           <div className={styles.whyUsContent}>
             <h2 className={styles.sectionTitle}>¿Por qué elegirnos?</h2>
@@ -545,7 +541,7 @@ export default function ServiciosPage() {
       </section>
 
       {/* CTA final */}
-      <section className={styles.finalCta}>
+      <section id="contacto" className={styles.finalCta}>
         <div className={styles.ctaContent}>
           <h2>¿Listo para equipar tu proyecto?</h2>
           <p>

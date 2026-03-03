@@ -189,7 +189,7 @@ const EvidenceTable: React.FC<{ mode?: 'admin' | 'user'; title?: string | null }
 
   return (
     <div className="card">
-      {title && <h2 style={{ color: 'var(--primary)', marginBottom: 12 }}>{title}</h2>}
+      {title && <h2 className={styles.title}>{title}</h2>}
       <div className={styles.filtersRow}>
         <select className="input" value={estatus} onChange={e => setEstatus(e.target.value)}>
           <option value="">Todos los estatus</option>
@@ -238,7 +238,7 @@ const EvidenceTable: React.FC<{ mode?: 'admin' | 'user'; title?: string | null }
           </>
         )}
       </div>
-      {importMsg && <div style={{ color: importMsg.startsWith('Error') ? 'var(--danger)' : 'var(--accent)' }}>{importMsg}</div>}
+      {importMsg && <div className={importMsg.startsWith('Error') ? styles.feedbackError : styles.feedbackSuccess}>{importMsg}</div>}
       <div className={styles.tableWrapper}>
       <table className={`table ${styles.evidenceTable}`}>
         <thead className={styles.tableHead}>
@@ -357,7 +357,7 @@ const EvidenceTable: React.FC<{ mode?: 'admin' | 'user'; title?: string | null }
                       Quitar
                     </button>
                   ) : (
-                    <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Bloqueado</span>
+                    <span className={styles.lockedLabel}>Bloqueado</span>
                   )}
                 </td>
               )}

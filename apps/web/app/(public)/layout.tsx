@@ -11,7 +11,7 @@ export default function PublicLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="public-layout-wrapper">
+    <div className="public-layout-wrapper public-friendly">
       <NotificationBanner />
       <Header />
       {children}

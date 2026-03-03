@@ -382,184 +382,57 @@ const ActivitiesTable: React.FC = () => {
     fetchNextAn();
   };
 
-  const shellStyle: React.CSSProperties = {
-    display: 'grid',
-    gap: 16,
-  };
-
-  const heroStyle: React.CSSProperties = {
-    display: 'grid',
-    gap: 8,
-    background: 'linear-gradient(135deg, rgba(15,106,214,0.12) 0%, rgba(22,169,110,0.1) 100%)',
-    border: '1px solid rgba(15,106,214,0.18)',
-    boxShadow: '0 12px 26px rgba(15,106,214,0.12)',
-  };
-
-  const mainCardStyle: React.CSSProperties = {
-    display: 'grid',
-    gap: 16,
-  };
-
-  const formCardStyle: React.CSSProperties = {
-    background: 'linear-gradient(140deg, rgba(31,137,252,0.22), rgba(20,162,133,0.18)), var(--surface)',
-    border: '1px solid rgba(31,137,252,0.22)',
-    borderRadius: 16,
-    padding: 18,
-    display: 'grid',
-    gap: 12,
-    boxShadow: '0 14px 24px rgba(15,106,214,0.16)',
-  };
-
-  const helperTextStyle: React.CSSProperties = {
-    color: 'var(--text-secondary)',
-    fontSize: 12,
-  };
-
-  const formGridStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))',
-    gap: 12,
-  };
-
-  const formFooterStyle: React.CSSProperties = {
-    display: 'flex',
-    gap: 12,
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  };
-
-  const toolbarStyle: React.CSSProperties = {
-    display: 'grid',
-    gap: 12,
-  };
-
-  const filtersRowStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(190px, 1fr))',
-    gap: 12,
-  };
-
-  const actionRowStyle: React.CSSProperties = {
-    display: 'flex',
-    gap: 10,
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  };
-
-  const tableWrapStyle: React.CSSProperties = {
-    borderRadius: 16,
-    border: '1px solid var(--muted)',
-    overflow: 'auto',
-    overflowX: 'auto',
-    WebkitOverflowScrolling: 'touch',
-    background: 'var(--surface)',
-  };
-
-  const paginationStyle: React.CSSProperties = {
-    display: 'flex',
-    gap: 10,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-  };
-
-  const mobileCardListStyle: React.CSSProperties = {
-    display: 'grid',
-    gap: 14,
-    padding: '16px 12px',
-    boxSizing: 'border-box',
-  };
-
-  const mobileCardStyle: React.CSSProperties = {
-    border: '1px solid rgba(31,137,252,0.18)',
-    borderRadius: 14,
-    padding: '14px 12px',
-    background: 'linear-gradient(140deg, rgba(31,137,252,0.06), rgba(20,162,133,0.05)), var(--surface)',
-    boxShadow: '0 8px 18px rgba(15,106,214,0.1)',
-    display: 'grid',
-    gap: 10,
-    boxSizing: 'border-box',
-    width: '100%',
-    minWidth: 0,
-  };
-
-  const mobileMetaGridStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: isSmallMobile ? '1fr' : '1fr 1fr',
-    gap: 8,
-    width: '100%',
-    minWidth: 0,
-  };
-
-  const mobileMetaItemStyle: React.CSSProperties = {
-    padding: '8px 10px',
-    borderRadius: 10,
-    background: 'rgba(31,137,252,0.08)',
-    border: '1px solid rgba(31,137,252,0.12)',
-    fontSize: 12,
-    minWidth: 0,
-    wordBreak: 'break-word',
-    overflowWrap: 'break-word',
-  };
-
-  const mobileActionGridStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-    gap: 8,
-  };
-
   if (loading) {
     return (
-      <div className="card" style={heroStyle}>
-        <h2 style={{ color: 'var(--primary)', marginBottom: 4 }}>Actividades</h2>
-        <div style={helperTextStyle}>Cargando actividades...</div>
+      <div className="card activities-hero">
+        <h2 className="activities-title">Actividades</h2>
+        <div className="activities-helper">Cargando actividades...</div>
       </div>
     );
   }
 
   return (
-    <div style={shellStyle}>
-      <div className="card" style={heroStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+    <div className="activities-shell">
+      <div className="card activities-hero">
+        <div className="activities-hero-head">
           <div>
-            <h2 style={{ color: 'var(--primary)', marginBottom: 4 }}>Actividades</h2>
-            <div style={helperTextStyle}>Gestiona actividades, prioridades y asignaciones del equipo.</div>
+            <h2 className="activities-title">Actividades</h2>
+            <div className="activities-helper">Gestiona actividades, prioridades y asignaciones del equipo.</div>
           </div>
-          <div style={helperTextStyle}>Total visibles: {filtered.length}</div>
+          <div className="activities-helper">Total visibles: {filtered.length}</div>
         </div>
       </div>
 
-      <div className="card" style={mainCardStyle}>
+      <div className="card activities-main">
         {hasPermission(user, PERMISSIONS.CONSOLE_ADMIN) && (
-          <div className="card" style={{ display: 'grid', gap: 12, border: '1px solid rgba(31,107,186,0.2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div className="card activities-requests-card">
+            <div className="activities-requests-head">
               <div>
-                <h3 style={{ marginBottom: 4 }}>Tickets levantados por clientes</h3>
-                <div style={helperTextStyle}>Solicitudes nuevas para asignar al equipo.</div>
+                <h3 className="activities-subtitle">Tickets levantados por clientes</h3>
+                <div className="activities-helper">Solicitudes nuevas para asignar al equipo.</div>
               </div>
-              <div style={helperTextStyle}>Pendientes: {ticketRequests.filter((req) => req.status === 'NEW').length}</div>
+              <div className="activities-helper">Pendientes: {ticketRequests.filter((req) => req.status === 'NEW').length}</div>
             </div>
             {ticketRequests.length === 0 && (
-              <div style={helperTextStyle}>No hay solicitudes por el momento.</div>
+              <div className="activities-helper">No hay solicitudes por el momento.</div>
             )}
-            <div style={{ display: 'grid', gap: 10 }}>
+            <div className="activities-request-list">
               {ticketRequests.map((request) => (
-                <div key={request.id} style={{ display: 'grid', gap: 10, padding: 12, borderRadius: 12, border: '1px solid rgba(15,106,214,0.12)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                    <div style={{ fontWeight: 600 }}>
+                <div key={request.id} className="activities-request-item">
+                  <div className="activities-request-top">
+                    <div className="activities-request-title">
                       {request.client?.name || 'Cliente'} · {request.branchName || 'Sucursal'}
                     </div>
                     <span className="badge">{request.status}</span>
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{request.description}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  <div className="activities-helper">{request.description}</div>
+                  <div className="activities-helper">
                     Urgencia: {request.urgency} · Limite: {formatDateTime(request.dueAt || undefined)}
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  <div className="activities-helper">
                     Flujo: {request.requestType === 'PREVENTIVE_INVENTORY' ? 'Mantenimiento e inventario' : 'Ticket por problema'}
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  <div className="activities-helper">
                     {request.address || '-'} {request.city || ''} {request.state || ''}
                   </div>
                   {request.latitud && request.longitud && (
@@ -568,11 +441,11 @@ const ActivitiesTable: React.FC = () => {
                       src={`https://maps.google.com/maps?q=${request.latitud},${request.longitud}&z=15&output=embed`}
                       width="100%"
                       height="160"
-                      style={{ border: 0, borderRadius: 12 }}
+                      className="activities-map-embed"
                       loading="lazy"
                     />
                   )}
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div className="activities-request-actions">
                     {request.latitud && request.longitud && (
                       <a className="button-secondary" href={getMapsUrl(request.latitud, request.longitud)} target="_blank" rel="noreferrer">Ver mapa</a>
                     )}
@@ -587,15 +460,15 @@ const ActivitiesTable: React.FC = () => {
           </div>
         )}
         {hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && (
-          <div style={formCardStyle}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div className="activities-form-card">
+            <div className="activities-form-head">
               <div>
-                <h3 style={{ marginBottom: 4 }}>Asignar actividad</h3>
-                <div style={helperTextStyle}>Completa los campos clave para crear la actividad.</div>
+                <h3 className="activities-subtitle">Asignar actividad</h3>
+                <div className="activities-helper">Completa los campos clave para crear la actividad.</div>
               </div>
-              <div style={helperTextStyle}>AN sugerido: {nextAn || 'Calculando...'}</div>
+              <div className="activities-helper">AN sugerido: {nextAn || 'Calculando...'}</div>
             </div>
-            <div style={formGridStyle}>
+            <div className={`activities-form-grid ${isMobile ? 'is-mobile' : ''}`}>
               <input className="input" placeholder="AN (auto)" value={nextAn || 'Calculando...'} disabled />
               <input className="input" placeholder="Titulo" value={newActivity.titulo} onChange={(e) => setNewActivity({ ...newActivity, titulo: e.target.value })} />
               <select className="input" value={newActivity.ticketType} onChange={(e) => setNewActivity({ ...newActivity, ticketType: e.target.value })}>
@@ -637,30 +510,30 @@ const ActivitiesTable: React.FC = () => {
               <input className="input" type="number" placeholder="Tiempo estimado (min)" value={newActivity.tiempoEstimadoMin} onChange={(e) => setNewActivity({ ...newActivity, tiempoEstimadoMin: e.target.value })} />
               <input className="input" type="number" placeholder="Tiempo maximo (min)" value={newActivity.tiempoMaximoMin} onChange={(e) => setNewActivity({ ...newActivity, tiempoMaximoMin: e.target.value })} />
               <div>
-                <label style={{ display: 'block', marginBottom: 6, fontSize: 12, color: 'var(--text-tertiary)' }}>Fecha inicio</label>
+                <label className="activities-input-label">Fecha inicio</label>
                 <input className="input" type="datetime-local" value={newActivity.fechaInicio} onChange={(e) => setNewActivity({ ...newActivity, fechaInicio: e.target.value })} />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: 6, fontSize: 12, color: 'var(--text-tertiary)' }}>Fecha maxima</label>
+                <label className="activities-input-label">Fecha maxima</label>
                 <input className="input" type="datetime-local" value={newActivity.fechaMaxima} onChange={(e) => setNewActivity({ ...newActivity, fechaMaxima: e.target.value })} />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: 6, fontSize: 12, color: 'var(--text-tertiary)' }}>Entrega esperada</label>
+                <label className="activities-input-label">Entrega esperada</label>
                 <input className="input" type="datetime-local" value={newActivity.fechaEntregaEsperada} onChange={(e) => setNewActivity({ ...newActivity, fechaEntregaEsperada: e.target.value })} />
               </div>
               <input className="input" placeholder="Descripcion" value={newActivity.descripcion} onChange={(e) => setNewActivity({ ...newActivity, descripcion: e.target.value })} />
               <input className="input" placeholder="Indicaciones" value={newActivity.indicaciones} onChange={(e) => setNewActivity({ ...newActivity, indicaciones: e.target.value })} />
             </div>
-            <div style={formFooterStyle}>
+            <div className="activities-form-footer">
               <button className="button-primary" onClick={handleAssign}>Asignar</button>
-              {formError && <span style={{ color: 'var(--danger)' }}>{formError}</span>}
-              {formSuccess && <span style={{ color: 'var(--accent)' }}>{formSuccess}</span>}
+              {formError && <span className="activities-feedback-error">{formError}</span>}
+              {formSuccess && <span className="activities-feedback-success">{formSuccess}</span>}
             </div>
           </div>
         )}
 
-        <div style={toolbarStyle}>
-          <div style={filtersRowStyle}>
+        <div className="activities-toolbar">
+          <div className={`activities-filters-row ${isMobile ? 'is-mobile' : ''}`}>
             <select className="input" value={estatus} onChange={e => setEstatus(e.target.value)}>
               <option value="">Todos los estatus</option>
               {estatusList.map((e: string) => <option key={e} value={e}>{e}</option>)}
@@ -676,10 +549,10 @@ const ActivitiesTable: React.FC = () => {
               {prioridadList.map((p: string) => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
-          <div style={actionRowStyle}>
-            <div style={helperTextStyle}>{importMsg && <span style={{ color: importMsg.startsWith('Error') ? 'var(--danger)' : 'var(--accent)' }}>{importMsg}</span>}</div>
+          <div className="activities-actions-row">
+            <div className="activities-helper">{importMsg && <span className={importMsg.startsWith('Error') ? 'activities-feedback-error' : 'activities-feedback-success'}>{importMsg}</span>}</div>
             {hasPermission(user, PERMISSIONS.ACTIVITIES_EXPORT) && (
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <div className="activities-export-actions">
                 <button
                   className="button-secondary"
                   onClick={async () => {
@@ -703,7 +576,7 @@ const ActivitiesTable: React.FC = () => {
                   type="file"
                   accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                   ref={fileInputRef}
-                  style={{ display: 'none' }}
+                  className="activities-file-input"
                   onChange={handleImport}
                 />
               </div>
@@ -711,7 +584,7 @@ const ActivitiesTable: React.FC = () => {
           </div>
         </div>
 
-        <div style={tableWrapStyle}>
+        <div className="activities-table-wrap">
           {!isMobile && (
             <table className="table">
               <thead>
@@ -760,44 +633,36 @@ const ActivitiesTable: React.FC = () => {
                       <td>{a.responsable?.nombre}</td>
                       <td>{a.prioridad}</td>
                       <td>
-                        <span style={{
-                          display: 'inline-block',
-                          padding: '4px 8px',
-                          borderRadius: 4,
-                          backgroundColor: a.activityEvidence?.status === 'COMPLETED' ? '#efe' : '#fef',
-                          color: a.activityEvidence?.status === 'COMPLETED' ? '#060' : '#f90',
-                          fontSize: 12,
-                          fontWeight: 500,
-                        }}>
+                        <span className={`activities-evidence-pill ${a.activityEvidence?.status === 'COMPLETED' ? 'is-completed' : ''}`}>
                           {getEvidenceStatus(a)}
                         </span>
                         {(a.activityEvidence?.entryLatitude && a.activityEvidence?.entryLongitude) && (
-                          <div style={{ marginTop: 6 }}>
-                            <a href={getMapsUrl(a.activityEvidence.entryLatitude, a.activityEvidence.entryLongitude)} target="_blank" rel="noreferrer" style={{ fontSize: 11 }}>
+                          <div className="activities-link-row mt-6">
+                            <a href={getMapsUrl(a.activityEvidence.entryLatitude, a.activityEvidence.entryLongitude)} target="_blank" rel="noreferrer" className="activities-link-sm">
                               Ubicación entrada
                             </a>
                           </div>
                         )}
                         {(a.activityEvidence?.exitLatitude && a.activityEvidence?.exitLongitude) && (
-                          <div style={{ marginTop: 4 }}>
-                            <a href={getMapsUrl(a.activityEvidence.exitLatitude, a.activityEvidence.exitLongitude)} target="_blank" rel="noreferrer" style={{ fontSize: 11 }}>
+                          <div className="activities-link-row mt-4">
+                            <a href={getMapsUrl(a.activityEvidence.exitLatitude, a.activityEvidence.exitLongitude)} target="_blank" rel="noreferrer" className="activities-link-sm">
                               Ubicación salida
                             </a>
                           </div>
                         )}
-                        <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                        <div className="activities-thumb-row">
                           {a.activityEvidence?.entryPhotoUrl && (
                             <img
                               src={a.activityEvidence.entryPhotoUrl}
                               alt="entrada"
-                              style={{ width: 36, height: 36, borderRadius: 4, objectFit: 'cover', border: '1px solid var(--muted)' }}
+                              className="activities-thumb"
                             />
                           )}
                           {a.activityEvidence?.exitPhotoUrl && (
                             <img
                               src={a.activityEvidence.exitPhotoUrl}
                               alt="salida"
-                              style={{ width: 36, height: 36, borderRadius: 4, objectFit: 'cover', border: '1px solid var(--muted)' }}
+                              className="activities-thumb"
                             />
                           )}
                         </div>
@@ -808,7 +673,7 @@ const ActivitiesTable: React.FC = () => {
                       <td>{a.indicaciones || '-'}</td>
                       {hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && (
                         <td>
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <div className="activities-row-actions">
                             <button className="button-secondary">Editar</button>
                             <button className="button-primary">Borrar</button>
                           </div>
@@ -822,7 +687,7 @@ const ActivitiesTable: React.FC = () => {
           )}
 
           {isMobile && (
-            <div style={mobileCardListStyle}>
+            <div className="activities-mobile-list">
               {paginated.map((a: Activity) => {
                 const getEvidenceStatus = (activity: Activity) => {
                   if (!activity.activityEvidence) return 'Sin iniciar';
@@ -839,71 +704,64 @@ const ActivitiesTable: React.FC = () => {
                 };
 
                 return (
-                  <article key={a.id} style={mobileCardStyle}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start', width: '100%', minWidth: 0 }}>
-                      <div style={{ display: 'grid', gap: 4, minWidth: 0, flex: 1 }}>
-                        <div style={{ fontSize: 12, color: 'var(--text-tertiary)', wordBreak: 'break-word' }}>AN {a.anNumber}</div>
-                        <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.3, wordBreak: 'break-word', overflowWrap: 'break-word' }}>{a.titulo}</div>
+                  <article key={a.id} className="activities-mobile-card">
+                    <div className="activities-mobile-head">
+                      <div className="activities-mobile-title-wrap">
+                        <div className="activities-mobile-an">AN {a.anNumber}</div>
+                        <div className="activities-mobile-title">{a.titulo}</div>
                       </div>
-                      <span className={`badge ${a.estatus === 'Aprobada' ? 'approved' : a.estatus === 'Pendiente' ? 'pending' : ''}`} style={{ flexShrink: 0 }}>{a.estatus}</span>
+                      <span className={`badge ${a.estatus === 'Aprobada' ? 'approved' : a.estatus === 'Pendiente' ? 'pending' : ''} activities-mobile-badge`}>{a.estatus}</span>
                     </div>
 
-                    <div style={mobileMetaGridStyle}>
-                      <div style={mobileMetaItemStyle}><strong>Cliente:</strong> {a.client?.name || 'Interna'}</div>
-                      <div style={mobileMetaItemStyle}><strong>Sucursal:</strong> {a.branchName || '-'}</div>
-                      <div style={mobileMetaItemStyle}><strong>Tipo:</strong> {a.ticketType || '-'}</div>
-                      <div style={mobileMetaItemStyle}><strong>Flujo:</strong> {a.workType === 'PREVENTIVE_INVENTORY' ? 'Inventario/Mantenimiento' : 'Problema'}</div>
-                      <div style={mobileMetaItemStyle}><strong>Prioridad:</strong> {a.prioridad}</div>
-                      <div style={mobileMetaItemStyle}><strong>Responsable:</strong> {a.responsable?.nombre || '-'}</div>
-                      <div style={mobileMetaItemStyle}><strong>Estimado/Max:</strong> {a.tiempoEstimadoMin || 0}/{a.tiempoMaximoMin || 0} min</div>
-                      <div style={mobileMetaItemStyle}><strong>Inicio:</strong> {formatDateTime(a.fechaInicio)}</div>
-                      <div style={mobileMetaItemStyle}><strong>Entrega:</strong> {formatDateTime(a.fechaEntregaEsperada)}</div>
+                    <div className={`activities-mobile-meta-grid ${isSmallMobile ? 'is-small' : ''}`}>
+                      <div className="activities-mobile-meta-item"><strong>Cliente:</strong> {a.client?.name || 'Interna'}</div>
+                      <div className="activities-mobile-meta-item"><strong>Sucursal:</strong> {a.branchName || '-'}</div>
+                      <div className="activities-mobile-meta-item"><strong>Tipo:</strong> {a.ticketType || '-'}</div>
+                      <div className="activities-mobile-meta-item"><strong>Flujo:</strong> {a.workType === 'PREVENTIVE_INVENTORY' ? 'Inventario/Mantenimiento' : 'Problema'}</div>
+                      <div className="activities-mobile-meta-item"><strong>Prioridad:</strong> {a.prioridad}</div>
+                      <div className="activities-mobile-meta-item"><strong>Responsable:</strong> {a.responsable?.nombre || '-'}</div>
+                      <div className="activities-mobile-meta-item"><strong>Estimado/Max:</strong> {a.tiempoEstimadoMin || 0}/{a.tiempoMaximoMin || 0} min</div>
+                      <div className="activities-mobile-meta-item"><strong>Inicio:</strong> {formatDateTime(a.fechaInicio)}</div>
+                      <div className="activities-mobile-meta-item"><strong>Entrega:</strong> {formatDateTime(a.fechaEntregaEsperada)}</div>
                     </div>
 
-                    <div style={{ fontSize: 12 }}>
-                      <span style={{
-                        display: 'inline-block',
-                        padding: '6px 10px',
-                        borderRadius: 8,
-                        backgroundColor: a.activityEvidence?.status === 'COMPLETED' ? '#efe' : '#fef',
-                        color: a.activityEvidence?.status === 'COMPLETED' ? '#060' : '#f90',
-                        fontWeight: 600,
-                      }}>
+                    <div className="activities-mobile-evidence-wrap">
+                      <span className={`activities-evidence-pill activities-mobile-evidence ${a.activityEvidence?.status === 'COMPLETED' ? 'is-completed' : ''}`}>
                         Evidencias: {getEvidenceStatus(a)}
                       </span>
                       {(a.activityEvidence?.entryLatitude && a.activityEvidence?.entryLongitude) && (
-                        <div style={{ marginTop: 6 }}>
-                          <a href={getMapsUrl(a.activityEvidence.entryLatitude, a.activityEvidence.entryLongitude)} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
+                        <div className="activities-link-row mt-6">
+                          <a href={getMapsUrl(a.activityEvidence.entryLatitude, a.activityEvidence.entryLongitude)} target="_blank" rel="noreferrer" className="activities-link-sm">
                             Ver ubicación entrada
                           </a>
                         </div>
                       )}
-                      <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                      <div className="activities-thumb-row">
                         {a.activityEvidence?.entryPhotoUrl && (
                           <img
                             src={a.activityEvidence.entryPhotoUrl}
                             alt="entrada"
-                            style={{ width: 44, height: 44, borderRadius: 6, objectFit: 'cover', border: '1px solid var(--muted)' }}
+                            className="activities-thumb activities-thumb-mobile"
                           />
                         )}
                         {a.activityEvidence?.exitPhotoUrl && (
                           <img
                             src={a.activityEvidence.exitPhotoUrl}
                             alt="salida"
-                            style={{ width: 44, height: 44, borderRadius: 6, objectFit: 'cover', border: '1px solid var(--muted)' }}
+                            className="activities-thumb activities-thumb-mobile"
                           />
                         )}
                       </div>
                     </div>
 
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', wordBreak: 'break-word', overflowWrap: 'break-word', minWidth: 0 }}>
+                    <div className="activities-mobile-notes">
                       <strong>Indicaciones:</strong> {a.indicaciones || '-'}
                     </div>
 
                     {hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && (
-                      <div style={mobileActionGridStyle}>
-                        <button className="button-secondary" style={{ minHeight: 46, borderRadius: 10, fontWeight: 700 }}>Editar</button>
-                        <button className="button-primary" style={{ minHeight: 46, borderRadius: 10, fontWeight: 700 }}>Borrar</button>
+                      <div className="activities-mobile-actions">
+                        <button className="button-secondary activities-mobile-action-btn">Editar</button>
+                        <button className="button-primary activities-mobile-action-btn">Borrar</button>
                       </div>
                     )}
                   </article>
@@ -913,12 +771,12 @@ const ActivitiesTable: React.FC = () => {
           )}
         </div>
 
-        <div style={paginationStyle}>
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'auto auto', gap: 8, width: isMobile ? '100%' : 'auto' }}>
-            <button className="button-secondary" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={{ minHeight: isMobile ? 46 : undefined, fontWeight: 700 }}>Anterior</button>
-            <button className="button-secondary" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0} style={{ minHeight: isMobile ? 46 : undefined, fontWeight: 700 }}>Siguiente</button>
+        <div className="activities-pagination">
+          <div className={`activities-pagination-buttons ${isMobile ? 'is-mobile' : ''}`}>
+            <button className={`button-secondary activities-pagination-btn ${isMobile ? 'is-mobile' : ''}`} onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Anterior</button>
+            <button className={`button-secondary activities-pagination-btn ${isMobile ? 'is-mobile' : ''}`} onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0}>Siguiente</button>
           </div>
-          <span style={helperTextStyle}>Página {page} de {totalPages || 1}</span>
+          <span className="activities-helper">Página {page} de {totalPages || 1}</span>
         </div>
       </div>
     </div>

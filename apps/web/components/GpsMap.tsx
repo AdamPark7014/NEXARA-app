@@ -4,6 +4,7 @@ import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import { getSocketBaseUrl } from '@/lib/api-base';
+import styles from './GpsMap.module.css';
 
 const GOOGLE_MAPS_SCRIPT_ID = 'google-maps-script';
 
@@ -473,138 +474,81 @@ const GpsMap = () => {
     }
   }, [teamLocations]);
 
-  const shellStyle: React.CSSProperties = {
-    display: 'grid',
-    gap: 16,
-  };
-
-  const heroStyle: React.CSSProperties = {
-    display: 'grid',
-    gap: 12,
-    background: 'linear-gradient(135deg, rgba(15,106,214,0.14) 0%, rgba(22,169,110,0.08) 100%)',
-    border: '1px solid rgba(15,106,214,0.2)',
-    boxShadow: '0 12px 30px rgba(15,106,214,0.12)',
-  };
-
-  const mapShellStyle: React.CSSProperties = {
-    width: '100%',
-    height: 340,
-    background: 'linear-gradient(180deg, rgba(15,106,214,0.08) 0%, rgba(22,169,110,0.08) 100%)',
-    borderRadius: 16,
-    border: '1px solid rgba(15,106,214,0.12)',
-    display: 'grid',
-    placeItems: 'center',
-    position: 'relative',
-    overflow: 'hidden',
-  };
-
-  const teamMapShellStyle: React.CSSProperties = {
-    ...mapShellStyle,
-    height: 420,
-  };
-
-  const statCardStyle: React.CSSProperties = {
-    padding: 14,
-    background: 'linear-gradient(135deg, rgba(15,106,214,0.12), rgba(22,169,110,0.08))',
-    border: '1px solid rgba(15,106,214,0.22)',
-    boxShadow: '0 12px 22px rgba(15,106,214,0.12)',
-  };
-
-  const teamCardStyle: React.CSSProperties = {
-    padding: 14,
-    background: 'linear-gradient(135deg, rgba(15,106,214,0.16), rgba(22,169,110,0.12))',
-    border: '1px solid rgba(15,106,214,0.28)',
-    boxShadow: '0 14px 26px rgba(15,106,214,0.16)',
-  };
-
-  const helperTextStyle: React.CSSProperties = {
-    color: 'var(--text-secondary)',
-    fontSize: 12,
-  };
-
   return (
-    <div style={shellStyle}>
-      <div className="card" style={heroStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+    <div className={styles.shell}>
+      <div className={`card ${styles.hero}`}>
+        <div className={styles.rowBetween}>
           <div>
-            <h2 style={{ color: 'var(--primary)', marginBottom: 6, letterSpacing: 0.2 }}>GPS en tiempo real</h2>
-            <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
+            <h2 className={styles.title}>GPS en tiempo real</h2>
+            <div className={styles.subtitle}>
               {isHighLevel
                 ? 'Vista gerencial con el resumen del equipo en tiempo real.'
                 : 'La ubicacion se comparte automaticamente al registrar entrada.'}
             </div>
           </div>
           {!isHighLevel && (
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <div className={styles.statusRow}>
               <span className={`badge ${consent ? 'approved' : 'pending'}`}>
                 {consent ? 'Compartiendo' : 'Privado'}
               </span>
             </div>
           )}
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+        <div className={styles.rowBetweenSmall}>
+          <div className={styles.helperText}>
             {isHighLevel
               ? 'Solo visualizas a usuarios con consentimiento y nivel inferior.'
               : 'Solo puedes ver tu ubicacion y, si eres administrador, la de usuarios bajo tu jerarquia.'}
           </div>
           {!isHighLevel && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
-              <span
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  background: consent ? 'var(--accent)' : 'var(--info)',
-                  boxShadow: consent ? '0 0 0 4px rgba(32,185,129,0.18)' : '0 0 0 4px rgba(31,141,242,0.16)',
-                }}
-              />
+            <div className={styles.syncStatus}>
+              <span className={`${styles.dot} ${consent ? styles.dotActive : styles.dotPaused}`} />
               {loading ? 'Sincronizando...' : consent ? 'Ubicacion activa' : 'Ubicacion pausada'}
             </div>
           )}
         </div>
-        {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}
-        {statusMsg && <div style={{ color: 'var(--accent)' }}>{statusMsg}</div>}
+        {error && <div className={styles.errorText}>{error}</div>}
+        {statusMsg && <div className={styles.successText}>{statusMsg}</div>}
       </div>
 
       {!isHighLevel && (
-        <div className="card" style={{ display: 'grid', gap: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div className={`card ${styles.sectionCard}`}>
+        <div className={styles.rowBetweenSmall}>
           <div>
-            <h3 style={{ marginBottom: 4 }}>Mi ubicacion</h3>
-            <div style={helperTextStyle}>
+            <h3 className={styles.sectionTitle}>Mi ubicacion</h3>
+            <div className={styles.helperText}>
               {myLocation?.ultimaActualizacion
                 ? `Ultima actualizacion: ${new Date(myLocation.ultimaActualizacion).toLocaleString()}`
                 : 'Sin ubicacion registrada'}
             </div>
           </div>
-          <div style={helperTextStyle}>
+          <div className={styles.helperText}>
             {loading ? 'Cargando...' : consent ? 'En tiempo real' : 'Ubicacion privada'}
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-          <div className="card" style={statCardStyle}>
-            <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Latitud</div>
-            <div style={{ fontWeight: 600, fontSize: 16 }}>
+        <div className={styles.statsGrid}>
+          <div className={`card ${styles.statCard}`}>
+            <div className={styles.statLabel}>Latitud</div>
+            <div className={styles.statValue}>
               {toNumber(myLocation?.latitud) ?? '-'}
             </div>
           </div>
-          <div className="card" style={statCardStyle}>
-            <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Longitud</div>
-            <div style={{ fontWeight: 600, fontSize: 16 }}>
+          <div className={`card ${styles.statCard}`}>
+            <div className={styles.statLabel}>Longitud</div>
+            <div className={styles.statValue}>
               {toNumber(myLocation?.longitud) ?? '-'}
             </div>
           </div>
-          <div className="card" style={statCardStyle}>
-            <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Velocidad</div>
-            <div style={{ fontWeight: 600, fontSize: 16 }}>
+          <div className={`card ${styles.statCard}`}>
+            <div className={styles.statLabel}>Velocidad</div>
+            <div className={styles.statValue}>
               {toNumber(myLocation?.velocidadKmh) ? `${Number(myLocation?.velocidadKmh).toFixed(1)} km/h` : '-'}
             </div>
           </div>
         </div>
-        <div ref={myMapRef} style={mapShellStyle}>
+        <div ref={myMapRef} className={styles.mapShell}>
           {!canUseMaps && (
-            <span style={{ color: 'var(--text-secondary)' }}>
+            <span className={styles.mapHint}>
               Configura NEXT_PUBLIC_GOOGLE_MAPS_API_KEY para ver el mapa.
             </span>
           )}
@@ -613,47 +557,43 @@ const GpsMap = () => {
       )}
 
       {isAdmin && (
-        <div className="card" style={{ display: 'grid', gap: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div className={`card ${styles.sectionCard}`}>
+          <div className={styles.rowBetweenSmall}>
             <div>
-              <h3 style={{ marginBottom: 4 }}>Ubicaciones del equipo</h3>
-              <div style={helperTextStyle}>
+              <h3 className={styles.sectionTitle}>Ubicaciones del equipo</h3>
+              <div className={styles.helperText}>
                 Usuarios visibles: {teamLocations.length}
               </div>
             </div>
-            <div style={helperTextStyle}>
+            <div className={styles.helperText}>
               Solo usuarios con consentimiento y nivel inferior.
             </div>
           </div>
-          <div ref={teamMapRef} style={teamMapShellStyle}>
+          <div ref={teamMapRef} className={styles.teamMapShell}>
             {!canUseMaps && (
-              <span style={{ color: 'var(--text-secondary)' }}>
+              <span className={styles.mapHint}>
                 Configura NEXT_PUBLIC_GOOGLE_MAPS_API_KEY para ver el mapa.
               </span>
             )}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+          <div className={styles.teamGrid}>
             {teamLocations.length ? (
               teamLocations.map((location) => (
-                <div
-                  key={location.id}
-                  className="card"
-                  style={teamCardStyle}
-                >
-                  <div style={{ fontWeight: 700, color: 'var(--foreground)' }}>{location.usuario?.nombre || 'Usuario'}</div>
-                  <div style={helperTextStyle}>
+                <div key={location.id} className={`card ${styles.teamCard}`}>
+                  <div className={styles.teamName}>{location.usuario?.nombre || 'Usuario'}</div>
+                  <div className={styles.teamMeta}>
                     {location.usuario?.role?.nombre || 'Sin rol'}
                   </div>
-                  <div style={helperTextStyle}>
+                  <div className={styles.teamMeta}>
                     {location.usuario?.department?.nombre || 'Sin departamento'}
                   </div>
-                  <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-tertiary)' }}>
+                  <div className={styles.teamUpdated}>
                     Ultima ubicacion: {location.ultimaActualizacion ? new Date(location.ultimaActualizacion).toLocaleString() : '-'}
                   </div>
                 </div>
               ))
             ) : (
-              <div style={{ color: 'var(--text-secondary)' }}>No hay ubicaciones visibles por ahora.</div>
+              <div className={styles.emptyTeam}>No hay ubicaciones visibles por ahora.</div>
             )}
           </div>
         </div>

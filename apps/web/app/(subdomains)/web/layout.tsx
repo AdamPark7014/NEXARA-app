@@ -50,27 +50,13 @@ export default function WebPanelLayout({ children }: { children: React.ReactNode
             })}
           </nav>
         </div>
-        <div style={{ padding: '1rem', marginTop: 'auto', borderTop: '1px solid var(--border-color)' }}>
+        <div className={styles.themeSection}>
           <button
             onClick={toggleDarkMode}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              borderRadius: '8px',
-              border: 'none',
-              background: 'var(--card-bg)',
-              color: 'var(--text-color)',
-              cursor: 'pointer',
-              fontSize: '1rem',
-              transition: 'all 0.2s ease',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem',
-            }}
+            className={styles.themeButton}
             aria-label={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
           >
-            <span style={{ fontSize: '1.5rem' }}>{darkMode ? '🌙' : '☀️'}</span>
+            <span className={styles.themeIcon}>{darkMode ? '🌙' : '☀️'}</span>
             <span>{darkMode ? 'Modo Oscuro' : 'Modo Claro'}</span>
           </button>
         </div>

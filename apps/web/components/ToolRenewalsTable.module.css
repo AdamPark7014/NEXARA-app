@@ -1,0 +1,208 @@
+.loading {
+  text-align: center;
+  padding: 20px;
+}
+
+.root {
+  display: grid;
+  gap: 20px;
+}
+
+.panel {
+  display: grid;
+  gap: 16px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.title {
+  color: var(--primary);
+  margin-bottom: 0;
+}
+
+.filter {
+  max-width: 200px;
+}
+
+.error {
+  color: var(--danger);
+}
+
+.empty {
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 40px;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.rowBorder {
+  border-bottom: 1px solid var(--muted);
+}
+
+.rowUrgent {
+  background: rgba(255, 0, 0, 0.05);
+}
+
+.th,
+.td {
+  padding: 12px;
+  text-align: left;
+}
+
+.th {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.thCenter {
+  text-align: center;
+}
+
+.userName,
+.toolName,
+.newDate {
+  font-weight: 500;
+}
+
+.smallMuted {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.dateMuted {
+  color: var(--text-secondary);
+}
+
+.newDate {
+  color: var(--success);
+}
+
+.expiryText {
+  color: var(--text-secondary);
+}
+
+.expiryUrgent {
+  color: var(--danger);
+}
+
+.expiryWeight {
+  font-weight: 400;
+}
+
+.expiryWeightUrgent {
+  font-weight: 600;
+}
+
+.reason {
+  font-size: 11px;
+  margin-top: 4px;
+  color: var(--text-secondary);
+}
+
+.status {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 11px;
+}
+
+.statusPending {
+  background: color-mix(in srgb, var(--warning) 18%, transparent);
+  color: var(--warning);
+}
+
+.statusApproved {
+  background: color-mix(in srgb, var(--success) 18%, transparent);
+  color: var(--success);
+}
+
+.statusRejected {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  color: var(--danger);
+}
+
+.actionsCell {
+  padding: 12px;
+  text-align: center;
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.smallBtn {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.approveBtn {
+  background: color-mix(in srgb, var(--success) 18%, transparent);
+  color: var(--success);
+}
+
+.rejectBtn {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  color: var(--danger);
+}
+
+.processedText {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: grid;
+  place-items: center;
+  z-index: 1000;
+}
+
+.modalCard {
+  max-width: 500px;
+  width: 90%;
+}
+
+.modalTitle {
+  color: var(--primary);
+  margin-bottom: 20px;
+}
+
+.rejectField {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 16px;
+  color: var(--text-secondary);
+}
+
+.rejectArea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.modalError {
+  color: var(--danger);
+  margin-bottom: 12px;
+}
+
+.modalActions {
+  display: flex;
+  gap: 12px;
+}

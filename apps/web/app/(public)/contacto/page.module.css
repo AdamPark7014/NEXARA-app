@@ -43,6 +43,7 @@
   max-width: var(--content-max);
   margin: 0 auto;
   padding: var(--page-padding-y) var(--page-padding-x) var(--page-padding-bottom);
+  line-height: 1.68;
 }
 
 /* Hero */
@@ -81,10 +82,10 @@
 }
 
 .heroTitle {
-  font-size: clamp(2rem, 4.5vw, 3rem);
+  font-size: clamp(2.15rem, 4.6vw, 3.2rem);
   font-weight: 900;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
+  letter-spacing: -0.022em;
+  line-height: 1.08;
   margin-bottom: 16px;
   background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
   -webkit-background-clip: text;
@@ -93,10 +94,10 @@
 }
 
 .heroSubtitle {
-  font-size: clamp(1rem, 1.5vw, 1.15rem);
-  line-height: 1.65;
+  font-size: clamp(1.06rem, 1.5vw, 1.2rem);
+  line-height: 1.76;
   color: var(--foreground);
-  opacity: 0.85;
+  opacity: 0.9;
 }
 
 /* Content Grid */
@@ -145,15 +146,15 @@
 }
 
 .infoCard h3 {
-  font-size: 1rem;
+  font-size: 1.06rem;
   font-weight: 700;
   margin-bottom: 6px;
   color: var(--foreground);
 }
 
 .infoCard p {
-  font-size: 0.9rem;
-  line-height: 1.5;
+  font-size: 0.98rem;
+  line-height: 1.62;
   color: var(--foreground);
   opacity: 0.85;
   margin: 0;
@@ -356,6 +357,16 @@
 
 .submitButton:active:not(:disabled) {
   transform: translateY(0);
+}
+
+.contactLink:focus-visible,
+.quickLinks li a:focus-visible,
+.submitButton:focus-visible,
+.primaryButton:focus-visible,
+.secondaryButton:focus-visible,
+.ctaButton:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 70%, white 30%);
+  outline-offset: 3px;
 }
 
 .submitButton:disabled {
