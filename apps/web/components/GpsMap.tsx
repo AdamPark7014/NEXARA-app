@@ -51,6 +51,7 @@ const GpsMap = () => {
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
   const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+  const googleMapsMapId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || '';
 
   const canUseMaps = useMemo(() => Boolean(googleMapsKey), [googleMapsKey]);
 
@@ -141,7 +142,7 @@ const GpsMap = () => {
   };
 
   const createMapMarker = (mapsLib: any, map: any, position: { lat: number; lng: number }, label?: string) => {
-    if (mapsLib?.marker?.AdvancedMarkerElement) {
+    if (googleMapsMapId && mapsLib?.marker?.AdvancedMarkerElement) {
       return new mapsLib.marker.AdvancedMarkerElement({
         map,
         position,
@@ -375,6 +376,7 @@ const GpsMap = () => {
         myMapInstance.current = new mapCtor(myMapRef.current, {
           center: { lat: 19.4326, lng: -99.1332 },
           zoom: 14,
+          ...(googleMapsMapId ? { mapId: googleMapsMapId } : {}),
           zoomControl: false,
           mapTypeControl: false,
           fullscreenControl: false,
@@ -391,6 +393,7 @@ const GpsMap = () => {
         teamMapInstance.current = new mapCtor(teamMapRef.current, {
           center: { lat: 19.4326, lng: -99.1332 },
           zoom: 12,
+          ...(googleMapsMapId ? { mapId: googleMapsMapId } : {}),
           zoomControl: false,
           mapTypeControl: false,
           fullscreenControl: false,
@@ -402,7 +405,7 @@ const GpsMap = () => {
         return;
       }
     }
-  }, [mapsReady, mapCtor]);
+  }, [mapsReady, mapCtor, googleMapsMapId]);
 
   useEffect(() => {
     return () => {
