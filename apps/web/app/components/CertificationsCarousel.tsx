@@ -1,11 +1,56 @@
 'use client';
 
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import Image from 'next/image';
 import styles from '../page.module.css';
 
 export default function CertificationsCarousel() {
   const trackRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return undefined;
+
+    let frameId = 0;
+    let loopWidth = 0;
+    let position = 0;
+    let lastTimestamp = performance.now();
+    const speedPxPerSecond = 34;
+
+    const updateLoopWidth = () => {
+      loopWidth = track.scrollWidth / 3;
+    };
+
+    updateLoopWidth();
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateLoopWidth();
+      if (loopWidth > 0) {
+        position = position % loopWidth;
+      }
+    });
+    resizeObserver.observe(track);
+
+    const animate = (timestamp: number) => {
+      const deltaSeconds = (timestamp - lastTimestamp) / 1000;
+      lastTimestamp = timestamp;
+
+      if (loopWidth > 0) {
+        position = (position + speedPxPerSecond * deltaSeconds) % loopWidth;
+        track.style.transform = `translate3d(${-position}px, 0, 0)`;
+      }
+
+      frameId = window.requestAnimationFrame(animate);
+    };
+
+    frameId = window.requestAnimationFrame(animate);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      resizeObserver.disconnect();
+      track.style.transform = '';
+    };
+  }, []);
 
   const certifications = [
     { id: 1, file: 'certificaciones-01.png', alt: 'Linksys' },
@@ -32,7 +77,7 @@ export default function CertificationsCarousel() {
       </div>
 
       <div className={styles.carouselContainer}>
-        <div className={styles.carouselTrack} ref={trackRef}>
+        <div className={styles.carouselTrack} ref={trackRef} style={{ animation: 'none' }}>
           {duplicatedCerts.map((cert, idx) => (
             <div key={`${cert.id}-${idx}`} className={styles.carouselSlide}>
               <Image

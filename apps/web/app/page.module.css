@@ -2064,7 +2064,7 @@
   margin-top: calc(-1 * var(--header-offset));
   display: flex;
   justify-content: center;
-  min-height: clamp(600px, 75vh, 850px);
+  min-height: clamp(560px, 72vh, 760px);
   align-items: center;
   padding: 0;
   padding-top: var(--header-offset);
@@ -2073,11 +2073,10 @@
   justify-self: stretch;
   align-self: stretch;
   background:
-    radial-gradient(circle at 14% 18%, rgba(15, 106, 214, 0.16), transparent 36%),
-    radial-gradient(circle at 84% 12%, rgba(22, 169, 110, 0.18), transparent 40%),
-    radial-gradient(circle at 50% 100%, rgba(245, 158, 11, 0.12), transparent 46%),
-    linear-gradient(160deg, rgba(235, 246, 255, 0.94) 0%, rgba(230, 252, 242, 0.92) 42%, rgba(224, 242, 255, 0.94) 100%);
-  transition: background 0.35s ease;
+    radial-gradient(circle at 10% 14%, color-mix(in srgb, var(--primary) 14%, transparent) 0%, transparent 40%),
+    radial-gradient(circle at 88% 10%, color-mix(in srgb, var(--secondary) 16%, transparent) 0%, transparent 44%),
+    linear-gradient(160deg, color-mix(in srgb, var(--surface) 90%, var(--background)) 0%, color-mix(in srgb, var(--surface) 82%, var(--background)) 100%);
+  transition: background 0.3s ease;
 }
 
 .heroWrapper::before,
@@ -2089,20 +2088,25 @@
 }
 
 .heroWrapper::before {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.08) 48%, rgba(255, 255, 255, 0.16) 100%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface) 60%, transparent) 0%,
+    color-mix(in srgb, var(--surface) 18%, transparent) 52%,
+    color-mix(in srgb, var(--surface) 44%, transparent) 100%
+  );
 }
 
 .heroWrapper::after {
   background-image:
-    linear-gradient(rgba(15, 106, 214, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(15, 106, 214, 0.05) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(circle at center, black 52%, transparent 100%);
+    linear-gradient(color-mix(in srgb, var(--primary) 8%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--primary) 7%, transparent) 1px, transparent 1px);
+  background-size: 54px 54px;
+  mask-image: linear-gradient(180deg, black 0%, black 62%, transparent 100%);
 }
 
 @media (max-width: 768px) {
   .heroWrapper {
-    min-height: clamp(500px, 65vh, 700px);
+    min-height: clamp(520px, 70vh, 640px);
     padding: 0 12px;
     padding-top: var(--header-offset);
     width: 100%;
@@ -2115,7 +2119,7 @@
 
 @media (max-width: 480px) {
   .heroWrapper {
-    min-height: clamp(450px, 60vh, 600px);
+    min-height: clamp(500px, 68vh, 600px);
     padding: 0 8px;
     padding-top: var(--header-offset);
     width: 100%;
@@ -2127,34 +2131,69 @@
 }
 
 .hero {
-  text-align: center;
+  text-align: left;
   width: 100%;
-  max-width: 720px;
+  max-width: min(var(--content-max), 1200px);
   margin: 0 auto;
-  padding: clamp(28px, 5vw, 56px) clamp(20px, 4vw, 48px);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(231, 246, 247, 0.95), rgba(237, 249, 245, 0.94));
-  border: 1px solid rgba(14, 165, 114, 0.18);
-  border-radius: 28px;
-  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.08), 0 10px 24px rgba(14, 165, 114, 0.14), 0 0 0 1px rgba(255, 255, 255, 0.6) inset;
-  backdrop-filter: blur(6px);
+  padding: clamp(34px, 4.3vw, 52px) clamp(24px, 3.2vw, 44px);
+  background: linear-gradient(
+    155deg,
+    color-mix(in srgb, var(--surface) 96%, var(--background)) 0%,
+    color-mix(in srgb, var(--surface) 88%, var(--background)) 100%
+  );
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--gray-alpha-200));
+  border-radius: 26px;
+  box-shadow: 0 18px 38px var(--shadow);
   transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
   position: relative;
   z-index: 2;
 }
 
+.heroLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.92fr);
+  gap: clamp(24px, 3vw, 44px);
+  align-items: stretch;
+}
+
+.heroContent {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.heroEyebrow {
+  display: inline-flex;
+  width: fit-content;
+  padding: 7px 14px;
+  margin-bottom: 16px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--gray-alpha-200));
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+  color: color-mix(in srgb, var(--foreground) 86%, var(--primary));
+  font-size: 0.73rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
 @media (max-width: 768px) {
   .hero {
-    padding: 40px 24px;
+    padding: 30px 20px;
     border-radius: 20px;
     max-width: 100%;
     margin: 0;
     width: 100%;
   }
+
+  .heroLayout {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
 }
 
 @media (max-width: 480px) {
   .hero {
-    padding: 32px 20px;
+    padding: 24px 16px;
     border-radius: 16px;
     max-width: 100%;
     margin: 0;
@@ -2163,12 +2202,12 @@
 }
 
 .heroTitle {
-  font-size: clamp(1.9rem, 3.2vw, 2.9rem);
+  font-size: clamp(2.05rem, 3.3vw, 3rem);
   font-weight: 800;
   margin-bottom: 16px;
   color: var(--foreground); /* Light: #151518, Dark: #ededed */
-  line-height: 1.17;
-  letter-spacing: -0.018em;
+  line-height: 1.16;
+  letter-spacing: -0.022em;
   transition: color 0.3s;
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -2177,73 +2216,215 @@
 
 @media (max-width: 768px) {
   .heroTitle {
-    font-size: 1.6rem;
+    font-size: 1.86rem;
     margin-bottom: 12px;
-    line-height: 1.3;
+    line-height: 1.24;
   }
 }
 
 @media (max-width: 480px) {
   .heroTitle {
-    font-size: 1.4rem;
-    line-height: 1.35;
+    font-size: 1.55rem;
+    line-height: 1.3;
   }
 }
 
 .heroSubtitle {
-  font-size: clamp(1rem, 1.8vw, 1.3rem);
-  color: var(--foreground); /* Light: #151518, Dark: #ededed */
-  margin-bottom: 32px;
-  opacity: 0.92;
-  max-width: 640px;
-  margin-left: auto;
-  margin-right: auto;
-  line-height: 1.66;
+  font-size: clamp(1rem, 1.4vw, 1.15rem);
+  color: color-mix(in srgb, var(--foreground) 88%, var(--primary));
+  margin-bottom: 24px;
+  opacity: 1;
+  max-width: 52ch;
+  margin-left: 0;
+  margin-right: 0;
+  line-height: 1.6;
   transition: color 0.3s;
   word-wrap: break-word;
   overflow-wrap: break-word;
   text-wrap: pretty;
 }
 
+.heroBenefits {
+  margin: 0 0 28px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.heroBenefits li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 0.98rem;
+  color: color-mix(in srgb, var(--foreground) 90%, var(--primary));
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--primary) 14%, var(--gray-alpha-200));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 84%, var(--background));
+}
+
+.heroBenefits li::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  margin-top: 0.35em;
+  background: linear-gradient(
+    140deg,
+    color-mix(in srgb, var(--primary) 88%, var(--surface)) 0%,
+    color-mix(in srgb, var(--secondary) 70%, var(--surface)) 100%
+  );
+  flex-shrink: 0;
+}
+
 @media (max-width: 768px) {
   .heroSubtitle {
-    font-size: 0.95rem;
-    margin-bottom: 20px;
+    font-size: 0.98rem;
+    margin-bottom: 18px;
     line-height: 1.5;
     max-width: 100%;
+  }
+
+  .heroBenefits {
+    margin-bottom: 20px;
+    gap: 9px;
+  }
+
+  .heroBenefits li {
+    font-size: 0.92rem;
+    padding: 9px 11px;
   }
 }
 
 @media (max-width: 480px) {
   .heroSubtitle {
     font-size: 0.875rem;
-    margin-bottom: 18px;
+    margin-bottom: 14px;
     line-height: 1.4;
+  }
+
+  .heroBenefits li {
+    font-size: 0.88rem;
   }
 }
 
 .heroButtons {
   display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.heroButtons a {
+  min-height: 46px;
+}
+
+.heroPrimaryCta {
+  min-width: 220px;
+  font-weight: 700;
+}
+
+.heroSecondaryCta {
+  min-width: 220px;
+  font-weight: 650;
+}
+
+.heroPanel {
+  border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--gray-alpha-200));
+  border-radius: 20px;
+  background: linear-gradient(
+    170deg,
+    color-mix(in srgb, var(--surface) 97%, var(--background)) 0%,
+    color-mix(in srgb, var(--surface) 90%, var(--background)) 100%
+  );
+  padding: 22px;
+  box-shadow: 0 14px 30px var(--shadow);
+  display: flex;
+  flex-direction: column;
   justify-content: center;
-  gap: 16px;
+  height: 100%;
+}
+
+.heroPanelTitle {
+  margin: 0 0 16px;
+  font-size: 1.04rem;
+  font-weight: 800;
+  color: color-mix(in srgb, var(--foreground) 90%, var(--primary));
+  line-height: 1.35;
+}
+
+.heroStats {
+  display: grid;
+  gap: 12px;
+}
+
+.heroStatItem {
+  display: grid;
+  gap: 6px;
+  padding: 14px 14px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--primary) 12%, var(--gray-alpha-200));
+  background: color-mix(in srgb, var(--surface) 78%, var(--background));
+  transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+
+.heroStatItem strong {
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: color-mix(in srgb, var(--foreground) 92%, var(--primary));
+}
+
+.heroStatItem span {
+  font-size: 0.9rem;
+  color: color-mix(in srgb, var(--foreground) 80%, var(--primary));
+  opacity: 1;
+}
+
+.heroStatItem:hover {
+  border-color: color-mix(in srgb, var(--primary) 28%, var(--gray-alpha-200));
+  background: color-mix(in srgb, var(--surface) 88%, var(--background));
+  transform: translateY(-1px);
 }
 
 @media (max-width: 768px) {
   .heroButtons {
     flex-direction: column;
-    gap: 12px;
+    align-items: stretch;
+    gap: 10px;
     width: 100%;
   }
-  
+
   .heroButtons a {
     width: 100%;
     justify-content: center;
+  }
+
+  .heroPrimaryCta,
+  .heroSecondaryCta {
+    min-width: 0;
+  }
+
+  .heroPanel {
+    padding: 16px;
+    border-radius: 16px;
+    height: auto;
   }
 }
 
 @media (max-width: 480px) {
   .heroButtons {
-    gap: 10px;
+    gap: 8px;
+  }
+
+  .heroPanelTitle {
+    font-size: 0.94rem;
+  }
+
+  .heroStatItem {
+    padding: 10px;
   }
 }
 
@@ -2254,12 +2435,13 @@
 }
 
 :global(body.light) .hero {
-  /* Remove blue-tinted shading in light mode for crisper background */
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.93), rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.96));
-  border-color: rgba(100, 150, 200, 0.22);
-  /* Remove tinted shadow and blur in light mode for crisper hero */
-  box-shadow: 0 24px 72px rgba(0, 0, 0, 0.08), 0 8px 20px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(255, 255, 255, 0.7) inset;
-  backdrop-filter: none;
+  background: linear-gradient(
+    155deg,
+    color-mix(in srgb, var(--surface) 96%, var(--background)) 0%,
+    color-mix(in srgb, var(--surface) 88%, var(--background)) 100%
+  );
+  border-color: color-mix(in srgb, var(--primary) 20%, var(--gray-alpha-200));
+  box-shadow: 0 18px 38px var(--shadow);
 }
 
 /* Dark mode via media query */
@@ -2270,9 +2452,13 @@
   }
 
   .hero {
-    background: linear-gradient(180deg, rgba(21, 21, 24, 0.78), rgba(21, 21, 24, 0.92));
-    border-color: rgba(23, 137, 252, 0.16);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35), 0 6px 18px rgba(23, 137, 252, 0.18);
+    background: linear-gradient(
+      155deg,
+      color-mix(in srgb, var(--surface) 90%, var(--background)) 0%,
+      color-mix(in srgb, var(--surface) 84%, var(--background)) 100%
+    );
+    border-color: color-mix(in srgb, var(--primary) 26%, var(--gray-alpha-200));
+    box-shadow: 0 18px 38px var(--shadow);
   }
 }
 
@@ -2283,35 +2469,47 @@
 }
 
 :global(body.dark) .hero {
-  background: linear-gradient(180deg, rgba(21, 21, 24, 0.78), rgba(21, 21, 24, 0.92));
-  border-color: rgba(23, 137, 252, 0.16);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35), 0 6px 18px rgba(23, 137, 252, 0.18);
+  background: linear-gradient(
+    155deg,
+    color-mix(in srgb, var(--surface) 90%, var(--background)) 0%,
+    color-mix(in srgb, var(--surface) 84%, var(--background)) 100%
+  );
+  border-color: color-mix(in srgb, var(--primary) 26%, var(--gray-alpha-200));
+  box-shadow: 0 18px 38px var(--shadow);
+}
+
+:global(body.dark) .heroPanel,
+:global(body.dark) .heroStatItem {
+  border-color: var(--gray-alpha-200);
 }
 
 :global(body.light) .heroWrapper {
   background:
-    radial-gradient(circle at 14% 18%, rgba(15, 106, 214, 0.16), transparent 36%),
-    radial-gradient(circle at 84% 12%, rgba(22, 169, 110, 0.18), transparent 40%),
-    radial-gradient(circle at 50% 100%, rgba(245, 158, 11, 0.12), transparent 46%),
-    linear-gradient(160deg, rgba(235, 246, 255, 0.94) 0%, rgba(230, 252, 242, 0.92) 42%, rgba(224, 242, 255, 0.94) 100%);
+    radial-gradient(circle at 10% 14%, color-mix(in srgb, var(--primary) 14%, transparent) 0%, transparent 40%),
+    radial-gradient(circle at 88% 10%, color-mix(in srgb, var(--secondary) 16%, transparent) 0%, transparent 44%),
+    linear-gradient(160deg, color-mix(in srgb, var(--surface) 90%, var(--background)) 0%, color-mix(in srgb, var(--surface) 82%, var(--background)) 100%);
 }
 
 :global(body.dark) .heroWrapper {
   background:
-    radial-gradient(circle at 14% 16%, rgba(31, 137, 252, 0.2), transparent 38%),
-    radial-gradient(circle at 82% 10%, rgba(22, 169, 110, 0.18), transparent 42%),
-    radial-gradient(circle at 52% 102%, rgba(245, 158, 11, 0.14), transparent 48%),
-    linear-gradient(160deg, rgba(7, 12, 24, 0.98) 0%, rgba(8, 24, 30, 0.96) 42%, rgba(8, 16, 34, 0.98) 100%);
+    radial-gradient(circle at 10% 12%, color-mix(in srgb, var(--primary) 22%, transparent) 0%, transparent 42%),
+    radial-gradient(circle at 88% 10%, color-mix(in srgb, var(--secondary) 20%, transparent) 0%, transparent 44%),
+    linear-gradient(160deg, color-mix(in srgb, var(--surface) 72%, var(--background)) 0%, color-mix(in srgb, var(--surface) 66%, var(--background)) 100%);
 }
 
 :global(body.dark) .heroWrapper::before {
-  background: linear-gradient(180deg, rgba(2, 6, 16, 0.34) 0%, rgba(2, 6, 16, 0.18) 48%, rgba(2, 6, 16, 0.28) 100%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--background) 42%, transparent) 0%,
+    color-mix(in srgb, var(--background) 18%, transparent) 52%,
+    color-mix(in srgb, var(--background) 36%, transparent) 100%
+  );
 }
 
 :global(body.dark) .heroWrapper::after {
   background-image:
-    linear-gradient(rgba(31, 137, 252, 0.1) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(31, 137, 252, 0.08) 1px, transparent 1px);
+    linear-gradient(color-mix(in srgb, var(--primary) 14%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--primary) 11%, transparent) 1px, transparent 1px);
 }
 
 .main ol {
@@ -2528,134 +2726,10 @@ button.secondary {
   }
 }
 
-/* Responsive optimizado para móviles - MEJORADO */
+/* Responsive forms */
 @media (max-width: 768px) {
-  .heroWrapper {
-    min-height: clamp(500px, 75vh, 600px);
-    border-radius: 0 0 32px 32px;
-    overflow: hidden;
-  }
-  
-  .hero {
-    padding: 56px 24px 48px;
-    max-width: 100%;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    animation: fadeSlideUp 0.8s ease-out;
-  }
-
-  @keyframes fadeSlideUp {
-    from {
-      opacity: 0;
-      transform: translateY(30px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  
-  .heroTitle {
-    font-size: clamp(1.85rem, 8vw, 2.5rem);
-    margin-bottom: 20px;
-    line-height: 1.2;
-    font-weight: 900;
-    letter-spacing: -0.02em;
-    animation: fadeIn 1s ease-out 0.2s both;
-    text-shadow: 0 2px 20px rgba(70, 130, 180, 0.15);
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-  
-  .heroSubtitle {
-    font-size: clamp(1.05rem, 4vw, 1.2rem);
-    margin-bottom: 32px;
-    line-height: 1.6;
-    max-width: 90%;
-    animation: fadeIn 1s ease-out 0.4s both;
-    font-weight: 500;
-  }
-  
-  .heroButtons {
-    flex-direction: column;
-    gap: 16px;
-    width: 100%;
-    max-width: 400px;
-    animation: fadeSlideUp 1s ease-out 0.6s both;
-  }
-  
-  .heroButtons a {
-    width: 100%;
-    justify-content: center;
-    padding: 18px 32px;
-    font-size: 1.05rem;
-    font-weight: 700;
-    border-radius: 16px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  }
-
-  .heroButtons a.primary {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-    transform: scale(1);
-  }
-
-  .heroButtons a.primary:active {
-    transform: scale(0.96);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  }
-
-  .heroButtons a.secondary {
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(10px);
-    border: 1.5px solid rgba(255, 255, 255, 0.2);
-  }
-
-  .heroButtons a.secondary:active {
-    transform: scale(0.96);
-    background: rgba(255, 255, 255, 0.25);
-  }
-  
-  .formRow { 
-    grid-template-columns: 1fr; 
-  }
-}
-
-@media (max-width: 480px) {
-  .heroWrapper {
-    min-height: clamp(450px, 75vh, 550px);
-    border-radius: 0 0 28px 28px;
-  }
-  
-  .hero {
-    padding: 48px 20px 40px;
-  }
-  
-  .heroTitle {
-    font-size: clamp(1.65rem, 7vw, 2.2rem);
-    margin-bottom: 16px;
-  }
-  
-  .heroSubtitle {
-    font-size: clamp(0.95rem, 3.5vw, 1.1rem);
-    margin-bottom: 28px;
-  }
-
-  .heroButtons {
-    gap: 14px;
-    max-width: 100%;
-  }
-
-  .heroButtons a {
-    padding: 16px 28px;
-    font-size: 1rem;
-    border-radius: 14px;
+  .formRow {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -3859,11 +3933,13 @@ button.secondary {
 }
 
 .carouselTrack {
+  --certifications-marquee-duration: 15s;
   display: flex;
   gap: 24px;
   position: relative;
   width: max-content;
-  animation: certificationsMarquee 20s linear infinite;
+  animation: certificationsMarquee var(--certifications-marquee-duration) linear infinite;
+  animation-play-state: running;
   padding: 4px 0;
   will-change: transform;
 }
@@ -3877,8 +3953,10 @@ button.secondary {
   }
 }
 
-.carouselTrack:hover {
-  animation-play-state: paused;
+@media (hover: hover) and (pointer: fine) {
+  .carouselTrack:hover {
+    animation-play-state: paused;
+  }
 }
 
 .carouselSlide {
@@ -4063,7 +4141,9 @@ button.secondary {
   
   .carouselTrack {
     gap: 16px;
-    animation: certificationsMarquee 16s linear infinite;
+    --certifications-marquee-duration: 13s;
+    animation: certificationsMarquee var(--certifications-marquee-duration) linear infinite;
+    animation-play-state: running !important;
   }
   
   .carouselSlide {
@@ -4099,7 +4179,9 @@ button.secondary {
   
   .carouselTrack {
     gap: 12px;
-    animation: certificationsMarquee 14s linear infinite;
+    --certifications-marquee-duration: 12s;
+    animation: certificationsMarquee var(--certifications-marquee-duration) linear infinite;
+    animation-play-state: running !important;
   }
   
   .carouselSlide {
@@ -4178,17 +4260,21 @@ button.secondary {
 }
 
 .brandsCarouselTrack {
+  --brands-marquee-duration: 15s;
   display: flex;
   gap: 20px;
   position: relative;
   width: max-content;
-  animation: brandsMarquee 18s linear infinite;
+  animation: brandsMarquee var(--brands-marquee-duration) linear infinite;
+  animation-play-state: running;
   padding: 4px 0;
   will-change: transform;
 }
 
 .brandsCarouselTrackReverse {
-  animation: brandsMarqueeReverse 18s linear infinite;
+  animation: brandsMarqueeReverse var(--brands-marquee-duration) linear infinite;
+  animation-delay: -7.5s;
+  animation-play-state: running;
 }
 
 @keyframes brandsMarquee {
@@ -4209,8 +4295,10 @@ button.secondary {
   }
 }
 
-.brandsCarouselTrack:hover {
-  animation-play-state: paused;
+@media (hover: hover) and (pointer: fine) {
+  .brandsCarouselTrack:hover {
+    animation-play-state: paused;
+  }
 }
 
 .brandsCarouselSlide {
@@ -4363,11 +4451,15 @@ button.secondary {
   
   .brandsCarouselTrack {
     gap: 16px;
-    animation: brandsMarquee 16s linear infinite;
+    --brands-marquee-duration: 13s;
+    animation: brandsMarquee var(--brands-marquee-duration) linear infinite;
+    animation-play-state: running !important;
   }
   
   .brandsCarouselTrackReverse {
-    animation: brandsMarqueeReverse 16s linear infinite;
+    animation: brandsMarqueeReverse var(--brands-marquee-duration) linear infinite;
+    animation-delay: -6.5s;
+    animation-play-state: running !important;
   }
   
   .brandsCarouselSlide {
@@ -4400,11 +4492,15 @@ button.secondary {
   
   .brandsCarouselTrack {
     gap: 12px;
-    animation: brandsMarquee 14s linear infinite;
+    --brands-marquee-duration: 12s;
+    animation: brandsMarquee var(--brands-marquee-duration) linear infinite;
+    animation-play-state: running !important;
   }
   
   .brandsCarouselTrackReverse {
-    animation: brandsMarqueeReverse 14s linear infinite;
+    animation: brandsMarqueeReverse var(--brands-marquee-duration) linear infinite;
+    animation-delay: -6s;
+    animation-play-state: running !important;
   }
   
   .brandsCarouselSlide {
@@ -4645,5 +4741,825 @@ a.secondary:active,
   .newsButton {
     transition: none !important;
     animation: none !important;
+  }
+
+  .carouselTrack {
+    animation-name: certificationsMarquee !important;
+    animation-duration: 15s !important;
+    animation-timing-function: linear !important;
+    animation-iteration-count: infinite !important;
+    animation-play-state: running !important;
+  }
+
+  .brandsCarouselTrack {
+    animation-name: brandsMarquee !important;
+    animation-duration: 15s !important;
+    animation-timing-function: linear !important;
+    animation-iteration-count: infinite !important;
+    animation-play-state: running !important;
+  }
+
+  .brandsCarouselTrackReverse {
+    animation-name: brandsMarqueeReverse !important;
+    animation-duration: 15s !important;
+    animation-timing-function: linear !important;
+    animation-iteration-count: infinite !important;
+    animation-delay: -7.5s !important;
+    animation-play-state: running !important;
+  }
+}
+
+/* =========================
+   Enterprise homepage layer
+   ========================= */
+
+.enterpriseStrip {
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 18px auto 6px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.enterpriseMetricCard {
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--gray-alpha-200);
+  background: color-mix(in srgb, var(--surface) 92%, var(--background));
+  box-shadow: 0 10px 24px var(--shadow);
+  display: grid;
+  gap: 6px;
+}
+
+.enterpriseMetricCard strong {
+  font-size: clamp(1.2rem, 1.8vw, 1.55rem);
+  line-height: 1.2;
+  color: var(--foreground);
+}
+
+.enterpriseMetricCard h3 {
+  margin: 0;
+  font-size: 0.86rem;
+  text-transform: uppercase;
+  letter-spacing: 0.045em;
+  color: var(--foreground);
+  opacity: 0.88;
+}
+
+.enterpriseMetricCard p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--foreground);
+  opacity: 0.72;
+  line-height: 1.45;
+}
+
+.capabilitiesSection,
+.deliverySection,
+.executiveCta {
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 26px auto 0;
+}
+
+.capabilitiesHeader,
+.deliveryHeader,
+.servicesHeader {
+  margin-bottom: 14px;
+}
+
+.capabilitiesBadge,
+.deliveryBadge,
+.servicesBadge,
+.executiveCtaBadge {
+  display: inline-flex;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--gray-alpha-200);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.capabilitiesTitle,
+.deliveryTitle,
+.executiveCta h2 {
+  margin: 12px 0 8px;
+  font-size: clamp(1.45rem, 2.4vw, 2rem);
+  line-height: 1.24;
+  color: var(--foreground);
+}
+
+.capabilitiesSubtitle,
+.executiveCta p {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.62;
+  color: var(--foreground);
+  opacity: 0.86;
+  max-width: 72ch;
+}
+
+.capabilitiesGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.capabilityCard {
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 18px;
+  padding: 16px;
+  background: color-mix(in srgb, var(--surface) 94%, var(--background));
+  box-shadow: 0 10px 24px var(--shadow);
+}
+
+.capabilityIndex {
+  display: inline-flex;
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.capabilityCard h3 {
+  margin: 0 0 8px;
+  font-size: 1.02rem;
+  color: var(--foreground);
+}
+
+.capabilityCard p {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--foreground);
+  opacity: 0.82;
+}
+
+.servicesHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.servicesGridEnterprise {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.serviceCardEnterprise {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--surface) 95%, var(--background));
+  box-shadow: 0 12px 26px var(--shadow);
+  padding: 16px;
+}
+
+.deliveryGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.deliveryCard {
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 18px;
+  padding: 16px;
+  background: color-mix(in srgb, var(--surface) 93%, var(--background));
+  box-shadow: 0 10px 24px var(--shadow);
+}
+
+.deliveryStep {
+  display: inline-flex;
+  margin-bottom: 8px;
+  color: var(--primary);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.deliveryCard h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.deliveryCard p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--foreground);
+  opacity: 0.84;
+}
+
+.executiveCta {
+  margin-top: 30px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 24px;
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 22px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--surface) 94%, var(--background)) 0%, color-mix(in srgb, var(--primary) 8%, var(--surface)) 100%);
+  box-shadow: 0 14px 30px var(--shadow);
+}
+
+.executiveCtaContent {
+  display: grid;
+  gap: 8px;
+}
+
+.executiveCtaActions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.executiveCtaActions a {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  padding: 0 20px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  font-size: 0.98rem;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.25s ease, background 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+  min-width: 228px;
+}
+
+.executiveCtaActions a.primary {
+  background: linear-gradient(135deg, var(--primary) 0%, #0d5ccc 100%);
+  color: #ffffff;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--shadow) 78%, transparent);
+}
+
+.executiveCtaActions a.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--shadow) 88%, transparent);
+}
+
+.executiveCtaActions a.secondary {
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  border-color: var(--home-border-strong);
+  color: var(--foreground);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--shadow) 55%, transparent);
+}
+
+.executiveCtaActions a.secondary:hover {
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--surface) 96%, var(--primary));
+}
+
+@media (max-width: 1024px) {
+  .enterpriseStrip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .servicesGridEnterprise,
+  .deliveryGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .executiveCta {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .enterpriseStrip {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .enterpriseMetricCard {
+    padding: 14px;
+  }
+
+  .quickNav {
+    margin-top: 10px;
+  }
+
+  .capabilitiesSection,
+  .deliverySection,
+  .executiveCta {
+    margin-top: 22px;
+  }
+
+  .capabilitiesGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .serviceCardEnterprise {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    text-align: left;
+  }
+
+  .executiveCta {
+    padding: 18px;
+    border-radius: 18px;
+  }
+
+  .executiveCtaActions {
+    flex-direction: column;
+    width: 100%;
+    gap: 12px;
+  }
+
+  .executiveCtaActions a {
+    width: 100%;
+    min-width: 0;
+    height: 46px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+  }
+}
+
+/* ======================================
+   Home UI/UX color unification (final)
+   ====================================== */
+
+.page {
+  --home-bg: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--background) 84%, var(--surface)) 0%,
+    color-mix(in srgb, var(--background) 74%, var(--surface)) 100%
+  );
+  --home-surface: color-mix(in srgb, var(--surface) 92%, var(--background));
+  --home-elevated: color-mix(in srgb, var(--surface) 97%, var(--background));
+  --home-border: color-mix(in srgb, var(--foreground) 12%, transparent);
+  --home-border-strong: color-mix(in srgb, var(--primary) 34%, transparent);
+  --home-accent-soft: color-mix(in srgb, var(--primary) 9%, var(--surface));
+  --home-shadow: 0 14px 30px color-mix(in srgb, var(--shadow) 82%, transparent);
+  background: transparent !important;
+}
+
+:global(body.dark) .page {
+  --home-surface: color-mix(in srgb, var(--surface) 88%, var(--background));
+  --home-elevated: color-mix(in srgb, var(--surface) 93%, var(--background));
+  --home-border: color-mix(in srgb, var(--foreground) 18%, transparent);
+  --home-border-strong: color-mix(in srgb, var(--primary) 44%, transparent);
+  --home-accent-soft: color-mix(in srgb, var(--primary) 18%, var(--surface));
+}
+
+.heroWrapper,
+.newsSection,
+.capabilitiesSection,
+.servicesSection,
+.deliverySection,
+.clientsSection,
+.executiveCta {
+  background: transparent;
+}
+
+.hero,
+.newsCarousel,
+.enterpriseMetricCard,
+.capabilityCard,
+.serviceCardEnterprise,
+.deliveryCard,
+.clientCard,
+.heroPanel,
+.heroStatItem,
+.executiveCta {
+  background: var(--home-surface);
+  border-color: var(--home-border);
+  box-shadow: var(--home-shadow);
+}
+
+.quickNavLink,
+.newsBadge,
+.clientsBadge,
+.capabilitiesBadge,
+.deliveryBadge,
+.servicesBadge,
+.executiveCtaBadge,
+.heroEyebrow {
+  background: var(--home-accent-soft);
+  border-color: var(--home-border-strong);
+  color: var(--foreground);
+}
+
+.newsTitle,
+.clientsTitle,
+.capabilitiesTitle,
+.deliveryTitle,
+.executiveCta h2,
+.heroTitle {
+  color: var(--foreground);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}
+
+.newsSubtitle,
+.clientsSubtitle,
+.capabilitiesSubtitle,
+.executiveCta p,
+.heroSubtitle,
+.newsContent p,
+.capabilityCard p,
+.deliveryCard p,
+.clientDescription {
+  color: color-mix(in srgb, var(--foreground) 82%, transparent);
+}
+
+.newsNav,
+.newsDot,
+.newsDotActive {
+  border-color: var(--home-border-strong);
+}
+
+.newsDot {
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.newsDotActive {
+  background: var(--primary);
+}
+
+.heroButtons a.secondary,
+.executiveCtaActions a.secondary {
+  background: var(--home-elevated);
+  border-color: var(--home-border-strong);
+}
+
+@media (max-width: 768px) {
+  .hero,
+  .newsCarousel,
+  .enterpriseMetricCard,
+  .capabilityCard,
+  .serviceCardEnterprise,
+  .deliveryCard,
+  .clientCard,
+  .heroPanel,
+  .heroStatItem,
+  .executiveCta {
+    box-shadow: 0 10px 22px color-mix(in srgb, var(--shadow) 70%, transparent);
+  }
+
+  .newsSection,
+  .capabilitiesSection,
+  .servicesSection,
+  .deliverySection,
+  .clientsSection,
+  .executiveCta {
+    margin-top: 18px;
+  }
+}
+
+/* Hero spacing polish: avoid crowded/colliding look */
+.heroWrapper {
+  min-height: auto;
+  padding-bottom: clamp(20px, 3vw, 36px);
+}
+
+.hero {
+  margin-top: clamp(10px, 1.4vw, 18px);
+  padding: clamp(34px, 4.2vw, 52px) clamp(26px, 3.4vw, 44px);
+}
+
+.heroLayout {
+  grid-template-columns: minmax(0, 1.25fr) minmax(340px, 0.95fr);
+  gap: clamp(28px, 4vw, 54px);
+  align-items: start;
+}
+
+.heroContent {
+  max-width: 64ch;
+}
+
+.heroTitle {
+  font-size: clamp(2rem, 2.8vw, 3rem);
+  margin-bottom: 16px;
+  line-height: 1.16;
+}
+
+.heroSubtitle {
+  margin-bottom: 24px;
+  max-width: 58ch;
+}
+
+.heroBenefits {
+  margin-bottom: 28px;
+}
+
+.heroPanel {
+  margin-top: 8px;
+  padding: 22px;
+}
+
+.heroStatItem {
+  padding: 14px;
+}
+
+.enterpriseStrip {
+  margin-top: 20px;
+  gap: 14px;
+}
+
+@media (max-width: 1100px) {
+  .heroLayout {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .heroContent {
+    max-width: 100%;
+  }
+
+  .heroPanel {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .heroWrapper {
+    padding-bottom: 14px;
+  }
+
+  .hero {
+    margin-top: 8px;
+    padding: 24px 18px;
+  }
+
+  .heroTitle {
+    font-size: clamp(1.55rem, 6vw, 2rem);
+    line-height: 1.22;
+  }
+
+  .heroSubtitle {
+    margin-bottom: 16px;
+  }
+
+  .heroBenefits {
+    margin-bottom: 18px;
+  }
+
+  .heroPanel {
+    padding: 14px;
+    border-radius: 14px;
+  }
+
+  .heroPanelTitle {
+    margin-bottom: 10px;
+  }
+
+  .heroStatItem {
+    padding: 10px;
+  }
+
+  .enterpriseStrip {
+    margin-top: 12px;
+  }
+}
+
+/* Services enterprise layout fix: override legacy grid section */
+.servicesSection {
+  display: block;
+  margin: 26px auto 0;
+  padding: 0;
+}
+
+.servicesHeader {
+  max-width: 70ch;
+  margin-bottom: 14px;
+}
+
+.servicesGridEnterprise {
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.serviceCardEnterprise {
+  min-width: 0;
+  padding: 20px;
+  gap: 18px;
+  align-items: start;
+}
+
+.serviceCardEnterprise .serviceContent {
+  min-width: 0;
+}
+
+.serviceCardEnterprise .serviceBadge {
+  margin-bottom: 10px;
+  box-shadow: none;
+}
+
+.serviceCardEnterprise .serviceTitle {
+  font-size: clamp(1.2rem, 1.5vw, 1.5rem);
+  margin-bottom: 10px;
+  line-height: 1.28;
+  letter-spacing: -0.01em;
+  transform: none;
+}
+
+.serviceCardEnterprise .serviceDescription {
+  font-size: 0.98rem;
+  line-height: 1.6;
+  font-weight: 500;
+}
+
+.serviceCardEnterprise:hover .serviceTitle,
+.serviceCardEnterprise:hover .serviceBadge {
+  transform: none;
+}
+
+.serviceCardEnterprise .serviceImageWrapper {
+  width: 168px;
+  height: 168px;
+  border-radius: 16px;
+}
+
+@media (max-width: 1024px) {
+  .servicesSection {
+    margin-top: 22px;
+  }
+
+  .servicesGridEnterprise {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .serviceCardEnterprise {
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .serviceCardEnterprise .serviceTitle {
+    font-size: 1.15rem;
+    margin-bottom: 8px;
+  }
+
+  .serviceCardEnterprise .serviceDescription {
+    font-size: 0.92rem;
+    line-height: 1.5;
+  }
+
+  .serviceCardEnterprise .serviceImageWrapper {
+    width: 132px;
+    height: 132px;
+  }
+}
+
+/* Background cleanup requested: remove decorative backdrop */
+.page {
+  background: transparent !important;
+}
+
+.heroWrapper,
+:global(body.light) .heroWrapper,
+:global(body.dark) .heroWrapper {
+  position: static !important;
+  background: transparent !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  width: 100% !important;
+  max-width: var(--content-max) !important;
+  left: auto !important;
+  right: auto !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  min-height: auto !important;
+  transform: none !important;
+  justify-content: flex-start !important;
+  align-items: flex-start !important;
+  overflow: visible !important;
+  justify-self: auto !important;
+  align-self: auto !important;
+}
+
+.heroWrapper::before,
+.heroWrapper::after,
+:global(body.dark) .heroWrapper::before,
+:global(body.dark) .heroWrapper::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Unified corporate layer for Inicio */
+.page {
+  color: color-mix(in srgb, var(--foreground) 96%, var(--primary));
+  margin-top: calc(-1 * var(--header-offset)) !important;
+  padding-top: var(--header-offset) !important;
+}
+
+.hero,
+.heroPanel,
+.heroStatItem,
+.enterpriseMetricCard,
+.newsSection,
+.servicesSection,
+.whyNexara,
+.clientsSection,
+.faqSection {
+  border-color: var(--public-border) !important;
+  background: var(--public-surface-strong);
+  box-shadow: var(--public-shadow);
+}
+
+.hero {
+  background: var(--public-hero-bg);
+  border-radius: var(--public-radius-xl);
+  margin-top: 0 !important;
+}
+
+.main {
+  padding-top: 0 !important;
+}
+
+@media (max-width: 768px) {
+  .heroWrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+}
+
+.heroTitle,
+.newsTitle,
+.servicesTitle,
+.clientsTitle,
+.faqTitle {
+  background: var(--public-title-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.quickNav {
+  justify-content: center;
+}
+
+.quickNavLink {
+  background: var(--public-nav-pill);
+  border-color: var(--public-border);
+  color: var(--public-nav-text);
+}
+
+.quickNavLink:hover {
+  background: var(--public-nav-pill-active);
+}
+
+.quickNavLink:focus-visible,
+.heroPrimaryCta:focus-visible,
+.heroSecondaryCta:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary) 68%, white 32%);
+  outline-offset: 3px;
+}
+
+.heroPrimaryCta {
+  background: var(--public-title-gradient);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--shadow) 75%, transparent);
+}
+
+.heroSecondaryCta {
+  background: var(--public-surface-strong);
+  border-color: var(--public-border);
+  color: var(--public-nav-text);
+}
+
+.heroSubtitle,
+.newsSubtitle,
+.servicesSubtitle,
+.clientsSubtitle {
+  color: color-mix(in srgb, var(--foreground) 90%, var(--primary));
+}
+
+@media (max-width: 760px) {
+  .page {
+    margin-top: calc(-1 * (var(--header-offset) + 12px)) !important;
+    padding-top: calc(var(--header-offset) + 12px) !important;
+    padding: 10px 10px 38px;
+  }
+
+  .quickNav {
+    justify-content: flex-start;
+  }
+
+  .quickNavLink {
+    padding: 8px 12px;
+    font-size: 0.83rem;
+  }
+
+  .heroPrimaryCta,
+  .heroSecondaryCta {
+    padding: 11px 16px;
+    font-size: 0.92rem;
   }
 }

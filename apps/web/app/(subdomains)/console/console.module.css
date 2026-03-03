@@ -311,6 +311,18 @@
   opacity: 1;
 }
 
+:global(body.light) .consoleTopbar {
+  background: linear-gradient(180deg, rgba(247, 251, 255, 0.96), rgba(236, 245, 255, 0.96));
+  border-color: rgba(15, 106, 214, 0.2);
+  box-shadow: 0 10px 22px rgba(15, 106, 214, 0.12), 0 3px 8px rgba(15, 106, 214, 0.08);
+}
+
+:global(body.light) .consoleLayout :global(.card) {
+  background: linear-gradient(165deg, rgba(252, 255, 255, 0.94), rgba(239, 247, 255, 0.94));
+  border-color: rgba(15, 106, 214, 0.18);
+  box-shadow: 0 14px 28px rgba(15, 106, 214, 0.14), 0 4px 12px rgba(15, 106, 214, 0.08);
+}
+
 .consoleMain {
   flex: 1;
   padding: var(--panel-padding-y) var(--panel-padding-x);
@@ -2001,16 +2013,53 @@
 
   .themeSwitcher {
     width: 100%;
-    padding: 0.75rem;
-    border-radius: 12px;
-    font-size: 1.5rem;
-    background: transparent;
-    border: 2px solid rgba(15, 106, 214, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1.5px solid rgba(15, 106, 214, 0.24);
+    background: linear-gradient(135deg, rgba(15, 106, 214, 0.1), rgba(22, 169, 110, 0.08));
+    color: var(--foreground);
+    font-size: 0.95rem;
+    font-weight: 600;
+    box-shadow: 0 6px 14px rgba(15, 106, 214, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
+  }
+
+  :global(body.light) .themeSwitcher {
+    background: linear-gradient(135deg, rgba(15, 106, 214, 0.14), rgba(22, 169, 110, 0.1));
+    border-color: rgba(15, 106, 214, 0.3);
+    color: var(--foreground);
+  }
+
+  :global(body.dark) .themeSwitcher {
+    background: linear-gradient(135deg, rgba(31, 137, 252, 0.18), rgba(20, 162, 133, 0.15));
+    border-color: rgba(31, 137, 252, 0.35);
+    color: #d9e8ff;
   }
 
   .themeSwitcher:hover {
-    background: linear-gradient(135deg, rgba(15, 106, 214, 0.12), rgba(22, 169, 110, 0.12));
+    transform: translateY(-1px);
+    background: linear-gradient(135deg, rgba(15, 106, 214, 0.18), rgba(22, 169, 110, 0.14));
     border-color: var(--primary);
+    box-shadow: 0 10px 18px rgba(15, 106, 214, 0.2), 0 4px 10px rgba(15, 106, 214, 0.12);
+  }
+
+  .themeIcon {
+    font-size: 1rem;
+    color: var(--primary);
+  }
+
+  :global(body.dark) .themeIcon {
+    color: #9ec8ff;
+  }
+
+  .themeLabel {
+    display: inline;
+    font-size: 0.9rem;
+    letter-spacing: 0.01em;
   }
 }
 

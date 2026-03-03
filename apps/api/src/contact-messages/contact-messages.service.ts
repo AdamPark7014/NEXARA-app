@@ -28,6 +28,7 @@ export class ContactMessagesService {
         phone: createContactMessageDto.phone || null,
         company: createContactMessageDto.company || null,
         subject: createContactMessageDto.subject || null,
+        category: createContactMessageDto.category || 'SOPORTE',
         message: createContactMessageDto.message,
         newsletter: createContactMessageDto.newsletter ?? false,
         source: createContactMessageDto.source || null,
@@ -35,10 +36,18 @@ export class ContactMessagesService {
       },
     });
 
+    // Notify the new contact via realtime
     this.realtimeGateway.emit('contacts:changed', {
       type: 'created',
       message,
     });
+
+    // Send notification email to the corresponding team + BCC gerencia
+    try {
+      await this.sendInternalNotification(message);
+    } catch (err) {
+      console.warn('[contact-messages] Internal notification email failed', err);
+    }
 
     if (createContactMessageDto.newsletter) {
       try {
@@ -56,29 +65,95 @@ export class ContactMessagesService {
     return message;
   }
 
-  async findAll(status?: string) {
+  async findAll(status?: string, category?: string) {
     const normalizedStatus = this.normalizeStatus(status);
+    const normalizedCategory = category?.toUpperCase().trim();
+    const validCategory = normalizedCategory === 'SOPORTE' || normalizedCategory === 'VENTAS' ? normalizedCategory : undefined;
+    const where: any = {};
+    if (normalizedStatus) where.status = normalizedStatus;
+    if (validCategory) where.category = validCategory;
     return await this.db.contactMessage.findMany({
-      where: normalizedStatus ? { status: normalizedStatus } : undefined,
+      where: Object.keys(where).length ? where : undefined,
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  private buildTransporter() {
+  /** Build SMTP transporter for the given category */
+  private buildTransporterForCategory(category: 'SOPORTE' | 'VENTAS' = 'SOPORTE') {
     const host = process.env['SMTP_HOST'];
     const port = Number(process.env['SMTP_PORT'] || 587);
-    const user = process.env['SMTP_USER'];
-    const pass = process.env['SMTP_PASS'];
+
+    let user: string | undefined;
+    let pass: string | undefined;
+
+    if (category === 'VENTAS') {
+      user = process.env['SMTP_VENTAS_USER'] || process.env['SMTP_USER'];
+      pass = process.env['SMTP_VENTAS_PASS'] || process.env['SMTP_PASS'];
+    } else {
+      user = process.env['SMTP_SOPORTE_USER'] || process.env['SMTP_USER'];
+      pass = process.env['SMTP_SOPORTE_PASS'] || process.env['SMTP_PASS'];
+    }
 
     if (!host || !user || !pass) {
       throw new InternalServerErrorException('SMTP no configurado');
     }
 
-    return nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass },
+    return { transporter: nodemailer.createTransport({ host, port, secure: port === 465, auth: { user, pass } }), from: user };
+  }
+
+  /** Notify the responsible team when a new contact arrives */
+  private async sendInternalNotification(message: any) {
+    const category = message.category || 'SOPORTE';
+    const { transporter, from } = this.buildTransporterForCategory(category);
+    const gerenciaEmail = process.env['SMTP_USER'] || 'gerencia@nexara.com.mx';
+
+    const categoryLabel = category === 'VENTAS' ? 'Ventas y Productos' : 'Soporte y Ayuda';
+    const subject = `Nuevo contacto [${categoryLabel}]: ${message.name}`;
+    const baseUrl = (process.env['PUBLIC_WEB_URL'] || 'https://nexara.com.mx').replace(/\/+$/, '');
+    const logoUrl = (process.env['EMAIL_LOGO_URL'] || `${baseUrl}/logo-nexara.png`).trim();
+
+    const html = `
+      <div style="background-color:#f5f7fb;padding:24px 12px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:18px;overflow:hidden;font-family:Arial,sans-serif;">
+          <tr>
+            <td style="padding:20px 24px;background:linear-gradient(135deg,#0b1b2e,#0c243a);color:#ffffff;">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="vertical-align:middle;"><img src="${logoUrl}" alt="Nexara" width="120" height="40" style="display:block;border:0;" /></td>
+                  <td style="text-align:right;vertical-align:middle;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#c6d7ef;">Nuevo contacto</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px;color:#1f2a44;">
+              <p style="margin:0 0 6px;font-size:13px;opacity:0.6;">Categoria: <strong>${categoryLabel}</strong></p>
+              <p style="margin:0 0 12px;font-size:16px;font-weight:700;">${this.escapeHtml(message.name)}</p>
+              <table cellpadding="4" cellspacing="0" style="font-size:14px;color:#45556f;">
+                <tr><td style="font-weight:600;">Email:</td><td>${this.escapeHtml(message.email)}</td></tr>
+                ${message.phone ? `<tr><td style="font-weight:600;">Tel:</td><td>${this.escapeHtml(message.phone)}</td></tr>` : ''}
+                ${message.company ? `<tr><td style="font-weight:600;">Empresa:</td><td>${this.escapeHtml(message.company)}</td></tr>` : ''}
+                ${message.subject ? `<tr><td style="font-weight:600;">Asunto:</td><td>${this.escapeHtml(message.subject)}</td></tr>` : ''}
+              </table>
+              <div style="margin-top:16px;background:#f1f5fb;border:1px solid #d7e1f2;border-radius:14px;padding:14px;color:#24324a;line-height:1.6;">
+                ${this.escapeHtml(message.message).replace(/\n/g, '<br />')}
+              </div>
+              <p style="margin:16px 0 0;font-size:13px;opacity:0.5;">Origen: ${message.source || 'formulario'}</p>
+            </td>
+          </tr>
+        </table>
+      </div>
+    `;
+
+    // Send to the category email, BCC to gerencia always
+    const bcc = from.toLowerCase() !== gerenciaEmail.toLowerCase() ? [gerenciaEmail] : [];
+
+    await transporter.sendMail({
+      from,
+      to: from,
+      subject,
+      html,
+      bcc: bcc.length ? bcc : undefined,
     });
   }
 
@@ -87,15 +162,21 @@ export class ContactMessagesService {
     subject: string;
     htmlContent: string;
     textContent?: string;
+    category?: 'SOPORTE' | 'VENTAS';
   }) {
-    const transporter = this.buildTransporter();
-    const from = process.env['SMTP_FROM'] || 'no-reply@nexara.com';
-    const replyTo = process.env['SMTP_REPLY_TO'] || undefined;
+    const { transporter, from } = this.buildTransporterForCategory(payload.category || 'SOPORTE');
+    const gerenciaEmail = process.env['SMTP_USER'] || 'gerencia@nexara.com.mx';
+
+    // BCC to gerencia always
+    const bccEmails: string[] = [];
+    if (from.toLowerCase() !== gerenciaEmail.toLowerCase()) {
+      bccEmails.push(gerenciaEmail);
+    }
+    // Also include any extra BCCs from env
     const bccRaw = process.env['SMTP_BCC_EMAILS'] || '';
-    const bccEmails = bccRaw
-      .split(',')
-      .map((value) => value.trim())
-      .filter((value) => value.length > 0);
+    bccRaw.split(',').map((v) => v.trim()).filter((v) => v.length > 0).forEach((v) => {
+      if (!bccEmails.includes(v)) bccEmails.push(v);
+    });
 
     try {
       await transporter.sendMail({
@@ -104,7 +185,7 @@ export class ContactMessagesService {
         subject: payload.subject,
         html: payload.htmlContent,
         text: payload.textContent,
-        replyTo,
+        replyTo: from,
         bcc: bccEmails.length ? bccEmails : undefined,
       });
     } catch {
@@ -216,6 +297,7 @@ export class ContactMessagesService {
         subject,
         htmlContent,
         textContent,
+        category: (existing as any).category || 'SOPORTE',
       });
     }
 

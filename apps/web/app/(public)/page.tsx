@@ -64,6 +64,85 @@ const normalizeNewsImageUrl = (imageUrl?: string): string | undefined => {
 const formatNewsDate = (value?: string | null) =>
   value ? new Date(value).toLocaleDateString() : "";
 
+const enterpriseMetrics = [
+  {
+    value: "+150",
+    label: "proyectos tecnológicos entregados",
+    detail: "Implementaciones para operación empresarial y sector público.",
+  },
+  {
+    value: "99.9%",
+    label: "continuidad operativa objetivo",
+    detail: "Arquitecturas con enfoque en resiliencia y disponibilidad.",
+  },
+  {
+    value: "24/7",
+    label: "acompañamiento especializado",
+    detail: "Soporte consultivo para entornos críticos.",
+  },
+  {
+    value: "End-to-end",
+    label: "cobertura del ciclo tecnológico",
+    detail: "Diagnóstico, ejecución, adopción y mejora continua.",
+  },
+];
+
+const valuePillars = [
+  {
+    title: "Gobierno y planificación TI",
+    text: "Definimos hoja de ruta, prioridades y arquitectura alineada a objetivos de negocio.",
+  },
+  {
+    title: "Infraestructura y ciberseguridad",
+    text: "Diseñamos plataformas seguras, escalables y listas para crecimiento sostenido.",
+  },
+  {
+    title: "Servicios gestionados",
+    text: "Monitoreo, mantenimiento y soporte con acuerdos de nivel de servicio claros.",
+  },
+  {
+    title: "Adopción y cambio organizacional",
+    text: "Aseguramos transferencia de conocimiento y adopción efectiva de cada solución.",
+  },
+];
+
+const featuredSolutions = [
+  {
+    badge: "ESTRATEGIA Y EJECUCIÓN",
+    title: "Soluciones empresariales personalizadas",
+    description:
+      "Integración de infraestructura, seguridad, conectividad y continuidad con acompañamiento técnico de alto nivel.",
+    image: "soluciones-personalizadas.jpg",
+    alt: "Arquitectura empresarial personalizada",
+  },
+  {
+    badge: "RENOVACIÓN TECNOLÓGICA",
+    title: "Equipamiento corporativo y modernización",
+    description:
+      "Suministro de equipos y plataformas de marcas líderes con criterios técnicos, financieros y operativos.",
+    image: "ventas-equipos.jpg",
+    alt: "Equipamiento corporativo",
+  },
+];
+
+const deliveryModel = [
+  {
+    step: "01",
+    title: "Diagnóstico ejecutivo",
+    text: "Analizamos contexto, riesgos y objetivos para priorizar iniciativas con retorno medible.",
+  },
+  {
+    step: "02",
+    title: "Implementación controlada",
+    text: "Ejecutamos por fases con gestión de hitos, documentación y control de calidad.",
+  },
+  {
+    step: "03",
+    title: "Optimización continua",
+    text: "Medimos desempeño operativo y ajustamos capacidades para sostener resultados.",
+  },
+];
+
 export default function Home() {
   const [clients, setClients] = useState<Client[]>([]);
   const [news, setNews] = useState<NewsPost[]>([]);
@@ -82,7 +161,7 @@ export default function Home() {
     if (news.length <= 1) return undefined;
     const timer = window.setInterval(() => {
       setActiveNews((prev) => (prev + 1) % news.length);
-    }, 7000);
+    }, 5000);
     return () => window.clearInterval(timer);
   }, [news.length]);
 
@@ -241,39 +320,81 @@ export default function Home() {
     <div className={styles.page}>
       <main className={styles.main} aria-label="Inicio Nexara">
         <div className={styles.heroWrapper}>
-          <section className={styles.hero}>
-            <h1 className={styles.heroTitle}>
-              Expertos en Soluciones Tecnológicas para tu Empresa
-            </h1>
-            <p className={styles.heroSubtitle}>
-              Venta de computadoras, integración de tecnología y servicios IT a la medida.
-            </p>
-            <div className={`${styles.ctas} ${styles.heroButtons}`}>
-              <a href="/contacto" className={styles.primary}>
-                Solicita una asesoría
-              </a>
-              <a href="/soluciones" className={styles.secondary}>
-                Ver soluciones
-              </a>
+          <section className={styles.hero} aria-labelledby="hero-heading">
+            <div className={styles.heroLayout}>
+              <div className={styles.heroContent}>
+                <span className={styles.heroEyebrow}>TECNOLOGÍA EMPRESARIAL CONFIABLE</span>
+                <h1 id="hero-heading" className={styles.heroTitle}>
+                  Soluciones tecnológicas corporativas para impulsar tu operación
+                </h1>
+                <p className={styles.heroSubtitle}>
+                  Diseñamos, implementamos y damos soporte a infraestructura TI con enfoque en continuidad,
+                  productividad y crecimiento sostenible para empresas y gobierno.
+                </p>
+
+                <ul className={styles.heroBenefits} aria-label="Beneficios principales">
+                  <li>Atención consultiva y acompañamiento integral</li>
+                  <li>Implementación con estándares de calidad empresarial</li>
+                  <li>Soporte técnico especializado para tu equipo</li>
+                </ul>
+
+                <div className={`${styles.ctas} ${styles.heroButtons}`}>
+                  <a href="/contacto" className={`${styles.primary} ${styles.heroPrimaryCta}`}>
+                    Solicita una asesoría
+                  </a>
+                  <a href="/soluciones" className={`${styles.secondary} ${styles.heroSecondaryCta}`}>
+                    Conoce nuestras soluciones
+                  </a>
+                </div>
+              </div>
+
+              <aside className={styles.heroPanel} aria-label="Indicadores clave de Nexara">
+                <h2 className={styles.heroPanelTitle}>Resultados que respaldan cada proyecto</h2>
+                <div className={styles.heroStats}>
+                  <div className={styles.heroStatItem}>
+                    <strong>+10 años</strong>
+                    <span>de experiencia en servicios y soluciones TI.</span>
+                  </div>
+                  <div className={styles.heroStatItem}>
+                    <strong>Soporte especializado</strong>
+                    <span>Atención cercana para operación crítica.</span>
+                  </div>
+                  <div className={styles.heroStatItem}>
+                    <strong>Implementación de punta a punta</strong>
+                    <span>Desde diagnóstico hasta puesta en marcha.</span>
+                  </div>
+                </div>
+              </aside>
             </div>
           </section>
         </div>
 
+        <section className={styles.enterpriseStrip} aria-label="Métricas corporativas">
+          {enterpriseMetrics.map((metric) => (
+            <article key={metric.label} className={styles.enterpriseMetricCard}>
+              <strong>{metric.value}</strong>
+              <h3>{metric.label}</h3>
+              <p>{metric.detail}</p>
+            </article>
+          ))}
+        </section>
+
         <nav className={styles.quickNav} aria-label="Accesos rápidos">
-          <a href="#noticias" className={styles.quickNavLink}>Noticias</a>
-          <a href="#por-que" className={styles.quickNavLink}>Por qué Nexara</a>
+          <a href="#noticias" className={styles.quickNavLink}>Actualidad</a>
+          <a href="#capacidades" className={styles.quickNavLink}>Capacidades</a>
           <a href="#soluciones" className={styles.quickNavLink}>Soluciones</a>
+          <a href="#metodologia" className={styles.quickNavLink}>Metodología</a>
           <a href="#clientes" className={styles.quickNavLink}>Clientes</a>
           <a href="#faq" className={styles.quickNavLink}>FAQ</a>
         </nav>
 
         <section id="noticias" className={styles.newsSection} aria-labelledby="noticias-heading">
           <div className={styles.newsHeader}>
-            <span className={styles.newsBadge}>NEXARA NEWS</span>
+            <span className={styles.newsBadge}>INSIGHTS Y ACTUALIDAD</span>
             <div>
-              <h2 id="noticias-heading" className={styles.newsTitle}>Noticias que impulsan tu tecnologia</h2>
+              <h2 id="noticias-heading" className={styles.newsTitle}>Decisiones tecnológicas con contexto real</h2>
               <p className={styles.newsSubtitle}>
-                Descubre alianzas, casos de exito y lanzamientos que te mantienen un paso adelante.
+                Tendencias, alianzas y actualizaciones relevantes para equipos que lideran operación y transformación digital.
               </p>
             </div>
           </div>
@@ -301,18 +422,18 @@ export default function Home() {
                 </div>
                 <div className={styles.newsContent}>
                   <div className={styles.newsMetaLine}>
-                    <span>Actualizacion</span>
+                    <span>Reporte ejecutivo</span>
                     <span>{formatNewsDate(activeNewsItem.publishedAt || activeNewsItem.createdAt)}</span>
                   </div>
                   <h3>{activeNewsItem.title}</h3>
-                  <p>{activeNewsItem.summary || "Nueva noticia disponible."}</p>
+                  <p>{activeNewsItem.summary || "Nuevo insight disponible para tu operación."}</p>
                   <div className={styles.newsActions}>
                     <button
                       type="button"
                       className={styles.newsButton}
                       onClick={() => openNewsModal(activeNewsItem)}
                     >
-                      Ver mas
+                      Ver detalle
                     </button>
                     <div className={styles.newsDots} role="group" aria-label="Selector de noticias">
                       {news.map((item, index) => (
@@ -344,100 +465,69 @@ export default function Home() {
               </button>
             </div>
           ) : (
-            <div className={styles.newsEmpty}>Aun no hay noticias publicadas.</div>
+            <div className={styles.newsEmpty}>Próximamente publicaremos actualizaciones estratégicas.</div>
           )}
         </section>
 
-        <section id="por-que" className={styles.whyNexara} aria-labelledby="por-que-heading">
-          <div className={styles.whyBadge}>CONFIANZA Y EXPERIENCIA</div>
-          <h2 id="por-que-heading" className={styles.whyTitle}>¿Por qué Nexara?</h2>
-          <p className={styles.whyDescription}>
-            En Nexara, combinamos experiencia, calidad y atención personalizada para ofrecerte soluciones tecnológicas que impulsan tu negocio. Somos líderes en venta de equipos, integración de sistemas y soporte especializado.
-          </p>
-          <div className={styles.advantagesGrid}>
-            <div className={`${styles.advantageCard} ${styles.advantageDelay1}`}>
-              <div className={styles.advantageNumber}>01</div>
-              <div className={styles.advantageIcon}>
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"/>
-                  <polyline points="12 6 12 12 16 14"/>
-                </svg>
-              </div>
-              <h3 className={styles.advantageTitle}>+10 años de experiencia</h3>
-              <p className={styles.advantageText}>Respaldados por una década sirviendo a empresas con excelencia.</p>
-            </div>
-            <div className={`${styles.advantageCard} ${styles.advantageDelay2}`}>
-              <div className={styles.advantageNumber}>02</div>
-              <div className={styles.advantageIcon}>
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                </svg>
-              </div>
-              <h3 className={styles.advantageTitle}>Soporte especializado</h3>
-              <p className={styles.advantageText}>Equipo técnico disponible 24/7 para resolver tus dudas.</p>
-            </div>
-            <div className={`${styles.advantageCard} ${styles.advantageDelay3}`}>
-              <div className={styles.advantageNumber}>03</div>
-              <div className={styles.advantageIcon}>
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                </svg>
-              </div>
-              <h3 className={styles.advantageTitle}>Marcas líderes</h3>
-              <p className={styles.advantageText}>Productos de fabricantes reconocidos mundialmente.</p>
-            </div>
-            <div className={`${styles.advantageCard} ${styles.advantageDelay4}`}>
-              <div className={styles.advantageNumber}>04</div>
-              <div className={styles.advantageIcon}>
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                  <polyline points="22 4 12 14.01 9 11.01"/>
-                </svg>
-              </div>
-              <h3 className={styles.advantageTitle}>Soluciones llave en mano</h3>
-              <p className={styles.advantageText}>Implementación completa desde la cotización hasta la puesta en marcha.</p>
-            </div>
+        <section id="capacidades" className={styles.capabilitiesSection} aria-labelledby="capacidades-heading">
+          <div className={styles.capabilitiesHeader}>
+            <span className={styles.capabilitiesBadge}>CAPACIDADES ENTERPRISE</span>
+            <h2 id="capacidades-heading" className={styles.capabilitiesTitle}>Arquitectura, operación y evolución tecnológica</h2>
+            <p className={styles.capabilitiesSubtitle}>
+              Unificamos tecnología, procesos y personas para que cada inversión en TI se traduzca en rendimiento, control y escalabilidad.
+            </p>
+          </div>
+          <div className={styles.capabilitiesGrid}>
+            {valuePillars.map((pillar, index) => (
+              <article key={pillar.title} className={styles.capabilityCard}>
+                <span className={styles.capabilityIndex}>{String(index + 1).padStart(2, "0")}</span>
+                <h3>{pillar.title}</h3>
+                <p>{pillar.text}</p>
+              </article>
+            ))}
           </div>
         </section>
 
         <section id="soluciones" className={styles.servicesSection} aria-labelledby="soluciones-heading">
-          <h2 id="soluciones-heading" className={styles.newsTitle}>Soluciones destacadas</h2>
-          <div className={styles.serviceCard}>
-            <div className={styles.serviceContent}>
-              <div className={styles.serviceBadge}>ADECUADO A TUS NECESIDADES</div>
-              <h3 className={styles.serviceTitle}>Soluciones Personalizadas</h3>
-              <p className={styles.serviceDescription}>
-                Diseñamos soluciones TI a la medida para empresas y gobierno: infraestructura, energía, centros de datos y ciberseguridad con acompañamiento de punta a punta.
-              </p>
-            </div>
-            <div className={styles.serviceImageWrapper}>
-              <Image
-                src={versionedPublicSrc("soluciones-personalizadas.jpg")}
-                alt="Soluciones Personalizadas"
-                width={200}
-                height={200}
-                className={styles.serviceImage}
-              />
-            </div>
+          <div className={styles.servicesHeader}>
+            <span className={styles.servicesBadge}>PORTAFOLIO EMPRESARIAL</span>
+            <h2 id="soluciones-heading" className={styles.newsTitle}>Soluciones diseñadas para impacto operativo</h2>
           </div>
+          <div className={styles.servicesGridEnterprise}>
+            {featuredSolutions.map((solution) => (
+              <article key={solution.title} className={styles.serviceCardEnterprise}>
+                <div className={styles.serviceContent}>
+                  <div className={styles.serviceBadge}>{solution.badge}</div>
+                  <h3 className={styles.serviceTitle}>{solution.title}</h3>
+                  <p className={styles.serviceDescription}>{solution.description}</p>
+                </div>
+                <div className={styles.serviceImageWrapper}>
+                  <Image
+                    src={versionedPublicSrc(solution.image)}
+                    alt={solution.alt}
+                    width={200}
+                    height={200}
+                    className={styles.serviceImage}
+                  />
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
 
-          <div className={styles.serviceCard}>
-            <div className={styles.serviceContent}>
-              <div className={styles.serviceBadge}>EQUIPOS DE VANGUARDIA</div>
-              <h3 className={styles.serviceTitle}>Ventas</h3>
-              <p className={styles.serviceDescription}>
-                Te ayudamos a elegir equipos de última generación de marcas líderes, con asesoría clara para que compres justo lo que tu operación necesita.
-              </p>
-            </div>
-            <div className={styles.serviceImageWrapper}>
-              <Image
-                src={versionedPublicSrc("ventas-equipos.jpg")}
-                alt="Ventas de Equipos"
-                width={200}
-                height={200}
-                className={styles.serviceImage}
-              />
-            </div>
+        <section id="metodologia" className={styles.deliverySection} aria-labelledby="metodologia-heading">
+          <div className={styles.deliveryHeader}>
+            <span className={styles.deliveryBadge}>METODOLOGÍA DE ENTREGA</span>
+            <h2 id="metodologia-heading" className={styles.deliveryTitle}>Modelo operativo orientado a resultados</h2>
+          </div>
+          <div className={styles.deliveryGrid}>
+            {deliveryModel.map((phase) => (
+              <article key={phase.step} className={styles.deliveryCard}>
+                <span className={styles.deliveryStep}>{phase.step}</span>
+                <h3>{phase.title}</h3>
+                <p>{phase.text}</p>
+              </article>
+            ))}
           </div>
         </section>
 
@@ -447,10 +537,10 @@ export default function Home() {
         {/* Clientes satisfechos */}
         <section id="clientes" className={styles.clientsSection} aria-labelledby="clientes-heading">
           <div className={styles.clientsHeader}>
-            <div className={styles.clientsBadge}>RESULTADOS QUE RESPALDAN</div>
-            <h2 id="clientes-heading" className={styles.clientsTitle}>Clientes satisfechos</h2>
+            <div className={styles.clientsBadge}>CONFIANZA EMPRESARIAL</div>
+            <h2 id="clientes-heading" className={styles.clientsTitle}>Organizaciones que confían en Nexara</h2>
             <p className={styles.clientsSubtitle}>
-              Empresas que confían en nosotros para impulsar su tecnología.
+              Relación de largo plazo con empresas que priorizan continuidad, seguridad y eficiencia operativa.
             </p>
           </div>
           <div className={styles.clientsGrid}>
@@ -472,11 +562,25 @@ export default function Home() {
                 </div>
                 <div className={styles.clientInfo}>
                   <h3 className={styles.clientName}>{c.name}</h3>
-                  <p className={styles.clientDescription}>{c.description || "Cliente satisfecho"}</p>
+                  <p className={styles.clientDescription}>{c.description || "Cuenta activa en acompañamiento tecnológico."}</p>
                 </div>
               </div>
             );
             })}
+          </div>
+        </section>
+
+        <section className={styles.executiveCta} aria-labelledby="executive-cta-heading">
+          <div className={styles.executiveCtaContent}>
+            <span className={styles.executiveCtaBadge}>PRÓXIMO PASO</span>
+            <h2 id="executive-cta-heading">Planifica tu hoja de ruta tecnológica con un enfoque ejecutivo</h2>
+            <p>
+              Coordinemos una sesión para evaluar prioridades, riesgos y oportunidades de tu operación.
+            </p>
+          </div>
+          <div className={styles.executiveCtaActions}>
+            <a href="/contacto" className={styles.primary}>Agendar reunión estratégica</a>
+            <a href="/soluciones" className={styles.secondary}>Revisar portafolio</a>
           </div>
         </section>
 

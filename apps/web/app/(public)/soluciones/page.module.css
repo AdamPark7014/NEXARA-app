@@ -1,52 +1,57 @@
 /* Light theme overrides */
 :global(body.light) .hero {
-  border-color: color-mix(in srgb, var(--gray-alpha-200) 70%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 18%, var(--gray-alpha-200));
   background:
-    radial-gradient(1000px 380px at 10% -15%, color-mix(in srgb, var(--secondary) 14%, transparent), transparent),
-    color-mix(in srgb, var(--surface) 92%, white 8%);
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--shadow) 70%, transparent);
+    radial-gradient(1000px 380px at 10% -15%, color-mix(in srgb, var(--primary) 18%, transparent), transparent),
+    radial-gradient(800px 350px at 90% 120%, color-mix(in srgb, var(--secondary) 14%, transparent), transparent),
+    linear-gradient(145deg, color-mix(in srgb, var(--surface) 82%, var(--primary) 18%) 0%, color-mix(in srgb, var(--surface) 88%, var(--secondary) 12%) 100%);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--primary) 12%, var(--shadow));
 }
 
 :global(body.light) .solutionsHighlight {
-  background: color-mix(in srgb, var(--primary) 6%, white);
-  border-color: color-mix(in srgb, var(--gray-alpha-200) 70%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 14%, var(--surface)) 0%, color-mix(in srgb, var(--secondary) 10%, var(--surface)) 100%);
+  border-color: color-mix(in srgb, var(--primary) 22%, var(--gray-alpha-200));
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--primary) 10%, var(--shadow));
 }
 
 :global(body.light) .solutionCard {
-  border-color: color-mix(in srgb, var(--gray-alpha-200) 70%, transparent);
-  background: color-mix(in srgb, var(--surface) 96%, white 4%);
+  border-color: color-mix(in srgb, var(--primary) 15%, var(--gray-alpha-200));
+  background: linear-gradient(145deg, color-mix(in srgb, var(--surface) 88%, var(--primary) 12%) 0%, color-mix(in srgb, var(--surface) 92%, var(--secondary) 8%) 100%);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 8%, var(--shadow));
 }
 
 :global(body.light) .solutionCard:hover {
-  border-color: color-mix(in srgb, var(--primary) 50%, var(--gray-alpha-200));
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--shadow) 70%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--gray-alpha-200));
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--primary) 15%, var(--shadow));
 }
 
 :global(body.light) .solutionIcon {
-  background: color-mix(in srgb, var(--primary) 10%, white);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 15%, var(--surface)) 0%, color-mix(in srgb, var(--secondary) 12%, var(--surface)) 100%);
 }
 
 :global(body.light) .leasingSection {
   background: linear-gradient(135deg, 
-    color-mix(in srgb, var(--primary) 10%, white) 0%, 
-    color-mix(in srgb, var(--secondary) 8%, white) 100%
+    color-mix(in srgb, var(--primary) 16%, var(--surface)) 0%, 
+    color-mix(in srgb, var(--secondary) 12%, var(--surface)) 100%
   );
-  border-color: color-mix(in srgb, var(--gray-alpha-200) 70%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 20%, var(--gray-alpha-200));
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--primary) 12%, var(--shadow));
 }
 
 :global(body.light) .leasingCta {
-  background: color-mix(in srgb, var(--surface) 80%, white);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--surface) 85%, var(--primary) 15%) 0%, color-mix(in srgb, var(--surface) 90%, var(--secondary) 10%) 100%);
 }
 
 :global(body.light) .consultingBanner {
-  border-color: color-mix(in srgb, var(--gray-alpha-200) 70%, transparent);
-  background: color-mix(in srgb, var(--surface) 96%, white 4%);
+  border-color: color-mix(in srgb, var(--primary) 18%, var(--gray-alpha-200));
+  background: linear-gradient(145deg, color-mix(in srgb, var(--surface) 88%, var(--primary) 12%) 0%, color-mix(in srgb, var(--surface) 92%, var(--secondary) 8%) 100%);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--primary) 10%, var(--shadow));
 }
 
 :global(body.light) .brandsSection {
   background: linear-gradient(180deg, 
     transparent 0%, 
-    color-mix(in srgb, var(--primary) 3%, white) 50%,
+    color-mix(in srgb, var(--primary) 8%, var(--surface)) 50%,
     transparent 100%
   );
   padding: 48px 0;
@@ -54,19 +59,17 @@
 }
 
 :global(body.light) .brandsHeader .sectionTitle {
-  background: linear-gradient(135deg, 
-    color-mix(in srgb, var(--primary) 80%, #000) 0%, 
-    color-mix(in srgb, var(--secondary) 80%, #000) 100%
-  );
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  text-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 15%, transparent);
+  text-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 20%, transparent);
+  filter: saturate(1.15);
 }
 
 :global(body.light) .brandsHeader .lead {
-  color: color-mix(in srgb, var(--foreground) 85%, transparent);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  color: color-mix(in srgb, var(--foreground) 90%, var(--primary));
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 /* Contenedor general */
@@ -764,6 +767,133 @@
   .secondaryCta {
     transition: none !important;
     animation: none !important;
+  }
+}
+
+/* Unified corporate layer */
+.container {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--page-padding-y) var(--page-padding-x) var(--page-padding-bottom);
+  color: color-mix(in srgb, var(--foreground) 96%, var(--primary));
+}
+
+.hero,
+.leasingSection,
+.consultingBanner {
+  border-radius: var(--public-radius-xl);
+  border: 1px solid var(--public-border);
+  background: var(--public-hero-bg);
+  box-shadow: var(--public-shadow);
+}
+
+.heroTitle,
+.sectionTitle,
+.cardTitle {
+  background: var(--public-title-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.quickNav {
+  justify-content: center;
+}
+
+.quickNavLink {
+  background: var(--public-nav-pill);
+  border-color: var(--public-border);
+  color: var(--public-nav-text);
+}
+
+.quickNavLink:hover {
+  background: var(--public-nav-pill-active);
+}
+
+.quickNavLink:focus-visible,
+.primaryCta:focus-visible,
+.secondaryCta:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary) 68%, white 32%);
+  outline-offset: 3px;
+}
+
+.primaryCta,
+.secondaryCta {
+  border-radius: 999px;
+}
+
+.primaryCta {
+  background: var(--public-title-gradient);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--shadow) 75%, transparent);
+}
+
+.secondaryCta {
+  background: var(--public-surface-strong);
+  border-color: var(--public-border);
+  color: var(--public-nav-text);
+}
+
+.solutionCard,
+.solutionsHighlight,
+.squareItem,
+.mediaRectInner {
+  border-color: var(--public-border);
+  background: var(--public-surface-strong);
+}
+
+.heroSubtitle,
+.lead,
+.solutionCard p {
+  color: color-mix(in srgb, var(--foreground) 90%, var(--primary));
+}
+
+:global(body.dark) .hero,
+:global(body.dark) .leasingSection,
+:global(body.dark) .consultingBanner,
+:global(body.dark) .solutionCard,
+:global(body.dark) .solutionsHighlight {
+  background: color-mix(in srgb, var(--surface) 92%, #0b1522 8%);
+  border-color: color-mix(in srgb, var(--foreground) 20%, transparent);
+}
+
+:global(body.dark) .hero {
+  background:
+    radial-gradient(1000px 380px at 8% -12%, color-mix(in srgb, var(--primary) 18%, transparent), transparent),
+    radial-gradient(820px 360px at 95% -20%, color-mix(in srgb, var(--secondary) 14%, transparent), transparent),
+    color-mix(in srgb, var(--surface) 94%, #0b1522 6%);
+}
+
+:global(body.dark) .heroSubtitle,
+:global(body.dark) .lead,
+:global(body.dark) .solutionCard p,
+:global(body.dark) .leasingText p,
+:global(body.dark) .consultingBanner p,
+:global(body.dark) .solutionsHighlight p,
+:global(body.dark) .leasingBenefits li,
+:global(body.dark) .finalCta p {
+  color: color-mix(in srgb, #e6edf7 94%, var(--primary));
+  opacity: 1;
+}
+
+@media (max-width: 760px) {
+  .container {
+    padding: 24px 14px 42px;
+  }
+
+  .hero {
+    padding: 20px 16px;
+    margin-bottom: 24px;
+  }
+
+  .quickNavLink {
+    padding: 8px 12px;
+    font-size: 0.83rem;
+  }
+
+  .primaryCta,
+  .secondaryCta {
+    padding: 11px 16px;
+    font-size: 0.92rem;
   }
 }
 

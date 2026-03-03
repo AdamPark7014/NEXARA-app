@@ -11,11 +11,6 @@ const Icon = {
       <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
     </svg>
   ),
-  X: () => (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-    </svg>
-  ),
   LinkedIn: () => (
     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
@@ -46,6 +41,18 @@ const Icon = {
       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm3.5 11.5c-.69.38-1.45.59-2.25.59-2.43 0-4.42-1.99-4.42-4.42s1.99-4.42 4.42-4.42c.79 0 1.55.21 2.24.59v2.61c0 .55.45 1 1 1h1.06v2.07c0 .55-.45 1-1 1h-1.06v2.07z"/>
     </svg>
   ),
+  Briefcase: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+    </svg>
+  ),
+  Headphones: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+      <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+    </svg>
+  ),
 };
 
 export default function Footer() {
@@ -53,6 +60,7 @@ export default function Footer() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
@@ -87,128 +95,157 @@ export default function Footer() {
     <footer className={styles.footer}>
       <div className={styles.topAccent} />
       <div className={styles.footerInner}>
-      
-      {/* Newsletter arriba */}
-      <section className={styles.newsletter}>
-        <h2 className={styles.newsTitle}>Recibe novedades y ofertas de Nexara</h2>
-        <p className={styles.newsSubtitle}>
-          Suscríbete a nuestro boletín para enterarte de nuevos proyectos, productos y oportunidades.
-        </p>
-        <form className={styles.newsForm} onSubmit={onSubmit}>
-          <input
-            type="email"
-            required
-            placeholder="Tu correo electrónico"
-            className={styles.newsInput}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            disabled={loading}
-          />
-          <button type="submit" className={styles.newsButton}>
-            {loading ? "Enviando..." : "Suscribirme"}
-          </button>
-        </form>
-        {error && (
-          <p className={styles.brandTagline} style={{ marginTop: 10, color: "#ffb3b3" }}>
-            {error}
-          </p>
-        )}
-        {submitted && (
-          <p className={styles.brandTagline} style={{ marginTop: 10 }}>
-            ¡Gracias! Te hemos registrado, pronto recibirás noticias.
-          </p>
-        )}
-      </section>
-
-      <div className={styles.divider} />
-
-      {/* Layout principal: Izquierda | Mapa Centro | Derecha */}
-      <section className={styles.mainLayout}>
-        {/* Columna izquierda: Marca y Contacto */}
-        <div className={styles.leftColumn}>
-          <div className={styles.brandName}>NEXARA</div>
-          <div className={styles.brandTagline}>Tecnología que impulsa tu negocio</div>
-          <div className={styles.socials}>
-            <Link className={styles.social} href="#" aria-label="Facebook" title="Facebook (próximamente)"><Icon.Facebook /></Link>
-            <Link className={styles.social} href="https://www.tiktok.com/@nexara_mx?_r=1&_t=ZS-948WJNIEdeu" target="_blank" rel="noopener noreferrer" aria-label="TikTok"><Icon.TikTok /></Link>
-            <Link className={styles.social} href="https://www.linkedin.com/in/nexara-mx-413717359/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn"><Icon.LinkedIn /></Link>
-            <Link className={styles.social} href="https://www.instagram.com/nexara_mx/" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><Icon.Instagram /></Link>
+        
+        {/* Newsletter Section */}
+        <section className={styles.newsletter}>
+          <div className={styles.newsletterContent}>
+            <h2 className={styles.newsTitle}>Mantente informado</h2>
+            <p className={styles.newsSubtitle}>
+              Suscríbete para recibir las últimas novedades, proyectos y ofertas exclusivas.
+            </p>
           </div>
-          <div className={styles.divider} />
-          <div className={styles.contactCard}>
-            <div className={styles.colTitle}>Contacto rápido</div>
-            <div className={styles.contactRow}>
-              <Link className={styles.phoneButton} href="tel:+525536505044">
-                <Icon.Phone />
-                <span>+52 55 3650 5044</span>
-              </Link>
-              <Link className={styles.emailButton} href="mailto:ventas@nexara.com.mx">
-                <Icon.Email />
-                <span>ventas@nexara.com.mx</span>
-              </Link>
+          <form className={styles.newsForm} onSubmit={onSubmit}>
+            <input
+              type="email"
+              required
+              placeholder="Tu correo electrónico"
+              className={styles.newsInput}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={loading}
+            />
+            <button type="submit" className={styles.newsButton} disabled={loading}>
+              {loading ? "Enviando..." : "Suscribirme"}
+            </button>
+          </form>
+          {error && <p className={styles.newsMessage} style={{ color: "var(--error)" }}>{error}</p>}
+          {submitted && <p className={styles.newsMessage}>¡Gracias! Pronto recibirás noticias.</p>}
+        </section>
+
+        <div className={styles.divider} />
+
+        {/* Main Layout - 2 Rows */}
+        <section className={styles.mainLayout}>
+          
+          {/* Row 1: Brand | Map | Links */}
+          <div className={styles.topRow}>
+            {/* Brand */}
+            <div className={styles.brandSection}>
+              <div className={styles.brandName}>NEXARA</div>
+              <div className={styles.brandTagline}>Soluciones tecnológicas empresariales</div>
+              <div className={styles.socials}>
+                <Link className={styles.social} href="#" aria-label="Facebook" title="Facebook (próximamente)"><Icon.Facebook /></Link>
+                <Link className={styles.social} href="https://www.tiktok.com/@nexara_mx?_r=1&_t=ZS-948WJNIEdeu" target="_blank" rel="noopener noreferrer" aria-label="TikTok"><Icon.TikTok /></Link>
+                <Link className={styles.social} href="https://www.linkedin.com/in/nexara-mx-413717359/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn"><Icon.LinkedIn /></Link>
+                <Link className={styles.social} href="https://www.instagram.com/nexara_mx/" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><Icon.Instagram /></Link>
+              </div>
             </div>
-            <Link className={styles.whatsappButton} href="https://wa.me/525536505044" target="_blank" rel="noopener noreferrer">
-              <Icon.WhatsApp />
-              <span>Chatea con nosotros</span>
-            </Link>
-            <div className={styles.contactRow}>
-              <span className={styles.chip}>CDMX</span>
-              <span className={styles.chip}>Soporte 24/7</span>
-              <span className={styles.chip}>Respuesta en menos de 24h</span>
+
+            {/* Map */}
+            <div className={styles.mapCenter}>
+              <Map />
+            </div>
+
+            {/* Links */}
+            <div className={styles.linksRow}>
+              <div className={styles.linkGroup}>
+                <div className={styles.colTitle}>Soluciones</div>
+                <ul className={styles.list}>
+                  <li><Link href="/soluciones#infraestructura">Infraestructura</Link></li>
+                  <li><Link href="/soluciones#energia">Energía</Link></li>
+                  <li><Link href="/soluciones#seguridad">Ciberseguridad</Link></li>
+                  <li><Link href="/soluciones#datos">Centro de datos</Link></li>
+                </ul>
+              </div>
+
+              <div className={styles.linkGroup}>
+                <div className={styles.colTitle}>Servicios</div>
+                <ul className={styles.list}>
+                  <li><Link href="/servicios#venta">Venta de equipos</Link></li>
+                  <li><Link href="/servicios#integracion">Integración</Link></li>
+                  <li><Link href="/servicios#soporte">Soporte</Link></li>
+                  <li><Link href="/servicios#consultoria">Consultoría</Link></li>
+                </ul>
+              </div>
+
+              <div className={styles.linkGroup}>
+                <div className={styles.colTitle}>Compañía</div>
+                <ul className={styles.list}>
+                  <li><Link href="/nexara">Sobre Nexara</Link></li>
+                  <li><Link href="/proyectos">Proyectos</Link></li>
+                  <li><Link href="/contacto">Contacto</Link></li>
+                </ul>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Mapa en el centro */}
-        <div className={styles.mapCenter}>
-          <Map />
-        </div>
+          {/* Row 2: Contact Cards Side by Side */}
+          <div className={styles.contactRow}>
+            {/* Sales Card */}
+            <div className={styles.contactCard}>
+              <div className={styles.cardHeader}>
+                <div className={styles.cardIcon}><Icon.Briefcase /></div>
+                <div className={styles.cardHeaderText}>
+                  <h3 className={styles.cardTitle}>Ventas</h3>
+                  <p className={styles.cardDesc}>Cotizaciones y proyectos</p>
+                </div>
+              </div>
+              <div className={styles.cardBody}>
+                <div className={styles.cardContact}>
+                  <span className={styles.contactInfo}><Icon.Phone /> +52 1 55 3650 5044</span>
+                  <span className={styles.contactInfo}><Icon.Email /> ventas@nexara.com.mx</span>
+                </div>
+                <div className={styles.cardActions}>
+                  <Link className={styles.actionBtn} href="mailto:ventas@nexara.com.mx?subject=Solicitud de información" data-type="email">
+                    <Icon.Email /> Email
+                  </Link>
+                  <Link className={styles.actionBtn} href="https://wa.me/5215536505044?text=Hola,%20me%20interesa%20información%20sobre%20sus%20servicios" target="_blank" rel="noopener noreferrer" data-type="whatsapp">
+                    <Icon.WhatsApp /> WhatsApp
+                  </Link>
+                </div>
+              </div>
+            </div>
 
-        {/* Columna derecha: Soluciones, Servicios, Compañía */}
-        <div className={styles.rightColumn}>
-          <div>
-            <div className={styles.colTitle}>Soluciones</div>
-            <ul className={styles.list}>
-              <li><Link href="/soluciones#infraestructura">Infraestructura</Link></li>
-              <li><Link href="/soluciones#energia">Energía</Link></li>
-              <li><Link href="/soluciones#seguridad">Ciberseguridad</Link></li>
-              <li><Link href="/soluciones#datos">Centro de datos</Link></li>
-            </ul>
+            {/* Support Card */}
+            <div className={styles.contactCard}>
+              <div className={styles.cardHeader}>
+                <div className={styles.cardIcon}><Icon.Headphones /></div>
+                <div className={styles.cardHeaderText}>
+                  <h3 className={styles.cardTitle}>Soporte</h3>
+                  <p className={styles.cardDesc}>Ayuda técnica</p>
+                </div>
+              </div>
+              <div className={styles.cardBody}>
+                <div className={styles.cardContact}>
+                  <span className={styles.contactInfo}><Icon.Phone /> +52 1 55 4926 8141</span>
+                  <span className={styles.contactInfo}><Icon.Email /> soporte@nexara.com.mx</span>
+                </div>
+                <div className={styles.cardActions}>
+                  <Link className={styles.actionBtn} href="mailto:soporte@nexara.com.mx?subject=Solicitud de soporte" data-type="email">
+                    <Icon.Email /> Email
+                  </Link>
+                  <Link className={styles.actionBtn} href="https://wa.me/5215549268141?text=Hola,%20necesito%20soporte%20técnico" target="_blank" rel="noopener noreferrer" data-type="whatsapp">
+                    <Icon.WhatsApp /> WhatsApp
+                  </Link>
+                </div>
+              </div>
+            </div>
           </div>
+        </section>
 
-          <div>
-            <div className={styles.colTitle}>Servicios</div>
-            <ul className={styles.list}>
-              <li><Link href="/servicios#venta">Venta de equipos</Link></li>
-              <li><Link href="/servicios#integracion">Integración</Link></li>
-              <li><Link href="/servicios#soporte">Soporte</Link></li>
-              <li><Link href="/servicios#consultoria">Consultoría</Link></li>
-            </ul>
+        <div className={styles.divider} />
+
+        {/* Bottom Bar */}
+        <div className={styles.bottomBar}>
+          <div className={styles.legalLeft}>
+            © {new Date().getUTCFullYear()} Nexara. Todos los derechos reservados.
           </div>
-
-          <div>
-            <div className={styles.colTitle}>Compañía</div>
-            <ul className={styles.list}>
-              <li><Link href="/nexara">Sobre Nexara</Link></li>
-              <li><Link href="/proyectos">Proyectos</Link></li>
-              <li><Link href="/contacto">Contacto</Link></li>
-            </ul>
+          <div className={styles.legalRight}>
+            <Link href="/legal/privacidad">Privacidad</Link>
+            <Link href="/legal/terminos">Términos</Link>
+            <Link href="/legal/cookies">Cookies</Link>
           </div>
         </div>
-      </section>
-
-      <div className={styles.divider} />
-
-      <div className={styles.bottomBar}>
-        <div className={styles.legalLeft}>
-          © {new Date().getUTCFullYear()} Nexara. Todos los derechos reservados. • Developed by Nexara
-        </div>
-        <div className={styles.legalRight}>
-          <Link href="/legal/privacidad">Privacidad</Link>
-          <Link href="/legal/terminos">Términos</Link>
-          <Link href="/legal/cookies">Cookies</Link>
-        </div>
-      </div>
       </div>
 
       <button

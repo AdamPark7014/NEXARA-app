@@ -17,8 +17,23 @@ function getPublicImages(subdir: string): string[] {
   try {
     const monorepoDir = path.join(process.cwd(), "apps", "web", "public", subdir);
     const appDir = path.join(process.cwd(), "public", subdir);
-    const dir = fs.existsSync(monorepoDir) ? monorepoDir : appDir;
-    if (!fs.existsSync(dir)) return [];
+    let dir: string | null = null;
+
+    try {
+      if (fs.statSync(monorepoDir).isDirectory()) {
+        dir = monorepoDir;
+      }
+    } catch {}
+
+    if (!dir) {
+      try {
+        if (fs.statSync(appDir).isDirectory()) {
+          dir = appDir;
+        }
+      } catch {}
+    }
+
+    if (!dir) return [];
     const files = fs.readdirSync(dir);
     return files
       .filter((f) => imageExtensions.includes(path.extname(f).toLowerCase()))
@@ -49,8 +64,19 @@ function seededShuffle<T>(arr: T[], seed: string): T[] {
 function resolveSolDir(): string | null {
   const monorepoDir = path.join(process.cwd(), "apps", "web", "public", "soluciones");
   const appDir = path.join(process.cwd(), "public", "soluciones");
-  if (fs.existsSync(monorepoDir)) return monorepoDir;
-  if (fs.existsSync(appDir)) return appDir;
+
+  try {
+    if (fs.statSync(monorepoDir).isDirectory()) {
+      return monorepoDir;
+    }
+  } catch {}
+
+  try {
+    if (fs.statSync(appDir).isDirectory()) {
+      return appDir;
+    }
+  } catch {}
+
   return null;
 }
 

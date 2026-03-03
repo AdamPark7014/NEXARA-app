@@ -1,5 +1,5 @@
 :root {
-  /* Light mode defaults - oscila entre azul rey y verde */
+  /* Light mode defaults - corporativo y suave */
   --header-offset: clamp(76px, 10vw, 112px);
   --content-max: 1200px;
   --page-padding-x: clamp(16px, 4vw, 80px);
@@ -9,23 +9,23 @@
   --panel-padding-x: clamp(16px, 3vw, 32px);
   --panel-padding-y: clamp(16px, 3vw, 32px);
   --panel-sidebar-width: clamp(240px, 22vw, 300px);
-  --background: #f8fcff;
-  --foreground: #0a1628;
-  --primary: #0f6ad6; /* azul rey */
-  --primary-light: #56a6ff;
-  --secondary: #10b57a; /* verde limpio */
-  --accent: #2acb97;
-  --purple: #6f6ee8;
-  --danger: #d64545;
-  --info: #1f8df2;
-  --surface: #ffffff;
-  --muted: #ddeaff;
-  --link: #0f6ad6;
-  --shadow: rgba(21, 106, 214, 0.18);
+  --background: #e6f1ff;
+  --foreground: #0f2a43;
+  --primary: #1868db;
+  --primary-light: #4a98f0;
+  --secondary: #1aa18b;
+  --accent: #28baa4;
+  --purple: #615ddc;
+  --danger: #c34a4a;
+  --info: #2c7fd4;
+  --surface: #f3f9ff;
+  --muted: #d2e5fb;
+  --link: #1868db;
+  --shadow: rgba(10, 37, 72, 0.16);
   /* Extra blues for light mode */
-  --blue-1: #0f6ad6;
-  --blue-2: #1e88f5;
-  --blue-3: #86c7ff;
+  --blue-1: #1868db;
+  --blue-2: #4a98f0;
+  --blue-3: #b8dafb;
   /* Footer specific colors */
   --gray-alpha-200: rgba(11, 18, 32, 0.08);
   --phone-color: #3b82f6;
@@ -34,10 +34,10 @@
   --email-color-dark: #dc2626;
   --whatsapp-color: #25D366;
   --whatsapp-color-dark: #128C7E;
-  --text-secondary: #233a5d;
-  --text-tertiary: #1a2f4f;
-  --surface-light: #edf6ff;
-  --focus-ring: rgba(15, 106, 214, 0.35);
+  --text-secondary: #25527c;
+  --text-tertiary: #113654;
+  --surface-light: #e9f4ff;
+  --focus-ring: rgba(24, 104, 219, 0.36);
   --public-font-family: var(--font-geist-sans), "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
   --public-title-leading: 1.12;
   --public-body-leading: 1.72;
@@ -51,23 +51,23 @@
 
 /* Light mode explicit override */
 body.light {
-  --background: #f8fcff;
-  --foreground: #0a1628;
-  --primary: #0f6ad6;
-  --primary-light: #56a6ff;
-  --secondary: #10b57a;
-  --accent: #2acb97;
-  --purple: #6f6ee8;
-  --danger: #d64545;
-  --info: #1f8df2;
-  --surface: #ffffff;
-  --muted: #ddeaff;
-  --link: #0f6ad6;
-  --shadow: rgba(21, 106, 214, 0.18);
+  --background: #e6f1ff;
+  --foreground: #0f2a43;
+  --primary: #1868db;
+  --primary-light: #4a98f0;
+  --secondary: #1aa18b;
+  --accent: #28baa4;
+  --purple: #615ddc;
+  --danger: #c34a4a;
+  --info: #2c7fd4;
+  --surface: #f3f9ff;
+  --muted: #d2e5fb;
+  --link: #1868db;
+  --shadow: rgba(10, 37, 72, 0.16);
   /* Extra blues for light mode */
-  --blue-1: #0f6ad6;
-  --blue-2: #1e88f5;
-  --blue-3: #86c7ff;
+  --blue-1: #1868db;
+  --blue-2: #4a98f0;
+  --blue-3: #b8dafb;
   /* Footer specific colors */
   --gray-alpha-200: rgba(11, 18, 32, 0.08);
   --phone-color: #3b82f6;
@@ -76,30 +76,30 @@ body.light {
   --email-color-dark: #dc2626;
   --whatsapp-color: #25D366;
   --whatsapp-color-dark: #128C7E;
-  --text-secondary: #233a5d;
-  --text-tertiary: #1a2f4f;
-  --surface-light: #edf6ff;
+  --text-secondary: #25527c;
+  --text-tertiary: #113654;
+  --surface-light: #e9f4ff;
 }
 
 /* Dark mode explicit override */
 body.dark {
-  --background: #0c1220;
-  --foreground: #eaf2ff;
-  --primary: #39a0ff;
-  --primary-light: #73c3ff;
-  --secondary: #22c08a;
-  --accent: #59d8ac;
-  --purple: #a57cff;
-  --danger: #b43a3a;
-  --info: #71ccff;
-  --surface: #151f33;
-  --muted: #1c2942;
-  --link: #79ccff;
-  --shadow: rgba(57, 160, 255, 0.24);
+  --background: #0f1826;
+  --foreground: #e6edf7;
+  --primary: #5b95da;
+  --primary-light: #85b4e8;
+  --secondary: #4ea08a;
+  --accent: #63b7a2;
+  --purple: #9b8fe0;
+  --danger: #cf6a6a;
+  --info: #77abd9;
+  --surface: #162334;
+  --muted: #22344b;
+  --link: #8fb8e6;
+  --shadow: rgba(6, 15, 27, 0.38);
   /* Extra blues for dark mode */
-  --blue-1: #102a4f;
-  --blue-2: #2f8fff;
-  --blue-3: #23b989;
+  --blue-1: #18375d;
+  --blue-2: #5b95da;
+  --blue-3: #4ea08a;
   /* Footer specific colors */
   --gray-alpha-200: rgba(121, 184, 255, 0.24);
   --phone-color: #3b82f6;
@@ -108,33 +108,33 @@ body.dark {
   --email-color-dark: #dc2626;
   --whatsapp-color: #25D366;
   --whatsapp-color-dark: #128C7E;
-  --text-secondary: #bbd0ee;
-  --text-tertiary: #d8e6fb;
-  --surface-dark: rgba(21, 31, 51, 0.92);
-  --surface-light: #1c2942;
+  --text-secondary: #b9c9dd;
+  --text-tertiary: #d8e3f2;
+  --surface-dark: rgba(22, 35, 52, 0.92);
+  --surface-light: #20334a;
 }
 
 
 /* Dark mode via system preference */
 @media (prefers-color-scheme: dark) {
   body {
-    --background: #151518;
-    --foreground: #ededed;
-    --primary: #1789FC;
-    --primary-light: #3EC6E0;
-    --secondary: #F18B1F;
-    --accent: #FBC51F;
-    --purple: #AA539A;
-    --danger: #5C1917;
-    --info: #6FC6D9;
-    --surface: #23272f;
-    --muted: #23272f;
-    --link: #6FC6D9;
-    --shadow: rgba(23, 137, 252, 0.12);
+    --background: #0f1826;
+    --foreground: #e6edf7;
+    --primary: #5b95da;
+    --primary-light: #85b4e8;
+    --secondary: #4ea08a;
+    --accent: #63b7a2;
+    --purple: #9b8fe0;
+    --danger: #cf6a6a;
+    --info: #77abd9;
+    --surface: #162334;
+    --muted: #22344b;
+    --link: #8fb8e6;
+    --shadow: rgba(6, 15, 27, 0.38);
     /* Extra blues for dark mode */
-    --blue-1: #0A4D68;
-    --blue-2: #1789FC;
-    --blue-3: #14A285;
+    --blue-1: #18375d;
+    --blue-2: #5b95da;
+    --blue-3: #4ea08a;
   }
 }
 
@@ -183,6 +183,7 @@ body {
   color: var(--foreground);
   background: var(--background) !important;
   line-height: var(--panel-body-leading);
+  letter-spacing: 0.005em;
 }
 
 .public-layout-wrapper.public-friendly {
@@ -227,17 +228,18 @@ body {
 
 body.light {
   background:
-    radial-gradient(circle at 10% 8%, rgba(15, 106, 214, 0.2), transparent 43%),
-    radial-gradient(circle at 88% 0%, rgba(16, 181, 122, 0.18), transparent 45%),
-    radial-gradient(circle at 56% 0%, rgba(86, 166, 255, 0.12), transparent 38%),
-    linear-gradient(180deg, #fbfdff 0%, #edf6ff 100%) !important;
+    radial-gradient(circle at 7% 3%, rgba(74, 152, 240, 0.3), transparent 44%),
+    radial-gradient(circle at 94% 2%, rgba(40, 186, 164, 0.22), transparent 46%),
+    radial-gradient(circle at 50% -18%, rgba(97, 93, 220, 0.16), transparent 41%),
+    radial-gradient(circle at 24% 100%, rgba(74, 152, 240, 0.1), transparent 48%),
+    linear-gradient(180deg, #f1f8ff 0%, #e7f2ff 44%, #e4f1ff 72%, #e4f5f0 100%) !important;
 }
 
 body.dark {
   background:
-    radial-gradient(circle at 12% 8%, rgba(57, 160, 255, 0.2), transparent 42%),
-    radial-gradient(circle at 88% 0%, rgba(34, 192, 138, 0.16), transparent 46%),
-    linear-gradient(180deg, #0a1120 0%, #0f1729 100%) !important;
+    radial-gradient(circle at 12% 8%, rgba(91, 149, 218, 0.16), transparent 45%),
+    radial-gradient(circle at 88% 0%, rgba(78, 160, 138, 0.13), transparent 48%),
+    linear-gradient(180deg, #0e1724 0%, #121f30 100%) !important;
 }
 
 * {
@@ -253,7 +255,7 @@ a {
 
 :focus-visible {
   outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 
 button,
@@ -519,6 +521,59 @@ button,
 input,
 select,
 textarea {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease !important;
+  transition: background-color 220ms ease, color 220ms ease, border-color 220ms ease, box-shadow 220ms ease !important;
+}
+
+/* Public corporate visual system */
+:root {
+  --public-border: color-mix(in srgb, var(--foreground) 16%, transparent);
+  --public-shadow: 0 14px 34px color-mix(in srgb, var(--shadow) 76%, transparent);
+  --public-surface-strong: color-mix(in srgb, var(--surface) 78%, #dcedff 22%);
+  --public-surface-soft: color-mix(in srgb, var(--surface) 70%, var(--primary) 30%);
+  --public-title-gradient: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 68%, color-mix(in srgb, var(--purple) 55%, var(--secondary)) 100%);
+  --public-hero-bg:
+    radial-gradient(1000px 380px at 8% -12%, color-mix(in srgb, var(--primary) 16%, transparent), transparent),
+    radial-gradient(820px 360px at 95% -20%, color-mix(in srgb, var(--secondary) 12%, transparent), transparent),
+    linear-gradient(160deg, color-mix(in srgb, var(--surface) 94%, white 6%) 0%, color-mix(in srgb, var(--surface) 88%, var(--primary) 12%) 100%);
+  --public-header-bg: color-mix(in srgb, var(--surface) 68%, var(--primary) 32%);
+  --public-nav-text: color-mix(in srgb, var(--foreground) 90%, var(--primary));
+  --public-nav-pill: color-mix(in srgb, var(--surface) 70%, var(--primary) 30%);
+  --public-nav-pill-active: color-mix(in srgb, var(--primary) 34%, var(--surface));
+  --public-radius-xl: 20px;
+  --public-radius-lg: 14px;
+}
+
+body.light {
+  --public-surface-strong: color-mix(in srgb, var(--surface) 74%, #d6eaff 26%);
+  --public-surface-soft: color-mix(in srgb, var(--surface) 65%, var(--primary) 35%);
+  --public-header-bg: color-mix(in srgb, var(--surface) 62%, var(--primary) 38%);
+  --public-nav-pill: color-mix(in srgb, var(--surface) 66%, var(--primary) 34%);
+  --public-nav-pill-active: color-mix(in srgb, var(--primary) 40%, var(--surface));
+}
+
+body.dark {
+  --public-border: color-mix(in srgb, var(--foreground) 22%, transparent);
+  --public-shadow: 0 14px 36px color-mix(in srgb, #02060c 82%, transparent);
+  --public-surface-strong: color-mix(in srgb, var(--surface) 92%, #0f1c2d 8%);
+  --public-surface-soft: color-mix(in srgb, var(--surface) 78%, var(--primary) 22%);
+  --public-header-bg: color-mix(in srgb, var(--surface) 86%, #10243b 14%);
+  --public-nav-text: color-mix(in srgb, #e3f0ff 86%, var(--primary));
+  --public-nav-pill: color-mix(in srgb, var(--surface) 84%, var(--primary) 16%);
+  --public-nav-pill-active: color-mix(in srgb, var(--primary) 36%, var(--surface));
+}
+
+@media (max-width: 1024px) {
+  :root {
+    --public-shadow: 0 10px 24px color-mix(in srgb, var(--shadow) 70%, transparent);
+    --public-radius-xl: 18px;
+  }
+}
+
+@media (max-width: 760px) {
+  :root {
+    --public-shadow: 0 8px 18px color-mix(in srgb, var(--shadow) 62%, transparent);
+    --public-radius-xl: 16px;
+    --public-radius-lg: 12px;
+  }
 }
 

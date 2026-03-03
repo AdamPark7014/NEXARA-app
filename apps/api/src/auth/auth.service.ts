@@ -161,7 +161,7 @@ export class AuthService {
     await this.prisma.notification.create({
       data: {
         userId: user.id,
-        type: NotificationType.ATTENDANCE_UPDATE,
+        type: NotificationType.ATTENDANCE_CHECKIN,
         category: 'security',
         title: 'Nuevo acceso detectado',
         message: `Se inició sesión desde ${detectedDevice}.`,

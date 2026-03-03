@@ -1,4 +1,4 @@
-import { IsBoolean, IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CreateContactMessageDto {
   @IsString()
@@ -19,6 +19,10 @@ export class CreateContactMessageDto {
   @IsOptional()
   @IsString()
   subject?: string;
+
+  @IsOptional()
+  @IsIn(['SOPORTE', 'VENTAS'])
+  category?: 'SOPORTE' | 'VENTAS';
 
   @IsString()
   @MinLength(5)

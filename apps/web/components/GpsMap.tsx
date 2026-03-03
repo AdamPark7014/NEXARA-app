@@ -319,10 +319,13 @@ const GpsMap = () => {
     if (!user?.token) return;
     const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, {
-      transports: ['polling'],
-      upgrade: false,
-      timeout: 20000,
-      reconnectionAttempts: 8,
+      path: '/socket.io',
+      transports: ['websocket', 'polling'],
+      upgrade: true,
+      timeout: 12000,
+      reconnectionAttempts: 3,
+      reconnectionDelay: 1500,
+      reconnectionDelayMax: 5000,
     });
 
     socket.on('entity:updated', (payload: { model?: string }) => {
@@ -330,6 +333,18 @@ const GpsMap = () => {
         refreshMe().catch(() => null);
         refreshTeam().catch(() => null);
       }
+    });
+
+    socket.on('connect_error', () => {
+      setStatusMsg('Sin conexion en tiempo real con el servidor.');
+    });
+
+    socket.on('connect', () => {
+      setStatusMsg(null);
+    });
+
+    socket.io.on('reconnect_failed', () => {
+      socket.disconnect();
     });
 
     return () => {

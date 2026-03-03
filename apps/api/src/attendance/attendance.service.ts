@@ -344,7 +344,7 @@ export class AttendanceService {
         await this.prisma.notification.create({
           data: {
             userId: admin.id,
-            type: 'ATTENDANCE_UPDATE' as any,
+            type: type === 'entrada' ? 'ATTENDANCE_CHECKIN' : 'ATTENDANCE_CHECKOUT',
             category: 'attendance',
             title,
             message,
