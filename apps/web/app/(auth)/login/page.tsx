@@ -83,6 +83,7 @@ export default function LoginPage() {
           position: relative;
           width: 100%;
           max-width: 460px;
+          font-family: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
           background: rgba(255, 255, 255, 0.03);
           backdrop-filter: blur(20px);
           border-radius: 24px;
@@ -134,22 +135,22 @@ export default function LoginPage() {
           font-size: 14px;
           text-transform: uppercase;
           letter-spacing: 0.3rem;
-          color: rgba(190, 212, 245, 0.7);
+          color: rgba(176, 213, 255, 0.88);
           margin: 0 0 8px;
           font-weight: 700;
         }
 
         .title {
           font-size: 28px;
-          font-weight: 700;
-          color: #ffffff;
+          font-weight: 800;
+          color: #f3f8ff;
           margin: 0 0 8px 0;
-          letter-spacing: -0.5px;
+          letter-spacing: -0.35px;
         }
 
         .subtitle {
           font-size: 14px;
-          color: rgba(255, 255, 255, 0.6);
+          color: rgba(179, 204, 236, 0.9);
           margin: 0;
         }
 
@@ -299,7 +300,8 @@ export default function LoginPage() {
 
         .footer-text {
           font-size: 13px;
-          color: rgba(255, 255, 255, 0.5);
+          font-weight: 600;
+          color: rgba(160, 199, 246, 0.86);
           margin: 0;
         }
 

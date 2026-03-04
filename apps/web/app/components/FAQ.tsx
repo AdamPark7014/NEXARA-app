@@ -90,9 +90,9 @@ export default function FAQ() {
     <section className={styles.faqSection}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <div className={styles.faqHeader}>
-        <div className={styles.faqBadge}>PREGUNTAS FRECUENTES</div>
-        <h2 className={styles.faqTitle}>FAQ</h2>
-        <p className={styles.faqSubtitle}>Resolvemos tus dudas más comunes sobre nuestros servicios.</p>
+        <div className={styles.faqBadge}>Q&A ESTRATÉGICO</div>
+        <h2 className={styles.faqTitle}>Q&A</h2>
+        <p className={styles.faqSubtitle}>Respuestas claras sobre soluciones, implementación y soporte para tu operación.</p>
       </div>
 
       <div className={styles.faqControls}>

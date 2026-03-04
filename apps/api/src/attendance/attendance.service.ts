@@ -341,27 +341,35 @@ export class AttendanceService {
         const title = `${user.nombre} registró ${typeLabel}`;
         const message = `${user.nombre} (${user.email}) registró ${typeLabel} a las ${timestamp.toLocaleTimeString('es-MX')}`;
 
-        await this.prisma.notification.create({
-          data: {
-            userId: admin.id,
-            type: type === 'entrada' ? 'ATTENDANCE_CHECKIN' : 'ATTENDANCE_CHECKOUT',
-            category: 'attendance',
-            title,
-            message,
-            relatedEntityId: userId,
-            entityType: 'Attendance',
-          },
-        });
+        try {
+          await this.prisma.notification.create({
+            data: {
+              userId: admin.id,
+              type: type === 'entrada' ? 'ATTENDANCE_CHECKIN' : 'ATTENDANCE_CHECKOUT',
+              category: 'attendance',
+              title,
+              message,
+              relatedEntityId: userId,
+              entityType: 'Attendance',
+            },
+          });
 
-        // Emitir notificación en tiempo real al admin
-        this.realtimeGateway.emit('attendance:notification', {
-          adminId: admin.id,
-          userId,
-          type,
-          userName: user.nombre,
-          userEmail: user.email,
-          timestamp: timestamp.toISOString(),
-        });
+          // Emitir notificación en tiempo real al admin
+          this.realtimeGateway.emit('attendance:notification', {
+            adminId: admin.id,
+            userId,
+            type,
+            userName: user.nombre,
+            userEmail: user.email,
+            timestamp: timestamp.toISOString(),
+          });
+        } catch (notificationError) {
+          console.error(
+            `Error creating attendance notification for admin ${admin.id}:`,
+            notificationError,
+          );
+          continue;
+        }
       }
     } catch (error) {
       console.error('Error emitting attendance notifications:', error);

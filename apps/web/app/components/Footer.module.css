@@ -147,47 +147,72 @@
 
 .brandTagline {
   color: var(--foreground);
-  opacity: 0.7;
-  font-size: 0.75rem;
+  opacity: 0.86;
+  font-size: 0.8rem;
   line-height: 1.3;
   transition: color 0.3s ease, opacity 0.3s ease;
 }
 
 .socials {
   display: flex;
-  gap: 6px;
-  margin-top: 8px;
+  gap: 10px;
+  margin-top: 10px;
 }
 
 .social {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--primary);
-  background: var(--surface);
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
   border: 1px solid var(--gray-alpha-200);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--primary) 24%, transparent);
 }
 
 .social:hover {
-  transform: translateY(-2px);
-  border-color: var(--primary);
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
-  box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 30%, transparent);
+  transform: translateY(-3px) scale(1.03);
+  border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--primary) 35%, transparent);
 }
 
 .social svg {
-  width: 13px;
-  height: 13px;
+  width: 18px;
+  height: 18px;
   transition: all 0.3s ease;
 }
 
 .social:hover svg {
   color: #ffffff;
+}
+
+.social[data-network="facebook"] {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+}
+
+.social[data-network="instagram"] {
+  background: linear-gradient(135deg, #f43f5e 0%, #8b5cf6 100%);
+}
+
+.social[data-network="linkedin"] {
+  background: linear-gradient(135deg, #0a66c2 0%, #0f4fa8 100%);
+}
+
+.social[data-network="tiktok"] {
+  background: linear-gradient(135deg, #111827 0%, #0f172a 55%, #1f2937 100%);
+}
+
+.socialStatus {
+  margin-top: 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  color: color-mix(in srgb, var(--foreground) 86%, transparent);
 }
 
 /* Map Center */
@@ -636,6 +661,11 @@
   .socials {
     justify-content: center;
   }
+
+  .socialStatus {
+    text-align: center;
+    font-size: 0.7rem;
+  }
   
   .mapCenter {
     min-height: 160px;
@@ -704,6 +734,17 @@
   
   .brandName {
     font-size: 1rem;
+  }
+
+  .social {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+  }
+
+  .social svg {
+    width: 16px;
+    height: 16px;
   }
   
   .contactCard {

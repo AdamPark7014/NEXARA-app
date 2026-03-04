@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { JwtService } from '@nestjs/jwt';
 import { LoginDto } from './dto/login.dto.js';
@@ -9,6 +9,8 @@ import { detectDeviceFromUserAgent } from '../common/device-detector.js';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -158,17 +160,24 @@ export class AuthService {
       isSuperAdmin,
     };
 
-    await this.prisma.notification.create({
-      data: {
-        userId: user.id,
-        type: NotificationType.ATTENDANCE_CHECKIN,
-        category: 'security',
-        title: 'Nuevo acceso detectado',
-        message: `Se inició sesión desde ${detectedDevice}.`,
-        entityType: 'auth',
-        priority: 'normal',
-      },
-    });
+    try {
+      await this.prisma.notification.create({
+        data: {
+          userId: user.id,
+          type: NotificationType.ATTENDANCE_CHECKIN,
+          category: 'security',
+          title: 'Nuevo acceso detectado',
+          message: `Se inició sesión desde ${detectedDevice}.`,
+          entityType: 'auth',
+          priority: 'normal',
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `No se pudo crear notificación de login para userId=${user.id}. Continuando login.`,
+      );
+      this.logger.debug(error instanceof Error ? error.message : String(error));
+    }
 
     return {
       access_token: this.jwtService.sign(payload),

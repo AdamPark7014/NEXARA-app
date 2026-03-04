@@ -385,6 +385,63 @@
   color: var(--foreground);
 }
 
+.selectorButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.selectorButton,
+.selectorButtonActive {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-size: 0.9rem;
+  font-weight: 680;
+  background: var(--surface);
+  color: var(--foreground);
+  text-decoration: none;
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.selectorButton:hover {
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.selectorButtonActive {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--gray-alpha-200));
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+}
+
+.selectorDetailCard {
+  margin-top: 16px;
+  padding: 24px;
+  border: 1px solid var(--gray-alpha-200);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 95%, transparent);
+  box-shadow: 0 8px 20px var(--shadow);
+}
+
+.selectorDetailCard h3 {
+  font-size: 1.2rem;
+  margin-bottom: 10px;
+  color: var(--foreground);
+}
+
+.selectorDetailCard p {
+  margin: 0;
+  line-height: 1.66;
+  opacity: 0.88;
+}
+
+.selectorDetailCard p + p {
+  margin-top: 8px;
+}
+
 .serviceFeatures li::before {
   content: '→';
   position: absolute;

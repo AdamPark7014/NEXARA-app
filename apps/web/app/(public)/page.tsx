@@ -6,7 +6,6 @@ import CertificationsCarousel from "../components/CertificationsCarousel";
 import BrandsCarousel from "../components/BrandsCarousel";
 import ContactFormToggle from "../components/ContactFormToggle";
 import FloatingContactForm from "../components/FloatingContactForm";
-import FAQ from "../components/FAQ";
 import styles from "../page.module.css";
 import { buildApiUrl, getApiBase } from "@/lib/api-base";
 
@@ -67,42 +66,42 @@ const formatNewsDate = (value?: string | null) =>
 const enterpriseMetrics = [
   {
     value: "+150",
-    label: "proyectos tecnológicos entregados",
-    detail: "Implementaciones para operación empresarial y sector público.",
+    label: "proyectos tecnológicos implementados",
+    detail: "Despliegues para operación empresarial y entidades del sector público.",
   },
   {
     value: "99.9%",
     label: "continuidad operativa objetivo",
-    detail: "Arquitecturas con enfoque en resiliencia y disponibilidad.",
+    detail: "Arquitecturas enfocadas en resiliencia, disponibilidad y control.",
   },
   {
     value: "24/7",
     label: "acompañamiento especializado",
-    detail: "Soporte consultivo para entornos críticos.",
+    detail: "Soporte consultivo para entornos de misión crítica.",
   },
   {
     value: "End-to-end",
-    label: "cobertura del ciclo tecnológico",
-    detail: "Diagnóstico, ejecución, adopción y mejora continua.",
+    label: "cobertura integral del ciclo TI",
+    detail: "Diagnóstico, implementación, adopción y mejora continua.",
   },
 ];
 
 const valuePillars = [
   {
     title: "Gobierno y planificación TI",
-    text: "Definimos hoja de ruta, prioridades y arquitectura alineada a objetivos de negocio.",
+    text: "Definimos hoja de ruta, prioridades y arquitectura alineadas a objetivos del negocio.",
   },
   {
     title: "Infraestructura y ciberseguridad",
-    text: "Diseñamos plataformas seguras, escalables y listas para crecimiento sostenido.",
+    text: "Diseñamos plataformas seguras y escalables, preparadas para crecimiento sostenido.",
   },
   {
     title: "Servicios gestionados",
-    text: "Monitoreo, mantenimiento y soporte con acuerdos de nivel de servicio claros.",
+    text: "Monitoreo, mantenimiento y soporte con acuerdos de nivel de servicio medibles.",
   },
   {
     title: "Adopción y cambio organizacional",
-    text: "Aseguramos transferencia de conocimiento y adopción efectiva de cada solución.",
+    text: "Aseguramos transferencia de conocimiento y adopción efectiva de cada iniciativa.",
   },
 ];
 
@@ -111,7 +110,7 @@ const featuredSolutions = [
     badge: "ESTRATEGIA Y EJECUCIÓN",
     title: "Soluciones empresariales personalizadas",
     description:
-      "Integración de infraestructura, seguridad, conectividad y continuidad con acompañamiento técnico de alto nivel.",
+      "Integración de infraestructura, seguridad, conectividad y continuidad con acompañamiento técnico especializado.",
     image: "soluciones-personalizadas.jpg",
     alt: "Arquitectura empresarial personalizada",
   },
@@ -119,7 +118,7 @@ const featuredSolutions = [
     badge: "RENOVACIÓN TECNOLÓGICA",
     title: "Equipamiento corporativo y modernización",
     description:
-      "Suministro de equipos y plataformas de marcas líderes con criterios técnicos, financieros y operativos.",
+      "Suministro de equipos y plataformas de marcas líderes con evaluación técnica, financiera y operativa.",
     image: "ventas-equipos.jpg",
     alt: "Equipamiento corporativo",
   },
@@ -129,17 +128,17 @@ const deliveryModel = [
   {
     step: "01",
     title: "Diagnóstico ejecutivo",
-    text: "Analizamos contexto, riesgos y objetivos para priorizar iniciativas con retorno medible.",
+    text: "Analizamos contexto, riesgos y objetivos para priorizar iniciativas con impacto medible.",
   },
   {
     step: "02",
     title: "Implementación controlada",
-    text: "Ejecutamos por fases con gestión de hitos, documentación y control de calidad.",
+    text: "Ejecutamos por fases con gestión de hitos, documentación y estándares de calidad.",
   },
   {
     step: "03",
     title: "Optimización continua",
-    text: "Medimos desempeño operativo y ajustamos capacidades para sostener resultados.",
+    text: "Medimos desempeño operativo y ajustamos capacidades para sostener resultados en el tiempo.",
   },
 ];
 
@@ -325,25 +324,25 @@ export default function Home() {
               <div className={styles.heroContent}>
                 <span className={styles.heroEyebrow}>TECNOLOGÍA EMPRESARIAL CONFIABLE</span>
                 <h1 id="hero-heading" className={styles.heroTitle}>
-                  Soluciones tecnológicas corporativas para impulsar tu operación
+                  Soluciones tecnológicas corporativas para continuidad y crecimiento
                 </h1>
                 <p className={styles.heroSubtitle}>
-                  Diseñamos, implementamos y damos soporte a infraestructura TI con enfoque en continuidad,
-                  productividad y crecimiento sostenible para empresas y gobierno.
+                  Diseñamos, implementamos y operamos infraestructura TI con enfoque en
+                  continuidad, productividad y escalabilidad para empresas y sector público.
                 </p>
 
                 <ul className={styles.heroBenefits} aria-label="Beneficios principales">
-                  <li>Atención consultiva y acompañamiento integral</li>
-                  <li>Implementación con estándares de calidad empresarial</li>
-                  <li>Soporte técnico especializado para tu equipo</li>
+                  <li>Consultoría estratégica con acompañamiento integral</li>
+                  <li>Implementación bajo estándares empresariales</li>
+                  <li>Soporte especializado para operación crítica</li>
                 </ul>
 
                 <div className={`${styles.ctas} ${styles.heroButtons}`}>
                   <a href="/contacto" className={`${styles.primary} ${styles.heroPrimaryCta}`}>
-                    Solicita una asesoría
+                    Solicitar asesoría estratégica
                   </a>
                   <a href="/soluciones" className={`${styles.secondary} ${styles.heroSecondaryCta}`}>
-                    Conoce nuestras soluciones
+                    Revisar soluciones
                   </a>
                 </div>
               </div>
@@ -357,11 +356,11 @@ export default function Home() {
                   </div>
                   <div className={styles.heroStatItem}>
                     <strong>Soporte especializado</strong>
-                    <span>Atención cercana para operación crítica.</span>
+                    <span>Atención experta para continuidad operativa.</span>
                   </div>
                   <div className={styles.heroStatItem}>
                     <strong>Implementación de punta a punta</strong>
-                    <span>Desde diagnóstico hasta puesta en marcha.</span>
+                    <span>Desde diagnóstico hasta adopción en operación.</span>
                   </div>
                 </div>
               </aside>
@@ -385,16 +384,16 @@ export default function Home() {
           <a href="#soluciones" className={styles.quickNavLink}>Soluciones</a>
           <a href="#metodologia" className={styles.quickNavLink}>Metodología</a>
           <a href="#clientes" className={styles.quickNavLink}>Clientes</a>
-          <a href="#faq" className={styles.quickNavLink}>FAQ</a>
+          <a href="/qa" className={styles.quickNavLink}>Q&A</a>
         </nav>
 
         <section id="noticias" className={styles.newsSection} aria-labelledby="noticias-heading">
           <div className={styles.newsHeader}>
-            <span className={styles.newsBadge}>INSIGHTS Y ACTUALIDAD</span>
+            <span className={styles.newsBadge}>NOTICIAS, OFERTAS Y NOVEDADES</span>
             <div>
-              <h2 id="noticias-heading" className={styles.newsTitle}>Decisiones tecnológicas con contexto real</h2>
+              <h2 id="noticias-heading" className={styles.newsTitle}>Tecnología que impulsa tu negocio</h2>
               <p className={styles.newsSubtitle}>
-                Tendencias, alianzas y actualizaciones relevantes para equipos que lideran operación y transformación digital.
+                Noticias estratégicas, ofertas y novedades relevantes para equipos que lideran operación y transformación digital.
               </p>
             </div>
           </div>
@@ -540,7 +539,7 @@ export default function Home() {
             <div className={styles.clientsBadge}>CONFIANZA EMPRESARIAL</div>
             <h2 id="clientes-heading" className={styles.clientsTitle}>Organizaciones que confían en Nexara</h2>
             <p className={styles.clientsSubtitle}>
-              Relación de largo plazo con empresas que priorizan continuidad, seguridad y eficiencia operativa.
+              Relaciones de largo plazo con organizaciones que priorizan continuidad, seguridad y eficiencia.
             </p>
           </div>
           <div className={styles.clientsGrid}>
@@ -573,9 +572,9 @@ export default function Home() {
         <section className={styles.executiveCta} aria-labelledby="executive-cta-heading">
           <div className={styles.executiveCtaContent}>
             <span className={styles.executiveCtaBadge}>PRÓXIMO PASO</span>
-            <h2 id="executive-cta-heading">Planifica tu hoja de ruta tecnológica con un enfoque ejecutivo</h2>
+            <h2 id="executive-cta-heading">Define tu hoja de ruta tecnológica con enfoque ejecutivo</h2>
             <p>
-              Coordinemos una sesión para evaluar prioridades, riesgos y oportunidades de tu operación.
+              Coordinemos una sesión para priorizar riesgos, capacidades y oportunidades de tu operación.
             </p>
           </div>
           <div className={styles.executiveCtaActions}>
@@ -585,9 +584,6 @@ export default function Home() {
         </section>
 
         <ContactFormToggle />
-        <section id="faq">
-          <FAQ />
-        </section>
       </main>
       <FloatingContactForm />
 
@@ -602,7 +598,7 @@ export default function Home() {
                 <span className={styles.newsModalBadge}>Noticia</span>
                 <h3 id="news-modal-title">{selectedNews.title}</h3>
                 <p className={styles.newsModalSummary}>
-                  {selectedNews.summary || "Actualizacion destacada de Nexara."}
+                  {selectedNews.summary || "Actualización destacada de Nexara."}
                 </p>
                 <div className={styles.newsModalBody}>
                   {renderParagraphs(selectedNews.content)}
