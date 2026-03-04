@@ -155,14 +155,14 @@
 
 .socials {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   margin-top: 10px;
 }
 
 .social {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -181,8 +181,8 @@
 }
 
 .social svg {
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   transition: all 0.3s ease;
 }
 
@@ -208,11 +208,75 @@
 
 .socialStatus {
   margin-top: 10px;
-  font-size: 0.72rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 800;
   line-height: 1.4;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.03em;
   color: color-mix(in srgb, var(--foreground) 86%, transparent);
+}
+
+.socialCards {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.socialCard {
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
+  padding: 10px 12px;
+  display: grid;
+  gap: 3px;
+  color: #ffffff;
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--primary) 26%, transparent);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.socialCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--primary) 36%, transparent);
+}
+
+.socialCard strong {
+  font-size: 0.9rem;
+  letter-spacing: 0.01em;
+}
+
+.socialCard span {
+  font-size: 0.78rem;
+  font-weight: 700;
+  opacity: 0.95;
+}
+
+.socialCard small {
+  font-size: 0.7rem;
+  line-height: 1.3;
+  opacity: 0.9;
+}
+
+.socialCard em {
+  margin-top: 2px;
+  font-style: normal;
+  font-weight: 900;
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+}
+
+.socialCard[data-network="facebook"] {
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+}
+
+.socialCard[data-network="instagram"] {
+  background: linear-gradient(135deg, #f43f5e 0%, #8b5cf6 100%);
+}
+
+.socialCard[data-network="linkedin"] {
+  background: linear-gradient(135deg, #0a66c2 0%, #1d4ed8 100%);
+}
+
+.socialCard[data-network="tiktok"] {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
 }
 
 /* Map Center */
@@ -589,7 +653,7 @@
 /* Responsive - Tablet */
 @media (max-width: 900px) {
   .topRow {
-    grid-template-columns: 160px 1fr;
+    grid-template-columns: 1fr;
     gap: 16px;
   }
   
@@ -660,6 +724,10 @@
   
   .socials {
     justify-content: center;
+  }
+
+  .socialCards {
+    text-align: left;
   }
 
   .socialStatus {
@@ -737,14 +805,14 @@
   }
 
   .social {
-    width: 38px;
-    height: 38px;
+    width: 46px;
+    height: 46px;
     border-radius: 10px;
   }
 
   .social svg {
-    width: 16px;
-    height: 16px;
+    width: 20px;
+    height: 20px;
   }
   
   .contactCard {

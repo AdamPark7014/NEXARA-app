@@ -9,36 +9,39 @@
   --panel-padding-x: clamp(16px, 3vw, 32px);
   --panel-padding-y: clamp(16px, 3vw, 32px);
   --panel-sidebar-width: clamp(240px, 22vw, 300px);
-  --background: #eaf3ff;
-  --foreground: #0d2c4f;
-  --primary: #0f6fff;
-  --primary-light: #4aa3ff;
-  --secondary: #0fb9a8;
-  --accent: #27d3be;
-  --purple: #615ddc;
+  --background: #e6f2ff;
+  --foreground: #0b2e57;
+  --primary: #1166ff;
+  --primary-light: #4e9cff;
+  --secondary: #00bfa6;
+  --accent: #00d7c1;
+  --purple: #6b5cff;
   --danger: #c34a4a;
   --info: #2c7fd4;
-  --surface: #f7fbff;
-  --muted: #d8e9ff;
-  --link: #0f6fff;
-  --shadow: rgba(9, 45, 90, 0.18);
+  --surface: #f3fbff;
+  --muted: #cfe7ff;
+  --link: #1166ff;
+  --shadow: rgba(7, 49, 106, 0.2);
   /* Extra blues for light mode */
   --blue-1: #0f6fff;
   --blue-2: #4aa3ff;
   --blue-3: #c4e2ff;
   /* Footer specific colors */
-  --gray-alpha-200: rgba(11, 18, 32, 0.08);
+  --gray-alpha-200: rgba(17, 102, 255, 0.16);
   --phone-color: #3b82f6;
   --phone-color-dark: #2563eb;
   --email-color: #ef4444;
   --email-color-dark: #dc2626;
   --whatsapp-color: #25D366;
   --whatsapp-color-dark: #128C7E;
-  --text-secondary: #1e4f7c;
-  --text-tertiary: #0f3b66;
-  --surface-light: #edf6ff;
-  --focus-ring: rgba(15, 111, 255, 0.38);
-  --public-font-family: var(--font-geist-sans), "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --text-secondary: #1b4e88;
+  --text-tertiary: #0b3f77;
+  --surface-light: #eaf7ff;
+  --focus-ring: rgba(17, 102, 255, 0.42);
+  --public-title-font-family: var(--font-geist-sans), "Manrope", "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --public-subtitle-font-family: var(--font-geist-sans), "Sora", "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --public-body-font-family: var(--font-geist-sans), "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --public-font-family: var(--public-body-font-family);
   --public-title-leading: 1.12;
   --public-body-leading: 1.72;
   --public-title-tracking: -0.018em;
@@ -51,34 +54,34 @@
 
 /* Light mode explicit override */
 body.light {
-  --background: #eaf3ff;
-  --foreground: #0d2c4f;
-  --primary: #0f6fff;
-  --primary-light: #4aa3ff;
-  --secondary: #0fb9a8;
-  --accent: #27d3be;
-  --purple: #615ddc;
+  --background: #e6f2ff;
+  --foreground: #0b2e57;
+  --primary: #1166ff;
+  --primary-light: #4e9cff;
+  --secondary: #00bfa6;
+  --accent: #00d7c1;
+  --purple: #6b5cff;
   --danger: #c34a4a;
   --info: #2c7fd4;
-  --surface: #f7fbff;
-  --muted: #d8e9ff;
-  --link: #0f6fff;
-  --shadow: rgba(9, 45, 90, 0.18);
+  --surface: #f3fbff;
+  --muted: #cfe7ff;
+  --link: #1166ff;
+  --shadow: rgba(7, 49, 106, 0.2);
   /* Extra blues for light mode */
   --blue-1: #0f6fff;
   --blue-2: #4aa3ff;
   --blue-3: #c4e2ff;
   /* Footer specific colors */
-  --gray-alpha-200: rgba(11, 18, 32, 0.08);
+  --gray-alpha-200: rgba(17, 102, 255, 0.16);
   --phone-color: #3b82f6;
   --phone-color-dark: #2563eb;
   --email-color: #ef4444;
   --email-color-dark: #dc2626;
   --whatsapp-color: #25D366;
   --whatsapp-color-dark: #128C7E;
-  --text-secondary: #1e4f7c;
-  --text-tertiary: #0f3b66;
-  --surface-light: #edf6ff;
+  --text-secondary: #1b4e88;
+  --text-tertiary: #0b3f77;
+  --surface-light: #eaf7ff;
 }
 
 /* Dark mode explicit override */
@@ -198,12 +201,18 @@ body {
 }
 
 .public-layout-wrapper.public-friendly :where(h1, h2, h3) {
+  font-family: var(--public-title-font-family);
   line-height: var(--public-title-leading);
   letter-spacing: var(--public-title-tracking);
   text-wrap: balance;
 }
 
+.public-layout-wrapper.public-friendly :where(h4, h5, h6) {
+  font-family: var(--public-subtitle-font-family);
+}
+
 .public-layout-wrapper.public-friendly :where(p, li) {
+  font-family: var(--public-body-font-family);
   font-size: var(--public-body-size);
   line-height: var(--public-body-leading);
   text-wrap: pretty;
@@ -556,6 +565,11 @@ body.dark {
   --public-shadow: 0 14px 36px color-mix(in srgb, #02060c 82%, transparent);
   --public-surface-strong: color-mix(in srgb, var(--surface) 92%, #0f1c2d 8%);
   --public-surface-soft: color-mix(in srgb, var(--surface) 78%, var(--primary) 22%);
+  --public-title-gradient: linear-gradient(135deg, #d7e9ff 0%, #9bd8ff 55%, #7af5e1 100%);
+  --public-hero-bg:
+    radial-gradient(900px 320px at 8% -12%, color-mix(in srgb, var(--primary) 24%, transparent), transparent),
+    radial-gradient(760px 280px at 95% -20%, color-mix(in srgb, var(--secondary) 18%, transparent), transparent),
+    linear-gradient(160deg, color-mix(in srgb, #0f1f35 80%, var(--surface) 20%) 0%, color-mix(in srgb, #142b45 76%, var(--surface) 24%) 100%);
   --public-header-bg: color-mix(in srgb, var(--surface) 86%, #10243b 14%);
   --public-nav-text: color-mix(in srgb, #e3f0ff 86%, var(--primary));
   --public-nav-pill: color-mix(in srgb, var(--surface) 84%, var(--primary) 16%);
