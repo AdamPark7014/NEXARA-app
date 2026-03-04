@@ -1,22 +1,18 @@
 .webPanelRoot {
   min-height: 100vh;
   display: flex;
+  align-items: flex-start;
   background: var(--background);
   gap: var(--panel-gap);
   padding: var(--panel-padding-y) var(--panel-padding-x);
 }
 
 :global(body.light) .webPanelRoot {
-  background:
-    radial-gradient(circle at 12% 0%, rgba(15, 106, 214, 0.1), transparent 36%),
-    radial-gradient(circle at 88% 2%, rgba(22, 169, 110, 0.11), transparent 40%),
-    linear-gradient(180deg, rgba(246, 251, 255, 0.96), rgba(238, 247, 255, 0.96));
+  background: linear-gradient(180deg, #f3f8ff 0%, #edf5ff 100%);
 }
 
 :global(body.dark) .webPanelRoot {
-  background:
-    radial-gradient(circle at 80% 10%, rgba(241, 139, 31, 0.12), transparent 48%),
-    linear-gradient(180deg, rgba(12, 16, 24, 0.98), rgba(21, 26, 38, 0.98));
+  background: linear-gradient(180deg, #0b1627 0%, #111f35 100%);
 }
 
 .webPanelSidebar {
@@ -26,19 +22,23 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
-  border-radius: 24px;
+  border-radius: 18px;
   position: relative;
   overflow: hidden;
   border: 1px solid rgba(31, 77, 159, 0.12);
-  box-shadow: 0 18px 40px rgba(15, 32, 64, 0.18), 0 4px 10px rgba(15, 32, 64, 0.12);
-  background: linear-gradient(165deg, rgba(248, 250, 255, 0.96), rgba(234, 241, 252, 0.98));
+  box-shadow: 0 10px 24px rgba(15, 32, 64, 0.12);
+  background: var(--surface);
   font-family: var(--panel-font-family);
+  position: sticky;
+  top: var(--panel-padding-y);
+  max-height: calc(100vh - (var(--panel-padding-y) * 2));
+  overflow-y: auto;
 }
 
 :global(body.light) .webPanelSidebar {
-  background: linear-gradient(165deg, rgba(249, 253, 255, 0.98), rgba(228, 241, 255, 0.98));
-  border: 1px solid rgba(15, 106, 214, 0.18);
-  box-shadow: 0 22px 46px rgba(15, 106, 214, 0.16), 0 6px 14px rgba(15, 106, 214, 0.1);
+  background: #f7fbff;
+  border: 1px solid rgba(15, 106, 214, 0.14);
+  box-shadow: 0 10px 24px rgba(15, 106, 214, 0.1);
   color: var(--foreground);
 }
 
@@ -48,24 +48,24 @@
   inset: 0;
   background: radial-gradient(circle at 20% 10%, rgba(31, 141, 242, 0.18), transparent 55%),
     radial-gradient(circle at 80% 0%, rgba(22, 169, 110, 0.2), transparent 60%);
-  opacity: 0.8;
+  opacity: 0.08;
   pointer-events: none;
 }
 
 .webPanelSidebar::after {
   content: '';
   position: absolute;
-  inset: 12px;
-  border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  opacity: 0.25;
+  inset: 0;
+  border-radius: 0;
+  border: none;
+  opacity: 0;
   pointer-events: none;
 }
 
 :global(body.dark) .webPanelSidebar {
-  background: linear-gradient(160deg, rgba(20, 26, 38, 0.96), rgba(11, 16, 28, 0.98));
-  border: 1px solid rgba(31, 137, 252, 0.18);
-  box-shadow: 0 18px 40px rgba(5, 12, 24, 0.55), 0 4px 10px rgba(23, 137, 252, 0.12);
+  background: #0f223a;
+  border: 1px solid rgba(31, 137, 252, 0.16);
+  box-shadow: 0 12px 26px rgba(5, 12, 24, 0.42);
   color: #e7eefc;
 }
 
@@ -81,14 +81,14 @@
 
 .brandMark {
   font-family: var(--panel-font-family);
-  font-size: 1.9rem;
-  letter-spacing: 0.18rem;
+  font-size: 1.75rem;
+  letter-spacing: 0.14rem;
   color: var(--primary);
   font-weight: 700;
 }
 
 .brandSub {
-  font-size: 0.88rem;
+  font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.22rem;
   color: var(--text-tertiary);
@@ -96,7 +96,7 @@
 
 .webPanelDivider {
   height: 1px;
-  background: linear-gradient(90deg, rgba(31, 141, 242, 0.4), transparent);
+  background: rgba(15, 106, 214, 0.18);
   position: relative;
   z-index: 1;
   margin: 4px 12px 0;
@@ -105,33 +105,64 @@
 .webPanelMenuTitle {
   text-transform: uppercase;
   font-size: 0.7rem;
-  letter-spacing: 0.18rem;
+  letter-spacing: 0.16rem;
   color: var(--text-tertiary);
-  margin: 6px 14px 0;
+  margin: 6px 14px 12px;
   position: relative;
   z-index: 1;
+}
+
+.webPanelUser {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 14px 12px;
+  margin: -4px 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(15, 106, 214, 0.16);
+  box-shadow: none;
+}
+
+:global(body.dark) .webPanelUser {
+  background: rgba(22, 37, 58, 0.92);
+  border: 1px solid rgba(31, 137, 252, 0.16);
+  box-shadow: none;
+}
+
+.webPanelUserName {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.webPanelUserEmail {
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  opacity: 0.92;
 }
 
 .webPanelNavShell {
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.05));
-  border: 1px solid rgba(15, 106, 214, 0.12);
-  border-radius: 18px;
-  padding: 10px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
   position: relative;
   z-index: 1;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
 }
 
 :global(body.light) .webPanelNavShell {
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.74), rgba(233, 244, 255, 0.36));
-  border: 1px solid rgba(15, 106, 214, 0.2);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55), 0 8px 20px rgba(15, 106, 214, 0.1);
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 :global(body.dark) .webPanelNavShell {
-  background: linear-gradient(150deg, rgba(24, 36, 56, 0.85), rgba(15, 22, 36, 0.92));
-  border: 1px solid rgba(31, 137, 252, 0.2);
-  box-shadow: inset 0 0 0 1px rgba(31, 137, 252, 0.12);
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 :global(body.dark) .navLink {
@@ -149,8 +180,8 @@
 .webPanelNav {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 6px 4px 8px;
+  gap: 4px;
+  padding: 0;
   position: relative;
   z-index: 1;
 }
@@ -160,16 +191,16 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 48px;
-  padding: 14px 16px;
-  border-radius: 14px;
+  min-height: auto;
+  padding: 11px 14px;
+  border-radius: 10px;
   text-decoration: none;
   color: var(--foreground);
   background: transparent;
   border: 1px solid transparent;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
-  animation: navIn 0.45s ease forwards;
-  opacity: 0;
+  transition: box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  animation: none;
+  opacity: 1;
   overflow: hidden;
   isolation: isolate;
 }
@@ -178,7 +209,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(120deg, rgba(15, 106, 214, 0.18), rgba(22, 169, 110, 0.12));
+  background: rgba(15, 106, 214, 0.08);
   opacity: 0;
   transition: opacity 0.2s ease;
   z-index: -1;
@@ -188,8 +219,8 @@
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: 14px;
-  border: 1px solid rgba(15, 106, 214, 0.2);
+  border-radius: 10px;
+  border: 1px solid rgba(15, 106, 214, 0.14);
   opacity: 0;
   transition: opacity 0.2s ease;
   pointer-events: none;
@@ -200,9 +231,9 @@
 }
 
 .navLink:hover {
-  transform: translateX(4px);
   color: var(--primary);
-  box-shadow: 0 6px 16px rgba(15, 106, 214, 0.18);
+  box-shadow: 0 4px 10px rgba(15, 106, 214, 0.1);
+  border-color: rgba(15, 106, 214, 0.2);
 }
 
 .navLink:hover::before {
@@ -215,11 +246,13 @@
 
 .navLink.active {
   color: var(--primary);
-  box-shadow: 0 8px 20px rgba(15, 106, 214, 0.25);
+  box-shadow: 0 4px 12px rgba(15, 106, 214, 0.12);
+  border-color: rgba(15, 106, 214, 0.24);
 }
 
 :global(body.light) .navLink.active {
-  box-shadow: 0 12px 24px rgba(15, 106, 214, 0.28);
+  box-shadow: 0 6px 14px rgba(15, 106, 214, 0.16);
+  border-color: rgba(15, 106, 214, 0.26);
 }
 
 .navLink.active::before,
@@ -228,63 +261,71 @@
 }
 
 .navLabel {
-  font-size: 0.96rem;
-  font-weight: 600;
+  font-size: 0.98rem;
+  font-weight: 500;
 }
 
 .navPulse {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: rgba(15, 106, 214, 0.6);
+  background: rgba(15, 106, 214, 0.7);
   opacity: 0;
   transition: opacity 0.2s ease;
 }
 
 .navLink.active .navPulse {
   opacity: 1;
-  box-shadow: 0 0 0 4px rgba(15, 106, 214, 0.12);
+  box-shadow: none;
 }
 
 .themeSection {
-  padding: 12px;
+  padding: 1rem 0;
   margin-top: auto;
-  border-top: 1px solid rgba(15, 106, 214, 0.2);
+  border-top: 1px solid rgba(15, 106, 214, 0.12);
   position: relative;
   z-index: 1;
 }
 
 .themeButton {
   width: 100%;
-  padding: 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(15, 106, 214, 0.24);
-  background: rgba(255, 255, 255, 0.76);
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 106, 214, 0.22);
+  background: rgba(15, 106, 214, 0.08);
   color: var(--foreground);
   cursor: pointer;
   font-size: 0.95rem;
   font-weight: 600;
-  transition: all 0.2s ease;
+  box-shadow: none;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 10px;
 }
 
 .themeButton:hover {
-  background: rgba(15, 106, 214, 0.12);
-  border-color: rgba(15, 106, 214, 0.34);
+  transform: none;
+  background: rgba(15, 106, 214, 0.14);
+  border-color: var(--primary);
+  box-shadow: none;
 }
 
 .themeIcon {
-  font-size: 1.25rem;
+  font-size: 1rem;
+  color: var(--primary);
   line-height: 1;
 }
 
 :global(body.dark) .themeButton {
-  background: rgba(24, 35, 53, 0.9);
+  background: rgba(31, 137, 252, 0.14);
   border-color: rgba(31, 137, 252, 0.3);
-  color: #e7eefc;
+  color: #d9e8ff;
+}
+
+:global(body.dark) .themeIcon {
+  color: #9ec8ff;
 }
 
 .webPanelFooter {
@@ -295,16 +336,16 @@
   font-size: 12px;
   color: var(--text-tertiary);
   padding: 10px 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(15, 106, 214, 0.16);
-  background: rgba(15, 106, 214, 0.08);
+  border-radius: 10px;
+  border: 1px solid rgba(15, 106, 214, 0.14);
+  background: rgba(15, 106, 214, 0.06);
   position: relative;
   z-index: 1;
 }
 
 :global(body.light) .webPanelFooter {
-  background: linear-gradient(135deg, rgba(15, 106, 214, 0.14), rgba(22, 169, 110, 0.12));
-  border-color: rgba(15, 106, 214, 0.24);
+  background: rgba(15, 106, 214, 0.08);
+  border-color: rgba(15, 106, 214, 0.18);
 }
 
 .webPanelFooter strong {
@@ -314,9 +355,12 @@
 
 .webPanelMain {
   flex: 1;
-  background: var(--background);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
   color: var(--foreground);
   padding: var(--panel-padding-y) var(--panel-padding-x);
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--primary) 14%, transparent);
+  border-radius: 16px;
 }
 
 @keyframes navIn {
@@ -341,6 +385,8 @@
     width: 100%;
     min-height: auto;
     position: relative;
+    top: 0;
+    max-height: none;
     margin: 0;
     border-radius: 18px;
     padding: 16px 14px;
@@ -355,6 +401,11 @@
     scroll-snap-type: x proximity;
     gap: 8px;
     padding-bottom: 6px;
+  }
+
+  .webPanelUser {
+    margin: 0 2px 8px;
+    padding: 12px;
   }
 
   .navLink {
@@ -405,6 +456,18 @@
     letter-spacing: 0.2rem;
     font-size: 0.65rem;
     margin: 4px 8px 0;
+  }
+
+  .webPanelUser {
+    padding: 10px;
+  }
+
+  .webPanelUserName {
+    font-size: 0.9rem;
+  }
+
+  .webPanelUserEmail {
+    font-size: 0.72rem;
   }
 
   .webPanelNav {
