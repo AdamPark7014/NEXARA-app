@@ -91,6 +91,37 @@ export default function Footer() {
     }
   };
 
+  const socialPresence = [
+    {
+      key: "facebook",
+      title: "Facebook",
+      href: "https://www.facebook.com/nexara.mexico/",
+      status: "Canal principal",
+      others: "También en TikTok, Instagram y LinkedIn",
+    },
+    {
+      key: "instagram",
+      title: "Instagram",
+      href: "https://www.instagram.com/nexara_mx/",
+      status: "1 publicación",
+      others: "También en Facebook, TikTok y LinkedIn",
+    },
+    {
+      key: "tiktok",
+      title: "TikTok",
+      href: "https://www.tiktok.com/@nexara_mx?_r=1&_t=ZS-948WJNIEdeu",
+      status: "Sin contenido",
+      others: "También en Facebook, Instagram y LinkedIn",
+    },
+    {
+      key: "linkedin",
+      title: "LinkedIn",
+      href: "https://www.linkedin.com/in/nexara-mx-413717359/",
+      status: "Sin contenido",
+      others: "También en Facebook, TikTok e Instagram",
+    },
+  ] as const;
+
   return (
     <footer className={styles.footer}>
       <div className={styles.topAccent} />
@@ -132,14 +163,31 @@ export default function Footer() {
             {/* Brand */}
             <div className={styles.brandSection}>
               <div className={styles.brandName}>NEXARA</div>
-              <div className={styles.brandTagline}>Tecnología que impulsa tu negocio</div>
+              <div className={styles.brandTagline}>Transformamos tecnología en resultados reales</div>
               <div className={styles.socials}>
-                <Link className={styles.social} data-network="facebook" href="https://www.facebook.com/nexara.mexico" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><Icon.Facebook /></Link>
-                <Link className={styles.social} data-network="tiktok" href="https://www.tiktok.com/@nexara_mx?_r=1&_t=ZS-948WJNIEdeu" target="_blank" rel="noopener noreferrer" aria-label="TikTok"><Icon.TikTok /></Link>
-                <Link className={styles.social} data-network="linkedin" href="https://www.linkedin.com/in/nexara-mx-413717359/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn"><Icon.LinkedIn /></Link>
-                <Link className={styles.social} data-network="instagram" href="https://www.instagram.com/nexara_mx/" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><Icon.Instagram /></Link>
+                <a className={styles.social} data-network="facebook" href="https://www.facebook.com/nexara.mexico/" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><Icon.Facebook /></a>
+                <a className={styles.social} data-network="tiktok" href="https://www.tiktok.com/@nexara_mx?_r=1&_t=ZS-948WJNIEdeu" target="_blank" rel="noopener noreferrer" aria-label="TikTok"><Icon.TikTok /></a>
+                <a className={styles.social} data-network="linkedin" href="https://www.linkedin.com/in/nexara-mx-413717359/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn"><Icon.LinkedIn /></a>
+                <a className={styles.social} data-network="instagram" href="https://www.instagram.com/nexara_mx/" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><Icon.Instagram /></a>
               </div>
-              <div className={styles.socialStatus}>Presencia digital activa · Parque Ecológico y cobertura nacional</div>
+              <div className={styles.socialStatus}>PARQUE ECOLÓGICO · Presencia digital y cobertura nacional</div>
+              <div className={styles.socialCards}>
+                {socialPresence.map((network) => (
+                  <a
+                    key={network.key}
+                    className={styles.socialCard}
+                    data-network={network.key}
+                    href={network.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <strong>{network.title}</strong>
+                    <span>{network.status}</span>
+                    <small>{network.others}</small>
+                    <em>PARQUE ECOLÓGICO</em>
+                  </a>
+                ))}
+              </div>
             </div>
 
             {/* Map */}
