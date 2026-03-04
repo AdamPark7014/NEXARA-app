@@ -12,69 +12,88 @@ export default function MarcaPage() {
         Biblia de Marca — NEXARA
       </h1>
       <p style={{ color: "var(--text-secondary)", marginBottom: 24 }}>
-        Última actualización: 3 de marzo de 2026
+        Última actualización: 4 de marzo de 2026
       </p>
 
       <section style={{ marginBottom: 22 }}>
         <h2 style={{ fontSize: "1.2rem", marginBottom: 10 }}>1. Slogan oficial</h2>
         <p style={{ lineHeight: 1.7 }}>
-          Tecnología que impulsa tu negocio.
+          Transformamos tecnología en resultados reales.
+        </p>
+        <p style={{ lineHeight: 1.7, marginTop: 10 }}>
+          Uso recomendado: encabezados principales de web, presentaciones comerciales y piezas institucionales.
+          Evitar su uso en bloques donde compita con titulares promocionales.
         </p>
       </section>
 
       <section style={{ marginBottom: 22 }}>
-        <h2 style={{ fontSize: "1.2rem", marginBottom: 10 }}>2. Uso del logotipo</h2>
+        <h2 style={{ fontSize: "1.2rem", marginBottom: 10 }}>2. ¿Cómo, dónde, cuándo y para qué usar el logotipo?</h2>
         <ul style={{ paddingLeft: 18, lineHeight: 1.75 }}>
-          <li>Usar preferentemente la versión principal sobre fondo limpio o de alto contraste.</li>
+          <li><strong>Cómo:</strong> usar la versión horizontal principal en headers, portadas y firmas corporativas.</li>
+          <li><strong>Dónde:</strong> sitio público, subdominios de panel, firmas de correo, propuestas y documentos legales.</li>
+          <li><strong>Cuándo:</strong> siempre que la pieza represente oficialmente a NEXARA frente a cliente o aliado.</li>
+          <li><strong>Para qué:</strong> reforzar reconocimiento de marca y consistencia visual entre canales.</li>
           <li>Mantener un área de seguridad mínima equivalente al alto de la letra “N” alrededor del logo.</li>
-          <li>No deformar, rotar ni aplicar filtros excesivos que alteren identidad.</li>
-          <li>Evitar usar el logo sobre fondos con ruido visual fuerte sin contenedor.</li>
+          <li>No deformar, rotar ni aplicar filtros, sombras agresivas o efectos 3D que alteren la identidad.</li>
+          <li>Evitar usar el logo sobre fondos con ruido visual fuerte sin contenedor sólido.</li>
         </ul>
       </section>
 
       <section style={{ marginBottom: 22 }}>
-        <h2 style={{ fontSize: "1.2rem", marginBottom: 10 }}>3. Paleta cromática base</h2>
+        <h2 style={{ fontSize: "1.2rem", marginBottom: 10 }}>3. Variaciones permitidas del logo</h2>
         <ul style={{ paddingLeft: 18, lineHeight: 1.75 }}>
-          <li>Primario: #0F6FFF</li>
-          <li>Secundario: #0FB9A8</li>
-          <li>Acento: #27D3BE</li>
-          <li>Texto principal: #0D2C4F</li>
-          <li>Superficie clara: #F7FBFF</li>
+          <li>Versión principal a color: uso predeterminado en fondos claros y piezas digitales.</li>
+          <li>Versión monocromática clara: uso sobre fondos oscuros o fotográficos.</li>
+          <li>Versión monocromática oscura: uso en impresos a una tinta o fondos muy claros.</li>
+          <li>No crear nuevas variantes de color sin validación de dirección de marca.</li>
+        </ul>
+      </section>
+
+      <section style={{ marginBottom: 22 }}>
+        <h2 style={{ fontSize: "1.2rem", marginBottom: 10 }}>4. Paleta cromática y significado</h2>
+        <ul style={{ paddingLeft: 18, lineHeight: 1.75 }}>
+          <li>Primario: #1166FF — innovación, confianza y dirección tecnológica.</li>
+          <li>Secundario: #00BFA6 — dinamismo, cercanía operativa y evolución continua.</li>
+          <li>Acento: #00D7C1 — energía visual para CTA, estados activos y elementos clave.</li>
+          <li>Texto principal: #0B2E57 — lectura firme en digital sin verse oscuro o apagado.</li>
+          <li>Superficie clara: #F3FBFF — limpieza visual y contraste en interfaces.</li>
         </ul>
         <p style={{ lineHeight: 1.7, marginTop: 10 }}>
-          Estas variantes mantienen una percepción corporativa, tecnológica y moderna sin caer en tonos grises apagados.
+          Estas variantes mantienen una percepción corporativa, tecnológica y moderna evitando tonos grises opacos.
         </p>
       </section>
 
       <section style={{ marginBottom: 22 }}>
-        <h2 style={{ fontSize: "1.2rem", marginBottom: 10 }}>4. Tipografía</h2>
+        <h2 style={{ fontSize: "1.2rem", marginBottom: 10 }}>5. Tipografía oficial</h2>
         <ul style={{ paddingLeft: 18, lineHeight: 1.75 }}>
-          <li>Títulos y encabezados: familia sans serif moderna (Inter/Geist/Segoe UI).</li>
-          <li>Texto corrido: sans serif legible para web y mobile.</li>
-          <li>Evitar tipografías serif clásicas para UI principal.</li>
+          <li>Títulos: Geist/Manrope (sans moderna, de alto impacto).</li>
+          <li>Subtítulos: Sora/Inter (estructura y jerarquía).</li>
+          <li>Texto corrido: Inter/Geist (lectura continua en web y mobile).</li>
+          <li>Evitar serif clásicas (ej. Times New Roman) en la UI principal.</li>
         </ul>
       </section>
 
       <section style={{ marginBottom: 22 }}>
-        <h2 style={{ fontSize: "1.2rem", marginBottom: 10 }}>5. Redes sociales y presencia</h2>
+        <h2 style={{ fontSize: "1.2rem", marginBottom: 10 }}>6. Redes sociales y presencia</h2>
         <ul style={{ paddingLeft: 18, lineHeight: 1.75 }}>
-          <li>Los íconos deben ser visibles, de alto contraste y con tamaño mínimo de 40px en footer.</li>
-          <li>Cada red puede tener acento de color propio para mejorar reconocimiento visual.</li>
-          <li>Mencionar plazas o zonas de operación en el bloque social cuando aplique.</li>
+          <li>Los íconos deben ser visibles, de alto contraste y con tamaño mínimo de 46px en footer.</li>
+          <li>Cada red debe contar con bloque de color propio para reconocimiento inmediato.</li>
+          <li>Mostrar ubicación de operación en grande: “PARQUE ECOLÓGICO”.</li>
+          <li>Estado de presencia actual: TikTok sin contenido, Instagram 1 publicación, LinkedIn sin contenido.</li>
         </ul>
       </section>
 
       <section style={{ marginBottom: 22 }}>
-        <h2 style={{ fontSize: "1.2rem", marginBottom: 10 }}>6. Fotografía y contenido visual</h2>
+        <h2 style={{ fontSize: "1.2rem", marginBottom: 10 }}>7. Fotografía y contenido visual</h2>
         <ul style={{ paddingLeft: 18, lineHeight: 1.75 }}>
-          <li>Priorizar fotografías reales de proyectos y operación de campo.</li>
-          <li>Reducir uso de imágenes genéricas de internet cuando existan activos propios.</li>
+          <li>Priorizar fotografías reales de proyectos, personal técnico y operación de campo.</li>
+          <li>Reducir uso de imágenes genéricas de internet cuando existan activos propios verificables.</li>
           <li>Mantener coherencia de iluminación y tono corporativo en galerías y banners.</li>
         </ul>
       </section>
 
       <section>
-        <h2 style={{ fontSize: "1.2rem", marginBottom: 10 }}>7. Aplicación digital</h2>
+        <h2 style={{ fontSize: "1.2rem", marginBottom: 10 }}>8. Aplicación digital</h2>
         <p style={{ lineHeight: 1.7 }}>
           Esta guía aplica para sitio web público, paneles, piezas comerciales y redes. Cualquier nueva pieza debe validar slogan,
           tipografía, color y uso de logo antes de publicación.

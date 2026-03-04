@@ -322,7 +322,7 @@ export default function Home() {
           <section className={styles.hero} aria-labelledby="hero-heading">
             <div className={styles.heroLayout}>
               <div className={styles.heroContent}>
-                <span className={styles.heroEyebrow}>TECNOLOGÍA EMPRESARIAL CONFIABLE</span>
+                <span className={styles.heroEyebrow}>TRANSFORMAMOS TECNOLOGÍA EN RESULTADOS REALES</span>
                 <h1 id="hero-heading" className={styles.heroTitle}>
                   Soluciones tecnológicas corporativas para continuidad y crecimiento
                 </h1>
@@ -379,6 +379,7 @@ export default function Home() {
         </section>
 
         <nav className={styles.quickNav} aria-label="Accesos rápidos">
+          <a href="#qa-exclusivo" className={styles.quickNavLink}>Q&A exclusivo</a>
           <a href="#noticias" className={styles.quickNavLink}>Actualidad</a>
           <a href="#capacidades" className={styles.quickNavLink}>Capacidades</a>
           <a href="#soluciones" className={styles.quickNavLink}>Soluciones</a>
@@ -386,6 +387,20 @@ export default function Home() {
           <a href="#clientes" className={styles.quickNavLink}>Clientes</a>
           <a href="/qa" className={styles.quickNavLink}>Q&A</a>
         </nav>
+
+        <section id="qa-exclusivo" className={styles.qaSpotlight} aria-labelledby="qa-exclusivo-heading">
+          <div className={styles.qaSpotlightContent}>
+            <span className={styles.qaSpotlightBadge}>APARTADO EXCLUSIVO</span>
+            <h2 id="qa-exclusivo-heading" className={styles.qaSpotlightTitle}>Q&A estratégico para dirección y operación</h2>
+            <p className={styles.qaSpotlightText}>
+              Accede a respuestas puntuales sobre implementación, tiempos, cobertura y soporte para acelerar decisiones.
+            </p>
+          </div>
+          <div className={styles.qaSpotlightActions}>
+            <a href="/qa" className={styles.primary}>Ir al Q&A</a>
+            <a href="/contacto" className={styles.secondary}>Hacer una pregunta</a>
+          </div>
+        </section>
 
         <section id="noticias" className={styles.newsSection} aria-labelledby="noticias-heading">
           <div className={styles.newsHeader}>

@@ -3,11 +3,13 @@ import Link from "next/link";
 import React from "react";
 import { usePathname } from "next/navigation";
 import { useTheme } from "@/components/ThemeContext";
+import { useUser } from "@/components/UserContext";
 import styles from "./layout.module.css";
 
 export default function WebPanelLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { darkMode, toggleDarkMode } = useTheme();
+  const { user } = useUser();
   const currentPath = pathname ? pathname.replace(/\/+$/, "") : "";
 
   const navItems = [
@@ -30,7 +32,11 @@ export default function WebPanelLayout({ children }: { children: React.ReactNode
           <div className={styles.brandSub}>Panel Web</div>
         </div>
         <div className={styles.webPanelDivider} />
-        <div className={styles.webPanelMenuTitle}>Menu principal</div>
+        <div className={styles.webPanelMenuTitle}>Menú principal</div>
+        <div className={styles.webPanelUser}>
+          <div className={styles.webPanelUserName}>{user?.nombre || "Usuario Web"}</div>
+          <div className={styles.webPanelUserEmail}>{user?.email || "panel@nexara.com.mx"}</div>
+        </div>
         <div className={styles.webPanelNavShell}>
           <nav className={styles.webPanelNav}>
             {navItems.map((item, index) => {

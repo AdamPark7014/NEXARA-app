@@ -1,5 +1,5 @@
 :root {
-  /* Light mode defaults - corporativo y suave */
+  /* Light mode defaults - vibrante y moderno */
   --header-offset: clamp(76px, 10vw, 112px);
   --content-max: 1200px;
   --page-padding-x: clamp(16px, 4vw, 80px);
@@ -9,36 +9,39 @@
   --panel-padding-x: clamp(16px, 3vw, 32px);
   --panel-padding-y: clamp(16px, 3vw, 32px);
   --panel-sidebar-width: clamp(240px, 22vw, 300px);
-  --background: #eaf3ff;
-  --foreground: #0d2c4f;
-  --primary: #0f6fff;
-  --primary-light: #4aa3ff;
-  --secondary: #0fb9a8;
-  --accent: #27d3be;
-  --purple: #615ddc;
+  --background: #e7f4ff;
+  --foreground: #042a56;
+  --primary: #0d7bff;
+  --primary-light: #45a7ff;
+  --secondary: #00cdb8;
+  --accent: #06e0c9;
+  --purple: #695dff;
   --danger: #c34a4a;
   --info: #2c7fd4;
-  --surface: #f7fbff;
-  --muted: #d8e9ff;
-  --link: #0f6fff;
-  --shadow: rgba(9, 45, 90, 0.18);
+  --surface: #f0f9ff;
+  --muted: #c5e8ff;
+  --link: #0d7bff;
+  --shadow: rgba(5, 54, 122, 0.22);
   /* Extra blues for light mode */
-  --blue-1: #0f6fff;
-  --blue-2: #4aa3ff;
-  --blue-3: #c4e2ff;
+  --blue-1: #0d7bff;
+  --blue-2: #44b0ff;
+  --blue-3: #bce8ff;
   /* Footer specific colors */
-  --gray-alpha-200: rgba(11, 18, 32, 0.08);
+  --gray-alpha-200: rgba(13, 123, 255, 0.18);
   --phone-color: #3b82f6;
   --phone-color-dark: #2563eb;
   --email-color: #ef4444;
   --email-color-dark: #dc2626;
   --whatsapp-color: #25D366;
   --whatsapp-color-dark: #128C7E;
-  --text-secondary: #1e4f7c;
-  --text-tertiary: #0f3b66;
-  --surface-light: #edf6ff;
-  --focus-ring: rgba(15, 111, 255, 0.38);
-  --public-font-family: var(--font-geist-sans), "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --text-secondary: #0f4d97;
+  --text-tertiary: #0450a5;
+  --surface-light: #e7f7ff;
+  --focus-ring: rgba(13, 123, 255, 0.45);
+  --public-title-font-family: var(--font-geist-sans), "Sora", "Manrope", "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --public-subtitle-font-family: var(--font-geist-sans), "Manrope", "Sora", "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --public-body-font-family: var(--font-geist-sans), "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --public-font-family: var(--public-body-font-family);
   --public-title-leading: 1.12;
   --public-body-leading: 1.72;
   --public-title-tracking: -0.018em;
@@ -51,67 +54,67 @@
 
 /* Light mode explicit override */
 body.light {
-  --background: #eaf3ff;
-  --foreground: #0d2c4f;
-  --primary: #0f6fff;
-  --primary-light: #4aa3ff;
-  --secondary: #0fb9a8;
-  --accent: #27d3be;
-  --purple: #615ddc;
+  --background: #e7f4ff;
+  --foreground: #042a56;
+  --primary: #0d7bff;
+  --primary-light: #45a7ff;
+  --secondary: #00cdb8;
+  --accent: #06e0c9;
+  --purple: #695dff;
   --danger: #c34a4a;
   --info: #2c7fd4;
-  --surface: #f7fbff;
-  --muted: #d8e9ff;
-  --link: #0f6fff;
-  --shadow: rgba(9, 45, 90, 0.18);
+  --surface: #f0f9ff;
+  --muted: #c5e8ff;
+  --link: #0d7bff;
+  --shadow: rgba(5, 54, 122, 0.22);
   /* Extra blues for light mode */
-  --blue-1: #0f6fff;
-  --blue-2: #4aa3ff;
-  --blue-3: #c4e2ff;
+  --blue-1: #0d7bff;
+  --blue-2: #44b0ff;
+  --blue-3: #bce8ff;
   /* Footer specific colors */
-  --gray-alpha-200: rgba(11, 18, 32, 0.08);
+  --gray-alpha-200: rgba(13, 123, 255, 0.18);
   --phone-color: #3b82f6;
   --phone-color-dark: #2563eb;
   --email-color: #ef4444;
   --email-color-dark: #dc2626;
   --whatsapp-color: #25D366;
   --whatsapp-color-dark: #128C7E;
-  --text-secondary: #1e4f7c;
-  --text-tertiary: #0f3b66;
-  --surface-light: #edf6ff;
+  --text-secondary: #0f4d97;
+  --text-tertiary: #0450a5;
+  --surface-light: #e7f7ff;
 }
 
 /* Dark mode explicit override */
 body.dark {
-  --background: #0b1424;
-  --foreground: #e9f2ff;
-  --primary: #5aa2ff;
-  --primary-light: #8ac2ff;
-  --secondary: #4ac8b4;
-  --accent: #69e0cf;
+  --background: #051327;
+  --foreground: #edf6ff;
+  --primary: #49a3ff;
+  --primary-light: #7fc4ff;
+  --secondary: #31d8c4;
+  --accent: #55ead8;
   --purple: #9b8fe0;
   --danger: #cf6a6a;
   --info: #77abd9;
-  --surface: #14233a;
-  --muted: #203854;
+  --surface: #0f2743;
+  --muted: #1b3d63;
   --link: #9cc6ff;
-  --shadow: rgba(5, 14, 28, 0.42);
+  --shadow: rgba(2, 12, 28, 0.5);
   /* Extra blues for dark mode */
-  --blue-1: #173967;
-  --blue-2: #5aa2ff;
-  --blue-3: #4ac8b4;
+  --blue-1: #0d3b73;
+  --blue-2: #49a3ff;
+  --blue-3: #31d8c4;
   /* Footer specific colors */
-  --gray-alpha-200: rgba(136, 196, 255, 0.26);
+  --gray-alpha-200: rgba(110, 194, 255, 0.28);
   --phone-color: #3b82f6;
   --phone-color-dark: #2563eb;
   --email-color: #ef4444;
   --email-color-dark: #dc2626;
   --whatsapp-color: #25D366;
   --whatsapp-color-dark: #128C7E;
-  --text-secondary: #bfd4ef;
-  --text-tertiary: #dde9fb;
-  --surface-dark: rgba(20, 35, 58, 0.92);
-  --surface-light: #224062;
+  --text-secondary: #c9e1ff;
+  --text-tertiary: #e5f0ff;
+  --surface-dark: rgba(15, 39, 67, 0.94);
+  --surface-light: #23517d;
 }
 
 
@@ -198,12 +201,18 @@ body {
 }
 
 .public-layout-wrapper.public-friendly :where(h1, h2, h3) {
+  font-family: var(--public-title-font-family);
   line-height: var(--public-title-leading);
   letter-spacing: var(--public-title-tracking);
   text-wrap: balance;
 }
 
+.public-layout-wrapper.public-friendly :where(h4, h5, h6) {
+  font-family: var(--public-subtitle-font-family);
+}
+
 .public-layout-wrapper.public-friendly :where(p, li) {
+  font-family: var(--public-body-font-family);
   font-size: var(--public-body-size);
   line-height: var(--public-body-leading);
   text-wrap: pretty;
@@ -228,18 +237,18 @@ body {
 
 body.light {
   background:
-    radial-gradient(circle at 7% 3%, rgba(74, 163, 255, 0.32), transparent 44%),
-    radial-gradient(circle at 94% 2%, rgba(39, 211, 190, 0.24), transparent 46%),
-    radial-gradient(circle at 50% -18%, rgba(97, 93, 220, 0.14), transparent 41%),
-    radial-gradient(circle at 24% 100%, rgba(74, 163, 255, 0.12), transparent 48%),
-    linear-gradient(180deg, #f4f9ff 0%, #ebf4ff 44%, #e8f2ff 72%, #e8f9f5 100%) !important;
+    radial-gradient(circle at 8% 2%, rgba(68, 176, 255, 0.34), transparent 44%),
+    radial-gradient(circle at 94% 3%, rgba(6, 224, 201, 0.22), transparent 48%),
+    radial-gradient(circle at 53% -20%, rgba(105, 93, 255, 0.14), transparent 42%),
+    radial-gradient(circle at 22% 100%, rgba(13, 123, 255, 0.13), transparent 48%),
+    linear-gradient(180deg, #f5fbff 0%, #eaf6ff 46%, #e5f3ff 74%, #e6fcf7 100%) !important;
 }
 
 body.dark {
   background:
-    radial-gradient(circle at 12% 8%, rgba(90, 162, 255, 0.2), transparent 45%),
-    radial-gradient(circle at 88% 0%, rgba(74, 200, 180, 0.16), transparent 48%),
-    linear-gradient(180deg, #0b1424 0%, #12233a 100%) !important;
+    radial-gradient(circle at 12% 8%, rgba(73, 163, 255, 0.24), transparent 45%),
+    radial-gradient(circle at 88% 0%, rgba(49, 216, 196, 0.2), transparent 48%),
+    linear-gradient(180deg, #051327 0%, #0a2440 100%) !important;
 }
 
 * {
@@ -556,6 +565,11 @@ body.dark {
   --public-shadow: 0 14px 36px color-mix(in srgb, #02060c 82%, transparent);
   --public-surface-strong: color-mix(in srgb, var(--surface) 92%, #0f1c2d 8%);
   --public-surface-soft: color-mix(in srgb, var(--surface) 78%, var(--primary) 22%);
+  --public-title-gradient: linear-gradient(135deg, #d7e9ff 0%, #9bd8ff 55%, #7af5e1 100%);
+  --public-hero-bg:
+    radial-gradient(900px 320px at 8% -12%, color-mix(in srgb, var(--primary) 24%, transparent), transparent),
+    radial-gradient(760px 280px at 95% -20%, color-mix(in srgb, var(--secondary) 18%, transparent), transparent),
+    linear-gradient(160deg, color-mix(in srgb, #0f1f35 80%, var(--surface) 20%) 0%, color-mix(in srgb, #142b45 76%, var(--surface) 24%) 100%);
   --public-header-bg: color-mix(in srgb, var(--surface) 86%, #10243b 14%);
   --public-nav-text: color-mix(in srgb, #e3f0ff 86%, var(--primary));
   --public-nav-pill: color-mix(in srgb, var(--surface) 84%, var(--primary) 16%);
