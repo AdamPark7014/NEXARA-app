@@ -135,6 +135,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .brandName {
@@ -216,20 +217,21 @@
 }
 
 .socialCards {
-  margin-top: 12px;
+  margin-top: 10px;
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  max-width: 420px;
 }
 
 .socialCard {
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
-  padding: 10px 12px;
+  padding: 8px 10px;
   display: grid;
-  gap: 3px;
+  gap: 2px;
   color: #ffffff;
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--primary) 26%, transparent);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--primary) 24%, transparent);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -239,28 +241,28 @@
 }
 
 .socialCard strong {
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   letter-spacing: 0.01em;
 }
 
 .socialCard span {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 700;
   opacity: 0.95;
 }
 
 .socialCard small {
-  font-size: 0.7rem;
-  line-height: 1.3;
+  font-size: 0.64rem;
+  line-height: 1.2;
   opacity: 0.9;
 }
 
 .socialCard em {
-  margin-top: 2px;
+  margin-top: 1px;
   font-style: normal;
-  font-weight: 900;
-  font-size: 0.76rem;
-  letter-spacing: 0.08em;
+  font-weight: 800;
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
 }
 
 .socialCard[data-network="facebook"] {
@@ -416,7 +418,7 @@
   gap: 12px;
   flex: 1;
   min-width: 0;
-  overflow: hidden;
+  flex-wrap: wrap;
 }
 
 .cardContact {
@@ -451,6 +453,9 @@
   display: flex;
   gap: 6px;
   flex-shrink: 0;
+  margin-left: auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .actionBtn {
@@ -593,8 +598,8 @@
 }
 
 :global(body.light) .social {
-  background: #ffffff;
   border-color: color-mix(in srgb, var(--primary) 15%, transparent);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--primary) 20%, transparent);
 }
 
 :global(body.light) .actionBtn[data-type="email"] {
@@ -659,6 +664,11 @@
   
   .linksRow {
     display: none;
+  }
+
+  .socialCards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: 100%;
   }
   
   .mapCenter {
@@ -728,6 +738,8 @@
 
   .socialCards {
     text-align: left;
+    grid-template-columns: 1fr;
+    max-width: 100%;
   }
 
   .socialStatus {
@@ -813,6 +825,10 @@
   .social svg {
     width: 20px;
     height: 20px;
+  }
+
+  .socialCard {
+    padding: 8px 9px;
   }
   
   .contactCard {

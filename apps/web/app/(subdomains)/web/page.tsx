@@ -46,6 +46,18 @@ type Highlight = {
 const formatDate = (value?: string | null) =>
   value ? new Date(value).toLocaleString() : "Sin fecha";
 
+async function readJsonSafe<T>(response: Response, fallbackLabel: string): Promise<T> {
+  const raw = await response.text();
+  if (!raw.trim()) return [] as T;
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    const firstLine = raw.split("\n")[0]?.trim();
+    throw new Error(`${fallbackLabel}: respuesta no es JSON (${firstLine?.slice(0, 120) || "vacía"})`);
+  }
+}
+
 const getLatest = <T extends { createdAt: string }>(items: T[]) => {
   if (!items.length) return null;
   return items.reduce((latest, item) =>
@@ -88,10 +100,10 @@ export default function WebPanel() {
         }
 
         const [clientsData, projectsData, contactsData, newsData] = await Promise.all([
-          clientsRes.json(),
-          projectsRes.json(),
-          contactsRes.json(),
-          newsRes.json(),
+          readJsonSafe<Client[]>(clientsRes, "Clientes"),
+          readJsonSafe<Project[]>(projectsRes, "Proyectos"),
+          readJsonSafe<ContactMessage[]>(contactsRes, "Contactos"),
+          readJsonSafe<NewsPost[]>(newsRes, "Noticias"),
         ]);
 
         if (!active) return;
@@ -181,7 +193,7 @@ export default function WebPanel() {
           <p className={styles.subtitle}>
             {user?.nombre
               ? `Bienvenido, ${user.nombre}.`
-              : "Bienvenido."} Aqui tienes una vista rapida de clientes, proyectos, contactos y
+              : "Bienvenido."} Aquí tienes una vista rápida de clientes, proyectos, contactos y
             noticias.
           </p>
         </div>
@@ -200,7 +212,7 @@ export default function WebPanel() {
             <div>
               <p className={styles.cardKicker}>Clientes</p>
               <h2 className={styles.cardValue}>{clients.length}</h2>
-              <p className={styles.cardMeta}>Ultimo: {latestClient?.name || "Sin registros"}</p>
+              <p className={styles.cardMeta}>Último: {latestClient?.name || "Sin registros"}</p>
             </div>
             <Link className={styles.cardLink} href="/clientes">
               Gestionar
@@ -247,19 +259,19 @@ export default function WebPanel() {
           <div className={styles.activityCard}>
             <div className={styles.cardHeader}>
               <div>
-                <h3 className={styles.cardTitle}>Ultimos movimientos</h3>
+                <h3 className={styles.cardTitle}>Últimos movimientos</h3>
                 <p className={styles.cardSubtitle}>
-                  Resumen rapido de lo mas reciente en cada seccion.
+                  Resumen rápido de lo más reciente en cada sección.
                 </p>
               </div>
               <span className={styles.badge}>{highlights.length} entradas</span>
             </div>
             {loading ? (
-              <p className={styles.loading}>Cargando informacion...</p>
+              <p className={styles.loading}>Cargando información...</p>
             ) : error ? (
               <p className={styles.error}>{error}</p>
             ) : highlights.length === 0 ? (
-              <p className={styles.empty}>Aun no hay actividad.</p>
+              <p className={styles.empty}>Aún no hay actividad.</p>
             ) : (
               <div className={styles.activityList}>
                 {highlights.map((item) => (
