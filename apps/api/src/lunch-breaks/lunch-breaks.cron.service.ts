@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { NotificationType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 @Injectable()
@@ -31,17 +32,20 @@ export class LunchBreaksCronService {
       const notifications = users
         .filter((u: any) => u.email !== 'developer@nexara.com.mx' && u.email !== 'gerencia@nexara.com.mx') // Excluir superadmins
         .map((u: any) => ({
-          usuarioId: u.id,
-          tipo: 'LUNCH_BREAK_APPROACHING',
-          titulo: '🍽️ Hora de Comida',
-          mensaje: `Tu hora de comida se acerca en 10 minutos. Registra tu entrada, deja tu escritorio limpio y tómate tiempo para descansar.`,
-          leido: false,
+          userId: u.id,
+          type: NotificationType.LUNCH_CHECKIN,
+          category: 'lunch_break',
+          title: '🍽️ Hora de Comida',
+          message: 'Tu hora de comida se acerca en 10 minutos. Registra tu entrada, deja tu escritorio limpio y tómate tiempo para descansar.',
+          isRead: false,
+          entityType: 'lunch_break',
+          priority: 'normal',
           createdAt: new Date(),
         }));
 
       if (notifications.length > 0) {
-        await this.prisma['notification'].createMany({
-          data: notifications as any,
+        await this.prisma.notification.createMany({
+          data: notifications,
         });
 
         this.logger.log(`✓ Notificaciones enviadas a ${notifications.length} usuarios`);
@@ -89,17 +93,20 @@ export class LunchBreaksCronService {
       const notifications = usersWithoutCheckout
         .filter((u: any) => u.user.email !== 'developer@nexara.com.mx' && u.user.email !== 'gerencia@nexara.com.mx')
         .map((u: any) => ({
-          usuarioId: u.user.id,
-          tipo: 'LUNCH_BREAK_EXPIRED',
-          titulo: '🍽️ Hora de Comida Completada',
-          mensaje: `Tu hora de comida ha expirado. Por favor regresa al trabajo y registra tu salida con una foto de que iniciaste labores nuevamente.`,
-          leido: false,
+          userId: u.user.id,
+          type: NotificationType.LUNCH_CHECKOUT,
+          category: 'lunch_break',
+          title: '🍽️ Hora de Comida Completada',
+          message: 'Tu hora de comida ha expirado. Por favor regresa al trabajo y registra tu salida con una foto de que iniciaste labores nuevamente.',
+          isRead: false,
+          entityType: 'lunch_break',
+          priority: 'high',
           createdAt: new Date(),
         }));
 
       if (notifications.length > 0) {
-        await this.prisma['notification'].createMany({
-          data: notifications as any,
+        await this.prisma.notification.createMany({
+          data: notifications,
         });
 
         this.logger.log(`✓ Notificaciones de expiración enviadas a ${notifications.length} usuarios`);
@@ -150,16 +157,19 @@ export class LunchBreaksCronService {
 
       if (targetUserIds.length > 0) {
         const notifications = targetUserIds.map((userId: any) => ({
-          usuarioId: userId,
-          tipo: type === 'checkin' ? 'USER_LUNCH_CHECKIN' : 'USER_LUNCH_CHECKOUT',
-          titulo: titles[type],
-          mensaje: messages[type],
-          leido: false,
+          userId,
+          type: type === 'checkin' ? NotificationType.LUNCH_CHECKIN : NotificationType.LUNCH_CHECKOUT,
+          category: 'lunch_break',
+          title: titles[type],
+          message: messages[type],
+          isRead: false,
+          entityType: 'lunch_break',
+          priority: 'normal',
           createdAt: new Date(),
         }));
 
         await this.prisma.notification.createMany({
-          data: notifications as any,
+          data: notifications,
         });
 
         this.broadcastNotification(`lunch_break:${type}`, { user: userData, targetUsers: targetUserIds });

@@ -425,13 +425,14 @@
   align-items: center;
   gap: clamp(12px, 2vw, 20px);
   background:
-    radial-gradient(circle at 12% -20%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 40%),
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface) 90%, var(--primary) 10%));
+    radial-gradient(circle at 14% -24%, color-mix(in srgb, var(--primary) 16%, transparent), transparent 46%),
+    radial-gradient(circle at 86% 0%, color-mix(in srgb, var(--secondary) 9%, transparent), transparent 52%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 97%, transparent), color-mix(in srgb, var(--surface) 92%, var(--primary) 8%));
   border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
   border-radius: clamp(16px, 2.8vw, 28px);
   padding: clamp(14px, 2.3vw, 26px);
   box-shadow:
-    0 18px 44px color-mix(in srgb, var(--primary) 18%, transparent),
+    0 16px 38px color-mix(in srgb, var(--primary) 14%, transparent),
     inset 0 1px 0 color-mix(in srgb, #fff 40%, transparent);
 }
 
@@ -540,7 +541,7 @@
   border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
   border-radius: 999px;
   padding: 11px 24px;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 88%, #fff 12%) 0%, color-mix(in srgb, var(--secondary) 72%, var(--primary) 28%) 100%);
   color: #fff;
   font-weight: 700;
   font-size: 0.96rem;
@@ -999,9 +1000,9 @@
 
 :global(body.light) .newsCarousel {
   background:
-    radial-gradient(circle at 12% 12%, rgba(16, 181, 122, 0.2), transparent 42%),
-    radial-gradient(circle at 88% 8%, rgba(15, 106, 214, 0.22), transparent 48%),
-    linear-gradient(145deg, rgba(255, 255, 255, 0.99), rgba(228, 242, 255, 0.95));
+    radial-gradient(circle at 14% 12%, rgba(34, 139, 230, 0.18), transparent 44%),
+    radial-gradient(circle at 88% 8%, rgba(68, 163, 243, 0.16), transparent 50%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.99), rgba(236, 246, 255, 0.96));
   border-color: rgba(15, 106, 214, 0.28);
 }
 
@@ -1016,12 +1017,16 @@
 }
 
 :global(body.light) .newsButton {
-  box-shadow: 0 14px 28px rgba(15, 106, 214, 0.22);
+  box-shadow: 0 12px 24px rgba(15, 106, 214, 0.2);
 }
 
 :global(body.light) .newsDot,
 :global(body.light) .newsDotActive {
   background: rgba(15, 106, 214, 0.22);
+}
+
+:global(body.light) .newsDotActive {
+  background: linear-gradient(135deg, rgba(23, 137, 252, 0.95), rgba(84, 187, 255, 0.95));
 }
 
 /* Dark theme explicit */
@@ -1032,7 +1037,7 @@
 }
 
 :global(body.dark) .newsTitle {
-  background: linear-gradient(135deg, #7ec8ff, #f4b24c);
+  background: linear-gradient(135deg, #8fd4ff, #56a6ff);
   -webkit-background-clip: text;
   background-clip: text;
 }
@@ -1044,9 +1049,9 @@
 
 :global(body.dark) .newsCarousel {
   background:
-    radial-gradient(circle at 12% 12%, rgba(23, 137, 252, 0.18), transparent 42%),
-    radial-gradient(circle at 88% 8%, rgba(241, 139, 31, 0.18), transparent 48%),
-    linear-gradient(150deg, rgba(16, 22, 36, 0.95), rgba(9, 14, 24, 0.98));
+    radial-gradient(circle at 12% 12%, rgba(23, 137, 252, 0.2), transparent 44%),
+    radial-gradient(circle at 86% 10%, rgba(75, 166, 246, 0.16), transparent 50%),
+    linear-gradient(150deg, rgba(16, 22, 36, 0.96), rgba(10, 16, 28, 0.98));
   border-color: rgba(23, 137, 252, 0.22);
   box-shadow: 0 22px 44px rgba(3, 10, 20, 0.7);
 }
@@ -1078,13 +1083,17 @@
 }
 
 :global(body.dark) .newsButton {
-  background: linear-gradient(135deg, #1789fc, #f18b1f);
+  background: linear-gradient(135deg, #1789fc, #4bb2ff);
   box-shadow: 0 14px 28px rgba(3, 10, 20, 0.65);
 }
 
 :global(body.dark) .newsDot,
 :global(body.dark) .newsDotActive {
   background: rgba(113, 182, 255, 0.35);
+}
+
+:global(body.dark) .newsDotActive {
+  background: linear-gradient(135deg, rgba(113, 182, 255, 0.95), rgba(23, 137, 252, 0.95));
 }
 
 :global(body.dark) .newsDotActive {
