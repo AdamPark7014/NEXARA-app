@@ -8,7 +8,7 @@ import styles from "./page.module.css";
 
 export const metadata = {
   title: "Soluciones | Nexara",
-  description: "Soluciones integrales de TI para tu empresa: equipamiento, redes, seguridad, virtualización y más",
+  description: "Soluciones de TI para empresas: equipamiento, redes, seguridad, virtualización y soporte especializado.",
 };
 
 const imageExtensions = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
@@ -114,14 +114,12 @@ export default function SolucionesPage() {
         <div className={styles.heroContent}>
           <h1 className={styles.heroTitle}>Soluciones integrales de TI</h1>
           <p className={styles.heroSubtitle}>
-            En NEXARA nos especializamos en ofrecer asesoramiento integral para la
-            adquisición, instalación e implementación de Tecnologías de la Información.
-            Entendemos los procesos y desafíos únicos de cada empresa, lo que nos permite
-            ofrecer soluciones personalizadas que se ajusten a sus necesidades específicas.
+            Integramos infraestructura, seguridad, equipamiento y soporte para fortalecer
+            continuidad operativa, eficiencia y crecimiento sostenible en tu organización.
           </p>
           <div className={styles.heroCtas}>
-            <Link href="/contacto" className={styles.primaryCta}>Solicitar cotización</Link>
-            <Link href="https://wa.me/525536505044" className={styles.secondaryCta} target="_blank" rel="noopener noreferrer">WhatsApp</Link>
+            <Link href="/contacto" className={styles.primaryCta}>Solicitar propuesta</Link>
+            <Link href="https://wa.me/525536505044" className={styles.secondaryCta} target="_blank" rel="noopener noreferrer">Canal WhatsApp</Link>
           </div>
         </div>
       </section>
@@ -168,11 +166,8 @@ export default function SolucionesPage() {
           <div>
             <h3 className={styles.cardTitle}>Equipo y alianzas estratégicas</h3>
             <p>
-              Nuestra organización está compuesta por un equipo con amplia experiencia
-              y un fuerte compromiso con la satisfacción de nuestros clientes. Mantenemos
-              alianzas estratégicas con las principales marcas de tecnología y contamos
-              con socios de negocios altamente capacitados, lo que garantiza el éxito
-              y la calidad de nuestros servicios.
+              Integramos especialistas certificados y marcas líderes para ejecutar proyectos
+              con tiempos claros, alcance definido y calidad verificable.
             </p>
           </div>
         </div>
@@ -192,9 +187,7 @@ export default function SolucionesPage() {
             </div>
             <h3 className={styles.cardTitle}>Equipamiento corporativo</h3>
             <p>
-              Suministro de computadoras, servidores, componentes y periféricos de
-              las marcas más confiables del mercado. Asesoramos en la selección del
-              equipamiento ideal según tu presupuesto y objetivos.
+              Computadoras, servidores y periféricos alineados a tu operación y presupuesto.
             </p>
           </article>
 
@@ -208,9 +201,7 @@ export default function SolucionesPage() {
             </div>
             <h3 className={styles.cardTitle}>Infraestructura de redes</h3>
             <p>
-              Diseño, instalación y configuración de redes LAN/WAN, cableado estructurado,
-              switches, routers y puntos de acceso. Garantizamos conectividad robusta
-              y escalable para tu operación.
+              Redes LAN/WAN, cableado y conectividad segura para operación continua.
             </p>
           </article>
 
@@ -223,9 +214,7 @@ export default function SolucionesPage() {
             </div>
             <h3 className={styles.cardTitle}>Seguridad informática</h3>
             <p>
-              Implementación de firewalls, sistemas de detección de intrusos, antivirus
-              empresarial, respaldos automáticos y políticas de seguridad. Protegemos
-              tu información crítica contra amenazas actuales.
+              Firewalls, respaldos y controles de seguridad para proteger activos críticos.
             </p>
           </article>
 
@@ -238,9 +227,7 @@ export default function SolucionesPage() {
             </div>
             <h3 className={styles.cardTitle}>Virtualización y nube</h3>
             <p>
-              Migración a entornos virtuales, implementación de servidores virtualizados,
-              backup en nube y soluciones híbridas. Optimiza recursos y reduce costos
-              operativos con tecnologías modernas.
+              Entornos híbridos y virtuales para optimizar costos, escalabilidad y desempeño.
             </p>
           </article>
 
@@ -252,9 +239,7 @@ export default function SolucionesPage() {
             </div>
             <h3 className={styles.cardTitle}>Energía y respaldo eléctrico</h3>
             <p>
-              UPS, plantas de emergencia, reguladores y sistemas de protección eléctrica.
-              Aseguramos continuidad operativa ante cortes o variaciones de voltaje
-              en tu infraestructura crítica.
+              UPS y protección eléctrica para mantener disponibilidad ante variaciones y cortes.
             </p>
           </article>
 
@@ -266,10 +251,34 @@ export default function SolucionesPage() {
             </div>
             <h3 className={styles.cardTitle}>Soporte y mantenimiento</h3>
             <p>
-              Contratos de soporte técnico 24/7, mantenimiento preventivo y correctivo,
-              monitoreo remoto y atención en sitio. Mantén tu operación funcionando
-              sin interrupciones con respuesta menor a 4 horas.
+              Mantenimiento preventivo/correctivo y soporte técnico para reducir interrupciones.
             </p>
+          </article>
+        </div>
+      </section>
+
+      <section className={styles.section} aria-label="Preguntas frecuentes de soluciones">
+        <h2 className={styles.sectionTitle}>Q&A rápido de Soluciones</h2>
+        <div className={styles.solutionsGrid}>
+          <article className={styles.solutionCard}>
+            <h3 className={styles.cardTitle}>¿Qué tipo de empresas atienden?</h3>
+            <p>Atendemos corporativos, pymes y sector público con proyectos a la medida.</p>
+          </article>
+          <article className={styles.solutionCard}>
+            <h3 className={styles.cardTitle}>¿Pueden implementar por fases?</h3>
+            <p>Sí, priorizamos por impacto y disponibilidad operativa para evitar fricciones.</p>
+          </article>
+          <article className={styles.solutionCard}>
+            <h3 className={styles.cardTitle}>¿Incluyen marcas específicas?</h3>
+            <p>Trabajamos con fabricantes líderes según requisitos técnicos y presupuesto.</p>
+          </article>
+          <article className={styles.solutionCard}>
+            <h3 className={styles.cardTitle}>¿Solo venden equipo?</h3>
+            <p>No, también diseñamos, instalamos, configuramos y damos soporte continuo.</p>
+          </article>
+          <article className={styles.solutionCard}>
+            <h3 className={styles.cardTitle}>¿Cómo solicito una propuesta?</h3>
+            <p>Comparte tu necesidad por contacto o WhatsApp y armamos un alcance inicial.</p>
           </article>
         </div>
       </section>
@@ -332,11 +341,11 @@ export default function SolucionesPage() {
             <div className={styles.leasingText}>
               <h3 className={styles.cardTitle}>Arrendamiento de equipos</h3>
               <p>
-                <strong>¿Necesitas renovar el equipo tecnológico de tu empresa, pero no quieres descapitalizarte?</strong>
+                <strong>¿Necesitas renovar tecnología sin descapitalizar la operación?</strong>
               </p>
               <p>
-                En NEXARA ofrecemos <strong>Arrendamiento Puro y Arrendamiento Financiero</strong> para empresas,
-                una herramienta estratégica para el desarrollo, modernización y competitividad de tu compañía.
+                En NEXARA ofrecemos <strong>arrendamiento puro y financiero</strong> para modernizar
+                infraestructura con pagos previsibles y control financiero.
               </p>
               <ul className={styles.leasingBenefits}>
                 <li>
@@ -371,8 +380,8 @@ export default function SolucionesPage() {
                 </li>
               </ul>
               <p className={styles.leasingCta}>
-                Solicita una cotización y descubre cómo el arrendamiento puede impulsar
-                la modernización de tu infraestructura TI sin afectar tu liquidez.
+                Solicita una propuesta y descubre cómo el arrendamiento acelera
+                la modernización de tu infraestructura TI sin comprometer liquidez.
               </p>
             </div>
           </div>
@@ -384,10 +393,8 @@ export default function SolucionesPage() {
         <div className={styles.consultingBanner}>
           <h3>Soporte Técnico Empresarial Integral</h3>
           <p>
-            Entendemos que las operaciones modernas dependen de la continuidad y confiabilidad de tu infraestructura tecnológica.
-            <strong> Nuestro servicio de Soporte Técnico Empresarial</strong> está diseñado específicamente para empresas con
-            múltiples sucursales que requieren cobertura garantizada en equipos críticos de punto de venta, sistemas operativos
-            y infraestructura tecnológica.
+            Soporte especializado para empresas con operación multi-sucursal y equipos críticos.
+            <strong> Cubrimos continuidad tecnológica</strong> con tiempos de respuesta definidos y seguimiento puntual.
           </p>
           <div className={styles.supportFeatures}>
             <div className={styles.supportFeature}>
@@ -416,7 +423,7 @@ export default function SolucionesPage() {
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
                 <polyline points="16 8 12 12 8 10" />
               </svg>
-              <span><strong>Traslado incluido</strong><br/>Cubrimos viaticos y gastos de desplazamiento</span>
+              <span><strong>Traslado incluido</strong><br/>Cubrimos viáticos y gastos de desplazamiento</span>
             </div>
           </div>
         </div>
@@ -437,10 +444,10 @@ export default function SolucionesPage() {
       {/* CTA final */}
       <section className={styles.finalCta}>
         <h2>¿Listo para modernizar tu infraestructura?</h2>
-        <p>Conversemos sobre la solución ideal para tu empresa.</p>
+        <p>Conversemos y definimos el alcance ideal para tu operación.</p>
         <div className={styles.heroCtas}>
           <Link href="/contacto" className={styles.primaryCta}>Contactar asesor</Link>
-          <Link href="/nexara" className={styles.secondaryCta}>Conocer más sobre Nexara</Link>
+          <Link href="/nexara" className={styles.secondaryCta}>Conocer quiénes somos</Link>
         </div>
       </section>
     </main>

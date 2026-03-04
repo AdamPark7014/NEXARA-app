@@ -68,7 +68,7 @@ import { usePathname } from 'next/navigation';
 
 const navLinks = [
   { name: 'Inicio', href: '/' },
-  { name: 'Nexara', href: '/nexara' },
+  { name: 'Quiénes somos', href: '/nexara' },
   { name: 'Soluciones', href: '/soluciones' },
   { name: 'Servicios', href: '/servicios' },
   { name: 'Proyectos', href: '/proyectos' },

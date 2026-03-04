@@ -4,9 +4,9 @@ import styles from "./page.module.css";
 import { buildApiUrl, getApiBase } from "@/lib/api-base";
 
 export const metadata = {
-  title: "Nexara | Proyectos",
+  title: "Proyectos | Nexara",
   description:
-    "Casos recientes de Nexara con imágenes y resultados destacados para retail, industria y servicios.",
+    "Casos de éxito de Nexara con resultados medibles en retail, industria y servicios.",
 };
 
 export const dynamic = "force-dynamic";
@@ -61,11 +61,11 @@ export default async function ProjectsPage() {
           <div>
             <h1 className={styles.heroTitle}>Proyectos recientes</h1>
             <p className={styles.heroSubtitle}>
-              Casos reales con resultados medibles para mostrar cómo trabajamos,
-              qué entregamos y el impacto logrado.
+              Casos reales con resultados medibles que muestran alcance,
+              ejecución y valor entregado en operación.
             </p>
             <div className={styles.heroActions}>
-              <Link href="/contacto" className={styles.primaryCta}>Hablar con un asesor</Link>
+              <Link href="/contacto" className={styles.primaryCta}>Solicitar sesión</Link>
               <Link href="/nexara" className={styles.secondaryCta}>Ver credenciales</Link>
             </div>
           </div>
@@ -88,6 +88,7 @@ export default async function ProjectsPage() {
 
       <nav className={styles.quickNav} aria-label="Accesos rápidos">
         <a href="#casos" className={styles.quickNavLink}>Casos</a>
+        <a href="#por-que" className={styles.quickNavLink}>Por qué elegirnos</a>
         <a href="#cta" className={styles.quickNavLink}>Agendar sesión</a>
       </nav>
 
@@ -156,10 +157,26 @@ export default async function ProjectsPage() {
           <div className={styles.projectCard}>
             <h2 className={styles.projectTitle}>Sin proyectos publicados</h2>
             <p className={styles.projectSubtitle}>
-              Agrega proyectos desde el panel web para mostrar resultados aqui.
+              Agrega proyectos desde el panel web para mostrar resultados aquí.
             </p>
           </div>
         )}
+      </section>
+
+      <section id="por-que" className={styles.whyUsSection} aria-label="Razones para elegirnos">
+        <div>
+          <p className={styles.kicker}>Valor diferencial</p>
+          <h3 className={styles.whyUsTitle}>¿Por qué elegirnos?</h3>
+          <p className={styles.ctaText}>
+            Combinamos experiencia operativa, ejecución técnica y seguimiento para entregar resultados medibles.
+          </p>
+        </div>
+        <div className={styles.whyUsGrid}>
+          <div className={styles.whyUsItem}><strong>8+ años</strong><span>de experiencia en TI empresarial</span></div>
+          <div className={styles.whyUsItem}><strong>500+ clientes</strong><span>atendidos en distintos sectores</span></div>
+          <div className={styles.whyUsItem}><strong>300+ proyectos</strong><span>implementados de punta a punta</span></div>
+          <div className={styles.whyUsItem}><strong>95% SLA</strong><span>de cumplimiento en servicio</span></div>
+        </div>
       </section>
 
       <section id="cta" className={styles.ctaStrip}>
@@ -167,12 +184,12 @@ export default async function ProjectsPage() {
           <p className={styles.kicker}>¿Quieres un caso similar?</p>
           <h3>Agendemos una sesión de 20 minutos</h3>
           <p className={styles.ctaText}>
-            Te mostramos entregables, tableros y metodología para replicar
+            Revisamos tu contexto y te mostramos una ruta clara para replicar
             resultados en tu operación.
           </p>
         </div>
         <div className={styles.heroActions}>
-          <Link href="/contacto" className={styles.primaryCta}>Agenda ahora</Link>
+          <Link href="/contacto" className={styles.primaryCta}>Agendar ahora</Link>
           <Link
             href="https://wa.me/525536505044"
             className={styles.secondaryCta}

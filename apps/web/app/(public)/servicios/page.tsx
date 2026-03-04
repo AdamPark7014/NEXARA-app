@@ -7,8 +7,69 @@ import styles from "./page.module.css";
 
 export const metadata = {
   title: "Servicios | Nexara",
-  description: "Expertos en tecnología: venta de computadoras, accesorios, videovigilancia y soluciones para gobierno, educación, pymes y más",
+  description: "Servicios tecnológicos para empresas: equipamiento, redes, seguridad, soporte y licenciamiento.",
 };
+
+const sectorOptions = [
+  {
+    key: "gobierno",
+    label: "Gobierno",
+    description: "Modernizamos entornos públicos con infraestructura segura, equipamiento y soporte operativo continuo.",
+  },
+  {
+    key: "educativo",
+    label: "Educativo",
+    description: "Implementamos aulas y redes institucionales para aprendizaje digital con alta disponibilidad.",
+  },
+  {
+    key: "pymes",
+    label: "Pymes",
+    description: "Diseñamos paquetes tecnológicos escalables para crecer sin frenar la operación.",
+  },
+  {
+    key: "salud",
+    label: "Salud",
+    description: "Aseguramos continuidad y protección de información en clínicas y centros médicos.",
+  },
+  {
+    key: "industria",
+    label: "Industria",
+    description: "Integración de TI para plantas y operaciones con foco en control, seguridad y productividad.",
+  },
+];
+
+const serviceOptions = [
+  {
+    key: "computo",
+    label: "Cómputo empresarial",
+    accessories: "Laptops, workstations y servidores",
+    description: "Suministro y configuración de equipos listos para operación y crecimiento.",
+  },
+  {
+    key: "redes",
+    label: "Redes y conectividad",
+    accessories: "Switches, access points y cableado",
+    description: "Diseño e implementación de redes estables, seguras y administrables.",
+  },
+  {
+    key: "seguridad",
+    label: "Videovigilancia y seguridad",
+    accessories: "CCTV, control de acceso y monitoreo",
+    description: "Cobertura integral para proteger activos físicos y digitales.",
+  },
+  {
+    key: "soporte",
+    label: "Soporte técnico",
+    accessories: "Mesa de ayuda, mantenimiento y sitio",
+    description: "Atención especializada con tiempos de respuesta definidos para continuidad.",
+  },
+  {
+    key: "licencias",
+    label: "Licenciamiento",
+    accessories: "Productividad, seguridad y colaboración",
+    description: "Gestión de licencias y cumplimiento para operar con software legal y actualizado.",
+  },
+];
 
 const imageExtensions = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
 
@@ -95,7 +156,18 @@ function withVersionServ(src: string): string {
   }
 }
 
-export default function ServiciosPage() {
+type ServiciosPageProps = {
+  searchParams?: {
+    sector?: string | string[];
+    service?: string | string[];
+  };
+};
+
+export default function ServiciosPage({ searchParams }: ServiciosPageProps) {
+  const sectorParam = typeof searchParams?.sector === "string" ? searchParams.sector : undefined;
+  const serviceParam = typeof searchParams?.service === "string" ? searchParams.service : undefined;
+  const activeSector = sectorOptions.find((sector) => sector.key === sectorParam) ?? sectorOptions[0];
+  const activeService = serviceOptions.find((service) => service.key === serviceParam) ?? serviceOptions[0];
   const serviciosRaw = getPublicImages("servicios");
   const serviciosImages = seededShuffle(serviciosRaw, "servicios");
   const byName = (token: string) => serviciosImages.find((src) => path.basename(src).toLowerCase().includes(token));
@@ -115,16 +187,15 @@ export default function ServiciosPage() {
           <div className={styles.heroBadge}>EXPERTOS EN TECNOLOGÍA</div>
           <h1 className={styles.heroTitle}>¿Tienes un proyecto en mente?</h1>
           <p className={styles.heroSubtitle}>
-            Has llegado con los expertos. Encuentra los mejores productos y tecnología
-            al mejor precio. Te ayudamos a equipar y modernizar tu operación con
-            soluciones diseñadas para tu sector.
+            Diseñamos la combinación correcta de servicios y tecnología para equipar,
+            modernizar y escalar tu operación con criterio técnico y financiero.
           </p>
           <div className={styles.heroCtas}>
             <Link href="/contacto" className={styles.primaryCta}>
-              Solicitar asesoría
+              Solicitar diagnóstico
             </Link>
             <Link href="https://wa.me/525536505044" className={styles.secondaryCta} target="_blank" rel="noopener noreferrer">
-              WhatsApp directo
+              Canal WhatsApp
             </Link>
           </div>
         </div>
@@ -133,7 +204,6 @@ export default function ServiciosPage() {
       <nav className={styles.quickNav} aria-label="Accesos rápidos">
         <a href="#sectores" className={styles.quickNavLink}>Sectores</a>
         <a href="#servicios-principales" className={styles.quickNavLink}>Servicios</a>
-        <a href="#por-que" className={styles.quickNavLink}>Por qué elegirnos</a>
         <a href="#contacto" className={styles.quickNavLink}>Contacto</a>
       </nav>
 
@@ -163,103 +233,25 @@ export default function ServiciosPage() {
         <div className={styles.sectionHeader}>
           <h2 className={styles.sectionTitle}>Sectores que atendemos</h2>
           <p className={styles.sectionLead}>
-            Conocemos las necesidades específicas de cada industria y ofrecemos
-            soluciones personalizadas que impulsan tu éxito.
+            Selecciona un sector para visualizar nuestro enfoque operativo.
           </p>
         </div>
-
-        <div className={styles.sectorsGrid}>
-          <article className={styles.sectorCard}>
-            <div className={styles.sectorIcon}>
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                <polyline points="9 22 9 12 15 12 15 22" />
-              </svg>
-            </div>
-            <h3>Gobierno</h3>
-            <p>
-              Equipamiento tecnológico para oficinas gubernamentales, sistemas de
-              gestión documental, videovigilancia y soluciones de ciberseguridad
-              para entidades públicas.
-            </p>
-          </article>
-
-          <article className={styles.sectorCard}>
-            <div className={styles.sectorIcon}>
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-              </svg>
-            </div>
-            <h3>Educativo</h3>
-            <p>
-              Soluciones para escuelas y universidades: laboratorios de cómputo,
-              proyectores, pizarras interactivas, redes wifi institucionales y
-              sistemas de gestión académica.
-            </p>
-          </article>
-
-          <article className={styles.sectorCard}>
-            <div className={styles.sectorIcon}>
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                <circle cx="9" cy="10" r="2" />
-                <path d="M9 21V16a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v5" />
-              </svg>
-            </div>
-            <h3>Hogar</h3>
-            <p>
-              Computadoras personales, periféricos, sistemas de entretenimiento,
-              redes domésticas inteligentes, videovigilancia residencial y
-              automatización del hogar.
-            </p>
-          </article>
-
-          <article className={styles.sectorCard}>
-            <div className={styles.sectorIcon}>
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-              </svg>
-            </div>
-            <h3>Pymes</h3>
-            <p>
-              Equipamiento completo para pequeñas y medianas empresas: estaciones
-              de trabajo, servidores, redes, punto de venta, respaldos en nube y
-              soporte técnico continuo.
-            </p>
-          </article>
-
-          <article className={styles.sectorCard}>
-            <div className={styles.sectorIcon}>
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-              </svg>
-            </div>
-            <h3>Salud</h3>
-            <p>
-              Soluciones especializadas para clínicas y hospitales: equipos médicos
-              certificados, sistemas de gestión hospitalaria, respaldos HIPAA y
-              redes seguras para información sensible.
-            </p>
-          </article>
-
-          <article className={styles.sectorCard}>
-            <div className={styles.sectorIcon}>
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="6" width="20" height="12" rx="2" />
-                <circle cx="12" cy="12" r="2" />
-                <path d="M6 12h.01M18 12h.01" />
-              </svg>
-            </div>
-            <h3>Industria</h3>
-            <p>
-              Tecnología industrial robusta: computadoras industriales, sistemas de
-              control, automatización, videovigilancia perimetral y soluciones IoT
-              para manufactura.
-            </p>
-          </article>
+        <div className={styles.selectorButtons}>
+          {sectorOptions.map((sector) => (
+            <Link
+              key={sector.key}
+              href={`/servicios?sector=${sector.key}&service=${activeService.key}#sectores`}
+              className={activeSector.key === sector.key ? styles.selectorButtonActive : styles.selectorButton}
+              aria-current={activeSector.key === sector.key ? "true" : undefined}
+            >
+              {sector.label}
+            </Link>
+          ))}
         </div>
+        <article className={styles.selectorDetailCard}>
+          <h3>{activeSector.label}</h3>
+          <p>{activeSector.description}</p>
+        </article>
       </section>
 
       {/* Espacio estratégico 2 (dos cuadrados, tras sectores) */}
@@ -292,179 +284,31 @@ export default function ServiciosPage() {
         <div className={styles.sectionHeader}>
           <h2 className={styles.sectionTitle}>Nuestros servicios principales</h2>
           <p className={styles.sectionLead}>
-            Servicios clave para equipar, proteger y mantener tu operación sin fricción.
+            Selecciona un servicio y revisa alcance, accesorios y valor esperado.
           </p>
         </div>
-
-        <div className={styles.servicesGrid} aria-label="Listado de servicios principales">
-          <article className={styles.serviceCard}>
-            <div className={styles.serviceNumber}>01</div>
-            <div className={styles.serviceIcon}>
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="3" width="20" height="14" rx="2" />
-                <line x1="8" y1="21" x2="16" y2="21" />
-                <line x1="12" y1="17" x2="12" y2="21" />
-              </svg>
-            </div>
-            <div className={styles.serviceContent}>
-              <h3>Venta de computadoras</h3>
-              <p>
-                Equipos de cómputo para oficina, operación y alto rendimiento,
-                seleccionados según tu presupuesto y objetivos.
-              </p>
-              <ul className={styles.serviceFeatures}>
-                <li>Laptops empresariales y personales</li>
-                <li>Desktops personalizadas según requerimientos</li>
-                <li>Workstations para diseño y renderizado</li>
-                <li>Servidores de marcas líderes</li>
-              </ul>
-            </div>
-          </article>
-
-          <article className={styles.serviceCard}>
-            <div className={styles.serviceNumber}>02</div>
-            <div className={styles.serviceIcon}>
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-                <circle cx="9" cy="10" r="1" />
-                <circle cx="15" cy="10" r="1" />
-              </svg>
-            </div>
-            <div className={styles.serviceContent}>
-              <h3>Accesorios y periféricos</h3>
-              <p>
-                Complementamos tu operación con periféricos y accesorios confiables
-                para productividad, conectividad y respaldo.
-              </p>
-              <ul className={styles.serviceFeatures}>
-                <li>Teclados mecánicos y ergonómicos</li>
-                <li>Monitores profesionales y gaming</li>
-                <li>Impresoras láser y multifuncionales</li>
-                <li>Almacenamiento SSD y respaldo externo</li>
-              </ul>
-            </div>
-          </article>
-
-          <article className={styles.serviceCard}>
-            <div className={styles.serviceNumber}>03</div>
-            <div className={styles.serviceIcon}>
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                <circle cx="12" cy="13" r="4" />
-              </svg>
-            </div>
-            <div className={styles.serviceContent}>
-              <h3>Videovigilancia y seguridad</h3>
-              <p>
-                Implementamos CCTV y control de acceso para proteger tu operación
-                con monitoreo en tiempo real.
-              </p>
-              <ul className={styles.serviceFeatures}>
-                <li>Cámaras IP de alta resolución 4K</li>
-                <li>Sistemas DVR/NVR con almacenamiento</li>
-                <li>Monitoreo remoto desde dispositivos móviles</li>
-                <li>Control de acceso biométrico</li>
-              </ul>
-            </div>
-          </article>
-
-          <article className={styles.serviceCard}>
-            <div className={styles.serviceNumber}>04</div>
-            <div className={styles.serviceIcon}>
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <circle cx="12" cy="12" r="6" />
-                <circle cx="12" cy="12" r="2" />
-              </svg>
-            </div>
-            <div className={styles.serviceContent}>
-              <h3>Redes y conectividad</h3>
-              <p>
-                Diseñamos y optimizamos redes empresariales para estabilidad,
-                cobertura y seguridad en todas tus sucursales.
-              </p>
-              <ul className={styles.serviceFeatures}>
-                <li>Cableado estructurado certificado</li>
-                <li>Redes WiFi 6 de alto rendimiento</li>
-                <li>Configuración de switches y routers</li>
-                <li>VPN y acceso remoto seguro</li>
-              </ul>
-            </div>
-          </article>
-
-          <article className={styles.serviceCard}>
-            <div className={styles.serviceNumber}>05</div>
-            <div className={styles.serviceIcon}>
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-              </svg>
-            </div>
-            <div className={styles.serviceContent}>
-              <h3>Soporte Técnico Empresarial</h3>
-              <p>
-                Soporte técnico empresarial con ingenieros asignados, seguimiento de
-                tickets y cobertura en múltiples ubicaciones.
-              </p>
-              <ul className={styles.serviceFeatures}>
-                <li>Resolución de incidencias en equipos de punto de venta (cajas registradoras, scanners)</li>
-                <li>Soporte en múltiples sucursales y ubicaciones geográficas</li>
-                <li>Ingenieros especializados asignados a tu cuenta</li>
-                <li>RTA prioritario menor a 4 horas hábiles</li>
-              </ul>
-            </div>
-          </article>
-
-          <article className={styles.serviceCard}>
-            <div className={styles.serviceNumber}>06</div>
-            <div className={styles.serviceIcon}>
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-              </svg>
-            </div>
-            <div className={styles.serviceContent}>
-              <h3>Mantenimiento y soporte</h3>
-              <p>
-                Mantenimiento preventivo y correctivo para reducir incidencias y
-                mantener continuidad operativa.
-              </p>
-              <ul className={styles.serviceFeatures}>
-                <li>Mantenimiento preventivo programado</li>
-                <li>Reparación y diagnóstico de equipos</li>
-                <li>Soporte técnico remoto y en sitio</li>
-                <li>Actualización de hardware y software</li>
-              </ul>
-            </div>
-          </article>
-
-          <article className={styles.serviceCard}>
-            <div className={styles.serviceNumber}>07</div>
-            <div className={styles.serviceIcon}>
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                <line x1="12" y1="22.08" x2="12" y2="12" />
-              </svg>
-            </div>
-            <div className={styles.serviceContent}>
-              <h3>Licenciamiento de software</h3>
-              <p>
-                Licencias originales y asesoría de cumplimiento para operar con
-                software legal, actualizado y seguro.
-              </p>
-              <ul className={styles.serviceFeatures}>
-                <li>Microsoft Office 365 y Windows</li>
-                <li>Licencias Adobe Creative Cloud</li>
-                <li>Antivirus corporativos (Kaspersky, ESET)</li>
-                <li>Asesoría en licenciamiento empresarial</li>
-              </ul>
-            </div>
-          </article>
+        <div className={styles.selectorButtons}>
+          {serviceOptions.map((service) => (
+            <Link
+              key={service.key}
+              href={`/servicios?sector=${activeSector.key}&service=${service.key}#servicios-principales`}
+              className={activeService.key === service.key ? styles.selectorButtonActive : styles.selectorButton}
+              aria-current={activeService.key === service.key ? "true" : undefined}
+            >
+              {service.label}
+            </Link>
+          ))}
         </div>
+
+        <article className={styles.selectorDetailCard} aria-label="Detalle del servicio seleccionado">
+          <h3>{activeService.label}</h3>
+          <p>{activeService.description}</p>
+          <p><strong>Accesorios:</strong> {activeService.accessories}</p>
+        </article>
 
         <div className={styles.servicesCtaBar}>
           <p className={styles.servicesCtaText}>
-            ¿Quieres una recomendación rápida para tu empresa?
+            ¿Quieres una recomendación puntual para tu operación?
           </p>
           <div className={styles.heroCtas}>
             <Link href="/contacto" className={styles.primaryCta}>Cotización express</Link>
@@ -495,84 +339,13 @@ export default function ServiciosPage() {
         </div>
       </section>
 
-      {/* Por qué elegirnos */}
-      <section id="por-que" className={styles.section}>
-        <div className={styles.whyUsSection}>
-          <div className={styles.whyUsContent}>
-            <h2 className={styles.sectionTitle}>¿Por qué elegirnos?</h2>
-            <p className={styles.whyUsLead}>
-              Más de 8 años de experiencia nos respaldan como uno de los proveedores
-              tecnológicos más confiables de México.
-            </p>
-            <div className={styles.benefitsGrid}>
-              <div className={styles.benefitItem}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                <span>Mejores precios del mercado</span>
-              </div>
-              <div className={styles.benefitItem}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                <span>Productos 100% originales y certificados</span>
-              </div>
-              <div className={styles.benefitItem}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                <span>Asesoría personalizada sin costo</span>
-              </div>
-              <div className={styles.benefitItem}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                <span>Garantía extendida en todos los productos</span>
-              </div>
-              <div className={styles.benefitItem}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                <span>Instalación y configuración profesional</span>
-              </div>
-              <div className={styles.benefitItem}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                <span>Soporte técnico continuo 24/7</span>
-              </div>
-            </div>
-          </div>
-          <div className={styles.whyUsImage}>
-            <div className={styles.statsCard}>
-              <div className={styles.statItem}>
-                <h3>8+</h3>
-                <p>Años de experiencia</p>
-              </div>
-              <div className={styles.statItem}>
-                <h3>500+</h3>
-                <p>Clientes satisfechos</p>
-              </div>
-              <div className={styles.statItem}>
-                <h3>300+</h3>
-                <p>Proyectos completados</p>
-              </div>
-              <div className={styles.statItem}>
-                <h3>95%</h3>
-                <p>SLA de cumplimiento</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* CTA final */}
       <section id="contacto" className={styles.finalCta}>
         <div className={styles.ctaContent}>
           <h2>¿Listo para equipar tu proyecto?</h2>
           <p>
-            Nuestros asesores están listos para ayudarte a encontrar las mejores
-            soluciones tecnológicas al mejor precio.
+            Nuestros asesores están listos para diseñar una propuesta tecnológica
+            alineada a tus prioridades operativas.
           </p>
           <div className={styles.heroCtas}>
             <Link href="/contacto" className={styles.primaryCta}>

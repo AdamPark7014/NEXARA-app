@@ -9,23 +9,23 @@
   --panel-padding-x: clamp(16px, 3vw, 32px);
   --panel-padding-y: clamp(16px, 3vw, 32px);
   --panel-sidebar-width: clamp(240px, 22vw, 300px);
-  --background: #e6f1ff;
-  --foreground: #0f2a43;
-  --primary: #1868db;
-  --primary-light: #4a98f0;
-  --secondary: #1aa18b;
-  --accent: #28baa4;
+  --background: #eaf3ff;
+  --foreground: #0d2c4f;
+  --primary: #0f6fff;
+  --primary-light: #4aa3ff;
+  --secondary: #0fb9a8;
+  --accent: #27d3be;
   --purple: #615ddc;
   --danger: #c34a4a;
   --info: #2c7fd4;
-  --surface: #f3f9ff;
-  --muted: #d2e5fb;
-  --link: #1868db;
-  --shadow: rgba(10, 37, 72, 0.16);
+  --surface: #f7fbff;
+  --muted: #d8e9ff;
+  --link: #0f6fff;
+  --shadow: rgba(9, 45, 90, 0.18);
   /* Extra blues for light mode */
-  --blue-1: #1868db;
-  --blue-2: #4a98f0;
-  --blue-3: #b8dafb;
+  --blue-1: #0f6fff;
+  --blue-2: #4aa3ff;
+  --blue-3: #c4e2ff;
   /* Footer specific colors */
   --gray-alpha-200: rgba(11, 18, 32, 0.08);
   --phone-color: #3b82f6;
@@ -34,10 +34,10 @@
   --email-color-dark: #dc2626;
   --whatsapp-color: #25D366;
   --whatsapp-color-dark: #128C7E;
-  --text-secondary: #25527c;
-  --text-tertiary: #113654;
-  --surface-light: #e9f4ff;
-  --focus-ring: rgba(24, 104, 219, 0.36);
+  --text-secondary: #1e4f7c;
+  --text-tertiary: #0f3b66;
+  --surface-light: #edf6ff;
+  --focus-ring: rgba(15, 111, 255, 0.38);
   --public-font-family: var(--font-geist-sans), "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
   --public-title-leading: 1.12;
   --public-body-leading: 1.72;
@@ -51,23 +51,23 @@
 
 /* Light mode explicit override */
 body.light {
-  --background: #e6f1ff;
-  --foreground: #0f2a43;
-  --primary: #1868db;
-  --primary-light: #4a98f0;
-  --secondary: #1aa18b;
-  --accent: #28baa4;
+  --background: #eaf3ff;
+  --foreground: #0d2c4f;
+  --primary: #0f6fff;
+  --primary-light: #4aa3ff;
+  --secondary: #0fb9a8;
+  --accent: #27d3be;
   --purple: #615ddc;
   --danger: #c34a4a;
   --info: #2c7fd4;
-  --surface: #f3f9ff;
-  --muted: #d2e5fb;
-  --link: #1868db;
-  --shadow: rgba(10, 37, 72, 0.16);
+  --surface: #f7fbff;
+  --muted: #d8e9ff;
+  --link: #0f6fff;
+  --shadow: rgba(9, 45, 90, 0.18);
   /* Extra blues for light mode */
-  --blue-1: #1868db;
-  --blue-2: #4a98f0;
-  --blue-3: #b8dafb;
+  --blue-1: #0f6fff;
+  --blue-2: #4aa3ff;
+  --blue-3: #c4e2ff;
   /* Footer specific colors */
   --gray-alpha-200: rgba(11, 18, 32, 0.08);
   --phone-color: #3b82f6;
@@ -76,65 +76,65 @@ body.light {
   --email-color-dark: #dc2626;
   --whatsapp-color: #25D366;
   --whatsapp-color-dark: #128C7E;
-  --text-secondary: #25527c;
-  --text-tertiary: #113654;
-  --surface-light: #e9f4ff;
+  --text-secondary: #1e4f7c;
+  --text-tertiary: #0f3b66;
+  --surface-light: #edf6ff;
 }
 
 /* Dark mode explicit override */
 body.dark {
-  --background: #0f1826;
-  --foreground: #e6edf7;
-  --primary: #5b95da;
-  --primary-light: #85b4e8;
-  --secondary: #4ea08a;
-  --accent: #63b7a2;
+  --background: #0b1424;
+  --foreground: #e9f2ff;
+  --primary: #5aa2ff;
+  --primary-light: #8ac2ff;
+  --secondary: #4ac8b4;
+  --accent: #69e0cf;
   --purple: #9b8fe0;
   --danger: #cf6a6a;
   --info: #77abd9;
-  --surface: #162334;
-  --muted: #22344b;
-  --link: #8fb8e6;
-  --shadow: rgba(6, 15, 27, 0.38);
+  --surface: #14233a;
+  --muted: #203854;
+  --link: #9cc6ff;
+  --shadow: rgba(5, 14, 28, 0.42);
   /* Extra blues for dark mode */
-  --blue-1: #18375d;
-  --blue-2: #5b95da;
-  --blue-3: #4ea08a;
+  --blue-1: #173967;
+  --blue-2: #5aa2ff;
+  --blue-3: #4ac8b4;
   /* Footer specific colors */
-  --gray-alpha-200: rgba(121, 184, 255, 0.24);
+  --gray-alpha-200: rgba(136, 196, 255, 0.26);
   --phone-color: #3b82f6;
   --phone-color-dark: #2563eb;
   --email-color: #ef4444;
   --email-color-dark: #dc2626;
   --whatsapp-color: #25D366;
   --whatsapp-color-dark: #128C7E;
-  --text-secondary: #b9c9dd;
-  --text-tertiary: #d8e3f2;
-  --surface-dark: rgba(22, 35, 52, 0.92);
-  --surface-light: #20334a;
+  --text-secondary: #bfd4ef;
+  --text-tertiary: #dde9fb;
+  --surface-dark: rgba(20, 35, 58, 0.92);
+  --surface-light: #224062;
 }
 
 
 /* Dark mode via system preference */
 @media (prefers-color-scheme: dark) {
   body {
-    --background: #0f1826;
-    --foreground: #e6edf7;
-    --primary: #5b95da;
-    --primary-light: #85b4e8;
-    --secondary: #4ea08a;
-    --accent: #63b7a2;
+    --background: #0b1424;
+    --foreground: #e9f2ff;
+    --primary: #5aa2ff;
+    --primary-light: #8ac2ff;
+    --secondary: #4ac8b4;
+    --accent: #69e0cf;
     --purple: #9b8fe0;
     --danger: #cf6a6a;
     --info: #77abd9;
-    --surface: #162334;
-    --muted: #22344b;
-    --link: #8fb8e6;
-    --shadow: rgba(6, 15, 27, 0.38);
+    --surface: #14233a;
+    --muted: #203854;
+    --link: #9cc6ff;
+    --shadow: rgba(5, 14, 28, 0.42);
     /* Extra blues for dark mode */
-    --blue-1: #18375d;
-    --blue-2: #5b95da;
-    --blue-3: #4ea08a;
+    --blue-1: #173967;
+    --blue-2: #5aa2ff;
+    --blue-3: #4ac8b4;
   }
 }
 
@@ -228,18 +228,18 @@ body {
 
 body.light {
   background:
-    radial-gradient(circle at 7% 3%, rgba(74, 152, 240, 0.3), transparent 44%),
-    radial-gradient(circle at 94% 2%, rgba(40, 186, 164, 0.22), transparent 46%),
-    radial-gradient(circle at 50% -18%, rgba(97, 93, 220, 0.16), transparent 41%),
-    radial-gradient(circle at 24% 100%, rgba(74, 152, 240, 0.1), transparent 48%),
-    linear-gradient(180deg, #f1f8ff 0%, #e7f2ff 44%, #e4f1ff 72%, #e4f5f0 100%) !important;
+    radial-gradient(circle at 7% 3%, rgba(74, 163, 255, 0.32), transparent 44%),
+    radial-gradient(circle at 94% 2%, rgba(39, 211, 190, 0.24), transparent 46%),
+    radial-gradient(circle at 50% -18%, rgba(97, 93, 220, 0.14), transparent 41%),
+    radial-gradient(circle at 24% 100%, rgba(74, 163, 255, 0.12), transparent 48%),
+    linear-gradient(180deg, #f4f9ff 0%, #ebf4ff 44%, #e8f2ff 72%, #e8f9f5 100%) !important;
 }
 
 body.dark {
   background:
-    radial-gradient(circle at 12% 8%, rgba(91, 149, 218, 0.16), transparent 45%),
-    radial-gradient(circle at 88% 0%, rgba(78, 160, 138, 0.13), transparent 48%),
-    linear-gradient(180deg, #0e1724 0%, #121f30 100%) !important;
+    radial-gradient(circle at 12% 8%, rgba(90, 162, 255, 0.2), transparent 45%),
+    radial-gradient(circle at 88% 0%, rgba(74, 200, 180, 0.16), transparent 48%),
+    linear-gradient(180deg, #0b1424 0%, #12233a 100%) !important;
 }
 
 * {
