@@ -114,6 +114,21 @@ const applySecurityHeaders = (response: NextResponse) => {
   return response;
 };
 
+const applyNoStoreForHtml = (request: NextRequest, response: NextResponse) => {
+  const accept = (request.headers.get('accept') || '').toLowerCase();
+  const isHtmlRequest = accept.includes('text/html');
+  const pathname = request.nextUrl.pathname;
+  const isApi = pathname === '/api' || pathname.startsWith('/api/');
+
+  if (isHtmlRequest && !isApi) {
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+  }
+
+  return response;
+};
+
 const rejectWithSecurityHeaders = (message: string, status: number) => {
   return applySecurityHeaders(new NextResponse(message, { status }));
 };
@@ -222,14 +237,16 @@ export function middleware(request: NextRequest) {
       pathname === '/socket.io' ||
       pathname.startsWith('/socket.io/')
     ) {
-      return applySecurityHeaders(NextResponse.next());
+      const response = applySecurityHeaders(NextResponse.next());
+      return applyNoStoreForHtml(request, response);
     }
     
     // NO reescribir archivos estáticos (imágenes, fuentes, etc.)
     // Permitir que Next.js los sirva directamente desde /public
     const staticFileExtensions = /\.(png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot|css|js|json)$/i;
     if (staticFileExtensions.test(pathname)) {
-      return applySecurityHeaders(NextResponse.next());
+      const response = applySecurityHeaders(NextResponse.next());
+      return applyNoStoreForHtml(request, response);
     }
     
     // Reescribir a /<slug><pathname>
@@ -240,11 +257,12 @@ export function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = rewritePath;
     
-    return applySecurityHeaders(NextResponse.rewrite(url));
+    const response = applySecurityHeaders(NextResponse.rewrite(url));
+    return applyNoStoreForHtml(request, response);
   }
 
   // Dominio principal o www: mantener como está, Next.js maneja normalmente
-  const response = applySecurityHeaders(NextResponse.next());
+  const response = applyNoStoreForHtml(request, applySecurityHeaders(NextResponse.next()));
   if (SENSITIVE_PATH_PATTERN.test(request.nextUrl.pathname)) {
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
     response.headers.set('Pragma', 'no-cache');
