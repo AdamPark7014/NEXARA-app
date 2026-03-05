@@ -19,12 +19,32 @@ const normalizeSocketOrigin = (baseUrl: string) => {
 
 export const getApiBase = () => {
   const envBase = process.env.NEXT_PUBLIC_API_URL;
-  if (envBase && envBase.trim()) {
-    return ensureApiBase(envBase);
-  }
 
   if (typeof window !== "undefined" && window.location?.origin) {
+    const originHost = window.location.hostname.toLowerCase();
+    const isLocalOrigin =
+      originHost === "localhost" ||
+      originHost === "127.0.0.1" ||
+      originHost.endsWith(".localhost");
+
+    if (envBase && envBase.trim()) {
+      const normalizedEnvBase = ensureApiBase(envBase);
+      const lowerEnvBase = normalizedEnvBase.toLowerCase();
+      const pointsToLocalhost =
+        lowerEnvBase.includes("//localhost") ||
+        lowerEnvBase.includes("//127.0.0.1") ||
+        lowerEnvBase.includes(".localhost");
+
+      if (!pointsToLocalhost || isLocalOrigin) {
+        return normalizedEnvBase;
+      }
+    }
+
     return `${window.location.origin}/api`;
+  }
+
+  if (envBase && envBase.trim()) {
+    return ensureApiBase(envBase);
   }
 
   return "http://localhost:3001/api";
