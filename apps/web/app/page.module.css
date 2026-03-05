@@ -537,7 +537,7 @@
     radial-gradient(circle at 86% 0%, color-mix(in srgb, var(--secondary) 9%, transparent), transparent 52%),
     linear-gradient(180deg, color-mix(in srgb, var(--surface) 97%, transparent), color-mix(in srgb, var(--surface) 92%, var(--primary) 8%));
   border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
-  border-radius: clamp(20px, 3.2vw, 34px);
+  border-radius: clamp(26px, 3.6vw, 44px);
   padding: clamp(16px, 2.6vw, 30px);
   box-shadow:
     0 16px 38px color-mix(in srgb, var(--primary) 14%, transparent),
@@ -590,7 +590,7 @@
   grid-template-columns: minmax(250px, 360px) minmax(0, 1fr);
   gap: clamp(14px, 2.6vw, 30px);
   align-items: center;
-  min-height: clamp(280px, 33vw, 370px);
+  min-height: clamp(260px, 31vw, 360px);
   animation: newsFade 0.4s ease;
   position: relative;
   z-index: 1;
@@ -598,9 +598,10 @@
 
 .newsImageWrap {
   width: 100%;
-  height: 100%;
-  min-height: clamp(210px, 28vw, 320px);
-  border-radius: clamp(18px, 2.4vw, 28px);
+  height: auto;
+  aspect-ratio: 4 / 5;
+  min-height: clamp(220px, 26vw, 340px);
+  border-radius: clamp(26px, 3vw, 38px) clamp(16px, 2vw, 24px) clamp(26px, 3vw, 38px) clamp(16px, 2vw, 24px);
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
   background: color-mix(in srgb, var(--surface) 90%, var(--primary) 10%);
@@ -631,7 +632,7 @@
   gap: clamp(10px, 1.2vw, 14px);
   background: linear-gradient(165deg, color-mix(in srgb, var(--surface) 94%, transparent), color-mix(in srgb, var(--surface) 86%, var(--primary) 14%));
   border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
-  border-radius: clamp(16px, 2vw, 24px);
+  border-radius: clamp(24px, 2.6vw, 34px) clamp(14px, 1.8vw, 22px) clamp(24px, 2.6vw, 34px) clamp(14px, 1.8vw, 22px);
   padding: clamp(14px, 2vw, 24px);
   box-shadow: 0 14px 30px color-mix(in srgb, var(--primary) 12%, transparent);
 }
@@ -722,6 +723,10 @@
   .newsSlide {
     grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
   }
+
+  .newsImageWrap {
+    aspect-ratio: 5 / 6;
+  }
 }
 
 @media (max-width: 768px) {
@@ -764,6 +769,7 @@
     max-width: min(100%, 340px);
     margin: 0 auto;
     min-height: 210px;
+    aspect-ratio: 4 / 5;
   }
 
   .newsMetaLine {
@@ -791,6 +797,7 @@
   .newsImageWrap {
     max-width: 100%;
     min-height: 190px;
+    border-radius: 22px 14px 22px 14px;
   }
 
   .newsButton {
