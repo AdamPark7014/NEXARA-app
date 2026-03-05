@@ -22,10 +22,12 @@ export const getApiBase = () => {
 
   if (typeof window !== "undefined" && window.location?.origin) {
     const originHost = window.location.hostname.toLowerCase();
+    const currentOrigin = window.location.origin;
     const isLocalOrigin =
       originHost === "localhost" ||
       originHost === "127.0.0.1" ||
       originHost.endsWith(".localhost");
+    const allowCrossOriginApi = process.env.NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API === 'true';
 
     if (envBase && envBase.trim()) {
       const normalizedEnvBase = ensureApiBase(envBase);
@@ -35,12 +37,22 @@ export const getApiBase = () => {
         lowerEnvBase.includes("//127.0.0.1") ||
         lowerEnvBase.includes(".localhost");
 
-      if (!pointsToLocalhost || isLocalOrigin) {
-        return normalizedEnvBase;
+      if (pointsToLocalhost) {
+        if (isLocalOrigin) return normalizedEnvBase;
+      } else {
+        try {
+          const envUrl = new URL(normalizedEnvBase);
+          const isSameOriginApi = envUrl.origin === currentOrigin;
+
+          if (isSameOriginApi) return normalizedEnvBase;
+          if (allowCrossOriginApi) return normalizedEnvBase;
+        } catch {
+          // Keep fallback to same-origin /api when parsing fails.
+        }
       }
     }
 
-    return `${window.location.origin}/api`;
+    return `${currentOrigin}/api`;
   }
 
   if (envBase && envBase.trim()) {
