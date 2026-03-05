@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo } from 'react';
+import { Suspense, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { saveDeviceIdentity } from '@/lib/device-identity';
 
-export default function DeviceRegisterPage() {
+function DeviceRegisterContent() {
   const params = useSearchParams();
 
   const result = useMemo(() => {
@@ -52,5 +52,13 @@ export default function DeviceRegisterPage() {
         )}
       </section>
     </main>
+  );
+}
+
+export default function DeviceRegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <DeviceRegisterContent />
+    </Suspense>
   );
 }
