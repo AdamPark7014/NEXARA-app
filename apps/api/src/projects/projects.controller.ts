@@ -131,6 +131,11 @@ export class ProjectsController {
     return this.projectsService.remove(id);
   }
 
+  @Post(':id/delete')
+  removeViaPost(@Param('id', ParseIntPipe) id: number) {
+    return this.projectsService.remove(id);
+  }
+
   private validateImages(files: MulterFile[]) {
     const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
     const maxSize = parseInt(process.env['MAX_FILE_SIZE'] || '5242880');

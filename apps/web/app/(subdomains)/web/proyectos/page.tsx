@@ -384,11 +384,23 @@ export default function ProyectosWeb() {
 
     setLoading(true);
     try {
-      const response = await fetch(buildApiUrl(`projects/${selectedId}`), {
-        method: "DELETE",
+      const response = await fetch(buildApiUrl(`projects/${selectedId}/delete`), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: "{}",
       });
       if (!response.ok) {
-        throw new Error("No se pudo eliminar el proyecto");
+        const errorText = await response.text();
+        let message = "No se pudo eliminar el proyecto";
+        try {
+          const parsed = JSON.parse(errorText);
+          message = parsed.message || message;
+        } catch {
+          message = errorText || message;
+        }
+        throw new Error(message);
       }
       setStatus("Proyecto eliminado.");
       handleNew();
