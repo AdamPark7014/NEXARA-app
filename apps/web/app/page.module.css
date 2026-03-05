@@ -483,6 +483,14 @@
   padding: 0 clamp(14px, 2.4vw, 28px) clamp(36px, 5vw, 64px);
   position: relative;
   overflow-x: clip;
+  border-radius: clamp(22px, 3vw, 34px);
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+  background:
+    radial-gradient(circle at 14% -18%, color-mix(in srgb, var(--secondary) 20%, transparent), transparent 48%),
+    linear-gradient(165deg, color-mix(in srgb, var(--surface) 90%, var(--background)), color-mix(in srgb, var(--surface) 84%, var(--background)));
+  box-shadow: 0 20px 38px color-mix(in srgb, var(--primary) 14%, transparent);
+  padding-top: clamp(18px, 2.4vw, 28px);
+  overflow: hidden;
 }
 
 .newsHeader {
@@ -731,7 +739,8 @@
 
 @media (max-width: 768px) {
   .newsSection {
-    padding: 0 12px 36px;
+    padding: 16px 12px 30px;
+    border-radius: 20px;
   }
 
   .newsHeader {
@@ -786,7 +795,8 @@
 
 @media (max-width: 480px) {
   .newsSection {
-    padding: 0 8px 28px;
+    padding: 14px 8px 24px;
+    border-radius: 16px;
   }
 
   .newsCarousel {
@@ -1198,6 +1208,13 @@
   box-shadow: 0 4px 12px rgba(15, 106, 214, 0.12);
 }
 
+:global(body.light) .newsSection {
+  background:
+    radial-gradient(circle at 12% -16%, rgba(82, 178, 255, 0.18), transparent 46%),
+    linear-gradient(160deg, rgba(246, 251, 255, 0.9), rgba(232, 243, 255, 0.86));
+  border-color: rgba(15, 106, 214, 0.22);
+}
+
 :global(body.light) .newsCarousel {
   background:
     radial-gradient(circle at 14% 12%, rgba(34, 139, 230, 0.18), transparent 44%),
@@ -1234,6 +1251,14 @@
   background: rgba(18, 26, 40, 0.9);
   border-color: rgba(23, 137, 252, 0.28);
   color: #8cc7ff;
+}
+
+:global(body.dark) .newsSection {
+  background:
+    radial-gradient(circle at 12% -14%, rgba(23, 137, 252, 0.2), transparent 48%),
+    linear-gradient(160deg, rgba(18, 30, 52, 0.95), rgba(14, 25, 44, 0.96));
+  border-color: rgba(23, 137, 252, 0.18);
+  box-shadow: 0 24px 46px rgba(2, 8, 20, 0.55);
 }
 
 :global(body.dark) .newsTitle {
