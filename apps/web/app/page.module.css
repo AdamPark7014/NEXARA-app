@@ -530,24 +530,46 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: clamp(12px, 2vw, 20px);
+  position: relative;
+  overflow: hidden;
   background:
     radial-gradient(circle at 14% -24%, color-mix(in srgb, var(--primary) 16%, transparent), transparent 46%),
     radial-gradient(circle at 86% 0%, color-mix(in srgb, var(--secondary) 9%, transparent), transparent 52%),
     linear-gradient(180deg, color-mix(in srgb, var(--surface) 97%, transparent), color-mix(in srgb, var(--surface) 92%, var(--primary) 8%));
   border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
-  border-radius: clamp(16px, 2.8vw, 28px);
-  padding: clamp(14px, 2.3vw, 26px);
+  border-radius: clamp(20px, 3.2vw, 34px);
+  padding: clamp(16px, 2.6vw, 30px);
   box-shadow:
     0 16px 38px color-mix(in srgb, var(--primary) 14%, transparent),
     inset 0 1px 0 color-mix(in srgb, #fff 40%, transparent);
 }
 
+.newsCarousel::before {
+  content: "";
+  position: absolute;
+  inset: -18% auto auto -14%;
+  width: min(32vw, 380px);
+  height: min(32vw, 380px);
+  background: radial-gradient(circle, color-mix(in srgb, var(--secondary) 22%, transparent), transparent 64%);
+  pointer-events: none;
+}
+
+.newsCarousel::after {
+  content: "";
+  position: absolute;
+  inset: auto -10% -32% auto;
+  width: min(30vw, 340px);
+  height: min(30vw, 340px);
+  background: radial-gradient(circle, color-mix(in srgb, var(--primary) 20%, transparent), transparent 66%);
+  pointer-events: none;
+}
+
 .newsNav {
   width: clamp(34px, 3vw, 46px);
   height: clamp(34px, 3vw, 46px);
-  border-radius: 12px;
+  border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--primary) 26%, transparent);
-  background: color-mix(in srgb, var(--surface) 88%, var(--primary) 12%);
+  background: color-mix(in srgb, var(--surface) 90%, var(--primary) 10%);
   color: var(--primary);
   font-size: clamp(1.2rem, 1.6vw, 1.65rem);
   font-weight: 700;
@@ -567,20 +589,24 @@
   display: grid;
   grid-template-columns: minmax(250px, 360px) minmax(0, 1fr);
   gap: clamp(14px, 2.6vw, 30px);
-  align-items: stretch;
+  align-items: center;
   min-height: clamp(280px, 33vw, 370px);
   animation: newsFade 0.4s ease;
+  position: relative;
+  z-index: 1;
 }
 
 .newsImageWrap {
   width: 100%;
   height: 100%;
   min-height: clamp(210px, 28vw, 320px);
-  border-radius: clamp(12px, 1.8vw, 20px);
+  border-radius: clamp(18px, 2.4vw, 28px);
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
   background: color-mix(in srgb, var(--surface) 90%, var(--primary) 10%);
-  box-shadow: 0 14px 30px color-mix(in srgb, var(--primary) 16%, transparent);
+  box-shadow:
+    0 18px 34px color-mix(in srgb, var(--primary) 18%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 30%, transparent);
 }
 
 .newsImageWrap:hover {
@@ -603,6 +629,11 @@
   flex-direction: column;
   justify-content: center;
   gap: clamp(10px, 1.2vw, 14px);
+  background: linear-gradient(165deg, color-mix(in srgb, var(--surface) 94%, transparent), color-mix(in srgb, var(--surface) 86%, var(--primary) 14%));
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
+  border-radius: clamp(16px, 2vw, 24px);
+  padding: clamp(14px, 2vw, 24px);
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--primary) 12%, transparent);
 }
 
 .newsMetaLine {
@@ -646,7 +677,7 @@
 .newsButton {
   border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
   border-radius: 999px;
-  padding: 11px 24px;
+  padding: 12px 26px;
   background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 88%, #fff 12%) 0%, color-mix(in srgb, var(--secondary) 72%, var(--primary) 28%) 100%);
   color: #fff;
   font-weight: 700;
@@ -753,7 +784,7 @@
   }
 
   .newsCarousel {
-    border-radius: 14px;
+    border-radius: 18px;
     padding: 12px;
   }
 
@@ -1186,6 +1217,12 @@
 :global(body.dark) .newsContent p {
   color: var(--text-secondary);
   opacity: 0.95;
+}
+
+:global(body.dark) .newsContent {
+  background: linear-gradient(160deg, rgba(18, 24, 38, 0.94), rgba(12, 18, 30, 0.96));
+  border-color: rgba(23, 137, 252, 0.2);
+  box-shadow: 0 18px 36px rgba(3, 10, 20, 0.5);
 }
 
 :global(body.dark) .newsButton {
