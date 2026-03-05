@@ -293,18 +293,19 @@ export default function ListUsers() {
   const tableWrapStyle: React.CSSProperties = {
     width: "100%",
     overflowX: "auto",
+    overflowY: "hidden",
     WebkitOverflowScrolling: "touch",
     marginTop: 32,
-    borderRadius: 16,
-    border: "1px solid var(--muted)",
-    background: "var(--surface)",
-    boxShadow: "0 12px 26px var(--shadow)",
+    borderRadius: 18,
+    border: "1px solid rgba(96, 140, 184, 0.28)",
+    background: "linear-gradient(180deg, rgba(10, 28, 48, 0.95) 0%, rgba(10, 24, 42, 0.98) 100%)",
+    boxShadow: "0 16px 34px rgba(4, 18, 34, 0.46)",
   };
 
   return (
     <>
       <div style={tableWrapStyle}>
-        <table className="table" style={{ minWidth: 680 }}>
+        <table className="table usersTable">
           <thead>
             <tr>
               <th>Foto</th>
@@ -319,7 +320,7 @@ export default function ListUsers() {
           <tbody>
             {users.map((u) => (
               <tr key={u.id}>
-                <td>
+                <td data-label="Foto">
                   {u.avatarUrl ? (
                     <Image src={u.avatarUrl} alt={u.nombre} width={40} height={40} style={{ borderRadius: "50%", objectFit: "cover" }} unoptimized />
                   ) : (
@@ -328,23 +329,15 @@ export default function ListUsers() {
                     </span>
                   )}
                 </td>
-                <td>{u.nombre}</td>
-                <td>{u.email}</td>
-                <td>{u.role?.nombre}</td>
-                <td>{u.department?.nombre}</td>
-                <td>
+                <td data-label="Nombre">{u.nombre}</td>
+                <td data-label="Email">{u.email}</td>
+                <td data-label="Rol">{u.role?.nombre}</td>
+                <td data-label="Departamento">{u.department?.nombre}</td>
+                <td data-label="Perfil" className="tableProfileCell">
                   {hasPermission(user, PERMISSIONS.USERS_REVIEW) ? (
                     <button
+                      className="tableAction tableActionInfo"
                       onClick={() => handleViewProfile(u)}
-                      style={{
-                        background: "var(--info)",
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: 6,
-                        padding: "6px 14px",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                      }}
                     >
                       Ver informacion
                     </button>
@@ -352,35 +345,18 @@ export default function ListUsers() {
                     <span style={{ color: 'var(--muted)', fontSize: 12 }}>Sin permisos</span>
                   )}
                 </td>
-                <td>
+                <td data-label="Acciones" className="tableActionsCell">
                   {user && hasPermission(user, PERMISSIONS.USERS_MANAGE) && (!user.isSuperAdmin && u.department?.id ? user.departmentId === u.department.id : true) && (
                     <>
                       <button
+                        className="tableAction tableActionEdit"
                         onClick={() => handleEdit(u)}
-                        style={{
-                          marginRight: 8,
-                          background: "var(--primary)",
-                          color: "#fff",
-                          border: "none",
-                          borderRadius: 6,
-                          padding: "6px 14px",
-                          fontWeight: 500,
-                          cursor: "pointer",
-                        }}
                       >
                         Editar
                       </button>
                       <button
+                        className="tableAction tableActionDelete"
                         onClick={() => handleDelete(u.id)}
-                        style={{
-                          background: "var(--danger)",
-                          color: "#fff",
-                          border: "none",
-                          borderRadius: 6,
-                          padding: "6px 14px",
-                          fontWeight: 500,
-                          cursor: "pointer",
-                        }}
                       >
                         Eliminar
                       </button>
@@ -573,6 +549,132 @@ export default function ListUsers() {
         </div>
       )}
       <style jsx>{`
+        .usersTable {
+          width: 100%;
+          border-collapse: separate;
+          border-spacing: 0;
+          table-layout: fixed;
+          border-radius: 14px;
+          overflow: hidden;
+        }
+
+        .usersTable thead th {
+          background: linear-gradient(135deg, #173a5a 0%, #1d486f 100%);
+          color: #e7eff8;
+          border-bottom: 1px solid rgba(110, 148, 186, 0.35);
+          font-weight: 700;
+          letter-spacing: 0.03em;
+          white-space: nowrap;
+        }
+
+        .usersTable tbody td {
+          color: color-mix(in srgb, var(--text-primary) 94%, #ffffff 6%);
+          border-bottom-color: rgba(84, 122, 158, 0.26);
+          overflow-wrap: anywhere;
+          vertical-align: middle;
+        }
+
+        .usersTable tbody tr:nth-child(even) {
+          background: rgba(17, 39, 62, 0.72);
+        }
+
+        .usersTable tbody tr:hover {
+          background: rgba(30, 64, 94, 0.62);
+        }
+
+        .tableAction {
+          border: none;
+          border-radius: 10px;
+          padding: 8px 12px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: transform 0.16s ease, filter 0.2s ease;
+          color: #eef5fd;
+          border: 1px solid rgba(142, 176, 210, 0.24);
+          box-shadow: 0 6px 14px rgba(5, 19, 36, 0.28);
+        }
+
+        .tableAction:hover {
+          transform: translateY(-1px);
+          filter: brightness(1.05);
+        }
+
+        .tableActionInfo {
+          background: linear-gradient(135deg, #466b8d 0%, #5a82a8 100%);
+        }
+
+        .tableActionEdit {
+          background: linear-gradient(135deg, #2b5f92 0%, #3e76ad 100%);
+          margin-right: 8px;
+        }
+
+        .tableActionDelete {
+          background: linear-gradient(135deg, #874b54 0%, #9d5c66 100%);
+          border-color: rgba(193, 136, 145, 0.36);
+        }
+
+        @media (max-width: 760px) {
+          .usersTable thead {
+            display: none;
+          }
+
+          .usersTable,
+          .usersTable tbody,
+          .usersTable tr,
+          .usersTable td {
+            display: block;
+            width: 100%;
+          }
+
+          .usersTable tbody tr {
+            margin-bottom: 10px;
+            padding: 12px;
+            border-radius: 14px;
+            border: 1px solid rgba(96, 136, 176, 0.28);
+            background: rgba(15, 35, 56, 0.88);
+            box-shadow: 0 10px 20px rgba(4, 14, 28, 0.3);
+          }
+
+          .usersTable tbody td {
+            border: none;
+            padding: 4px 0;
+            line-height: 1.35;
+          }
+
+          .usersTable tbody td::before {
+            content: attr(data-label);
+            display: block;
+            margin-bottom: 2px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #98b9d8;
+          }
+
+          .usersTable tbody td[data-label="Foto"] {
+            padding-top: 0;
+          }
+
+          .usersTable tbody td[data-label="Foto"]::before {
+            margin-bottom: 8px;
+          }
+
+          .tableProfileCell,
+          .tableActionsCell {
+            margin-top: 8px;
+          }
+
+          .tableAction {
+            width: 100%;
+            margin: 0 0 8px 0;
+          }
+
+          .tableActionsCell .tableAction:last-child {
+            margin-bottom: 0;
+          }
+        }
+
         .editModalOverlay {
           position: fixed;
           inset: 0;
@@ -617,6 +719,15 @@ export default function ListUsers() {
         }
 
         @media (max-width: 720px) {
+          .usersTable {
+            font-size: 0.84rem;
+          }
+
+          .usersTable thead th,
+          .usersTable tbody td {
+            padding: 9px 8px;
+          }
+
           .editModal {
             width: 94vw;
             padding: 20px 18px 26px;

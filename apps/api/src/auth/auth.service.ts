@@ -125,6 +125,47 @@ export class AuthService {
     return Array.from(new Set(permissions));
   }
 
+  private async createLoginNotification(userId: number, detectedDevice: string) {
+    const baseData = {
+      userId,
+      category: 'security',
+      title: 'Nuevo acceso detectado',
+      message: `Se inició sesión desde ${detectedDevice}.`,
+      entityType: 'auth',
+      priority: 'normal' as const,
+    };
+
+    try {
+      await this.prisma.notification.create({
+        data: {
+          ...baseData,
+          type: NotificationType.ATTENDANCE_CHECKIN,
+        },
+      });
+      return;
+    } catch (error) {
+      // Fallback para entornos donde el enum de NotificationType no está migrado.
+      this.logger.warn(
+        `Fallo ATTENDANCE_CHECKIN para login userId=${userId}. Reintentando con tipo legacy.`,
+      );
+      this.logger.debug(error instanceof Error ? error.message : String(error));
+    }
+
+    try {
+      await this.prisma.notification.create({
+        data: {
+          ...baseData,
+          type: NotificationType.QUOTE_EXPIRING,
+        },
+      });
+    } catch (fallbackError) {
+      this.logger.warn(
+        `No se pudo crear notificación de login para userId=${userId} ni con fallback. Continuando login.`,
+      );
+      this.logger.debug(fallbackError instanceof Error ? fallbackError.message : String(fallbackError));
+    }
+  }
+
   async validateUser(email: string, password: string) {
     const normalizedEmail = email.trim();
     const user = await this.prisma['user'].findFirst({
@@ -147,7 +188,7 @@ export class AuthService {
     const isSuperAdmin = this.isSuperAdmin(user.email);
     const permissions = this.buildPermissions(user.role, isSuperAdmin);
     const userAgent = req?.headers?.['user-agent'] || req?.headers?.['User-Agent'];
-    const detectedDevice = detectDeviceFromUserAgent(userAgent);
+    const detectedDevice = detectDeviceFromUserAgent(userAgent, req?.headers);
 
     if (loginDto.panel === 'ventas' && !isSuperAdmin && !permissions.includes(PERMISSIONS.PANEL_VENTAS)) {
       throw new UnauthorizedException('Tu usuario no tiene acceso al panel de ventas');
@@ -160,24 +201,7 @@ export class AuthService {
       isSuperAdmin,
     };
 
-    try {
-      await this.prisma.notification.create({
-        data: {
-          userId: user.id,
-          type: NotificationType.ATTENDANCE_CHECKIN,
-          category: 'security',
-          title: 'Nuevo acceso detectado',
-          message: `Se inició sesión desde ${detectedDevice}.`,
-          entityType: 'auth',
-          priority: 'normal',
-        },
-      });
-    } catch (error) {
-      this.logger.warn(
-        `No se pudo crear notificación de login para userId=${user.id}. Continuando login.`,
-      );
-      this.logger.debug(error instanceof Error ? error.message : String(error));
-    }
+    await this.createLoginNotification(user.id, detectedDevice);
 
     return {
       access_token: this.jwtService.sign(payload),

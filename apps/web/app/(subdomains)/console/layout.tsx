@@ -3,6 +3,7 @@ import styles from "./console.module.css";
 import Sidebar from "./Sidebar";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import NotificationCenter from "@/components/NotificationCenter";
 
 const formatConsoleTitle = (pathname: string) => {
   const normalized = pathname.replace(/^\/+/, "").split("?")[0];
@@ -51,7 +52,10 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
           <p className={styles.consoleEyebrow}>Panel corporativo</p>
           <div className={styles.consoleTopbarRow}>
             <h1 className={styles.consoleViewTitle}>{viewTitle}</h1>
-            <span className={styles.consoleViewMeta}>{viewSubtitle}</span>
+            <div className={styles.consoleTopbarActions}>
+              <span className={styles.consoleViewMeta}>{viewSubtitle}</span>
+              <NotificationCenter inlineTrigger position="top-right" maxNotifications={5} autoCloseTime={6000} />
+            </div>
           </div>
         </section>
         <div className={styles.consoleContent}>{children}</div>

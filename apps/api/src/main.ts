@@ -131,7 +131,28 @@ async function bootstrap() {
       return;
     }
 
-    if (isMutatingMethod(request.method) && !isAllowedContentType(request.headers['content-type'])) {
+    const hasRequestBody = (() => {
+      const contentLengthHeader = request.headers['content-length'];
+      const transferEncodingHeader = request.headers['transfer-encoding'];
+
+      const contentLength = Array.isArray(contentLengthHeader)
+        ? Number(contentLengthHeader[0])
+        : Number(contentLengthHeader || 0);
+
+      const transferEncoding = Array.isArray(transferEncodingHeader)
+        ? transferEncodingHeader[0]
+        : transferEncodingHeader;
+
+      return Number.isFinite(contentLength) && contentLength > 0
+        ? true
+        : Boolean((transferEncoding || '').toLowerCase().includes('chunked'));
+    })();
+
+    if (
+      isMutatingMethod(request.method) &&
+      hasRequestBody &&
+      !isAllowedContentType(request.headers['content-type'])
+    ) {
       ipPenaltyBox.addStrike(ip, 1);
       response.status(415).json({
         statusCode: 415,
@@ -243,7 +264,19 @@ async function bootstrap() {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Authorization', 'Content-Type', 'Accept', 'Origin', 'X-Requested-With'],
+    allowedHeaders: [
+      'Authorization',
+      'Content-Type',
+      'Accept',
+      'Origin',
+      'X-Requested-With',
+      'X-Device-Id',
+      'X-Device-Name',
+      'X-Device-Model',
+      'X-Device-Serial',
+      'Sec-CH-UA-Model',
+      'Sec-CH-UA-Platform',
+    ],
   });
 
   // Servir archivos estáticos desde uploads (en raíz del proyecto)

@@ -28,6 +28,7 @@ interface NotificationCenterProps {
   position?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
   maxNotifications?: number;
   autoCloseTime?: number;
+  inlineTrigger?: boolean;
 }
 
 const getCategoryIcon = (category: string): string => {
@@ -94,10 +95,25 @@ const getStackClass = (index: number) => {
   return styles.stack5;
 };
 
+const formatTime = (isoDate: string) =>
+  new Date(isoDate).toLocaleTimeString('es-MX', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+const formatDateTime = (isoDate: string) =>
+  new Date(isoDate).toLocaleString('es-MX', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
 const NotificationCenter: React.FC<NotificationCenterProps> = ({
   position = 'top-right',
   maxNotifications = 5,
   autoCloseTime = 5000,
+  inlineTrigger = false,
 }) => {
   const { user } = useUser();
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -128,9 +144,15 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
     // Eventos de notificaciones
     socketRef.current.on('notification:new', (notification: Notification) => {
-      setNotifications(prev => [notification, ...prev]);
-      setDisplayedNotifications(prev => [notification, ...prev].slice(0, maxNotifications));
-      setUnreadCount(prev => prev + 1);
+      setNotifications(prev => {
+        if (prev.some(item => item.id === notification.id)) return prev;
+        return [notification, ...prev];
+      });
+      setDisplayedNotifications(prev => {
+        if (prev.some(item => item.id === notification.id)) return prev;
+        return [notification, ...prev].slice(0, maxNotifications);
+      });
+      setUnreadCount(prev => (notification.isRead ? prev : prev + 1));
 
       // Auto cerrar notificación
       const timer = setTimeout(() => {
@@ -174,9 +196,11 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
           headers: { Authorization: `Bearer ${user.token}` },
         });
         const data = await response.json();
-        setNotifications(data);
+        const items = Array.isArray(data) ? (data as Notification[]) : [];
+        setNotifications(items);
+        setDisplayedNotifications([]);
 
-        const unread = data.filter((n: Notification) => !n.isRead).length;
+        const unread = items.filter((n: Notification) => !n.isRead).length;
         setUnreadCount(unread);
       } catch (error) {
         console.error('Error fetching notifications:', error);
@@ -184,7 +208,14 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
     };
 
     fetchNotifications();
-  }, [user?.token]);
+  }, [user?.token, maxNotifications, API_URL]);
+
+  useEffect(() => {
+    if (!showPanel) return;
+    notificationTimers.current.forEach((timer) => clearTimeout(timer));
+    notificationTimers.current.clear();
+    setDisplayedNotifications([]);
+  }, [showPanel]);
 
   const handleMarkAsRead = async (notificationId: number) => {
     try {
@@ -192,6 +223,8 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
         method: 'PATCH',
         headers: { Authorization: `Bearer ${user?.token}` },
       });
+      setNotifications(prev => prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n)));
+      setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
@@ -203,6 +236,8 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
         method: 'PATCH',
         headers: { Authorization: `Bearer ${user?.token}` },
       });
+      setNotifications(prev => prev.map((n) => ({ ...n, isRead: true })));
+      setUnreadCount(0);
     } catch (error) {
       console.error('Error marking all as read:', error);
     }
@@ -293,27 +328,29 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
   return (
     <>
       {/* Campana con badge */}
-      <div className={`${styles.floatingRoot} ${getPositionClass(position)}`}>
-        <button
-          ref={bellButtonRef}
-          type="button"
-          onClick={() => setShowPanel(!showPanel)}
-          className={styles.bellBtn}
-          aria-label="Abrir panel de notificaciones"
-          aria-expanded={showPanel}
-          aria-controls="notification-side-panel"
-        >
-          🔔
-          {unreadCount > 0 && (
-            <span className={styles.badge}>
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </span>
-          )}
-        </button>
-      </div>
+      {!showPanel && (
+        <div className={inlineTrigger ? styles.inlineRoot : `${styles.floatingRoot} ${getPositionClass(position)}`}>
+          <button
+            ref={bellButtonRef}
+            type="button"
+            onClick={() => setShowPanel(!showPanel)}
+            className={styles.bellBtn}
+            aria-label="Abrir panel de notificaciones"
+            aria-expanded={showPanel}
+            aria-controls="notification-side-panel"
+          >
+            🔔
+            {unreadCount > 0 && (
+              <span className={styles.badge}>
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Panel de notificaciones mostradas */}
-      {displayedNotifications.map((notification, index) => (
+      {!showPanel && displayedNotifications.map((notification, index) => (
         <div
           key={notification.id}
           className={`${styles.toast} ${getToastAnchorClass(position)} ${getStackClass(index)} ${getPriorityClass(notification.priority)}`}
@@ -333,7 +370,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
                 </div>
               )}
               <div className={styles.toastTime}>
-                {new Date(notification.createdAt).toLocaleTimeString('es-MX')}
+                {formatTime(notification.createdAt)}
               </div>
             </div>
             <button
@@ -425,16 +462,10 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
                           )}
                         </div>
                         <div className={styles.itemMessage}>
-                          {notification.message.substring(0, 70)}
-                          {notification.message.length > 70 ? '...' : ''}
+                          {notification.message}
                         </div>
                         <div className={styles.itemTime}>
-                          {new Date(notification.createdAt).toLocaleString('es-MX', {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
+                          {formatDateTime(notification.createdAt)}
                         </div>
                       </div>
                       <button

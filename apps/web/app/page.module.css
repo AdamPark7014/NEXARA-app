@@ -5323,25 +5323,65 @@ a.secondary:active,
 /* Services enterprise layout fix: override legacy grid section */
 .servicesSection {
   display: block;
+  width: 100%;
+  max-width: var(--content-max);
   margin: 26px auto 0;
-  padding: 0;
+  padding: 24px 24px 28px;
+  border-radius: 34px;
+  overflow: hidden;
 }
 
 .servicesHeader {
-  max-width: 70ch;
-  margin-bottom: 14px;
+  max-width: 78ch;
+  margin: 0 auto 18px;
+  text-align: center;
+  align-items: center;
 }
 
 .servicesGridEnterprise {
   width: 100%;
+  max-width: calc(var(--content-max) - 48px);
+  margin: 0 auto;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: stretch;
+}
+
+.deliverySection {
+  display: block;
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 26px auto 0;
+  padding: 14px 24px 8px;
+}
+
+.deliveryHeader {
+  max-width: 78ch;
+  margin: 0 auto 18px;
+  text-align: center;
+  align-items: center;
+}
+
+.deliveryGrid {
+  width: 100%;
+  max-width: calc(var(--content-max) - 48px);
+  margin: 0 auto;
+  gap: 20px;
+  align-items: stretch;
+}
+
+.clientsSection {
+  border-radius: 34px;
+  overflow: hidden;
 }
 
 .serviceCardEnterprise {
   min-width: 0;
   padding: 20px;
   gap: 18px;
-  align-items: start;
+  align-items: center;
+  border-radius: 28px;
+  overflow: hidden;
 }
 
 .serviceCardEnterprise .serviceContent {
@@ -5375,12 +5415,23 @@ a.secondary:active,
 .serviceCardEnterprise .serviceImageWrapper {
   width: 168px;
   height: 168px;
-  border-radius: 16px;
+  border-radius: 22px;
 }
 
 @media (max-width: 1024px) {
   .servicesSection {
     margin-top: 22px;
+    padding: 20px 16px 24px;
+    border-radius: 28px;
+  }
+
+  .deliverySection {
+    margin-top: 22px;
+    padding: 12px 16px 6px;
+  }
+
+  .clientsSection {
+    border-radius: 28px;
   }
 
   .servicesGridEnterprise {
@@ -5389,9 +5440,23 @@ a.secondary:active,
 }
 
 @media (max-width: 768px) {
+  .servicesSection {
+    padding: 18px 14px 20px;
+    border-radius: 22px;
+  }
+
+  .deliverySection {
+    padding: 10px 14px 4px;
+  }
+
+  .clientsSection {
+    border-radius: 22px;
+  }
+
   .serviceCardEnterprise {
     padding: 16px;
     gap: 12px;
+    border-radius: 24px;
   }
 
   .serviceCardEnterprise .serviceTitle {
@@ -5407,6 +5472,11 @@ a.secondary:active,
   .serviceCardEnterprise .serviceImageWrapper {
     width: 132px;
     height: 132px;
+    border-radius: 18px;
+  }
+
+  .deliveryGrid {
+    gap: 14px;
   }
 }
 
@@ -5484,6 +5554,49 @@ a.secondary:active,
     max-width: 100% !important;
     padding: 0 !important;
   }
+
+  .serviceCardEnterprise {
+    justify-items: center;
+    text-align: center;
+  }
+
+  .serviceCardEnterprise .serviceContent {
+    width: 100%;
+    text-align: center;
+  }
+
+  .serviceCardEnterprise .serviceBadge {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .serviceCardEnterprise .serviceImageWrapper {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .serviceCardEnterprise,
+  .serviceCardEnterprise * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .serviceCardEnterprise .serviceBadge::selection,
+  .serviceCardEnterprise .serviceTitle::selection,
+  .serviceCardEnterprise .serviceDescription::selection {
+    background: transparent;
+    color: inherit;
+  }
+}
+
+@media (max-width: 480px) {
+  .serviceCardEnterprise {
+    justify-items: center;
+  }
+
+  .serviceCardEnterprise .serviceImageWrapper {
+    margin-left: auto;
+    margin-right: auto;
+  }
 }
 
 .heroTitle,
@@ -5556,5 +5669,66 @@ a.secondary:active,
   .heroSecondaryCta {
     padding: 11px 16px;
     font-size: 0.92rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .quickNav {
+    display: flex;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 8px;
+    padding: 2px 6px 8px;
+    margin: 6px auto 12px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    max-width: 100%;
+  }
+
+  .quickNav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .quickNavLink {
+    flex: 0 0 auto;
+    width: max-content;
+    min-width: max-content;
+    max-width: none;
+    white-space: nowrap;
+    scroll-snap-align: start;
+  }
+}
+
+@media (max-width: 480px) {
+  .quickNav {
+    padding-inline: 4px;
+    gap: 7px;
+  }
+
+  .quickNavLink {
+    padding: 7px 11px;
+    font-size: 0.8rem;
+  }
+}
+
+/* Final mobile override: wrap chips to avoid any clipped pills */
+@media (max-width: 768px) {
+  .quickNav {
+    flex-wrap: wrap !important;
+    justify-content: center;
+    overflow: visible;
+    padding: 2px 0 8px;
+    margin: 6px auto 12px;
+    scroll-snap-type: none;
+  }
+
+  .quickNavLink {
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 0;
+    max-width: 100%;
+    scroll-snap-align: none;
   }
 }

@@ -358,6 +358,12 @@
   flex-wrap: wrap;
 }
 
+.consoleTopbarActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .consoleViewTitle {
   margin: 0;
   font-size: clamp(1.08rem, 2.2vw, 1.42rem);
@@ -2101,6 +2107,50 @@
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
 }
+
+  .sidebarFooterActions {
+    display: grid;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .logoutButton {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 11px 12px;
+    border-radius: 12px;
+    border: 1.5px solid rgba(196, 110, 118, 0.34);
+    background: linear-gradient(135deg, rgba(161, 76, 86, 0.92), rgba(138, 60, 70, 0.92));
+    color: #f7f9fc;
+    font-size: 0.9rem;
+    font-weight: 650;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+    box-shadow: 0 8px 16px rgba(76, 20, 29, 0.26);
+  }
+
+  .logoutButton:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.04);
+    box-shadow: 0 10px 20px rgba(76, 20, 29, 0.32);
+  }
+
+  .logoutButton:active {
+    transform: translateY(0) scale(0.985);
+  }
+
+  @media (max-width: 900px) {
+    .sidebarFooterActions {
+      gap: 8px;
+    }
+
+    .logoutButton {
+      padding: 10px 11px;
+      font-size: 0.88rem;
+    }
+  }
 
 
 
