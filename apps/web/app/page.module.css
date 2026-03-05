@@ -818,23 +818,79 @@
 }
 
 .newsEmpty {
-  padding: clamp(18px, 2.8vw, 28px);
+  width: min(760px, 100%);
+  margin: 0 auto;
+  padding: clamp(20px, 3.2vw, 34px) clamp(18px, 3.4vw, 42px);
   text-align: center;
-  border-radius: 16px;
-  border: 1px dashed color-mix(in srgb, var(--primary) 30%, transparent);
-  background: color-mix(in srgb, var(--surface) 88%, var(--primary) 12%);
+  border-radius: clamp(22px, 3vw, 34px);
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
+  background:
+    radial-gradient(circle at 18% -26%, color-mix(in srgb, var(--secondary) 24%, transparent), transparent 55%),
+    radial-gradient(circle at 84% 112%, color-mix(in srgb, var(--primary) 18%, transparent), transparent 58%),
+    linear-gradient(145deg, color-mix(in srgb, var(--surface) 93%, transparent), color-mix(in srgb, var(--surface) 87%, var(--primary) 13%));
   color: color-mix(in srgb, var(--foreground) 88%, transparent);
+  box-shadow: 0 18px 34px color-mix(in srgb, var(--primary) 14%, transparent);
+  display: grid;
+  gap: 10px;
+}
+
+.newsEmptyBadge {
+  display: inline-flex;
+  justify-self: center;
+  align-items: center;
+  width: fit-content;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  background: color-mix(in srgb, var(--surface) 86%, var(--primary) 14%);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.16rem;
+  text-transform: uppercase;
+}
+
+.newsEmptyTitle {
+  margin: 0;
+  font-size: clamp(1.18rem, 1.9vw, 1.58rem);
+  font-weight: 760;
+  line-height: 1.28;
+  color: color-mix(in srgb, var(--foreground) 94%, var(--primary));
+  text-wrap: balance;
+}
+
+.newsEmptyText {
+  margin: 0;
+  font-size: clamp(0.95rem, 1.15vw, 1.02rem);
+  line-height: 1.58;
+  color: color-mix(in srgb, var(--foreground) 80%, transparent);
+  max-width: 62ch;
+  justify-self: center;
 }
 
 :global(body.light) .newsEmpty {
-  background: linear-gradient(150deg, rgba(240, 246, 255, 0.82), rgba(231, 240, 252, 0.78));
+  background:
+    radial-gradient(circle at 14% -22%, rgba(93, 176, 255, 0.24), transparent 52%),
+    linear-gradient(150deg, rgba(244, 249, 255, 0.9), rgba(233, 242, 254, 0.86));
   border-color: rgba(15, 106, 214, 0.22);
 }
 
 :global(body.dark) .newsEmpty {
-  background: linear-gradient(150deg, rgba(20, 28, 44, 0.85), rgba(14, 20, 34, 0.88));
+  background:
+    radial-gradient(circle at 16% -20%, rgba(23, 137, 252, 0.2), transparent 56%),
+    linear-gradient(150deg, rgba(20, 28, 44, 0.88), rgba(12, 19, 32, 0.92));
   border-color: rgba(23, 137, 252, 0.22);
   color: var(--foreground);
+}
+
+@media (max-width: 480px) {
+  .newsEmpty {
+    border-radius: 20px;
+    padding: 18px 14px;
+  }
+
+  .newsEmptyBadge {
+    letter-spacing: 0.12rem;
+  }
 }
 
 @keyframes newsFade {

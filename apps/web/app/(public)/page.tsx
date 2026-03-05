@@ -479,7 +479,11 @@ export default function Home() {
               </button>
             </div>
           ) : (
-            <div className={styles.newsEmpty}>Próximamente publicaremos actualizaciones estratégicas.</div>
+            <div className={styles.newsEmpty} role="status" aria-live="polite">
+              <span className={styles.newsEmptyBadge}>ACTUALIZACION EN CURSO</span>
+              <p className={styles.newsEmptyTitle}>Próximamente publicaremos actualizaciones estratégicas.</p>
+              <p className={styles.newsEmptyText}>Muy pronto verás aquí novedades, ofertas y casos relevantes para toma de decisiones empresariales.</p>
+            </div>
           )}
         </section>
 
