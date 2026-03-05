@@ -109,7 +109,7 @@ npm run build
 # Iniciar/reiniciar backend con PM2
 if pm2 list | grep -q "nexara-api"; then
     echo -e "${YELLOW}🔄 Reiniciando backend...${NC}"
-    pm2 restart nexara-api
+    pm2 restart nexara-api --update-env
 else
     echo -e "${YELLOW}🚀 Iniciando backend...${NC}"
     pm2 start dist/main.js --name nexara-api
@@ -144,12 +144,14 @@ fi
 
 # Compilar frontend
 echo -e "${YELLOW}📦 Compilando frontend (esto puede tardar unos minutos)...${NC}"
+# Evitar artefactos stale de Next que pueden romper Server Actions tras deploy
+rm -rf .next
 npm run build
 
 # Iniciar/reiniciar frontend con PM2
 if pm2 list | grep -q "nexara-web"; then
     echo -e "${YELLOW}🔄 Reiniciando frontend...${NC}"
-    pm2 restart nexara-web
+    pm2 restart nexara-web --update-env
 else
     echo -e "${YELLOW}🚀 Iniciando frontend...${NC}"
     pm2 start npm --name nexara-web -- start
