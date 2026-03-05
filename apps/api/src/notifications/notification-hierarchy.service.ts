@@ -76,6 +76,7 @@ export class NotificationHierarchyService {
     userId: number,
     type: 'ATTENDANCE_CHECKIN' | 'ATTENDANCE_CHECKOUT',
     userName: string,
+    deviceInfo?: string,
   ) {
     try {
       const user = await this.prisma.user.findUnique({
@@ -88,6 +89,7 @@ export class NotificationHierarchyService {
       const isAdmin = (user.role as any)?.accesoConsoleAdmin === true;
 
       const actionText = type === 'ATTENDANCE_CHECKIN' ? 'entró a laborar' : 'dejó de laborar';
+      const deviceText = deviceInfo ? ` desde ${deviceInfo}` : '';
 
       if (isAdmin) {
         // Admin entra/sale -> notificar a otros admins
@@ -98,7 +100,7 @@ export class NotificationHierarchyService {
             type,
             category: 'attendance',
             title: `Admin ${type === 'ATTENDANCE_CHECKIN' ? 'en línea' : 'fuera de línea'}`,
-            message: `${userName} ${actionText}`,
+            message: `${userName} ${actionText}${deviceText}`,
             triggerUserId: userId,
             priority: 'high',
           });
@@ -112,7 +114,7 @@ export class NotificationHierarchyService {
             type,
             category: 'attendance',
             title: type === 'ATTENDANCE_CHECKIN' ? 'Usuario en línea' : 'Usuario fuera de línea',
-            message: `${userName} ${actionText}`,
+            message: `${userName} ${actionText}${deviceText}`,
             triggerUserId: userId,
             relatedUrl: `/console/attendance`,
           });

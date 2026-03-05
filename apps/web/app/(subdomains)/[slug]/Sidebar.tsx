@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import styles from "../console/console.module.css";
 import { useUser } from '@/components/UserContext';
 import { useTheme } from '@/components/ThemeContext';
@@ -10,8 +10,9 @@ import { useEffect, useState } from "react";
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { user } = useUser();
+  const { user, logout } = useUser();
   const { darkMode, toggleDarkMode } = useTheme();
+  const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -45,6 +46,11 @@ export default function Sidebar() {
 
   if (!user) return null;
   const closeMenu = () => setIsMenuOpen(false);
+  const handleLogout = () => {
+    logout();
+    closeMenu();
+    router.replace('/login');
+  };
 
   // Menú por permisos
   const menu = [
@@ -174,15 +180,25 @@ export default function Sidebar() {
         ))}
       </ul>
       <div className={styles.sidebarFooter}>
-        <button
-          onClick={toggleDarkMode}
-          className={styles.themeSwitcher}
-          aria-label={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-          title={darkMode ? 'Modo claro' : 'Modo oscuro'}
-        >
-          <span className={styles.themeIcon}>{darkMode ? '🌙' : '☀️'}</span>
-          <span className={styles.themeLabel}>{darkMode ? 'Oscuro' : 'Claro'}</span>
-        </button>
+        <div className={styles.sidebarFooterActions}>
+          <button
+            onClick={toggleDarkMode}
+            className={styles.themeSwitcher}
+            aria-label={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            title={darkMode ? 'Modo claro' : 'Modo oscuro'}
+          >
+            <span className={styles.themeIcon}>{darkMode ? '🌙' : '☀️'}</span>
+            <span className={styles.themeLabel}>{darkMode ? 'Oscuro' : 'Claro'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className={styles.logoutButton}
+            aria-label="Cerrar sesion"
+          >
+            Cerrar sesion
+          </button>
+        </div>
       </div>
       </div>
       )}

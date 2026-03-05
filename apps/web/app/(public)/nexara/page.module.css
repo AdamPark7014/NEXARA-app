@@ -656,10 +656,12 @@
   .quickNav {
     flex-wrap: nowrap;
     overflow-x: auto;
+    overflow-y: hidden;
     margin-top: 10px;
-    padding-bottom: 6px;
+    padding: 0 4px 6px;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    scroll-snap-type: x proximity;
   }
 
   .quickNav::-webkit-scrollbar {
@@ -835,9 +837,11 @@
     justify-content: flex-start;
     flex-wrap: nowrap;
     overflow-x: auto;
-    padding-bottom: 6px;
+    overflow-y: hidden;
+    padding: 0 4px 6px;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    scroll-snap-type: x proximity;
   }
 
   .quickNav::-webkit-scrollbar {
@@ -845,6 +849,12 @@
   }
 
   .quickNavLink {
+    flex: 0 0 auto;
+    width: max-content;
+    min-width: max-content;
+    max-width: none;
+    white-space: nowrap;
+    scroll-snap-align: start;
     padding: 8px 12px;
     font-size: 0.83rem;
   }
@@ -853,5 +863,24 @@
   .secondaryCta {
     padding: 11px 16px;
     font-size: 0.92rem;
+  }
+}
+
+/* Final mobile override: wrap chips to avoid clipping */
+@media (max-width: 760px) {
+  .quickNav {
+    justify-content: center;
+    flex-wrap: wrap;
+    overflow: visible;
+    padding: 0 0 6px;
+    scroll-snap-type: none;
+  }
+
+  .quickNavLink {
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 0;
+    max-width: 100%;
+    scroll-snap-align: none;
   }
 }

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import styles from './login.module.css'
 import Link from 'next/link'
 import { useUser } from '../../../../components/UserContext'
+import { getDeviceIdentityHeaders } from '@/lib/device-identity'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -26,9 +27,10 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
     try {
+      const deviceHeaders = await getDeviceIdentityHeaders()
       const res = await fetch(buildApiUrl('auth/login'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...deviceHeaders },
         body: JSON.stringify({ email, password }),
       })
       const data = await res.json().catch(() => ({}))

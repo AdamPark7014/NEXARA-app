@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useUser } from "./UserContext";
 import { hasPermission, PERMISSIONS } from "../lib/permissions";
+import { getDeviceIdentityHeaders } from "@/lib/device-identity";
 
 type PanelLoginProps = {
   redirectTo: string;
@@ -30,6 +31,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
     setError("");
     setIsLoading(true);
     try {
+      const deviceHeaders = await getDeviceIdentityHeaders();
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
       const endpoint = mode === "client"
         ? `${API_URL}/client-auth/login`
@@ -38,7 +40,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           : `${API_URL}/auth/login`;
       const res = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...deviceHeaders },
         body: JSON.stringify({
           email,
           password,

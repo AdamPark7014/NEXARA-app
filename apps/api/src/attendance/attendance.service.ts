@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, Injectable, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -8,6 +8,8 @@ import { detectDeviceFromUserAgent } from '../common/device-detector.js';
 
 @Injectable()
 export class AttendanceService {
+  private readonly logger = new Logger(AttendanceService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtimeGateway: RealtimeGateway,
@@ -193,7 +195,7 @@ export class AttendanceService {
     const now = dto.timestamp ? new Date(dto.timestamp) : new Date();
     const today = this.getDateOnly(now);
     const userAgent = req?.headers?.['user-agent'] || req?.headers?.['User-Agent'];
-    const deviceInfo = detectDeviceFromUserAgent(userAgent);
+    const deviceInfo = detectDeviceFromUserAgent(userAgent, req?.headers);
 
     // Determinar si es entrada o salida para guardar coordenadas correctas
     const isEntry = dto.type === 'entrada';
@@ -250,12 +252,35 @@ export class AttendanceService {
         },
       });
       this.emitAttendanceUpdate(userId, dto.type, now, attendance.user);
+
+      try {
+        await this.prisma.notification.create({
+          data: {
+            userId,
+            type: 'ATTENDANCE_CHECKIN',
+            category: 'attendance',
+            title: 'Entrada registrada',
+            message: `Registraste tu entrada desde ${deviceInfo}.`,
+            relatedEntityId: attendance.id,
+            entityType: 'Attendance',
+            priority: 'normal',
+          },
+        });
+      } catch (selfNotificationError) {
+        this.logger.warn(`No se pudo crear notificación propia de entrada para userId=${userId}`);
+        this.logger.debug(
+          selfNotificationError instanceof Error
+            ? selfNotificationError.message
+            : String(selfNotificationError),
+        );
+      }
       
       // Enviar notificación a supervisores
       await this.notificationHierarchy.notifyAttendanceChange(
         userId,
         'ATTENDANCE_CHECKIN',
         attendance.user.nombre || 'Usuario',
+        deviceInfo,
       );
       
       return {
@@ -282,12 +307,35 @@ export class AttendanceService {
       },
     });
     this.emitAttendanceUpdate(userId, dto.type, now, attendance.user);
+
+    try {
+      await this.prisma.notification.create({
+        data: {
+          userId,
+          type: 'ATTENDANCE_CHECKOUT',
+          category: 'attendance',
+          title: 'Salida registrada',
+          message: `Registraste tu salida desde ${deviceInfo}.`,
+          relatedEntityId: attendance.id,
+          entityType: 'Attendance',
+          priority: 'normal',
+        },
+      });
+    } catch (selfNotificationError) {
+      this.logger.warn(`No se pudo crear notificación propia de salida para userId=${userId}`);
+      this.logger.debug(
+        selfNotificationError instanceof Error
+          ? selfNotificationError.message
+          : String(selfNotificationError),
+      );
+    }
     
     // Enviar notificación a supervisores
     await this.notificationHierarchy.notifyAttendanceChange(
       userId,
       'ATTENDANCE_CHECKOUT',
       attendance.user.nombre || 'Usuario',
+      deviceInfo,
     );
     
     return {

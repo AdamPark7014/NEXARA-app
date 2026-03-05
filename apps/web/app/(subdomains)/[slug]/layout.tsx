@@ -2,6 +2,7 @@
 import { useParams, usePathname } from "next/navigation";
 import styles from "../console/console.module.css";
 import Sidebar from "./Sidebar";
+import NotificationCenter from "@/components/NotificationCenter";
 
 export default function DynamicPanelLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
@@ -20,6 +21,7 @@ export default function DynamicPanelLayout({ children }: { children: React.React
     <div className={styles.consoleLayout}>
       <Sidebar />
       <main className={styles.consoleMain}>
+        <NotificationCenter position="top-right" maxNotifications={5} autoCloseTime={6000} />
         {children}
       </main>
     </div>

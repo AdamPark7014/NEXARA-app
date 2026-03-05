@@ -693,6 +693,14 @@
   
   .cardActions {
     justify-content: flex-start;
+    width: 100%;
+    margin-left: 0;
+    flex-shrink: 1;
+  }
+
+  .actionBtn {
+    flex: 1 1 0;
+    min-width: 0;
   }
 }
 
@@ -782,7 +790,8 @@
   .cardActions {
     flex: 1;
     min-width: 140px;
-    justify-content: flex-end;
+    justify-content: flex-start;
+    margin-left: 0;
   }
   
   .bottomBar {

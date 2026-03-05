@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useUser } from "../../../components/UserContext";
+import { getDeviceIdentityHeaders } from "@/lib/device-identity";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -25,9 +26,10 @@ export default function LoginPage() {
     setError("");
     setIsLoading(true);
     try {
+      const deviceHeaders = await getDeviceIdentityHeaders();
       const res = await fetch(buildApiUrl('auth/login'), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...deviceHeaders },
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();

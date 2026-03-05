@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import styles from "./console.module.css";
 import { useUser } from '@/components/UserContext';
 import { useTheme } from '@/components/ThemeContext';
@@ -11,8 +11,9 @@ import { useState, useEffect } from "react";
 export default function Sidebar() {
   const MOBILE_BREAKPOINT = 900;
   const pathname = usePathname();
-  const { user } = useUser();
+  const { user, logout } = useUser();
   const { darkMode, toggleDarkMode } = useTheme();
+  const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -57,6 +58,12 @@ export default function Sidebar() {
 
   const closeMenu = () => {
     setIsMenuOpen(false);
+  };
+
+  const handleLogout = () => {
+    logout();
+    closeMenu();
+    router.replace('/login');
   };
 
   if (!user) return null;
@@ -270,15 +277,25 @@ export default function Sidebar() {
           </div>
         ))}
         <div className={styles.sidebarFooter}>
-          <button
-            onClick={toggleDarkMode}
-            className={styles.themeSwitcher}
-            aria-label={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-            title={darkMode ? 'Modo claro' : 'Modo oscuro'}
-          >
-            <span className={styles.themeIcon} aria-hidden="true">●</span>
-            <span className={styles.themeLabel}>{darkMode ? 'Vista oscura' : 'Vista clara'}</span>
-          </button>
+          <div className={styles.sidebarFooterActions}>
+            <button
+              onClick={toggleDarkMode}
+              className={styles.themeSwitcher}
+              aria-label={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+              title={darkMode ? 'Modo claro' : 'Modo oscuro'}
+            >
+              <span className={styles.themeIcon} aria-hidden="true">●</span>
+              <span className={styles.themeLabel}>{darkMode ? 'Vista oscura' : 'Vista clara'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className={styles.logoutButton}
+              aria-label="Cerrar sesion"
+            >
+              Cerrar sesion
+            </button>
+          </div>
         </div>
       </div>
       )}
