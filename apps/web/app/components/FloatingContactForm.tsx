@@ -8,6 +8,7 @@ export default function FloatingContactForm() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {
@@ -15,6 +16,17 @@ export default function FloatingContactForm() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        handleClose();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open]);
 
   const onSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
     e.preventDefault();
@@ -74,12 +86,11 @@ export default function FloatingContactForm() {
 
   return (
     <>
-      {/* Floating Action Button */}
       <button
         type="button"
         className={`${styles.fab} ${open ? styles.fabOpen : ""}`}
         onClick={() => setOpen(!open)}
-        aria-label="Abrir formulario de contacto"
+        aria-label="Abrir asesoria corporativa"
         aria-expanded={open}
       >
         {open ? (
@@ -88,22 +99,24 @@ export default function FloatingContactForm() {
             <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
         ) : (
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-            <circle cx="12" cy="12" r="1" fill="currentColor" />
-            <circle cx="16" cy="12" r="1" fill="currentColor" />
-            <circle cx="8" cy="12" r="1" fill="currentColor" />
-          </svg>
+          <>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+            </svg>
+            <span className={styles.fabLabel}>Asesoria</span>
+          </>
         )}
       </button>
 
-      {/* Floating Panel */}
       {open && (
         <>
           <div className={styles.overlay} onClick={handleClose} />
-          <div className={styles.panel}>
+          <div className={styles.panel} role="dialog" aria-modal="true" aria-labelledby="floating-contact-title">
             <div className={styles.panelHeader}>
-              <h3>Contáctanos</h3>
+              <div>
+                <p className={styles.panelEyebrow}>NEXARA | CONTACTO DIRECTIVO</p>
+                <h3 id="floating-contact-title">Asesoria corporativa inmediata</h3>
+              </div>
               <button
                 type="button"
                 className={styles.closeButton}
@@ -115,6 +128,11 @@ export default function FloatingContactForm() {
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </button>
+            </div>
+
+            <div className={styles.panelMeta}>
+              <span>Respuesta en horario laboral</span>
+              <span>Atencion comercial y tecnica</span>
             </div>
 
             {!submitted ? (
@@ -203,8 +221,9 @@ export default function FloatingContactForm() {
                   className={styles.submitButton}
                   disabled={loading}
                 >
-                  {loading ? "Enviando..." : "Enviar mensaje"}
+                  {loading ? "Enviando solicitud..." : "Solicitar contacto"}
                 </button>
+                <p className={styles.footNote}>Al enviar aceptas recibir comunicacion de seguimiento sobre tu solicitud.</p>
               </form>
             ) : (
               <div className={styles.success}>
@@ -212,8 +231,8 @@ export default function FloatingContactForm() {
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                   <polyline points="22 4 12 14.01 9 11.01" />
                 </svg>
-                <h4>¡Mensaje enviado!</h4>
-                <p>Nos pondremos en contacto contigo pronto.</p>
+                <h4>Solicitud registrada</h4>
+                <p>Un asesor de Nexara te contactara en breve.</p>
               </div>
             )}
           </div>

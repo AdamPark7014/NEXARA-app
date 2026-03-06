@@ -50,7 +50,7 @@
 }
 
 .title {
-  font-family: "Playfair Display", "Times New Roman", serif;
+  font-family: var(--public-title-font-family);
   font-size: clamp(1.9rem, 2.6vw, 2.6rem);
   font-weight: 700;
   margin-top: 8px;

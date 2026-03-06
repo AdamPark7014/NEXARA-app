@@ -2,7 +2,6 @@ import Link from "next/link";
 import Image from "next/image";
 import fs from "fs";
 import path from "path";
-import FloatingContactForm from "../../components/FloatingContactForm";
 import styles from "./page.module.css";
 
 export const metadata = {
@@ -358,7 +357,6 @@ export default function ServiciosPage({ searchParams }: ServiciosPageProps) {
         </div>
       </section>
     </main>
-    <FloatingContactForm />
     </>
   );
 }

@@ -68,6 +68,56 @@
   background: color-mix(in srgb, var(--primary) 7%, var(--surface));
 }
 
+.socialStrip {
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--gray-alpha-200));
+  border-radius: 16px;
+  padding: 16px 18px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--surface) 88%, var(--primary) 12%) 0%, color-mix(in srgb, var(--surface) 82%, var(--secondary) 18%) 100%);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--shadow) 72%, transparent);
+}
+
+.socialButtons {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.socialButton {
+  min-height: 46px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: 760;
+  letter-spacing: 0.01em;
+  box-shadow: 0 8px 16px color-mix(in srgb, var(--shadow) 68%, transparent);
+  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+}
+
+.socialButton:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.02);
+}
+
+.socialButton[data-network="facebook"] {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+}
+
+.socialButton[data-network="instagram"] {
+  background: linear-gradient(135deg, #f43f5e 0%, #7c3aed 100%);
+}
+
+.socialButton[data-network="tiktok"] {
+  background: linear-gradient(135deg, #0a0a13 0%, #0f2a4a 58%, #00d5c2 100%);
+}
+
+.socialButton[data-network="linkedin"] {
+  background: linear-gradient(135deg, #0a66c2 0%, #1e3a8a 100%);
+}
+
 /* Hero */
 .hero {
   border: 1px solid var(--gray-alpha-200);
@@ -421,6 +471,7 @@
   }
   .quickNav::-webkit-scrollbar { display: none; }
   .heroStats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .socialButtons { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .mediaGrid { gap: 10px; }
   .gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .mainImage { min-height: 260px; }
@@ -430,6 +481,7 @@
 
 @media (max-width: 520px) {
   .container { gap: 20px; }
+  .socialButtons { grid-template-columns: 1fr; }
   .gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .heroActions { gap: 10px; }
 }

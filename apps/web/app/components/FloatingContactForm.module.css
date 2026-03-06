@@ -2,42 +2,56 @@
 .fab {
   position: fixed;
   bottom: 24px;
-  right: 80px; /* Desplazado a la izquierda para no superponerse con backTop */
-  width: 56px;
+  right: 88px;
+  min-width: 134px;
   height: 56px;
+  padding: 0 16px;
   border-radius: 999px;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-  border: none;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 92%, #0d1f3f) 0%, color-mix(in srgb, var(--secondary) 84%, var(--primary)) 100%);
+  border: 1px solid color-mix(in srgb, var(--primary) 45%, transparent);
   color: #fff;
-  box-shadow: 0 8px 24px var(--shadow);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--shadow) 88%, transparent);
   cursor: pointer;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   z-index: 999;
-  transition: transform 200ms ease, box-shadow 200ms ease, background 200ms ease;
+  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
 }
 
 .fab:hover {
-  transform: scale(1.05);
-  box-shadow: 0 12px 32px var(--shadow);
+  transform: translateY(-1px);
+  box-shadow: 0 16px 34px color-mix(in srgb, var(--shadow) 96%, transparent);
+  filter: brightness(1.03);
 }
 
 .fab:active {
-  transform: scale(0.95);
+  transform: translateY(0);
 }
 
 .fabOpen {
-  background: var(--foreground);
+  min-width: 56px;
+  width: 56px;
+  padding: 0;
+  background: color-mix(in srgb, var(--foreground) 92%, #0c223f);
+}
+
+.fabLabel {
+  font-size: 0.83rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 /* Overlay */
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(3, 12, 28, 0.46);
   z-index: 998;
   animation: fadeIn 200ms ease;
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(4px);
 }
 
 @keyframes fadeIn {
@@ -52,15 +66,15 @@
 /* Floating Panel */
 .panel {
   position: fixed;
-  bottom: 96px;
+  bottom: 92px;
   right: 24px;
-  width: 420px;
+  width: 440px;
   max-width: calc(100vw - 48px);
   max-height: calc(100vh - 180px);
-  background: var(--surface);
-  border: 1px solid var(--gray-alpha-200);
-  border-radius: 18px;
-  box-shadow: 0 16px 48px var(--shadow);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--surface) 92%, #ffffff) 0%, color-mix(in srgb, var(--surface) 88%, var(--primary) 12%) 100%);
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--gray-alpha-200));
+  border-radius: 20px;
+  box-shadow: 0 22px 58px color-mix(in srgb, var(--shadow) 92%, transparent);
   z-index: 999;
   overflow: hidden;
   display: flex;
@@ -83,16 +97,48 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 20px;
-  border-bottom: 1px solid var(--gray-alpha-200);
-  background: color-mix(in srgb, var(--surface) 92%, var(--primary) 4%);
+  gap: 12px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+  background:
+    radial-gradient(circle at 0% -10%, color-mix(in srgb, var(--secondary) 24%, transparent), transparent 52%),
+    linear-gradient(135deg, color-mix(in srgb, var(--surface) 90%, var(--primary) 10%) 0%, color-mix(in srgb, var(--surface) 86%, var(--secondary) 14%) 100%);
+}
+
+.panelEyebrow {
+  margin: 0 0 5px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: color-mix(in srgb, var(--foreground) 70%, var(--primary));
 }
 
 .panelHeader h3 {
-  font-size: 1.1rem;
-  font-weight: 700;
+  font-size: 1.14rem;
+  font-weight: 820;
+  line-height: 1.18;
+  letter-spacing: -0.01em;
   color: var(--foreground);
   margin: 0;
+}
+
+.panelMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 20px 4px;
+}
+
+.panelMeta span {
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  color: color-mix(in srgb, var(--foreground) 84%, var(--primary));
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 5px 10px;
 }
 
 .closeButton {
@@ -114,7 +160,7 @@
 
 /* Form */
 .form {
-  padding: 16px 20px;
+  padding: 12px 20px 18px;
   overflow-y: auto;
   flex: 1;
 }
@@ -132,12 +178,13 @@
 }
 
 .formField input,
-.formField textarea {
+.formField textarea,
+.formField select {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--gray-alpha-200);
-  border-radius: 10px;
-  background: var(--background);
+  padding: 11px 12px;
+  border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--gray-alpha-200));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--background) 94%, white);
   color: var(--foreground);
   font-family: inherit;
   font-size: 0.95rem;
@@ -145,14 +192,16 @@
 }
 
 .formField input:focus,
-.formField textarea:focus {
+.formField textarea:focus,
+.formField select:focus {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
 }
 
 .formField input:disabled,
-.formField textarea:disabled {
+.formField textarea:disabled,
+.formField select:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -181,7 +230,7 @@
   width: 100%;
   padding: 12px 18px;
   border-radius: 10px;
-  border: none;
+  border: 1px solid color-mix(in srgb, var(--primary) 36%, transparent);
   background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
   color: #fff;
   font-weight: 700;
@@ -189,6 +238,13 @@
   cursor: pointer;
   transition: transform 200ms ease, box-shadow 200ms ease, filter 200ms ease;
   box-shadow: 0 6px 16px var(--shadow);
+}
+
+.footNote {
+  margin-top: 8px;
+  color: color-mix(in srgb, var(--foreground) 75%, transparent);
+  font-size: 0.73rem;
+  line-height: 1.4;
 }
 
 .submitButton:hover:not(:disabled) {
@@ -248,29 +304,47 @@
 
 /* Light theme overrides */
 :global(body.light) .panel {
-  background: color-mix(in srgb, var(--surface) 98%, white);
-  border-color: color-mix(in srgb, var(--gray-alpha-200) 70%, transparent);
+  background: linear-gradient(160deg, #f7fcff 0%, #eef8ff 100%);
+  border-color: color-mix(in srgb, var(--primary) 24%, transparent);
   box-shadow: 0 16px 48px color-mix(in srgb, var(--shadow) 80%, transparent);
 }
 
 :global(body.light) .panelHeader {
-  background: color-mix(in srgb, var(--surface) 96%, var(--primary) 3%);
-  border-color: color-mix(in srgb, var(--gray-alpha-200) 70%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 16%, transparent);
 }
 
 :global(body.light) .formField input,
-:global(body.light) .formField textarea {
-  border-color: color-mix(in srgb, var(--gray-alpha-200) 70%, transparent);
+:global(body.light) .formField textarea,
+:global(body.light) .formField select {
+  border-color: color-mix(in srgb, var(--primary) 16%, transparent);
   background: color-mix(in srgb, var(--background) 98%, white);
+}
+
+:global(body.dark) .panel {
+  background: linear-gradient(160deg, color-mix(in srgb, var(--surface) 90%, #07192f) 0%, color-mix(in srgb, var(--surface) 82%, #0d2b4a) 100%);
+  border-color: color-mix(in srgb, var(--primary) 34%, transparent);
+}
+
+:global(body.dark) .formField input,
+:global(body.dark) .formField textarea,
+:global(body.dark) .formField select {
+  background: color-mix(in srgb, var(--surface) 84%, #081a30);
+  border-color: color-mix(in srgb, var(--primary) 34%, transparent);
 }
 
 /* Responsive */
 @media (max-width: 600px) {
   .fab {
     bottom: 20px;
-    right: 76px; /* También ajustado en mobile */
+    right: 78px;
+    min-width: 52px;
     width: 52px;
     height: 52px;
+    padding: 0;
+  }
+
+  .fabLabel {
+    display: none;
   }
 
   .panel {

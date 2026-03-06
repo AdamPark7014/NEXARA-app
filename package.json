@@ -14,7 +14,8 @@
     "turbo": "^1.13.0"
   },
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "turbo run dev --parallel --filter=api --filter=web",
+    "dev:all": "turbo run dev --parallel",
     "dev:web": "npm run dev --workspace=apps/web",
     "dev:api": "npm run dev --workspace=apps/api",
     "build": "turbo run build",

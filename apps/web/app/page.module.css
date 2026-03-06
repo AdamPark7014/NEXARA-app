@@ -4824,6 +4824,10 @@ a.secondary:active,
   margin-bottom: 14px;
 }
 
+.capabilitiesHeader {
+  text-align: center;
+}
+
 .capabilitiesBadge,
 .deliveryBadge,
 .servicesBadge,
@@ -4857,6 +4861,11 @@ a.secondary:active,
   max-width: 72ch;
 }
 
+.capabilitiesSubtitle {
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .capabilitiesGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4883,6 +4892,7 @@ a.secondary:active,
   margin: 0 0 8px;
   font-size: 1.02rem;
   color: var(--foreground);
+  text-align: center;
 }
 
 .capabilityCard p {
@@ -5612,6 +5622,86 @@ a.secondary:active,
 
 .quickNav {
   justify-content: center;
+}
+
+/* Noticias (Inicio): compact, cleaner, max 1-2 visual layers */
+.newsSection {
+  padding: clamp(18px, 2.2vw, 28px) clamp(14px, 2vw, 24px) !important;
+  border-radius: clamp(20px, 2.8vw, 30px) !important;
+}
+
+.newsCarousel {
+  gap: clamp(10px, 1.6vw, 16px);
+  padding: clamp(12px, 1.8vw, 20px) !important;
+  border-radius: clamp(18px, 2.2vw, 24px) !important;
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--public-surface-strong) 92%, #ffffff 8%),
+    color-mix(in srgb, var(--public-surface-strong) 86%, var(--primary) 14%)
+  ) !important;
+  box-shadow: 0 10px 20px color-mix(in srgb, var(--shadow) 48%, transparent) !important;
+}
+
+.newsCarousel::before,
+.newsCarousel::after {
+  content: none !important;
+  display: none !important;
+}
+
+.newsSlide {
+  grid-template-columns: minmax(210px, 300px) minmax(0, 1fr);
+  min-height: clamp(210px, 24vw, 300px);
+  gap: clamp(10px, 1.8vw, 20px);
+}
+
+.newsImageWrap {
+  min-height: clamp(180px, 20vw, 260px);
+  border-radius: clamp(16px, 2vw, 22px) !important;
+  border: 1px solid color-mix(in srgb, var(--public-border) 88%, transparent) !important;
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--shadow) 36%, transparent) !important;
+}
+
+.newsContent {
+  padding: clamp(12px, 1.7vw, 18px) !important;
+  border-radius: clamp(14px, 1.8vw, 20px) !important;
+  background: color-mix(in srgb, var(--public-surface-strong) 94%, var(--primary) 6%) !important;
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--shadow) 34%, transparent) !important;
+}
+
+.newsContent h3 {
+  font-size: clamp(1.12rem, 1.6vw, 1.52rem);
+}
+
+.newsContent p {
+  font-size: clamp(0.92rem, 1.1vw, 1rem);
+  line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+  .newsSection {
+    padding: 14px 10px 20px !important;
+    border-radius: 16px !important;
+  }
+
+  .newsCarousel {
+    padding: 12px !important;
+    border-radius: 14px !important;
+  }
+
+  .newsSlide {
+    grid-template-columns: 1fr;
+    min-height: auto;
+    gap: 12px;
+  }
+
+  .newsImageWrap {
+    max-width: min(100%, 300px);
+    min-height: 170px;
+  }
+
+  .newsContent {
+    padding: 12px !important;
+  }
 }
 
 .quickNavLink {

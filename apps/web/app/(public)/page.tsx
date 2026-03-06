@@ -5,7 +5,6 @@ import Image from "next/image";
 import CertificationsCarousel from "../components/CertificationsCarousel";
 import BrandsCarousel from "../components/BrandsCarousel";
 import ContactFormToggle from "../components/ContactFormToggle";
-import FloatingContactForm from "../components/FloatingContactForm";
 import styles from "../page.module.css";
 import { buildApiUrl, getApiBase } from "@/lib/api-base";
 
@@ -604,7 +603,6 @@ export default function Home() {
 
         <ContactFormToggle />
       </main>
-      <FloatingContactForm />
 
       {selectedNews && (
         <div className={styles.newsModalOverlay} onClick={closeNewsModal} aria-hidden="true">
