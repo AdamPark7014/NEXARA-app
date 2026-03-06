@@ -137,7 +137,7 @@
 }
 
 .brandMark {
-  font-family: 'Playfair Display', 'Times New Roman', serif;
+  font-family: var(--public-title-font-family);
   font-size: 1.9rem;
   letter-spacing: 0.18rem;
   color: var(--primary);

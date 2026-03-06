@@ -38,7 +38,7 @@ const Icon = {
   ),
   TikTok: () => (
     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm3.5 11.5c-.69.38-1.45.59-2.25.59-2.43 0-4.42-1.99-4.42-4.42s1.99-4.42 4.42-4.42c.79 0 1.55.21 2.24.59v2.61c0 .55.45 1 1 1h1.06v2.07c0 .55-.45 1-1 1h-1.06v2.07z"/>
+      <path d="M19.32 5.56a5.1 5.1 0 0 1-3.06-3.83h-3.14v12.16a2.82 2.82 0 1 1-1.95-2.69V8.01A5.95 5.95 0 1 0 16.24 13.9V7.73c.98.39 2.02.6 3.08.61V5.56z"/>
     </svg>
   ),
   Briefcase: () => (
@@ -139,7 +139,6 @@ export default function Footer() {
                 <a className={styles.social} data-network="linkedin" href="https://www.linkedin.com/in/nexara-mx-413717359/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn"><Icon.LinkedIn /></a>
                 <a className={styles.social} data-network="instagram" href="https://www.instagram.com/nexara_mx/" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><Icon.Instagram /></a>
               </div>
-              <div className={styles.socialStatus}>Presencia digital y cobertura nacional</div>
             </div>
 
             {/* Map */}

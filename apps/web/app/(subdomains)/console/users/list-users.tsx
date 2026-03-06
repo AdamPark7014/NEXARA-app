@@ -220,8 +220,13 @@ export default function ListUsers() {
       const data = await res.json();
       setProfileData(data || null);
       setProfileReviewNote(data?.perfil?.observaciones || '');
+      const notesByDocument = Object.fromEntries(
+        (data?.documentos || []).map((doc: { id: number; observaciones?: string | null }) => [doc.id, doc.observaciones || ''])
+      ) as Record<number, string>;
+      setDocReviewNotes(notesByDocument);
     } catch {
       setProfileData(null);
+      setDocReviewNotes({});
     } finally {
       setProfileLoading(false);
     }
@@ -247,6 +252,11 @@ export default function ListUsers() {
 
   const handleDocumentReview = async (docId: number, estatus: 'Aprobado' | 'Rechazado') => {
     if (!user?.token) return;
+    const docNote = (docReviewNotes[docId] || '').trim();
+    if (estatus === 'Rechazado' && !docNote) {
+      alert('Agrega observaciones para rechazar este documento.');
+      return;
+    }
     const res = await fetch(buildApiUrl(`users/documents/${docId}/review`), {
       method: 'PATCH',
       headers: {
@@ -255,7 +265,7 @@ export default function ListUsers() {
       },
       body: JSON.stringify({
         estatus,
-        observaciones: docReviewNotes[docId] || '',
+        observaciones: docNote,
       }),
     });
     if (res.ok && profileUser) {
@@ -296,16 +306,26 @@ export default function ListUsers() {
     overflowY: "hidden",
     WebkitOverflowScrolling: "touch",
     marginTop: 32,
-    borderRadius: 18,
-    border: "1px solid rgba(96, 140, 184, 0.28)",
-    background: "linear-gradient(180deg, rgba(10, 28, 48, 0.95) 0%, rgba(10, 24, 42, 0.98) 100%)",
-    boxShadow: "0 16px 34px rgba(4, 18, 34, 0.46)",
+    borderRadius: 16,
+    border: "1px solid rgba(79, 141, 203, 0.4)",
+    background: "linear-gradient(180deg, rgba(9, 38, 71, 0.95) 0%, rgba(8, 28, 53, 0.95) 100%)",
+    boxShadow: "0 14px 28px rgba(4, 16, 30, 0.4)",
+    backdropFilter: "blur(4px)",
   };
 
   return (
     <>
       <div style={tableWrapStyle}>
         <table className="table usersTable">
+          <colgroup>
+            <col style={{ width: "82px" }} />
+            <col style={{ width: "27%" }} />
+            <col style={{ width: "24%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "12%" }} />
+            <col style={{ width: "12%" }} />
+            <col style={{ width: "15%" }} />
+          </colgroup>
           <thead>
             <tr>
               <th>Foto</th>
@@ -389,54 +409,53 @@ export default function ListUsers() {
         </div>
       )}
       {profileModalOpen && (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", background: "#0008", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div style={{ background: "var(--surface)", padding: "clamp(12px, 3vw, 24px)", borderRadius: 16, width: "min(980px, 94vw)", position: "relative", maxHeight: "90vh", overflowY: "auto" }}>
-            <button onClick={() => setProfileModalOpen(false)} style={{ position: "absolute", top: 8, right: 8 }}>✕</button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+        <div className="profileModalOverlay" role="dialog" aria-modal="true">
+          <div className="profileModal">
+            <button onClick={() => setProfileModalOpen(false)} className="profileModalClose" aria-label="Cerrar">✕</button>
+            <div className="profileModalHeader">
               {profileUser?.avatarUrl ? (
                 <Image src={profileUser.avatarUrl} alt={profileUser.nombre} width={56} height={56} style={{ borderRadius: '50%', objectFit: 'cover' }} unoptimized />
               ) : (
-                <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--muted)', display: 'grid', placeItems: 'center', fontWeight: 700, color: 'var(--primary)' }}>
+                <div className="profileAvatarFallback">
                   {profileUser?.nombre?.[0] || 'U'}
                 </div>
               )}
               <div>
-                <h3 style={{ marginBottom: 4 }}>{profileUser?.nombre}</h3>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{profileUser?.email}</div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                <h3 className="profileTitle">{profileUser?.nombre}</h3>
+                <div className="profileSubtitle">{profileUser?.email}</div>
+                <div className="profileRole">
                   {profileUser?.role?.nombre}
                 </div>
               </div>
             </div>
             {profileLoading && <div>Cargando perfil...</div>}
             {!profileLoading && (
-              <div style={{ display: 'grid', gap: 16 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
-                  <div className="card" style={{ padding: 12, background: 'var(--surface-light)' }}>
-                    <div style={{ fontWeight: 600, marginBottom: 8 }}>Estado de perfil</div>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="profileModalBody">
+                <div className="profileGrid">
+                  <div className="profileCard">
+                    <div className="profileSectionTitle">Estado de perfil</div>
+                    <div className="profileStatusRow">
                       <span className={`badge ${profileData?.perfil?.estatus === 'Aprobado' ? 'approved' : profileData?.perfil?.estatus === 'Rechazado' ? 'rejected' : 'pending'}`}>
                         {profileData?.perfil?.estatus || 'Pendiente'}
                       </span>
                       {profileData?.perfil?.observaciones && (
-                        <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{profileData.perfil.observaciones}</span>
+                        <span className="profileMetaText">{profileData.perfil.observaciones}</span>
                       )}
                     </div>
                     <textarea
                       className="input"
                       rows={2}
-                      placeholder="Observaciones"
+                      placeholder="Observaciones generales del perfil"
                       value={profileReviewNote}
                       onChange={(event) => setProfileReviewNote(event.target.value)}
-                      style={{ marginTop: 8 }}
                     />
-                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                      <button className="button-primary" onClick={() => handleProfileReview('Aprobado')}>Aprobar informacion</button>
-                      <button className="button-secondary" onClick={() => handleProfileReview('Rechazado')}>Rechazar</button>
+                    <div className="profileHintText">El rechazo y observaciones de documentos se realiza por cada documento.</div>
+                    <div className="profileActionRow">
+                      <button className="button-primary" onClick={() => handleProfileReview('Aprobado')}>Aprobar informacion general</button>
                     </div>
                   </div>
-                  <div className="card" style={{ padding: 12, background: 'var(--surface-light)' }}>
-                    <div style={{ fontWeight: 600, marginBottom: 8 }}>Datos personales</div>
+                  <div className="profileCard">
+                    <div className="profileSectionTitle">Datos personales</div>
                     <div>Telefono: {profileData?.perfil?.telefono || '-'}</div>
                     <div>Fecha nacimiento: {profileData?.perfil?.fechaNacimiento || '-'}</div>
                     <div>CURP: {profileData?.perfil?.curp || '-'}</div>
@@ -444,39 +463,39 @@ export default function ListUsers() {
                     <div>INE: {profileData?.perfil?.ineNumero || '-'}</div>
                     <div>NSS: {profileData?.perfil?.nss || '-'}</div>
                   </div>
-                  <div className="card" style={{ padding: 12, background: 'var(--surface-light)' }}>
-                    <div style={{ fontWeight: 600, marginBottom: 8 }}>Direccion</div>
+                  <div className="profileCard">
+                    <div className="profileSectionTitle">Direccion</div>
                     <div>{profileData?.perfil?.direccion || '-'}</div>
                     <div>{profileData?.perfil?.colonia || '-'} | {profileData?.perfil?.codigoPostal || '-'}</div>
                     <div>{profileData?.perfil?.ciudad || '-'}, {profileData?.perfil?.estado || '-'}</div>
                     <div>{profileData?.perfil?.pais || '-'}</div>
                   </div>
-                  <div className="card" style={{ padding: 12, background: 'var(--surface-light)' }}>
-                    <div style={{ fontWeight: 600, marginBottom: 8 }}>Contacto de emergencia</div>
+                  <div className="profileCard">
+                    <div className="profileSectionTitle">Contacto de emergencia</div>
                     <div>{profileData?.perfil?.contactoEmergenciaNombre || '-'}</div>
                     <div>{profileData?.perfil?.contactoEmergenciaTelefono || '-'}</div>
                   </div>
                 </div>
 
-                <div className="card" style={{ padding: 12, background: 'var(--surface-light)' }}>
-                  <div style={{ fontWeight: 600, marginBottom: 8 }}>Documentos (PDF)</div>
-                  <div style={{ display: 'grid', gap: 10 }}>
+                <div className="profileCard">
+                  <div className="profileSectionTitle">Documentos (PDF)</div>
+                  <div className="profileDocumentsList">
                     {requiredDocuments.map((doc) => {
                       const match = profileData?.documentos?.find((item) => normalizeDocumentKey(item.tipo) === doc.key.toLowerCase().trim());
                       const status = match?.estatus || 'Pendiente';
                       return (
-                        <div key={doc.key} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', padding: '10px 12px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface)' }}>
+                        <div key={doc.key} className="profileDocumentRow">
                           <div>
                             <div style={{ fontWeight: 600 }}>{doc.label}</div>
-                            <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{doc.description}</div>
+                            <div className="profileMetaText">{doc.description}</div>
                           </div>
-                          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          <div className="profileDocumentActions">
                             <span className={`badge ${status === 'Aprobado' ? 'approved' : status === 'Rechazado' ? 'rejected' : 'pending'}`}>
                               {status}
                             </span>
                             {match?.archivoUrl ? (
                               <div style={{ display: 'grid', gap: 8 }}>
-                                <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--surface)', width: 200 }}>
+                                <div className="profileDocPreview profileDocPreviewSmall">
                                   {isPdf(match.archivoUrl) ? (
                                     <object data={getAssetUrl(match.archivoUrl)} type="application/pdf" width="100%" height="140" aria-label="Vista previa PDF">
                                       <embed src={getAssetUrl(match.archivoUrl)} type="application/pdf" />
@@ -499,21 +518,21 @@ export default function ListUsers() {
                   </div>
                 </div>
 
-                <div className="card" style={{ padding: 12, background: 'var(--surface-light)' }}>
-                  <div style={{ fontWeight: 600, marginBottom: 8 }}>Revision por documento</div>
+                <div className="profileCard">
+                  <div className="profileSectionTitle">Revision por documento</div>
                   {profileData?.documentos?.length ? (
                     <div style={{ display: 'grid', gap: 12 }}>
                       {profileData.documentos.map((doc) => (
-                        <div key={doc.id} style={{ display: 'grid', gap: 10, padding: '12px 14px', borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface)' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                        <div key={doc.id} className="profileDocReviewCard">
+                          <div className="profileDocReviewHeader">
                             <div>
                               <div style={{ fontWeight: 600 }}>{doc.tipo}</div>
-                              <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Estatus: {doc.estatus || 'Pendiente'}</div>
+                              <div className="profileMetaText">Estatus: {doc.estatus || 'Pendiente'}</div>
                             </div>
                             <a className="link" href={getAssetUrl(doc.archivoUrl)} target="_blank" rel="noopener noreferrer">Ver documento</a>
                           </div>
                           {doc.archivoUrl && (
-                            <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--surface)' }}>
+                            <div className="profileDocPreview">
                               {isPdf(doc.archivoUrl) ? (
                                 <object data={getAssetUrl(doc.archivoUrl)} type="application/pdf" width="100%" height="180" aria-label="Vista previa PDF">
                                   <embed src={getAssetUrl(doc.archivoUrl)} type="application/pdf" />
@@ -528,11 +547,11 @@ export default function ListUsers() {
                           <textarea
                             className="input"
                             rows={2}
-                            placeholder="Observaciones"
-                            value={docReviewNotes[doc.id] ?? doc.observaciones ?? ''}
+                            placeholder="Observaciones del documento"
+                            value={docReviewNotes[doc.id] ?? ''}
                             onChange={(event) => setDocReviewNotes((prev) => ({ ...prev, [doc.id]: event.target.value }))}
                           />
-                          <div style={{ display: 'flex', gap: 8 }}>
+                          <div className="profileActionRow">
                             <button className="button-primary" onClick={() => handleDocumentReview(doc.id, 'Aprobado')}>Aprobar</button>
                             <button className="button-secondary" onClick={() => handleDocumentReview(doc.id, 'Rechazado')}>Rechazar</button>
                           </div>
@@ -554,63 +573,85 @@ export default function ListUsers() {
           border-collapse: separate;
           border-spacing: 0;
           table-layout: fixed;
-          border-radius: 14px;
+          border-radius: 12px;
           overflow: hidden;
         }
 
         .usersTable thead th {
-          background: linear-gradient(135deg, #173a5a 0%, #1d486f 100%);
-          color: #e7eff8;
-          border-bottom: 1px solid rgba(110, 148, 186, 0.35);
-          font-weight: 700;
-          letter-spacing: 0.03em;
+          background: linear-gradient(135deg, rgba(23, 84, 149, 0.96) 0%, rgba(31, 95, 191, 0.94) 100%);
+          color: #edf6ff;
+          border-bottom: 1px solid rgba(116, 171, 225, 0.45);
+          font-weight: 600;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          font-size: 0.76rem;
           white-space: nowrap;
+          text-align: left;
+          padding: 13px 14px;
         }
 
         .usersTable tbody td {
           color: color-mix(in srgb, var(--text-primary) 94%, #ffffff 6%);
-          border-bottom-color: rgba(84, 122, 158, 0.26);
+          border-bottom-color: rgba(88, 139, 190, 0.32);
           overflow-wrap: anywhere;
           vertical-align: middle;
+          line-height: 1.45;
+          text-align: left;
+          padding: 13px 14px;
         }
 
         .usersTable tbody tr:nth-child(even) {
-          background: rgba(17, 39, 62, 0.72);
+          background: rgba(13, 47, 81, 0.6);
         }
 
         .usersTable tbody tr:hover {
-          background: rgba(30, 64, 94, 0.62);
+          background: rgba(22, 72, 120, 0.56);
         }
 
         .tableAction {
-          border: none;
-          border-radius: 10px;
-          padding: 8px 12px;
+          border-radius: 9px;
+          padding: 7px 12px;
           font-weight: 600;
+          font-size: 0.84rem;
           cursor: pointer;
-          transition: transform 0.16s ease, filter 0.2s ease;
-          color: #eef5fd;
-          border: 1px solid rgba(142, 176, 210, 0.24);
-          box-shadow: 0 6px 14px rgba(5, 19, 36, 0.28);
+          transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+          color: #f3f8ff;
+          border: 1px solid rgba(126, 183, 236, 0.45);
+          background: rgba(27, 93, 155, 0.62);
+          box-shadow: none;
         }
 
         .tableAction:hover {
-          transform: translateY(-1px);
-          filter: brightness(1.05);
+          background: rgba(36, 112, 182, 0.78);
+          border-color: rgba(162, 209, 250, 0.64);
+        }
+
+        .tableAction:focus-visible {
+          outline: 2px solid rgba(173, 203, 232, 0.55);
+          outline-offset: 1px;
         }
 
         .tableActionInfo {
-          background: linear-gradient(135deg, #466b8d 0%, #5a82a8 100%);
+          background: linear-gradient(135deg, rgba(49, 115, 182, 0.95) 0%, rgba(63, 134, 209, 0.92) 100%);
         }
 
         .tableActionEdit {
-          background: linear-gradient(135deg, #2b5f92 0%, #3e76ad 100%);
-          margin-right: 8px;
+          background: linear-gradient(135deg, rgba(31, 95, 191, 0.96) 0%, rgba(53, 119, 200, 0.93) 100%);
         }
 
         .tableActionDelete {
-          background: linear-gradient(135deg, #874b54 0%, #9d5c66 100%);
-          border-color: rgba(193, 136, 145, 0.36);
+          background: linear-gradient(135deg, rgba(149, 78, 89, 0.95) 0%, rgba(169, 95, 108, 0.9) 100%);
+          border-color: rgba(225, 166, 177, 0.45);
+        }
+
+        .tableProfileCell,
+        .tableActionsCell {
+          text-align: left;
+          white-space: nowrap;
+        }
+
+        .tableActionsCell .tableAction + .tableAction {
+          margin-left: 8px;
         }
 
         @media (max-width: 760px) {
@@ -629,15 +670,15 @@ export default function ListUsers() {
           .usersTable tbody tr {
             margin-bottom: 10px;
             padding: 12px;
-            border-radius: 14px;
-            border: 1px solid rgba(96, 136, 176, 0.28);
-            background: rgba(15, 35, 56, 0.88);
-            box-shadow: 0 10px 20px rgba(4, 14, 28, 0.3);
+            border-radius: 12px;
+            border: 1px solid rgba(118, 149, 180, 0.24);
+            background: rgba(15, 36, 57, 0.76);
+            box-shadow: 0 6px 16px rgba(3, 12, 24, 0.22);
           }
 
           .usersTable tbody td {
             border: none;
-            padding: 4px 0;
+            padding: 5px 0;
             line-height: 1.35;
           }
 
@@ -646,10 +687,10 @@ export default function ListUsers() {
             display: block;
             margin-bottom: 2px;
             font-size: 0.68rem;
-            font-weight: 700;
+            font-weight: 600;
             letter-spacing: 0.08em;
             text-transform: uppercase;
-            color: #98b9d8;
+            color: #8eb1d2;
           }
 
           .usersTable tbody td[data-label="Foto"] {
@@ -668,6 +709,10 @@ export default function ListUsers() {
           .tableAction {
             width: 100%;
             margin: 0 0 8px 0;
+          }
+
+          .tableActionsCell .tableAction + .tableAction {
+            margin-left: 0;
           }
 
           .tableActionsCell .tableAction:last-child {
@@ -718,6 +763,184 @@ export default function ListUsers() {
           background: rgba(255, 255, 255, 0.16);
         }
 
+        .profileModalOverlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(3, 13, 27, 0.74);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1100;
+          padding: clamp(12px, 3vw, 24px);
+          backdrop-filter: blur(2px);
+        }
+
+        .profileModal {
+          position: relative;
+          width: min(1040px, 96vw);
+          max-height: 92vh;
+          overflow-y: auto;
+          border-radius: 18px;
+          border: 1px solid rgba(90, 148, 206, 0.42);
+          background: linear-gradient(165deg, rgba(10, 33, 58, 0.98) 0%, rgba(12, 38, 66, 0.98) 55%, rgba(10, 30, 52, 0.98) 100%);
+          box-shadow: 0 24px 56px rgba(1, 9, 20, 0.52);
+          padding: clamp(14px, 2.6vw, 24px);
+        }
+
+        .profileModalClose {
+          position: sticky;
+          top: 0;
+          margin-left: auto;
+          display: grid;
+          place-items: center;
+          border: 1px solid rgba(154, 196, 236, 0.5);
+          background: rgba(38, 91, 142, 0.75);
+          color: #eef6ff;
+          border-radius: 8px;
+          width: 30px;
+          height: 30px;
+          cursor: pointer;
+          z-index: 2;
+        }
+
+        .profileModalHeader {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          margin: 4px 0 14px;
+        }
+
+        .profileAvatarFallback {
+          width: 56px;
+          height: 56px;
+          border-radius: 999px;
+          display: grid;
+          place-items: center;
+          font-weight: 700;
+          color: #a7d1ff;
+          background: linear-gradient(145deg, rgba(30, 73, 120, 0.85), rgba(20, 54, 92, 0.9));
+          border: 1px solid rgba(107, 159, 211, 0.4);
+        }
+
+        .profileTitle {
+          margin: 0 0 2px;
+          font-size: 1.55rem;
+        }
+
+        .profileSubtitle {
+          color: #d0e6ff;
+          font-size: 0.86rem;
+        }
+
+        .profileRole {
+          color: #9bc8f5;
+          font-size: 0.8rem;
+          margin-top: 2px;
+        }
+
+        .profileModalBody {
+          display: grid;
+          gap: 14px;
+        }
+
+        .profileGrid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+          gap: 12px;
+        }
+
+        .profileCard {
+          background: rgba(23, 54, 89, 0.72);
+          border: 1px solid rgba(88, 142, 196, 0.38);
+          border-radius: 14px;
+          padding: 12px;
+          box-shadow: inset 0 1px 0 rgba(167, 206, 246, 0.12);
+        }
+
+        .profileSectionTitle {
+          font-weight: 700;
+          letter-spacing: 0.02em;
+          margin-bottom: 8px;
+        }
+
+        .profileStatusRow {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+          flex-wrap: wrap;
+          margin-bottom: 8px;
+        }
+
+        .profileMetaText {
+          color: #b7d6f5;
+          font-size: 12px;
+        }
+
+        .profileHintText {
+          color: #9fc4e9;
+          font-size: 12px;
+          margin-top: 8px;
+        }
+
+        .profileActionRow {
+          display: flex;
+          gap: 8px;
+          margin-top: 8px;
+          flex-wrap: wrap;
+        }
+
+        .profileDocumentsList {
+          display: grid;
+          gap: 10px;
+        }
+
+        .profileDocumentRow {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          align-items: center;
+          padding: 10px 12px;
+          border-radius: 12px;
+          border: 1px solid rgba(80, 132, 186, 0.36);
+          background: rgba(12, 35, 61, 0.8);
+        }
+
+        .profileDocumentActions {
+          display: flex;
+          gap: 12px;
+          align-items: center;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+
+        .profileDocReviewCard {
+          display: grid;
+          gap: 10px;
+          padding: 12px 14px;
+          border-radius: 12px;
+          border: 1px solid rgba(79, 132, 186, 0.38);
+          background: rgba(11, 33, 56, 0.78);
+        }
+
+        .profileDocReviewHeader {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .profileDocPreview {
+          border-radius: 10px;
+          overflow: hidden;
+          border: 1px solid rgba(90, 139, 187, 0.36);
+          background: rgba(8, 25, 43, 0.9);
+        }
+
+        .profileDocPreviewSmall {
+          width: 200px;
+        }
+
         @media (max-width: 720px) {
           .usersTable {
             font-size: 0.84rem;
@@ -731,6 +954,29 @@ export default function ListUsers() {
           .editModal {
             width: 94vw;
             padding: 20px 18px 26px;
+          }
+
+          .profileModal {
+            width: 96vw;
+            border-radius: 14px;
+          }
+
+          .profileTitle {
+            font-size: 1.2rem;
+          }
+
+          .profileDocumentRow {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
+          .profileDocumentActions {
+            width: 100%;
+            justify-content: flex-start;
+          }
+
+          .profileDocPreviewSmall {
+            width: 100%;
           }
         }
       `}</style>

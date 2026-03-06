@@ -1,5 +1,4 @@
 import Link from "next/link";
-import FloatingContactForm from "../../components/FloatingContactForm";
 import BrandsCarousel from "../../components/BrandsCarousel";
 import Image from "next/image";
 import fs from "fs";
@@ -451,7 +450,6 @@ export default function SolucionesPage() {
         </div>
       </section>
     </main>
-    <FloatingContactForm />
     </>
   );
 }

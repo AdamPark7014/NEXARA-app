@@ -92,6 +92,16 @@ export default async function ProjectsPage() {
         <a href="#cta" className={styles.quickNavLink}>Agendar sesión</a>
       </nav>
 
+      <section className={styles.socialStrip} aria-label="Redes sociales Nexara">
+        <p className={styles.kicker}>Redes oficiales</p>
+        <div className={styles.socialButtons}>
+          <a className={styles.socialButton} data-network="facebook" href="https://www.facebook.com/nexara.mexico/" target="_blank" rel="noopener noreferrer">Facebook</a>
+          <a className={styles.socialButton} data-network="instagram" href="https://www.instagram.com/nexara_mx/" target="_blank" rel="noopener noreferrer">Instagram</a>
+          <a className={styles.socialButton} data-network="tiktok" href="https://www.tiktok.com/@nexara_mx?_r=1&_t=ZS-948WJNIEdeu" target="_blank" rel="noopener noreferrer">TikTok</a>
+          <a className={styles.socialButton} data-network="linkedin" href="https://www.linkedin.com/in/nexara-mx-413717359/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+        </div>
+      </section>
+
       <section id="casos" className={styles.projectsSection} aria-label="Casos de éxito publicados">
         {projects.map((project) => (
           <article key={project.slug} className={styles.projectCard}>

@@ -37,7 +37,7 @@
   margin: 0 0 6px;
   font-size: 1.8rem;
   color: var(--foreground);
-  font-family: 'Playfair Display', 'Times New Roman', serif;
+  font-family: var(--public-title-font-family);
 }
 
 .subtitle {
