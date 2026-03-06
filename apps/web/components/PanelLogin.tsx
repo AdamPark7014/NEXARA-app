@@ -100,13 +100,18 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
       <style jsx>{`
         .login-container {
           min-height: 100vh;
+          min-height: 100dvh;
           display: flex;
           align-items: center;
           justify-content: center;
-          background: linear-gradient(135deg, #0a0e27 0%, #0f1419 50%, #1a1a2e 100%);
+          background:
+            radial-gradient(circle at 4% -12%, rgba(59, 130, 246, 0.34), transparent 44%),
+            radial-gradient(circle at 96% -4%, rgba(34, 211, 238, 0.18), transparent 46%),
+            linear-gradient(140deg, #070b1f 0%, #0d1833 46%, #111a36 100%);
           position: relative;
           overflow: hidden;
-          padding: 20px;
+          isolation: isolate;
+          padding: clamp(14px, 2.2vw, 30px);
         }
 
         .login-container::before {
@@ -116,8 +121,21 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           left: -50%;
           width: 200%;
           height: 200%;
-          background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%);
-          animation: rotate 30s linear infinite;
+          background: radial-gradient(circle, rgba(59, 130, 246, 0.18) 0%, transparent 70%);
+          animation: rotate 26s linear infinite;
+          z-index: -2;
+        }
+
+        .login-container::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background:
+            linear-gradient(rgba(118, 158, 219, 0.08) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(118, 158, 219, 0.08) 1px, transparent 1px);
+          background-size: 42px 42px;
+          mask-image: radial-gradient(circle at 50% 36%, black 16%, transparent 78%);
+          z-index: -1;
         }
 
         @keyframes rotate {
@@ -128,16 +146,19 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         .login-card {
           position: relative;
           width: 100%;
-          max-width: 460px;
-          background: rgba(255, 255, 255, 0.03);
-          backdrop-filter: blur(20px);
-          border-radius: 24px;
-          padding: 48px 40px;
+          max-width: 540px;
+          background:
+            radial-gradient(circle at 86% -22%, rgba(59, 130, 246, 0.22), transparent 48%),
+            linear-gradient(160deg, rgba(16, 29, 52, 0.92), rgba(14, 24, 45, 0.94));
+          backdrop-filter: blur(16px);
+          border-radius: 26px;
+          padding: clamp(26px, 4vw, 48px) clamp(20px, 3.2vw, 40px);
           box-shadow:
-            0 8px 32px rgba(0, 0, 0, 0.4),
-            0 0 0 1px rgba(255, 255, 255, 0.05),
-            inset 0 0 0 1px rgba(255, 255, 255, 0.05);
-          animation: slideUp 0.6s ease-out;
+            0 20px 50px rgba(4, 12, 28, 0.62),
+            0 8px 18px rgba(4, 12, 28, 0.32),
+            inset 0 1px 0 rgba(255, 255, 255, 0.14);
+          border: 1px solid rgba(124, 173, 255, 0.2);
+          animation: slideUp 0.44s ease-out;
         }
 
         @keyframes slideUp {
@@ -153,20 +174,20 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
 
         .logo-container {
           text-align: center;
-          margin-bottom: 40px;
+          margin-bottom: clamp(26px, 2.8vw, 40px);
         }
 
         .logo {
           width: 92px;
           height: 92px;
           margin: 0 auto 12px;
-          background: linear-gradient(135deg, rgba(24, 45, 72, 0.85), rgba(12, 28, 48, 0.85));
+          background: linear-gradient(135deg, rgba(17, 41, 73, 0.94), rgba(10, 25, 45, 0.9));
           border-radius: 20px;
           display: flex;
           align-items: center;
           justify-content: center;
-          box-shadow: 0 10px 24px rgba(7, 15, 28, 0.5);
-          border: 1px solid rgba(59, 130, 246, 0.25);
+          box-shadow: 0 12px 26px rgba(4, 12, 25, 0.54);
+          border: 1px solid rgba(86, 151, 255, 0.36);
         }
 
         .logoImage {
@@ -179,40 +200,44 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         .brandName {
           font-size: 14px;
           text-transform: uppercase;
-          letter-spacing: 0.3rem;
-          color: rgba(190, 212, 245, 0.7);
+          letter-spacing: 0.26rem;
+          color: rgba(194, 217, 252, 0.8);
           margin: 0 0 8px;
           font-weight: 700;
         }
 
         .title {
-          font-size: 28px;
-          font-weight: 700;
+          font-size: clamp(1.74rem, 2.8vw, 2.18rem);
+          font-weight: 780;
           color: #ffffff;
           margin: 0 0 8px 0;
-          letter-spacing: -0.5px;
+          letter-spacing: -0.025em;
+          line-height: 1.12;
+          text-wrap: balance;
         }
 
         .subtitle {
-          font-size: 14px;
-          color: rgba(255, 255, 255, 0.6);
+          font-size: clamp(0.88rem, 1.4vw, 0.98rem);
+          color: rgba(199, 217, 243, 0.9);
           margin: 0;
+          line-height: 1.56;
+          text-wrap: pretty;
         }
 
         .form {
-          margin-top: 32px;
+          margin-top: clamp(22px, 2.2vw, 32px);
         }
 
         .input-group {
-          margin-bottom: 24px;
+          margin-bottom: 18px;
           position: relative;
         }
 
         .input-label {
           display: block;
-          font-size: 14px;
-          font-weight: 500;
-          color: rgba(255, 255, 255, 0.8);
+          font-size: 0.92rem;
+          font-weight: 620;
+          color: rgba(206, 221, 246, 0.94);
           margin-bottom: 8px;
         }
 
@@ -234,35 +259,61 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           z-index: 2;
         }
 
-        .input {
+        .login-card .input {
           width: 100%;
           padding: 14px 16px 14px 50px;
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: linear-gradient(180deg, rgba(248, 252, 255, 0.14), rgba(235, 245, 255, 0.08)) !important;
+          border: 1px solid rgba(132, 179, 255, 0.26) !important;
           border-radius: 12px;
-          color: #ffffff;
+          color: #f7fbff !important;
           font-size: 15px;
           line-height: 1.35;
-          transition: all 0.3s ease;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
           outline: none;
+        }
+
+        .login-card .input:hover {
+          border-color: rgba(132, 179, 255, 0.42);
+          background: linear-gradient(180deg, rgba(248, 252, 255, 0.18), rgba(235, 245, 255, 0.11)) !important;
         }
 
         .input-has-toggle {
           padding-right: 56px;
         }
 
-        .input:focus {
-          background: rgba(255, 255, 255, 0.08);
-          border-color: #3b82f6;
-          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        .login-card .input:focus {
+          background: linear-gradient(180deg, rgba(248, 252, 255, 0.22), rgba(235, 245, 255, 0.14)) !important;
+          border-color: #62a3ff !important;
+          box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.24);
         }
 
         .input:focus + .input-icon {
           color: #3b82f6;
         }
 
-        .input::placeholder {
+        .login-card .input::placeholder {
           color: rgba(255, 255, 255, 0.3);
+        }
+
+        .login-card .input:-webkit-autofill,
+        .login-card .input:-webkit-autofill:hover,
+        .login-card .input:-webkit-autofill:focus,
+        .login-card .input:-webkit-autofill:active {
+          -webkit-text-fill-color: #f7fbff;
+          caret-color: #f7fbff;
+          border: 1px solid rgba(132, 179, 255, 0.34);
+          -webkit-box-shadow: 0 0 0 1000px rgba(26, 43, 69, 0.96) inset;
+          box-shadow: 0 0 0 1000px rgba(26, 43, 69, 0.96) inset;
+          transition: background-color 9999s ease-out 0s;
+        }
+
+        .login-card .input:autofill,
+        .login-card .input:autofill:hover,
+        .login-card .input:autofill:focus {
+          color: #f7fbff;
+          caret-color: #f7fbff;
+          background: linear-gradient(180deg, rgba(248, 252, 255, 0.22), rgba(235, 245, 255, 0.14)) !important;
+          border: 1px solid rgba(132, 179, 255, 0.34);
         }
 
         .password-toggle {
@@ -287,18 +338,24 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           color: rgba(255, 255, 255, 0.7);
         }
 
+        .password-toggle:focus-visible {
+          outline: 2px solid rgba(124, 173, 255, 0.8);
+          outline-offset: 2px;
+        }
+
         .submit-button {
           width: 100%;
-          padding: 16px;
-          background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+          min-height: 52px;
+          padding: 14px 16px;
+          background: linear-gradient(135deg, #3f8af9 0%, #2d6eea 100%);
           border: none;
           border-radius: 12px;
           color: white;
           font-size: 16px;
-          font-weight: 600;
+          font-weight: 700;
           cursor: pointer;
-          transition: all 0.3s ease;
-          box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+          transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+          box-shadow: 0 10px 24px rgba(59, 130, 246, 0.34);
           position: relative;
           overflow: hidden;
         }
@@ -320,7 +377,8 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
 
         .submit-button:hover {
           transform: translateY(-2px);
-          box-shadow: 0 6px 24px rgba(59, 130, 246, 0.4);
+          box-shadow: 0 14px 28px rgba(59, 130, 246, 0.42);
+          filter: brightness(1.03);
         }
 
         .submit-button:active {
@@ -331,17 +389,24 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           opacity: 0.6;
           cursor: not-allowed;
           transform: none;
+          filter: saturate(0.7);
+        }
+
+        .submit-button:focus-visible {
+          outline: 3px solid rgba(133, 184, 255, 0.8);
+          outline-offset: 2px;
         }
 
         .error-message {
-          background: rgba(239, 68, 68, 0.1);
-          border: 1px solid rgba(239, 68, 68, 0.3);
-          color: #fca5a5;
+          background: rgba(239, 68, 68, 0.13);
+          border: 1px solid rgba(239, 68, 68, 0.42);
+          color: #ffd2d2;
           padding: 12px 16px;
           border-radius: 12px;
           font-size: 14px;
           margin-top: 20px;
           animation: shake 0.5s ease;
+          line-height: 1.4;
         }
 
         @keyframes shake {
@@ -354,12 +419,12 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           margin-top: 32px;
           text-align: center;
           padding-top: 24px;
-          border-top: 1px solid rgba(255, 255, 255, 0.08);
+          border-top: 1px solid rgba(134, 181, 255, 0.16);
         }
 
         .footer-text {
           font-size: 13px;
-          color: rgba(255, 255, 255, 0.5);
+          color: rgba(186, 208, 241, 0.8);
           margin: 0;
         }
 
@@ -380,13 +445,12 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
 
         @media (max-width: 480px) {
           .login-container {
-            padding: 16px;
-            background: linear-gradient(135deg, #0a0e27 0%, #0f1419 50%, #1a1a2e 100%);
+            padding: 14px;
           }
 
           .login-card {
-            padding: 32px 20px;
-            border-radius: 20px;
+            padding: 30px 18px;
+            border-radius: 18px;
             max-width: 100%;
             box-shadow:
               0 4px 24px rgba(0, 0, 0, 0.5),
@@ -395,7 +459,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           }
 
           .logo-container {
-            margin-bottom: 32px;
+            margin-bottom: 24px;
           }
 
           .logo {
@@ -425,11 +489,11 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           .subtitle {
             font-size: 13px;
             line-height: 1.5;
-            padding: 0 10px;
+            padding: 0 8px;
           }
 
           .form {
-            margin-top: 28px;
+            margin-top: 22px;
           }
 
           .input-group {
@@ -442,7 +506,8 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           }
 
           .input {
-            padding: 15px 14px 15px 48px;
+            min-height: 48px;
+            padding: 14px 12px 14px 44px;
             font-size: 16px;
             border-radius: 10px;
             -webkit-appearance: none;
@@ -467,7 +532,8 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           }
 
           .submit-button {
-            padding: 17px 16px;
+            min-height: 50px;
+            padding: 14px;
             font-size: 16px;
             border-radius: 10px;
             font-weight: 700;
@@ -499,7 +565,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
 
         @media (max-width: 380px) {
           .login-card {
-            padding: 28px 18px;
+            padding: 24px 14px;
           }
 
           .logo {
@@ -521,7 +587,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           }
 
           .input {
-            padding: 14px 12px 14px 46px;
+            padding: 13px 10px 13px 40px;
             font-size: 15px;
           }
 
@@ -547,12 +613,38 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
 
         @media (min-width: 481px) and (max-width: 768px) {
           .login-card {
-            max-width: 420px;
+            max-width: 460px;
             padding: 40px 32px;
           }
 
           .title {
             font-size: 26px;
+          }
+        }
+
+        @media (min-width: 1024px) {
+          .login-card {
+            max-width: 560px;
+          }
+
+          .form {
+            margin-top: 30px;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .login-container::before,
+          .login-card,
+          .submit-button::before,
+          .loader,
+          .error-message {
+            animation: none !important;
+          }
+
+          .submit-button,
+          .input,
+          .password-toggle {
+            transition: none !important;
           }
         }
       `}</style>
@@ -561,7 +653,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         <div className="login-card">
           <div className="logo-container">
             <div className="logo">
-              <img src="/logo-nexara.png" alt="Nexara" width={64} height={64} className="logoImage" />
+              <Image src="/logo-nexara.png" alt="Nexara" width={64} height={64} className="logoImage" priority />
             </div>
             <p className="brandName">Nexara</p>
             <h1 className="title">{title || "Iniciar sesion"}</h1>

@@ -31,7 +31,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     let isDark = false;
     if (stored === "dark") isDark = true;
     else if (stored === "light") isDark = false;
-    else isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    else isDark = false;
     setDarkMode(isDark);
     syncDarkClass(isDark);
   }, []);

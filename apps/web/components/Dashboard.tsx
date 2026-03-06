@@ -674,9 +674,12 @@ export default function Dashboard() {
           gap: 14px;
           padding: 24px;
           border-radius: 20px;
-          border: 1px solid rgba(15, 106, 214, 0.16);
-          background: var(--surface);
-          box-shadow: 0 16px 32px var(--shadow);
+          border: 1px solid rgba(15, 106, 214, 0.2);
+          background:
+            radial-gradient(circle at 90% -30%, rgba(22, 169, 110, 0.16), transparent 48%),
+            radial-gradient(circle at 12% -24%, rgba(23, 137, 252, 0.2), transparent 56%),
+            linear-gradient(165deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface) 88%, var(--primary) 12%));
+          box-shadow: 0 18px 36px var(--shadow);
           overflow: hidden;
         }
 
@@ -686,8 +689,12 @@ export default function Dashboard() {
         }
 
         :global(body.dark) .heroCard {
-          border: 1px solid rgba(23, 137, 252, 0.2);
-          box-shadow: 0 16px 32px rgba(0, 0, 0, 0.3);
+          border: 1px solid rgba(101, 176, 245, 0.36);
+          background:
+            radial-gradient(circle at 90% -28%, rgba(49, 216, 196, 0.22), transparent 48%),
+            radial-gradient(circle at 12% -14%, rgba(73, 163, 255, 0.28), transparent 56%),
+            linear-gradient(165deg, rgba(13, 49, 92, 0.96), rgba(9, 34, 66, 0.96));
+          box-shadow: 0 20px 38px rgba(3, 12, 28, 0.6);
         }
 
         .heroCard::after {
@@ -707,6 +714,10 @@ export default function Dashboard() {
           gap: 12px;
         }
 
+        .heroHeader > div:first-child {
+          min-width: 0;
+        }
+
         .heroKicker {
           text-transform: uppercase;
           letter-spacing: 0.3em;
@@ -716,21 +727,27 @@ export default function Dashboard() {
         }
 
         .heroTitle {
-          color: var(--primary);
+          color: color-mix(in srgb, var(--foreground) 92%, var(--primary));
           margin: 0 0 6px;
-          font-size: clamp(22px, 2.2vw, 28px);
+          font-size: clamp(21px, 2.3vw, 30px);
           letter-spacing: 0.02em;
+          line-height: 1.14;
+          text-wrap: balance;
         }
 
         .heroSubtitle {
           color: var(--text-secondary);
           font-size: 13px;
+          line-height: 1.45;
+          overflow-wrap: anywhere;
         }
 
         .heroMeta {
           color: var(--text-secondary);
           font-size: 12px;
           text-align: right;
+          display: grid;
+          gap: 4px;
         }
 
         .heroRole {
@@ -761,24 +778,26 @@ export default function Dashboard() {
         .chip {
           padding: 6px 12px;
           border-radius: 999px;
-          background: rgba(15, 106, 214, 0.14);
+          background: linear-gradient(135deg, rgba(15, 106, 214, 0.18), rgba(23, 137, 252, 0.11));
           color: var(--text-secondary);
           font-size: 12px;
-          border: 1px solid rgba(15, 106, 214, 0.18);
+          border: 1px solid rgba(15, 106, 214, 0.26);
         }
 
         :global(body.dark) .chip {
-          background: rgba(23, 137, 252, 0.14);
-          border-color: rgba(23, 137, 252, 0.2);
+          background: linear-gradient(135deg, rgba(73, 163, 255, 0.22), rgba(49, 216, 196, 0.16));
+          border-color: rgba(110, 192, 255, 0.38);
         }
 
         .chipLive {
-          color: var(--primary);
-          background: rgba(15, 106, 214, 0.18);
+          color: #eaf5ff;
+          background: linear-gradient(135deg, rgba(23, 137, 252, 0.42), rgba(22, 169, 110, 0.28));
+          border-color: rgba(22, 169, 110, 0.38);
         }
 
         :global(body.dark) .chipLive {
-          background: rgba(23, 137, 252, 0.2);
+          background: linear-gradient(135deg, rgba(73, 163, 255, 0.42), rgba(49, 216, 196, 0.3));
+          border-color: rgba(83, 217, 196, 0.44);
         }
 
         .filtersRow {
@@ -804,14 +823,23 @@ export default function Dashboard() {
           padding: 8px 12px;
           border-radius: 8px;
           border: 1px solid rgba(15, 106, 214, 0.2);
-          background: var(--surface);
+          background: linear-gradient(150deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface-light) 80%, transparent));
           color: var(--foreground);
           font-size: 14px;
         }
 
         :global(body.dark) .input {
-          border-color: rgba(23, 137, 252, 0.3);
-          background: rgba(35, 39, 47, 0.8);
+          border-color: rgba(112, 191, 255, 0.45);
+          background: linear-gradient(150deg, rgba(19, 63, 110, 0.94), rgba(14, 50, 90, 0.94));
+          color: #eaf5ff;
+          box-shadow:
+            0 8px 16px rgba(3, 12, 28, 0.34),
+            inset 0 1px 0 rgba(255, 255, 255, 0.12);
+        }
+
+        :global(body.dark) select.input option {
+          background: #123c6c;
+          color: #eaf5ff;
         }
 
         .kpiGrid {
@@ -823,14 +851,29 @@ export default function Dashboard() {
         }
 
         .kpiCard {
+          position: relative;
           padding: 18px;
           border-radius: 18px;
-          border: 1px solid rgba(15, 106, 214, 0.14);
-          background: var(--surface);
-          box-shadow: 0 14px 26px var(--shadow);
+          border: 1px solid rgba(15, 106, 214, 0.2);
+          background:
+            radial-gradient(circle at 88% -28%, rgba(22, 169, 110, 0.16), transparent 50%),
+            linear-gradient(155deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface) 84%, var(--primary) 16%));
+          box-shadow: 0 14px 28px var(--shadow);
           display: grid;
           gap: 10px;
           animation: floatUp 0.4s ease both;
+          overflow: hidden;
+        }
+
+        .kpiCard::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 4px;
+          background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 86%, #fff 14%), color-mix(in srgb, var(--secondary) 74%, var(--primary) 26%));
+          opacity: 0.95;
         }
 
         .kpiDelay1 { animation-delay: 0.05s; }
@@ -845,8 +888,12 @@ export default function Dashboard() {
         }
 
         :global(body.dark) .kpiCard {
-          background: linear-gradient(150deg, rgba(35, 39, 47, 0.96), rgba(21, 21, 24, 0.98));
-          border-color: rgba(23, 137, 252, 0.2);
+          background:
+            radial-gradient(circle at 84% -22%, rgba(49, 216, 196, 0.2), transparent 52%),
+            radial-gradient(circle at 10% -16%, rgba(73, 163, 255, 0.24), transparent 56%),
+            linear-gradient(155deg, rgba(13, 48, 90, 0.96), rgba(9, 32, 62, 0.96));
+          border-color: rgba(103, 180, 247, 0.34);
+          box-shadow: 0 14px 28px rgba(3, 12, 28, 0.5);
         }
 
         .kpiHeader {
@@ -866,13 +913,15 @@ export default function Dashboard() {
           font-size: 11px;
           padding: 4px 10px;
           border-radius: 999px;
-          background: rgba(15, 106, 214, 0.14);
-          color: var(--text-secondary);
+          background: linear-gradient(135deg, rgba(15, 106, 214, 0.2), rgba(22, 169, 110, 0.14));
+          color: color-mix(in srgb, var(--text-secondary) 92%, var(--foreground));
+          border: 1px solid rgba(15, 106, 214, 0.22);
         }
 
         :global(body.dark) .kpiPill {
-          background: rgba(23, 137, 252, 0.14);
-          color: var(--text-tertiary);
+          background: linear-gradient(135deg, rgba(73, 163, 255, 0.24), rgba(49, 216, 196, 0.18));
+          color: #d8eeff;
+          border-color: rgba(110, 192, 255, 0.32);
         }
 
         .pillAccent {
@@ -885,9 +934,12 @@ export default function Dashboard() {
         }
 
         .kpiValue {
-          font-size: 22px;
-          font-weight: 700;
-          color: var(--foreground);
+          font-size: clamp(1.4rem, 2.6vw, 2rem);
+          font-weight: 800;
+          color: color-mix(in srgb, var(--foreground) 90%, var(--primary));
+          letter-spacing: -0.01em;
+          line-height: 1.04;
+          text-wrap: balance;
         }
 
         .kpiMeta {
@@ -904,13 +956,28 @@ export default function Dashboard() {
         }
 
         .analysisCard {
+          position: relative;
           padding: 20px;
           border-radius: 20px;
-          border: 1px solid rgba(15, 106, 214, 0.16);
-          background: var(--surface);
-          box-shadow: 0 16px 34px var(--shadow);
+          border: 1px solid rgba(15, 106, 214, 0.22);
+          background:
+            radial-gradient(circle at 86% -26%, rgba(23, 137, 252, 0.16), transparent 52%),
+            linear-gradient(160deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface) 86%, var(--primary) 14%));
+          box-shadow: 0 16px 32px var(--shadow);
           display: grid;
           gap: 16px;
+          overflow: hidden;
+        }
+
+        .analysisCard::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          right: 0;
+          top: 0;
+          height: 3px;
+          background: linear-gradient(90deg, color-mix(in srgb, var(--primary) 92%, #fff 8%), color-mix(in srgb, var(--secondary) 76%, var(--primary) 24%));
+          opacity: 0.88;
         }
 
         :global(body.light) .analysisCard {
@@ -919,8 +986,12 @@ export default function Dashboard() {
         }
 
         :global(body.dark) .analysisCard {
-          background: linear-gradient(155deg, rgba(35, 39, 47, 0.98), rgba(21, 21, 24, 0.98));
-          border-color: rgba(23, 137, 252, 0.2);
+          background:
+            radial-gradient(circle at 86% -24%, rgba(49, 216, 196, 0.19), transparent 52%),
+            radial-gradient(circle at 12% -14%, rgba(73, 163, 255, 0.24), transparent 56%),
+            linear-gradient(160deg, rgba(12, 45, 84, 0.96), rgba(9, 31, 61, 0.96));
+          border-color: rgba(105, 182, 248, 0.34);
+          box-shadow: 0 16px 34px rgba(3, 12, 28, 0.56);
         }
 
         .analysisHeader {
@@ -939,22 +1010,26 @@ export default function Dashboard() {
 
         .analysisTitle {
           margin: 6px 0 0;
-          font-size: 18px;
-          color: var(--foreground);
+          font-size: clamp(1.16rem, 1.8vw, 1.36rem);
+          color: color-mix(in srgb, var(--foreground) 94%, var(--primary));
+          letter-spacing: -0.01em;
+          line-height: 1.15;
         }
 
         .analysisPill {
           padding: 6px 12px;
           border-radius: 999px;
-          background: rgba(15, 106, 214, 0.14);
-          color: var(--text-secondary);
+          background: linear-gradient(135deg, rgba(15, 106, 214, 0.2), rgba(23, 137, 252, 0.12));
+          color: color-mix(in srgb, var(--text-secondary) 90%, var(--foreground));
           font-size: 12px;
           white-space: nowrap;
+          border: 1px solid rgba(15, 106, 214, 0.24);
         }
 
         :global(body.dark) .analysisPill {
-          background: rgba(23, 137, 252, 0.14);
-          color: var(--text-tertiary);
+          background: linear-gradient(135deg, rgba(73, 163, 255, 0.24), rgba(49, 216, 196, 0.16));
+          color: #d8eeff;
+          border-color: rgba(108, 189, 255, 0.32);
         }
 
         .userHoursList {
@@ -978,8 +1053,8 @@ export default function Dashboard() {
         }
 
         :global(body.dark) .userHoursRow {
-          background: rgba(23, 137, 252, 0.1);
-          border: 1px solid rgba(23, 137, 252, 0.2);
+          background: linear-gradient(135deg, rgba(73, 163, 255, 0.2), rgba(49, 216, 196, 0.12));
+          border: 1px solid rgba(108, 188, 255, 0.28);
         }
 
         .userHoursName {
@@ -999,6 +1074,20 @@ export default function Dashboard() {
           border-radius: 16px;
           border: 1px solid rgba(23, 137, 252, 0.2);
           background: rgba(35, 39, 47, 0.6);
+          position: relative;
+          overflow: hidden;
+        }
+
+        .chartWrap::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background:
+            linear-gradient(transparent 95%, color-mix(in srgb, var(--primary) 16%, transparent) 95%),
+            linear-gradient(90deg, transparent 95%, color-mix(in srgb, var(--primary) 14%, transparent) 95%);
+          background-size: 100% 28px, 40px 100%;
+          opacity: 0.25;
+          pointer-events: none;
         }
 
         .chartEmpty {
@@ -1007,15 +1096,20 @@ export default function Dashboard() {
           place-items: center;
           text-align: center;
           color: var(--text-tertiary);
-          font-size: 12px;
+          font-size: 0.88rem;
+          font-weight: 600;
+          letter-spacing: 0.01em;
           border-radius: 12px;
-          background: rgba(15, 106, 214, 0.06);
-          border: 1px dashed rgba(15, 106, 214, 0.2);
+          background: linear-gradient(160deg, rgba(15, 106, 214, 0.12), rgba(22, 169, 110, 0.08));
+          border: 1px dashed rgba(15, 106, 214, 0.3);
+          padding: 14px;
+          position: relative;
+          z-index: 1;
         }
 
         :global(body.dark) .chartEmpty {
-          background: rgba(23, 137, 252, 0.08);
-          border-color: rgba(23, 137, 252, 0.24);
+          background: linear-gradient(160deg, rgba(73, 163, 255, 0.12), rgba(49, 216, 196, 0.08));
+          border-color: rgba(108, 189, 255, 0.3);
         }
 
         :global(body.light) .chartWrap {
@@ -1024,8 +1118,10 @@ export default function Dashboard() {
         }
 
         :global(body.dark) .chartWrap {
-          background: linear-gradient(160deg, rgba(35, 39, 47, 0.6), rgba(21, 21, 24, 0.9));
-          border-color: rgba(23, 137, 252, 0.2);
+          background:
+            radial-gradient(circle at 92% -20%, rgba(49, 216, 196, 0.16), transparent 54%),
+            linear-gradient(160deg, rgba(12, 44, 82, 0.78), rgba(8, 29, 56, 0.94));
+          border-color: rgba(105, 183, 248, 0.32);
         }
 
         .chartTooltip {
@@ -1047,9 +1143,10 @@ export default function Dashboard() {
         }
 
         :global(body.dark) .chartTooltip {
-          background: rgba(35, 39, 47, 0.95);
-          color: #ededed;
-          border: 1px solid rgba(23, 137, 252, 0.35);
+          background: rgba(9, 31, 60, 0.96);
+          color: #eaf5ff;
+          border: 1px solid rgba(111, 191, 255, 0.4);
+          box-shadow: 0 12px 28px rgba(3, 12, 28, 0.46);
         }
 
         .chartTooltipTitle {
@@ -1097,6 +1194,59 @@ export default function Dashboard() {
 
           .heroMeta {
             text-align: left;
+          }
+
+          .heroCard {
+            padding: 16px 14px;
+            border-radius: 16px;
+          }
+
+          .heroBadges {
+            gap: 8px;
+          }
+
+          .chip {
+            font-size: 11px;
+            padding: 5px 10px;
+          }
+
+          .analysisHeader {
+            align-items: flex-start;
+            flex-wrap: wrap;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .heroTitle {
+            font-size: clamp(1.5rem, 7vw, 1.9rem);
+            margin-bottom: 4px;
+          }
+
+          .heroSubtitle {
+            font-size: 12px;
+          }
+
+          .kpiGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .kpiCard,
+          .analysisCard {
+            border-radius: 16px;
+            padding: 16px 14px;
+          }
+
+          .kpiValue {
+            font-size: 20px;
+          }
+
+          .analysisTitle {
+            font-size: 17px;
+          }
+
+          .chartWrap {
+            padding: 6px;
+            border-radius: 14px;
           }
         }
       `}</style>

@@ -617,6 +617,14 @@ export default function Home() {
                 <p className={styles.newsModalSummary}>
                   {selectedNews.summary || "Actualización destacada de Nexara."}
                 </p>
+                <div className={styles.newsModalMeta}>
+                  <span className={styles.newsModalDate}>
+                    {formatNewsDate(selectedNews.publishedAt || selectedNews.createdAt)}
+                  </span>
+                  <span className={styles.newsModalCounter}>
+                    {Math.max(1, [selectedNews.coverImageUrl, ...selectedNews.galleryUrls].filter(Boolean).length)} imagenes
+                  </span>
+                </div>
                 <div className={styles.newsModalBody}>
                   {renderParagraphs(selectedNews.content)}
                 </div>

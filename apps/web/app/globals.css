@@ -591,3 +591,76 @@ body.dark {
   }
 }
 
+/* Light-mode UX refresh: global tokens and readable rhythm */
+body.light {
+  --background: #eff6ff;
+  --foreground: #0f2942;
+  --surface: #f8fbff;
+  --surface-light: #ffffff;
+  --muted: #d6e6f8;
+  --primary: #125fcc;
+  --primary-light: #3d83df;
+  --secondary: #1c9a86;
+  --text-secondary: #355a7f;
+  --text-tertiary: #57789b;
+  --focus-ring: rgba(18, 95, 204, 0.32);
+  --shadow: rgba(10, 40, 78, 0.16);
+  background:
+    radial-gradient(900px 420px at -8% -18%, rgba(80, 156, 255, 0.2), transparent 62%),
+    radial-gradient(860px 360px at 108% -10%, rgba(16, 183, 149, 0.14), transparent 66%),
+    linear-gradient(180deg, #f6faff 0%, #edf5ff 48%, #eaf3ff 100%) !important;
+}
+
+body.light {
+  font-family: var(--panel-font-family);
+  letter-spacing: 0.004em;
+  line-height: 1.62;
+  color: var(--foreground);
+}
+
+body.light main {
+  animation: page-enter 260ms ease;
+}
+
+body.light :where(h1, h2, h3) {
+  color: color-mix(in srgb, var(--foreground) 92%, var(--primary));
+}
+
+body.light :where(p, li, span, small) {
+  color: color-mix(in srgb, var(--foreground) 88%, #183f64);
+}
+
+body.light :where(section, article, .card) {
+  scroll-margin-top: calc(var(--header-offset) + 18px);
+}
+
+body.light :where(button, a, input, select, textarea) {
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+body.light :focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+body.light ::selection {
+  background: rgba(18, 95, 204, 0.18);
+  color: #09243e;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+

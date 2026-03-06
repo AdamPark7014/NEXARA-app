@@ -141,9 +141,11 @@ body.dark .button-secondary:disabled {
 .table {
   width: 100%;
   border-collapse: collapse;
-  background: var(--surface);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface-light) 84%, transparent));
   border-radius: 14px;
   overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--shadow) 82%, transparent);
 }
 
 body.light .table {
@@ -155,11 +157,11 @@ body.light .table {
   background: var(--muted);
   color: var(--text-secondary);
   font-weight: 700;
-  padding: 13px 12px;
-  border-bottom: 2px solid var(--muted);
+  padding: 14px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--primary) 28%, transparent);
   text-align: left;
   white-space: nowrap;
-  letter-spacing: 0.012em;
+  letter-spacing: 0.08em;
   font-size: 0.82rem;
   text-transform: uppercase;
 }
@@ -170,22 +172,50 @@ body.light .table th {
 }
 
 .table td {
-  padding: 12px;
-  border-bottom: 1px solid var(--muted);
+  padding: 13px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--primary) 16%, transparent);
   line-height: 1.52;
 }
 
 .table tr:nth-child(even) {
-  background: var(--surface-light);
+  background: color-mix(in srgb, var(--surface-light) 70%, transparent);
 }
 
 .table tbody tr:hover {
-  background: rgba(31, 95, 191, 0.05);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--primary) 14%, transparent), color-mix(in srgb, var(--secondary) 9%, transparent));
   transform: translateZ(0);
 }
 
 body.light .table tbody tr:hover {
   background: rgba(31, 95, 191, 0.08);
+}
+
+body.dark .table {
+  background:
+    radial-gradient(circle at 90% -24%, rgba(49, 216, 196, 0.12), transparent 48%),
+    radial-gradient(circle at 12% -18%, rgba(73, 163, 255, 0.16), transparent 54%),
+    linear-gradient(180deg, rgba(12, 45, 84, 0.94), rgba(8, 31, 60, 0.94));
+  border-color: rgba(105, 183, 248, 0.28);
+  box-shadow: 0 14px 28px rgba(3, 12, 28, 0.54);
+}
+
+body.dark .table th {
+  background: linear-gradient(140deg, rgba(73, 163, 255, 0.28), rgba(49, 216, 196, 0.18));
+  color: #d9eeff;
+  border-bottom-color: rgba(109, 190, 255, 0.32);
+}
+
+body.dark .table td {
+  color: #e8f4ff;
+  border-bottom-color: rgba(98, 173, 238, 0.18);
+}
+
+body.dark .table tr:nth-child(even) {
+  background: rgba(73, 163, 255, 0.08);
+}
+
+body.dark .table tbody tr:hover {
+  background: linear-gradient(90deg, rgba(73, 163, 255, 0.18), rgba(49, 216, 196, 0.12));
 }
 
 @media (max-width: 900px) {
@@ -952,4 +982,113 @@ textarea {
 }
 .recharts-pie-sector {
   stroke: var(--surface) !important;
+}
+
+/* Light-mode UX refresh: shared component primitives */
+body.light .card {
+  border-radius: 18px;
+  border: 1px solid rgba(19, 92, 192, 0.14);
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.96), rgba(245, 250, 255, 0.94));
+  box-shadow:
+    0 14px 32px rgba(14, 48, 92, 0.11),
+    0 4px 10px rgba(14, 48, 92, 0.06);
+}
+
+body.light .card:hover {
+  border-color: rgba(19, 92, 192, 0.24);
+  box-shadow:
+    0 18px 36px rgba(14, 48, 92, 0.13),
+    0 6px 14px rgba(14, 48, 92, 0.08);
+}
+
+body.light .button-primary {
+  background: linear-gradient(135deg, #155fcb 0%, #2b7de0 100%);
+  border: 1px solid rgba(12, 74, 170, 0.24);
+  box-shadow: 0 10px 18px rgba(21, 95, 203, 0.24);
+  border-radius: 12px;
+}
+
+body.light .button-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 24px rgba(21, 95, 203, 0.28);
+}
+
+body.light .button-secondary {
+  border-radius: 12px;
+  border: 1px solid rgba(18, 95, 204, 0.24);
+  color: #164472;
+  background: linear-gradient(145deg, #ffffff, #f0f6ff);
+}
+
+body.light .button-secondary:hover {
+  border-color: rgba(18, 95, 204, 0.38);
+  background: linear-gradient(145deg, #fafdff, #eaf3ff);
+  box-shadow: 0 9px 16px rgba(17, 73, 141, 0.14);
+}
+
+body.light .input,
+body.light input,
+body.light select,
+body.light textarea {
+  border-radius: 12px;
+  border: 1px solid rgba(18, 95, 204, 0.22);
+  background: linear-gradient(180deg, #ffffff, #f6faff);
+  color: #0f2942;
+}
+
+body.light .input:focus,
+body.light input:focus,
+body.light select:focus,
+body.light textarea:focus {
+  border-color: #155fcb;
+  box-shadow: 0 0 0 3px rgba(21, 95, 203, 0.17);
+}
+
+body.light .table {
+  border-radius: 16px;
+  border: 1px solid rgba(20, 89, 180, 0.14);
+  box-shadow: 0 14px 28px rgba(14, 48, 92, 0.11);
+}
+
+body.light .table th {
+  background: linear-gradient(135deg, rgba(21, 95, 203, 0.14), rgba(28, 154, 134, 0.1));
+  color: #204466;
+}
+
+body.light .table td {
+  color: #224866;
+}
+
+body.light .table tr:nth-child(even) {
+  background: rgba(20, 89, 180, 0.045);
+}
+
+body.light .sidebar {
+  border-radius: 20px;
+  border-right: 1px solid rgba(20, 89, 180, 0.16);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(89, 164, 255, 0.14), transparent 46%),
+    linear-gradient(170deg, #fafdff 0%, #e9f3ff 100%);
+}
+
+body.light .sidebar .menu-item {
+  border-left-width: 3px;
+  border-left-style: solid;
+  border-left-color: transparent;
+}
+
+body.light .sidebar .menu-item .menuLink {
+  color: #234a72;
+  font-weight: 600;
+  border-radius: 10px;
+}
+
+body.light .sidebar .menu-item:hover {
+  background: rgba(18, 95, 204, 0.1);
+}
+
+body.light .sidebar .menu-item.active {
+  background: linear-gradient(120deg, rgba(18, 95, 204, 0.16), rgba(28, 154, 134, 0.1));
+  border-left-color: #155fcb;
 }
