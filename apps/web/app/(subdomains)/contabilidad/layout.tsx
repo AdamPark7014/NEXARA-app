@@ -122,7 +122,7 @@ export default function ContabilidadLayout({ children }: { children: React.React
 
   // Si estamos en login, no renderizar el sidebar
   if (pathname && pathname.includes("/login")) {
-    return <main className={consoleStyles.consoleMain}>{children}</main>;
+    return <>{children}</>;
   }
 
   return (

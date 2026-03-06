@@ -82,34 +82,88 @@
   position: relative;
   min-height: 100vh;
   min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr;
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .authWrap :global(.login-container) {
-  min-height: calc(100vh - 118px);
-  min-height: calc(100dvh - 118px);
-  align-items: flex-start;
-  padding-top: 24px;
+  min-height: 0;
+  height: 100%;
+  align-items: center;
+  padding-top: 10px;
+  padding-bottom: 12px;
 }
 
 .authWrap :global(.login-card) {
-  width: min(100%, 460px);
+  width: min(100%, 500px);
+  padding: clamp(20px, 2.5vw, 30px) clamp(16px, 2.4vw, 26px);
+}
+
+.authWrap :global(.logo-container) {
+  margin-bottom: 18px;
+}
+
+.authWrap :global(.logo) {
+  width: 78px;
+  height: 78px;
+}
+
+.authWrap :global(.logoImage) {
+  width: 52px;
+  height: 52px;
+}
+
+.authWrap :global(.brandName) {
+  margin-bottom: 6px;
+}
+
+.authWrap :global(.title) {
+  font-size: clamp(1.64rem, 2vw, 2rem);
+  margin-bottom: 6px;
+}
+
+.authWrap :global(.subtitle) {
+  font-size: 0.94rem;
+}
+
+.authWrap :global(.form) {
+  margin-top: 16px;
+}
+
+.authWrap :global(.input-group) {
+  margin-bottom: 12px;
+}
+
+.authWrap :global(.input) {
+  min-height: 44px;
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
+
+.authWrap :global(.submit-button) {
+  min-height: 46px;
+}
+
+.authWrap :global(.footer) {
+  margin-top: 14px;
+  padding-top: 12px;
 }
 
 .authHeader {
-  position: sticky;
-  top: 10px;
+  position: relative;
+  top: 0;
   width: min(860px, calc(100% - 24px));
-  margin: 12px auto 0;
+  margin: 8px auto 0;
   z-index: 60;
   border-radius: 16px;
   border: 1px solid rgba(31, 137, 252, 0.28);
   background: linear-gradient(140deg, rgba(11, 26, 49, 0.84), rgba(8, 21, 41, 0.82));
   box-shadow: 0 18px 30px rgba(2, 8, 18, 0.45);
   backdrop-filter: blur(10px);
-  padding: 12px 14px;
+  padding: 10px 14px;
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 @media (min-width: 769px) {
@@ -118,10 +172,11 @@
   }
 
   .authHeader {
+    position: relative;
     top: 0;
     width: 100%;
     margin: 0;
-    padding: 12px clamp(14px, 3.2vw, 34px);
+    padding: 8px clamp(14px, 3.2vw, 34px);
     border-radius: 0;
     border-left: 0;
     border-right: 0;
@@ -137,9 +192,9 @@
 }
 
 :global(body.light) .authHeader {
-  background: linear-gradient(140deg, rgba(247, 252, 255, 0.95), rgba(234, 245, 255, 0.92));
-  border-color: rgba(15, 106, 214, 0.24);
-  box-shadow: 0 16px 26px rgba(15, 106, 214, 0.14);
+  background: linear-gradient(140deg, rgba(11, 28, 52, 0.92), rgba(9, 22, 42, 0.9));
+  border-color: rgba(93, 154, 236, 0.36);
+  box-shadow: 0 16px 30px rgba(2, 10, 22, 0.46);
 }
 
 .authEyebrow {
@@ -152,7 +207,7 @@
 }
 
 :global(body.light) .authEyebrow {
-  color: rgba(30, 69, 117, 0.8);
+  color: rgba(173, 205, 246, 0.86);
 }
 
 .authHeaderRow {
@@ -165,69 +220,71 @@
 
 .authTitle {
   margin: 0;
-  font-size: clamp(1rem, 2.1vw, 1.2rem);
+  font-size: clamp(0.98rem, 1.4vw, 1.12rem);
   color: #f3f8ff;
   font-weight: 700;
 }
 
 :global(body.light) .authTitle {
-  color: #102b4d;
+  color: #f2f8ff;
 }
 
 .authLead {
   margin: 3px 0 0;
   color: rgba(213, 229, 249, 0.78);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
 }
 
 :global(body.light) .authLead {
-  color: rgba(26, 62, 106, 0.72);
+  color: rgba(205, 226, 250, 0.82);
 }
 
 .authSwitch {
   display: inline-flex;
   gap: 6px;
   align-items: center;
-  padding: 5px;
-  border-radius: 12px;
-  border: 1px solid rgba(31, 137, 252, 0.24);
-  background: rgba(8, 21, 40, 0.55);
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid rgba(99, 162, 248, 0.28);
+  background: linear-gradient(145deg, rgba(7, 20, 38, 0.68), rgba(10, 25, 48, 0.6));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 :global(body.light) .authSwitch {
-  background: rgba(255, 255, 255, 0.78);
-  border-color: rgba(15, 106, 214, 0.22);
+  background: linear-gradient(145deg, rgba(7, 20, 38, 0.68), rgba(10, 25, 48, 0.6));
+  border-color: rgba(99, 162, 248, 0.28);
 }
 
 .authSwitchBtn {
   border: 0;
   border-radius: 10px;
-  padding: 8px 16px;
+  padding: 9px 16px;
   font-size: 0.9rem;
   font-weight: 700;
   color: rgba(198, 219, 245, 0.9);
-  background: transparent;
+  background: rgba(86, 136, 204, 0.08);
   cursor: pointer;
-  min-height: 40px;
+  min-height: 36px;
   transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
 :global(body.light) .authSwitchBtn {
-  color: rgba(22, 60, 104, 0.82);
+  color: rgba(198, 219, 245, 0.9);
 }
 
 .authSwitchBtn:hover {
-  background: rgba(31, 137, 252, 0.16);
-}
-
-:global(body.light) .authSwitchBtn:hover {
-  background: rgba(15, 106, 214, 0.12);
+  background: rgba(31, 137, 252, 0.18);
 }
 
 .authSwitchBtnActive {
-  background: linear-gradient(135deg, #0f6ad6, #1f8df2);
+  background: linear-gradient(135deg, #2f8ef4, #1f78e2);
   color: #ffffff;
-  box-shadow: 0 10px 18px rgba(15, 106, 214, 0.35);
+  box-shadow: 0 10px 20px rgba(23, 111, 226, 0.42);
+}
+
+.authSwitchBtn:focus-visible {
+  outline: 2px solid rgba(131, 187, 255, 0.9);
+  outline-offset: 2px;
 }
 
 .mainStack {
@@ -749,5 +806,46 @@
   .ticketsConsole :global(.badge) {
     font-size: 0.72rem;
     padding: 5px 8px;
+  }
+}
+
+@media (max-height: 820px) {
+  .authWrap :global(.login-card) {
+    padding: 18px 14px;
+  }
+
+  .authWrap :global(.logo-container) {
+    margin-bottom: 14px;
+  }
+
+  .authWrap :global(.logo) {
+    width: 70px;
+    height: 70px;
+  }
+
+  .authWrap :global(.logoImage) {
+    width: 46px;
+    height: 46px;
+  }
+
+  .authWrap :global(.title) {
+    font-size: 1.7rem;
+  }
+
+  .authWrap :global(.subtitle) {
+    font-size: 0.9rem;
+  }
+
+  .authWrap :global(.form) {
+    margin-top: 14px;
+  }
+
+  .authWrap :global(.input-group) {
+    margin-bottom: 10px;
+  }
+
+  .authWrap :global(.footer) {
+    margin-top: 12px;
+    padding-top: 10px;
   }
 }

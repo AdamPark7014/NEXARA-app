@@ -51,9 +51,11 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         <section className={styles.consoleTopbar}>
           <p className={styles.consoleEyebrow}>Panel corporativo</p>
           <div className={styles.consoleTopbarRow}>
-            <h1 className={styles.consoleViewTitle}>{viewTitle}</h1>
-            <div className={styles.consoleTopbarActions}>
+            <div className={styles.consoleTitleGroup}>
+              <h1 className={styles.consoleViewTitle}>{viewTitle}</h1>
               <span className={styles.consoleViewMeta}>{viewSubtitle}</span>
+            </div>
+            <div className={styles.consoleTopbarActions}>
               <NotificationCenter inlineTrigger position="top-right" maxNotifications={5} autoCloseTime={6000} />
             </div>
           </div>

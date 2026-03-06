@@ -16,6 +16,7 @@ export default function Sidebar() {
   const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [mobileOpenGroups, setMobileOpenGroups] = useState<string[]>([]);
 
   // Detectar si es móvil
   useEffect(() => {
@@ -30,6 +31,7 @@ export default function Sidebar() {
   useEffect(() => {
     if (isMobile) {
       setIsMenuOpen(false);
+      setMobileOpenGroups([]);
     }
   }, [pathname, isMobile]);
 
@@ -53,11 +55,18 @@ export default function Sidebar() {
   }, [isMenuOpen, isMobile]);
 
   const toggleMenu = () => {
-    setIsMenuOpen((prev) => !prev);
+    setIsMenuOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        setMobileOpenGroups([]);
+      }
+      return next;
+    });
   };
 
   const closeMenu = () => {
     setIsMenuOpen(false);
+    setMobileOpenGroups([]);
   };
 
   const handleLogout = () => {
@@ -171,6 +180,14 @@ export default function Sidebar() {
 
   const groupsToRender = visibleGroups.length > 0 ? visibleGroups : fallbackGroups;
 
+  const isPathActive = (href: string) => pathname === href || (pathname?.startsWith(`${href}/`) ?? false);
+
+  const toggleMobileGroup = (groupId: string) => {
+    setMobileOpenGroups((prev) =>
+      prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId],
+    );
+  };
+
   // Avatar: usa user.avatarUrl si existe, si no, usa un avatar generado por ui-avatars.com
   const avatarUrl = user.isSuperAdmin
     ? '/logo-nexara.png'
@@ -256,24 +273,42 @@ export default function Sidebar() {
           </div>
         </div>
         {groupsToRender.map((group) => (
-          <div key={group.id}>
-            <div className={styles.menuTitle}>{group.title}</div>
-            <ul className={styles.sidebarMenu}>
-              {group.items.map((item) => {
-                const isItemActive = pathname === item.href || (pathname?.startsWith(`${item.href}/`) ?? false);
-                return (
-                  <li key={`${group.id}-${item.href}`} className={styles.sidebarMenuItem}>
-                    <Link
-                      href={item.href}
-                      className={isItemActive ? `${styles.menuLink} ${styles.active}` : styles.menuLink}
-                      onClick={closeMenu}
-                    >
-                      {item.label}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+          <div key={group.id} className={styles.menuGroup}>
+            {isMobile ? (
+              <button
+                type="button"
+                className={styles.menuGroupToggle}
+                onClick={() => toggleMobileGroup(group.id)}
+                aria-expanded={mobileOpenGroups.includes(group.id)}
+                aria-controls={`menu-group-${group.id}`}
+              >
+                <span>{group.title}</span>
+                <span className={`${styles.menuGroupChevron} ${mobileOpenGroups.includes(group.id) ? styles.menuGroupChevronOpen : ""}`}>
+                  ▾
+                </span>
+              </button>
+            ) : (
+              <div className={styles.menuTitle}>{group.title}</div>
+            )}
+
+            {(!isMobile || mobileOpenGroups.includes(group.id)) && (
+              <ul className={styles.sidebarMenu} id={`menu-group-${group.id}`}>
+                {group.items.map((item) => {
+                  const isItemActive = isPathActive(item.href);
+                  return (
+                    <li key={`${group.id}-${item.href}`} className={styles.sidebarMenuItem}>
+                      <Link
+                        href={item.href}
+                        className={isItemActive ? `${styles.menuLink} ${styles.active}` : styles.menuLink}
+                        onClick={closeMenu}
+                      >
+                        {item.label}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         ))}
         <div className={styles.sidebarFooter}>

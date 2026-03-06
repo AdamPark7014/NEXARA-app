@@ -19,14 +19,20 @@
 .sidebar {
   width: var(--panel-sidebar-width);
   color: var(--foreground);
-  padding: 20px 18px 18px;
+  padding: 22px 18px 20px;
   margin: 0;
   border-radius: 24px;
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(31, 77, 159, 0.12);
-  box-shadow: 0 18px 40px rgba(15, 32, 64, 0.18), 0 4px 10px rgba(15, 32, 64, 0.12);
-  background: linear-gradient(165deg, rgba(248, 250, 255, 0.96), rgba(234, 241, 252, 0.98));
+  border: 1px solid rgba(31, 95, 191, 0.2);
+  box-shadow:
+    0 22px 44px rgba(15, 32, 64, 0.2),
+    0 6px 14px rgba(15, 32, 64, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32);
+  background:
+    radial-gradient(circle at 14% -8%, rgba(68, 176, 255, 0.22), transparent 56%),
+    radial-gradient(circle at 86% 0%, rgba(122, 190, 255, 0.14), transparent 54%),
+    linear-gradient(165deg, rgba(246, 252, 255, 0.98), rgba(229, 241, 255, 0.98));
   font-family: var(--panel-font-family);
 }
 
@@ -42,23 +48,29 @@
   position: absolute;
   inset: 0;
   background: radial-gradient(circle at 20% 10%, rgba(31, 141, 242, 0.18), transparent 55%),
-    radial-gradient(circle at 80% 0%, rgba(22, 169, 110, 0.2), transparent 60%);
+    radial-gradient(circle at 80% 0%, rgba(108, 178, 247, 0.18), transparent 60%);
   opacity: 0.45;
   pointer-events: none;
 }
 
 :global(body.dark) .sidebar {
-  background: linear-gradient(160deg, rgba(20, 26, 38, 0.96), rgba(11, 16, 28, 0.98));
-  border: 1px solid rgba(31, 137, 252, 0.18);
-  box-shadow: 0 18px 40px rgba(5, 12, 24, 0.55), 0 4px 10px rgba(23, 137, 252, 0.12);
+  background:
+    radial-gradient(circle at 16% -8%, rgba(73, 163, 255, 0.3), transparent 56%),
+    radial-gradient(circle at 88% 0%, rgba(124, 189, 255, 0.16), transparent 52%),
+    linear-gradient(160deg, rgba(12, 38, 72, 0.98), rgba(9, 28, 56, 0.98));
+  border: 1px solid rgba(105, 181, 247, 0.34);
+  box-shadow: 0 20px 44px rgba(3, 12, 28, 0.56), 0 6px 14px rgba(73, 163, 255, 0.18);
   color: #e7eefc;
 }
 
 @media (prefers-color-scheme: dark) {
   .sidebar {
-    background: linear-gradient(160deg, rgba(20, 26, 38, 0.96), rgba(11, 16, 28, 0.98));
-    border: 1px solid rgba(31, 137, 252, 0.18);
-    box-shadow: 0 18px 40px rgba(5, 12, 24, 0.55), 0 4px 10px rgba(23, 137, 252, 0.12);
+    background:
+      radial-gradient(circle at 16% -8%, rgba(73, 163, 255, 0.28), transparent 56%),
+      radial-gradient(circle at 88% 0%, rgba(124, 189, 255, 0.14), transparent 52%),
+      linear-gradient(160deg, rgba(12, 38, 72, 0.98), rgba(9, 28, 56, 0.98));
+    border: 1px solid rgba(105, 181, 247, 0.3);
+    box-shadow: 0 18px 40px rgba(5, 12, 24, 0.52), 0 4px 10px rgba(23, 137, 252, 0.16);
     color: #e7eefc;
   }
 }
@@ -73,26 +85,27 @@
 .sidebarLogo {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  margin-bottom: 20px;
+  align-items: flex-start;
+  gap: 4px;
+  margin-bottom: 18px;
   position: relative;
   z-index: 1;
 }
 
 .brandMark {
   font-family: var(--panel-font-family);
-  font-size: 1.9rem;
-  letter-spacing: 0.18rem;
+  font-size: 1.72rem;
+  letter-spacing: 0.12rem;
   color: var(--primary);
-  font-weight: 700;
+  font-weight: 760;
 }
 
 .brandSub {
-  font-size: 0.95rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.35rem;
+  letter-spacing: 0.22rem;
   color: var(--text-tertiary);
+  font-weight: 700;
 }
 
 .brandLogo {
@@ -106,17 +119,19 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 18px 16px 16px;
+  padding: 16px 14px 14px;
   margin-bottom: 18px;
-  border-radius: 18px;
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.75), rgba(226, 236, 248, 0.75));
-  border: 1px solid rgba(15, 106, 214, 0.12);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+  border-radius: 16px;
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.74), rgba(224, 238, 255, 0.72));
+  border: 1px solid rgba(15, 106, 214, 0.2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.46),
+    0 10px 20px rgba(15, 106, 214, 0.1);
 }
 
 :global(body.dark) .sidebarUser {
-  background: linear-gradient(150deg, rgba(30, 38, 56, 0.85), rgba(21, 28, 44, 0.85));
-  border: 1px solid rgba(31, 137, 252, 0.18);
+  background: linear-gradient(150deg, rgba(12, 42, 78, 0.88), rgba(8, 31, 60, 0.88));
+  border: 1px solid rgba(102, 178, 245, 0.3);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -139,7 +154,7 @@
   display: grid;
   place-items: center;
   padding: 4px;
-  background: linear-gradient(140deg, rgba(31, 141, 242, 0.7), rgba(22, 169, 110, 0.7));
+  background: linear-gradient(140deg, rgba(31, 141, 242, 0.8), rgba(96, 170, 247, 0.78));
   margin-bottom: 10px;
 }
 
@@ -216,10 +231,13 @@
 
 .menuTitle {
   text-transform: uppercase;
-  font-size: 0.7rem;
-  letter-spacing: 0.3rem;
-  color: var(--text-tertiary);
-  margin: 6px 14px 12px;
+  font-size: 0.66rem;
+  letter-spacing: 0.2rem;
+  color: color-mix(in srgb, var(--text-tertiary) 88%, var(--foreground));
+  margin: 10px 8px 12px;
+  padding-left: 10px;
+  border-left: 2px solid color-mix(in srgb, var(--primary) 64%, var(--secondary) 36%);
+  font-weight: 700;
   position: relative;
   z-index: 1;
 }
@@ -230,7 +248,7 @@
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   position: relative;
   z-index: 1;
 }
@@ -243,11 +261,28 @@
   display: flex;
 }
 
+.menuGroup {
+  display: grid;
+  gap: 6px;
+}
+
+.menuGroupToggle {
+  display: none;
+}
+
+.menuGroupChevron {
+  transition: transform 0.2s ease;
+}
+
+.menuGroupChevronOpen {
+  transform: rotate(180deg);
+}
+
 .menuLink {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 16px;
+  padding: 12px 14px;
   border-radius: 14px;
   color: var(--foreground);
   text-decoration: none;
@@ -257,14 +292,22 @@
   position: relative;
   overflow: hidden;
   isolation: isolate;
-  border: 1px solid transparent;
+  border: 1px solid color-mix(in srgb, var(--primary) 14%, transparent);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+}
+
+:global(body.dark) .menuLink {
+  background: linear-gradient(145deg, rgba(24, 74, 126, 0.72), rgba(17, 58, 102, 0.72));
+  border-color: rgba(110, 191, 255, 0.3);
+  color: #deefff;
+  box-shadow: 0 6px 12px rgba(3, 12, 28, 0.28);
 }
 
 .menuLink::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(120deg, rgba(15, 106, 214, 0.18), rgba(22, 169, 110, 0.12));
+  background: linear-gradient(120deg, rgba(15, 106, 214, 0.2), rgba(68, 176, 255, 0.14));
   opacity: 0;
   transition: opacity 0.2s ease;
   pointer-events: none;
@@ -281,10 +324,10 @@
 }
 
 .menuLink:hover {
-  transform: translateX(2px);
-  color: var(--primary);
-  box-shadow: 0 6px 14px rgba(15, 106, 214, 0.14);
-  border-color: rgba(15, 106, 214, 0.16);
+  transform: translateX(4px);
+  color: color-mix(in srgb, var(--primary) 86%, var(--foreground));
+  box-shadow: 0 8px 16px rgba(15, 106, 214, 0.16);
+  border-color: rgba(15, 106, 214, 0.28);
 }
 
 :global(body.light) .menuLink:hover {
@@ -297,9 +340,12 @@
 }
 
 .active {
-  color: var(--primary);
-  box-shadow: 0 8px 18px rgba(15, 106, 214, 0.2);
-  border-color: rgba(15, 106, 214, 0.2);
+  color: color-mix(in srgb, var(--primary) 90%, var(--foreground));
+  box-shadow:
+    0 10px 20px rgba(15, 106, 214, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  border-color: rgba(15, 106, 214, 0.34);
+  background: linear-gradient(120deg, rgba(15, 106, 214, 0.24), rgba(68, 176, 255, 0.14));
 }
 
 :global(body.light) .active {
@@ -309,6 +355,11 @@
 
 .active::after {
   opacity: 1;
+}
+
+.menuLink:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--secondary) 60%, var(--primary) 40%);
+  outline-offset: 2px;
 }
 
 :global(body.light) .consoleTopbar {
@@ -333,12 +384,18 @@
 
 .consoleTopbar {
   display: grid;
-  gap: 8px;
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
+  border-radius: 18px;
   margin-bottom: 14px;
-  background: var(--surface);
+  background:
+    radial-gradient(circle at 90% -35%, color-mix(in srgb, var(--secondary) 24%, transparent), transparent 54%),
+    radial-gradient(circle at 8% -20%, color-mix(in srgb, var(--primary) 22%, transparent), transparent 52%),
+    linear-gradient(160deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface) 88%, var(--primary) 12%));
+  box-shadow:
+    0 14px 30px color-mix(in srgb, var(--shadow) 80%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 32%, transparent);
 }
 
 .consoleEyebrow {
@@ -353,29 +410,37 @@
 .consoleTopbarRow {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
-  flex-wrap: wrap;
+}
+
+.consoleTitleGroup {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
 }
 
 .consoleTopbarActions {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .consoleViewTitle {
   margin: 0;
-  font-size: clamp(1.08rem, 2.2vw, 1.42rem);
-  color: var(--foreground);
-  font-weight: 700;
+  font-size: clamp(1.12rem, 2.35vw, 1.58rem);
+  color: color-mix(in srgb, var(--foreground) 92%, var(--primary));
+  font-weight: 760;
   letter-spacing: var(--panel-title-tracking);
-  line-height: var(--panel-title-leading);
+  line-height: 1.16;
+  text-wrap: balance;
 }
 
 .consoleViewMeta {
-  color: var(--text-secondary);
-  font-size: 0.84rem;
+  color: color-mix(in srgb, var(--text-secondary) 90%, var(--foreground));
+  font-size: 0.82rem;
+  line-height: 1.35;
 }
 
 .consoleContent {
@@ -411,13 +476,21 @@
 }
 
 :global(body.dark) .consoleMain {
-  background: var(--background);
+  background:
+    radial-gradient(circle at 8% 2%, rgba(73, 163, 255, 0.2), transparent 34%),
+    radial-gradient(circle at 92% 0%, rgba(49, 216, 196, 0.17), transparent 38%),
+    linear-gradient(185deg, #071a33 0%, #0a2242 50%, #071a33 100%);
 }
 
 :global(body.dark) .consoleLayout :global(.card) {
-  background: linear-gradient(160deg, rgba(23, 137, 252, 0.08), rgba(20, 162, 133, 0.06)) , var(--surface);
-  border-color: rgba(31, 137, 252, 0.16);
-  box-shadow: 0 16px 36px rgba(7, 18, 36, 0.6);
+  background:
+    radial-gradient(circle at 88% -24%, rgba(49, 216, 196, 0.2), transparent 52%),
+    radial-gradient(circle at 14% -16%, rgba(73, 163, 255, 0.24), transparent 56%),
+    linear-gradient(160deg, rgba(13, 49, 92, 0.94), rgba(10, 34, 67, 0.94));
+  border-color: rgba(101, 176, 245, 0.32);
+  box-shadow:
+    0 18px 38px rgba(3, 12, 28, 0.62),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 :global(body.dark) .consoleLayout :global(.input),
@@ -610,8 +683,10 @@
     align-items: center;
     justify-content: center;
     gap: 5px;
-    background: var(--card-bg, rgba(255, 255, 255, 0.72));
-    border: 1.5px solid rgba(15, 106, 214, 0.2);
+    background:
+      radial-gradient(circle at 30% 18%, rgba(122, 204, 255, 0.32), transparent 52%),
+      linear-gradient(145deg, #184b86 0%, #123a6d 100%);
+    border: 1.5px solid rgba(109, 182, 245, 0.48);
     cursor: pointer;
     padding: 8px;
     position: relative;
@@ -619,14 +694,19 @@
     width: 40px;
     height: 40px;
     border-radius: 10px;
-    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    box-shadow:
+      0 8px 18px rgba(7, 20, 44, 0.34),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28);
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
   }
 
   .hamburgerButton:hover {
     transform: scale(1.02);
-    background: linear-gradient(135deg, rgba(15, 106, 214, 0.15), rgba(22, 169, 110, 0.15));
-    border-color: var(--primary);
-    box-shadow: 0 6px 14px rgba(15, 106, 214, 0.18);
+    border-color: rgba(132, 203, 255, 0.68);
+    box-shadow:
+      0 10px 20px rgba(7, 20, 44, 0.45),
+      inset 0 1px 0 rgba(255, 255, 255, 0.34);
+    filter: brightness(1.04);
   }
 
   .hamburgerButton:active {
@@ -636,10 +716,24 @@
   .hamburgerLine {
     width: 20px;
     height: 2px;
-    background: var(--primary);
+    background: #8bc8ff;
     border-radius: 3px;
     transition: all 0.25s ease;
-    box-shadow: none;
+    box-shadow: 0 0 8px rgba(139, 200, 255, 0.25);
+  }
+
+  :global(body.light) .hamburgerButton {
+    background:
+      radial-gradient(circle at 30% 16%, rgba(171, 225, 255, 0.45), transparent 54%),
+      linear-gradient(145deg, #1e5ea6 0%, #174a83 100%);
+    border-color: rgba(126, 199, 255, 0.62);
+  }
+
+  :global(body.dark) .hamburgerButton {
+    background:
+      radial-gradient(circle at 28% 16%, rgba(98, 182, 255, 0.3), transparent 50%),
+      linear-gradient(145deg, #143f76 0%, #102f59 100%);
+    border-color: rgba(95, 166, 231, 0.5);
   }
 
   .hamburgerButton.hamburgerActive .hamburgerLine:nth-child(1),
@@ -667,7 +761,7 @@
     display: none;
     flex-direction: column;
     gap: 0;
-    padding: 12px 14px;
+    padding: 10px 12px;
     overflow-y: auto;
     max-height: calc(100dvh - 62px);
     opacity: 0;
@@ -785,35 +879,50 @@
   }
   
   .menuTitle {
-    font-size: 0.66rem;
-    letter-spacing: 0.22rem;
-    margin: 12px 8px 14px;
-    padding-left: 8px;
-    border-left: 3px solid var(--primary);
+    display: none;
+  }
+
+  .menuGroup {
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .menuGroupToggle {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 8px;
+    border: 1px solid rgba(15, 106, 214, 0.2);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
     color: var(--primary);
-    font-weight: 700;
+    font-size: 0.71rem;
+    letter-spacing: 0.13rem;
     text-transform: uppercase;
+    font-weight: 750;
+    cursor: pointer;
   }
   
   .sidebarMenu {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
-    gap: 8px;
-    margin: 0 0 16px 0;
+    grid-template-columns: 1fr;
+    gap: 7px;
+    margin: 0 0 10px 0;
   }
   
   .menuLink {
-    padding: 11px 12px;
+    padding: 10px 11px;
     border-radius: 12px;
-    font-size: 0.88rem;
+    font-size: 0.84rem;
     font-weight: 600;
-    text-align: center;
-    flex-direction: column;
-    gap: 6px;
+    text-align: left;
+    flex-direction: row;
+    gap: 8px;
     transform: translateY(0) scale(1);
     transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
-    box-shadow: 0 2px 8px rgba(15, 106, 214, 0.08);
-    border: 2px solid transparent;
+    box-shadow: 0 4px 10px rgba(15, 106, 214, 0.1);
+    border: 1.5px solid rgba(15, 106, 214, 0.18);
     background: var(--card-bg, rgba(248, 250, 255, 0.66));
     color: var(--foreground);
     display: flex;
@@ -822,13 +931,15 @@
   }
 
   :global(body.dark) .menuLink {
-    background: var(--card-bg, rgba(31, 137, 252, 0.08));
-    color: #cfe0ff;
+    background: linear-gradient(145deg, rgba(25, 78, 132, 0.74), rgba(18, 60, 106, 0.74));
+    color: #e2f1ff;
+    border-color: rgba(112, 193, 255, 0.34);
+    box-shadow: 0 6px 12px rgba(3, 12, 28, 0.3);
   }
   
   .menuLink:hover {
-    transform: none;
-    box-shadow: 0 6px 12px rgba(15, 106, 214, 0.15), 0 2px 6px rgba(15, 106, 214, 0.1);
+    transform: translateX(2px);
+    box-shadow: 0 8px 14px rgba(15, 106, 214, 0.2), 0 2px 6px rgba(15, 106, 214, 0.1);
     background: var(--primary-soft, rgba(15, 106, 214, 0.14));
     color: var(--primary);
     border-color: rgba(15, 106, 214, 0.24);
@@ -840,15 +951,15 @@
   
   .active {
     border-color: var(--primary);
-    background: rgba(15, 106, 214, 0.18);
+    background: linear-gradient(120deg, rgba(15, 106, 214, 0.28), rgba(68, 176, 255, 0.16));
     color: var(--primary);
-    box-shadow: 0 8px 16px rgba(15, 106, 214, 0.16), 0 3px 8px rgba(15, 106, 214, 0.1);
+    box-shadow: 0 8px 16px rgba(15, 106, 214, 0.22), 0 3px 8px rgba(15, 106, 214, 0.12);
     animation: none;
   }
 
   /* Footer del Sidebar */
   .sidebarFooter {
-    padding: 14px 0;
+    padding: 10px 0;
     margin-top: auto;
     border-top: 1.5px solid rgba(31, 141, 242, 0.12);
     flex-shrink: 0;
@@ -858,7 +969,7 @@
     width: 100%;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 10px;
     padding: 11px 12px;
     border-radius: 12px;
@@ -898,8 +1009,17 @@
   }
 
   .themeIcon {
-    font-size: 1.3rem;
+    font-size: 1.1rem;
     transition: transform 0.25s ease;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in srgb, var(--primary) 22%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+    flex-shrink: 0;
   }
 
   .themeSwitcher:hover .themeIcon {
@@ -907,7 +1027,11 @@
   }
 
   .themeLabel {
-    display: none;
+    display: inline;
+    font-size: 0.9rem;
+    font-weight: 650;
+    letter-spacing: 0.01em;
+    color: var(--foreground);
   }
   
   .sidebarUser:hover {
@@ -941,16 +1065,66 @@
   }
 
   .consoleTopbar {
-    position: sticky;
-    top: 66px;
-    z-index: 100;
+    position: relative;
+    top: auto;
+    z-index: 1;
     margin-bottom: 10px;
-    padding: 10px;
-    border-radius: 12px;
+    padding: 11px 10px;
+    border-radius: 14px;
+  }
+
+  .consoleTopbarRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 10px;
+  }
+
+  .consoleTitleGroup {
+    gap: 4px;
+  }
+
+  .consoleViewTitle {
+    font-size: clamp(1.24rem, 5.3vw, 1.7rem);
+    line-height: 1.12;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+
+  .consoleTopbarActions {
+    align-self: start;
+    justify-self: end;
+    margin-top: 2px;
+  }
+
+  .consoleEyebrow {
+    letter-spacing: 0.14rem;
+    font-size: 0.66rem;
   }
 
   .consoleViewMeta {
-    font-size: 0.75rem;
+    font-size: 0.73rem;
+    max-width: min(100%, 44ch);
+  }
+}
+
+@media (max-width: 560px) {
+  .consoleTopbar {
+    padding: 10px 9px;
+    margin-bottom: 12px;
+  }
+
+  .consoleTopbarRow {
+    gap: 8px;
+  }
+
+  .consoleViewTitle {
+    font-size: clamp(1.12rem, 5.8vw, 1.44rem);
+  }
+
+  .consoleViewMeta {
+    font-size: 0.7rem;
   }
 }
 
@@ -994,6 +1168,7 @@
     height: 36px;
     gap: 4px;
     border-radius: 10px;
+    padding: 7px;
   }
 
   .hamburgerLine {
@@ -1002,8 +1177,20 @@
   }
   
   .sidebarContent {
-    padding: 10px 12px;
+    padding: 8px 10px;
     max-height: calc(100dvh - 52px);
+  }
+
+  .menuGroup {
+    gap: 5px;
+    margin-bottom: 6px;
+  }
+
+  .menuGroupToggle {
+    padding: 6px 7px;
+    font-size: 0.66rem;
+    letter-spacing: 0.1rem;
+    border-radius: 9px;
   }
   
   .sidebarUser {
@@ -1046,15 +1233,15 @@
   }
   
   .sidebarMenu {
-    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-    gap: 9px;
-    margin-bottom: 12px;
+    grid-template-columns: 1fr;
+    gap: 6px;
+    margin-bottom: 8px;
   }
   
   .menuLink {
-    padding: 10px 12px;
-    font-size: 0.84rem;
-    border-radius: 12px;
+    padding: 9px 10px;
+    font-size: 0.8rem;
+    border-radius: 10px;
     font-weight: 600;
   }
 
@@ -1064,13 +1251,19 @@
   }
 
   .themeSwitcher {
-    padding: 10px 12px;
-    font-size: 0.9rem;
+    padding: 10px 11px;
+    font-size: 0.88rem;
     border-radius: 12px;
   }
 
   .themeIcon {
-    font-size: 1.1rem;
+    font-size: 1rem;
+    width: 20px;
+    height: 20px;
+  }
+
+  .themeLabel {
+    font-size: 0.84rem;
   }
   
   .consoleMain {
@@ -1364,6 +1557,89 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* Light-mode UX refresh: console workspace */
+:global(body.light) .consoleLayout {
+  gap: clamp(12px, 1.5vw, 20px);
+  background:
+    radial-gradient(circle at 4% 0%, rgba(74, 150, 255, 0.13), transparent 34%),
+    radial-gradient(circle at 96% 1%, rgba(22, 169, 110, 0.1), transparent 34%),
+    linear-gradient(180deg, #f5faff, #ecf5ff);
+}
+
+:global(body.light) .sidebar {
+  border: 1px solid rgba(18, 95, 204, 0.18);
+  border-radius: 22px;
+  box-shadow:
+    0 22px 40px rgba(11, 43, 88, 0.14),
+    0 8px 18px rgba(11, 43, 88, 0.08);
+  background:
+    radial-gradient(circle at 8% -10%, rgba(77, 152, 255, 0.2), transparent 54%),
+    linear-gradient(165deg, rgba(251, 253, 255, 0.98), rgba(234, 245, 255, 0.98));
+}
+
+:global(body.light) .menuTitle {
+  color: #4a6b8f;
+  border-left-color: rgba(18, 95, 204, 0.58);
+}
+
+:global(body.light) .menuLink {
+  border-radius: 12px;
+  border: 1px solid rgba(18, 95, 204, 0.14);
+  color: #1e456d;
+  font-weight: 600;
+  background: linear-gradient(145deg, #ffffff, #f2f8ff);
+}
+
+:global(body.light) .menuLink:hover {
+  transform: translateX(2px);
+  border-color: rgba(18, 95, 204, 0.28);
+  box-shadow: 0 10px 18px rgba(18, 95, 204, 0.16);
+}
+
+:global(body.light) .active {
+  color: #153f68;
+  border-color: rgba(18, 95, 204, 0.32);
+  background: linear-gradient(120deg, rgba(18, 95, 204, 0.18), rgba(28, 154, 134, 0.12));
+}
+
+:global(body.light) .consoleMain {
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 7% 0%, rgba(18, 95, 204, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(247, 251, 255, 0.94), rgba(238, 246, 255, 0.94));
+}
+
+:global(body.light) .consoleTopbar {
+  border-radius: 18px;
+  border: 1px solid rgba(18, 95, 204, 0.18);
+  background:
+    radial-gradient(circle at 95% -20%, rgba(28, 154, 134, 0.14), transparent 50%),
+    linear-gradient(165deg, rgba(255, 255, 255, 0.96), rgba(241, 248, 255, 0.94));
+  box-shadow: 0 14px 26px rgba(11, 43, 88, 0.12);
+}
+
+:global(body.light) .consoleViewTitle {
+  color: #133c65;
+}
+
+:global(body.light) .consoleViewMeta {
+  color: #4c6e90;
+}
+
+@media (max-width: 900px) {
+  :global(body.light) .consoleMain {
+    border-radius: 0;
+  }
+
+  :global(body.light) .sidebar {
+    border-radius: 0 0 20px 20px;
+  }
+
+  :global(body.light) .menuLink {
+    justify-content: flex-start;
   }
 }
 
@@ -1950,11 +2226,17 @@
 @media (min-width: 901px) {
   .sidebar {
     backdrop-filter: blur(10px);
-    background: linear-gradient(165deg, rgba(248, 250, 255, 0.96), rgba(234, 241, 252, 0.98));
+    background:
+      radial-gradient(circle at 14% -10%, rgba(68, 176, 255, 0.2), transparent 56%),
+      radial-gradient(circle at 86% 0%, rgba(122, 190, 255, 0.12), transparent 54%),
+      linear-gradient(165deg, rgba(248, 250, 255, 0.96), rgba(234, 241, 252, 0.98));
   }
 
   :global(body.dark) .sidebar {
-    background: linear-gradient(160deg, rgba(20, 26, 38, 0.96), rgba(11, 16, 28, 0.98));
+    background:
+      radial-gradient(circle at 16% -8%, rgba(73, 163, 255, 0.3), transparent 56%),
+      radial-gradient(circle at 88% 0%, rgba(124, 189, 255, 0.16), transparent 52%),
+      linear-gradient(160deg, rgba(12, 38, 72, 0.98), rgba(9, 28, 56, 0.98));
   }
 
   .sidebarHeader {
@@ -1983,9 +2265,9 @@
   }
 
   .menuLink {
-    background: transparent;
-    box-shadow: none;
-    border: none;
+    background: color-mix(in srgb, var(--surface) 90%, transparent);
+    box-shadow: 0 4px 10px rgba(15, 106, 214, 0.08);
+    border: 1px solid color-mix(in srgb, var(--primary) 16%, transparent);
     text-align: left;
     flex-direction: row;
     gap: 10px;
@@ -1997,15 +2279,16 @@
 
   .menuLink:hover {
     transform: translateX(4px);
-    background: linear-gradient(120deg, rgba(15, 106, 214, 0.18), rgba(22, 169, 110, 0.12));
-    box-shadow: 0 6px 16px rgba(15, 106, 214, 0.18);
+    background: linear-gradient(120deg, rgba(15, 106, 214, 0.24), rgba(68, 176, 255, 0.16));
+    box-shadow: 0 8px 18px rgba(15, 106, 214, 0.2);
     color: var(--primary);
   }
 
   .active {
     color: var(--primary);
-    background: linear-gradient(120deg, rgba(15, 106, 214, 0.25), rgba(22, 169, 110, 0.15));
-    box-shadow: 0 8px 20px rgba(15, 106, 214, 0.25);
+    border-color: rgba(15, 106, 214, 0.34);
+    background: linear-gradient(120deg, rgba(15, 106, 214, 0.3), rgba(68, 176, 255, 0.18));
+    box-shadow: 0 10px 22px rgba(15, 106, 214, 0.26);
   }
 
   .sidebarFooter {
@@ -2026,7 +2309,7 @@
     padding: 12px 14px;
     border-radius: 14px;
     border: 1.5px solid rgba(15, 106, 214, 0.24);
-    background: linear-gradient(135deg, rgba(15, 106, 214, 0.1), rgba(22, 169, 110, 0.08));
+    background: linear-gradient(135deg, rgba(15, 106, 214, 0.12), rgba(68, 176, 255, 0.09));
     color: var(--foreground);
     font-size: 0.95rem;
     font-weight: 600;
@@ -2035,13 +2318,13 @@
   }
 
   :global(body.light) .themeSwitcher {
-    background: linear-gradient(135deg, rgba(15, 106, 214, 0.14), rgba(22, 169, 110, 0.1));
+    background: linear-gradient(135deg, rgba(15, 106, 214, 0.16), rgba(68, 176, 255, 0.12));
     border-color: rgba(15, 106, 214, 0.3);
     color: var(--foreground);
   }
 
   :global(body.dark) .themeSwitcher {
-    background: linear-gradient(135deg, rgba(31, 137, 252, 0.18), rgba(20, 162, 133, 0.15));
+    background: linear-gradient(135deg, rgba(31, 137, 252, 0.2), rgba(105, 181, 247, 0.16));
     border-color: rgba(31, 137, 252, 0.35);
     color: #d9e8ff;
   }
@@ -2121,14 +2404,16 @@
     justify-content: center;
     padding: 11px 12px;
     border-radius: 12px;
-    border: 1.5px solid rgba(196, 110, 118, 0.34);
-    background: linear-gradient(135deg, rgba(161, 76, 86, 0.92), rgba(138, 60, 70, 0.92));
+    border: 1.5px solid rgba(220, 124, 132, 0.42);
+    background: linear-gradient(135deg, rgba(186, 78, 92, 0.94), rgba(150, 62, 74, 0.94));
     color: #f7f9fc;
     font-size: 0.9rem;
     font-weight: 650;
     cursor: pointer;
     transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
-    box-shadow: 0 8px 16px rgba(76, 20, 29, 0.26);
+    box-shadow:
+      0 8px 16px rgba(76, 20, 29, 0.26),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
   }
 
   .logoutButton:hover {

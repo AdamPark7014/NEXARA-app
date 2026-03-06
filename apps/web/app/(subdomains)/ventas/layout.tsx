@@ -34,7 +34,7 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
   
   // Si estamos en login, no renderizar el sidebar
   if (pathname && pathname.includes("/login")) {
-    return <main className={styles.salesMain}>{children}</main>;
+    return <>{children}</>;
   }
 
   return (
