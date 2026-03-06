@@ -539,37 +539,16 @@
   align-items: center;
   gap: clamp(12px, 2vw, 20px);
   position: relative;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at 14% -24%, color-mix(in srgb, var(--primary) 16%, transparent), transparent 46%),
-    radial-gradient(circle at 86% 0%, color-mix(in srgb, var(--secondary) 9%, transparent), transparent 52%),
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 97%, transparent), color-mix(in srgb, var(--surface) 92%, var(--primary) 8%));
-  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
-  border-radius: clamp(26px, 3.6vw, 44px);
-  padding: clamp(16px, 2.6vw, 30px);
-  box-shadow:
-    0 16px 38px color-mix(in srgb, var(--primary) 14%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #fff 40%, transparent);
+  overflow: visible;
+  padding: 0;
 }
 
 .newsCarousel::before {
-  content: "";
-  position: absolute;
-  inset: -18% auto auto -14%;
-  width: min(32vw, 380px);
-  height: min(32vw, 380px);
-  background: radial-gradient(circle, color-mix(in srgb, var(--secondary) 22%, transparent), transparent 64%);
-  pointer-events: none;
+  content: none;
 }
 
 .newsCarousel::after {
-  content: "";
-  position: absolute;
-  inset: auto -10% -32% auto;
-  width: min(30vw, 340px);
-  height: min(30vw, 340px);
-  background: radial-gradient(circle, color-mix(in srgb, var(--primary) 20%, transparent), transparent 66%);
-  pointer-events: none;
+  content: none;
 }
 
 .newsNav {
@@ -598,24 +577,31 @@
   grid-template-columns: minmax(250px, 360px) minmax(0, 1fr);
   gap: clamp(14px, 2.6vw, 30px);
   align-items: center;
-  min-height: clamp(260px, 31vw, 360px);
+  min-height: clamp(248px, 29vw, 340px);
   animation: newsFade 0.4s ease;
   position: relative;
   z-index: 1;
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+  border-radius: clamp(22px, 3vw, 34px);
+  background:
+    radial-gradient(circle at 12% -32%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 48%),
+    linear-gradient(165deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface) 89%, var(--primary) 11%));
+  box-shadow:
+    0 16px 34px color-mix(in srgb, var(--primary) 12%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 34%, transparent);
+  padding: clamp(12px, 1.8vw, 22px);
 }
 
 .newsImageWrap {
   width: 100%;
   height: auto;
   aspect-ratio: 4 / 5;
-  min-height: clamp(220px, 26vw, 340px);
+  min-height: clamp(210px, 24vw, 320px);
   border-radius: clamp(26px, 3vw, 38px) clamp(16px, 2vw, 24px) clamp(26px, 3vw, 38px) clamp(16px, 2vw, 24px);
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
-  background: color-mix(in srgb, var(--surface) 90%, var(--primary) 10%);
-  box-shadow:
-    0 18px 34px color-mix(in srgb, var(--primary) 18%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #fff 30%, transparent);
+  background: color-mix(in srgb, var(--surface) 92%, var(--primary) 8%);
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--primary) 12%, transparent);
 }
 
 .newsImageWrap:hover {
@@ -638,11 +624,7 @@
   flex-direction: column;
   justify-content: center;
   gap: clamp(10px, 1.2vw, 14px);
-  background: linear-gradient(165deg, color-mix(in srgb, var(--surface) 94%, transparent), color-mix(in srgb, var(--surface) 86%, var(--primary) 14%));
-  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
-  border-radius: clamp(24px, 2.6vw, 34px) clamp(14px, 1.8vw, 22px) clamp(24px, 2.6vw, 34px) clamp(14px, 1.8vw, 22px);
-  padding: clamp(14px, 2vw, 24px);
-  box-shadow: 0 14px 30px color-mix(in srgb, var(--primary) 12%, transparent);
+  padding: clamp(2px, 0.5vw, 6px);
 }
 
 .newsMetaLine {
@@ -755,30 +737,48 @@
 
   .newsCarousel {
     grid-template-columns: 1fr;
-    gap: 14px;
-    padding: 16px;
+    gap: 0;
+    padding: 0;
   }
 
   .newsNav {
-    position: static;
-    justify-self: center;
+    position: absolute;
+    top: 42%;
+    transform: translateY(-50%);
     width: 38px;
     height: 38px;
     font-size: 1.35rem;
+    z-index: 3;
+    background: color-mix(in srgb, var(--surface) 84%, var(--primary) 16%);
+    backdrop-filter: blur(4px);
+  }
+
+  .newsCarousel > .newsNav:first-of-type {
+    left: 6px;
+  }
+
+  .newsCarousel > .newsNav:last-of-type {
+    right: 6px;
+  }
+
+  .newsNav:hover {
+    transform: translateY(-50%);
   }
 
   .newsSlide {
     grid-template-columns: 1fr;
-    gap: 16px;
+    gap: 12px;
     min-height: auto;
     text-align: center;
+    padding: 14px 12px;
   }
 
   .newsImageWrap {
-    max-width: min(100%, 340px);
+    max-width: min(100%, 260px);
     margin: 0 auto;
-    min-height: 210px;
-    aspect-ratio: 4 / 5;
+    min-height: 0;
+    aspect-ratio: 1 / 1;
+    border-radius: 18px;
   }
 
   .newsMetaLine {
@@ -790,6 +790,16 @@
   .newsActions {
     justify-content: center;
     flex-direction: column;
+    margin-top: 2px;
+    gap: 10px;
+  }
+
+  .newsContent p {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.48;
   }
 }
 
@@ -800,19 +810,32 @@
   }
 
   .newsCarousel {
-    border-radius: 18px;
-    padding: 12px;
+    padding: 0;
   }
 
   .newsImageWrap {
     max-width: 100%;
-    min-height: 190px;
-    border-radius: 22px 14px 22px 14px;
+    min-height: 0;
+    max-width: min(100%, 240px);
+    border-radius: 16px;
   }
 
   .newsButton {
     width: 100%;
-    max-width: 240px;
+    max-width: 210px;
+    padding: 11px 20px;
+  }
+
+  .newsNav {
+    top: 40%;
+    width: 34px;
+    height: 34px;
+    font-size: 1.1rem;
+  }
+
+  .newsMetaLine {
+    letter-spacing: 0.08rem;
+    font-size: 0.72rem;
   }
 }
 
