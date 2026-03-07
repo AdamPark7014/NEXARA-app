@@ -1,101 +1,57 @@
-/* Floating Action Button */
 .fab {
   position: fixed;
-  bottom: 24px;
-  right: 88px;
-  min-width: 188px;
+  right: 16px;
+  bottom: 18px;
+  width: 58px;
   height: 58px;
-  padding: 0 14px 0 10px;
   border-radius: 999px;
-  background: linear-gradient(140deg, color-mix(in srgb, var(--primary) 86%, #0f2648) 0%, color-mix(in srgb, var(--secondary) 76%, var(--primary) 24%) 100%);
-  border: 1px solid color-mix(in srgb, var(--primary) 38%, #6fc0ff);
-  color: #fff;
+  border: 1px solid color-mix(in srgb, var(--primary) 42%, #7cb8ff);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--primary) 90%, #1a4cc6) 0%, color-mix(in srgb, var(--secondary) 78%, var(--primary) 22%) 100%);
+  color: #ffffff;
   box-shadow:
-    0 14px 30px color-mix(in srgb, var(--shadow) 88%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #fff 30%, transparent);
+    0 12px 28px color-mix(in srgb, var(--shadow) 84%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 30%, transparent);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 10px;
-  z-index: 999;
-  isolation: isolate;
-  overflow: hidden;
+  justify-content: center;
+  z-index: 960;
   transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
 }
 
 .fab:hover {
   transform: translateY(-1px);
   box-shadow:
-    0 18px 36px color-mix(in srgb, var(--shadow) 96%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #fff 38%, transparent);
-  filter: brightness(1.03);
+    0 16px 34px color-mix(in srgb, var(--shadow) 92%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 34%, transparent);
 }
 
 .fab:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--secondary) 64%, #fff 36%);
+  outline: 3px solid color-mix(in srgb, var(--secondary) 60%, #ffffff 40%);
   outline-offset: 3px;
 }
 
-.fab:active {
-  transform: translateY(0);
-}
-
 .fabOpen {
-  min-width: 56px;
-  width: 56px;
-  padding: 0;
-  justify-content: center;
-  background: color-mix(in srgb, var(--foreground) 92%, #0c223f);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--foreground) 92%, #0f2a51) 0%, color-mix(in srgb, var(--foreground) 84%, #133462) 100%);
 }
 
 .fabIconWrap {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border-radius: 999px;
   display: grid;
   place-items: center;
-  color: #ffffff;
-  background: linear-gradient(145deg, color-mix(in srgb, var(--secondary) 70%, var(--primary) 30%), color-mix(in srgb, var(--secondary) 48%, #94dcff));
-  border: 1px solid color-mix(in srgb, #fff 32%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 35%, transparent);
-  flex-shrink: 0;
+  background: color-mix(in srgb, #ffffff 18%, transparent);
+  border: 1px solid color-mix(in srgb, #ffffff 28%, transparent);
 }
 
-.fabText {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  min-width: 0;
-}
-
-.fabLabel {
-  font-size: 0.84rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.11em;
-  line-height: 1;
-}
-
-.fabSubLabel {
-  margin-top: 5px;
-  font-size: 0.66rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: color-mix(in srgb, #fff 82%, #b7ddff 18%);
-  line-height: 1;
-}
-
-/* Overlay */
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(3, 12, 28, 0.46);
-  z-index: 998;
-  animation: fadeIn 200ms ease;
+  background: rgba(6, 18, 37, 0.5);
   backdrop-filter: blur(4px);
+  z-index: 958;
+  animation: fadeIn 180ms ease;
 }
 
 @keyframes fadeIn {
@@ -107,29 +63,28 @@
   }
 }
 
-/* Floating Panel */
 .panel {
   position: fixed;
-  bottom: 92px;
-  right: 24px;
-  width: 440px;
-  max-width: calc(100vw - 48px);
-  max-height: calc(100vh - 180px);
-  background: linear-gradient(160deg, color-mix(in srgb, var(--surface) 92%, #ffffff) 0%, color-mix(in srgb, var(--surface) 88%, var(--primary) 12%) 100%);
-  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--gray-alpha-200));
-  border-radius: 20px;
-  box-shadow: 0 22px 58px color-mix(in srgb, var(--shadow) 92%, transparent);
-  z-index: 999;
+  right: 16px;
+  top: calc(var(--header-offset, 72px) + 10px);
+  bottom: 72px;
+  width: 408px;
+  max-width: calc(100vw - 32px);
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  background: linear-gradient(165deg, color-mix(in srgb, var(--surface) 94%, #ffffff) 0%, color-mix(in srgb, var(--surface) 88%, var(--primary) 12%) 100%);
+  box-shadow: 0 24px 58px color-mix(in srgb, var(--shadow) 92%, transparent);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  animation: slideUp 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 962;
+  animation: riseIn 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes slideUp {
+@keyframes riseIn {
   from {
     opacity: 0;
-    transform: translateY(20px) scale(0.96);
+    transform: translateY(16px) scale(0.97);
   }
   to {
     opacity: 1;
@@ -141,164 +96,121 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 18px 20px 14px;
-  border-bottom: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
-  background:
-    radial-gradient(circle at 0% -10%, color-mix(in srgb, var(--secondary) 24%, transparent), transparent 52%),
-    linear-gradient(135deg, color-mix(in srgb, var(--surface) 90%, var(--primary) 10%) 0%, color-mix(in srgb, var(--surface) 86%, var(--secondary) 14%) 100%);
+  gap: 10px;
+  padding: 13px 16px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
+  background: linear-gradient(145deg, #2b58cb 0%, #3e73e6 100%);
 }
 
 .panelEyebrow {
-  margin: 0 0 5px;
+  margin: 0 0 3px;
   font-size: 0.68rem;
   font-weight: 800;
-  text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: color-mix(in srgb, var(--foreground) 70%, var(--primary));
+  text-transform: uppercase;
+  color: rgba(240, 247, 255, 0.92);
 }
 
 .panelHeader h3 {
-  font-size: 1.14rem;
-  font-weight: 820;
-  line-height: 1.18;
-  letter-spacing: -0.01em;
-  color: var(--foreground);
   margin: 0;
+  font-size: 1.02rem;
+  font-weight: 780;
+  line-height: 1.2;
+  color: #ffffff;
+}
+
+.closeButton {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.closeButton:hover {
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .panelMeta {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 10px 20px 4px;
+  padding: 8px 16px 2px;
 }
 
 .panelMeta span {
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
   color: color-mix(in srgb, var(--foreground) 84%, var(--primary));
-  font-size: 0.72rem;
+  font-size: 0.71rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
   padding: 5px 10px;
 }
 
-.closeButton {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  border: none;
-  background: transparent;
-  color: var(--foreground);
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  transition: background 200ms ease;
-}
-
-.closeButton:hover {
-  background: color-mix(in srgb, var(--gray-alpha-200) 60%, transparent);
-}
-
-/* Form */
 .form {
-  padding: 12px 20px 18px;
+  padding: 10px 16px 14px;
   overflow-y: auto;
-  flex: 1;
 }
 
 .formField {
-  margin-bottom: 16px;
+  margin-bottom: 11px;
 }
 
 .formField label {
   display: block;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--foreground);
   margin-bottom: 6px;
+  font-size: 0.89rem;
+  font-weight: 620;
+  color: var(--foreground);
 }
 
 .formField input,
 .formField textarea,
 .formField select {
   width: 100%;
-  padding: 11px 12px;
-  border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--gray-alpha-200));
+  padding: 9px 11px;
   border-radius: 11px;
-  background: color-mix(in srgb, var(--background) 94%, white);
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--gray-alpha-200));
+  background: color-mix(in srgb, var(--background) 97%, #ffffff);
   color: var(--foreground);
-  font-family: inherit;
-  font-size: 0.95rem;
-  transition: border-color 200ms ease, box-shadow 200ms ease;
+  font-size: 0.94rem;
 }
 
 .formField input:focus,
 .formField textarea:focus,
 .formField select:focus {
   outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent);
-}
-
-.formField input:disabled,
-.formField textarea:disabled,
-.formField select:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.formField textarea {
-  resize: vertical;
-  min-height: 60px;
+  border-color: color-mix(in srgb, var(--primary) 62%, #ffffff 38%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
 }
 
 .checkboxLabel {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 0.88rem;
-  font-weight: 500;
-  color: var(--foreground);
-}
-
-.checkboxLabel input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--primary);
+  font-size: 0.87rem;
 }
 
 .submitButton {
   width: 100%;
-  padding: 12px 18px;
-  border-radius: 10px;
-  border: 1px solid color-mix(in srgb, var(--primary) 36%, transparent);
+  min-height: 42px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--primary) 38%, transparent);
   background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-  color: #fff;
-  font-weight: 700;
-  font-size: 1rem;
+  color: #ffffff;
+  font-size: 0.97rem;
+  font-weight: 740;
   cursor: pointer;
-  transition: transform 200ms ease, box-shadow 200ms ease, filter 200ms ease;
-  box-shadow: 0 6px 16px var(--shadow);
-}
-
-.footNote {
-  margin-top: 8px;
-  color: color-mix(in srgb, var(--foreground) 75%, transparent);
-  font-size: 0.73rem;
-  line-height: 1.4;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--shadow) 76%, transparent);
 }
 
 .submitButton:hover:not(:disabled) {
   transform: translateY(-1px);
-  filter: brightness(1.03);
-  box-shadow: 0 10px 22px var(--shadow);
-}
-
-.submitButton:active:not(:disabled) {
-  transform: translateY(0);
 }
 
 .submitButton:disabled {
@@ -306,110 +218,116 @@
   cursor: not-allowed;
 }
 
-/* Success State */
+.footNote {
+  margin-top: 8px;
+  font-size: 0.73rem;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--foreground) 76%, transparent);
+}
+
 .success {
-  padding: 40px 20px;
+  padding: 34px 18px;
   text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-
-.success svg {
-  color: var(--primary);
-  animation: scaleIn 400ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes scaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.8);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+  display: grid;
+  justify-items: center;
+  gap: 10px;
 }
 
 .success h4 {
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: var(--foreground);
   margin: 0;
+  font-size: 1.05rem;
 }
 
 .success p {
-  font-size: 0.95rem;
-  color: var(--foreground);
-  opacity: 0.75;
   margin: 0;
+  font-size: 0.92rem;
+  opacity: 0.82;
 }
 
-/* Light theme overrides */
+:global(body.light) .fab {
+  background: linear-gradient(145deg, #2a56cc 0%, #3f7af0 100%);
+  border-color: rgba(145, 186, 255, 0.62);
+  box-shadow: 0 12px 28px rgba(31, 76, 186, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.36);
+}
+
 :global(body.light) .panel {
-  background: linear-gradient(160deg, #f7fcff 0%, #eef8ff 100%);
-  border-color: color-mix(in srgb, var(--primary) 24%, transparent);
-  box-shadow: 0 16px 48px color-mix(in srgb, var(--shadow) 80%, transparent);
+  background: linear-gradient(165deg, rgba(245, 251, 255, 0.98) 0%, rgba(232, 244, 255, 0.98) 100%);
+  border-color: rgba(59, 113, 223, 0.34);
+  box-shadow: 0 24px 58px rgba(19, 65, 165, 0.2);
 }
 
 :global(body.light) .panelHeader {
-  border-color: color-mix(in srgb, var(--primary) 16%, transparent);
+  border-bottom-color: rgba(214, 232, 255, 0.34);
 }
 
-:global(body.light) .formField input,
-:global(body.light) .formField textarea,
-:global(body.light) .formField select {
-  border-color: color-mix(in srgb, var(--primary) 16%, transparent);
-  background: color-mix(in srgb, var(--background) 98%, white);
+:global(body.light) .panelHeader h3 {
+  color: #ffffff;
+}
+
+:global(body.light) .panelEyebrow {
+  color: rgba(240, 247, 255, 0.92);
+}
+
+:global(body.light) .closeButton {
+  color: #ffffff;
+}
+
+:global(body.light) .closeButton:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+:global(body.dark) .fab {
+  background: linear-gradient(145deg, rgba(27, 78, 189, 0.95) 0%, rgba(15, 40, 86, 0.96) 100%);
+  border-color: rgba(114, 170, 255, 0.4);
 }
 
 :global(body.dark) .panel {
-  background: linear-gradient(160deg, color-mix(in srgb, var(--surface) 90%, #07192f) 0%, color-mix(in srgb, var(--surface) 82%, #0d2b4a) 100%);
-  border-color: color-mix(in srgb, var(--primary) 34%, transparent);
+  background: linear-gradient(165deg, rgba(12, 25, 46, 0.97) 0%, rgba(10, 21, 38, 0.98) 100%);
+  border-color: rgba(83, 146, 235, 0.3);
+}
+
+:global(body.dark) .panelHeader {
+  background: linear-gradient(145deg, rgba(16, 34, 64, 0.95) 0%, rgba(14, 30, 56, 0.96) 100%);
+  border-bottom-color: rgba(83, 146, 235, 0.22);
+}
+
+:global(body.dark) .panelHeader h3 {
+  color: var(--foreground);
+}
+
+:global(body.dark) .panelEyebrow {
+  color: color-mix(in srgb, var(--foreground) 84%, #8fb9ff 16%);
+}
+
+:global(body.dark) .closeButton {
+  color: var(--foreground);
+}
+
+:global(body.dark) .closeButton:hover {
+  background: rgba(143, 185, 255, 0.15);
 }
 
 :global(body.dark) .formField input,
 :global(body.dark) .formField textarea,
 :global(body.dark) .formField select {
-  background: color-mix(in srgb, var(--surface) 84%, #081a30);
-  border-color: color-mix(in srgb, var(--primary) 34%, transparent);
+  background: rgba(13, 30, 54, 0.9);
+  border-color: rgba(83, 146, 235, 0.3);
 }
 
-/* Responsive */
 @media (max-width: 600px) {
   .fab {
-    bottom: 20px;
-    right: 78px;
-    min-width: 54px;
-    width: 52px;
-    height: 52px;
-    padding: 0;
-    justify-content: center;
-  }
-
-  .fabText {
-    display: none;
-  }
-
-  .fabIconWrap {
-    width: 36px;
-    height: 36px;
+    right: 12px;
+    bottom: 14px;
+    width: 54px;
+    height: 54px;
   }
 
   .panel {
-    bottom: 88px;
-    right: 20px;
-    left: 20px;
+    right: 10px;
+    left: 10px;
+    top: calc(var(--header-offset, 64px) + 8px);
+    bottom: 70px;
     width: auto;
     max-width: none;
-  }
-
-  .form {
-    padding: 16px;
-  }
-
-  .panelHeader {
-    padding: 14px 16px;
   }
 }

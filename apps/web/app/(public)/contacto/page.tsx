@@ -157,7 +157,7 @@ export default function ContactoPage() {
                 <Link href="/nexara">Sobre nosotros</Link>
               </li>
               <li>
-                <Link href="/soluciones">Nuestras soluciones</Link>
+                <Link href="/servicios">Nuestras soluciones</Link>
               </li>
               <li>
                 <Link href="/">Inicio</Link>
@@ -371,7 +371,7 @@ export default function ContactoPage() {
           <div>
             <h3>¿Buscas una cotización?</h3>
             <p>Conoce nuestras soluciones y servicios especializados</p>
-            <Link href="/soluciones" className={styles.ctaButton}>
+            <Link href="/servicios" className={styles.ctaButton}>
               Ver soluciones
             </Link>
           </div>

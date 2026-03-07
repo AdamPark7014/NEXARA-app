@@ -182,7 +182,7 @@ export default function FirmarCotizacionPage() {
           display: grid;
           place-items: center;
           padding: 32px 16px;
-          font-family: "Space Grotesk", "Montserrat", sans-serif;
+          font-family: var(--panel-font-family);
           color: #e6f0ff;
         }
 
@@ -342,3 +342,4 @@ export default function FirmarCotizacionPage() {
     </main>
   );
 }
+

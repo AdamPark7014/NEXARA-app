@@ -10,7 +10,7 @@ export const metadata = {
 export default function NexaraPage() {
   return (
     <>
-    <main className={styles.container} aria-label="Página sobre Nexara">
+    <main className={`${styles.container} public-section-page`} aria-label="Página sobre Nexara">
       {/* Hero */}
       <section className={styles.hero}>
         <div className={styles.heroContent}>

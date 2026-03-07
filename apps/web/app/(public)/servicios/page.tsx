@@ -14,26 +14,41 @@ const sectorOptions = [
     key: "gobierno",
     label: "Gobierno",
     description: "Modernizamos entornos públicos con infraestructura segura, equipamiento y soporte operativo continuo.",
+    focus: "Cumplimiento, trazabilidad y continuidad de servicio.",
+    outcomes: ["+99.5% continuidad operativa", "Control documental para auditorias", "Cobertura multisede estandarizada"],
+    deliverables: ["Infraestructura validada por norma", "Mesa de servicio con trazabilidad", "Plan de mantenimiento anual"],
   },
   {
     key: "educativo",
     label: "Educativo",
     description: "Implementamos aulas y redes institucionales para aprendizaje digital con alta disponibilidad.",
+    focus: "Conectividad estable y experiencia academica sin friccion.",
+    outcomes: ["Aulas listas para clases hibridas", "Menos incidencias en periodos criticos", "Administracion centralizada de equipos"],
+    deliverables: ["Wifi de alta densidad", "Equipamiento por laboratorio", "Soporte preventivo por calendario"],
   },
   {
     key: "pymes",
     label: "Pymes",
     description: "Diseñamos paquetes tecnológicos escalables para crecer sin frenar la operación.",
+    focus: "Escalabilidad real con inversion inteligente.",
+    outcomes: ["Arranque rapido por fases", "Costos controlados desde el dia 1", "Visibilidad de activos y licencias"],
+    deliverables: ["Kit inicial de infraestructura", "Roadmap de crecimiento trimestral", "Cobertura de soporte flexible"],
   },
   {
     key: "salud",
     label: "Salud",
     description: "Aseguramos continuidad y protección de información en clínicas y centros médicos.",
+    focus: "Disponibilidad critica y proteccion de datos sensibles.",
+    outcomes: ["Operaciones criticas sin interrupciones", "Respaldo y recuperacion confiables", "Entornos de atencion mas seguros"],
+    deliverables: ["Segmentacion de red clinica", "Control de acceso y monitoreo", "Plan de contingencia TI"],
   },
   {
     key: "industria",
     label: "Industria",
     description: "Integración de TI para plantas y operaciones con foco en control, seguridad y productividad.",
+    focus: "Productividad de planta con infraestructura resistente.",
+    outcomes: ["Menos paros por fallas de TI", "Mayor visibilidad operativa", "Seguridad integral en campo"],
+    deliverables: ["Red industrial segmentada", "Puntos de control y monitoreo", "Soporte en sitio por prioridad"],
   },
 ];
 
@@ -179,7 +194,7 @@ export default function ServiciosPage({ searchParams }: ServiciosPageProps) {
   const rectSrcB = byName("rect-2") ?? serviciosImages[3] ?? serviciosImages[1];
   return (
     <>
-    <main className={styles.container} aria-label="Página de servicios">
+    <main className={`${styles.container} public-section-page`} aria-label="Página de servicios">
       {/* Hero */}
       <section className={styles.hero}>
         <div className={styles.heroContent}>
@@ -232,7 +247,7 @@ export default function ServiciosPage({ searchParams }: ServiciosPageProps) {
         <div className={styles.sectionHeader}>
           <h2 className={styles.sectionTitle}>Sectores que atendemos</h2>
           <p className={styles.sectionLead}>
-            Selecciona un sector para visualizar nuestro enfoque operativo.
+            Selecciona un sector y revisa como aterrizamos estrategia, operacion y resultados medibles.
           </p>
         </div>
         <div className={styles.selectorButtons}>
@@ -248,8 +263,33 @@ export default function ServiciosPage({ searchParams }: ServiciosPageProps) {
           ))}
         </div>
         <article className={styles.selectorDetailCard}>
-          <h3>{activeSector.label}</h3>
-          <p>{activeSector.description}</p>
+          <div className={styles.selectorDetailTop}>
+            <div>
+              <p className={styles.selectorEyebrow}>Sector activo</p>
+              <h3>{activeSector.label}</h3>
+            </div>
+            <p className={styles.selectorPill}>{activeSector.focus}</p>
+          </div>
+
+          <p className={styles.selectorSummary}>{activeSector.description}</p>
+
+          <div className={styles.selectorOutcomeGrid}>
+            {activeSector.outcomes.map((item) => (
+              <div key={item} className={styles.selectorOutcomeCard}>
+                <span className={styles.selectorOutcomeDot} aria-hidden="true" />
+                <p>{item}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className={styles.selectorDeliverables}>
+            <p className={styles.selectorDeliverablesTitle}>Entregables frecuentes</p>
+            <ul>
+              {activeSector.deliverables.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
         </article>
       </section>
 
@@ -350,8 +390,8 @@ export default function ServiciosPage({ searchParams }: ServiciosPageProps) {
             <Link href="/contacto" className={styles.primaryCta}>
               Solicitar cotización
             </Link>
-            <Link href="/soluciones" className={styles.secondaryCta}>
-              Ver soluciones TI
+            <Link href="/servicios#servicios-principales" className={styles.secondaryCta}>
+              Ver más servicios
             </Link>
           </div>
         </div>

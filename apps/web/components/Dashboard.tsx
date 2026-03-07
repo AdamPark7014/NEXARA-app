@@ -637,19 +637,35 @@ export default function Dashboard() {
 
       <style jsx>{`
         .loadingCard,
+        .errorCard,
+        .heroCard,
+        .kpiCard,
+        .analysisCard,
+        .chartWrap,
+        .userHoursRow,
+        .chartEmpty,
+        .chartTooltip,
+        .chip,
+        .chipLive,
+        .kpiPill,
+        .analysisPill,
+        .heroLevel,
+        .input {
+          background: var(--surface) !important;
+          box-shadow: none !important;
+          text-shadow: none !important;
+          filter: none !important;
+          backdrop-filter: none !important;
+        }
+
+        .loadingCard,
         .errorCard {
           padding: 24px;
-          border-radius: 16px;
-          background: var(--surface);
-          border: 1px solid rgba(15, 106, 214, 0.16);
+          border-radius: 12px;
+          border: 1px solid var(--border);
           color: var(--foreground);
           text-align: center;
           font-size: 16px;
-        }
-
-        :global(body.dark) .loadingCard,
-        :global(body.dark) .errorCard {
-          border-color: rgba(23, 137, 252, 0.2);
         }
 
         .errorCard {
@@ -659,152 +675,86 @@ export default function Dashboard() {
 
         .dashboardRoot {
           display: grid;
-          gap: 18px;
-          position: relative;
-        }
-
-        .dashboardRoot::before {
-          display: none;
-        }
-
-        .heroCard {
-          position: relative;
-          z-index: 1;
-          display: grid;
           gap: 14px;
-          padding: 24px;
-          border-radius: 20px;
-          border: 1px solid rgba(15, 106, 214, 0.2);
-          background:
-            radial-gradient(circle at 90% -30%, rgba(22, 169, 110, 0.16), transparent 48%),
-            radial-gradient(circle at 12% -24%, rgba(23, 137, 252, 0.2), transparent 56%),
-            linear-gradient(165deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface) 88%, var(--primary) 12%));
-          box-shadow: 0 18px 36px var(--shadow);
+        }
+
+        .heroCard,
+        .kpiCard,
+        .analysisCard {
+          display: grid;
+          gap: 12px;
+          padding: 16px;
+          border: 1px solid var(--border);
+          border-radius: 12px;
           overflow: hidden;
         }
 
-        :global(body.light) .heroCard {
-          border: 1px solid rgba(15, 106, 214, 0.16);
-          box-shadow: 0 16px 32px rgba(11, 32, 68, 0.12);
-        }
-
-        :global(body.dark) .heroCard {
-          border: 1px solid rgba(101, 176, 245, 0.36);
-          background:
-            radial-gradient(circle at 90% -28%, rgba(49, 216, 196, 0.22), transparent 48%),
-            radial-gradient(circle at 12% -14%, rgba(73, 163, 255, 0.28), transparent 56%),
-            linear-gradient(165deg, rgba(13, 49, 92, 0.96), rgba(9, 34, 66, 0.96));
-          box-shadow: 0 20px 38px rgba(3, 12, 28, 0.6);
-        }
-
-        .heroCard::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.08) 40%, transparent 100%);
-          transform: translateX(-60%);
-          animation: shimmer 6s ease-in-out infinite;
-          pointer-events: none;
-        }
-
-        .heroHeader {
+        .heroHeader,
+        .kpiHeader,
+        .analysisHeader,
+        .userHoursRow {
           display: flex;
           justify-content: space-between;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .heroHeader,
+        .analysisHeader {
           flex-wrap: wrap;
-          gap: 12px;
         }
 
-        .heroHeader > div:first-child {
-          min-width: 0;
-        }
-
-        .heroKicker {
+        .heroKicker,
+        .kpiEyebrow,
+        .analysisEyebrow,
+        .filterLabel {
+          margin: 0;
           text-transform: uppercase;
-          letter-spacing: 0.3em;
+          letter-spacing: 0.14em;
           font-size: 11px;
           color: var(--text-tertiary);
-          margin: 0 0 6px;
+        }
+
+        .heroTitle,
+        .analysisTitle,
+        .kpiValue {
+          margin: 0;
+          color: var(--foreground);
+          line-height: 1.15;
         }
 
         .heroTitle {
-          color: color-mix(in srgb, var(--foreground) 92%, var(--primary));
-          margin: 0 0 6px;
-          font-size: clamp(21px, 2.3vw, 30px);
-          letter-spacing: 0.02em;
-          line-height: 1.14;
-          text-wrap: balance;
+          font-size: clamp(20px, 2.2vw, 28px);
         }
 
-        .heroSubtitle {
-          color: var(--text-secondary);
-          font-size: 13px;
-          line-height: 1.45;
-          overflow-wrap: anywhere;
+        .analysisTitle {
+          margin-top: 4px;
+          font-size: clamp(18px, 1.8vw, 22px);
         }
 
-        .heroMeta {
-          color: var(--text-secondary);
-          font-size: 12px;
-          text-align: right;
-          display: grid;
-          gap: 4px;
+        .kpiValue {
+          font-size: clamp(22px, 2.4vw, 30px);
+          font-weight: 700;
         }
 
-        .heroRole {
-          font-weight: 600;
-          color: var(--text-primary);
-        }
-
-        .heroBadges {
-          display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
-        }
-
-        .heroLevel {
-          margin-top: 6px;
-          font-size: 11px;
-          padding: 4px 10px;
-          border-radius: 999px;
-          background: rgba(15, 106, 214, 0.12);
-          color: var(--text-secondary);
-        }
-
-        :global(body.dark) .heroLevel {
-          background: rgba(23, 137, 252, 0.15);
-          color: var(--text-tertiary);
-        }
-
-        .chip {
-          padding: 6px 12px;
-          border-radius: 999px;
-          background: linear-gradient(135deg, rgba(15, 106, 214, 0.18), rgba(23, 137, 252, 0.11));
-          color: var(--text-secondary);
-          font-size: 12px;
-          border: 1px solid rgba(15, 106, 214, 0.26);
-        }
-
-        :global(body.dark) .chip {
-          background: linear-gradient(135deg, rgba(73, 163, 255, 0.22), rgba(49, 216, 196, 0.16));
-          border-color: rgba(110, 192, 255, 0.38);
-        }
-
+        .heroSubtitle,
+        .heroMeta,
+        .kpiMeta,
+        .userHoursName,
+        .analysisPill,
+        .kpiPill,
+        .heroLevel,
+        .chip,
         .chipLive {
-          color: #eaf5ff;
-          background: linear-gradient(135deg, rgba(23, 137, 252, 0.42), rgba(22, 169, 110, 0.28));
-          border-color: rgba(22, 169, 110, 0.38);
+          color: var(--text-secondary);
+          font-size: 12px;
         }
 
-        :global(body.dark) .chipLive {
-          background: linear-gradient(135deg, rgba(73, 163, 255, 0.42), rgba(49, 216, 196, 0.3));
-          border-color: rgba(83, 217, 196, 0.44);
-        }
-
+        .heroBadges,
         .filtersRow {
           display: flex;
-          gap: 12px;
+          gap: 8px;
           flex-wrap: wrap;
-          align-items: center;
         }
 
         .filterControl {
@@ -812,257 +762,39 @@ export default function Dashboard() {
           gap: 6px;
         }
 
-        .filterLabel {
-          text-transform: uppercase;
-          letter-spacing: 0.16em;
-          font-size: 10px;
-          color: var(--text-tertiary);
-        }
-
         .input {
-          padding: 8px 12px;
+          padding: 8px 10px;
           border-radius: 8px;
-          border: 1px solid rgba(15, 106, 214, 0.2);
-          background: linear-gradient(150deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface-light) 80%, transparent));
+          border: 1px solid var(--border);
           color: var(--foreground);
           font-size: 14px;
         }
 
-        :global(body.dark) .input {
-          border-color: rgba(112, 191, 255, 0.45);
-          background: linear-gradient(150deg, rgba(19, 63, 110, 0.94), rgba(14, 50, 90, 0.94));
-          color: #eaf5ff;
-          box-shadow:
-            0 8px 16px rgba(3, 12, 28, 0.34),
-            inset 0 1px 0 rgba(255, 255, 255, 0.12);
-        }
-
-        :global(body.dark) select.input option {
-          background: #123c6c;
-          color: #eaf5ff;
-        }
-
         .kpiGrid {
-          position: relative;
-          z-index: 1;
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-          gap: 14px;
-        }
-
-        .kpiCard {
-          position: relative;
-          padding: 18px;
-          border-radius: 18px;
-          border: 1px solid rgba(15, 106, 214, 0.2);
-          background:
-            radial-gradient(circle at 88% -28%, rgba(22, 169, 110, 0.16), transparent 50%),
-            linear-gradient(155deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface) 84%, var(--primary) 16%));
-          box-shadow: 0 14px 28px var(--shadow);
-          display: grid;
-          gap: 10px;
-          animation: floatUp 0.4s ease both;
-          overflow: hidden;
-        }
-
-        .kpiCard::before {
-          content: '';
-          position: absolute;
-          left: 0;
-          top: 0;
-          bottom: 0;
-          width: 4px;
-          background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 86%, #fff 14%), color-mix(in srgb, var(--secondary) 74%, var(--primary) 26%));
-          opacity: 0.95;
-        }
-
-        .kpiDelay1 { animation-delay: 0.05s; }
-        .kpiDelay2 { animation-delay: 0.08s; }
-        .kpiDelay3 { animation-delay: 0.1s; }
-        .kpiDelay4 { animation-delay: 0.15s; }
-        .kpiDelay5 { animation-delay: 0.2s; }
-
-        :global(body.light) .kpiCard {
-          background: linear-gradient(150deg, rgba(255, 255, 255, 0.86), rgba(235, 243, 255, 0.9));
-          border: 1px solid rgba(15, 106, 214, 0.14);
-        }
-
-        :global(body.dark) .kpiCard {
-          background:
-            radial-gradient(circle at 84% -22%, rgba(49, 216, 196, 0.2), transparent 52%),
-            radial-gradient(circle at 10% -16%, rgba(73, 163, 255, 0.24), transparent 56%),
-            linear-gradient(155deg, rgba(13, 48, 90, 0.96), rgba(9, 32, 62, 0.96));
-          border-color: rgba(103, 180, 247, 0.34);
-          box-shadow: 0 14px 28px rgba(3, 12, 28, 0.5);
-        }
-
-        .kpiHeader {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-
-        .kpiEyebrow {
-          font-size: 11px;
-          letter-spacing: 0.18em;
-          text-transform: uppercase;
-          color: var(--text-tertiary);
-        }
-
-        .kpiPill {
-          font-size: 11px;
-          padding: 4px 10px;
-          border-radius: 999px;
-          background: linear-gradient(135deg, rgba(15, 106, 214, 0.2), rgba(22, 169, 110, 0.14));
-          color: color-mix(in srgb, var(--text-secondary) 92%, var(--foreground));
-          border: 1px solid rgba(15, 106, 214, 0.22);
-        }
-
-        :global(body.dark) .kpiPill {
-          background: linear-gradient(135deg, rgba(73, 163, 255, 0.24), rgba(49, 216, 196, 0.18));
-          color: #d8eeff;
-          border-color: rgba(110, 192, 255, 0.32);
-        }
-
-        .pillAccent {
-          background: rgba(22, 169, 110, 0.2);
-          color: var(--accent);
-        }
-
-        :global(body.dark) .pillAccent {
-          background: rgba(251, 197, 31, 0.2);
-        }
-
-        .kpiValue {
-          font-size: clamp(1.4rem, 2.6vw, 2rem);
-          font-weight: 800;
-          color: color-mix(in srgb, var(--foreground) 90%, var(--primary));
-          letter-spacing: -0.01em;
-          line-height: 1.04;
-          text-wrap: balance;
-        }
-
-        .kpiMeta {
-          font-size: 12px;
-          color: var(--text-secondary);
+          gap: 12px;
         }
 
         .analyticsGrid {
-          position: relative;
-          z-index: 1;
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-          gap: 18px;
-        }
-
-        .analysisCard {
-          position: relative;
-          padding: 20px;
-          border-radius: 20px;
-          border: 1px solid rgba(15, 106, 214, 0.22);
-          background:
-            radial-gradient(circle at 86% -26%, rgba(23, 137, 252, 0.16), transparent 52%),
-            linear-gradient(160deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface) 86%, var(--primary) 14%));
-          box-shadow: 0 16px 32px var(--shadow);
-          display: grid;
-          gap: 16px;
-          overflow: hidden;
-        }
-
-        .analysisCard::before {
-          content: '';
-          position: absolute;
-          left: 0;
-          right: 0;
-          top: 0;
-          height: 3px;
-          background: linear-gradient(90deg, color-mix(in srgb, var(--primary) 92%, #fff 8%), color-mix(in srgb, var(--secondary) 76%, var(--primary) 24%));
-          opacity: 0.88;
-        }
-
-        :global(body.light) .analysisCard {
-          background: linear-gradient(155deg, rgba(255, 255, 255, 0.88), rgba(232, 241, 255, 0.94));
-          border: 1px solid rgba(15, 106, 214, 0.16);
-        }
-
-        :global(body.dark) .analysisCard {
-          background:
-            radial-gradient(circle at 86% -24%, rgba(49, 216, 196, 0.19), transparent 52%),
-            radial-gradient(circle at 12% -14%, rgba(73, 163, 255, 0.24), transparent 56%),
-            linear-gradient(160deg, rgba(12, 45, 84, 0.96), rgba(9, 31, 61, 0.96));
-          border-color: rgba(105, 182, 248, 0.34);
-          box-shadow: 0 16px 34px rgba(3, 12, 28, 0.56);
-        }
-
-        .analysisHeader {
-          display: flex;
-          justify-content: space-between;
           gap: 12px;
-          align-items: center;
-        }
-
-        .analysisEyebrow {
-          font-size: 11px;
-          letter-spacing: 0.16em;
-          text-transform: uppercase;
-          color: var(--text-tertiary);
-        }
-
-        .analysisTitle {
-          margin: 6px 0 0;
-          font-size: clamp(1.16rem, 1.8vw, 1.36rem);
-          color: color-mix(in srgb, var(--foreground) 94%, var(--primary));
-          letter-spacing: -0.01em;
-          line-height: 1.15;
-        }
-
-        .analysisPill {
-          padding: 6px 12px;
-          border-radius: 999px;
-          background: linear-gradient(135deg, rgba(15, 106, 214, 0.2), rgba(23, 137, 252, 0.12));
-          color: color-mix(in srgb, var(--text-secondary) 90%, var(--foreground));
-          font-size: 12px;
-          white-space: nowrap;
-          border: 1px solid rgba(15, 106, 214, 0.24);
-        }
-
-        :global(body.dark) .analysisPill {
-          background: linear-gradient(135deg, rgba(73, 163, 255, 0.24), rgba(49, 216, 196, 0.16));
-          color: #d8eeff;
-          border-color: rgba(108, 189, 255, 0.32);
         }
 
         .userHoursList {
           display: grid;
-          gap: 10px;
+          gap: 8px;
         }
 
         .userHoursRow {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 10px 12px;
-          border-radius: 12px;
-          background: rgba(15, 106, 214, 0.08);
-          border: 1px solid rgba(15, 106, 214, 0.14);
+          padding: 8px 10px;
+          border-radius: 10px;
+          border: 1px solid var(--border);
         }
 
-        :global(body.light) .userHoursRow {
-          background: rgba(15, 106, 214, 0.08);
-          border: 1px solid rgba(15, 106, 214, 0.14);
-        }
-
-        :global(body.dark) .userHoursRow {
-          background: linear-gradient(135deg, rgba(73, 163, 255, 0.2), rgba(49, 216, 196, 0.12));
-          border: 1px solid rgba(108, 188, 255, 0.28);
-        }
-
-        .userHoursName {
-          font-size: 13px;
-          color: var(--text-secondary);
-        }
-
-        .userHoursValue {
+        .userHoursValue,
+        .chartTooltipValue {
           font-weight: 700;
           color: var(--foreground);
         }
@@ -1071,23 +803,16 @@ export default function Dashboard() {
           width: 100%;
           height: 240px;
           padding: 8px;
-          border-radius: 16px;
-          border: 1px solid rgba(23, 137, 252, 0.2);
-          background: rgba(35, 39, 47, 0.6);
-          position: relative;
+          border: 1px solid var(--border);
+          border-radius: 10px;
           overflow: hidden;
         }
 
-        .chartWrap::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background:
-            linear-gradient(transparent 95%, color-mix(in srgb, var(--primary) 16%, transparent) 95%),
-            linear-gradient(90deg, transparent 95%, color-mix(in srgb, var(--primary) 14%, transparent) 95%);
-          background-size: 100% 28px, 40px 100%;
-          opacity: 0.25;
-          pointer-events: none;
+        .chartWrap::before,
+        .heroCard::after,
+        .kpiCard::before,
+        .analysisCard::before {
+          content: none !important;
         }
 
         .chartEmpty {
@@ -1095,158 +820,45 @@ export default function Dashboard() {
           display: grid;
           place-items: center;
           text-align: center;
+          border: 1px dashed var(--border);
+          border-radius: 8px;
           color: var(--text-tertiary);
-          font-size: 0.88rem;
-          font-weight: 600;
-          letter-spacing: 0.01em;
-          border-radius: 12px;
-          background: linear-gradient(160deg, rgba(15, 106, 214, 0.12), rgba(22, 169, 110, 0.08));
-          border: 1px dashed rgba(15, 106, 214, 0.3);
-          padding: 14px;
-          position: relative;
-          z-index: 1;
-        }
-
-        :global(body.dark) .chartEmpty {
-          background: linear-gradient(160deg, rgba(73, 163, 255, 0.12), rgba(49, 216, 196, 0.08));
-          border-color: rgba(108, 189, 255, 0.3);
-        }
-
-        :global(body.light) .chartWrap {
-          background: linear-gradient(160deg, rgba(240, 246, 255, 0.92), rgba(225, 236, 252, 0.96));
-          border-color: rgba(15, 106, 214, 0.18);
-        }
-
-        :global(body.dark) .chartWrap {
-          background:
-            radial-gradient(circle at 92% -20%, rgba(49, 216, 196, 0.16), transparent 54%),
-            linear-gradient(160deg, rgba(12, 44, 82, 0.78), rgba(8, 29, 56, 0.94));
-          border-color: rgba(105, 183, 248, 0.32);
+          font-size: 13px;
+          padding: 12px;
         }
 
         .chartTooltip {
-          background: rgba(35, 39, 47, 0.95);
-          color: #ededed;
-          padding: 10px 12px;
-          border-radius: 12px;
+          padding: 8px 10px;
+          border-radius: 8px;
+          border: 1px solid var(--border);
+          color: var(--foreground);
           font-size: 12px;
           display: grid;
-          gap: 6px;
-          border: 1px solid rgba(23, 137, 252, 0.35);
-        }
-
-        :global(body.light) .chartTooltip {
-          background: rgba(255, 255, 255, 0.98);
-          color: var(--foreground);
-          border-color: rgba(15, 106, 214, 0.2);
-          box-shadow: 0 12px 26px rgba(15, 106, 214, 0.18);
-        }
-
-        :global(body.dark) .chartTooltip {
-          background: rgba(9, 31, 60, 0.96);
-          color: #eaf5ff;
-          border: 1px solid rgba(111, 191, 255, 0.4);
-          box-shadow: 0 12px 28px rgba(3, 12, 28, 0.46);
-        }
-
-        .chartTooltipTitle {
-          font-weight: 600;
+          gap: 4px;
         }
 
         .chartTooltipRow {
           display: flex;
           justify-content: space-between;
-          gap: 10px;
-        }
-
-        .chartTooltipValue {
-          font-weight: 600;
-        }
-
-        @keyframes shimmer {
-          0% {
-            transform: translateX(-60%);
-          }
-          50% {
-            transform: translateX(60%);
-          }
-          100% {
-            transform: translateX(-60%);
-          }
-        }
-
-        @keyframes floatUp {
-          from {
-            opacity: 0;
-            transform: translateY(8px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          gap: 8px;
         }
 
         @media (max-width: 900px) {
-          .heroHeader {
-            flex-direction: column;
-            align-items: flex-start;
-          }
-
           .heroMeta {
             text-align: left;
-          }
-
-          .heroCard {
-            padding: 16px 14px;
-            border-radius: 16px;
-          }
-
-          .heroBadges {
-            gap: 8px;
-          }
-
-          .chip {
-            font-size: 11px;
-            padding: 5px 10px;
-          }
-
-          .analysisHeader {
-            align-items: flex-start;
-            flex-wrap: wrap;
           }
         }
 
         @media (max-width: 640px) {
-          .heroTitle {
-            font-size: clamp(1.5rem, 7vw, 1.9rem);
-            margin-bottom: 4px;
-          }
-
-          .heroSubtitle {
-            font-size: 12px;
-          }
-
-          .kpiGrid {
+          .kpiGrid,
+          .analyticsGrid {
             grid-template-columns: 1fr;
           }
 
+          .heroCard,
           .kpiCard,
           .analysisCard {
-            border-radius: 16px;
-            padding: 16px 14px;
-          }
-
-          .kpiValue {
-            font-size: 20px;
-          }
-
-          .analysisTitle {
-            font-size: 17px;
-          }
-
-          .chartWrap {
-            padding: 6px;
-            border-radius: 14px;
+            padding: 14px;
           }
         }
       `}</style>

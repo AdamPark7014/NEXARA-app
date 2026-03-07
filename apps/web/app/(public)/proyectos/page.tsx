@@ -54,7 +54,7 @@ const getProjects = async (): Promise<Project[]> => {
 export default async function ProjectsPage() {
   const projects = await getProjects();
   return (
-    <main className={styles.container} aria-label="Página de proyectos">
+    <main className={`${styles.container} public-section-page`} aria-label="Página de proyectos">
       <section className={styles.hero}>
         <p className={styles.kicker}>Portafolio vivo</p>
         <div className={styles.heroHeader}>

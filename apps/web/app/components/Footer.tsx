@@ -1,5 +1,5 @@
 "use client";
-import React, { FormEvent, useState } from "react";
+import React, { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import styles from "./Footer.module.css";
 import Map from "./Map";
@@ -60,6 +60,20 @@ export default function Footer() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showBackTop, setShowBackTop] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackTop(window.scrollY > 420);
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
   
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -151,20 +165,20 @@ export default function Footer() {
               <div className={styles.linkGroup}>
                 <div className={styles.colTitle}>Soluciones</div>
                 <ul className={styles.list}>
-                  <li><Link href="/soluciones#infraestructura">Infraestructura</Link></li>
-                  <li><Link href="/soluciones#energia">Energía</Link></li>
-                  <li><Link href="/soluciones#seguridad">Ciberseguridad</Link></li>
-                  <li><Link href="/soluciones#datos">Centro de datos</Link></li>
+                  <li><Link href="/servicios#servicios-principales">Infraestructura</Link></li>
+                  <li><Link href="/servicios#servicios-principales">Energía</Link></li>
+                  <li><Link href="/servicios#servicios-principales">Ciberseguridad</Link></li>
+                  <li><Link href="/servicios#servicios-principales">Centro de datos</Link></li>
                 </ul>
               </div>
 
               <div className={styles.linkGroup}>
                 <div className={styles.colTitle}>Servicios</div>
                 <ul className={styles.list}>
-                  <li><Link href="/servicios#venta">Venta de equipos</Link></li>
-                  <li><Link href="/servicios#integracion">Integración</Link></li>
-                  <li><Link href="/servicios#soporte">Soporte</Link></li>
-                  <li><Link href="/servicios#consultoria">Consultoría</Link></li>
+                  <li><Link href="/servicios#servicios-principales">Venta de equipos</Link></li>
+                  <li><Link href="/servicios#servicios-principales">Integración</Link></li>
+                  <li><Link href="/servicios#contacto">Soporte</Link></li>
+                  <li><Link href="/servicios#sectores">Consultoría</Link></li>
                 </ul>
               </div>
 
@@ -249,15 +263,21 @@ export default function Footer() {
         </div>
       </div>
 
-      <button
-        aria-label="Volver arriba"
-        className={styles.backTop}
-        onClick={() => {
-          if (typeof window !== "undefined") {
-            window.scrollTo({ top: 0, behavior: "smooth" });
-          }
-        }}
-      >↑</button>
+      {showBackTop && (
+        <button
+          aria-label="Volver arriba"
+          className={styles.backTop}
+          onClick={() => {
+            if (typeof window !== "undefined") {
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }
+          }}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 6l-6 6h4v6h4v-6h4z" />
+          </svg>
+        </button>
+      )}
     </footer>
   );
 }

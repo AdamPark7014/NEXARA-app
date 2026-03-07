@@ -105,9 +105,9 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           align-items: center;
           justify-content: center;
           background:
-            radial-gradient(circle at 4% -12%, rgba(59, 130, 246, 0.34), transparent 44%),
-            radial-gradient(circle at 96% -4%, rgba(34, 211, 238, 0.18), transparent 46%),
-            linear-gradient(140deg, #070b1f 0%, #0d1833 46%, #111a36 100%);
+            radial-gradient(circle at 4% -12%, rgba(95, 123, 156, 0.28), transparent 44%),
+            radial-gradient(circle at 96% -4%, rgba(95, 128, 136, 0.14), transparent 46%),
+            linear-gradient(140deg, #101825 0%, #172234 46%, #1b2738 100%);
           position: relative;
           overflow: hidden;
           isolation: isolate;
@@ -121,7 +121,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           left: -50%;
           width: 200%;
           height: 200%;
-          background: radial-gradient(circle, rgba(59, 130, 246, 0.18) 0%, transparent 70%);
+          background: radial-gradient(circle, rgba(109, 143, 178, 0.16) 0%, transparent 70%);
           animation: rotate 26s linear infinite;
           z-index: -2;
         }
@@ -131,8 +131,8 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           position: absolute;
           inset: 0;
           background:
-            linear-gradient(rgba(118, 158, 219, 0.08) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(118, 158, 219, 0.08) 1px, transparent 1px);
+            linear-gradient(rgba(133, 149, 173, 0.08) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(133, 149, 173, 0.08) 1px, transparent 1px);
           background-size: 42px 42px;
           mask-image: radial-gradient(circle at 50% 36%, black 16%, transparent 78%);
           z-index: -1;
@@ -148,8 +148,8 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           width: 100%;
           max-width: 540px;
           background:
-            radial-gradient(circle at 86% -22%, rgba(59, 130, 246, 0.22), transparent 48%),
-            linear-gradient(160deg, rgba(16, 29, 52, 0.92), rgba(14, 24, 45, 0.94));
+            radial-gradient(circle at 86% -22%, rgba(109, 143, 178, 0.2), transparent 48%),
+            linear-gradient(160deg, rgba(24, 36, 54, 0.92), rgba(20, 30, 46, 0.94));
           backdrop-filter: blur(16px);
           border-radius: 26px;
           padding: clamp(26px, 4vw, 48px) clamp(20px, 3.2vw, 40px);
@@ -157,7 +157,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
             0 20px 50px rgba(4, 12, 28, 0.62),
             0 8px 18px rgba(4, 12, 28, 0.32),
             inset 0 1px 0 rgba(255, 255, 255, 0.14);
-          border: 1px solid rgba(124, 173, 255, 0.2);
+          border: 1px solid rgba(146, 166, 192, 0.24);
           animation: slideUp 0.44s ease-out;
         }
 
@@ -187,21 +187,21 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           align-items: center;
           justify-content: center;
           box-shadow: 0 12px 26px rgba(4, 12, 25, 0.54);
-          border: 1px solid rgba(86, 151, 255, 0.36);
+          border: 1px solid rgba(137, 162, 192, 0.34);
         }
 
         .logoImage {
           width: 64px;
           height: 64px;
           object-fit: contain;
-          filter: drop-shadow(0 6px 12px rgba(59, 130, 246, 0.4));
+          filter: drop-shadow(0 6px 12px rgba(84, 110, 140, 0.34));
         }
 
         .brandName {
           font-size: 14px;
           text-transform: uppercase;
           letter-spacing: 0.26rem;
-          color: rgba(194, 217, 252, 0.8);
+          color: rgba(206, 217, 232, 0.82);
           margin: 0 0 8px;
           font-weight: 700;
         }
@@ -218,7 +218,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
 
         .subtitle {
           font-size: clamp(0.88rem, 1.4vw, 0.98rem);
-          color: rgba(199, 217, 243, 0.9);
+          color: rgba(207, 219, 234, 0.9);
           margin: 0;
           line-height: 1.56;
           text-wrap: pretty;
@@ -237,7 +237,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           display: block;
           font-size: 0.92rem;
           font-weight: 620;
-          color: rgba(206, 221, 246, 0.94);
+          color: rgba(214, 224, 236, 0.94);
           margin-bottom: 8px;
         }
 
@@ -263,7 +263,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           width: 100%;
           padding: 14px 16px 14px 50px;
           background: linear-gradient(180deg, rgba(248, 252, 255, 0.14), rgba(235, 245, 255, 0.08)) !important;
-          border: 1px solid rgba(132, 179, 255, 0.26) !important;
+          border: 1px solid rgba(146, 166, 192, 0.32) !important;
           border-radius: 12px;
           color: #f7fbff !important;
           font-size: 15px;
@@ -273,7 +273,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         }
 
         .login-card .input:hover {
-          border-color: rgba(132, 179, 255, 0.42);
+          border-color: rgba(156, 176, 201, 0.52);
           background: linear-gradient(180deg, rgba(248, 252, 255, 0.18), rgba(235, 245, 255, 0.11)) !important;
         }
 
@@ -283,12 +283,12 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
 
         .login-card .input:focus {
           background: linear-gradient(180deg, rgba(248, 252, 255, 0.22), rgba(235, 245, 255, 0.14)) !important;
-          border-color: #62a3ff !important;
-          box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.24);
+          border-color: #90aac8 !important;
+          box-shadow: 0 0 0 4px rgba(109, 143, 178, 0.24);
         }
 
         .input:focus + .input-icon {
-          color: #3b82f6;
+          color: #8eaccd;
         }
 
         .login-card .input::placeholder {
@@ -339,7 +339,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         }
 
         .password-toggle:focus-visible {
-          outline: 2px solid rgba(124, 173, 255, 0.8);
+          outline: 2px solid rgba(146, 166, 192, 0.8);
           outline-offset: 2px;
         }
 
@@ -347,7 +347,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           width: 100%;
           min-height: 52px;
           padding: 14px 16px;
-          background: linear-gradient(135deg, #3f8af9 0%, #2d6eea 100%);
+          background: linear-gradient(135deg, #4f759f 0%, #3e648c 100%);
           border: none;
           border-radius: 12px;
           color: white;
@@ -355,7 +355,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           font-weight: 700;
           cursor: pointer;
           transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
-          box-shadow: 0 10px 24px rgba(59, 130, 246, 0.34);
+          box-shadow: 0 10px 24px rgba(64, 88, 120, 0.34);
           position: relative;
           overflow: hidden;
         }
@@ -377,7 +377,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
 
         .submit-button:hover {
           transform: translateY(-2px);
-          box-shadow: 0 14px 28px rgba(59, 130, 246, 0.42);
+          box-shadow: 0 14px 28px rgba(64, 88, 120, 0.42);
           filter: brightness(1.03);
         }
 
@@ -393,7 +393,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         }
 
         .submit-button:focus-visible {
-          outline: 3px solid rgba(133, 184, 255, 0.8);
+          outline: 3px solid rgba(159, 178, 201, 0.86);
           outline-offset: 2px;
         }
 
@@ -419,12 +419,12 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           margin-top: 32px;
           text-align: center;
           padding-top: 24px;
-          border-top: 1px solid rgba(134, 181, 255, 0.16);
+          border-top: 1px solid rgba(152, 172, 196, 0.22);
         }
 
         .footer-text {
           font-size: 13px;
-          color: rgba(186, 208, 241, 0.8);
+          color: rgba(190, 204, 222, 0.84);
           margin: 0;
         }
 
