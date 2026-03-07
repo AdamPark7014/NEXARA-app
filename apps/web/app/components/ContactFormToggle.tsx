@@ -79,7 +79,16 @@ export default function ContactFormToggle() {
         className={`${styles.contactPanel} ${open ? styles.contactPanelOpen : ""}`}
       >
         {!submitted ? (
-          <form className={styles.contactForm} onSubmit={onSubmit}>
+          <>
+            <div className={styles.contactPanelIntro}>
+              <p className={styles.contactPanelEyebrow}>Asesoria personalizada</p>
+              <h3 className={styles.contactPanelTitle}>Cuentanos sobre tu proyecto</h3>
+              <p className={styles.contactPanelText}>
+                Nuestro equipo revisa tu caso y te responde con una propuesta clara en menos de 24 horas habiles.
+              </p>
+            </div>
+
+            <form className={styles.contactForm} onSubmit={onSubmit}>
             <div className={styles.formRow}>
               <div className={styles.formField}>
                 <label htmlFor="name">Nombre</label>
@@ -118,7 +127,8 @@ export default function ContactFormToggle() {
               </button>
               <button type="button" className={styles.cancelButton} onClick={() => setOpen(false)} disabled={loading}>Cancelar</button>
             </div>
-          </form>
+            </form>
+          </>
         ) : (
           <div className={styles.contactSuccess}>¡Gracias! Te contactaremos pronto.</div>
         )}

@@ -24,16 +24,10 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Init theme from localStorage or system
+  // Always start in light mode on each load.
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = localStorage.getItem("theme");
-    let isDark = false;
-    if (stored === "dark") isDark = true;
-    else if (stored === "light") isDark = false;
-    else isDark = false;
-    setDarkMode(isDark);
-    syncDarkClass(isDark);
+    setDarkMode(false);
+    syncDarkClass(false);
   }, []);
 
   // Sync class on change
@@ -42,13 +36,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   }, [darkMode]);
 
   const toggleDarkMode = () => {
-    setDarkMode((prev) => {
-      const newDark = !prev;
-      if (typeof window !== "undefined") {
-        localStorage.setItem("theme", newDark ? "dark" : "light");
-      }
-      return newDark;
-    });
+    setDarkMode((prev) => !prev);
   };
 
   return (

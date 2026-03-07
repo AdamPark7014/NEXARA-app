@@ -1,0 +1,304 @@
+.subdomainsPaletteLock {
+  --sd-shell-bg: #2459b6;
+  --sd-shell-bg-alt: #1f4ea3;
+  --sd-shell-border: rgba(219, 233, 255, 0.34);
+  --sd-shell-text: #eef5ff;
+  --sd-shell-text-soft: rgba(224, 238, 255, 0.9);
+  --sd-menu-bg: rgba(255, 255, 255, 0.1);
+  --sd-menu-bg-hover: rgba(255, 255, 255, 0.18);
+  --sd-menu-bg-active: linear-gradient(135deg, #5a86c8 0%, #4a76b7 100%);
+  --sd-menu-border: rgba(219, 233, 255, 0.24);
+}
+
+body.light .subdomainsPaletteLock {
+  --primary: #1f5fbf;
+  --secondary: #2b8a7d;
+  --surface: #f4f8fd;
+  --surface-light: #eef4fb;
+  --background: #edf4fb;
+  background: linear-gradient(180deg, #f5faff 0%, #eef6ff 100%);
+}
+
+body.dark .subdomainsPaletteLock {
+  --sd-shell-bg: #14345e;
+  --sd-shell-bg-alt: #10294a;
+  --sd-shell-border: rgba(133, 171, 223, 0.34);
+  --sd-shell-text: #dceaff;
+  --sd-shell-text-soft: rgba(210, 229, 255, 0.9);
+  --sd-menu-bg: rgba(147, 186, 241, 0.12);
+  --sd-menu-bg-hover: rgba(147, 186, 241, 0.22);
+  --sd-menu-bg-active: linear-gradient(135deg, #31537f 0%, #27466e 100%);
+  --sd-menu-border: rgba(133, 171, 223, 0.28);
+  background: linear-gradient(180deg, #0f1c2c 0%, #0c1724 100%);
+}
+
+/* Keep content area free; lock only sidebars. */
+body .subdomainsPaletteLock :is(.consoleLayout, .webPanelRoot, [class*="ticketsConsole"], .consoleMain, .webPanelMain) {
+  background-color: transparent !important;
+}
+
+/* Sidebar shell: catches CSS-module names while excluding inner sidebar fragments. */
+body .subdomainsPaletteLock :is(
+  .sidebar,
+  .webPanelSidebar,
+  .ventasSidebar,
+  [class*="webPanelSidebar"],
+  [class*="consoleSidebar"],
+  [class*="ticketsSidebar"],
+  [class*="VentasSidebar"],
+  [class*="ventasSidebar"],
+  div[class*="sidebar"],
+  section[class*="sidebar"],
+  aside[class*="sidebar"],
+  nav[class*="sidebar"],
+  article[class*="sidebar"]
+):not([class*="sidebarUser"]):not([class*="sidebarName"]):not([class*="sidebarEmail"]):not([class*="sidebarMeta"]):not([class*="sidebarAvatar"]):not([class*="sidebarFooter"]):not([class*="sidebarMenu"]):not([class*="sidebarContent"]):not([class*="sidebarHeader"]):not([class*="sidebarOverlay"]):not([class*="menuLink"]):not([class*="navLink"]) {
+  background-image: linear-gradient(168deg, var(--sd-shell-bg) 0%, var(--sd-shell-bg-alt) 100%) !important;
+  background-color: var(--sd-shell-bg) !important;
+  border-color: var(--sd-shell-border) !important;
+  color: var(--sd-shell-text) !important;
+  box-shadow: 0 20px 40px rgba(13, 33, 69, 0.3) !important;
+}
+
+/* Profile/user card inside sidebar */
+body .subdomainsPaletteLock :is(
+  .sidebarUser,
+  .webPanelUser,
+  .userCard,
+  [class*="sidebarUser"],
+  [class*="webPanelUser"],
+  [class*="userCard"]
+) {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(224, 238, 255, 0.1)) !important;
+  border-color: rgba(228, 240, 255, 0.34) !important;
+  color: var(--sd-shell-text) !important;
+  box-shadow: none !important;
+}
+
+/* Section titles */
+body .subdomainsPaletteLock :is(
+  .menuTitle,
+  .sectionTitle,
+  [class*="menuTitle"],
+  [class*="sectionTitle"]
+) {
+  color: var(--sd-shell-text-soft) !important;
+  -webkit-text-fill-color: var(--sd-shell-text-soft) !important;
+  border-left-color: rgba(191, 215, 255, 0.56) !important;
+  background: transparent !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+}
+
+/* Menu links */
+body .subdomainsPaletteLock :is(
+  .menuLink,
+  .navLink,
+  [class*="menuLink"],
+  [class*="navLink"]
+) {
+  background: var(--sd-menu-bg) !important;
+  border-color: var(--sd-menu-border) !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+body .subdomainsPaletteLock :is(
+  .menuLink:hover,
+  .navLink:hover,
+  [class*="menuLink"]:hover,
+  [class*="navLink"]:hover
+) {
+  background: var(--sd-menu-bg-hover) !important;
+  color: #ffffff !important;
+}
+
+body .subdomainsPaletteLock :is(
+  .menuLink.active,
+  .navLink.active,
+  .active,
+  [class*="menuLink"][class*="active"],
+  [class*="navLink"][class*="active"],
+  [class*="active"]
+) {
+  background: var(--sd-menu-bg-active) !important;
+  border-color: rgba(239, 246, 255, 0.48) !important;
+  color: #ffffff !important;
+}
+
+/* Footer controls */
+body .subdomainsPaletteLock :is(
+  .themeSwitcher,
+  .themeButton,
+  .logoutButton,
+  [class*="themeSwitcher"],
+  [class*="themeButton"],
+  [class*="logoutButton"]
+) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+/* Typography cleanup to prevent box artifacts and low contrast. */
+body .subdomainsPaletteLock :is(
+  .sidebar,
+  .webPanelSidebar,
+  .ventasSidebar,
+  [class*="webPanelSidebar"],
+  [class*="consoleSidebar"],
+  [class*="ticketsSidebar"],
+  [class*="VentasSidebar"],
+  [class*="ventasSidebar"],
+  div[class*="sidebar"],
+  section[class*="sidebar"],
+  aside[class*="sidebar"],
+  nav[class*="sidebar"],
+  article[class*="sidebar"]
+) :is(
+  .brandMark,
+  .brandSub,
+  .sidebarName,
+  .sidebarEmail,
+  .navLabel,
+  .navDescription,
+  .themeLabel,
+  .themeIcon,
+  .rolePill,
+  .levelPill,
+  [class*="brandMark"],
+  [class*="brandSub"],
+  [class*="sidebarName"],
+  [class*="sidebarEmail"],
+  [class*="navLabel"],
+  [class*="navDescription"],
+  [class*="themeLabel"],
+  [class*="themeIcon"],
+  [class*="rolePill"],
+  [class*="levelPill"]
+) {
+  color: var(--sd-shell-text) !important;
+  -webkit-text-fill-color: var(--sd-shell-text) !important;
+  background: transparent !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+}
+
+body .subdomainsPaletteLock :is(
+  .sidebarEmail,
+  .navDescription,
+  [class*="sidebarEmail"],
+  [class*="navDescription"]
+) {
+  color: var(--sd-shell-text-soft) !important;
+  -webkit-text-fill-color: var(--sd-shell-text-soft) !important;
+}
+
+/* Console content cleanup: keep global/base look and remove decorative over-styling. */
+body .subdomainsPaletteLock :is(
+  .consoleMain,
+  .webPanelMain,
+  [class*="consoleMain"],
+  [class*="webPanelMain"]
+) :is(
+  .card,
+  [class*="card"],
+  [class*="panel"],
+  [class*="Topbar"],
+  [class*="Hero"],
+  [class*="metric"],
+  [class*="widget"]
+) {
+  background-image: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+  transform: none !important;
+}
+
+body .subdomainsPaletteLock :is(
+  .consoleMain,
+  .webPanelMain,
+  [class*="consoleMain"],
+  [class*="webPanelMain"]
+) :is(
+  .card,
+  [class*="card"],
+  [class*="panel"],
+  [class*="Topbar"],
+  [class*="Hero"],
+  [class*="metric"],
+  [class*="widget"]
+)::before,
+body .subdomainsPaletteLock :is(
+  .consoleMain,
+  .webPanelMain,
+  [class*="consoleMain"],
+  [class*="webPanelMain"]
+) :is(
+  .card,
+  [class*="card"],
+  [class*="panel"],
+  [class*="Topbar"],
+  [class*="Hero"],
+  [class*="metric"],
+  [class*="widget"]
+)::after {
+  background: none !important;
+  box-shadow: none !important;
+}
+
+body.light .subdomainsPaletteLock :is(
+  .consoleMain,
+  .webPanelMain,
+  [class*="consoleMain"],
+  [class*="webPanelMain"]
+) :is(
+  .card,
+  [class*="card"],
+  [class*="panel"],
+  [class*="Topbar"],
+  [class*="Hero"],
+  [class*="metric"],
+  [class*="widget"]
+) {
+  background: var(--surface) !important;
+  border-color: rgba(31, 95, 191, 0.18) !important;
+}
+
+body.dark .subdomainsPaletteLock :is(
+  .consoleMain,
+  .webPanelMain,
+  [class*="consoleMain"],
+  [class*="webPanelMain"]
+) :is(
+  .card,
+  [class*="card"],
+  [class*="panel"],
+  [class*="Topbar"],
+  [class*="Hero"],
+  [class*="metric"],
+  [class*="widget"]
+) {
+  background: color-mix(in srgb, var(--surface) 92%, #0b1624) !important;
+  border-color: rgba(92, 150, 200, 0.26) !important;
+}
+
+body .subdomainsPaletteLock :is(
+  .consoleMain,
+  .webPanelMain,
+  [class*="consoleMain"],
+  [class*="webPanelMain"]
+) :is(
+  .card,
+  [class*="card"],
+  [class*="panel"],
+  [class*="Topbar"],
+  [class*="Hero"],
+  [class*="metric"],
+  [class*="widget"]
+):hover {
+  box-shadow: none !important;
+  transform: none !important;
+}

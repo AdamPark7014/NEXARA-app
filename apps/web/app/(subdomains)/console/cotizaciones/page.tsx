@@ -837,7 +837,7 @@ export default function CotizacionesPage() {
         .quoteShell {
           display: grid;
           gap: 24px;
-          font-family: "Space Grotesk", "Montserrat", sans-serif;
+          font-family: var(--panel-font-family);
           color: var(--quote-text);
         }
 
@@ -1425,3 +1425,4 @@ export default function CotizacionesPage() {
     </RoleGuard>
   );
 }
+

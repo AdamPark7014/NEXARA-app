@@ -319,87 +319,39 @@ export default function Home() {
       <main className={styles.main} aria-label="Inicio Nexara">
         <div className={styles.heroWrapper}>
           <section className={styles.hero} aria-labelledby="hero-heading">
+            <div className={styles.heroBackground} aria-hidden="true">
+              <Image
+                src="/images/hero_inicio.jpg"
+                alt=""
+                fill
+                priority
+                quality={100}
+                sizes="100vw"
+                className={styles.heroBackgroundImage}
+              />
+            </div>
             <div className={styles.heroLayout}>
               <div className={styles.heroContent}>
-                <span className={styles.heroEyebrow}>TRANSFORMAMOS TECNOLOGÍA EN RESULTADOS REALES</span>
-                <h1 id="hero-heading" className={styles.heroTitle}>
-                  Soluciones tecnológicas corporativas para continuidad y crecimiento
-                </h1>
-                <p className={styles.heroSubtitle}>
-                  Diseñamos, implementamos y operamos infraestructura TI con enfoque en
-                  continuidad, productividad y escalabilidad para empresas y sector público.
-                </p>
-
-                <ul className={styles.heroBenefits} aria-label="Beneficios principales">
-                  <li>Consultoría estratégica con acompañamiento integral</li>
-                  <li>Implementación bajo estándares empresariales</li>
-                  <li>Soporte especializado para operación crítica</li>
-                </ul>
-
-                <div className={`${styles.ctas} ${styles.heroButtons}`}>
-                  <a href="/contacto" className={`${styles.primary} ${styles.heroPrimaryCta}`}>
-                    Solicitar asesoría estratégica
-                  </a>
-                  <a href="/soluciones" className={`${styles.secondary} ${styles.heroSecondaryCta}`}>
-                    Revisar soluciones
-                  </a>
+                <div className={styles.heroMinimal} aria-label="Portada Nexara">
+                  <Image
+                    src="/logo-nexara.png"
+                    alt="Logo Nexara"
+                    width={220}
+                    height={220}
+                    className={styles.heroMinimalLogo}
+                    priority
+                  />
+                  <h1 id="hero-heading" className={styles.heroMinimalPhrase}>
+                    Protegemos lo que mas importa con tecnologia confiable y cercana.
+                  </h1>
+                  <p className={styles.heroMinimalSubphrase}>
+                    Soluciones profesionales para hogares y empresas, con acompanamiento real en cada paso.
+                  </p>
                 </div>
               </div>
-
-              <aside className={styles.heroPanel} aria-label="Indicadores clave de Nexara">
-                <h2 className={styles.heroPanelTitle}>Resultados que respaldan cada proyecto</h2>
-                <div className={styles.heroStats}>
-                  <div className={styles.heroStatItem}>
-                    <strong>+10 años</strong>
-                    <span>de experiencia en servicios y soluciones TI.</span>
-                  </div>
-                  <div className={styles.heroStatItem}>
-                    <strong>Soporte especializado</strong>
-                    <span>Atención experta para continuidad operativa.</span>
-                  </div>
-                  <div className={styles.heroStatItem}>
-                    <strong>Implementación de punta a punta</strong>
-                    <span>Desde diagnóstico hasta adopción en operación.</span>
-                  </div>
-                </div>
-              </aside>
             </div>
           </section>
         </div>
-
-        <section className={styles.enterpriseStrip} aria-label="Métricas corporativas">
-          {enterpriseMetrics.map((metric) => (
-            <article key={metric.label} className={styles.enterpriseMetricCard}>
-              <strong>{metric.value}</strong>
-              <h3>{metric.label}</h3>
-              <p>{metric.detail}</p>
-            </article>
-          ))}
-        </section>
-
-        <nav className={styles.quickNav} aria-label="Accesos rápidos">
-          <a href="#qa-exclusivo" className={styles.quickNavLink}>Q&A exclusivo</a>
-          <a href="#noticias" className={styles.quickNavLink}>Actualidad</a>
-          <a href="#capacidades" className={styles.quickNavLink}>Capacidades</a>
-          <a href="#soluciones" className={styles.quickNavLink}>Soluciones</a>
-          <a href="#metodologia" className={styles.quickNavLink}>Metodología</a>
-          <a href="#clientes" className={styles.quickNavLink}>Clientes</a>
-          <a href="/qa" className={styles.quickNavLink}>Q&A</a>
-        </nav>
-
-        <section id="qa-exclusivo" className={styles.qaSpotlight} aria-labelledby="qa-exclusivo-heading">
-          <div className={styles.qaSpotlightContent}>
-            <span className={styles.qaSpotlightBadge}>APARTADO EXCLUSIVO</span>
-            <h2 id="qa-exclusivo-heading" className={styles.qaSpotlightTitle}>Q&A estratégico para dirección y operación</h2>
-            <p className={styles.qaSpotlightText}>
-              Accede a respuestas puntuales sobre implementación, tiempos, cobertura y soporte para acelerar decisiones.
-            </p>
-          </div>
-          <div className={styles.qaSpotlightActions}>
-            <a href="/qa" className={styles.primary}>Ir al Q&A</a>
-            <a href="/contacto" className={styles.secondary}>Hacer una pregunta</a>
-          </div>
-        </section>
 
         <section id="noticias" className={styles.newsSection} aria-labelledby="noticias-heading">
           <div className={styles.newsHeader}>
@@ -484,6 +436,40 @@ export default function Home() {
               <p className={styles.newsEmptyText}>Muy pronto verás aquí novedades, ofertas y casos relevantes para toma de decisiones empresariales.</p>
             </div>
           )}
+        </section>
+
+        <section className={styles.enterpriseStrip} aria-label="Métricas corporativas">
+          {enterpriseMetrics.map((metric) => (
+            <article key={metric.label} className={styles.enterpriseMetricCard}>
+              <strong>{metric.value}</strong>
+              <h3>{metric.label}</h3>
+              <p>{metric.detail}</p>
+            </article>
+          ))}
+        </section>
+
+        <nav className={styles.quickNav} aria-label="Accesos rápidos">
+          <a href="#qa-exclusivo" className={styles.quickNavLink}>Q&A exclusivo</a>
+          <a href="#noticias" className={styles.quickNavLink}>Actualidad</a>
+          <a href="#capacidades" className={styles.quickNavLink}>Capacidades</a>
+          <a href="#soluciones" className={styles.quickNavLink}>Soluciones</a>
+          <a href="#metodologia" className={styles.quickNavLink}>Metodología</a>
+          <a href="#clientes" className={styles.quickNavLink}>Clientes</a>
+          <a href="/qa" className={styles.quickNavLink}>Q&A</a>
+        </nav>
+
+        <section id="qa-exclusivo" className={styles.qaSpotlight} aria-labelledby="qa-exclusivo-heading">
+          <div className={styles.qaSpotlightContent}>
+            <span className={styles.qaSpotlightBadge}>APARTADO EXCLUSIVO</span>
+            <h2 id="qa-exclusivo-heading" className={styles.qaSpotlightTitle}>Q&A estratégico para dirección y operación</h2>
+            <p className={styles.qaSpotlightText}>
+              Accede a respuestas puntuales sobre implementación, tiempos, cobertura y soporte para acelerar decisiones.
+            </p>
+          </div>
+          <div className={styles.qaSpotlightActions}>
+            <a href="/qa" className={styles.primary}>Ir al Q&A</a>
+            <a href="/contacto" className={styles.secondary}>Hacer una pregunta</a>
+          </div>
         </section>
 
         <section id="capacidades" className={styles.capabilitiesSection} aria-labelledby="capacidades-heading">
@@ -597,7 +583,7 @@ export default function Home() {
           </div>
           <div className={styles.executiveCtaActions}>
             <a href="/contacto" className={styles.primary}>Agendar reunión estratégica</a>
-            <a href="/soluciones" className={styles.secondary}>Revisar portafolio</a>
+            <a href="/servicios" className={styles.secondary}>Revisar portafolio</a>
           </div>
         </section>
 

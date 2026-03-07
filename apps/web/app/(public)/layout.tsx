@@ -15,7 +15,7 @@ export default function PublicLayout({
     <div className="public-layout-wrapper public-friendly">
       <NotificationBanner />
       <Header />
-      {children}
+      <div className="public-layout-content">{children}</div>
       <FloatingContactForm />
       <Footer />
     </div>
