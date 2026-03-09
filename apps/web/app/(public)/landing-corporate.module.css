@@ -12,7 +12,7 @@
 
 .root :global([data-ui="landing-hero-wrap"]) {
   width: 100% !important;
-  max-width: var(--content-max) !important;
+  max-width: 1680px !important;
   margin: 0 auto !important;
   min-height: auto !important;
   padding: 0 !important;
@@ -21,8 +21,8 @@
 
 .root :global([data-ui="landing-hero"]) {
   width: 100% !important;
-  max-width: var(--content-max) !important;
-  min-height: clamp(520px, 70vh, 760px) !important;
+  max-width: 1680px !important;
+  min-height: clamp(660px, 78vh, 920px) !important;
   margin: 0 !important;
   border-radius: 18px !important;
   border: 1px solid var(--landing-clean-border) !important;
@@ -94,7 +94,7 @@
 
 @media (max-width: 768px) {
   .root :global([data-ui="landing-hero"]) {
-    min-height: clamp(460px, 62vh, 620px) !important;
+    min-height: clamp(520px, 68vh, 720px) !important;
     border-radius: 14px !important;
   }
 
