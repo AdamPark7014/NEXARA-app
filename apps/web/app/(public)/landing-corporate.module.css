@@ -8,19 +8,19 @@
 .root {
   width: 100%;
   max-width: 100%;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
 }
 
 .root :global([data-ui="landing-hero-wrap"]) {
   width: 100vw !important;
   max-width: none !important;
   margin: 0 !important;
-  margin-left: 50% !important;
-  transform: translateX(-50%) !important;
+  margin-left: calc(-1 * var(--page-padding-x)) !important;
+  margin-right: calc(-1 * var(--page-padding-x)) !important;
   min-height: auto !important;
   padding: 0 !important;
   position: relative !important;
-  left: 0 !important;
-  right: 0 !important;
 }
 
 .root :global([data-ui="landing-hero"]) {
