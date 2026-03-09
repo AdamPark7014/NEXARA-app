@@ -1,0 +1,338 @@
+:root {
+  --font-base: "Manrope", "Segoe UI", "Inter", "Helvetica Neue", sans-serif;
+  --font-heading: "Space Grotesk", "Manrope", "Segoe UI", sans-serif;
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+
+  --elev-1: 0 6px 20px rgba(8, 24, 42, 0.09);
+  --elev-2: 0 14px 32px rgba(8, 24, 42, 0.14);
+  --ring-soft: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent);
+
+  --control-height: 42px;
+  --control-padding-y: 0.62rem;
+  --control-padding-x: 0.75rem;
+  --table-cell-y: 0.75rem;
+  --table-cell-x: 0.75rem;
+
+  --content-max: 1240px;
+  --page-padding-x: clamp(14px, 3vw, 44px);
+  --page-padding-y: clamp(16px, 2vw, 28px);
+  --panel-padding-x: clamp(16px, 2.2vw, 28px);
+  --panel-padding-y: clamp(18px, 2.2vw, 28px);
+  --panel-gap: clamp(14px, 1.8vw, 22px);
+  --panel-sidebar-width: 280px;
+  --header-offset: 16px;
+  --panel-title-leading: 1.28;
+  --panel-title-tracking: -0.01em;
+  --panel-font-family: var(--font-base);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Light theme: refined corporate palette with enhanced sophistication */
+body,
+body.light {
+  --background: #f8f9fc;
+  --background-elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f4f7fb;
+  --surface-3: #edf3f9;
+
+  --foreground: #0f1c2e;
+  --text-primary: #0f1c2e;
+  --text-secondary: #445668;
+  --text-tertiary: #6b7a8f;
+
+  --primary: #1a7ba8;
+  --primary-strong: #0d5a7d;
+  --secondary: #1b9678;
+  --accent: #d66533;
+  --accent-strong: #c24e1e;
+  --support: #5bb8cd;
+  --success: #1a8d6f;
+  --warning: #e67e15;
+  --danger: #c9423d;
+  --error: var(--danger);
+  --info: var(--primary);
+
+  --surface-light: color-mix(in srgb, var(--surface) 92%, var(--background));
+  --bg-secondary: color-mix(in srgb, var(--surface-2) 88%, var(--background));
+  --muted: color-mix(in srgb, var(--border) 68%, transparent);
+
+  --border: rgba(15, 48, 78, 0.12);
+  --border-strong: rgba(15, 48, 78, 0.24);
+  --shadow: 0 12px 28px rgba(10, 30, 52, 0.11);
+  --focus: rgba(26, 123, 168, 0.32);
+
+  /* Header / menu tokens with refined gradients and depth */
+  --header-bg: linear-gradient(142deg, #1a7ba8 0%, #1e88b4 38%, #5bb8cd 100%);
+  --header-border: rgba(91, 184, 205, 0.38);
+  --header-text: #ffffff;
+  --header-link: #ffffff;
+  --header-link-hover-bg: rgba(255, 255, 255, 0.18);
+  --header-link-active-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.16));
+
+  --menu-bg: linear-gradient(170deg, #1a7ba8 0%, #1d85af 54%, #1b6f94 100%);
+  --menu-text: #ffffff;
+  --menu-muted: rgba(230, 244, 255, 0.85);
+  --menu-item-bg: rgba(255, 255, 255, 0.08);
+  --menu-item-hover-bg: rgba(255, 255, 255, 0.16);
+  --menu-item-active-bg: linear-gradient(135deg, rgba(91, 184, 205, 0.42), rgba(255, 255, 255, 0.24));
+
+  --public-title-gradient: linear-gradient(138deg, #0d5a7d 0%, #1a7ba8 48%, #1b9678 100%);
+
+  --state-success-bg: color-mix(in srgb, var(--success) 12%, transparent);
+  --state-success-border: color-mix(in srgb, var(--success) 32%, transparent);
+  --state-success-text: color-mix(in srgb, var(--success) 88%, #0a3328);
+
+  --state-warning-bg: color-mix(in srgb, var(--warning) 13%, transparent);
+  --state-warning-border: color-mix(in srgb, var(--warning) 32%, transparent);
+  --state-warning-text: color-mix(in srgb, var(--warning) 90%, #482a0f);
+
+  --state-danger-bg: color-mix(in srgb, var(--danger) 12%, transparent);
+  --state-danger-border: color-mix(in srgb, var(--danger) 32%, transparent);
+  --state-danger-text: color-mix(in srgb, var(--danger) 88%, #481d1a);
+
+  --state-info-bg: color-mix(in srgb, var(--primary) 12%, transparent);
+  --state-info-border: color-mix(in srgb, var(--primary) 32%, transparent);
+  --state-info-text: color-mix(in srgb, var(--primary) 88%, #0f2d48);
+
+  --brand-glass-primary: color-mix(in srgb, var(--primary) 16%, transparent);
+  --brand-glass-secondary: color-mix(in srgb, var(--secondary) 13%, transparent);
+
+  color-scheme: light;
+}
+
+/* Dark theme: sophisticated depth with enhanced elegance */
+body.dark {
+  --background: #090f19;
+  --background-elevated: #0f1721;
+  --surface: #11202f;
+  --surface-2: #152938;
+  --surface-3: #1b3546;
+
+  --foreground: #eaf4ff;
+  --text-primary: #eaf4ff;
+  --text-secondary: #c5d7eb;
+  --text-tertiary: #91acc7;
+
+  --primary: #64c0d4;
+  --primary-strong: #47aec4;
+  --secondary: #1f9f83;
+  --accent: #ed8219;
+  --accent-strong: #ff9427;
+  --support: #7fd4e8;
+  --success: #2fb896;
+  --warning: #f19f34;
+  --danger: #d46d6d;
+  --error: var(--danger);
+  --info: var(--primary);
+
+  --surface-light: color-mix(in srgb, var(--surface) 90%, var(--background));
+  --bg-secondary: color-mix(in srgb, var(--surface-2) 86%, var(--background));
+  --muted: color-mix(in srgb, var(--border) 68%, transparent);
+
+  --border: rgba(100, 160, 205, 0.22);
+  --border-strong: rgba(120, 180, 225, 0.38);
+  --shadow: 0 16px 38px rgba(0, 0, 0, 0.58);
+  --focus: rgba(100, 192, 212, 0.4);
+
+  --header-bg: linear-gradient(142deg, #0f2233 0%, #153247 46%, #1b415a 100%);
+  --header-border: rgba(102, 170, 205, 0.3);
+  --header-text: #e8f4ff;
+  --header-link: #e8f4ff;
+  --header-link-hover-bg: rgba(100, 192, 212, 0.14);
+  --header-link-active-bg: linear-gradient(135deg, rgba(73, 156, 186, 0.4), rgba(24, 61, 86, 0.54));
+
+  --menu-bg: linear-gradient(170deg, #0e1e2d 0%, #123044 54%, #10273a 100%);
+  --menu-text: #eaf5ff;
+  --menu-muted: rgba(205, 224, 242, 0.78);
+  --menu-item-bg: rgba(100, 192, 212, 0.08);
+  --menu-item-hover-bg: rgba(100, 192, 212, 0.14);
+  --menu-item-active-bg: linear-gradient(135deg, rgba(73, 156, 186, 0.42), rgba(34, 88, 120, 0.52));
+
+  --public-title-gradient: linear-gradient(138deg, #7fd4e8 0%, var(--success) 48%, var(--accent) 100%);
+
+  --state-success-bg: color-mix(in srgb, var(--success) 20%, transparent);
+  --state-success-border: color-mix(in srgb, var(--success) 42%, transparent);
+  --state-success-text: color-mix(in srgb, var(--success) 78%, #e2f9f1);
+
+  --state-warning-bg: color-mix(in srgb, var(--warning) 20%, transparent);
+  --state-warning-border: color-mix(in srgb, var(--warning) 42%, transparent);
+  --state-warning-text: color-mix(in srgb, var(--warning) 78%, #fff3de);
+
+  --state-danger-bg: color-mix(in srgb, var(--danger) 20%, transparent);
+  --state-danger-border: color-mix(in srgb, var(--danger) 42%, transparent);
+  --state-danger-text: color-mix(in srgb, var(--danger) 80%, #ffe6e6);
+
+  --state-info-bg: color-mix(in srgb, var(--primary) 20%, transparent);
+  --state-info-border: color-mix(in srgb, var(--primary) 42%, transparent);
+  --state-info-text: color-mix(in srgb, var(--primary) 80%, #e4f5ff);
+
+  --brand-glass-primary: color-mix(in srgb, var(--primary) 22%, transparent);
+  --brand-glass-secondary: color-mix(in srgb, var(--secondary) 17%, transparent);
+
+  color-scheme: dark;
+}
+
+body.density-compact {
+  --control-height: 36px;
+  --control-padding-y: 0.44rem;
+  --control-padding-x: 0.62rem;
+  --table-cell-y: 0.56rem;
+  --table-cell-x: 0.62rem;
+}
+
+body.density-cozy {
+  --control-height: 42px;
+  --control-padding-y: 0.62rem;
+  --control-padding-x: 0.75rem;
+  --table-cell-y: 0.75rem;
+  --table-cell-x: 0.75rem;
+}
+
+body {
+  font-family: var(--font-base);
+  color: var(--foreground);
+  line-height: 1.58;
+  letter-spacing: 0.003em;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background:
+    radial-gradient(circle at 8% -10%, rgba(110, 199, 217, 0.08), transparent 42%),
+    radial-gradient(circle at 94% -10%, rgba(61, 150, 196, 0.06), transparent 40%),
+    linear-gradient(180deg, var(--background) 0%, color-mix(in srgb, var(--surface-2) 90%, var(--background)) 100%);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-heading);
+  letter-spacing: -0.015em;
+  line-height: 1.18;
+  margin: 0 0 var(--space-3);
+  color: var(--text-primary);
+}
+
+h1 {
+  font-size: clamp(1.9rem, 2.8vw, 2.7rem);
+}
+
+h2 {
+  font-size: clamp(1.55rem, 2.3vw, 2.1rem);
+}
+
+h3 {
+  font-size: clamp(1.2rem, 1.9vw, 1.55rem);
+}
+
+h4 {
+  font-size: clamp(1.02rem, 1.4vw, 1.2rem);
+}
+
+p {
+  margin: 0 0 var(--space-3);
+  color: var(--text-secondary);
+}
+
+small,
+.text-small {
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
+  margin: var(--space-4) 0;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  color: var(--accent);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Keep keyboard focus visible even if local modules reset outlines. */
+:where(a, button, [role="button"], input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Respect reduced-motion preferences across all routes and subdomains. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-play-state: paused !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+::selection {
+  background: rgba(110, 199, 217, 0.28);
+  color: var(--text-primary);
+}
+

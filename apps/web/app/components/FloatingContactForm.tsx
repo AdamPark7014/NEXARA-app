@@ -117,30 +117,18 @@ export default function FloatingContactForm() {
             aria-modal="true"
             aria-labelledby="floating-contact-title"
           >
-            <div
-              className={styles.panelHeader}
-              style={{
-                background: "linear-gradient(145deg, #2b58cb 0%, #3e73e6 100%)",
-                borderBottomColor: "rgba(214, 232, 255, 0.34)",
-              }}
-            >
+            <div className={styles.panelHeader}>
               <div>
-                <p className={styles.panelEyebrow} style={{ color: "rgba(240, 247, 255, 0.92)" }}>
+                <p className={styles.panelEyebrow}>
                   NEXARA | CONTACTO DIRECTIVO
                 </p>
-                <h3 id="floating-contact-title" style={{ color: "#ffffff" }}>
+                <h3 id="floating-contact-title">
                   Asesoria corporativa inmediata
                 </h3>
               </div>
               <button
                 type="button"
                 className={styles.closeButton}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  boxShadow: "none",
-                  color: "#ffffff",
-                }}
                 onClick={handleClose}
                 aria-label="Cerrar formulario"
               >

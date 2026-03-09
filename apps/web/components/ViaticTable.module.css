@@ -1,1 +1,145 @@
-.title {  color: var(--primary);  margin-bottom: 12px;}.filtersGrid {  display: grid;  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));  gap: 12px;  margin-bottom: 12px;  align-items: center;}.filtersGridMobile {  grid-template-columns: 1fr;}.importActions {  display: grid;  grid-template-columns: auto auto;  gap: 10px;  margin-bottom: 12px;  justify-content: start;}.importActionsMobile {  grid-template-columns: 1fr;  justify-content: stretch;}.fullWidthBtn {  width: 100%;}.hiddenInput {  display: none;}.importError {  color: var(--danger);}.importSuccess,.successText {  color: var(--accent);}.tableWrap {  overflow-x: auto;  -webkit-overflow-scrolling: touch;  border: 1px solid var(--muted);  border-radius: 12px;}.tableMin {  min-width: 840px;}.mobileList {  display: grid;  gap: 12px;}.mobileCard {  border: 1px solid var(--muted);  padding: 12px;  display: grid;  gap: 8px;}.mobileHeader {  display: flex;  justify-content: space-between;  gap: 10px;  align-items: flex-start;}.mobileHeaderMain {  min-width: 0;}.mobileActivity {  font-weight: 600;}.mobileUser {  color: var(--text-secondary);  font-size: 12px;}.mobileText {  font-size: 13px;}.mobileReason {  font-size: 13px;  word-break: break-word;}.mobileActionsSingle,.mobileActionsTriple {  display: grid;  gap: 8px;}.mobileActionsSingle {  grid-template-columns: 1fr;}.mobileActionsTriple {  grid-template-columns: 1fr 1fr 1fr;}.ticketLink {  text-align: center;}.ticketLinkDisabled {  pointer-events: none;  opacity: 0.6;}.actionBtn {  min-height: 42px;}.pagination {  margin-top: 12px;  display: flex;  gap: 8px;  align-items: center;  justify-content: space-between;  flex-wrap: wrap;}.errorText {  color: var(--danger);}
+.title {
+	margin: 0 0 0.8rem;
+}
+
+.filtersGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+	gap: 0.6rem;
+	margin-bottom: 0.7rem;
+}
+
+.filtersGridMobile {
+	grid-template-columns: 1fr;
+}
+
+.importActions {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 0.55rem;
+	margin-bottom: 0.65rem;
+}
+
+.importActionsMobile {
+	flex-direction: column;
+	align-items: stretch;
+}
+
+.fullWidthBtn {
+	width: 100%;
+}
+
+.hiddenInput {
+	display: none;
+}
+
+.importError,
+.importSuccess {
+	font-size: 0.85rem;
+	margin-bottom: 0.65rem;
+	font-weight: 700;
+}
+
+.importError,
+.errorText {
+	color: var(--danger);
+}
+
+.importSuccess,
+.successText {
+	color: var(--success);
+}
+
+.tableWrap {
+	overflow-x: auto;
+}
+
+.tableMin {
+	min-width: 860px;
+}
+
+.mobileList {
+	display: grid;
+	gap: 0.7rem;
+}
+
+.mobileCard {
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	padding: 0.7rem;
+	background: var(--surface);
+}
+
+.mobileHeader {
+	display: flex;
+	justify-content: space-between;
+	gap: 0.55rem;
+	align-items: flex-start;
+}
+
+.mobileHeaderMain {
+	min-width: 0;
+}
+
+.mobileActivity {
+	font-weight: 700;
+}
+
+.mobileUser,
+.mobileText,
+.mobileReason {
+	font-size: 0.86rem;
+}
+
+.mobileUser {
+	color: var(--text-secondary);
+}
+
+.mobileReason {
+	margin-top: 0.5rem;
+}
+
+.mobileActionsSingle,
+.mobileActionsTriple {
+	margin-top: 0.55rem;
+	display: grid;
+	gap: 0.5rem;
+}
+
+.mobileActionsSingle {
+	grid-template-columns: 1fr;
+}
+
+.mobileActionsTriple {
+	grid-template-columns: 1fr 1fr 1fr;
+}
+
+.ticketLink {
+	justify-content: center;
+}
+
+.ticketLinkDisabled {
+	pointer-events: none;
+	opacity: 0.6;
+}
+
+.actionBtn {
+	min-height: 41px;
+}
+
+.pagination {
+	margin-top: 0.65rem;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	justify-content: space-between;
+	flex-wrap: wrap;
+}
+
+@media (max-width: 720px) {
+	.mobileActionsTriple {
+		grid-template-columns: 1fr;
+	}
+}
+
