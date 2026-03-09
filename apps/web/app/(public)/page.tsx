@@ -6,6 +6,7 @@ import CertificationsCarousel from "../components/CertificationsCarousel";
 import BrandsCarousel from "../components/BrandsCarousel";
 import ContactFormToggle from "../components/ContactFormToggle";
 import styles from "../page.module.css";
+import corporateStyles from "./landing-corporate.module.css";
 import { buildApiUrl, getApiBase } from "@/lib/api-base";
 
 interface Client {
@@ -315,10 +316,10 @@ export default function Home() {
       ));
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${corporateStyles.root}`}>
       <main className={styles.main} aria-label="Inicio Nexara">
-        <div className={styles.heroWrapper}>
-          <section className={styles.hero} aria-labelledby="hero-heading">
+        <div data-ui="landing-hero-wrap" className={styles.heroWrapper}>
+          <section data-ui="landing-hero" className={styles.hero} aria-labelledby="hero-heading">
             <div className={styles.heroBackground} aria-hidden="true">
               <Image
                 src="/images/hero_inicio.jpg"
@@ -353,7 +354,7 @@ export default function Home() {
           </section>
         </div>
 
-        <section id="noticias" className={styles.newsSection} aria-labelledby="noticias-heading">
+        <section id="noticias" data-ui="landing-news" className={styles.newsSection} aria-labelledby="noticias-heading">
           <div className={styles.newsHeader}>
             <span className={styles.newsBadge}>NOTICIAS, OFERTAS Y NOVEDADES</span>
             <div>
@@ -438,9 +439,9 @@ export default function Home() {
           )}
         </section>
 
-        <section className={styles.enterpriseStrip} aria-label="Métricas corporativas">
+        <section data-ui="landing-metrics" className={styles.enterpriseStrip} aria-label="Métricas corporativas">
           {enterpriseMetrics.map((metric) => (
-            <article key={metric.label} className={styles.enterpriseMetricCard}>
+            <article key={metric.label} data-ui="metric-card" className={styles.enterpriseMetricCard}>
               <strong>{metric.value}</strong>
               <h3>{metric.label}</h3>
               <p>{metric.detail}</p>
@@ -448,7 +449,7 @@ export default function Home() {
           ))}
         </section>
 
-        <nav className={styles.quickNav} aria-label="Accesos rápidos">
+        <nav data-ui="landing-quicknav" className={styles.quickNav} aria-label="Accesos rápidos">
           <a href="#qa-exclusivo" className={styles.quickNavLink}>Q&A exclusivo</a>
           <a href="#noticias" className={styles.quickNavLink}>Actualidad</a>
           <a href="#capacidades" className={styles.quickNavLink}>Capacidades</a>
@@ -458,7 +459,7 @@ export default function Home() {
           <a href="/qa" className={styles.quickNavLink}>Q&A</a>
         </nav>
 
-        <section id="qa-exclusivo" className={styles.qaSpotlight} aria-labelledby="qa-exclusivo-heading">
+        <section id="qa-exclusivo" data-ui="landing-qa" className={styles.qaSpotlight} aria-labelledby="qa-exclusivo-heading">
           <div className={styles.qaSpotlightContent}>
             <span className={styles.qaSpotlightBadge}>APARTADO EXCLUSIVO</span>
             <h2 id="qa-exclusivo-heading" className={styles.qaSpotlightTitle}>Q&A estratégico para dirección y operación</h2>
@@ -472,7 +473,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="capacidades" className={styles.capabilitiesSection} aria-labelledby="capacidades-heading">
+        <section id="capacidades" data-ui="landing-capabilities" className={styles.capabilitiesSection} aria-labelledby="capacidades-heading">
           <div className={styles.capabilitiesHeader}>
             <span className={styles.capabilitiesBadge}>CAPACIDADES ENTERPRISE</span>
             <h2 id="capacidades-heading" className={styles.capabilitiesTitle}>Arquitectura, operación y evolución tecnológica</h2>
@@ -482,7 +483,7 @@ export default function Home() {
           </div>
           <div className={styles.capabilitiesGrid}>
             {valuePillars.map((pillar, index) => (
-              <article key={pillar.title} className={styles.capabilityCard}>
+              <article key={pillar.title} data-ui="capability-card" className={styles.capabilityCard}>
                 <span className={styles.capabilityIndex}>{String(index + 1).padStart(2, "0")}</span>
                 <h3>{pillar.title}</h3>
                 <p>{pillar.text}</p>
@@ -491,14 +492,14 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="soluciones" className={styles.servicesSection} aria-labelledby="soluciones-heading">
+        <section id="soluciones" data-ui="landing-solutions" className={styles.servicesSection} aria-labelledby="soluciones-heading">
           <div className={styles.servicesHeader}>
             <span className={styles.servicesBadge}>PORTAFOLIO EMPRESARIAL</span>
             <h2 id="soluciones-heading" className={styles.newsTitle}>Soluciones diseñadas para impacto operativo</h2>
           </div>
           <div className={styles.servicesGridEnterprise}>
             {featuredSolutions.map((solution) => (
-              <article key={solution.title} className={styles.serviceCardEnterprise}>
+              <article key={solution.title} data-ui="solution-card" className={styles.serviceCardEnterprise}>
                 <div className={styles.serviceContent}>
                   <div className={styles.serviceBadge}>{solution.badge}</div>
                   <h3 className={styles.serviceTitle}>{solution.title}</h3>
@@ -518,14 +519,14 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="metodologia" className={styles.deliverySection} aria-labelledby="metodologia-heading">
+        <section id="metodologia" data-ui="landing-delivery" className={styles.deliverySection} aria-labelledby="metodologia-heading">
           <div className={styles.deliveryHeader}>
             <span className={styles.deliveryBadge}>METODOLOGÍA DE ENTREGA</span>
             <h2 id="metodologia-heading" className={styles.deliveryTitle}>Modelo operativo orientado a resultados</h2>
           </div>
           <div className={styles.deliveryGrid}>
             {deliveryModel.map((phase) => (
-              <article key={phase.step} className={styles.deliveryCard}>
+              <article key={phase.step} data-ui="delivery-card" className={styles.deliveryCard}>
                 <span className={styles.deliveryStep}>{phase.step}</span>
                 <h3>{phase.title}</h3>
                 <p>{phase.text}</p>
@@ -538,7 +539,7 @@ export default function Home() {
         <BrandsCarousel />
 
         {/* Clientes satisfechos */}
-        <section id="clientes" className={styles.clientsSection} aria-labelledby="clientes-heading">
+        <section id="clientes" data-ui="landing-clients" className={styles.clientsSection} aria-labelledby="clientes-heading">
           <div className={styles.clientsHeader}>
             <div className={styles.clientsBadge}>CONFIANZA EMPRESARIAL</div>
             <h2 id="clientes-heading" className={styles.clientsTitle}>Organizaciones que confían en Nexara</h2>
@@ -550,7 +551,7 @@ export default function Home() {
             {clients.map((c) => {
               const normalizedImageUrl = normalizeImageUrl(c.imageUrl) || "/marcas/marcas-01.png";
               return (
-              <div className={styles.clientCard} key={c.id}>
+              <div data-ui="client-card" className={styles.clientCard} key={c.id}>
                 <div className={styles.clientLogo}>
                   <Image 
                     src={normalizedImageUrl} 
@@ -573,7 +574,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className={styles.executiveCta} aria-labelledby="executive-cta-heading">
+        <section data-ui="landing-cta" className={styles.executiveCta} aria-labelledby="executive-cta-heading">
           <div className={styles.executiveCtaContent}>
             <span className={styles.executiveCtaBadge}>PRÓXIMO PASO</span>
             <h2 id="executive-cta-heading">Define tu hoja de ruta tecnológica con enfoque ejecutivo</h2>

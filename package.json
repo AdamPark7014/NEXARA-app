@@ -38,5 +38,9 @@
     "socket.io": "^4.8.3",
     "winston": "^3.19.0",
     "zod": "^4.3.5"
+  },
+  "overrides": {
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
   }
 }

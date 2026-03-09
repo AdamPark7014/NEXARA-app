@@ -1,6 +1,6 @@
-import "./globals.css";
-import "./utilities.css";
-import "./ecosystem.css";
+import "./globals.scss";
+import "./utilities.scss";
+import "./ecosystem.scss";
 import ClientLayout from "./ClientLayout";
 import Providers from "./providers";
 

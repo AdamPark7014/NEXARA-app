@@ -1,12 +1,12 @@
 .subdomainsPaletteLock {
-  --sd-shell-bg: #2459b6;
-  --sd-shell-bg-alt: #1f4ea3;
+  --sd-shell-bg: #2b5f9f;
+  --sd-shell-bg-alt: #24528a;
   --sd-shell-border: rgba(219, 233, 255, 0.34);
   --sd-shell-text: #eef5ff;
   --sd-shell-text-soft: rgba(224, 238, 255, 0.9);
-  --sd-menu-bg: rgba(255, 255, 255, 0.1);
-  --sd-menu-bg-hover: rgba(255, 255, 255, 0.18);
-  --sd-menu-bg-active: linear-gradient(135deg, #5a86c8 0%, #4a76b7 100%);
+  --sd-menu-bg: rgba(255, 255, 255, 0.09);
+  --sd-menu-bg-hover: rgba(255, 255, 255, 0.15);
+  --sd-menu-bg-active: linear-gradient(135deg, #6287b9 0%, #4f739f 100%);
   --sd-menu-border: rgba(219, 233, 255, 0.24);
 }
 
@@ -20,8 +20,8 @@ body.light .subdomainsPaletteLock {
 }
 
 body.dark .subdomainsPaletteLock {
-  --sd-shell-bg: #14345e;
-  --sd-shell-bg-alt: #10294a;
+  --sd-shell-bg: #163656;
+  --sd-shell-bg-alt: #122d48;
   --sd-shell-border: rgba(133, 171, 223, 0.34);
   --sd-shell-text: #dceaff;
   --sd-shell-text-soft: rgba(210, 229, 255, 0.9);
@@ -41,17 +41,9 @@ body .subdomainsPaletteLock :is(.consoleLayout, .webPanelRoot, [class*="ticketsC
 body .subdomainsPaletteLock :is(
   .sidebar,
   .webPanelSidebar,
-  .ventasSidebar,
   [class*="webPanelSidebar"],
   [class*="consoleSidebar"],
-  [class*="ticketsSidebar"],
-  [class*="VentasSidebar"],
-  [class*="ventasSidebar"],
-  div[class*="sidebar"],
-  section[class*="sidebar"],
-  aside[class*="sidebar"],
-  nav[class*="sidebar"],
-  article[class*="sidebar"]
+  [class*="ticketsSidebar"]
 ):not([class*="sidebarUser"]):not([class*="sidebarName"]):not([class*="sidebarEmail"]):not([class*="sidebarMeta"]):not([class*="sidebarAvatar"]):not([class*="sidebarFooter"]):not([class*="sidebarMenu"]):not([class*="sidebarContent"]):not([class*="sidebarHeader"]):not([class*="sidebarOverlay"]):not([class*="menuLink"]):not([class*="navLink"]) {
   background-image: linear-gradient(168deg, var(--sd-shell-bg) 0%, var(--sd-shell-bg-alt) 100%) !important;
   background-color: var(--sd-shell-bg) !important;
@@ -62,6 +54,12 @@ body .subdomainsPaletteLock :is(
 
 /* Profile/user card inside sidebar */
 body .subdomainsPaletteLock :is(
+  .sidebar,
+  .webPanelSidebar,
+  [class*="webPanelSidebar"],
+  [class*="consoleSidebar"],
+  [class*="ticketsSidebar"]
+) :is(
   .sidebarUser,
   .webPanelUser,
   .userCard,
@@ -77,6 +75,12 @@ body .subdomainsPaletteLock :is(
 
 /* Section titles */
 body .subdomainsPaletteLock :is(
+  .sidebar,
+  .webPanelSidebar,
+  [class*="webPanelSidebar"],
+  [class*="consoleSidebar"],
+  [class*="ticketsSidebar"]
+) :is(
   .menuTitle,
   .sectionTitle,
   [class*="menuTitle"],
@@ -92,6 +96,12 @@ body .subdomainsPaletteLock :is(
 
 /* Menu links */
 body .subdomainsPaletteLock :is(
+  .sidebar,
+  .webPanelSidebar,
+  [class*="webPanelSidebar"],
+  [class*="consoleSidebar"],
+  [class*="ticketsSidebar"]
+) :is(
   .menuLink,
   .navLink,
   [class*="menuLink"],
@@ -105,6 +115,12 @@ body .subdomainsPaletteLock :is(
 }
 
 body .subdomainsPaletteLock :is(
+  .sidebar,
+  .webPanelSidebar,
+  [class*="webPanelSidebar"],
+  [class*="consoleSidebar"],
+  [class*="ticketsSidebar"]
+) :is(
   .menuLink:hover,
   .navLink:hover,
   [class*="menuLink"]:hover,
@@ -115,12 +131,14 @@ body .subdomainsPaletteLock :is(
 }
 
 body .subdomainsPaletteLock :is(
+  .sidebar,
+  .webPanelSidebar,
+  [class*="webPanelSidebar"],
+  [class*="consoleSidebar"],
+  [class*="ticketsSidebar"]
+) :is(
   .menuLink.active,
-  .navLink.active,
-  .active,
-  [class*="menuLink"][class*="active"],
-  [class*="navLink"][class*="active"],
-  [class*="active"]
+  .navLink.active
 ) {
   background: var(--sd-menu-bg-active) !important;
   border-color: rgba(239, 246, 255, 0.48) !important;
@@ -129,6 +147,12 @@ body .subdomainsPaletteLock :is(
 
 /* Footer controls */
 body .subdomainsPaletteLock :is(
+  .sidebar,
+  .webPanelSidebar,
+  [class*="webPanelSidebar"],
+  [class*="consoleSidebar"],
+  [class*="ticketsSidebar"]
+) :is(
   .themeSwitcher,
   .themeButton,
   .logoutButton,
@@ -144,17 +168,9 @@ body .subdomainsPaletteLock :is(
 body .subdomainsPaletteLock :is(
   .sidebar,
   .webPanelSidebar,
-  .ventasSidebar,
   [class*="webPanelSidebar"],
   [class*="consoleSidebar"],
-  [class*="ticketsSidebar"],
-  [class*="VentasSidebar"],
-  [class*="ventasSidebar"],
-  div[class*="sidebar"],
-  section[class*="sidebar"],
-  aside[class*="sidebar"],
-  nav[class*="sidebar"],
-  article[class*="sidebar"]
+  [class*="ticketsSidebar"]
 ) :is(
   .brandMark,
   .brandSub,
@@ -185,6 +201,12 @@ body .subdomainsPaletteLock :is(
 }
 
 body .subdomainsPaletteLock :is(
+  .sidebar,
+  .webPanelSidebar,
+  [class*="webPanelSidebar"],
+  [class*="consoleSidebar"],
+  [class*="ticketsSidebar"]
+) :is(
   .sidebarEmail,
   .navDescription,
   [class*="sidebarEmail"],
@@ -194,7 +216,7 @@ body .subdomainsPaletteLock :is(
   -webkit-text-fill-color: var(--sd-shell-text-soft) !important;
 }
 
-/* Console content cleanup: keep global/base look and remove decorative over-styling. */
+/* Console content cleanup: keep scope narrow to shared utility classes only. */
 body .subdomainsPaletteLock :is(
   .consoleMain,
   .webPanelMain,
@@ -202,12 +224,8 @@ body .subdomainsPaletteLock :is(
   [class*="webPanelMain"]
 ) :is(
   .card,
-  [class*="card"],
-  [class*="panel"],
-  [class*="Topbar"],
-  [class*="Hero"],
-  [class*="metric"],
-  [class*="widget"]
+  .panel,
+  .widget
 ) {
   background-image: none !important;
   box-shadow: none !important;
@@ -224,12 +242,8 @@ body .subdomainsPaletteLock :is(
   [class*="webPanelMain"]
 ) :is(
   .card,
-  [class*="card"],
-  [class*="panel"],
-  [class*="Topbar"],
-  [class*="Hero"],
-  [class*="metric"],
-  [class*="widget"]
+  .panel,
+  .widget
 )::before,
 body .subdomainsPaletteLock :is(
   .consoleMain,
@@ -238,12 +252,8 @@ body .subdomainsPaletteLock :is(
   [class*="webPanelMain"]
 ) :is(
   .card,
-  [class*="card"],
-  [class*="panel"],
-  [class*="Topbar"],
-  [class*="Hero"],
-  [class*="metric"],
-  [class*="widget"]
+  .panel,
+  .widget
 )::after {
   background: none !important;
   box-shadow: none !important;
@@ -256,12 +266,8 @@ body.light .subdomainsPaletteLock :is(
   [class*="webPanelMain"]
 ) :is(
   .card,
-  [class*="card"],
-  [class*="panel"],
-  [class*="Topbar"],
-  [class*="Hero"],
-  [class*="metric"],
-  [class*="widget"]
+  .panel,
+  .widget
 ) {
   background: var(--surface) !important;
   border-color: rgba(31, 95, 191, 0.18) !important;
@@ -274,12 +280,8 @@ body.dark .subdomainsPaletteLock :is(
   [class*="webPanelMain"]
 ) :is(
   .card,
-  [class*="card"],
-  [class*="panel"],
-  [class*="Topbar"],
-  [class*="Hero"],
-  [class*="metric"],
-  [class*="widget"]
+  .panel,
+  .widget
 ) {
   background: color-mix(in srgb, var(--surface) 92%, #0b1624) !important;
   border-color: rgba(92, 150, 200, 0.26) !important;
@@ -292,12 +294,8 @@ body .subdomainsPaletteLock :is(
   [class*="webPanelMain"]
 ) :is(
   .card,
-  [class*="card"],
-  [class*="panel"],
-  [class*="Topbar"],
-  [class*="Hero"],
-  [class*="metric"],
-  [class*="widget"]
+  .panel,
+  .widget
 ):hover {
   box-shadow: none !important;
   transform: none !important;

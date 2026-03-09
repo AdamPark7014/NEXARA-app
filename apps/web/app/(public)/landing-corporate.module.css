@@ -1,0 +1,145 @@
+.root {
+  --landing-clean-surface: color-mix(in srgb, var(--surface) 96%, var(--background));
+  --landing-clean-surface-soft: color-mix(in srgb, var(--surface) 92%, var(--background));
+  --landing-clean-border: color-mix(in srgb, var(--primary) 20%, transparent);
+  --landing-clean-shadow: 0 10px 22px color-mix(in srgb, var(--shadow) 58%, transparent);
+}
+
+.root {
+  width: 100%;
+  max-width: 100%;
+}
+
+.root :global([data-ui="landing-hero-wrap"]) {
+  width: 100% !important;
+  max-width: var(--content-max) !important;
+  margin: 0 auto !important;
+  min-height: auto !important;
+  padding: 0 !important;
+  transform: none !important;
+}
+
+.root :global([data-ui="landing-hero"]) {
+  width: 100% !important;
+  max-width: var(--content-max) !important;
+  min-height: clamp(520px, 70vh, 760px) !important;
+  margin: 0 !important;
+  border-radius: 18px !important;
+  border: 1px solid var(--landing-clean-border) !important;
+  box-shadow: var(--landing-clean-shadow) !important;
+  overflow: hidden !important;
+}
+
+.root :global([data-ui="landing-quicknav"]) {
+  width: 100% !important;
+  max-width: var(--content-max) !important;
+  margin: 14px auto 4px !important;
+  justify-content: center !important;
+  overflow: visible !important;
+}
+
+.root :global([data-ui="landing-news"]),
+.root :global([data-ui="landing-metrics"]),
+.root :global([data-ui="landing-qa"]),
+.root :global([data-ui="landing-capabilities"]),
+.root :global([data-ui="landing-solutions"]),
+.root :global([data-ui="landing-delivery"]),
+.root :global([data-ui="landing-clients"]),
+.root :global([data-ui="landing-cta"]) {
+  max-width: var(--content-max);
+  margin: 22px auto 0;
+  border-radius: 20px;
+}
+
+.root :global([data-ui="metric-card"]),
+.root :global([data-ui="capability-card"]),
+.root :global([data-ui="solution-card"]),
+.root :global([data-ui="delivery-card"]),
+.root :global([data-ui="client-card"]) {
+  background: var(--landing-clean-surface) !important;
+  border: 1px solid var(--landing-clean-border) !important;
+  box-shadow: var(--landing-clean-shadow) !important;
+  border-radius: 16px !important;
+}
+
+.root :global([data-ui="landing-qa"]),
+.root :global([data-ui="landing-cta"]) {
+  background: linear-gradient(160deg, var(--landing-clean-surface), var(--landing-clean-surface-soft)) !important;
+  border: 1px solid var(--landing-clean-border) !important;
+  box-shadow: var(--landing-clean-shadow) !important;
+}
+
+.root :global([data-ui="landing-news"]) {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding-top: 10px !important;
+}
+
+.root :global([data-ui="landing-news"] [id="news-active-slide"]) {
+  background: var(--landing-clean-surface) !important;
+  border: 1px solid var(--landing-clean-border) !important;
+  box-shadow: var(--landing-clean-shadow) !important;
+  border-radius: 18px !important;
+}
+
+.root :global([data-ui="landing-solutions"]),
+.root :global([data-ui="landing-delivery"]),
+.root :global([data-ui="landing-clients"]) {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding-top: 8px !important;
+}
+
+@media (max-width: 768px) {
+  .root :global([data-ui="landing-hero"]) {
+    min-height: clamp(460px, 62vh, 620px) !important;
+    border-radius: 14px !important;
+  }
+
+  .root :global([data-ui="landing-quicknav"]) {
+    justify-content: flex-start !important;
+    flex-wrap: wrap !important;
+    row-gap: 8px;
+  }
+
+  .root :global([data-ui="landing-news"]),
+  .root :global([data-ui="landing-metrics"]),
+  .root :global([data-ui="landing-qa"]),
+  .root :global([data-ui="landing-capabilities"]),
+  .root :global([data-ui="landing-solutions"]),
+  .root :global([data-ui="landing-delivery"]),
+  .root :global([data-ui="landing-clients"]),
+  .root :global([data-ui="landing-cta"]) {
+    margin-top: 16px;
+    border-radius: 14px;
+  }
+
+  .root :global([data-ui="solution-card"]) {
+    text-align: center;
+  }
+}
+
+/* Final anti-collision guard against legacy full-bleed rules in page.module.css */
+.root :global([data-ui="landing-news"]),
+.root :global([data-ui="landing-metrics"]),
+.root :global([data-ui="landing-qa"]),
+.root :global([data-ui="landing-capabilities"]),
+.root :global([data-ui="landing-solutions"]),
+.root :global([data-ui="landing-delivery"]),
+.root :global([data-ui="landing-clients"]),
+.root :global([data-ui="landing-cta"]) {
+  width: 100% !important;
+  max-width: var(--content-max) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+@media (max-width: 768px) {
+  .root :global([data-ui="landing-quicknav"]) {
+    flex-wrap: wrap !important;
+    overflow: visible !important;
+    scroll-snap-type: none !important;
+  }
+}
