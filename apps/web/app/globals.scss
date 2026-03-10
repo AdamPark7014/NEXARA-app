@@ -70,12 +70,12 @@ body.light {
   --text-secondary: #445668;
   --text-tertiary: #6b7a8f;
 
-  --primary: #1a7ba8;
-  --primary-strong: #0d5a7d;
-  --secondary: #1b9678;
+  --primary: #15a99d;
+  --primary-strong: #0b7a72;
+  --secondary: #36bcae;
   --accent: #d66533;
   --accent-strong: #c24e1e;
-  --support: #5bb8cd;
+  --support: #79d8ce;
   --success: #1a8d6f;
   --warning: #e67e15;
   --danger: #c9423d;
@@ -86,27 +86,27 @@ body.light {
   --bg-secondary: color-mix(in srgb, var(--surface-2) 88%, var(--background));
   --muted: color-mix(in srgb, var(--border) 68%, transparent);
 
-  --border: rgba(15, 48, 78, 0.12);
-  --border-strong: rgba(15, 48, 78, 0.24);
+  --border: rgba(12, 71, 69, 0.14);
+  --border-strong: rgba(12, 71, 69, 0.26);
   --shadow: 0 12px 28px rgba(10, 30, 52, 0.11);
-  --focus: rgba(26, 123, 168, 0.32);
+  --focus: rgba(21, 169, 157, 0.34);
 
   /* Header / menu tokens with refined gradients and depth */
-  --header-bg: linear-gradient(142deg, #1a7ba8 0%, #1e88b4 38%, #5bb8cd 100%);
-  --header-border: rgba(91, 184, 205, 0.38);
+  --header-bg: linear-gradient(142deg, #109b90 0%, #1fb0a4 40%, #6ed8cd 100%);
+  --header-border: rgba(110, 216, 205, 0.42);
   --header-text: #ffffff;
   --header-link: #ffffff;
   --header-link-hover-bg: rgba(255, 255, 255, 0.18);
   --header-link-active-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.16));
 
-  --menu-bg: linear-gradient(170deg, #1a7ba8 0%, #1d85af 54%, #1b6f94 100%);
+  --menu-bg: linear-gradient(170deg, #0f9187 0%, #1ca79b 54%, #137f76 100%);
   --menu-text: #ffffff;
-  --menu-muted: rgba(230, 244, 255, 0.85);
+  --menu-muted: rgba(232, 255, 251, 0.86);
   --menu-item-bg: rgba(255, 255, 255, 0.08);
   --menu-item-hover-bg: rgba(255, 255, 255, 0.16);
-  --menu-item-active-bg: linear-gradient(135deg, rgba(91, 184, 205, 0.42), rgba(255, 255, 255, 0.24));
+  --menu-item-active-bg: linear-gradient(135deg, rgba(121, 216, 206, 0.44), rgba(255, 255, 255, 0.24));
 
-  --public-title-gradient: linear-gradient(138deg, #0d5a7d 0%, #1a7ba8 48%, #1b9678 100%);
+  --public-title-gradient: linear-gradient(138deg, #0b7a72 0%, #15a99d 48%, #36bcae 100%);
 
   --state-success-bg: color-mix(in srgb, var(--success) 12%, transparent);
   --state-success-border: color-mix(in srgb, var(--success) 32%, transparent);
@@ -122,7 +122,7 @@ body.light {
 
   --state-info-bg: color-mix(in srgb, var(--primary) 12%, transparent);
   --state-info-border: color-mix(in srgb, var(--primary) 32%, transparent);
-  --state-info-text: color-mix(in srgb, var(--primary) 88%, #0f2d48);
+  --state-info-text: color-mix(in srgb, var(--primary) 88%, #103835);
 
   --brand-glass-primary: color-mix(in srgb, var(--primary) 16%, transparent);
   --brand-glass-secondary: color-mix(in srgb, var(--secondary) 13%, transparent);
@@ -227,8 +227,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background:
-    radial-gradient(circle at 8% -10%, rgba(110, 199, 217, 0.08), transparent 42%),
-    radial-gradient(circle at 94% -10%, rgba(61, 150, 196, 0.06), transparent 40%),
+    radial-gradient(circle at 8% -10%, rgba(121, 216, 206, 0.1), transparent 42%),
+    radial-gradient(circle at 94% -10%, rgba(67, 184, 171, 0.08), transparent 40%),
     linear-gradient(180deg, var(--background) 0%, color-mix(in srgb, var(--surface-2) 90%, var(--background)) 100%);
 }
 
@@ -332,7 +332,7 @@ textarea:disabled {
 }
 
 ::selection {
-  background: rgba(110, 199, 217, 0.28);
+  background: rgba(121, 216, 206, 0.32);
   color: var(--text-primary);
 }
 

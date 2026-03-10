@@ -70,6 +70,17 @@ export class ProjectsController {
     return this.projectsService.findAll();
   }
 
+  @Get('catalog-pdf/download')
+  async downloadCatalogPdf(@Res() res: Response) {
+    const pdfBuffer = await this.projectsService.buildCatalogPdf();
+    const filename = `cv-empresarial-proyectos-${new Date().toISOString().slice(0, 10)}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length.toString());
+    res.send(pdfBuffer);
+  }
+
   @Get('image/:filename')
   async getImage(@Param('filename') filename: string, @Res() res: Response) {
     try {
@@ -166,11 +177,22 @@ export class ProjectsController {
         .filter((item) => item.length > 0);
     };
 
+    const parseBoolean = (value?: unknown) => {
+      if (typeof value === 'boolean') return value;
+      if (typeof value !== 'string') return undefined;
+
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'true') return true;
+      if (normalized === 'false') return false;
+      return undefined;
+    };
+
     return {
       ...dto,
       services: parseList(dto.services) as string[] | undefined,
       tags: parseList(dto.tags) as string[] | undefined,
       highlights: parseList(dto.highlights) as string[] | undefined,
+      showInCatalog: parseBoolean((dto as Record<string, unknown>)['showInCatalog']),
       galleryKeep: parseList((dto as Record<string, unknown>)['galleryKeep']) as
         | string[]
         | undefined,

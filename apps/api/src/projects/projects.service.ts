@@ -10,6 +10,7 @@ import { CreateProjectDto } from './dto/create-project.dto.js';
 import { UpdateProjectDto } from './dto/update-project.dto.js';
 import { promises as fs } from 'fs';
 import * as path from 'path';
+import PDFDocument from 'pdfkit';
 
 interface MulterFile {
   fieldname: string;
@@ -80,6 +81,7 @@ export class ProjectsService {
         highlights: payload.highlights,
         mainImage: mainImageUrl,
         gallery: galleryUrls,
+        showInCatalog: payload.showInCatalog ?? true,
       },
     });
 
@@ -126,6 +128,7 @@ export class ProjectsService {
     if (payload.services.length) updateData['services'] = payload.services;
     if (payload.tags.length) updateData['tags'] = payload.tags;
     if (payload.highlights.length) updateData['highlights'] = payload.highlights;
+    if (payload.showInCatalog !== undefined) updateData['showInCatalog'] = payload.showInCatalog;
 
     if (payload.slug) {
       const slug = this.ensureSlug(payload.slug);
@@ -199,6 +202,88 @@ export class ProjectsService {
     return removed;
   }
 
+  async buildCatalogPdf(): Promise<Buffer> {
+    const projects = await this.db.project.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const doc = new PDFDocument({
+      size: 'A4',
+      margin: 48,
+      info: {
+        Title: 'CV Empresarial de Proyectos',
+        Author: 'Nexara',
+      },
+    });
+
+    const chunks: Uint8Array[] = [];
+    const pdfBufferPromise = new Promise<Buffer>((resolve, reject) => {
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', (error) => reject(error));
+    });
+
+    doc
+      .fontSize(22)
+      .fillColor('#0c3f72')
+      .text('CV Empresarial de Proyectos', { align: 'left' });
+    doc
+      .moveDown(0.3)
+      .fontSize(10)
+      .fillColor('#3d4e60')
+      .text(`Generado: ${new Date().toLocaleString('es-MX')}`)
+      .text(`Total de proyectos: ${projects.length}`);
+
+    doc.moveDown(0.8);
+    doc.strokeColor('#d5deea').lineWidth(1).moveTo(48, doc.y).lineTo(547, doc.y).stroke();
+    doc.moveDown(0.8);
+
+    if (!projects.length) {
+      doc
+        .fontSize(12)
+        .fillColor('#22303e')
+        .text('No hay proyectos registrados para incluir en este documento.');
+      doc.end();
+      return pdfBufferPromise;
+    }
+
+    projects.forEach((project, index) => {
+      if (doc.y > 700) {
+        doc.addPage();
+      }
+
+      const visibility = project.showInCatalog ? 'Visible en catalogo' : 'No visible en catalogo';
+
+      doc
+        .fontSize(14)
+        .fillColor('#0d2d52')
+        .text(`${index + 1}. ${project.title}`)
+        .moveDown(0.15)
+        .fontSize(10)
+        .fillColor('#324b63')
+        .text(`Sector: ${project.sector}`)
+        .text(`Slug: ${project.slug}`)
+        .text(`Estado catalogo: ${visibility}`)
+        .text(`Creado: ${project.createdAt.toLocaleDateString('es-MX')}`)
+        .moveDown(0.2)
+        .fontSize(10)
+        .fillColor('#1d2b39')
+        .text(project.summary || 'Sin resumen')
+        .moveDown(0.2)
+        .fillColor('#3a4e63')
+        .text(`Impacto: ${project.impact || 'No especificado'}`)
+        .text(`Servicios: ${(project.services || []).join(', ') || 'No especificados'}`)
+        .text(`Tags: ${(project.tags || []).join(', ') || 'No especificados'}`)
+        .moveDown(0.6);
+
+      doc.strokeColor('#e1e7ef').lineWidth(1).moveTo(48, doc.y).lineTo(547, doc.y).stroke();
+      doc.moveDown(0.7);
+    });
+
+    doc.end();
+    return pdfBufferPromise;
+  }
+
   private normalizePayload(dto: Partial<CreateProjectDto>) {
     return {
       slug: dto.slug?.trim(),
@@ -209,6 +294,7 @@ export class ProjectsService {
       services: this.sanitizeList(dto.services),
       tags: this.sanitizeList(dto.tags),
       highlights: this.sanitizeList(dto.highlights),
+      showInCatalog: dto.showInCatalog,
     };
   }
 
