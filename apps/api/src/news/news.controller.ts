@@ -82,9 +82,19 @@ export class NewsController {
       }
 
       await fs.access(filepath);
+      const stats = await fs.stat(filepath);
+      const etag = `W/\"${stats.size}-${stats.mtimeMs}\"`;
+      const requestEtag = res.req.headers['if-none-match'];
+
+      if (requestEtag === etag) {
+        res.status(304).end();
+        return;
+      }
 
       res.setHeader('Content-Type', 'image/jpeg');
-      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('ETag', etag);
+      res.setHeader('Last-Modified', stats.mtime.toUTCString());
+      res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300, must-revalidate');
 
       const stream = createReadStream(filepath);
       stream.pipe(res);

@@ -67,7 +67,7 @@ export default async function ProjectsPage() {
   }
 
   const renderProjectCard = (project: Project, prioritizeImage = false) => (
-    <article key={project.slug} className={styles.projectCard}>
+    <article key={project.slug} id={project.slug} className={styles.projectCard}>
       <header className={styles.projectHeader}>
         <div>
           <p className={styles.badge}>{project.sector}</p>

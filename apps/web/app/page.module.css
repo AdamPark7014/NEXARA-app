@@ -45,30 +45,48 @@
 .quickNav {
   width: 100%;
   max-width: var(--content-max);
-  margin: 8px auto 0;
+  margin: 10px auto 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 9px;
   justify-content: center;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--surface) 92%, var(--primary) 8%),
+      color-mix(in srgb, var(--surface) 86%, var(--secondary) 14%)
+    );
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #ffffff 58%, transparent),
+    0 10px 24px color-mix(in srgb, var(--primary) 14%, transparent);
 }
 .quickNavLink {
-  padding: 8px 14px;
+  padding: 9px 17px;
   border-radius: 999px;
-  border: 1px solid var(--gray-alpha-200);
-  background: var(--surface);
-  color: var(--foreground);
-  font-size: 0.9rem;
-  font-weight: 650;
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  color: color-mix(in srgb, var(--foreground) 92%, var(--primary));
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   white-space: nowrap;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 10%, transparent);
   transition:
     transform 160ms ease,
     border-color 160ms ease,
-    background 160ms ease;
+    background 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease;
 }
 .quickNavLink:hover {
-  transform: translateY(-1px);
-  border-color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+  transform: translateY(-1px) scale(1.01);
+  border-color: color-mix(in srgb, var(--primary) 52%, transparent);
+  color: color-mix(in srgb, var(--primary) 82%, var(--foreground));
+  background: color-mix(in srgb, var(--primary) 14%, var(--surface));
+  box-shadow: 0 10px 20px color-mix(in srgb, var(--primary) 16%, transparent);
 }
 .newsSection,
 .servicesSection,
@@ -862,11 +880,12 @@
   background:
     radial-gradient(
       circle at 14% -22%,
-      rgba(93, 176, 255, 0.24),
+      rgba(21, 169, 157, 0.16),
       transparent 52%
     ),
-    linear-gradient(150deg, rgba(244, 249, 255, 0.9), rgba(233, 242, 254, 0.86));
-  border-color: rgba(15, 106, 214, 0.22);
+    linear-gradient(150deg, rgba(242, 254, 252, 0.94), rgba(224, 248, 244, 0.9));
+  border-color: rgba(21, 169, 157, 0.38);
+  box-shadow: 0 14px 28px rgba(21, 169, 157, 0.12);
 }
 :global(body.dark) .newsEmpty {
   background:
@@ -901,93 +920,107 @@
 .newsModalOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(10, 18, 32, 0.55);
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  z-index: 40;
+  background: color-mix(in srgb, var(--background) 18%, transparent);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(16px, 3vw, 32px);
+  z-index: 1200;
   overflow-y: auto;
+  animation: overlayIn 0.18s ease;
+}
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 @media (max-width: 768px) {
   .newsModalOverlay {
-    padding: 16px;
     align-items: flex-start;
-    padding-top: 40px;
+    padding-top: clamp(16px, 6vh, 48px);
   }
 }
 @media (max-width: 480px) {
   .newsModalOverlay {
-    padding: 12px;
-    padding-top: 32px;
+    padding: 10px;
+    padding-top: 24px;
   }
 }
 .newsModal {
-  width: min(1100px, 92vw);
+  width: min(1060px, 94vw);
+  max-height: min(88vh, 860px);
   background: var(--surface);
-  border-radius: 26px;
-  border: 1px solid rgba(15, 106, 214, 0.16);
-  box-shadow: 0 28px 60px rgba(10, 18, 32, 0.2);
+  border-radius: 24px;
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
+  box-shadow:
+    0 32px 64px color-mix(in srgb, var(--shadow) 48%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--primary) 8%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 40%, transparent);
   position: relative;
-  padding: 24px;
-  max-height: 90vh;
+  padding: clamp(20px, 2.4vw, 32px);
   overflow-y: auto;
+  overflow-x: hidden;
+  animation: modalIn 0.22s cubic-bezier(0.34, 1.36, 0.64, 1);
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 @media (max-width: 768px) {
   .newsModal {
     width: 100%;
     border-radius: 20px;
-    padding: 20px;
-    max-height: calc(100vh - 80px);
-    margin: auto 0;
+    padding: 18px;
+    max-height: calc(100svh - 40px);
   }
 }
 @media (max-width: 480px) {
   .newsModal {
-    width: 100%;
     border-radius: 16px;
-    padding: 16px;
-    max-height: calc(100vh - 64px);
-    margin: auto 0;
+    padding: 14px;
+    max-height: calc(100svh - 28px);
   }
 }
 .newsClose {
-  position: absolute;
-  top: 18px;
-  right: 18px;
+  position: sticky;
+  top: 0;
+  float: right;
+  margin: -6px -6px 8px 12px;
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  border: 1px solid rgba(15, 106, 214, 0.18);
-  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, transparent);
+  background: color-mix(in srgb, var(--surface) 90%, var(--primary) 10%);
   cursor: pointer;
-  z-index: 10;
+  z-index: 20;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
-  color: var(--foreground);
-  transition: all 0.3s ease;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--primary-strong);
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--primary) 18%, transparent);
+  transition: background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  flex-shrink: 0;
 }
 .newsClose:hover {
-  background: rgba(15, 106, 214, 0.1);
-  transform: scale(1.1);
+  background: color-mix(in srgb, var(--primary) 16%, var(--surface));
+  transform: scale(1.08) rotate(90deg);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--primary) 26%, transparent);
 }
 @media (max-width: 768px) {
   .newsClose {
     width: 32px;
     height: 32px;
-    top: 12px;
-    right: 12px;
-    font-size: 18px;
+    font-size: 14px;
   }
 }
 @media (max-width: 480px) {
   .newsClose {
-    width: 28px;
-    height: 28px;
-    top: 10px;
-    right: 10px;
-    font-size: 16px;
+    width: 30px;
+    height: 30px;
+    font-size: 13px;
   }
 }
 .newsModalContent {
@@ -1148,53 +1181,41 @@
   border-color: var(--primary);
 } /* Light theme explicit */
 :global(body.light) .newsBadge {
-  background: rgba(255, 255, 255, 0.88);
-  border-color: rgba(15, 106, 214, 0.22);
-  box-shadow: 0 4px 12px rgba(15, 106, 214, 0.12);
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(21, 169, 157, 0.32);
+  color: #0b7a72;
+  box-shadow: 0 4px 12px rgba(21, 169, 157, 0.14);
 }
 :global(body.light) .newsSection {
   background:
     radial-gradient(
       circle at 12% -16%,
-      rgba(82, 178, 255, 0.18),
-      transparent 46%
+      rgba(21, 169, 157, 0.13),
+      transparent 48%
     ),
-    linear-gradient(160deg, rgba(246, 251, 255, 0.9), rgba(232, 243, 255, 0.86));
-  border-color: rgba(15, 106, 214, 0.22);
+    linear-gradient(160deg, rgba(244, 254, 252, 0.94), rgba(228, 248, 245, 0.9));
+  border-color: rgba(21, 169, 157, 0.34);
+  box-shadow: 0 20px 38px rgba(21, 169, 157, 0.12);
 }
 :global(body.light) .newsCarousel {
-  background:
-    radial-gradient(
-      circle at 14% 12%,
-      rgba(34, 139, 230, 0.18),
-      transparent 44%
-    ),
-    radial-gradient(
-      circle at 88% 8%,
-      rgba(68, 163, 243, 0.16),
-      transparent 50%
-    ),
-    linear-gradient(
-      145deg,
-      rgba(255, 255, 255, 0.99),
-      rgba(236, 246, 255, 0.96)
-    );
-  border-color: rgba(15, 106, 214, 0.28);
+  background: transparent;
+  border-color: transparent;
 }
 :global(body.light) .newsNav {
-  background: rgba(255, 255, 255, 0.95);
-  border-color: rgba(15, 106, 214, 0.28);
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(21, 169, 157, 0.32);
+  color: #0b7a72;
 }
 :global(body.light) .newsImageWrap {
-  background: rgba(255, 255, 255, 0.95);
-  border-color: rgba(15, 106, 214, 0.22);
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(21, 169, 157, 0.26);
 }
 :global(body.light) .newsButton {
-  box-shadow: 0 12px 24px rgba(15, 106, 214, 0.2);
+  box-shadow: 0 12px 24px rgba(21, 169, 157, 0.24);
 }
 :global(body.light) .newsDot,
 :global(body.light) .newsDotActive {
-  background: rgba(15, 106, 214, 0.22);
+  background: rgba(21, 169, 157, 0.26);
 }
 :global(body.light) .newsDotActive {
   background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
@@ -4013,39 +4034,75 @@ a.secondary:active,
 .enterpriseStrip {
   width: 100%;
   max-width: var(--content-max);
-  margin: 18px auto 6px;
+  margin: 20px auto 8px;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 14px;
 }
 .enterpriseMetricCard {
-  padding: 16px;
-  border-radius: 16px;
-  border: 1px solid var(--gray-alpha-200);
-  background: color-mix(in srgb, var(--surface) 92%, var(--background));
-  box-shadow: 0 10px 24px var(--shadow);
+  position: relative;
+  isolation: isolate;
+  padding: 18px 18px 16px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
+  background:
+    radial-gradient(
+      circle at 16% -8%,
+      color-mix(in srgb, var(--secondary) 26%, transparent),
+      transparent 42%
+    ),
+    linear-gradient(
+      150deg,
+      color-mix(in srgb, var(--surface) 96%, var(--primary) 4%),
+      color-mix(in srgb, var(--surface) 88%, var(--secondary) 12%)
+    );
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #ffffff 64%, transparent),
+    0 16px 30px color-mix(in srgb, var(--primary) 13%, transparent);
   display: grid;
-  gap: 6px;
+  gap: 8px;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+.enterpriseMetricCard::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 3px;
+  border-radius: 18px 18px 0 0;
+  background: linear-gradient(90deg, var(--primary), var(--secondary));
+  opacity: 0.6;
+}
+.enterpriseMetricCard:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--primary) 44%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #ffffff 68%, transparent),
+    0 20px 36px color-mix(in srgb, var(--primary) 20%, transparent);
 }
 .enterpriseMetricCard strong {
-  font-size: clamp(1.2rem, 1.8vw, 1.55rem);
-  line-height: 1.2;
-  color: var(--foreground);
+  font-size: clamp(1.4rem, 2.2vw, 2rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: color-mix(in srgb, var(--foreground) 90%, var(--primary));
 }
 .enterpriseMetricCard h3 {
   margin: 0;
-  font-size: 0.86rem;
+  font-size: 0.95rem;
   text-transform: uppercase;
-  letter-spacing: 0.045em;
-  color: var(--foreground);
-  opacity: 0.88;
+  letter-spacing: 0.055em;
+  color: color-mix(in srgb, var(--foreground) 90%, var(--primary));
+  opacity: 0.92;
 }
 .enterpriseMetricCard p {
   margin: 0;
-  font-size: 0.82rem;
-  color: var(--foreground);
-  opacity: 0.72;
-  line-height: 1.45;
+  font-size: 0.98rem;
+  color: color-mix(in srgb, var(--foreground) 84%, transparent);
+  opacity: 0.9;
+  line-height: 1.5;
 }
 .capabilitiesSection,
 .deliverySection,
@@ -4263,10 +4320,12 @@ a.secondary:active,
     margin-top: 12px;
   }
   .enterpriseMetricCard {
-    padding: 14px;
+    padding: 16px 14px 14px;
   }
   .quickNav {
     margin-top: 10px;
+    padding: 8px 8px 10px;
+    border-radius: 18px;
   }
   .capabilitiesSection,
   .deliverySection,
@@ -4330,7 +4389,6 @@ a.secondary:active,
 }
 .hero,
 .newsCarousel,
-.enterpriseMetricCard,
 .capabilityCard,
 .serviceCardEnterprise,
 .deliveryCard,
@@ -4342,7 +4400,6 @@ a.secondary:active,
   border-color: var(--home-border);
   box-shadow: var(--home-shadow);
 }
-.quickNavLink,
 .newsBadge,
 .clientsBadge,
 .capabilitiesBadge,
@@ -4390,6 +4447,47 @@ a.secondary:active,
 .executiveCtaActions a.secondary {
   background: var(--home-elevated);
   border-color: var(--home-border-strong);
+}
+.enterpriseMetricCard {
+  background:
+    radial-gradient(
+      circle at 16% -8%,
+      color-mix(in srgb, var(--secondary) 26%, transparent),
+      transparent 42%
+    ),
+    linear-gradient(
+      150deg,
+      color-mix(in srgb, var(--surface) 96%, var(--primary) 4%),
+      color-mix(in srgb, var(--surface) 88%, var(--secondary) 12%)
+    );
+  border-color: color-mix(in srgb, var(--primary) 22%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #ffffff 64%, transparent),
+    0 16px 30px color-mix(in srgb, var(--primary) 13%, transparent);
+}
+:global(body.dark) .enterpriseMetricCard {
+  background:
+    radial-gradient(
+      circle at 12% -10%,
+      color-mix(in srgb, var(--primary) 20%, transparent),
+      transparent 46%
+    ),
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--surface) 90%, var(--background)),
+      color-mix(in srgb, var(--surface) 80%, var(--background))
+    );
+  border-color: color-mix(in srgb, var(--primary) 35%, transparent);
+}
+.quickNavLink {
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 24%, transparent);
+  color: color-mix(in srgb, var(--foreground) 92%, var(--primary));
+}
+:global(body.dark) .quickNavLink {
+  background: color-mix(in srgb, var(--surface) 86%, var(--background));
+  border-color: color-mix(in srgb, var(--primary) 36%, transparent);
+  color: color-mix(in srgb, var(--foreground) 94%, var(--secondary));
 }
 @media (max-width: 768px) {
   .hero,
@@ -5227,19 +5325,29 @@ button.secondary {
 }
 
 .recentProjectLink {
-  margin-top: 2px;
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   width: fit-content;
-  color: color-mix(in srgb, var(--foreground) 94%, var(--primary));
+  padding: 0.42rem 1.1rem;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #ffffff;
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.86rem;
   text-decoration: none;
-  border-bottom: 1px solid color-mix(in srgb, var(--primary) 36%, transparent);
+  border: 1px solid transparent;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 32%, transparent);
+  transition: background 0.18s ease, transform 0.15s ease, box-shadow 0.18s ease;
 }
 
 .recentProjectLink:hover,
 .recentProjectLink:focus-visible {
-  color: var(--primary);
-  border-bottom-color: var(--primary);
+  background: var(--primary-strong);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 42%, transparent);
 }
 
 .recentProjectsEmpty {
@@ -5250,6 +5358,111 @@ button.secondary {
   text-align: center;
   color: color-mix(in srgb, var(--foreground) 82%, transparent);
   background: color-mix(in srgb, var(--surface) 94%, transparent);
+}
+
+/* Capabilities section refresh: cleaner hierarchy and less flat cards */
+.capabilitiesSection {
+  padding: clamp(18px, 2.6vw, 30px) !important;
+  border-radius: clamp(20px, 2.8vw, 30px) !important;
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent) !important;
+  background:
+    radial-gradient(
+      circle at 8% -12%,
+      color-mix(in srgb, var(--secondary) 20%, transparent),
+      transparent 46%
+    ),
+    linear-gradient(
+      155deg,
+      color-mix(in srgb, var(--surface) 96%, var(--primary) 4%),
+      color-mix(in srgb, var(--surface) 92%, var(--secondary) 8%)
+    ) !important;
+  box-shadow: 0 16px 34px color-mix(in srgb, var(--primary) 14%, transparent) !important;
+}
+
+.capabilitiesHeader {
+  margin-bottom: 18px !important;
+}
+
+.capabilitiesGrid {
+  gap: 16px !important;
+}
+
+.capabilityCard {
+  position: relative;
+  padding: 18px 20px 16px !important;
+  border-radius: 18px !important;
+  background: color-mix(in srgb, var(--surface) 97%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent) !important;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #ffffff 66%, transparent),
+    0 12px 24px color-mix(in srgb, var(--shadow) 54%, transparent) !important;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-height: 176px;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.capabilityCard:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent) !important;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #ffffff 70%, transparent),
+    0 18px 30px color-mix(in srgb, var(--primary) 18%, transparent) !important;
+}
+
+.capabilityIndex {
+  margin: 0 !important;
+  width: fit-content;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--secondary) 38%, transparent);
+  background: color-mix(in srgb, var(--secondary) 14%, var(--surface));
+  color: color-mix(in srgb, var(--foreground) 90%, var(--secondary));
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  font-weight: 800;
+}
+
+.capabilityCard h3 {
+  margin: 0 !important;
+  text-align: left !important;
+  font-size: clamp(1.05rem, 1.6vw, 1.3rem);
+  line-height: 1.3;
+  color: color-mix(in srgb, var(--foreground) 95%, var(--primary));
+}
+
+.capabilityCard p {
+  margin: 0 !important;
+  text-align: left !important;
+  font-size: 0.98rem;
+  line-height: 1.58;
+  color: color-mix(in srgb, var(--foreground) 82%, transparent) !important;
+  opacity: 1 !important;
+}
+
+@media (max-width: 768px) {
+  .capabilitiesSection {
+    padding: 16px !important;
+    border-radius: 18px !important;
+  }
+
+  .capabilitiesGrid {
+    gap: 12px !important;
+  }
+
+  .capabilityCard {
+    min-height: 0;
+    padding: 14px 14px 13px !important;
+  }
+
+  .capabilityCard h3 {
+    font-size: 1.02rem;
+  }
+
+  .capabilityCard p {
+    font-size: 0.93rem;
+  }
 }
 
 @media (max-width: 980px) {
