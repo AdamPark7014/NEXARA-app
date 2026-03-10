@@ -1,467 +1,244 @@
 .container {
   width: 100%;
-  max-width: none;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--page-padding-y) var(--page-padding-x) calc(var(--page-padding-y) * 1.6);
+}
+
+.headerBlock {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(160deg, var(--surface-clean), var(--surface-clean-soft));
+  padding: clamp(16px, 2vw, 24px);
+  box-shadow: var(--elev-1);
+}
+
+.pageTitle {
   margin: 0;
-  padding: var(--page-padding-y) var(--page-padding-x) calc(var(--page-padding-y) * 1.5);
-  color: var(--foreground);
-}
-
-.hero {
-  position: relative;
-  border: 1px solid var(--public-border);
-  border-radius: var(--public-radius-xl);
-  background: var(--public-hero-bg);
-  box-shadow: var(--public-shadow);
-  padding: clamp(18px, 2.6vw, 30px);
-  overflow: hidden;
-}
-
-.hero::after {
-  content: "";
-  position: absolute;
-  right: -120px;
-  top: -80px;
-  width: 360px;
-  height: 280px;
-  background: radial-gradient(circle, color-mix(in srgb, var(--secondary) 22%, transparent) 0%, transparent 72%);
-  pointer-events: none;
-}
-
-.heroContent {
-  position: relative;
-  z-index: 1;
-  max-width: 100%;
-}
-
-.heroTitle {
-  margin: 0;
-  font-size: clamp(2rem, 4.1vw, 2.9rem);
-  line-height: 1.08;
-  font-weight: 800;
-  background: var(--public-title-gradient);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-}
-
-.heroSubtitle {
-  margin-top: 10px;
-  color: color-mix(in srgb, var(--foreground) 90%, var(--primary));
-  font-size: clamp(1rem, 1.45vw, 1.12rem);
-  line-height: 1.7;
-  max-width: 66ch;
-}
-
-.heroCtas {
-  margin-top: 16px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.primaryCta,
-.secondaryCta {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 42px;
-  padding: 11px 18px;
-  border-radius: 999px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
-}
-
-.primaryCta {
-  color: #fff;
-  border: 1px solid color-mix(in srgb, var(--primary) 62%, var(--public-border));
-  background: var(--public-title-gradient);
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--shadow) 66%, transparent);
-}
-
-.primaryCta:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 20px color-mix(in srgb, var(--shadow) 72%, transparent);
-}
-
-.secondaryCta {
-  color: var(--foreground);
-  border: 1px solid var(--public-border);
-  background: var(--public-surface-strong);
-}
-
-.secondaryCta:hover {
-  transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--primary) 40%, var(--public-border));
-}
-
-.highlightsStrip {
-  margin-top: 18px;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.highlightBadge {
-  border: 1px solid var(--public-border);
-  border-radius: 999px;
-  background: var(--public-surface-strong);
+  font-size: clamp(1.6rem, 2.5vw, 2.2rem);
+  line-height: 1.12;
   color: color-mix(in srgb, var(--foreground) 92%, var(--primary));
-  text-align: center;
-  padding: 9px 12px;
-  font-size: 0.9rem;
-  font-weight: 650;
+}
+
+.pageLead {
+  margin: 8px 0 0;
+  max-width: 72ch;
+  color: var(--text-secondary);
 }
 
 .quickNav {
-  margin-top: 16px;
+  margin-top: 14px;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  justify-content: center;
+  gap: 8px;
 }
 
 .quickNavLink {
-  border: 1px solid var(--public-border);
+  border: 1px solid var(--border);
   border-radius: 999px;
-  background: var(--public-nav-pill);
-  color: var(--public-nav-text);
-  padding: 8px 14px;
-  font-size: 0.88rem;
-  font-weight: 650;
-  white-space: nowrap;
-  transition: transform 160ms ease, background 160ms ease;
-}
-
-.quickNavLink:hover {
-  transform: translateY(-1px);
-  background: var(--public-nav-pill-active);
+  background: var(--surface);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  font-size: 0.86rem;
+  font-weight: 700;
 }
 
 .section {
-  margin-top: 34px;
-  scroll-margin-top: calc(var(--header-offset) + 10px);
-  padding: 0;
+  margin-top: 24px;
+  scroll-margin-top: calc(var(--header-offset) + 12px);
 }
 
 .sectionTitle {
   margin: 0;
-  font-size: clamp(1.2rem, 2.2vw, 1.7rem);
-  font-weight: 750;
-  line-height: 1.2;
-  background: var(--public-title-gradient);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
+  font-size: clamp(1.15rem, 2vw, 1.55rem);
+  color: color-mix(in srgb, var(--foreground) 92%, var(--primary));
 }
 
-.lead {
-  margin-top: 8px;
-  max-width: 72ch;
-  color: color-mix(in srgb, var(--foreground) 88%, var(--primary));
-  line-height: 1.7;
+.identityCard,
+.infoCard,
+.mapCard,
+.visualSlot {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: linear-gradient(160deg, var(--surface-clean), var(--surface-clean-soft));
+  box-shadow: var(--elev-1);
 }
 
-.gridCols2 {
-  margin-top: 16px;
+.identityCard {
+  margin-top: 12px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  grid-template-columns: 110px 1fr;
   gap: 16px;
-  align-items: start;
-}
-
-.card,
-.cardAccent,
-.methodStep,
-.metricCard,
-.valueCard,
-.mapCard {
-  border: 1px solid color-mix(in srgb, var(--public-border) 88%, var(--primary));
-  border-radius: 18px;
-  background: linear-gradient(
-    162deg,
-    color-mix(in srgb, var(--public-surface-strong) 94%, #ffffff) 0%,
-    color-mix(in srgb, var(--public-surface-strong) 90%, var(--surface-light)) 100%
-  );
-  box-shadow:
-    0 14px 28px color-mix(in srgb, var(--shadow) 64%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #ffffff 24%, transparent);
-  min-width: 0;
-  transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
-}
-
-.card:hover,
-.cardAccent:hover,
-.methodStep:hover,
-.metricCard:hover,
-.valueCard:hover,
-.mapCard:hover {
-  transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--primary) 42%, var(--public-border));
-  box-shadow:
-    0 18px 32px color-mix(in srgb, var(--shadow) 68%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #ffffff 30%, transparent);
-}
-
-.card,
-.cardAccent,
-.valueCard {
   padding: 16px;
+  align-items: center;
 }
 
-.cardAccent {
-  border-left: 3px solid color-mix(in srgb, var(--accent) 52%, var(--public-border));
+.identityLogo {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+}
+
+.identityContent h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: color-mix(in srgb, var(--foreground) 90%, var(--primary));
+}
+
+.identityContent p {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  line-height: 1.64;
+}
+
+.fundamentalsGrid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.infoCard {
+  padding: 14px;
 }
 
 .cardTitle {
   margin: 0;
-  font-size: 1.02rem;
-  font-weight: 720;
-  color: color-mix(in srgb, var(--foreground) 95%, var(--primary));
+  font-size: 1rem;
+  color: color-mix(in srgb, var(--foreground) 94%, var(--primary));
 }
 
-.list {
-  margin: 10px 0 0;
+.infoCard p {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  line-height: 1.58;
+}
+
+.valuesList,
+.bullets {
+  margin: 8px 0 0;
   padding-left: 18px;
 }
 
-.list li {
+.valuesList li,
+.bullets li {
   margin: 6px 0;
-  color: color-mix(in srgb, var(--foreground) 93%, var(--primary));
-  line-height: 1.55;
+  color: var(--text-secondary);
+  line-height: 1.5;
 }
 
-.badgesGrid {
+.whyGrid {
   margin-top: 12px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: 1.1fr 0.9fr;
   gap: 12px;
+  align-items: stretch;
 }
 
-.badgeSolid {
-  border: 1px solid var(--public-border);
-  border-radius: 16px;
-  background: var(--public-surface-strong);
-  color: color-mix(in srgb, var(--foreground) 94%, var(--primary));
-  font-weight: 680;
-  text-align: center;
-  padding: 14px;
-}
-
-.methodGrid {
-  margin-top: 14px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 14px;
-}
-
-.methodStep {
+.visualSlot {
+  padding: 12px;
+  min-height: 240px;
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 15px;
 }
 
-.methodIndex {
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
+.visualSlotInner {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px dashed color-mix(in srgb, var(--primary) 34%, var(--border));
+  background:
+    linear-gradient(140deg, color-mix(in srgb, var(--surface) 88%, var(--primary) 12%), color-mix(in srgb, var(--surface) 90%, var(--secondary) 10%));
   display: grid;
   place-items: center;
-  color: #fff;
+  color: var(--text-secondary);
   font-weight: 700;
-  background: var(--public-title-gradient);
-  box-shadow: 0 5px 12px color-mix(in srgb, var(--shadow) 60%, transparent);
-  flex-shrink: 0;
-}
-
-.metricsGrid {
-  margin-top: 14px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 14px;
-}
-
-.metricCard {
-  padding: 18px 14px;
-  text-align: center;
-}
-
-.metricCard h3 {
-  margin: 0;
-  font-size: clamp(1.35rem, 2.8vw, 1.95rem);
-  font-weight: 800;
-  line-height: 1.1;
-  background: var(--public-title-gradient);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-}
-
-.metricLabel {
-  margin-top: 4px;
-  color: var(--text-tertiary);
-}
-
-.slaNote {
-  margin-top: 10px;
-  color: var(--text-tertiary);
-  font-size: 0.92rem;
+  letter-spacing: 0.03em;
 }
 
 .mapCard {
-  margin-top: 14px;
-  padding: 16px;
+  margin-top: 12px;
+  padding: 14px;
 }
 
 .mapImage {
   width: 100%;
   height: auto;
-  border: 1px solid var(--public-border);
-  border-radius: 16px;
-}
-
-.mapLegend {
-  margin-top: 10px;
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.legendBadge,
-.legendBadgeSecondary {
-  border: 1px solid var(--public-border);
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 0.84rem;
-  color: color-mix(in srgb, var(--foreground) 90%, var(--primary));
-  background: var(--public-surface-strong);
-}
-
-.valuesGrid {
-  margin-top: 14px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 18px;
-  align-items: stretch;
-}
-
-.valueCard h3 {
-  margin: 0;
-  font-size: 1.06rem;
-  color: color-mix(in srgb, var(--foreground) 96%, var(--primary));
-}
-
-.valueCard p {
-  margin-top: 8px;
-  color: color-mix(in srgb, var(--foreground) 88%, var(--primary));
-  font-size: 0.95rem;
-  line-height: 1.65;
-}
-
-.valueCard {
-  min-height: 170px;
-  padding: 18px;
-  position: relative;
-  overflow: hidden;
-}
-
-.valueCard::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto auto 0;
-  width: 100%;
-  height: 3px;
-  background: linear-gradient(90deg, var(--primary), var(--secondary));
-  opacity: 0.74;
+  border-radius: 10px;
+  border: 1px solid var(--border);
 }
 
 .finalCta {
-  margin-top: 32px;
-  padding-top: 22px;
-  border-top: 1px solid var(--public-border);
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
   text-align: center;
-  background: transparent;
 }
 
 .finalCta h2 {
   margin: 0;
-  font-size: clamp(1.18rem, 2.2vw, 1.5rem);
+  font-size: clamp(1.25rem, 2.3vw, 1.9rem);
   color: color-mix(in srgb, var(--foreground) 94%, var(--primary));
 }
 
 .finalCta p {
-  margin-top: 7px;
+  margin-top: 8px;
   color: var(--text-secondary);
 }
 
-.finalCta .primaryCta {
-  color: #ffffff;
+.heroCtas {
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.primaryCta,
+.secondaryCta {
+  min-height: 42px;
+  padding: 11px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-weight: 700;
+}
+
+.primaryCta {
+  color: #fff;
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
   background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
 }
 
-.finalCta .heroCtas {
-  justify-content: center;
-}
-
-.quickNavLink:focus-visible,
-.primaryCta:focus-visible,
-.secondaryCta:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--primary) 65%, white 35%);
-  outline-offset: 2px;
+.secondaryCta {
+  color: var(--text-primary);
+  background: var(--surface);
 }
 
 @media (max-width: 900px) {
-  .container {
-    padding-bottom: 36px;
+  .fundamentalsGrid,
+  .whyGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .identityCard {
+    grid-template-columns: 1fr;
+    text-align: center;
+    justify-items: center;
+  }
+
+  .identityContent p {
+    max-width: 62ch;
   }
 }
 
 @media (max-width: 640px) {
   .container {
-    padding-left: 14px;
-    padding-right: 14px;
-  }
-
-  .hero {
-    padding: 18px;
-  }
-
-  .section {
-    margin-top: 24px;
-  }
-
-  .gridCols2,
-  .methodGrid,
-  .metricsGrid,
-  .valuesGrid,
-  .badgesGrid {
-    gap: 12px;
-  }
-
-  .card,
-  .cardAccent,
-  .methodStep,
-  .metricCard,
-  .valueCard,
-  .mapCard,
-  .badgeSolid {
-    border-radius: 16px;
-  }
-
-  .highlightsStrip {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding-left: 12px;
+    padding-right: 12px;
   }
 
   .quickNav {
-    justify-content: flex-start;
-    overflow-x: auto;
     flex-wrap: nowrap;
-    padding-bottom: 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
   }
 
@@ -474,91 +251,6 @@
   }
 
   .heroCtas {
-    width: 100%;
+    flex-direction: column;
   }
-
-  .heroCtas .primaryCta,
-  .heroCtas .secondaryCta {
-    flex: 1 1 100%;
-  }
-}
-
-@media (max-width: 480px) {
-  .highlightsStrip,
-  .badgesGrid,
-  .valuesGrid,
-  .metricsGrid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Override global public lock for Nexara with stronger specificity */
-:global(.public-layout-content main.public-section-page) .section {
-  background: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-}
-
-.container {
-  width: 100% !important;
-  max-width: none !important;
-  margin: 0 !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-}
-
-:global(.public-layout-content main.public-section-page) .hero {
-  background: var(--public-hero-bg) !important;
-  border: 1px solid var(--public-border) !important;
-  box-shadow: var(--public-shadow) !important;
-}
-
-:global(.public-layout-content main.public-section-page) .card,
-:global(.public-layout-content main.public-section-page) .cardAccent,
-:global(.public-layout-content main.public-section-page) .methodStep,
-:global(.public-layout-content main.public-section-page) .metricCard,
-:global(.public-layout-content main.public-section-page) .valueCard,
-:global(.public-layout-content main.public-section-page) .mapCard {
-  background: linear-gradient(
-    162deg,
-    color-mix(in srgb, var(--public-surface-strong) 94%, #ffffff) 0%,
-    color-mix(in srgb, var(--public-surface-strong) 90%, var(--surface-light)) 100%
-  ) !important;
-  border: 1px solid color-mix(in srgb, var(--public-border) 88%, var(--primary)) !important;
-  border-radius: 18px !important;
-  box-shadow:
-    0 14px 28px color-mix(in srgb, var(--shadow) 64%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #ffffff 24%, transparent) !important;
-}
-
-:global(.public-layout-content main.public-section-page) .card:hover,
-:global(.public-layout-content main.public-section-page) .cardAccent:hover,
-:global(.public-layout-content main.public-section-page) .methodStep:hover,
-:global(.public-layout-content main.public-section-page) .metricCard:hover,
-:global(.public-layout-content main.public-section-page) .valueCard:hover,
-:global(.public-layout-content main.public-section-page) .mapCard:hover {
-  transform: translateY(-2px) !important;
-  border-color: color-mix(in srgb, var(--primary) 42%, var(--public-border)) !important;
-  box-shadow:
-    0 18px 32px color-mix(in srgb, var(--shadow) 68%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #ffffff 30%, transparent) !important;
-}
-
-:global(.public-layout-content main.public-section-page) .finalCta {
-  background: transparent !important;
-  border-top: 1px solid var(--public-border) !important;
-  box-shadow: none !important;
-}
-
-:global(.public-layout-content main.public-section-page) .primaryCta {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%) !important;
-  color: #ffffff !important;
-  border-color: color-mix(in srgb, var(--primary) 52%, var(--public-border)) !important;
-}
-
-:global(.public-layout-content main.public-section-page) .secondaryCta {
-  background: var(--public-surface-strong) !important;
-  color: color-mix(in srgb, var(--foreground) 92%, var(--primary)) !important;
-  border-color: var(--public-border) !important;
 }

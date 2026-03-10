@@ -223,20 +223,29 @@ export class ProjectsService {
       doc.on('error', (error) => reject(error));
     });
 
+    const pageWidth = doc.page.width;
+    const pageHeight = doc.page.height;
+    const margin = 36;
+    const cardWidth = pageWidth - margin * 2;
+
+    doc.save();
     doc
-      .fontSize(22)
-      .fillColor('#0c3f72')
-      .text('CV Empresarial de Proyectos', { align: 'left' });
+      .rect(0, 0, pageWidth, 120)
+      .fill('#0d4d82');
     doc
-      .moveDown(0.3)
-      .fontSize(10)
-      .fillColor('#3d4e60')
+      .rect(0, 0, pageWidth, 64)
+      .fill('#2f8ec8');
+    doc.restore();
+
+    doc
+      .fillColor('#ffffff')
+      .fontSize(26)
+      .text('CV Empresarial de Proyectos', margin, 40, { align: 'left' })
+      .fontSize(11)
       .text(`Generado: ${new Date().toLocaleString('es-MX')}`)
       .text(`Total de proyectos: ${projects.length}`);
 
-    doc.moveDown(0.8);
-    doc.strokeColor('#d5deea').lineWidth(1).moveTo(48, doc.y).lineTo(547, doc.y).stroke();
-    doc.moveDown(0.8);
+    doc.y = 138;
 
     if (!projects.length) {
       doc
@@ -247,41 +256,148 @@ export class ProjectsService {
       return pdfBufferPromise;
     }
 
-    projects.forEach((project, index) => {
-      if (doc.y > 700) {
+    for (let index = 0; index < projects.length; index += 1) {
+      const project = projects[index];
+      const cardHeight = 310;
+      if (doc.y + cardHeight > pageHeight - margin) {
         doc.addPage();
+        doc.y = margin;
       }
 
+      const x = margin;
+      const y = doc.y;
       const visibility = project.showInCatalog ? 'Visible en catalogo' : 'No visible en catalogo';
 
+      doc.save();
+      doc.roundedRect(x, y, cardWidth, cardHeight, 12).fill('#f7fbff');
+      doc.roundedRect(x, y, cardWidth, 50, 12).fill('#1b5f9e');
+      doc.restore();
+
       doc
-        .fontSize(14)
-        .fillColor('#0d2d52')
-        .text(`${index + 1}. ${project.title}`)
-        .moveDown(0.15)
+        .fillColor('#ffffff')
+        .fontSize(15)
+        .text(`${index + 1}. ${project.title}`, x + 14, y + 16, { width: cardWidth - 28 });
+
+      doc
+        .fillColor('#2b4b67')
         .fontSize(10)
-        .fillColor('#324b63')
-        .text(`Sector: ${project.sector}`)
+        .text(`Sector: ${project.sector}`, x + 14, y + 60)
         .text(`Slug: ${project.slug}`)
         .text(`Estado catalogo: ${visibility}`)
-        .text(`Creado: ${project.createdAt.toLocaleDateString('es-MX')}`)
-        .moveDown(0.2)
-        .fontSize(10)
-        .fillColor('#1d2b39')
-        .text(project.summary || 'Sin resumen')
-        .moveDown(0.2)
-        .fillColor('#3a4e63')
-        .text(`Impacto: ${project.impact || 'No especificado'}`)
-        .text(`Servicios: ${(project.services || []).join(', ') || 'No especificados'}`)
-        .text(`Tags: ${(project.tags || []).join(', ') || 'No especificados'}`)
-        .moveDown(0.6);
+        .text(`Creado: ${project.createdAt.toLocaleDateString('es-MX')}`);
 
-      doc.strokeColor('#e1e7ef').lineWidth(1).moveTo(48, doc.y).lineTo(547, doc.y).stroke();
-      doc.moveDown(0.7);
-    });
+      const mediaY = y + 126;
+      const mainImageX = x + 14;
+      const mainImageWidth = 300;
+      const mainImageHeight = 150;
+      const galleryX = mainImageX + mainImageWidth + 10;
+      const thumbGap = 6;
+      const thumbSize = 72;
+
+      await this.drawProjectImage(
+        doc,
+        project.mainImage || undefined,
+        mainImageX,
+        mediaY,
+        mainImageWidth,
+        mainImageHeight,
+      );
+
+      const galleryList = (project.gallery || []).slice(0, 4);
+      for (let g = 0; g < 4; g += 1) {
+        const gx = galleryX + (g % 2) * (thumbSize + thumbGap);
+        const gy = mediaY + Math.floor(g / 2) * (thumbSize + thumbGap);
+        await this.drawProjectImage(doc, galleryList[g], gx, gy, thumbSize, thumbSize);
+      }
+
+      doc
+        .fillColor('#243749')
+        .fontSize(10)
+        .text(project.summary || 'Sin resumen', x + 14, y + 282, {
+          width: cardWidth - 28,
+          lineGap: 2,
+        });
+
+      const metaY = y + 236;
+      doc
+        .fillColor('#2f4f67')
+        .fontSize(10)
+        .text(`Impacto: ${project.impact || 'No especificado'}`, galleryX, metaY, {
+          width: cardWidth - (galleryX - x) - 14,
+          lineGap: 2,
+        })
+        .text(`Servicios: ${(project.services || []).join(', ') || 'No especificados'}`, {
+          width: cardWidth - (galleryX - x) - 14,
+          lineGap: 2,
+        });
+
+      doc.y = y + cardHeight + 14;
+    }
 
     doc.end();
     return pdfBufferPromise;
+  }
+
+  private async drawProjectImage(
+    doc: any,
+    imageUrl: string | undefined,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ) {
+    doc
+      .save()
+      .roundedRect(x, y, width, height, 8)
+      .fill('#e9f2f8')
+      .stroke('#c7d8e6')
+      .restore();
+
+    const imagePath = await this.resolveProjectImagePath(imageUrl);
+    if (imagePath) {
+      try {
+        doc.image(imagePath, x, y, { fit: [width, height], align: 'center', valign: 'center' });
+        return;
+      } catch {
+        // fallback to placeholder
+      }
+    }
+
+    doc
+      .fillColor('#6a8298')
+      .fontSize(9)
+      .text('Imagen de proyecto', x + 10, y + height / 2 - 5, {
+        width: width - 20,
+        align: 'center',
+      });
+  }
+
+  private async resolveProjectImagePath(imageUrl?: string) {
+    if (!imageUrl) return null;
+
+    if (imageUrl.startsWith('/projects/image/')) {
+      const filename = imageUrl.split('/').pop();
+      if (!filename) return null;
+      const uploadPath = path.resolve(process.cwd(), './uploads/projects', filename);
+      try {
+        await fs.access(uploadPath);
+        return uploadPath;
+      } catch {
+        return null;
+      }
+    }
+
+    if (imageUrl.startsWith('/')) {
+      const publicPath = path.resolve(process.cwd(), './apps/web/public', imageUrl.slice(1));
+      try {
+        await fs.access(publicPath);
+        return publicPath;
+      } catch {
+        return null;
+      }
+    }
+
+    return null;
   }
 
   private normalizePayload(dto: Partial<CreateProjectDto>) {
