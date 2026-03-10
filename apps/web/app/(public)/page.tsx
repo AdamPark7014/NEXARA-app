@@ -35,6 +35,12 @@ interface HomeProject {
   title: string;
   sector: string;
   summary?: string | null;
+  impact?: string | null;
+  services?: string[];
+  tags?: string[];
+  highlights?: string[];
+  gallery?: string[];
+  showInCatalog?: boolean;
   mainImage?: string | null;
   createdAt: string;
 }
@@ -432,38 +438,107 @@ export default function Home() {
           aria-labelledby="proyectos-recientes-heading"
         >
           <div className={styles.recentProjectsHeader}>
-            <span className={styles.recentProjectsBadge}>PROYECTOS RECIENTES</span>
+            <div className={styles.recentProjectsHeaderTop}>
+              <span className={styles.recentProjectsBadge}>PROYECTOS RECIENTES</span>
+              <div className={styles.recentProjectsActions}>
+                <a
+                  href={`${API_URL}/projects/catalog-pdf/download`}
+                  className={styles.recentProjectsPdfCta}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Descargar PDF
+                </a>
+                <a href="/proyectos" className={styles.recentProjectsPdfCta}>Ver catalogo</a>
+              </div>
+            </div>
             <div>
               <h2 id="proyectos-recientes-heading" className={styles.recentProjectsTitle}>
                 Proyectos recientes
               </h2>
               <p className={styles.recentProjectsSubtitle}>
-                Casos destacados que reflejan trabajo reciente y resultados reales.
+                Cargamos solo los ultimos proyectos publicados para mostrar lo mas reciente.
               </p>
             </div>
           </div>
 
           <div className={styles.recentProjectsGrid}>
             {recentProjects.map((project) => (
-              <article key={project.id} className={styles.recentProjectCard}>
-                <div className={styles.recentProjectMedia}>
-                  <Image
-                    src={normalizeProjectImageUrl(project.mainImage) || "/soluciones/rect-a.jpg"}
-                    alt={`Proyecto ${project.title}`}
-                    fill
-                    sizes="(max-width: 900px) 100vw, 33vw"
-                    className={styles.recentProjectImage}
-                    unoptimized
-                  />
+              <article key={project.id} className={styles.recentProjectFullCard}>
+                <header className={styles.recentProjectFullHeader}>
+                  <div>
+                    <p className={styles.recentProjectSector}>{project.sector || "Proyecto"}</p>
+                    <h3 className={styles.recentProjectFullTitle}>{project.title}</h3>
+                    <p className={styles.recentProjectSummary}>
+                      {project.summary || "Caso publicado en el portafolio Nexara."}
+                    </p>
+                    <div className={styles.recentProjectMetaRow}>
+                      <p>
+                        <span>Impacto</span>
+                        <strong>{project.impact || "Resultados medibles en operación"}</strong>
+                      </p>
+                      <p>
+                        <span>Servicios</span>
+                        <strong>
+                          {(project.services || []).length
+                            ? (project.services || []).slice(0, 3).join(" • ")
+                            : "Integración TI • Implementación • Soporte"}
+                        </strong>
+                      </p>
+                    </div>
+                  </div>
+                  {!!(project.tags || []).length && (
+                    <div className={styles.recentProjectTagRow}>
+                      {(project.tags || []).slice(0, 4).map((tag) => (
+                        <span key={`${project.id}-${tag}`} className={styles.recentProjectTag}>{tag}</span>
+                      ))}
+                    </div>
+                  )}
+                </header>
+
+                <div className={styles.recentProjectFullMedia}>
+                  <div className={styles.recentProjectMainImage}>
+                    <Image
+                      src={normalizeProjectImageUrl(project.mainImage) || "/soluciones/rect-a.jpg"}
+                      alt={`Proyecto ${project.title}`}
+                      fill
+                      sizes="(max-width: 900px) 100vw, 55vw"
+                      className={styles.recentProjectImage}
+                      unoptimized
+                    />
+                  </div>
+                  <div className={styles.recentProjectGallery}>
+                    {(project.gallery || []).slice(0, 4).map((image, index) => (
+                      <div key={`${project.id}-gallery-${index}`} className={styles.recentProjectGalleryItem}>
+                        <Image
+                          src={normalizeProjectImageUrl(image) || "/servicios/square-1.jpg"}
+                          alt={`${project.title} imagen ${index + 1}`}
+                          fill
+                          sizes="(max-width: 900px) 50vw, 18vw"
+                          className={styles.recentProjectImage}
+                          unoptimized
+                        />
+                      </div>
+                    ))}
+                    {!(project.gallery || []).length && (
+                      <div className={styles.recentProjectGalleryEmpty}>Sin galeria adicional</div>
+                    )}
+                  </div>
                 </div>
-                <div className={styles.recentProjectBody}>
-                  <p className={styles.recentProjectSector}>{project.sector}</p>
-                  <h3 className={styles.recentProjectTitle}>{project.title}</h3>
-                  <p className={styles.recentProjectSummary}>
-                    {project.summary || "Caso publicado en el portafolio Nexara."}
-                  </p>
-                  <a href={`/proyectos#${project.slug}`} className={styles.recentProjectLink}>Ver proyecto</a>
-                </div>
+
+                <ul className={styles.recentProjectHighlights}>
+                  {(
+                    (project.highlights || []).length
+                      ? (project.highlights || []).slice(0, 4)
+                      : [
+                          project.summary || "Proyecto enfocado en continuidad y eficiencia operativa.",
+                          "Implementación alineada a objetivos del negocio.",
+                          "Seguimiento técnico con métricas de desempeño.",
+                        ]
+                  ).map((item, index) => (
+                    <li key={`${project.id}-hl-${index}`}>{item}</li>
+                  ))}
+                </ul>
               </article>
             ))}
 

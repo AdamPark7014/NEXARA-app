@@ -272,7 +272,7 @@
 	}
 
 	.navLinks {
-		display: none;
+		display: none !important;
 	}
 
 	.mobileMenuButton {
@@ -281,6 +281,18 @@
 
 	.backupPanel {
 		display: none;
+	}
+
+	.mobileMenuOverlay {
+		align-items: flex-start;
+		padding-top: calc(var(--public-header-height) + 8px);
+	}
+
+	.mobileMenu {
+		width: min(92vw, 360px);
+		max-height: calc(100dvh - var(--public-header-height) - 16px);
+		overflow-y: auto;
+		-webkit-overflow-scrolling: touch;
 	}
 }
 

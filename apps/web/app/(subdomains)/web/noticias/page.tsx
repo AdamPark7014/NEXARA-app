@@ -18,6 +18,7 @@ type NewsPost = {
   title: string;
   slug: string;
   summary?: string | null;
+  content: string;
   coverImageUrl?: string | null;
   galleryUrls: string[];
   status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
@@ -66,6 +67,13 @@ const slugify = (value: string) =>
 const formatDate = (value?: string | null) =>
   value ? new Date(value).toLocaleString() : "Sin fecha";
 
+const toDatetimeLocalValue = (value?: string | null) => {
+  if (!value) return "";
+  const date = new Date(value);
+  const timezoneOffset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 16);
+};
+
 const normalizeNewsImageUrl = (imageUrl?: string | null) => {
   if (!imageUrl) return undefined;
   if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
@@ -90,6 +98,8 @@ export default function NoticiasPanel() {
   const [newsForm, setNewsForm] = useState<NewsFormState>(INITIAL_FORM);
   const [slugTouched, setSlugTouched] = useState(false);
   const [savingNews, setSavingNews] = useState(false);
+  const [editingNewsId, setEditingNewsId] = useState<number | null>(null);
+  const [deletingNewsId, setDeletingNewsId] = useState<number | null>(null);
   const [newsFeedback, setNewsFeedback] = useState<string | null>(null);
   const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
   const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
@@ -98,6 +108,14 @@ export default function NoticiasPanel() {
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const coverInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
+
+  const resetNewsEditor = () => {
+    setNewsForm(INITIAL_FORM);
+    setSlugTouched(false);
+    setCoverImageFile(null);
+    setGalleryFiles([]);
+    setEditingNewsId(null);
+  };
 
   const fetchSubscribers = async () => {
     setLoading(true);
@@ -178,33 +196,63 @@ export default function NoticiasPanel() {
     setSavingNews(true);
     setNewsFeedback(null);
     try {
-      const formData = new FormData();
-      formData.append("title", newsForm.title.trim());
-      if (newsForm.slug.trim()) {
-        formData.append("slug", newsForm.slug.trim());
-      }
-      if (newsForm.summary.trim()) {
-        formData.append("summary", newsForm.summary.trim());
-      }
-      formData.append("content", newsForm.content.trim());
-      formData.append("status", status);
-      if (newsForm.publishedAt) {
-        formData.append("publishedAt", new Date(newsForm.publishedAt).toISOString());
-      }
-      if (newsForm.tags.trim()) {
-        formData.append("tags", JSON.stringify(splitList(newsForm.tags)));
-      }
-      if (coverImageFile) {
-        formData.append("coverImage", coverImageFile);
-      }
-      if (galleryFiles.length) {
-        galleryFiles.forEach((file) => formData.append("gallery", file));
+      const payload = {
+        title: newsForm.title.trim(),
+        slug: newsForm.slug.trim() || undefined,
+        summary: newsForm.summary.trim() || undefined,
+        content: newsForm.content.trim(),
+        status,
+        publishedAt: newsForm.publishedAt
+          ? new Date(newsForm.publishedAt).toISOString()
+          : undefined,
+        tags: newsForm.tags.trim() ? splitList(newsForm.tags) : [],
+      };
+
+      const isEditing = editingNewsId !== null;
+      const endpoint = isEditing ? `news/${editingNewsId}` : "news";
+
+      if (isEditing && (coverImageFile || galleryFiles.length)) {
+        throw new Error(
+          "La edicion actual permite actualizar texto y estado. Para imagenes, crea una nueva noticia."
+        );
       }
 
-      const response = await fetch(buildApiUrl("news"), {
-        method: "POST",
-        body: formData,
-      });
+      const requestInit: RequestInit = isEditing
+        ? {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          }
+        : (() => {
+            const formData = new FormData();
+            formData.append("title", payload.title);
+            if (payload.slug) {
+              formData.append("slug", payload.slug);
+            }
+            if (payload.summary) {
+              formData.append("summary", payload.summary);
+            }
+            formData.append("content", payload.content);
+            formData.append("status", payload.status);
+            if (payload.publishedAt) {
+              formData.append("publishedAt", payload.publishedAt);
+            }
+            if (payload.tags.length) {
+              formData.append("tags", JSON.stringify(payload.tags));
+            }
+            if (coverImageFile) {
+              formData.append("coverImage", coverImageFile);
+            }
+            if (galleryFiles.length) {
+              galleryFiles.forEach((file) => formData.append("gallery", file));
+            }
+            return {
+              method: "POST",
+              body: formData,
+            };
+          })();
+
+      const response = await fetch(buildApiUrl(endpoint), requestInit);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -218,12 +266,15 @@ export default function NoticiasPanel() {
         throw new Error(message);
       }
 
-      setNewsForm(INITIAL_FORM);
-      setSlugTouched(false);
-      setCoverImageFile(null);
-      setGalleryFiles([]);
-      setNewsFeedback(status === "PUBLISHED" ? "Noticia publicada." : "Borrador guardado.");
-      fetchNews();
+      resetNewsEditor();
+      setNewsFeedback(
+        isEditing
+          ? "Noticia actualizada correctamente."
+          : status === "PUBLISHED"
+            ? "Noticia publicada."
+            : "Borrador guardado."
+      );
+      await fetchNews();
     } catch (err) {
       setNewsFeedback(err instanceof Error ? err.message : "Error desconocido");
     } finally {
@@ -292,6 +343,47 @@ export default function NoticiasPanel() {
     event.preventDefault();
     setGalleryDragActive(false);
     handleGalleryFiles(getImageFiles(event.dataTransfer.files));
+  };
+
+  const handleStartEditNews = (item: NewsPost) => {
+    setEditingNewsId(item.id);
+    setSlugTouched(true);
+    setCoverImageFile(null);
+    setGalleryFiles([]);
+    setNewsFeedback(null);
+    setNewsForm({
+      title: item.title,
+      slug: item.slug,
+      summary: item.summary || "",
+      content: item.content,
+      tags: item.tags.join(", "),
+      publishedAt: toDatetimeLocalValue(item.publishedAt),
+    });
+  };
+
+  const handleDeleteNews = async (item: NewsPost) => {
+    const confirmed = window.confirm(`Eliminar la noticia "${item.title}"? Esta accion no se puede deshacer.`);
+    if (!confirmed) return;
+
+    setDeletingNewsId(item.id);
+    setNewsFeedback(null);
+    try {
+      const response = await fetch(buildApiUrl(`news/${item.id}`), {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        throw new Error("No se pudo eliminar la noticia");
+      }
+      if (editingNewsId === item.id) {
+        resetNewsEditor();
+      }
+      setNewsFeedback("Noticia eliminada correctamente.");
+      await fetchNews();
+    } catch (err) {
+      setNewsFeedback(err instanceof Error ? err.message : "Error desconocido");
+    } finally {
+      setDeletingNewsId(null);
+    }
   };
 
   const counts = useMemo(() => {
@@ -375,10 +467,12 @@ export default function NoticiasPanel() {
             <div>
               <h2 className={styles.cardTitle}>Creador de noticias</h2>
               <p className={styles.cardSubtitle}>
-                Redacta, programa y publica novedades para la web y newsletter.
+                {editingNewsId
+                  ? "Edita y guarda cambios de la noticia seleccionada."
+                  : "Redacta, programa y publica novedades para la web y newsletter."}
               </p>
             </div>
-            <span className={styles.cardBadge}>Editor</span>
+            <span className={styles.cardBadge}>{editingNewsId ? "Editando" : "Editor"}</span>
           </header>
 
           <div className={styles.formGrid}>
@@ -558,13 +652,26 @@ export default function NoticiasPanel() {
           {newsFeedback && <p className={styles.feedback}>{newsFeedback}</p>}
 
           <div className={styles.buttonRow}>
+            {editingNewsId && (
+              <button
+                type="button"
+                className={styles.ghostButton}
+                onClick={resetNewsEditor}
+                disabled={savingNews}
+              >
+                Cancelar edicion
+              </button>
+            )}
             <button
               type="button"
               className={styles.ghostButton}
               onClick={() => submitNews("DRAFT")}
               disabled={savingNews}
             >
-              {savingNews ? "Guardando..." : "Guardar borrador"}
+              {savingNews
+                ? "Guardando..."
+                : editingNewsId
+                  ? "Guardar cambios" : "Guardar borrador"}
             </button>
             <button
               type="button"
@@ -572,7 +679,10 @@ export default function NoticiasPanel() {
               onClick={() => submitNews("PUBLISHED")}
               disabled={savingNews}
             >
-              {savingNews ? "Publicando..." : "Publicar"}
+              {savingNews
+                ? "Publicando..."
+                : editingNewsId
+                  ? "Guardar y publicar" : "Publicar"}
             </button>
           </div>
         </section>
@@ -645,6 +755,24 @@ export default function NoticiasPanel() {
                     <span>{item.tags.length ? item.tags.join(" · ") : "Sin tags"}</span>
                   </div>
                   <div className={styles.newsSlug}>/{item.slug}</div>
+                  <div className={styles.newsActions}>
+                    <button
+                      type="button"
+                      className={styles.ghostButton}
+                      onClick={() => handleStartEditNews(item)}
+                      disabled={savingNews || deletingNewsId === item.id}
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.dangerButton}
+                      onClick={() => handleDeleteNews(item)}
+                      disabled={deletingNewsId === item.id}
+                    >
+                      {deletingNewsId === item.id ? "Eliminando..." : "Eliminar"}
+                    </button>
+                  </div>
                 </div>
               </article>
             ))}

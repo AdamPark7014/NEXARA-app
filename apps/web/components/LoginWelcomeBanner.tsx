@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import styles from './LoginWelcomeBanner.module.css';
 
 const STORAGE_KEY = 'nexara_login_greeting';
@@ -8,29 +9,47 @@ const STORAGE_KEY = 'nexara_login_greeting';
 export default function LoginWelcomeBanner() {
   const [message, setMessage] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
+  const timersRef = useRef<number[]>([]);
+  const pathname = usePathname();
+
+  const clearTimers = () => {
+    timersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+    timersRef.current = [];
+  };
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    clearTimers();
+
     const greeting = window.sessionStorage.getItem(STORAGE_KEY);
     if (!greeting) return;
 
+    window.sessionStorage.removeItem(STORAGE_KEY);
     setMessage(greeting);
     setIsClosing(false);
-    window.sessionStorage.removeItem(STORAGE_KEY);
 
-    // Start fade-out shortly before removing the banner from the DOM.
     const fadeTimer = window.setTimeout(() => {
       setIsClosing(true);
-    }, 4500);
+    }, 3200);
 
     const removeTimer = window.setTimeout(() => {
       setMessage(null);
       setIsClosing(false);
-    }, 5000);
+    }, 3800);
+
+    timersRef.current = [fadeTimer, removeTimer];
 
     return () => {
-      window.clearTimeout(fadeTimer);
-      window.clearTimeout(removeTimer);
+      clearTimers();
+    };
+  }, [pathname]);
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined') {
+        clearTimers();
+      }
     };
   }, []);
 
