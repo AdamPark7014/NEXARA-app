@@ -28,11 +28,11 @@
   align-content: center;
   padding: clamp(20px, 2.4vw, 30px) clamp(22px, 2.8vw, 34px);
   border-radius: 10px;
-  border: 1px solid color-mix(in srgb, #ffffff 56%, var(--primary));
+  border: 1px solid color-mix(in srgb, #ffffff 72%, var(--primary));
   background: linear-gradient(
     128deg,
-    color-mix(in srgb, #ffffff 36%, transparent) 0%,
-    color-mix(in srgb, #f6ffff 30%, transparent) 100%
+    color-mix(in srgb, #ffffff 62%, transparent) 0%,
+    color-mix(in srgb, #f6ffff 54%, transparent) 100%
   );
   backdrop-filter: blur(11px) saturate(112%);
   box-shadow:
