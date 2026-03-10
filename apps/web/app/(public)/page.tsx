@@ -28,6 +28,16 @@ interface NewsPost {
   createdAt: string;
 }
 
+interface HomeProject {
+  id: number;
+  slug: string;
+  title: string;
+  sector: string;
+  summary?: string | null;
+  mainImage?: string | null;
+  createdAt: string;
+}
+
 const API_URL = getApiBase();
 
 // Función para normalizar URLs de imágenes
@@ -58,6 +68,20 @@ const normalizeNewsImageUrl = (imageUrl?: string): string | undefined => {
     return `${API_URL}${imageUrl}`;
   }
   return `${API_URL}/${imageUrl}`;
+};
+
+const normalizeProjectImageUrl = (imageUrl?: string | null): string | undefined => {
+  if (!imageUrl || imageUrl.trim() === "") return undefined;
+  if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+    return imageUrl;
+  }
+  if (imageUrl.startsWith("/")) {
+    if (imageUrl.startsWith("/projects/image/")) {
+      return `${API_URL}${imageUrl}`;
+    }
+    return imageUrl;
+  }
+  return `${API_URL}/projects/image/${imageUrl}`;
 };
 
 const formatNewsDate = (value?: string | null) =>
@@ -145,6 +169,7 @@ const deliveryModel = [
 export default function Home() {
   const [clients, setClients] = useState<Client[]>([]);
   const [news, setNews] = useState<NewsPost[]>([]);
+  const [projects, setProjects] = useState<HomeProject[]>([]);
   const [activeNews, setActiveNews] = useState(0);
   const [selectedNews, setSelectedNews] = useState<NewsPost | null>(null);
   const [selectedImage, setSelectedImage] = useState(0);
@@ -154,6 +179,7 @@ export default function Home() {
   useEffect(() => {
     fetchClients();
     fetchNews();
+    fetchProjects();
   }, []);
 
   useEffect(() => {
@@ -290,11 +316,27 @@ export default function Home() {
     }
   };
 
+  const fetchProjects = async () => {
+    try {
+      const response = await fetch(buildApiUrl("projects"));
+      if (!response.ok) return;
+      const data = (await response.json()) as HomeProject[];
+      setProjects(data);
+    } catch (err) {
+      console.error("Error al cargar proyectos:", err);
+      setProjects([]);
+    }
+  };
+
   const versionedPublicSrc = (file: string): string => {
     return `/${file}`;
   };
 
   const activeNewsItem = news[activeNews];
+  const recentProjects = [...projects]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 3);
+
   const openNewsModal = (item: NewsPost) => {
     previousFocusRef.current = document.activeElement as HTMLElement | null;
     setSelectedNews(item);
@@ -319,6 +361,25 @@ export default function Home() {
     <div className={`${styles.page} ${corporateStyles.root}`}>
       <main className={styles.main} aria-label="Inicio Nexara">
         <div data-ui="landing-hero-wrap" className={styles.heroWrapper}>
+          <aside className={corporateStyles.heroTopCard} aria-label="Resumen de que hacemos">
+            <Image
+              src="/logo-nexara.png"
+              alt="Logo Nexara"
+              width={84}
+              height={84}
+              className={corporateStyles.heroTopCardLogo}
+            />
+            <div className={corporateStyles.heroTopCardContent}>
+              <h2 className={corporateStyles.heroTopCardTitle}>¿QUÉ HACEMOS?</h2>
+              <p className={corporateStyles.heroTopCardText}>
+                En Nexara integramos tecnología, equipamiento y servicios de IT end-to-end a la
+                medida para que tu operación crezca con continuidad. Combinamos experiencia
+                técnica, ejecución ágil y acompañamiento cercano en cada etapa para resolver
+                necesidades reales.
+              </p>
+            </div>
+          </aside>
+
           <section data-ui="landing-hero" className={styles.hero} aria-labelledby="hero-heading">
             <div className={styles.heroBackground} aria-hidden="true">
               <Image
@@ -353,6 +414,56 @@ export default function Home() {
             </div>
           </section>
         </div>
+
+        <section
+          id="proyectos-recientes"
+          data-ui="landing-recent-projects"
+          className={styles.recentProjectsSection}
+          aria-labelledby="proyectos-recientes-heading"
+        >
+          <div className={styles.recentProjectsHeader}>
+            <span className={styles.recentProjectsBadge}>PROYECTOS RECIENTES</span>
+            <div>
+              <h2 id="proyectos-recientes-heading" className={styles.recentProjectsTitle}>
+                Proyectos recientes
+              </h2>
+              <p className={styles.recentProjectsSubtitle}>
+                Casos destacados que reflejan trabajo reciente y resultados reales.
+              </p>
+            </div>
+          </div>
+
+          <div className={styles.recentProjectsGrid}>
+            {recentProjects.map((project) => (
+              <article key={project.id} className={styles.recentProjectCard}>
+                <div className={styles.recentProjectMedia}>
+                  <Image
+                    src={normalizeProjectImageUrl(project.mainImage) || "/soluciones/rect-a.jpg"}
+                    alt={`Proyecto ${project.title}`}
+                    fill
+                    sizes="(max-width: 900px) 100vw, 33vw"
+                    className={styles.recentProjectImage}
+                    unoptimized
+                  />
+                </div>
+                <div className={styles.recentProjectBody}>
+                  <p className={styles.recentProjectSector}>{project.sector}</p>
+                  <h3 className={styles.recentProjectTitle}>{project.title}</h3>
+                  <p className={styles.recentProjectSummary}>
+                    {project.summary || "Caso publicado en el portafolio Nexara."}
+                  </p>
+                  <a href="/proyectos" className={styles.recentProjectLink}>Ver proyecto</a>
+                </div>
+              </article>
+            ))}
+
+            {!recentProjects.length && (
+              <div className={styles.recentProjectsEmpty}>
+                Aun no hay proyectos publicados.
+              </div>
+            )}
+          </div>
+        </section>
 
         <section id="noticias" data-ui="landing-news" className={styles.newsSection} aria-labelledby="noticias-heading">
           <div className={styles.newsHeader}>
@@ -451,6 +562,7 @@ export default function Home() {
 
         <nav data-ui="landing-quicknav" className={styles.quickNav} aria-label="Accesos rápidos">
           <a href="#qa-exclusivo" className={styles.quickNavLink}>Q&A exclusivo</a>
+          <a href="#proyectos-recientes" className={styles.quickNavLink}>Proyectos recientes</a>
           <a href="#noticias" className={styles.quickNavLink}>Actualidad</a>
           <a href="#capacidades" className={styles.quickNavLink}>Capacidades</a>
           <a href="#soluciones" className={styles.quickNavLink}>Soluciones</a>

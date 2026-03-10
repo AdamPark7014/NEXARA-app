@@ -12,15 +12,76 @@
   padding-right: 0 !important;
 }
 
+.heroTopCard {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 7;
+  width: clamp(640px, 66vw, 860px);
+  max-width: calc(100% - 52px);
+  min-height: clamp(220px, 28vw, 300px);
+  display: grid;
+  grid-template-columns: minmax(92px, 112px) minmax(0, 1fr);
+  gap: clamp(14px, 2.2vw, 26px);
+  align-items: center;
+  align-content: center;
+  padding: clamp(20px, 2.4vw, 30px) clamp(22px, 2.8vw, 34px);
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, #ffffff 56%, var(--primary));
+  background: linear-gradient(
+    128deg,
+    color-mix(in srgb, #ffffff 36%, transparent) 0%,
+    color-mix(in srgb, #f6ffff 30%, transparent) 100%
+  );
+  backdrop-filter: blur(11px) saturate(112%);
+  box-shadow:
+    0 10px 24px color-mix(in srgb, var(--shadow) 12%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 46%, transparent);
+}
+
+.heroTopCardLogo {
+  width: 112px;
+  height: 112px;
+  object-fit: contain;
+}
+
+.heroTopCardContent {
+  display: grid;
+  gap: 12px;
+  align-content: center;
+  height: 100%;
+}
+
+.heroTopCardTitle {
+  margin: 0;
+  color: color-mix(in srgb, var(--primary-strong) 88%, var(--foreground));
+  font-size: 1.28rem;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  font-weight: 800;
+}
+
+.heroTopCardText {
+  margin: 0;
+  color: color-mix(in srgb, var(--foreground) 94%, #1f3d52);
+  max-width: 64ch;
+  font-size: 1.34rem;
+  line-height: 1.54;
+  text-wrap: pretty;
+}
+
 .root :global([data-ui="landing-hero-wrap"]) {
   width: 100vw !important;
   max-width: none !important;
   margin: 0 !important;
-  margin-left: calc(-1 * var(--page-padding-x)) !important;
-  margin-right: calc(-1 * var(--page-padding-x)) !important;
+  margin-left: calc(50% - 50vw) !important;
+  margin-right: calc(50% - 50vw) !important;
   min-height: auto !important;
   padding: 0 !important;
   position: relative !important;
+  left: auto !important;
+  right: auto !important;
 }
 
 .root :global([data-ui="landing-hero"]) {
@@ -98,6 +159,41 @@
 }
 
 @media (max-width: 768px) {
+  .heroTopCard {
+    position: relative;
+    top: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 20px);
+    max-width: 100%;
+    min-height: auto;
+    margin: 10px auto 8px;
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .heroTopCardLogo {
+    width: 64px;
+    height: 64px;
+  }
+
+  .heroTopCardTitle {
+    font-size: 1rem;
+    letter-spacing: 0.12em;
+  }
+
+  .heroTopCardText {
+    font-size: 1.1rem;
+  }
+
+  .root :global([data-ui="landing-hero-wrap"]) {
+    width: 100vw !important;
+    margin-left: calc(50% - 50vw) !important;
+    margin-right: calc(50% - 50vw) !important;
+    padding: 0 !important;
+  }
+
   .root :global([data-ui="landing-hero"]) {
     height: calc(100vh - 66px) !important;
     min-height: calc(100vh - 66px) !important;

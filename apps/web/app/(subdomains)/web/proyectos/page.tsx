@@ -17,6 +17,7 @@ type Project = {
   highlights: string[];
   mainImage?: string | null;
   gallery: string[];
+  showInCatalog: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -30,6 +31,7 @@ type ProjectForm = {
   services: string[];
   tags: string[];
   highlights: string[];
+  showInCatalog: boolean;
   mainImage?: string | null;
   gallery: string[];
 };
@@ -59,6 +61,7 @@ const emptyForm: ProjectForm = {
   services: [""],
   tags: [""],
   highlights: [""],
+  showInCatalog: true,
   mainImage: null,
   gallery: [],
 };
@@ -169,6 +172,7 @@ export default function ProyectosWeb() {
     services: project.services.length ? project.services : [""],
     tags: project.tags.length ? project.tags : [""],
     highlights: project.highlights.length ? project.highlights : [""],
+    showInCatalog: project.showInCatalog ?? true,
     mainImage: project.mainImage || null,
     gallery: project.gallery || [],
   });
@@ -330,6 +334,7 @@ export default function ProyectosWeb() {
       formData.append("services", JSON.stringify(sanitizeList(form.services)));
       formData.append("tags", JSON.stringify(sanitizeList(form.tags)));
       formData.append("highlights", JSON.stringify(sanitizeList(form.highlights)));
+      formData.append("showInCatalog", String(form.showInCatalog));
 
       if (mainImageFile) {
         formData.append("mainImage", mainImageFile);
@@ -505,6 +510,14 @@ export default function ProyectosWeb() {
                 placeholder="Ej: SLA 99.98%"
                 required
               />
+            </label>
+            <label className={styles.toggleField}>
+              <input
+                type="checkbox"
+                checked={form.showInCatalog}
+                onChange={(event) => setForm((prev) => ({ ...prev, showInCatalog: event.target.checked }))}
+              />
+              <span>Mostrar proyecto en el catalogo</span>
             </label>
           </div>
 

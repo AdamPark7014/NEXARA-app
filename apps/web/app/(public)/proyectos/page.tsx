@@ -23,6 +23,8 @@ type Project = {
   highlights: string[];
   mainImage?: string | null;
   gallery: string[];
+  showInCatalog: boolean;
+  createdAt: string;
 };
 
 const API_URL = getApiBase();
@@ -53,13 +55,85 @@ const getProjects = async (): Promise<Project[]> => {
 
 export default async function ProjectsPage() {
   const projects = await getProjects();
+  const catalogProjects = projects.filter((project) => project.showInCatalog);
+  const shuffledCatalogProjects = [...catalogProjects];
+
+  for (let index = shuffledCatalogProjects.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffledCatalogProjects[index], shuffledCatalogProjects[swapIndex]] = [
+      shuffledCatalogProjects[swapIndex],
+      shuffledCatalogProjects[index],
+    ];
+  }
+
+  const renderProjectCard = (project: Project, prioritizeImage = false) => (
+    <article key={project.slug} className={styles.projectCard}>
+      <header className={styles.projectHeader}>
+        <div>
+          <p className={styles.badge}>{project.sector}</p>
+          <h2 className={styles.projectTitle}>{project.title}</h2>
+          <p className={styles.projectSubtitle}>{project.summary}</p>
+          <div className={styles.metaRow}>
+            <div>
+              <p className={styles.metaLabel}>Impacto</p>
+              <p className={styles.metaValue}>{project.impact}</p>
+            </div>
+            <div>
+              <p className={styles.metaLabel}>Servicios</p>
+              <p className={styles.metaValue}>{project.services.join(" • ")}</p>
+            </div>
+          </div>
+        </div>
+        <div className={styles.tagRow}>
+          {project.tags.map((tag) => (
+            <span key={tag} className={styles.tag}>{tag}</span>
+          ))}
+        </div>
+      </header>
+
+      <div className={styles.mediaGrid}>
+        <div className={styles.mainImage}>
+          <Image
+            src={normalizeImageUrl(project.mainImage) || "/soluciones/rect-a.jpg"}
+            alt={`Proyecto ${project.title}`}
+            fill
+            sizes="(max-width: 900px) 100vw, 55vw"
+            className={styles.image}
+            priority={prioritizeImage}
+          />
+        </div>
+        <div className={styles.gallery} role="list" aria-label={`Galeria de ${project.title}`}>
+          {(project.gallery || []).map((image, index) => (
+            <div key={`${project.slug}-gallery-${index}`} className={styles.galleryItem} role="listitem">
+              <Image
+                src={normalizeImageUrl(image) || "/servicios/square-1.jpg"}
+                alt={`${project.title} imagen ${index + 1}`}
+                fill
+                sizes="(max-width: 900px) 50vw, 18vw"
+                className={styles.image}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className={styles.detailRow}>
+        <ul className={styles.highlights}>
+          {project.highlights.map((item) => (
+            <li key={`${project.slug}-${item}`}>{item}</li>
+          ))}
+        </ul>
+      </div>
+    </article>
+  );
+
   return (
     <main className={`${styles.container} public-section-page`} aria-label="Página de proyectos">
       <section className={styles.hero}>
         <p className={styles.kicker}>Portafolio vivo</p>
         <div className={styles.heroHeader}>
           <div>
-            <h1 className={styles.heroTitle}>Proyectos recientes</h1>
+            <h1 className={styles.heroTitle}>Nuestros proyectos</h1>
             <p className={styles.heroSubtitle}>
               Casos reales con resultados medibles que muestran alcance,
               ejecución y valor entregado en operación.
@@ -67,6 +141,14 @@ export default async function ProjectsPage() {
             <div className={styles.heroActions}>
               <Link href="/contacto" className={styles.primaryCta}>Solicitar sesión</Link>
               <Link href="/nexara" className={styles.secondaryCta}>Ver credenciales</Link>
+              <a
+                href={`${API_URL}/projects/catalog-pdf/download`}
+                className={styles.secondaryCta}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Descargar CV empresarial
+              </a>
             </div>
           </div>
           <div className={styles.heroStats}>
@@ -87,7 +169,7 @@ export default async function ProjectsPage() {
       </section>
 
       <nav className={styles.quickNav} aria-label="Accesos rápidos">
-        <a href="#casos" className={styles.quickNavLink}>Casos</a>
+        <a href="#casos" className={styles.quickNavLink}>Nuestros proyectos</a>
         <a href="#por-que" className={styles.quickNavLink}>Por qué elegirnos</a>
         <a href="#cta" className={styles.quickNavLink}>Agendar sesión</a>
       </nav>
@@ -102,76 +184,36 @@ export default async function ProjectsPage() {
         </div>
       </section>
 
-      <section id="casos" className={styles.projectsSection} aria-label="Casos de éxito publicados">
-        {projects.map((project) => (
-          <article key={project.slug} className={styles.projectCard}>
-            <header className={styles.projectHeader}>
-              <div>
-                <p className={styles.badge}>{project.sector}</p>
-                <h2 className={styles.projectTitle}>{project.title}</h2>
-                <p className={styles.projectSubtitle}>{project.summary}</p>
-                <div className={styles.metaRow}>
-                  <div>
-                    <p className={styles.metaLabel}>Impacto</p>
-                    <p className={styles.metaValue}>{project.impact}</p>
-                  </div>
-                  <div>
-                    <p className={styles.metaLabel}>Servicios</p>
-                    <p className={styles.metaValue}>{project.services.join(" • ")}</p>
-                  </div>
-                </div>
-              </div>
-              <div className={styles.tagRow}>
-                {project.tags.map((tag) => (
-                  <span key={tag} className={styles.tag}>{tag}</span>
-                ))}
-              </div>
-            </header>
-
-            <div className={styles.mediaGrid}>
-              <div className={styles.mainImage}>
-                <Image
-                  src={normalizeImageUrl(project.mainImage) || "/soluciones/rect-a.jpg"}
-                  alt={`Proyecto ${project.title}`}
-                  fill
-                  sizes="(max-width: 900px) 100vw, 55vw"
-                  className={styles.image}
-                  priority
-                />
-              </div>
-              <div className={styles.gallery} role="list" aria-label={`Galería de ${project.title}`}>
-                {(project.gallery || []).map((image, index) => (
-                  <div key={`${project.slug}-gallery-${index}`} className={styles.galleryItem} role="listitem">
-                    <Image
-                      src={normalizeImageUrl(image) || "/servicios/square-1.jpg"}
-                      alt={`${project.title} imagen ${index + 1}`}
-                      fill
-                      sizes="(max-width: 900px) 50vw, 18vw"
-                      className={styles.image}
-                    />
-                  </div>
-                ))}
-              </div>
+      {(shuffledCatalogProjects.length > 0 || !projects.length) && (
+        <section id="casos" className={styles.projectsSection} aria-label="Casos de éxito publicados">
+          {!!shuffledCatalogProjects.length && (
+            <div>
+              <p className={styles.kicker}>Seleccion curada</p>
+              <h2 className={styles.projectTitle}>Nuestros proyectos</h2>
+              <p className={styles.projectSubtitle}>
+                Proyectos destacados del catalogo, presentados de forma dinamica.
+              </p>
             </div>
-
-            <div className={styles.detailRow}>
-              <ul className={styles.highlights}>
-                {project.highlights.map((item) => (
-                  <li key={`${project.slug}-${item}`}>{item}</li>
-                ))}
-              </ul>
+          )}
+          {shuffledCatalogProjects.map((project, index) => renderProjectCard(project, index === 0))}
+          {!projects.length && (
+            <div className={styles.projectCard}>
+              <h2 className={styles.projectTitle}>Sin proyectos publicados</h2>
+              <p className={styles.projectSubtitle}>
+                Agrega proyectos desde el panel web para mostrar resultados aquí.
+              </p>
             </div>
-          </article>
-        ))}
-        {!projects.length && (
-          <div className={styles.projectCard}>
-            <h2 className={styles.projectTitle}>Sin proyectos publicados</h2>
-            <p className={styles.projectSubtitle}>
-              Agrega proyectos desde el panel web para mostrar resultados aquí.
-            </p>
-          </div>
-        )}
-      </section>
+          )}
+          {!!projects.length && !shuffledCatalogProjects.length && (
+            <div className={styles.projectCard}>
+              <h2 className={styles.projectTitle}>Sin proyectos en catalogo</h2>
+              <p className={styles.projectSubtitle}>
+                Marca proyectos como visibles en catalogo desde el panel web para mostrarlos aqui.
+              </p>
+            </div>
+          )}
+        </section>
+      )}
 
       <section id="por-que" className={styles.whyUsSection} aria-label="Razones para elegirnos">
         <div>
