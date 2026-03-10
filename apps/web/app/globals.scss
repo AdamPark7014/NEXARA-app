@@ -2,9 +2,9 @@
   --font-base: "Manrope", "Segoe UI", "Inter", "Helvetica Neue", sans-serif;
   --font-heading: "Space Grotesk", "Manrope", "Segoe UI", sans-serif;
 
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -13,8 +13,8 @@
   --space-5: 1.5rem;
   --space-6: 2rem;
 
-  --elev-1: 0 6px 20px rgba(8, 24, 42, 0.09);
-  --elev-2: 0 14px 32px rgba(8, 24, 42, 0.14);
+  --elev-1: 0 10px 24px rgba(8, 24, 42, 0.1);
+  --elev-2: 0 18px 40px rgba(8, 24, 42, 0.16);
   --ring-soft: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent);
 
   --control-height: 42px;
@@ -31,6 +31,7 @@
   --panel-gap: clamp(14px, 1.8vw, 22px);
   --panel-sidebar-width: 280px;
   --header-offset: 16px;
+  --public-header-height: 72px;
   --panel-title-leading: 1.28;
   --panel-title-tracking: -0.01em;
   --panel-font-family: var(--font-base);
@@ -88,8 +89,11 @@ body.light {
 
   --border: rgba(12, 71, 69, 0.14);
   --border-strong: rgba(12, 71, 69, 0.26);
-  --shadow: 0 12px 28px rgba(10, 30, 52, 0.11);
+  --shadow: 0 14px 32px rgba(10, 30, 52, 0.13);
   --focus: rgba(21, 169, 157, 0.34);
+  --surface-clean: color-mix(in srgb, var(--surface) 96%, var(--background));
+  --surface-clean-soft: color-mix(in srgb, var(--surface-2) 92%, var(--background));
+  --stroke-clean: color-mix(in srgb, var(--primary) 20%, transparent);
 
   /* Header / menu tokens with refined gradients and depth */
   --header-bg: linear-gradient(142deg, #109b90 0%, #1fb0a4 40%, #6ed8cd 100%);
@@ -161,8 +165,11 @@ body.dark {
 
   --border: rgba(100, 160, 205, 0.22);
   --border-strong: rgba(120, 180, 225, 0.38);
-  --shadow: 0 16px 38px rgba(0, 0, 0, 0.58);
+  --shadow: 0 18px 42px rgba(0, 0, 0, 0.62);
   --focus: rgba(100, 192, 212, 0.4);
+  --surface-clean: color-mix(in srgb, var(--surface) 94%, var(--background));
+  --surface-clean-soft: color-mix(in srgb, var(--surface-2) 90%, var(--background));
+  --stroke-clean: color-mix(in srgb, var(--primary) 24%, transparent);
 
   --header-bg: linear-gradient(142deg, #0f2233 0%, #153247 46%, #1b415a 100%);
   --header-border: rgba(102, 170, 205, 0.3);
@@ -230,6 +237,97 @@ body {
     radial-gradient(circle at 8% -10%, rgba(121, 216, 206, 0.1), transparent 42%),
     radial-gradient(circle at 94% -10%, rgba(67, 184, 171, 0.08), transparent 40%),
     linear-gradient(180deg, var(--background) 0%, color-mix(in srgb, var(--surface-2) 90%, var(--background)) 100%);
+}
+
+.public-layout-wrapper {
+  min-height: 100vh;
+}
+
+.public-layout-content {
+  padding-top: var(--public-header-height);
+}
+
+/* Global polish pass for consistent, clean, professional feel */
+:where(button, .button, [type="button"], [type="submit"]) {
+  border-radius: var(--radius-md);
+}
+
+:where(input, select, textarea) {
+  border-radius: var(--radius-sm);
+}
+
+/* Home landing sections controlled globally via data-ui attributes */
+body :where([data-ui="landing-news"],
+[data-ui="landing-metrics"],
+[data-ui="landing-qa"],
+[data-ui="landing-capabilities"],
+[data-ui="landing-solutions"],
+[data-ui="landing-delivery"],
+[data-ui="landing-clients"],
+[data-ui="landing-cta"],
+[data-ui="landing-recent-projects"]) {
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, transparent) !important;
+  border-radius: var(--radius-lg) !important;
+  background: linear-gradient(160deg, var(--surface-clean), var(--surface-clean-soft)) !important;
+  box-shadow:
+    var(--elev-1),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 55%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--primary) 8%, transparent) !important;
+}
+
+body :where([data-ui="metric-card"],
+[data-ui="capability-card"],
+[data-ui="solution-card"],
+[data-ui="delivery-card"],
+[data-ui="client-card"]) {
+  border-radius: var(--radius-md) !important;
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent) !important;
+  background: color-mix(in srgb, var(--surface) 97%, transparent) !important;
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--shadow) 56%, transparent) !important;
+}
+
+body :where([data-ui="landing-quicknav"]) {
+  border: 1px solid color-mix(in srgb, var(--primary) 26%, transparent) !important;
+  border-radius: 999px !important;
+  background: color-mix(in srgb, var(--surface) 94%, transparent) !important;
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--shadow) 45%, transparent) !important;
+}
+
+/* Extra pass: professional aqua styling for Inicio internals */
+body [data-ui="landing-recent-projects"] article,
+body [data-ui="landing-news"] [id="news-active-slide"],
+body [data-ui="landing-qa"],
+body [data-ui="landing-cta"] {
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent) !important;
+  border-radius: var(--radius-md) !important;
+  background: color-mix(in srgb, var(--surface) 96%, transparent) !important;
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--shadow) 54%, transparent) !important;
+}
+
+body [data-ui="landing-recent-projects"] :where(h2, h3),
+body [data-ui="landing-news"] :where(h2, h3),
+body [data-ui="landing-capabilities"] :where(h2, h3),
+body [data-ui="landing-solutions"] :where(h2, h3),
+body [data-ui="landing-delivery"] :where(h2, h3),
+body [data-ui="landing-clients"] :where(h2, h3),
+body [data-ui="landing-qa"] :where(h2, h3),
+body [data-ui="landing-cta"] :where(h2, h3) {
+  color: color-mix(in srgb, var(--foreground) 94%, var(--primary)) !important;
+  letter-spacing: -0.015em;
+}
+
+body [data-ui="landing-quicknav"] a {
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent) !important;
+  background: color-mix(in srgb, var(--surface) 94%, transparent) !important;
+  color: color-mix(in srgb, var(--foreground) 92%, var(--primary)) !important;
+  border-radius: 999px !important;
+  font-weight: 700 !important;
+}
+
+body [data-ui="landing-quicknav"] a:hover,
+body [data-ui="landing-quicknav"] a:focus-visible {
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface)) !important;
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent) !important;
 }
 
 h1,
@@ -334,5 +432,11 @@ textarea:disabled {
 ::selection {
   background: rgba(121, 216, 206, 0.32);
   color: var(--text-primary);
+}
+
+@media (max-width: 640px) {
+  :root {
+    --public-header-height: 66px;
+  }
 }
 

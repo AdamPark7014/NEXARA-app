@@ -26,6 +26,7 @@ interface NewsPost {
   galleryUrls: string[];
   publishedAt?: string | null;
   createdAt: string;
+  updatedAt?: string;
 }
 
 interface HomeProject {
@@ -59,15 +60,24 @@ const normalizeImageUrl = (imageUrl?: string): string | undefined => {
   return `${API_URL}/clients/image/${imageUrl}`;
 };
 
-const normalizeNewsImageUrl = (imageUrl?: string): string | undefined => {
+const addCacheKey = (url: string, cacheKey?: string): string => {
+  if (!cacheKey) return url;
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}v=${encodeURIComponent(cacheKey)}`;
+};
+
+const normalizeNewsImageUrl = (imageUrl?: string, cacheKey?: string): string | undefined => {
   if (!imageUrl || imageUrl.trim() === "") return undefined;
+
   if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
-    return imageUrl;
+    return addCacheKey(imageUrl, cacheKey);
   }
+
   if (imageUrl.startsWith("/")) {
-    return `${API_URL}${imageUrl}`;
+    return addCacheKey(`${API_URL}${imageUrl}`, cacheKey);
   }
-  return `${API_URL}/${imageUrl}`;
+
+  return addCacheKey(`${API_URL}/${imageUrl}`, cacheKey);
 };
 
 const normalizeProjectImageUrl = (imageUrl?: string | null): string | undefined => {
@@ -452,7 +462,7 @@ export default function Home() {
                   <p className={styles.recentProjectSummary}>
                     {project.summary || "Caso publicado en el portafolio Nexara."}
                   </p>
-                  <a href="/proyectos" className={styles.recentProjectLink}>Ver proyecto</a>
+                  <a href={`/proyectos#${project.slug}`} className={styles.recentProjectLink}>Ver proyecto</a>
                 </div>
               </article>
             ))}
@@ -491,7 +501,10 @@ export default function Home() {
                 <div className={styles.newsImageWrap}>
                   <img
                     src={
-                      normalizeNewsImageUrl(activeNewsItem.coverImageUrl || undefined) ||
+                      normalizeNewsImageUrl(
+                        activeNewsItem.coverImageUrl || undefined,
+                        activeNewsItem.updatedAt || activeNewsItem.createdAt,
+                      ) ||
                       "/soluciones/rect-a.jpg"
                     }
                     alt={activeNewsItem.title}
@@ -686,20 +699,6 @@ export default function Home() {
           </div>
         </section>
 
-        <section data-ui="landing-cta" className={styles.executiveCta} aria-labelledby="executive-cta-heading">
-          <div className={styles.executiveCtaContent}>
-            <span className={styles.executiveCtaBadge}>PRÓXIMO PASO</span>
-            <h2 id="executive-cta-heading">Define tu hoja de ruta tecnológica con enfoque ejecutivo</h2>
-            <p>
-              Coordinemos una sesión para priorizar riesgos, capacidades y oportunidades de tu operación.
-            </p>
-          </div>
-          <div className={styles.executiveCtaActions}>
-            <a href="/contacto" className={styles.primary}>Agendar reunión estratégica</a>
-            <a href="/servicios" className={styles.secondary}>Revisar portafolio</a>
-          </div>
-        </section>
-
         <ContactFormToggle />
       </main>
 
@@ -734,6 +733,7 @@ export default function Home() {
                     src={
                       normalizeNewsImageUrl(
                         selectedNews.galleryUrls[selectedImage] || selectedNews.coverImageUrl || undefined,
+                        selectedNews.updatedAt || selectedNews.createdAt,
                       ) || "/soluciones/rect-b.jpg"
                     }
                     alt={selectedNews.title}
@@ -756,7 +756,15 @@ export default function Home() {
                         aria-label={`Ver imagen ${index + 1}`}
                         aria-pressed={index === selectedImage}
                       >
-                        <img src={normalizeNewsImageUrl(image || undefined) || "/soluciones/rect-c.jpg"} alt="" />
+                        <img
+                          src={
+                            normalizeNewsImageUrl(
+                              image || undefined,
+                              selectedNews.updatedAt || selectedNews.createdAt,
+                            ) || "/soluciones/rect-c.jpg"
+                          }
+                          alt=""
+                        />
                       </button>
                     ))}
                 </div>

@@ -223,6 +223,15 @@
   }
 }
 
+:global(body.dark) .heroTopCardTitle {
+  color: #0f4f67;
+}
+
+:global(body.dark) .heroTopCardText {
+  color: #101820;
+  text-shadow: none;
+}
+
 /* Final anti-collision guard against legacy full-bleed rules in page.module.css */
 .root :global([data-ui="landing-news"]),
 .root :global([data-ui="landing-metrics"]),
