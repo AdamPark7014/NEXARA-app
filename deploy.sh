@@ -5,6 +5,16 @@
 
 set -e  # Detener si hay error
 
+# Forzar builds en serie durante deploy.
+BUILD_MODE="serial"
+
+run_build_serial() {
+    local target="$1"
+    shift
+    echo -e "${YELLOW}🧱 Compilando ${target} en serie (${BUILD_MODE})...${NC}"
+    "$@"
+}
+
 echo "🚀 Iniciando deploy de NEXARA-app..."
 
 # Variables
@@ -104,7 +114,7 @@ fi
 
 # Compilar backend
 echo -e "${YELLOW}📦 Compilando backend...${NC}"
-npm run build
+run_build_serial "backend" npm run build
 
 # Iniciar/reiniciar backend con PM2
 if pm2 list | grep -q "nexara-api"; then
@@ -146,7 +156,7 @@ fi
 echo -e "${YELLOW}📦 Compilando frontend (esto puede tardar unos minutos)...${NC}"
 # Evitar artefactos stale de Next que pueden romper Server Actions tras deploy
 rm -rf .next
-npm run build
+run_build_serial "frontend" npm run build
 
 # Iniciar/reiniciar frontend con PM2
 if pm2 list | grep -q "nexara-web"; then
