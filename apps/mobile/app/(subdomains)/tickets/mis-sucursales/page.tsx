@@ -232,7 +232,7 @@ export default function MyBranchesPage() {
             )}
           </div>
           <div className={consoleStyles.sidebarName}>{session.client.name}</div>
-          <div className={consoleStyles.sidebarEmail}>Administración de sucursales</div>
+          <div className={consoleStyles.sidebarEmail}>Seguimiento de servicio y soporte</div>
           <div className={consoleStyles.sidebarMeta}>
             <span className={consoleStyles.rolePill}>Cliente</span>
           </div>
@@ -242,7 +242,7 @@ export default function MyBranchesPage() {
         <ul className={consoleStyles.sidebarMenu}>
           <li className={consoleStyles.sidebarMenuItem}>
             <a href="..?tab=profile" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
-              👤 Mi perfil corporativo
+              🪪 Mi perfil corporativo
             </a>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
@@ -265,8 +265,8 @@ export default function MyBranchesPage() {
             </a>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
-            <a href="..?tab=profile" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
-              🏢 Perfil corporativo
+            <a href="..?tab=inventarios" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
+              🧰 Inventarios
             </a>
           </li>
         </ul>
