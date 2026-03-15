@@ -175,7 +175,7 @@ export default function ClientTicketsPage() {
         setActiveTab("tickets");
       } else if (tabParam === "new-ticket") {
         setActiveTab("nuevo");
-      } else if (tabParam === "inventories") {
+      } else if (tabParam === "inventories" || tabParam === "inventarios") {
         setActiveTab("inventarios");
       } else if (tabParam === "profile") {
         setActiveTab("perfil");

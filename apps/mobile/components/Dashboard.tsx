@@ -568,7 +568,7 @@ export default function Dashboard() {
                       <stop offset="100%" stopColor="var(--secondary)" />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid stroke="rgba(23, 137, 252, 0.18)" vertical={false} />
+                  <CartesianGrid stroke="var(--stroke-clean)" vertical={false} />
                   <XAxis dataKey="date" stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
                   <YAxis allowDecimals={false} stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
                   <Tooltip content={<ChartTooltip />} />
@@ -597,10 +597,10 @@ export default function Dashboard() {
                   <defs>
                     <linearGradient id="activityFill" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="var(--primary)" />
-                      <stop offset="100%" stopColor="var(--primary-light)" />
+                      <stop offset="100%" stopColor="var(--secondary)" />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid stroke="rgba(23, 137, 252, 0.18)" vertical={false} />
+                  <CartesianGrid stroke="var(--stroke-clean)" vertical={false} />
                   <XAxis dataKey="estatus" stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
                   <YAxis allowDecimals={false} stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
                   <Tooltip content={<ChartTooltip />} />
@@ -631,7 +631,7 @@ export default function Dashboard() {
                       <stop offset="100%" stopColor="var(--accent)" />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid stroke="rgba(23, 137, 252, 0.18)" vertical={false} />
+                  <CartesianGrid stroke="var(--stroke-clean)" vertical={false} />
                   <XAxis dataKey="estatus" stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
                   <YAxis allowDecimals={false} stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
                   <Tooltip content={<ChartTooltip />} />
@@ -665,57 +665,65 @@ export default function Dashboard() {
       </div>
 
       <style jsx>{`
+        .dashboardRoot {
+          display: grid;
+          gap: 18px;
+          padding-bottom: 12px;
+        }
+
         .loadingCard,
         .errorCard,
         .heroCard,
         .kpiCard,
         .analysisCard,
         .chartWrap,
-        .userHoursRow,
-        .chartEmpty,
         .chartTooltip,
-        .chip,
-        .chipLive,
-        .kpiPill,
-        .analysisPill,
-        .heroLevel,
+        .userHoursRow,
         .input {
-          background: var(--surface) !important;
-          box-shadow: none !important;
-          text-shadow: none !important;
-          filter: none !important;
-          backdrop-filter: none !important;
+          box-shadow: none;
+          text-shadow: none;
+          filter: none;
         }
 
         .loadingCard,
         .errorCard {
-          padding: 24px;
-          border-radius: 12px;
+          padding: 28px;
+          border-radius: 18px;
           border: 1px solid var(--border);
+          background: linear-gradient(160deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--surface-2) 92%, transparent));
           color: var(--foreground);
           text-align: center;
           font-size: 16px;
+          box-shadow: var(--elev-1);
         }
 
         .errorCard {
-          color: var(--danger);
-          border-color: var(--danger);
+          color: var(--state-danger-text);
+          border-color: var(--state-danger-border);
+          background: linear-gradient(160deg, color-mix(in srgb, var(--state-danger-bg) 72%, var(--surface)), color-mix(in srgb, var(--surface-2) 94%, transparent));
         }
 
-        .dashboardRoot {
+        .heroCard {
+          position: relative;
           display: grid;
-          gap: 14px;
-        }
-
-        .heroCard,
-        .kpiCard,
-        .analysisCard {
-          display: grid;
-          gap: 12px;
-          padding: 16px;
+          gap: 16px;
+          padding: clamp(18px, 2.5vw, 28px);
           border: 1px solid var(--border);
-          border-radius: 12px;
+          border-radius: 24px;
           overflow: hidden;
+          background:
+            radial-gradient(circle at top right, color-mix(in srgb, var(--primary) 18%, transparent), transparent 32%),
+            radial-gradient(circle at left bottom, color-mix(in srgb, var(--secondary) 14%, transparent), transparent 28%),
+            linear-gradient(155deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--surface-2) 92%, transparent));
+          box-shadow: var(--elev-2);
+        }
+
+        .heroCard::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(90deg, color-mix(in srgb, var(--primary) 8%, transparent), transparent 40%, color-mix(in srgb, var(--secondary) 7%, transparent));
+          pointer-events: none;
         }
 
         .heroHeader,
@@ -725,12 +733,13 @@ export default function Dashboard() {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          gap: 10px;
+          gap: 12px;
         }
 
         .heroHeader,
         .analysisHeader {
           flex-wrap: wrap;
+          align-items: flex-start;
         }
 
         .heroKicker,
@@ -739,7 +748,7 @@ export default function Dashboard() {
         .filterLabel {
           margin: 0;
           text-transform: uppercase;
-          letter-spacing: 0.14em;
+          letter-spacing: 0.16em;
           font-size: 11px;
           color: var(--text-tertiary);
         }
@@ -749,41 +758,94 @@ export default function Dashboard() {
         .kpiValue {
           margin: 0;
           color: var(--foreground);
-          line-height: 1.15;
+          line-height: 1.08;
         }
 
         .heroTitle {
-          font-size: clamp(20px, 2.2vw, 28px);
+          font-size: clamp(26px, 3vw, 38px);
+          font-family: var(--font-heading);
+          letter-spacing: var(--panel-title-tracking);
         }
 
         .analysisTitle {
-          margin-top: 4px;
-          font-size: clamp(18px, 1.8vw, 22px);
+          margin-top: 6px;
+          font-size: clamp(18px, 1.7vw, 22px);
+          font-family: var(--font-heading);
         }
 
         .kpiValue {
-          font-size: clamp(22px, 2.4vw, 30px);
+          font-size: clamp(24px, 2.4vw, 34px);
           font-weight: 700;
         }
 
         .heroSubtitle,
         .heroMeta,
         .kpiMeta,
-        .userHoursName,
-        .analysisPill,
-        .kpiPill,
+        .userHoursName {
+          color: var(--text-secondary);
+          font-size: 13px;
+        }
+
+        .heroMeta {
+          display: grid;
+          gap: 8px;
+          justify-items: end;
+        }
+
+        .heroRole,
         .heroLevel,
         .chip,
-        .chipLive {
+        .chipLive,
+        .kpiPill,
+        .analysisPill {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          min-height: 30px;
+          padding: 0 12px;
+          border-radius: 999px;
+          border: 1px solid var(--border);
+          background: color-mix(in srgb, var(--surface) 88%, transparent);
           color: var(--text-secondary);
           font-size: 12px;
+          font-weight: 650;
+          letter-spacing: 0.01em;
+        }
+
+        .heroRole {
+          background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 12%, var(--surface)), color-mix(in srgb, var(--secondary) 8%, var(--surface-2)));
+          border-color: color-mix(in srgb, var(--primary) 26%, var(--border));
+          color: var(--foreground);
+        }
+
+        .heroLevel,
+        .chipLive {
+          background: var(--state-info-bg);
+          border-color: var(--state-info-border);
+          color: var(--state-info-text);
+        }
+
+        .kpiPill,
+        .analysisPill,
+        .chip {
+          background: color-mix(in srgb, var(--surface-2) 88%, transparent);
+        }
+
+        .pillAccent {
+          background: color-mix(in srgb, var(--secondary) 16%, transparent);
+          border-color: color-mix(in srgb, var(--secondary) 30%, transparent);
+          color: color-mix(in srgb, var(--secondary) 78%, var(--foreground));
         }
 
         .heroBadges,
         .filtersRow {
           display: flex;
-          gap: 8px;
+          gap: 10px;
           flex-wrap: wrap;
+        }
+
+        .filtersRow {
+          padding-top: 4px;
         }
 
         .filterControl {
@@ -792,34 +854,137 @@ export default function Dashboard() {
         }
 
         .input {
-          padding: 8px 10px;
-          border-radius: 8px;
+          min-width: 220px;
+          padding: 10px 12px;
+          border-radius: 12px;
           border: 1px solid var(--border);
+          background: color-mix(in srgb, var(--surface) 96%, transparent);
           color: var(--foreground);
           font-size: 14px;
+        }
+
+        .input:focus {
+          outline: none;
+          border-color: color-mix(in srgb, var(--primary) 58%, var(--border));
+          box-shadow: var(--ring-soft);
         }
 
         .kpiGrid {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 14px;
+        }
+
+        .kpiCard {
+          position: relative;
+          display: grid;
           gap: 12px;
+          padding: 18px;
+          border: 1px solid var(--border);
+          border-radius: 20px;
+          overflow: hidden;
+          background: linear-gradient(160deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--surface-2) 92%, transparent));
+          box-shadow: var(--elev-1);
+        }
+
+        .kpiCard::before {
+          content: "";
+          position: absolute;
+          inset: 0 auto 0 0;
+          width: 4px;
+          background: linear-gradient(180deg, var(--primary), var(--secondary));
+        }
+
+        .kpiMeta {
+          font-size: 12px;
         }
 
         .analyticsGrid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-          gap: 12px;
+          grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+          gap: 14px;
+        }
+
+        .analysisCard {
+          position: relative;
+          display: grid;
+          gap: 14px;
+          padding: 18px;
+          border: 1px solid var(--border);
+          border-radius: 22px;
+          overflow: hidden;
+          background: linear-gradient(162deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--surface-2) 92%, transparent));
+          box-shadow: var(--elev-1);
+        }
+
+        .analysisCard::before {
+          content: "";
+          position: absolute;
+          left: 18px;
+          right: 18px;
+          top: 0;
+          height: 2px;
+          background: linear-gradient(90deg, var(--primary), var(--secondary));
+          opacity: 0.9;
+        }
+
+        .chartWrap {
+          width: 100%;
+          height: 240px;
+          padding: 10px;
+          border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+          border-radius: 16px;
+          overflow: hidden;
+          background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 97%, transparent), color-mix(in srgb, var(--surface-clean-soft) 92%, transparent));
+        }
+
+        .chartEmpty {
+          height: 100%;
+          display: grid;
+          place-items: center;
+          text-align: center;
+          border: 1px dashed color-mix(in srgb, var(--border) 90%, transparent);
+          border-radius: 12px;
+          color: var(--text-tertiary);
+          font-size: 13px;
+          padding: 12px;
+          background: color-mix(in srgb, var(--surface-2) 72%, transparent);
+        }
+
+        .chartTooltip {
+          padding: 10px 12px;
+          border-radius: 12px;
+          border: 1px solid var(--border);
+          background: color-mix(in srgb, var(--surface) 98%, transparent);
+          color: var(--foreground);
+          font-size: 12px;
+          display: grid;
+          gap: 6px;
+          box-shadow: var(--elev-1);
+        }
+
+        .chartTooltipTitle {
+          font-weight: 700;
+          color: var(--foreground);
+        }
+
+        .chartTooltipRow {
+          display: flex;
+          justify-content: space-between;
+          gap: 8px;
+          color: var(--text-secondary);
         }
 
         .userHoursList {
           display: grid;
-          gap: 8px;
+          gap: 10px;
         }
 
         .userHoursRow {
-          padding: 8px 10px;
-          border-radius: 10px;
+          padding: 12px 14px;
+          border-radius: 14px;
           border: 1px solid var(--border);
+          background: linear-gradient(145deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface-2) 88%, transparent));
         }
 
         .userHoursValue,
@@ -828,57 +993,17 @@ export default function Dashboard() {
           color: var(--foreground);
         }
 
-        .chartWrap {
-          width: 100%;
-          height: 240px;
-          padding: 8px;
-          border: 1px solid var(--border);
-          border-radius: 10px;
-          overflow: hidden;
-        }
-
-        .chartWrap::before,
-        .heroCard::after,
-        .kpiCard::before,
-        .analysisCard::before {
-          content: none !important;
-        }
-
-        .chartEmpty {
-          height: 100%;
-          display: grid;
-          place-items: center;
-          text-align: center;
-          border: 1px dashed var(--border);
-          border-radius: 8px;
-          color: var(--text-tertiary);
-          font-size: 13px;
-          padding: 12px;
-        }
-
-        .chartTooltip {
-          padding: 8px 10px;
-          border-radius: 8px;
-          border: 1px solid var(--border);
-          color: var(--foreground);
-          font-size: 12px;
-          display: grid;
-          gap: 4px;
-        }
-
-        .chartTooltipRow {
-          display: flex;
-          justify-content: space-between;
-          gap: 8px;
-        }
-
         @media (max-width: 900px) {
           .heroMeta {
-            text-align: left;
+            justify-items: start;
           }
         }
 
         @media (max-width: 640px) {
+          .dashboardRoot {
+            gap: 14px;
+          }
+
           .kpiGrid,
           .analyticsGrid {
             grid-template-columns: 1fr;
@@ -887,7 +1012,21 @@ export default function Dashboard() {
           .heroCard,
           .kpiCard,
           .analysisCard {
-            padding: 14px;
+            padding: 16px;
+            border-radius: 18px;
+          }
+
+          .heroTitle {
+            font-size: 24px;
+          }
+
+          .input {
+            min-width: 0;
+            width: 100%;
+          }
+
+          .chartWrap {
+            height: 220px;
           }
         }
       `}</style>

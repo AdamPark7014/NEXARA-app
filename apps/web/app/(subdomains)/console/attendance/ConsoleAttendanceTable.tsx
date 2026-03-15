@@ -623,7 +623,7 @@ const ConsoleAttendanceTable = () => {
                                                         height: 50,
                                                         borderRadius: 4,
                                                         border: '2px solid var(--primary)',
-                                                        backgroundColor: 'rgba(var(--primary-rgb), 0.1)',
+                                                        backgroundColor: 'color-mix(in srgb, var(--primary) 12%, transparent)',
                                                         cursor: 'pointer',
                                                         display: 'flex',
                                                         alignItems: 'center',
@@ -636,12 +636,12 @@ const ConsoleAttendanceTable = () => {
                                                       onMouseEnter={(e) => {
                                                         e.currentTarget.style.transform = 'scale(1.1)';
                                                         e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.25)';
-                                                        e.currentTarget.style.backgroundColor = 'rgba(var(--primary-rgb), 0.2)';
+                                                        e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--primary) 20%, transparent)';
                                                       }}
                                                       onMouseLeave={(e) => {
                                                         e.currentTarget.style.transform = 'scale(1)';
                                                         e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.15)';
-                                                        e.currentTarget.style.backgroundColor = 'rgba(var(--primary-rgb), 0.1)';
+                                                        e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--primary) 12%, transparent)';
                                                       }}
                                                     >
                                                       🗺️
@@ -688,7 +688,7 @@ const ConsoleAttendanceTable = () => {
                                                         height: 50,
                                                         borderRadius: 4,
                                                         border: '2px solid var(--primary)',
-                                                        backgroundColor: 'rgba(var(--primary-rgb), 0.1)',
+                                                        backgroundColor: 'color-mix(in srgb, var(--primary) 12%, transparent)',
                                                         cursor: 'pointer',
                                                         display: 'flex',
                                                         alignItems: 'center',
@@ -701,12 +701,12 @@ const ConsoleAttendanceTable = () => {
                                                       onMouseEnter={(e) => {
                                                         e.currentTarget.style.transform = 'scale(1.1)';
                                                         e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.25)';
-                                                        e.currentTarget.style.backgroundColor = 'rgba(var(--primary-rgb), 0.2)';
+                                                        e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--primary) 20%, transparent)';
                                                       }}
                                                       onMouseLeave={(e) => {
                                                         e.currentTarget.style.transform = 'scale(1)';
                                                         e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.15)';
-                                                        e.currentTarget.style.backgroundColor = 'rgba(var(--primary-rgb), 0.1)';
+                                                        e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--primary) 12%, transparent)';
                                                       }}
                                                     >
                                                       🗺️

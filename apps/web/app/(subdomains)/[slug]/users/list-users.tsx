@@ -319,9 +319,9 @@ export default function ListUsers() {
     WebkitOverflowScrolling: "touch",
     marginTop: 32,
     borderRadius: 16,
-    border: "1px solid rgba(79, 141, 203, 0.4)",
-    background: "linear-gradient(180deg, rgba(9, 38, 71, 0.95) 0%, rgba(8, 28, 53, 0.95) 100%)",
-    boxShadow: "0 14px 28px rgba(4, 16, 30, 0.4)",
+    border: "1px solid var(--border)",
+    background: "linear-gradient(180deg, color-mix(in srgb, var(--surface) 98%, transparent) 0%, color-mix(in srgb, var(--surface-2) 90%, transparent) 100%)",
+    boxShadow: "var(--elev-1)",
     backdropFilter: "blur(4px)",
   };
 
@@ -578,9 +578,9 @@ export default function ListUsers() {
         }
 
         .usersTable thead th {
-          background: linear-gradient(135deg, rgba(23, 84, 149, 0.96) 0%, rgba(31, 95, 191, 0.94) 100%);
-          color: #edf6ff;
-          border-bottom: 1px solid rgba(116, 171, 225, 0.45);
+          background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 18%, var(--surface)) 0%, color-mix(in srgb, var(--secondary) 14%, var(--surface-2)) 100%);
+          color: var(--foreground);
+          border-bottom: 1px solid var(--border);
           font-weight: 600;
           letter-spacing: 0.04em;
           text-transform: uppercase;
@@ -591,8 +591,8 @@ export default function ListUsers() {
         }
 
         .usersTable tbody td {
-          color: color-mix(in srgb, var(--text-primary) 94%, #ffffff 6%);
-          border-bottom-color: rgba(88, 139, 190, 0.32);
+          color: var(--text-primary);
+          border-bottom-color: color-mix(in srgb, var(--border) 82%, transparent);
           overflow-wrap: anywhere;
           vertical-align: middle;
           line-height: 1.45;
@@ -601,11 +601,11 @@ export default function ListUsers() {
         }
 
         .usersTable tbody tr:nth-child(even) {
-          background: rgba(13, 47, 81, 0.6);
+          background: color-mix(in srgb, var(--surface-2) 76%, transparent);
         }
 
         .usersTable tbody tr:hover {
-          background: rgba(22, 72, 120, 0.56);
+          background: linear-gradient(90deg, color-mix(in srgb, var(--primary) 10%, transparent), color-mix(in srgb, var(--secondary) 8%, transparent));
         }
 
         .tableAction {
@@ -614,34 +614,39 @@ export default function ListUsers() {
           font-weight: 600;
           font-size: 0.84rem;
           cursor: pointer;
-          transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
-          color: #f3f8ff;
-          border: 1px solid rgba(126, 183, 236, 0.45);
-          background: rgba(27, 93, 155, 0.62);
+          transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+          color: var(--foreground);
+          border: 1px solid var(--border);
+          background: color-mix(in srgb, var(--surface) 92%, transparent);
           box-shadow: none;
         }
 
         .tableAction:hover {
-          background: rgba(36, 112, 182, 0.78);
-          border-color: rgba(162, 209, 250, 0.64);
+          background: color-mix(in srgb, var(--surface-2) 92%, transparent);
+          border-color: var(--border-strong);
+          transform: translateY(-1px);
         }
 
         .tableAction:focus-visible {
-          outline: 2px solid rgba(173, 203, 232, 0.55);
+          outline: 2px solid var(--focus);
           outline-offset: 1px;
         }
 
         .tableActionInfo {
-          background: linear-gradient(135deg, rgba(49, 115, 182, 0.95) 0%, rgba(63, 134, 209, 0.92) 100%);
+          background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+          border-color: color-mix(in srgb, var(--primary) 36%, transparent);
+          color: var(--header-text);
         }
 
         .tableActionEdit {
-          background: linear-gradient(135deg, rgba(31, 95, 191, 0.96) 0%, rgba(53, 119, 200, 0.93) 100%);
+          background: color-mix(in srgb, var(--surface) 88%, var(--primary) 12%);
+          border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
         }
 
         .tableActionDelete {
-          background: linear-gradient(135deg, rgba(149, 78, 89, 0.95) 0%, rgba(169, 95, 108, 0.9) 100%);
-          border-color: rgba(225, 166, 177, 0.45);
+          background: var(--state-danger-bg);
+          border-color: var(--state-danger-border);
+          color: var(--state-danger-text);
         }
 
         .tableProfileCell,
@@ -671,9 +676,9 @@ export default function ListUsers() {
             margin-bottom: 10px;
             padding: 12px;
             border-radius: 12px;
-            border: 1px solid rgba(118, 149, 180, 0.24);
-            background: rgba(15, 36, 57, 0.76);
-            box-shadow: 0 6px 16px rgba(3, 12, 24, 0.22);
+            border: 1px solid var(--border);
+            background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 97%, transparent), color-mix(in srgb, var(--surface-2) 88%, transparent));
+            box-shadow: var(--elev-1);
           }
 
           .usersTable tbody td {
@@ -690,7 +695,7 @@ export default function ListUsers() {
             font-weight: 600;
             letter-spacing: 0.08em;
             text-transform: uppercase;
-            color: #8eb1d2;
+            color: var(--primary);
           }
 
           .usersTable tbody td[data-label="Foto"] {
