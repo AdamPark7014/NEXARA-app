@@ -6,7 +6,7 @@ import styles from "./VentasSidebar.module.css";
 import { useUser } from "@/components/UserContext";
 import { useTheme } from "@/components/ThemeContext";
 import { useState, useMemo, useEffect } from "react";
-import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions";
+import { getAvatarSrc, getRoleLabel, isSalesManagerUser } from "@/lib/panel-user";
 
 interface MenuItem {
   label: string;
@@ -88,27 +88,18 @@ export default function VentasSidebar() {
     router.replace("/login");
   };
 
-  const isAdminOrSuperAdmin =
-    Boolean(user?.isSuperAdmin) ||
-    (user?.role || "").toLowerCase().includes("admin") ||
-    hasAnyPermission(user, [
-      PERMISSIONS.CONSOLE_ADMIN,
-      PERMISSIONS.SALES_MANAGE,
-      PERMISSIONS.USERS_MANAGE,
-    ]);
+  const canManageSellers = isSalesManagerUser(user);
+  const userRoleLabel = getRoleLabel(user);
+  const userAvatarSrc = getAvatarSrc(user);
+  const selectedOwnerId =
+    typeof window === "undefined"
+      ? undefined
+      : Number(new URLSearchParams(window.location.search).get("ownerId") || 0) || undefined;
 
-  const canManageSellers = isAdminOrSuperAdmin && hasAnyPermission(user, [
-    PERMISSIONS.CONSOLE_ADMIN,
-    PERMISSIONS.SALES_VIEW,
-    PERMISSIONS.SALES_MANAGE,
-    PERMISSIONS.PANEL_VENTAS,
-  ]);
-
-  const userRoleLabel = user?.isSuperAdmin
-    ? "Super Admin"
-    : isAdminOrSuperAdmin
-      ? "Admin Comercial"
-      : "Vendedor";
+  const withOwnerFilter = (href: string) => {
+    if (!canManageSellers || !selectedOwnerId) return href;
+    return `${href}?ownerId=${selectedOwnerId}`;
+  };
 
   const isActive = (href: string) => {
     if (!pathname) return false;
@@ -232,12 +223,16 @@ export default function VentasSidebar() {
       {showExpandedContent && (
         <div className={styles.userCard}>
           <div className={styles.userAvatar}>
-            {user.nombre.charAt(0).toUpperCase()}
+            <img
+              src={userAvatarSrc}
+              alt={user?.isSuperAdmin ? "NEXARA" : user.nombre}
+              style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+            />
           </div>
           <div className={styles.userInfo}>
             <p className={styles.userName}>{user.nombre}</p>
             <p className={styles.userRole}>{userRoleLabel}</p>
-            {canManageSellers && <span className={styles.badgeAdmin}>Admin</span>}
+            {canManageSellers && <span className={styles.badgeAdmin}>Gestor</span>}
           </div>
         </div>
       )}
@@ -267,7 +262,7 @@ export default function VentasSidebar() {
                 return (
                   <li key={item.href} className={styles.navListItem}>
                     <Link
-                      href={item.href}
+                      href={withOwnerFilter(item.href)}
                       className={`${styles.navLink} ${active ? styles.navLinkActive : ""}`}
                       title={item.label}
                       aria-current={active ? "page" : undefined}

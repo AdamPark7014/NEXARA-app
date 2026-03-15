@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useUser } from "@/components/UserContext";
-import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions";
+import { isSalesManagerUser } from "@/lib/panel-user";
 import {
   getSalesManagerCockpit,
   getSalesMetrics,
@@ -98,13 +98,7 @@ export default function VentasGestionVendedoresPage() {
   const [cockpit, setCockpit] = useState<SalesManagerCockpit | null>(null);
   const [attendance, setAttendance] = useState<AttendanceRangeResponse | null>(null);
 
-  const canManageSellers = hasAnyPermission(user, [
-    PERMISSIONS.CONSOLE_ADMIN,
-    PERMISSIONS.SALES_MANAGE,
-    PERMISSIONS.ATTENDANCE_MANAGE,
-    PERMISSIONS.USERS_MANAGE,
-    PERMISSIONS.PANEL_VENTAS,
-  ]);
+  const canManageSellers = isSalesManagerUser(user);
 
   const periodLabel = period === "week" ? "Semana" : period === "month" ? "Mes" : "Año";
 

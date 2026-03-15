@@ -24,6 +24,10 @@ type OpportunityQuote = SalesOpportunityQuote;
 export default function VentasOportunidadesPage() {
   const { user } = useUser();
   const apiUrl = getApiBase();
+  const selectedOwnerId =
+    typeof window === "undefined"
+      ? undefined
+      : Number(new URLSearchParams(window.location.search).get("ownerId") || 0) || undefined;
   const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -152,6 +156,7 @@ export default function VentasOportunidadesPage() {
       {viewMode === 'kanban' ? (
         <OpportunitiesKanban 
           apiUrl={apiUrl}
+          ownerId={selectedOwnerId}
           onUpdateStage={handleUpdateStage}
           onSelectOpportunity={handleSelectOpportunity}
         />

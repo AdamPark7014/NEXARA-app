@@ -7,6 +7,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
@@ -42,8 +43,8 @@ export class VentasLeadsController {
   @Get()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
-  findAll(@CurrentUser() user: any) {
-    return this.ventasService.listLeads(user);
+  findAll(@CurrentUser() user: any, @Query('ownerId') ownerId?: string) {
+    return this.ventasService.listLeads(user, ownerId ? Number(ownerId) : undefined);
   }
 
   @Get(':id')

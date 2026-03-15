@@ -11,6 +11,10 @@ const money = (value: number) =>
 
 export default function VentasDashboardPage() {
   const { user } = useUser();
+  const selectedOwnerId =
+    typeof window === "undefined"
+      ? undefined
+      : Number(new URLSearchParams(window.location.search).get("ownerId") || 0) || undefined;
   const [data, setData] = useState<SalesDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +25,7 @@ export default function VentasDashboardPage() {
       setLoading(true);
       setError(null);
       try {
-        const dashboard = await getSalesDashboardData(user.token);
+        const dashboard = await getSalesDashboardData(user.token, { ownerId: selectedOwnerId });
         setData(dashboard);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Error al cargar datos");
@@ -30,7 +34,7 @@ export default function VentasDashboardPage() {
       }
     };
     fetchData();
-  }, [user?.token]);
+  }, [selectedOwnerId, user?.token]);
 
   if (loading) return <div className={styles.loading}>cargando...</div>;
 

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { setActivePanel } from "@/lib/panel-routing";
+import { isSalesManagerUser } from "@/lib/panel-user";
 
 export default function VentasIndex() {
   const router = useRouter();
@@ -15,6 +16,12 @@ export default function VentasIndex() {
       return;
     }
     setActivePanel("ventas");
+
+    if (isSalesManagerUser(user)) {
+      router.replace("/gestion-vendedores");
+      return;
+    }
+
     router.replace("/dashboard");
   }, [router, user]);
 

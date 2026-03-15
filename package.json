@@ -19,6 +19,8 @@
     "dev:web": "npm run dev --workspace=apps/web",
     "dev:api": "npm run dev --workspace=apps/api",
     "dev:mobile": "npm run dev --workspace=apps/mobile",
+    "clean:cache": "node scripts/clear-build-cache.js root",
+    "prebuild": "npm run clean:cache",
     "build": "turbo run build --filter=api --filter=web --filter=mobile-web",
     "start": "turbo run start",
     "local:setup": "npm run prisma:generate --workspace=apps/api && npm run prisma:deploy --workspace=apps/api && npm run prisma:seed --workspace=apps/api",

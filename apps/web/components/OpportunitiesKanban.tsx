@@ -17,6 +17,7 @@ interface KanbanOpportunity {
 
 interface OpportunitiesKanbanProps {
   apiUrl: string;
+  ownerId?: number;
   onUpdateStage?: (opportunityId: number, newStage: string) => Promise<void>;
   onSelectOpportunity?: (opportunity: KanbanOpportunity) => void;
 }
@@ -33,6 +34,7 @@ const STAGES = [
 
 export default function OpportunitiesKanban({
   apiUrl,
+  ownerId,
   onUpdateStage,
   onSelectOpportunity,
 }: OpportunitiesKanbanProps) {
@@ -61,7 +63,8 @@ export default function OpportunitiesKanban({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${apiUrl}/ventas/oportunidades`, {
+      const query = ownerId ? `?ownerId=${ownerId}` : '';
+      const res = await fetch(`${apiUrl}/ventas/oportunidades${query}`, {
         headers: { Authorization: `Bearer ${user.token}` },
       });
       if (!res.ok) throw new Error('Error al cargar oportunidades');
@@ -86,7 +89,7 @@ export default function OpportunitiesKanban({
     } finally {
       setLoading(false);
     }
-  }, [user?.token, apiUrl]);
+  }, [ownerId, user?.token, apiUrl]);
 
   useEffect(() => {
     fetchOpportunities();

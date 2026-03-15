@@ -2,13 +2,26 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useUser } from "@/components/UserContext";
+import { isSalesManagerUser } from "@/lib/panel-user";
 
 export default function VentasIndex() {
   const router = useRouter();
+  const { user } = useUser();
 
   useEffect(() => {
-    router.replace("/login");
-  }, [router]);
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
+
+    if (isSalesManagerUser(user)) {
+      router.replace("/gestion-vendedores");
+      return;
+    }
+
+    router.replace("/dashboard");
+  }, [router, user]);
 
   return null;
 }

@@ -48,6 +48,7 @@ cd apps/api
 npm install --legacy-peer-deps
 npx prisma generate
 npx prisma migrate deploy
+node ../../scripts/clear-build-cache.js api
 npm run build
 
 # 7. Actualizar Frontend (Web)
@@ -55,6 +56,7 @@ echo "🎨 Actualizando Frontend..."
 cd ../web
 rm -rf .next node_modules package-lock.json
 npm install --legacy-peer-deps
+node ../../scripts/clear-build-cache.js web
 NODE_OPTIONS="--max_old_space_size=2048" npm run build
 
 # 8. Actualizar Frontend (Mobile)
@@ -62,6 +64,7 @@ echo "📱 Actualizando Frontend Mobile..."
 cd ../mobile
 rm -rf .next node_modules package-lock.json
 npm install --legacy-peer-deps
+node ../../scripts/clear-build-cache.js mobile
 NODE_OPTIONS="--max_old_space_size=2048" npm run build
 
 # 9. Reiniciar servicios con PM2

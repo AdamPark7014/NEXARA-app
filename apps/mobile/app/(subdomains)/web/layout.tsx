@@ -1,11 +1,13 @@
 ﻿"use client";
 import Link from "next/link";
 import React from "react";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "@/components/ThemeContext";
 import { useUser } from "@/components/UserContext";
 import { useEffect } from "react";
 import { setActivePanel } from "@/lib/panel-routing";
+import { getAvatarSrc, getRoleLabel } from "@/lib/panel-user";
 import styles from "./layout.module.css";
 
 export default function WebPanelLayout({ children }: { children: React.ReactNode }) {
@@ -14,6 +16,8 @@ export default function WebPanelLayout({ children }: { children: React.ReactNode
   const { darkMode, toggleDarkMode } = useTheme();
   const { user, logout } = useUser();
   const currentPath = pathname ? pathname.replace(/\/+$/, "") : "";
+  const userRoleLabel = getRoleLabel(user);
+  const userAvatarSrc = getAvatarSrc(user);
 
   useEffect(() => {
     setActivePanel("web");
@@ -41,8 +45,19 @@ export default function WebPanelLayout({ children }: { children: React.ReactNode
         <div className={styles.webPanelDivider} />
         <div className={styles.webPanelMenuTitle}>Menú principal</div>
         <div className={styles.webPanelUser}>
+          <div style={{ width: 44, height: 44, borderRadius: "50%", overflow: "hidden", marginBottom: 8 }}>
+            <Image
+              src={userAvatarSrc}
+              alt={user?.isSuperAdmin ? "NEXARA" : (user?.nombre || "Usuario")}
+              width={44}
+              height={44}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              unoptimized
+            />
+          </div>
           <div className={styles.webPanelUserName}>{user?.nombre || "Usuario Web"}</div>
           <div className={styles.webPanelUserEmail}>{user?.email || "panel@nexara.com.mx"}</div>
+          <div className={styles.webPanelUserEmail}>{userRoleLabel}</div>
         </div>
         <div className={styles.webPanelNavShell}>
           <nav className={styles.webPanelNav}>

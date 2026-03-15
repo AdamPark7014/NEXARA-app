@@ -20,6 +20,10 @@ type SalesProject = SalesProjectDetail;
 export default function VentasProyectosPage() {
   const { user } = useUser();
   const router = useRouter();
+  const selectedOwnerId =
+    typeof window === "undefined"
+      ? undefined
+      : Number(new URLSearchParams(window.location.search).get("ownerId") || 0) || undefined;
   const apiOrigin = getApiBase().replace(/\/+api\/?$/, "");
   const [projects, setProjects] = useState<SalesProject[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +46,7 @@ export default function VentasProyectosPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await listSalesProjects(user.token);
+      const data = await listSalesProjects(user.token, { ownerId: selectedOwnerId });
       setProjects(data);
 
       // Fetch orders for each project
@@ -65,7 +69,7 @@ export default function VentasProyectosPage() {
 
   useEffect(() => {
     fetchProjects();
-  }, [user?.token]);
+  }, [selectedOwnerId, user?.token]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
