@@ -1,15 +1,18 @@
 ﻿"use client";
 import Link from "next/link";
+import Image from "next/image";
 import React from "react";
 import { usePathname } from "next/navigation";
 import { useTheme } from "@/components/ThemeContext";
 import { useUser } from "@/components/UserContext";
 import styles from "./layout.module.css";
+import { getAvatarSrc, getRoleLabel } from "@/lib/panel-user";
 
 export default function WebPanelLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { darkMode, toggleDarkMode } = useTheme();
   const { user } = useUser();
+  const userAvatarSrc = getAvatarSrc(user);
   const currentPath = pathname ? pathname.replace(/\/+$/, "") : "";
 
   const navItems = [
@@ -34,8 +37,19 @@ export default function WebPanelLayout({ children }: { children: React.ReactNode
         <div className={styles.webPanelDivider} />
         <div className={styles.webPanelMenuTitle}>Menú principal</div>
         <div className={styles.webPanelUser}>
+          <div style={{ width: 44, height: 44, borderRadius: "50%", overflow: "hidden", marginBottom: 8 }}>
+            <Image
+              src={userAvatarSrc}
+              alt={user?.isSuperAdmin ? "NEXARA" : (user?.nombre || "Usuario")}
+              width={44}
+              height={44}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              unoptimized
+            />
+          </div>
           <div className={styles.webPanelUserName}>{user?.nombre || "Usuario Web"}</div>
           <div className={styles.webPanelUserEmail}>{user?.email || "panel@nexara.com.mx"}</div>
+          <div className={styles.webPanelUserEmail}>{getRoleLabel(user)}</div>
         </div>
         <div className={styles.webPanelNavShell}>
           <nav className={styles.webPanelNav}>

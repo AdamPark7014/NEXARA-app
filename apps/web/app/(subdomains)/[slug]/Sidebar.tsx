@@ -6,6 +6,7 @@ import { useUser } from '@/components/UserContext';
 import { useTheme } from '@/components/ThemeContext';
 import Image from "next/image";
 import { hasAnyPermission, hasPermission, PERMISSIONS } from '@/lib/permissions';
+import { getAvatarSrc, getRoleLabel, isPlatformAdmin } from '@/lib/panel-user';
 import { useEffect, useState } from "react";
 
 export default function Sidebar() {
@@ -45,6 +46,8 @@ export default function Sidebar() {
   }, [isMenuOpen]);
 
   if (!user) return null;
+  const isAdmin = isPlatformAdmin(user);
+  const userRoleLabel = getRoleLabel(user);
   const closeMenu = () => setIsMenuOpen(false);
   const handleLogout = () => {
     logout();
@@ -73,10 +76,7 @@ export default function Sidebar() {
     { label: "Cotizaciones", href: "/cotizaciones", permissions: [PERMISSIONS.COTIZACIONES_ACCESS] },
   ];
 
-  // Superadmin: mostrar logo Nexara en lugar de foto
-  const avatarUrl = user.isSuperAdmin
-    ? "/logo-nexara.png"
-    : (user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nombre)}&background=0D8ABC&color=fff&size=96`);
+  const avatarUrl = getAvatarSrc(user);
 
   return (
     <aside className={styles.sidebar} data-mobile={isMobile ? 'true' : 'false'} data-open={isMenuOpen ? 'true' : 'false'}>
@@ -148,8 +148,9 @@ export default function Sidebar() {
         <div className={styles.sidebarName}>{user.nombre}</div>
         <div className={styles.sidebarEmail}>{user.email}</div>
         <div className={styles.sidebarMeta}>
-          <span className={styles.rolePill}>{user.role}</span>
+          <span className={styles.rolePill}>{userRoleLabel}</span>
           {user.isSuperAdmin && <span className={styles.levelPill}>Superadmin</span>}
+          {!user.isSuperAdmin && isAdmin && <span className={styles.levelPill}>Admin</span>}
         </div>
       </div>
       <div className={styles.menuTitle}>Menu principal</div>

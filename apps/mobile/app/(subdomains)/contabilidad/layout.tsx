@@ -1,11 +1,12 @@
 ﻿"use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import React, { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "@/components/ThemeContext";
 import { useUser } from "@/components/UserContext";
-import { hasPermission, PERMISSIONS } from "@/lib/permissions";
+import { getAvatarSrc, getRoleLabel, isPlatformAdmin } from "@/lib/panel-user";
 import consoleStyles from "../console/console.module.css";
 import styles from "./layout.module.css";
 import { setActivePanel } from "@/lib/panel-routing";
@@ -23,21 +24,11 @@ export default function ContabilidadLayout({ children }: { children: React.React
   const currentPath = pathname ? pathname.replace(/\/+$/, "") : "";
   const userName = user?.nombre || "Panel Contabilidad";
   const userEmail = user?.email || "Dirección financiera corporativa";
-  const userRole = user?.role || "Contabilidad";
-  const userInitials = userName
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() || "")
-    .join("") || "CO";
+  const userRole = getRoleLabel(user);
+  const userAvatarSrc = getAvatarSrc(user);
 
   const isSuperAdmin = Boolean(user?.isSuperAdmin);
-  const isAdmin = Boolean(
-    user && (
-      hasPermission(user, PERMISSIONS.CONSOLE_ADMIN) ||
-      hasPermission(user, PERMISSIONS.CONTABILIDAD_MANAGE)
-    ),
-  );
+  const isAdmin = isPlatformAdmin(user);
 
   const navGroups = [
     {
@@ -185,7 +176,14 @@ export default function ContabilidadLayout({ children }: { children: React.React
 
         <div className={consoleStyles.sidebarUser}>
           <div className={consoleStyles.sidebarAvatar}>
-            <span className={consoleStyles.sidebarName}>{userInitials}</span>
+            <Image
+              className={`${consoleStyles.avatarImage} ${isSuperAdmin ? consoleStyles.avatarImageLogo : ""}`}
+              src={userAvatarSrc}
+              alt={isSuperAdmin ? "NEXARA" : userName}
+              width={64}
+              height={64}
+              unoptimized
+            />
           </div>
           <div className={consoleStyles.sidebarName}>{userName}</div>
           <div className={consoleStyles.sidebarEmail}>{userEmail}</div>

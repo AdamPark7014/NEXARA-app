@@ -25,6 +25,10 @@ const matchesFilter = (lead: SalesLead, filter: LeadFilter) => {
 
 export default function VentasLeadsPage() {
   const { user } = useUser();
+  const selectedOwnerId =
+    typeof window === "undefined"
+      ? undefined
+      : Number(new URLSearchParams(window.location.search).get("ownerId") || 0) || undefined;
   const [leads, setLeads] = useState<SalesLead[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -46,7 +50,7 @@ export default function VentasLeadsPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await listSalesLeads(user.token);
+      const data = await listSalesLeads(user.token, { ownerId: selectedOwnerId });
       setLeads(data);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error inesperado");
@@ -57,7 +61,7 @@ export default function VentasLeadsPage() {
 
   useEffect(() => {
     fetchLeads();
-  }, [user?.token]);
+  }, [selectedOwnerId, user?.token]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;

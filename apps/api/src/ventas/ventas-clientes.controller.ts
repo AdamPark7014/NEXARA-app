@@ -8,6 +8,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
@@ -46,8 +47,8 @@ export class VentasClientesController {
   @Get()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
-  findAll(@CurrentUser() user: any) {
-    return this.ventasService.listClients(user);
+  findAll(@CurrentUser() user: any, @Query('ownerId') ownerId?: string) {
+    return this.ventasService.listClients(user, ownerId ? Number(ownerId) : undefined);
   }
 
   @Get(':id')

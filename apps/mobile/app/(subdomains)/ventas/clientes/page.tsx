@@ -14,6 +14,10 @@ import styles from "./page.module.css";
 
 export default function VentasClientesPage() {
   const { user } = useUser();
+  const selectedOwnerId =
+    typeof window === "undefined"
+      ? undefined
+      : Number(new URLSearchParams(window.location.search).get("ownerId") || 0) || undefined;
   const [clients, setClients] = useState<SalesClient[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +44,7 @@ export default function VentasClientesPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await listSalesClients(user.token);
+      const data = await listSalesClients(user.token, { ownerId: selectedOwnerId });
       setClients(data);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error inesperado");
@@ -51,7 +55,7 @@ export default function VentasClientesPage() {
 
   useEffect(() => {
     fetchClients();
-  }, [user?.token]);
+  }, [selectedOwnerId, user?.token]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;

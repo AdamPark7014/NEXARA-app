@@ -38,6 +38,7 @@ export class VentasService {
   private canAccessOwner(user: any, ownerId?: number | null) {
     if (!ownerId) return true;
     if (this.isSuperAdminUser(user)) return true;
+    if (this.isConsoleAdminUser(user)) return true;
     return user?.id === ownerId;
   }
 
@@ -57,13 +58,34 @@ export class VentasService {
   }
 
   private buildOwnerWhere(user?: any) {
-    if (this.isSuperAdminUser(user)) return {};
+    if (this.isSuperAdminUser(user) || this.isConsoleAdminUser(user)) return {};
     return user?.id ? { ownerId: user.id } : {};
   }
 
   private buildProjectOwnerWhere(user?: any) {
-    if (this.isSuperAdminUser(user)) return {};
+    if (this.isSuperAdminUser(user) || this.isConsoleAdminUser(user)) return {};
     return user?.id ? { opportunity: { ownerId: user.id } } : {};
+  }
+
+  private buildScopedOwnerWhere(user?: any, ownerId?: number) {
+    const base = this.buildOwnerWhere(user);
+    if (!ownerId || Number.isNaN(ownerId)) return base;
+    if (!this.canAccessOwner(user, ownerId)) {
+      throw new ForbiddenException('No tienes acceso al vendedor seleccionado');
+    }
+    return { ...(base as any), ownerId };
+  }
+
+  private buildScopedProjectOwnerWhere(user?: any, ownerId?: number) {
+    const base = this.buildProjectOwnerWhere(user);
+    if (!ownerId || Number.isNaN(ownerId)) return base;
+    if (!this.canAccessOwner(user, ownerId)) {
+      throw new ForbiddenException('No tienes acceso al vendedor seleccionado');
+    }
+    if (this.isSuperAdminUser(user) || this.isConsoleAdminUser(user)) {
+      return { opportunity: { ownerId } };
+    }
+    return base;
   }
 
   private getPeriodStart(period: 'week' | 'month' | 'year') {
@@ -231,9 +253,9 @@ export class VentasService {
     });
   }
 
-  async listClients(user?: any) {
+  async listClients(user?: any, ownerId?: number) {
     return this.prisma.salesClient.findMany({
-      where: this.buildOwnerWhere(user),
+      where: this.buildScopedOwnerWhere(user, ownerId),
       orderBy: { updatedAt: 'desc' },
       include: { documents: true, opportunities: true },
     });
@@ -316,9 +338,9 @@ export class VentasService {
     });
   }
 
-  async listLeads(user?: any) {
+  async listLeads(user?: any, ownerId?: number) {
     return this.prisma.salesLead.findMany({
-      where: this.buildOwnerWhere(user),
+      where: this.buildScopedOwnerWhere(user, ownerId),
       orderBy: { updatedAt: 'desc' },
       include: { client: true, opportunities: true },
     });
@@ -380,9 +402,9 @@ export class VentasService {
     });
   }
 
-  async listOpportunities(user?: any) {
+  async listOpportunities(user?: any, ownerId?: number) {
     return this.prisma.salesOpportunity.findMany({
-      where: this.buildOwnerWhere(user),
+      where: this.buildScopedOwnerWhere(user, ownerId),
       orderBy: { updatedAt: 'desc' },
       include: { client: true, lead: true, notes: true, evidences: true, quotes: true },
     });
@@ -516,9 +538,9 @@ export class VentasService {
     });
   }
 
-  async listProjects(user?: any) {
+  async listProjects(user?: any, ownerId?: number) {
     return this.prisma.salesProject.findMany({
-      where: this.buildProjectOwnerWhere(user),
+      where: this.buildScopedProjectOwnerWhere(user, ownerId),
       orderBy: { updatedAt: 'desc' },
       include: { opportunity: true },
     });

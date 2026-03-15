@@ -310,8 +310,11 @@ const apiRequest = async <T>(path: string, init: FetchInit, fallbackError = "Err
   return payload as T;
 };
 
-export const listSalesLeads = async (token: string) => {
-  const data = await apiRequest<unknown>("ventas/leads", { token, method: "GET" }, "No se pudieron cargar los leads");
+export const listSalesLeads = async (token: string, filters?: { ownerId?: number }) => {
+  const search = new URLSearchParams();
+  if (filters?.ownerId) search.set("ownerId", String(filters.ownerId));
+  const path = `ventas/leads${search.toString() ? `?${search.toString()}` : ""}`;
+  const data = await apiRequest<unknown>(path, { token, method: "GET" }, "No se pudieron cargar los leads");
   return Array.isArray(data) ? (data as SalesLead[]) : [];
 };
 
@@ -366,8 +369,11 @@ export const updateSalesLead = async (
   );
 };
 
-export const listSalesOpportunities = async (token: string) => {
-  const data = await apiRequest<unknown>("ventas/oportunidades", { token, method: "GET" }, "No se pudieron cargar las oportunidades");
+export const listSalesOpportunities = async (token: string, filters?: { ownerId?: number }) => {
+  const search = new URLSearchParams();
+  if (filters?.ownerId) search.set("ownerId", String(filters.ownerId));
+  const path = `ventas/oportunidades${search.toString() ? `?${search.toString()}` : ""}`;
+  const data = await apiRequest<unknown>(path, { token, method: "GET" }, "No se pudieron cargar las oportunidades");
   return Array.isArray(data) ? (data as SalesOpportunity[]) : [];
 };
 
@@ -424,11 +430,15 @@ export const addSalesOpportunityNote = async (token: string, opportunityId: numb
   );
 };
 
-export const getSalesDashboardData = async (token: string): Promise<SalesDashboardData> => {
+export const getSalesDashboardData = async (token: string, filters?: { ownerId?: number }): Promise<SalesDashboardData> => {
   const [leads, opportunities, projects] = await Promise.all([
-    listSalesLeads(token),
-    listSalesOpportunities(token),
-    apiRequest<unknown>("ventas/proyectos", { token, method: "GET" }, "No se pudieron cargar los proyectos"),
+    listSalesLeads(token, filters),
+    listSalesOpportunities(token, filters),
+    apiRequest<unknown>(
+      `ventas/proyectos${filters?.ownerId ? `?ownerId=${filters.ownerId}` : ""}`,
+      { token, method: "GET" },
+      "No se pudieron cargar los proyectos",
+    ),
   ]);
 
   const safeProjects = Array.isArray(projects) ? (projects as SalesProject[]) : [];
@@ -490,8 +500,11 @@ export const linkSalesQuoteToOpportunity = async (
   );
 };
 
-export const listSalesClients = async (token: string) => {
-  const data = await apiRequest<unknown>("ventas/clientes", { token, method: "GET" }, "No se pudieron cargar los clientes");
+export const listSalesClients = async (token: string, filters?: { ownerId?: number }) => {
+  const search = new URLSearchParams();
+  if (filters?.ownerId) search.set("ownerId", String(filters.ownerId));
+  const path = `ventas/clientes${search.toString() ? `?${search.toString()}` : ""}`;
+  const data = await apiRequest<unknown>(path, { token, method: "GET" }, "No se pudieron cargar los clientes");
   return Array.isArray(data) ? (data as SalesClient[]) : [];
 };
 
@@ -542,8 +555,11 @@ export const uploadSalesClientDocuments = async (
   );
 };
 
-export const listSalesProjects = async (token: string) => {
-  const data = await apiRequest<unknown>("ventas/proyectos", { token, method: "GET" }, "No se pudieron cargar los proyectos");
+export const listSalesProjects = async (token: string, filters?: { ownerId?: number }) => {
+  const search = new URLSearchParams();
+  if (filters?.ownerId) search.set("ownerId", String(filters.ownerId));
+  const path = `ventas/proyectos${search.toString() ? `?${search.toString()}` : ""}`;
+  const data = await apiRequest<unknown>(path, { token, method: "GET" }, "No se pudieron cargar los proyectos");
   return Array.isArray(data) ? (data as SalesProjectDetail[]) : [];
 };
 

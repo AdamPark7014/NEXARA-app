@@ -6,6 +6,7 @@ import { useUser } from '@/components/UserContext';
 import { useTheme } from '@/components/ThemeContext';
 import Image from "next/image";
 import { hasAnyPermission, hasPermission, PERMISSIONS } from '@/lib/permissions';
+import { getAvatarSrc, getRoleLabel, isPlatformAdmin } from '@/lib/panel-user';
 import { useState, useEffect } from "react";
 
 export default function Sidebar() {
@@ -79,6 +80,8 @@ export default function Sidebar() {
   if (!user) return null;
 
   const isSuperAdmin = user.isSuperAdmin;
+  const isAdmin = isPlatformAdmin(user);
+  const userRoleLabel = getRoleLabel(user);
 
   type MenuItem = {
     label: string;
@@ -189,10 +192,7 @@ export default function Sidebar() {
     );
   };
 
-  // Avatar: usa user.avatarUrl si existe, si no, usa un avatar generado por ui-avatars.com
-  const avatarUrl = user.isSuperAdmin
-    ? '/icon.png'
-    : (user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nombre)}&background=0D8ABC&color=fff&size=96`);
+  const avatarUrl = getAvatarSrc(user);
 
   return (
     <aside className={styles.sidebar} data-mobile={isMobile ? 'true' : 'false'} data-open={isMenuOpen ? 'true' : 'false'}>
@@ -274,8 +274,9 @@ export default function Sidebar() {
           <div className={styles.sidebarName}>{user.nombre}</div>
           <div className={styles.sidebarEmail}>{user.email}</div>
           <div className={styles.sidebarMeta}>
-            <span className={styles.rolePill}>{user.role}</span>
+            <span className={styles.rolePill}>{userRoleLabel}</span>
             {user.isSuperAdmin && <span className={styles.levelPill}>Superadmin</span>}
+            {!user.isSuperAdmin && isAdmin && <span className={styles.levelPill}>Admin</span>}
           </div>
         </div>
         {groupsToRender.map((group) => (
