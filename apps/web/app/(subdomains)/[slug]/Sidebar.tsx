@@ -57,23 +57,23 @@ export default function Sidebar() {
 
   // Menú por permisos
   const menu = [
-    { label: "Dashboard", href: "/dashboard", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Actividades", href: "/activities", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Evidencias", href: "/evidences", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Viáticos", href: "/viatics", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Vehículos", href: "/vehicles", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Clientes", href: "/clients", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Tickets clientes", href: "/client-tickets", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Usuarios", href: "/users", permissions: [PERMISSIONS.USERS_MANAGE] },
-    { label: "Gestión CVs", href: "/cvs", anyPermissions: [PERMISSIONS.CVS_MANAGE, PERMISSIONS.CVS_ADMIN_REVIEW, PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Mis Actividades", href: "/my-activities", permissions: [PERMISSIONS.CONSOLE_ACCESS], hideForAdmins: true },
-    { label: "Mi Perfil", href: "/my-profile", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Mis Evidencias", href: "/my-evidences", permissions: [PERMISSIONS.CONSOLE_ACCESS], hideForAdmins: true },
-    { label: "Mis Viáticos", href: "/my-viatics", permissions: [PERMISSIONS.CONSOLE_ACCESS], hideForAdmins: true },
-    { label: "Mis Vehículos", href: "/my-vehicles", permissions: [PERMISSIONS.CONSOLE_ACCESS], hideForAdmins: true },
-    { label: "Entradas/Salidas", href: "/attendance", permissions: [PERMISSIONS.ATTENDANCE_VIEW] },
-    { label: "Mapa GPS", href: "/gps", permissions: [PERMISSIONS.GPS_VIEW] },
-    { label: "Cotizaciones", href: "/cotizaciones", permissions: [PERMISSIONS.COTIZACIONES_ACCESS] },
+    { icon: "📊", label: "Dashboard", href: "/dashboard", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🗂️", label: "Actividades", href: "/activities", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "📸", label: "Evidencias", href: "/evidences", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "💼", label: "Viáticos", href: "/viatics", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🚗", label: "Vehículos", href: "/vehicles", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🏢", label: "Clientes", href: "/clients", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🎫", label: "Tickets clientes", href: "/client-tickets", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🧑‍💼", label: "Usuarios", href: "/users", permissions: [PERMISSIONS.USERS_MANAGE] },
+    { icon: "📄", label: "Gestión CVs", href: "/cvs", anyPermissions: [PERMISSIONS.CVS_MANAGE, PERMISSIONS.CVS_ADMIN_REVIEW, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "✅", label: "Mis Actividades", href: "/my-activities", permissions: [PERMISSIONS.CONSOLE_ACCESS], hideForAdmins: true },
+    { icon: "👤", label: "Mi Perfil", href: "/my-profile", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🧷", label: "Mis Evidencias", href: "/my-evidences", permissions: [PERMISSIONS.CONSOLE_ACCESS], hideForAdmins: true },
+    { icon: "🧳", label: "Mis Viáticos", href: "/my-viatics", permissions: [PERMISSIONS.CONSOLE_ACCESS], hideForAdmins: true },
+    { icon: "🚙", label: "Mis Vehículos", href: "/my-vehicles", permissions: [PERMISSIONS.CONSOLE_ACCESS], hideForAdmins: true },
+    { icon: "🕒", label: "Entradas/Salidas", href: "/attendance", permissions: [PERMISSIONS.ATTENDANCE_VIEW] },
+    { icon: "🛰️", label: "Mapa GPS", href: "/gps", permissions: [PERMISSIONS.GPS_VIEW] },
+    { icon: "🧾", label: "Cotizaciones", href: "/cotizaciones", permissions: [PERMISSIONS.COTIZACIONES_ACCESS] },
   ];
 
   const avatarUrl = getAvatarSrc(user);
@@ -175,7 +175,8 @@ export default function Sidebar() {
               }
               onClick={closeMenu}
             >
-              {item.label}
+              <span className={styles.menuLinkIcon} aria-hidden="true">{item.icon}</span>
+              <span className={styles.menuLinkText}>{item.label}</span>
             </Link>
           </li>
         ))}
