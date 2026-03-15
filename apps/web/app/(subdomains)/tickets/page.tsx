@@ -12,11 +12,6 @@ type ClientSession = {
   client: { id: number; name: string; logoUrl?: string | null };
 };
 
-type BranchSession = {
-  token: string;
-  branch: { id: number; name: string; branchNumber?: string | null; clientId: number; clientName?: string | null };
-};
-
 type Ticket = {
   id: number;
   anNumber: string;
@@ -103,7 +98,6 @@ export default function ClientTicketsPage() {
   const [mounted, setMounted] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [loginMode, setLoginMode] = useState<"client" | "branch">("client");
   const [error, setError] = useState<string | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(false);
@@ -281,14 +275,6 @@ export default function ClientTicketsPage() {
     window.sessionStorage.setItem("clientSession", JSON.stringify(nextSession));
     setSession(nextSession);
     setError(null);
-  };
-
-  const handleBranchLogin = (data: { access_token: string; branch: BranchSession["branch"] }) => {
-    const nextSession: BranchSession = { token: data.access_token, branch: data.branch };
-    window.sessionStorage.setItem("branchSession", JSON.stringify(nextSession));
-    setError(null);
-    const slug = data.branch.branchNumber || `branch-${data.branch.id}`;
-    window.location.replace(`/${slug}`);
   };
 
   const sortedTickets = useMemo(() => {
@@ -573,52 +559,12 @@ export default function ClientTicketsPage() {
   if (!session) {
     return (
       <div className={styles.authWrap}>
-        <div className={styles.authHeader}>
-          <p className={styles.authEyebrow}>Nexara · Portal de Tickets</p>
-          <div className={styles.authHeaderRow}>
-            <div>
-              <h1 className={styles.authTitle}>Acceso corporativo seguro</h1>
-              <p className={styles.authLead}>
-                Selecciona el tipo de acceso para ingresar con el perfil correcto.
-              </p>
-            </div>
-            <div className={styles.authSwitch}>
-              <button
-                className={`${styles.authSwitchBtn} ${loginMode === "client" ? styles.authSwitchBtnActive : ""}`}
-                type="button"
-                onClick={() => setLoginMode("client")}
-                aria-pressed={loginMode === "client"}
-              >
-                Cliente
-              </button>
-              <button
-                className={`${styles.authSwitchBtn} ${loginMode === "branch" ? styles.authSwitchBtnActive : ""}`}
-                type="button"
-                onClick={() => setLoginMode("branch")}
-                aria-pressed={loginMode === "branch"}
-              >
-                Sucursal
-              </button>
-            </div>
-          </div>
-        </div>
-        {loginMode === "client" ? (
-          <PanelLogin
-            mode="client"
-            redirectTo="/"
-            onClientLogin={handleClientLogin}
-            title="Portal de atención corporativa"
-            subtitle="Ingresa con la cuenta corporativa de cliente para seguimiento de servicios y reportes."
-          />
-        ) : (
-          <PanelLogin
-            mode="branch"
-            redirectTo="/"
-            onBranchLogin={handleBranchLogin}
-            title="Portal de sucursal"
-            subtitle="Acceso operativo para crear y monitorear solicitudes de servicio por sucursal."
-          />
-        )}
+        <PanelLogin
+          redirectTo="/"
+          onClientLogin={handleClientLogin}
+          title="Iniciar sesion"
+          subtitle="Ingresa a tu cuenta de Nexara"
+        />
       </div>
     );
   }
@@ -679,10 +625,6 @@ export default function ClientTicketsPage() {
               : undefined
           }
         >
-        <div className={consoleStyles.sidebarLogo}>
-          <span className={consoleStyles.brandMark}>NEXARA</span>
-          <span className={consoleStyles.brandSub}>Portal</span>
-        </div>
         <div className={consoleStyles.sidebarUser}>
           <div className={consoleStyles.sidebarAvatar}>
             {session.client.logoUrl ? (
