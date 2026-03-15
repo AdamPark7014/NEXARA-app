@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { useUser } from './UserContext';
 import { io, Socket } from 'socket.io-client';
 import { getSocketBaseUrl } from '@/lib/api-base';
@@ -127,6 +127,24 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
+  const fetchNotifications = useCallback(async () => {
+    if (!user?.token) return;
+    try {
+      const response = await fetch(`${API_URL}/notifications?limit=10`, {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      const data = await response.json();
+      const items = Array.isArray(data) ? (data as Notification[]) : [];
+      setNotifications(items);
+      setDisplayedNotifications([]);
+
+      const unread = items.filter((n: Notification) => !n.isRead).length;
+      setUnreadCount(unread);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
+  }, [user?.token, API_URL]);
+
   // Conectar WebSocket
   useEffect(() => {
     if (!user?.token) return;
@@ -141,6 +159,14 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
         token: user.token,
       },
     });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        fetchNotifications();
+      }, 300);
+    };
 
     // Eventos de notificaciones
     socketRef.current.on('notification:new', (notification: Notification) => {
@@ -180,35 +206,24 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
       setUnreadCount(0);
     });
 
+    socketRef.current.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['Notification', 'UserNotification'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
     return () => {
       socketRef.current?.disconnect();
       notificationTimers.current.forEach(timer => clearTimeout(timer));
+      if (refreshTimer) clearTimeout(refreshTimer);
     };
-  }, [user?.token, maxNotifications, autoCloseTime]);
+  }, [user?.token, maxNotifications, autoCloseTime, fetchNotifications]);
 
   // Cargar notificaciones iniciales
   useEffect(() => {
-    if (!user?.token) return;
-
-    const fetchNotifications = async () => {
-      try {
-        const response = await fetch(`${API_URL}/notifications?limit=10`, {
-          headers: { Authorization: `Bearer ${user.token}` },
-        });
-        const data = await response.json();
-        const items = Array.isArray(data) ? (data as Notification[]) : [];
-        setNotifications(items);
-        setDisplayedNotifications([]);
-
-        const unread = items.filter((n: Notification) => !n.isRead).length;
-        setUnreadCount(unread);
-      } catch (error) {
-        console.error('Error fetching notifications:', error);
-      }
-    };
-
     fetchNotifications();
-  }, [user?.token, maxNotifications, API_URL]);
+  }, [fetchNotifications]);
 
   useEffect(() => {
     if (!showPanel) return;

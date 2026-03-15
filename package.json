@@ -14,11 +14,12 @@
     "turbo": "^1.13.0"
   },
   "scripts": {
-    "dev": "turbo run dev --parallel --filter=api --filter=web",
-    "dev:all": "turbo run dev --parallel",
+    "dev": "turbo run dev --parallel --filter=api --filter=web --filter=mobile-web",
+    "dev:all": "turbo run dev --parallel --filter=api --filter=web --filter=mobile-web",
     "dev:web": "npm run dev --workspace=apps/web",
     "dev:api": "npm run dev --workspace=apps/api",
-    "build": "turbo run build",
+    "dev:mobile": "npm run dev --workspace=apps/mobile",
+    "build": "turbo run build --filter=api --filter=web --filter=mobile-web",
     "start": "turbo run start",
     "local:setup": "npm run prisma:generate --workspace=apps/api && npm run prisma:deploy --workspace=apps/api && npm run prisma:seed --workspace=apps/api",
     "local:status": "npm run prisma:status --workspace=apps/api",
@@ -38,9 +39,5 @@
     "socket.io": "^4.8.3",
     "winston": "^3.19.0",
     "zod": "^4.3.5"
-  },
-  "overrides": {
-    "react": "18.2.0",
-    "react-dom": "18.2.0"
   }
 }

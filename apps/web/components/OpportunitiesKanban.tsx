@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import styles from './OpportunitiesKanban.module.css';
 
@@ -90,6 +91,33 @@ export default function OpportunitiesKanban({
   useEffect(() => {
     fetchOpportunities();
   }, [fetchOpportunities]);
+
+  useEffect(() => {
+    if (!user?.token) return;
+
+    const socketUrl = apiUrl.replace(/\/+api\/?$/, '');
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        fetchOpportunities();
+      }, 250);
+    };
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['OportunidadVenta', 'Opportunity', 'Cliente', 'Client'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      socket.disconnect();
+    };
+  }, [user?.token, apiUrl, fetchOpportunities]);
 
   useEffect(() => {
     setNowMs(Date.now());

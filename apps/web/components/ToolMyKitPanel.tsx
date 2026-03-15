@@ -1,7 +1,8 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useUser } from './UserContext';
 import styles from './ToolMyKitPanel.module.css';
+import { io, Socket } from 'socket.io-client';
 
 interface KitEvent {
   id: number;
@@ -35,7 +36,7 @@ const ToolMyKitPanel: React.FC = () => {
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
 
-  const fetchKit = async () => {
+  const fetchKit = useCallback(async () => {
     if (!user?.token) return;
     setLoading(true);
     try {
@@ -52,11 +53,38 @@ const ToolMyKitPanel: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.token, API_URL]);
 
   useEffect(() => {
     fetchKit();
-  }, [user?.token]);
+  }, [fetchKit]);
+
+  useEffect(() => {
+    if (!user?.token) return;
+
+    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        fetchKit();
+      }, 250);
+    };
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['ToolAssignment', 'ToolKitEvent', 'ToolInventoryItem'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      socket.disconnect();
+    };
+  }, [user?.token, API_URL, fetchKit]);
 
   const reportIncident = async (assignmentId: number) => {
     if (!user?.token) return;

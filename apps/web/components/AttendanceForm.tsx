@@ -1,8 +1,9 @@
 "use client";
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useUser } from './UserContext';
 import styles from './AttendanceForm.module.css';
+import { io, Socket } from 'socket.io-client';
 
 
 const AttendanceForm = () => {
@@ -319,52 +320,78 @@ const AttendanceForm = () => {
     return dateStr === today;
   };
 
-  useEffect(() => {
+  const refreshSelectedDateAttendance = useCallback(async () => {
     if (!user) return;
-    
-    // Si cambio a un día que no es hoy, limpiar el timer
+
     if (!isToday(selectedDate)) {
       setStartTime(null);
       localStorage.removeItem(STORAGE_KEY);
     }
-    
-    const fetchDaySummary = async () => {
-      try {
-        const res = await fetch(buildApiUrl(`attendance/day?date=${selectedDate}`), {
+
+    try {
+      const [dayRes, historyRes] = await Promise.all([
+        fetch(buildApiUrl(`attendance/day?date=${selectedDate}`), {
           headers: { Authorization: `Bearer ${user.token}` },
-        });
-        if (!res.ok) return;
-        const day = await res.json();
+        }),
+        fetch(buildApiUrl(`attendance/history?date=${selectedDate}`), {
+          headers: { Authorization: `Bearer ${user.token}` },
+        }),
+      ]);
+
+      if (dayRes.ok) {
+        const day = await dayRes.json();
         if (!day) {
           setTotalMinutes(0);
           if (!isToday(selectedDate)) setStartTime(null);
-          return;
-        }
-        setTotalMinutes(day.totalMinutes || 0);
-        if (isToday(selectedDate) && day.isOpen && day.lastEntryAt) {
-          setStartTime(new Date(day.lastEntryAt));
         } else {
-          setStartTime(null);
+          setTotalMinutes(day.totalMinutes || 0);
+          if (isToday(selectedDate) && day.isOpen && day.lastEntryAt) {
+            setStartTime(new Date(day.lastEntryAt));
+          } else {
+            setStartTime(null);
+          }
         }
-      } catch {
-        // No interrumpir la UI si falla la consulta
       }
-    };
-    const fetchHistory = async () => {
-      try {
-        const res = await fetch(buildApiUrl(`attendance/history?date=${selectedDate}`), {
-          headers: { Authorization: `Bearer ${user.token}` },
-        });
-        if (!res.ok) return;
-        const list = await res.json();
+
+      if (historyRes.ok) {
+        const list = await historyRes.json();
         if (Array.isArray(list)) setHistory(list);
-      } catch {
-        // No interrumpir la UI si falla la consulta
       }
-    };
-    fetchDaySummary();
-    fetchHistory();
+    } catch {
+      // No interrumpir la UI si falla la consulta
+    }
   }, [user, selectedDate]);
+
+  useEffect(() => {
+    refreshSelectedDateAttendance();
+  }, [refreshSelectedDateAttendance]);
+
+  useEffect(() => {
+    if (!user?.token) return;
+
+    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        refreshSelectedDateAttendance();
+      }, 300);
+    };
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['Attendance', 'AttendanceDay'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      socket.disconnect();
+    };
+  }, [user?.token, API_URL, refreshSelectedDateAttendance]);
 
   useEffect(() => {
     return () => {

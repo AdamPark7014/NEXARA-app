@@ -2,6 +2,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useUser } from './UserContext';
 import styles from './ClientCreationForm.module.css';
+import { io, Socket } from 'socket.io-client';
 
 interface ClientCreationFormProps {
   onClientCreated?: () => void;
@@ -42,6 +43,33 @@ export default function ClientCreationForm({ onClientCreated }: ClientCreationFo
     setClientLogoPreview(url);
     return () => URL.revokeObjectURL(url);
   }, [clientLogo]);
+
+  useEffect(() => {
+    if (!user?.token) return;
+
+    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        onClientCreated?.();
+      }, 300);
+    };
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['ServiceClient', 'Client'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      socket.disconnect();
+    };
+  }, [user?.token, API_URL, onClientCreated]);
 
   const handleLogoSelect = (file?: File | null) => {
     if (!file) return;

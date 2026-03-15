@@ -1,7 +1,8 @@
 "use client";
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useUser } from './UserContext';
 import styles from './ToolUserKitPanel.module.css';
+import { io, Socket } from 'socket.io-client';
 
 interface AssignableUser {
   id: number;
@@ -63,7 +64,7 @@ const ToolUserKitPanel: React.FC = () => {
     return () => mediaQuery.removeEventListener('change', sync);
   }, []);
 
-  const fetchRows = async () => {
+  const fetchRows = useCallback(async () => {
     if (!user?.token) return;
     setLoading(true);
     try {
@@ -79,9 +80,9 @@ const ToolUserKitPanel: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.token, API_URL]);
 
-  const fetchAssignableUsers = async () => {
+  const fetchAssignableUsers = useCallback(async () => {
     if (!user?.token) return;
     try {
       const response = await fetch(buildApiUrl('users/assignable'), {
@@ -100,35 +101,78 @@ const ToolUserKitPanel: React.FC = () => {
     } catch {
       setUsers(user?.id ? [{ id: user.id, nombre: user.nombre || 'Mi usuario', email: user.email || '' }] : []);
     }
-  };
+  }, [user?.token, user?.id, user?.nombre, user?.email, API_URL]);
+
+  const searchInventory = useCallback(async (rawQuery: string) => {
+    const query = rawQuery.trim();
+    if (!user?.token || query.length < 2) {
+      setInventoryOptions([]);
+      return;
+    }
+    try {
+      const params = new URLSearchParams({ q: query });
+      const response = await fetch(buildApiUrl(`tool-requests/inventory/search?${params.toString()}`), {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      if (!response.ok) {
+        setInventoryOptions([]);
+        return;
+      }
+      const payload = await response.json();
+      setInventoryOptions(Array.isArray(payload) ? payload : []);
+    } catch {
+      setInventoryOptions([]);
+    }
+  }, [user?.token, API_URL]);
 
   useEffect(() => {
     fetchRows();
     fetchAssignableUsers();
-  }, [user?.token]);
+  }, [fetchRows, fetchAssignableUsers]);
 
   useEffect(() => {
-    if (!user?.token || inventoryQuery.trim().length < 2) {
+    if (inventoryQuery.trim().length < 2) {
       setInventoryOptions([]);
       return;
     }
 
     const timeout = setTimeout(async () => {
-      try {
-        const params = new URLSearchParams({ q: inventoryQuery.trim() });
-        const response = await fetch(buildApiUrl(`tool-requests/inventory/search?${params.toString()}`), {
-          headers: { Authorization: `Bearer ${user.token}` },
-        });
-        if (!response.ok) return;
-        const payload = await response.json();
-        setInventoryOptions(Array.isArray(payload) ? payload : []);
-      } catch {
-        setInventoryOptions([]);
-      }
+      searchInventory(inventoryQuery);
     }, 260);
 
     return () => clearTimeout(timeout);
-  }, [inventoryQuery, user?.token]);
+  }, [inventoryQuery, searchInventory]);
+
+  useEffect(() => {
+    if (!user?.token) return;
+
+    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        fetchRows();
+        fetchAssignableUsers();
+        if (inventoryQuery.trim().length >= 2) {
+          searchInventory(inventoryQuery);
+        }
+      }, 280);
+    };
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['ToolAssignment', 'ToolKitEvent', 'ToolInventoryItem', 'User'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      socket.disconnect();
+    };
+  }, [user?.token, API_URL, inventoryQuery, fetchRows, fetchAssignableUsers, searchInventory]);
 
   const groupedByUser = useMemo(() => {
     const map = new Map<number, { user: UserKitRow['user']; rows: UserKitRow[] }>();

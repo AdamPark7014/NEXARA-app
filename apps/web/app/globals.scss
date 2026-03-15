@@ -35,6 +35,10 @@
   --panel-title-leading: 1.28;
   --panel-title-tracking: -0.01em;
   --panel-font-family: var(--font-base);
+
+  --motion-fast: 0.18s;
+  --motion-base: 0.28s;
+  --motion-slow: 0.44s;
 }
 
 * {
@@ -239,6 +243,43 @@ body {
     linear-gradient(180deg, var(--background) 0%, color-mix(in srgb, var(--surface-2) 90%, var(--background)) 100%);
 }
 
+body::before {
+  content: "";
+  position: fixed;
+  inset: -20% -10% auto auto;
+  width: min(42vw, 520px);
+  aspect-ratio: 1;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(circle, color-mix(in srgb, var(--primary) 18%, transparent), transparent 64%);
+  filter: blur(18px);
+  opacity: 0.72;
+  animation: nexara-float 14s ease-in-out infinite;
+}
+
+@keyframes nexara-float {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-18px, 20px, 0) scale(1.06);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes nexara-fade-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 .public-layout-wrapper {
   min-height: 100vh;
 }
@@ -250,10 +291,37 @@ body {
 /* Global polish pass for consistent, clean, professional feel */
 :where(button, .button, [type="button"], [type="submit"]) {
   border-radius: var(--radius-md);
+  transition:
+    transform var(--motion-fast) ease,
+    box-shadow var(--motion-base) ease,
+    filter var(--motion-fast) ease,
+    background-color var(--motion-base) ease,
+    border-color var(--motion-base) ease;
+}
+
+:where(button, .button, .button-primary, .button-secondary, [type="button"], [type="submit"]):hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px color-mix(in srgb, var(--shadow) 52%, transparent);
+}
+
+:where(button, .button, .button-primary, .button-secondary, [type="button"], [type="submit"]):active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
 }
 
 :where(input, select, textarea) {
   border-radius: var(--radius-sm);
+  transition:
+    border-color var(--motion-base) ease,
+    box-shadow var(--motion-base) ease,
+    background-color var(--motion-base) ease;
+}
+
+:where(.card, [class*="card"], [class*="Card"]) {
+  animation: nexara-fade-up var(--motion-slow) ease both;
+}
+
+:where(.card, [class*="card"], [class*="Card"]):hover {
+  box-shadow: 0 16px 32px color-mix(in srgb, var(--shadow) 58%, transparent);
 }
 
 /* Home landing sections controlled globally via data-ui attributes */
@@ -427,6 +495,10 @@ textarea:disabled {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+
+  body::before {
+    animation: none !important;
+  }
 }
 
 ::selection {
@@ -482,6 +554,76 @@ textarea:disabled {
     min-height: 0;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Professional desktop rendering pass (web) */
+@media (min-width: 1100px) {
+  :root {
+    --content-max: 1380px;
+    --page-padding-x: clamp(22px, 2.3vw, 52px);
+    --panel-padding-x: clamp(20px, 2vw, 34px);
+    --panel-padding-y: clamp(20px, 2vw, 32px);
+    --panel-gap: clamp(16px, 1.5vw, 24px);
+    --control-height: 44px;
+  }
+
+  body {
+    font-size: 15.5px;
+    line-height: 1.6;
+  }
+
+  :where(main, section, article, .public-layout-content) {
+    max-width: var(--content-max);
+    margin-inline: auto;
+  }
+
+  :where(.card, [class*="card"], [class*="Card"]):not([class*="heroTopCard"]) {
+    border-radius: 18px;
+    border: 1px solid color-mix(in srgb, var(--border-strong) 74%, transparent);
+    background: linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--surface) 97%, transparent),
+      color-mix(in srgb, var(--surface-2) 88%, transparent)
+    );
+    box-shadow:
+      0 14px 30px color-mix(in srgb, var(--shadow) 56%, transparent),
+      inset 0 1px 0 color-mix(in srgb, #fff 58%, transparent);
+  }
+
+  :where(.card, [class*="card"], [class*="Card"]):not([class*="heroTopCard"]):hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 20px 38px color-mix(in srgb, var(--shadow) 62%, transparent),
+      inset 0 1px 0 color-mix(in srgb, #fff 60%, transparent);
+  }
+
+  :where(h1) {
+    font-size: clamp(2.2rem, 2.8vw, 3rem);
+    letter-spacing: -0.02em;
+  }
+
+  :where(h2) {
+    font-size: clamp(1.7rem, 2.1vw, 2.25rem);
+    letter-spacing: -0.017em;
+  }
+
+  :where(.table, table) {
+    border: 1px solid color-mix(in srgb, var(--border-strong) 78%, transparent);
+    border-radius: 14px;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--surface) 96%, transparent);
+  }
+
+  :where(.table th, table th) {
+    font-weight: 700;
+    color: color-mix(in srgb, var(--text-primary) 88%, var(--primary));
+    background: color-mix(in srgb, var(--surface-2) 86%, transparent);
+  }
+
+  :where(.table td, .table th, table td, table th) {
+    padding-block: 0.82rem;
+    padding-inline: 0.9rem;
   }
 }
 

@@ -6,11 +6,23 @@
 }
 
 .headerBlock {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: linear-gradient(160deg, var(--surface-clean), var(--surface-clean-soft));
-  box-shadow: var(--elev-1);
-  padding: clamp(16px, 2.2vw, 24px);
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--primary) 12%, transparent), transparent 56%),
+    radial-gradient(circle at 90% 10%, color-mix(in srgb, var(--secondary) 12%, transparent), transparent 58%),
+    linear-gradient(160deg, var(--surface-clean), var(--surface-clean-soft));
+  box-shadow: 0 16px 34px color-mix(in srgb, var(--shadow) 55%, transparent);
+  padding: clamp(18px, 2.4vw, 28px);
+}
+
+.kicker {
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--text-tertiary);
 }
 
 .pageTitle {
@@ -40,8 +52,10 @@
   background: var(--surface);
   color: var(--text-primary);
   padding: 8px 12px;
-  font-size: 0.86rem;
-  font-weight: 700;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .section {
@@ -86,6 +100,91 @@
   margin: 6px 0;
   color: var(--text-secondary);
   line-height: 1.5;
+}
+
+.serviceCards {
+  padding: 14px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.serviceCard {
+  border: 1px solid color-mix(in srgb, var(--secondary) 24%, var(--border));
+  border-radius: 12px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--surface) 95%, white 5%);
+  box-shadow: var(--elev-1);
+}
+
+.serviceCard h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: color-mix(in srgb, var(--foreground) 90%, var(--primary));
+}
+
+.serviceCard p {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.executionCard {
+  padding: 14px;
+}
+
+.executionList {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 8px;
+}
+
+.executionList li {
+  color: var(--text-secondary);
+  line-height: 1.56;
+}
+
+.signalPanel {
+  border: 1px solid color-mix(in srgb, var(--primary) 26%, var(--border));
+  border-radius: 12px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--surface) 92%, var(--primary) 8%), color-mix(in srgb, var(--surface) 90%, var(--secondary) 10%));
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.signalTitle {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  font-weight: 800;
+}
+
+.signalText {
+  margin: 0;
+  color: var(--text-primary);
+  line-height: 1.58;
+}
+
+.integrationNote {
+  border: 1px dashed color-mix(in srgb, var(--secondary) 30%, var(--border));
+  border-radius: 12px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--surface) 92%, var(--secondary) 8%);
+}
+
+.integrationNote h3 {
+  margin: 0;
+  font-size: 0.96rem;
+}
+
+.integrationNote p {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  line-height: 1.56;
 }
 
 .imageSlot {
@@ -172,7 +271,8 @@
 
 @media (max-width: 900px) {
   .contentCard,
-  .includesGrid {
+  .includesGrid,
+  .serviceCards {
     grid-template-columns: 1fr;
   }
 

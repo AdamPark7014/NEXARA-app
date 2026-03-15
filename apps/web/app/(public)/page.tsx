@@ -374,10 +374,14 @@ export default function Home() {
       ));
 
   return (
-    <div className={`${styles.page} ${corporateStyles.root}`}>
+    <div className={`${styles.page} ${corporateStyles.root} ultra-corp-home ultra-corp-strict`}>
       <main className={styles.main} aria-label="Inicio Nexara">
         <div data-ui="landing-hero-wrap" className={styles.heroWrapper}>
-          <aside className={corporateStyles.heroTopCard} aria-label="Resumen de que hacemos">
+          <aside
+            data-ui="hero-top-card"
+            className={corporateStyles.heroTopCard}
+            aria-label="Resumen de que hacemos"
+          >
             <Image
               src="/logo-nexara.png"
               alt="Logo Nexara"
@@ -385,9 +389,15 @@ export default function Home() {
               height={84}
               className={corporateStyles.heroTopCardLogo}
             />
-            <div className={corporateStyles.heroTopCardContent}>
-              <h2 className={corporateStyles.heroTopCardTitle}>¿QUÉ HACEMOS?</h2>
-              <p className={corporateStyles.heroTopCardText}>
+            <div data-ui="hero-top-card-content" className={corporateStyles.heroTopCardContent}>
+              <h1
+                id="hero-heading"
+                data-ui="hero-top-card-title"
+                className={corporateStyles.heroTopCardTitle}
+              >
+                ¿QUÉ HACEMOS?
+              </h1>
+              <p data-ui="hero-top-card-text" className={corporateStyles.heroTopCardText}>
                 En Nexara integramos tecnología, equipamiento y servicios de IT end-to-end a la
                 medida para que tu operación crezca con continuidad. Combinamos experiencia
                 técnica, ejecución ágil y acompañamiento cercano en cada etapa para resolver
@@ -399,7 +409,7 @@ export default function Home() {
           <section data-ui="landing-hero" className={styles.hero} aria-labelledby="hero-heading">
             <div className={styles.heroBackground} aria-hidden="true">
               <Image
-                src="/images/hero_inicio.jpg"
+                src="/images/hero_nexara_enterprise.svg"
                 alt=""
                 fill
                 priority
@@ -408,26 +418,7 @@ export default function Home() {
                 className={styles.heroBackgroundImage}
               />
             </div>
-            <div className={styles.heroLayout}>
-              <div className={styles.heroContent}>
-                <div className={styles.heroMinimal} aria-label="Portada Nexara">
-                  <Image
-                    src="/logo-nexara.png"
-                    alt="Logo Nexara"
-                    width={220}
-                    height={220}
-                    className={styles.heroMinimalLogo}
-                    priority
-                  />
-                  <h1 id="hero-heading" className={styles.heroMinimalPhrase}>
-                    Protegemos lo que mas importa con tecnologia confiable y cercana.
-                  </h1>
-                  <p className={styles.heroMinimalSubphrase}>
-                    Soluciones profesionales para hogares y empresas, con acompanamiento real en cada paso.
-                  </p>
-                </div>
-              </div>
-            </div>
+            <div className={styles.heroLayout} aria-hidden="true" />
           </section>
         </div>
 

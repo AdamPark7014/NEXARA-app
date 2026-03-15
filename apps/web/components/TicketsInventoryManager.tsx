@@ -1,5 +1,6 @@
 "use client";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { io, Socket } from 'socket.io-client';
 
 type BranchOption = { id: number; name: string; branchNumber?: string | null };
 
@@ -206,22 +207,52 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
     node?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
-  const fetchInventories = async () => {
+  const fetchInventories = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const query = mode === "client" && activeBranchId ? `?branchId=${activeBranchId}` : "";
-    const endpoint = mode === "branch" ? "branch-portal/inventories" : `client-portal/inventories${query}`;
-    const response = await fetch(buildApiUrl(endpoint), {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = response.ok ? await response.json() : [];
-    setInventories(Array.isArray(data) ? data : []);
-    setLoading(false);
-  };
+    try {
+      const query = mode === "client" && activeBranchId ? `?branchId=${activeBranchId}` : "";
+      const endpoint = mode === "branch" ? "branch-portal/inventories" : `client-portal/inventories${query}`;
+      const response = await fetch(buildApiUrl(endpoint), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = response.ok ? await response.json() : [];
+      setInventories(Array.isArray(data) ? data : []);
+    } catch {
+      setInventories([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [mode, activeBranchId, token, apiUrl]);
 
   useEffect(() => {
     fetchInventories();
-  }, [token, selectedBranchId]);
+  }, [fetchInventories]);
+
+  useEffect(() => {
+    const socketUrl = apiUrl.replace(/\/+api\/?$/, '');
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        fetchInventories();
+      }, 300);
+    };
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['Inventory', 'InventarioTickets', 'TicketInventory'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      socket.disconnect();
+    };
+  }, [apiUrl, fetchInventories]);
 
   useEffect(() => {
     if (mode === "client" && !selectedBranchId && branches.length > 0) {

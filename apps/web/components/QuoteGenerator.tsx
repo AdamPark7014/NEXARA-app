@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useUser } from './UserContext';
 import PDFViewer from './PDFViewer';
 import styles from './QuoteGenerator.module.css';
+import { io, Socket } from 'socket.io-client';
 
 interface Quote {
   id: number;
@@ -60,12 +61,7 @@ export default function QuoteGenerator({ onQuoteGenerated }: QuoteGeneratorProps
     size: number;
   } | null>(null);
 
-  useEffect(() => {
-    if (!token) return;
-    loadInitialData();
-  }, [token]);
-
-  const loadInitialData = async () => {
+  const loadInitialData = useCallback(async () => {
     try {
       setLoading(true);
       const [quotesRes, clientsRes, templatesRes] = await Promise.all([
@@ -92,7 +88,41 @@ export default function QuoteGenerator({ onQuoteGenerated }: QuoteGeneratorProps
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    loadInitialData();
+  }, [token, loadInitialData]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    const socketUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api')
+      .replace(/[\/.]+$/, '')
+      .replace(/\/+api\/?$/, '');
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        loadInitialData();
+      }, 250);
+    };
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['CotizacionVenta', 'ClientVenta', 'OrderTemplate'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      socket.disconnect();
+    };
+  }, [token, loadInitialData]);
 
   const generateQuote = async () => {
     if (!opportunityQuoteId || !clientId) {

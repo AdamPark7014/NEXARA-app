@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import styles from './LunchBreaksTable.module.css';
@@ -35,7 +35,7 @@ const LunchBreaksTable: React.FC = () => {
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
   const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, '');
 
-  const fetchLunchBreaks = async () => {
+  const fetchLunchBreaks = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     try {
@@ -64,26 +64,41 @@ const LunchBreaksTable: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, dateFilter]);
 
   useEffect(() => {
     fetchLunchBreaks();
-  }, [user, dateFilter]);
+  }, [fetchLunchBreaks]);
 
   useEffect(() => {
     if (!user?.token) return;
     const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
-    socket.on('lunch_break:approaching', () => fetchLunchBreaks());
-    socket.on('lunch_break:expired', () => fetchLunchBreaks());
-    socket.on('lunch_break:checkin', () => fetchLunchBreaks());
-    socket.on('lunch_break:checkout', () => fetchLunchBreaks());
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        fetchLunchBreaks();
+      }, 250);
+    };
+
+    socket.on('lunch_break:approaching', scheduleRefresh);
+    socket.on('lunch_break:expired', scheduleRefresh);
+    socket.on('lunch_break:checkin', scheduleRefresh);
+    socket.on('lunch_break:checkout', scheduleRefresh);
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['LunchBreak', 'LunchBreaks', 'Attendance'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
 
     return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
       socket.disconnect();
     };
-  }, [user?.token]);
+  }, [user?.token, fetchLunchBreaks]);
 
   const openPhotoGallery = (photoUrl: string) => {
     setExpandedPhotoUrl(photoUrl);

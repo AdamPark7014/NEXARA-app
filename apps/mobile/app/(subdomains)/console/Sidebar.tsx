@@ -1,0 +1,352 @@
+"use client";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import styles from "./console.module.css";
+import { useUser } from '@/components/UserContext';
+import { useTheme } from '@/components/ThemeContext';
+import Image from "next/image";
+import { hasAnyPermission, hasPermission, PERMISSIONS } from '@/lib/permissions';
+import { useState, useEffect } from "react";
+
+export default function Sidebar() {
+  const MOBILE_BREAKPOINT = 900;
+  const pathname = usePathname();
+  const { user, logout } = useUser();
+  const { darkMode, toggleDarkMode } = useTheme();
+  const router = useRouter();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileOpenGroups, setMobileOpenGroups] = useState<string[]>([]);
+  const [brandLogoSrc, setBrandLogoSrc] = useState("/icon.png");
+
+  // Detectar si es móvil
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, [MOBILE_BREAKPOINT]);
+
+  useEffect(() => {
+    if (isMobile) {
+      setIsMenuOpen(false);
+      setMobileOpenGroups([]);
+    }
+  }, [pathname, isMobile]);
+
+  // Cerrar menú al hacer Escape
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isMenuOpen) {
+        closeMenu();
+      }
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [isMenuOpen]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    document.body.style.overflow = isMenuOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMenuOpen, isMobile]);
+
+  const toggleMenu = () => {
+    setIsMenuOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        setMobileOpenGroups([]);
+      }
+      return next;
+    });
+  };
+
+  const closeMenu = () => {
+    setIsMenuOpen(false);
+    setMobileOpenGroups([]);
+  };
+
+  const handleLogout = () => {
+    logout();
+    closeMenu();
+    router.replace('/login');
+  };
+
+  if (!user) return null;
+
+  const isSuperAdmin = user.isSuperAdmin;
+
+  type MenuItem = {
+    label: string;
+    href: string;
+    permissions?: string[];
+    anyPermissions?: string[];
+  };
+
+  type MenuGroup = {
+    id: string;
+    title: string;
+    items: MenuItem[];
+  };
+
+  const canAccessItem = (item: MenuItem) => {
+    if (item.permissions && !item.permissions.every((permission) => hasPermission(user, permission))) {
+      return false;
+    }
+    if (item.anyPermissions && !hasAnyPermission(user, item.anyPermissions)) {
+      return false;
+    }
+    return true;
+  };
+
+  const profileItems: MenuItem[] = [
+    { label: "Mi perfil", href: "/my-profile", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+  ];
+
+  const operationItems: MenuItem[] = [
+    { label: "Resumen ejecutivo", href: "/dashboard", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Operación: actividades", href: "/activities", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Evidencias de servicio", href: "/evidences", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Viáticos operativos", href: "/viatics", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Control vehicular", href: "/vehicles", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Monitoreo GPS", href: "/gps", permissions: [PERMISSIONS.GPS_VIEW] },
+  ];
+
+  const peopleItems: MenuItem[] = [
+    { label: "Asistencia", href: "/attendance", permissions: [PERMISSIONS.ATTENDANCE_VIEW] },
+    { label: "Multas y sanciones", href: "/fines", anyPermissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Gestión de CVs", href: "/cvs", anyPermissions: [PERMISSIONS.CVS_MANAGE, PERMISSIONS.CVS_ADMIN_REVIEW, PERMISSIONS.CVS_SUPERADMIN_REVIEW, PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Gestión de usuarios", href: "/users", permissions: [PERMISSIONS.USERS_MANAGE] },
+  ];
+
+  const commercialItems: MenuItem[] = [
+    { label: "Clientes corporativos", href: "/clients", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { label: "Cotizaciones", href: "/cotizaciones", permissions: [PERMISSIONS.COTIZACIONES_ACCESS] },
+    { label: "Gestión comercial", href: "/gestion-vendedores", anyPermissions: [PERMISSIONS.CONSOLE_ADMIN] },
+  ];
+
+  const systemItems: MenuItem[] = [
+    { label: "Herramientas internas", href: "/tools", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+  ];
+
+  const groups: MenuGroup[] = [
+    {
+      id: "profile",
+      title: "Cuenta personal",
+      items: profileItems,
+    },
+    {
+      id: "operations",
+      title: "Operación y seguimiento",
+      items: operationItems,
+    },
+    {
+      id: "people",
+      title: "RRHH y control de personal",
+      items: peopleItems,
+    },
+    {
+      id: "commercial",
+      title: "Clientes y comercial",
+      items: commercialItems,
+    },
+    {
+      id: "system",
+      title: "Administración interna",
+      items: systemItems,
+    },
+  ];
+
+  const visibleGroups = groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(canAccessItem),
+    }))
+    .filter((group) => group.items.length > 0);
+
+  const fallbackGroups: MenuGroup[] = [
+    {
+      id: "fallback",
+      title: "Menú principal",
+      items: [
+        { label: "Mi perfil", href: "/my-profile" },
+        { label: "Resumen ejecutivo", href: "/dashboard" },
+      ],
+    },
+  ];
+
+  const groupsToRender = visibleGroups.length > 0 ? visibleGroups : fallbackGroups;
+
+  const isPathActive = (href: string) => pathname === href || (pathname?.startsWith(`${href}/`) ?? false);
+
+  const toggleMobileGroup = (groupId: string) => {
+    setMobileOpenGroups((prev) =>
+      prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId],
+    );
+  };
+
+  // Avatar: usa user.avatarUrl si existe, si no, usa un avatar generado por ui-avatars.com
+  const avatarUrl = user.isSuperAdmin
+    ? '/icon.png'
+    : (user.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.nombre)}&background=0D8ABC&color=fff&size=96`);
+
+  return (
+    <aside className={styles.sidebar} data-mobile={isMobile ? 'true' : 'false'} data-open={isMenuOpen ? 'true' : 'false'}>
+      {/* Header del Sidebar con Logo y Hamburguesa */}
+      <div className={styles.sidebarHeader}>
+        <div className={styles.sidebarLogo}>
+          <img
+            src={brandLogoSrc}
+            alt="NEXARA"
+            className={styles.brandLogo}
+            onError={() => setBrandLogoSrc("/icon.png")}
+          />
+          <span className={styles.brandMark}>NEXARA</span>
+          {isMobile && <span className={styles.brandSub}>Consola</span>}
+        </div>
+        {isMobile && (
+          <button
+            type="button"
+            className={styles.hamburgerButton}
+            onClick={toggleMenu}
+            aria-label={isMenuOpen ? "Cerrar menú" : "Abrir menú"}
+            aria-expanded={isMenuOpen}
+            aria-controls="sidebar-menu"
+            data-open={isMenuOpen ? 'true' : 'false'}
+          >
+            <span className={styles.hamburgerLine}></span>
+            <span className={styles.hamburgerLine}></span>
+            <span className={styles.hamburgerLine}></span>
+          </button>
+        )}
+      </div>
+
+      {/* Overlay para móvil */}
+      {isMobile && isMenuOpen && (
+        <div
+          className={styles.sidebarOverlay}
+          onClick={closeMenu}
+          role="presentation"
+          style={{ zIndex: 12001 }}
+        ></div>
+      )}
+
+      {/* Contenedor del menú que se desplaza en móvil */}
+      {(!isMobile || isMenuOpen) && (
+      <div
+        className={styles.sidebarContent}
+        id="sidebar-menu"
+        data-open={isMobile && isMenuOpen ? 'true' : undefined}
+        style={
+          isMobile && isMenuOpen
+            ? {
+                position: 'fixed',
+                top: '64px',
+                left: '8px',
+                right: '8px',
+                zIndex: 12002,
+                display: 'flex',
+                opacity: 1,
+                visibility: 'visible',
+                transform: 'translateY(0) scale(1)',
+                pointerEvents: 'auto',
+              }
+            : undefined
+        }
+      >
+        <div className={styles.sidebarUser}>
+          <div className={styles.sidebarAvatar}>
+            <Image 
+              className={`${styles.avatarImage} ${user.isSuperAdmin ? styles.avatarImageLogo : ''}`} 
+              src={avatarUrl} 
+              alt={user.isSuperAdmin ? 'NEXARA' : user.nombre}
+              width={64} 
+              height={64}
+              priority={false}
+              loading="lazy"
+              unoptimized
+            />
+          </div>
+          <div className={styles.sidebarName}>{user.nombre}</div>
+          <div className={styles.sidebarEmail}>{user.email}</div>
+          <div className={styles.sidebarMeta}>
+            <span className={styles.rolePill}>{user.role}</span>
+            {user.isSuperAdmin && <span className={styles.levelPill}>Superadmin</span>}
+          </div>
+        </div>
+        {groupsToRender.map((group) => (
+          <div key={group.id} className={styles.menuGroup}>
+            {isMobile ? (
+              <button
+                type="button"
+                className={styles.menuGroupToggle}
+                onClick={() => toggleMobileGroup(group.id)}
+                aria-expanded={mobileOpenGroups.includes(group.id)}
+                aria-controls={`menu-group-${group.id}`}
+              >
+                <span>{group.title}</span>
+                <span className={`${styles.menuGroupChevron} ${mobileOpenGroups.includes(group.id) ? styles.menuGroupChevronOpen : ""}`}>
+                  ▾
+                </span>
+              </button>
+            ) : (
+              <div className={styles.menuTitle}>{group.title}</div>
+            )}
+
+            {(!isMobile || mobileOpenGroups.includes(group.id)) && (
+              <ul className={styles.sidebarMenu} id={`menu-group-${group.id}`}>
+                {group.items.map((item) => {
+                  const isItemActive = isPathActive(item.href);
+                  return (
+                    <li key={`${group.id}-${item.href}`} className={styles.sidebarMenuItem}>
+                      <Link
+                        href={item.href}
+                        className={isItemActive ? `${styles.menuLink} ${styles.active}` : styles.menuLink}
+                        onClick={closeMenu}
+                      >
+                        {item.label}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        ))}
+        <div className={styles.sidebarFooter}>
+          <div className={styles.sidebarFooterActions}>
+            <Link
+              href="/paneles"
+              className={styles.menuLink}
+              onClick={closeMenu}
+            >
+              Cambiar panel
+            </Link>
+            <button
+              onClick={toggleDarkMode}
+              className={styles.themeSwitcher}
+              aria-label={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+              title={darkMode ? 'Modo claro' : 'Modo oscuro'}
+            >
+              <span className={styles.themeIcon} aria-hidden="true">●</span>
+              <span className={styles.themeLabel}>{darkMode ? 'Vista oscura' : 'Vista clara'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className={styles.logoutButton}
+              aria-label="Cerrar sesion"
+            >
+              Cerrar sesion
+            </button>
+          </div>
+        </div>
+      </div>
+      )}
+    </aside>
+  );
+}

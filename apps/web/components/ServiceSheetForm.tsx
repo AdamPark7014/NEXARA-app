@@ -1,8 +1,9 @@
 "use client";
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useUser } from './UserContext';
 import PDFViewer from './PDFViewer';
 import styles from './ServiceSheetForm.module.css';
+import { io, Socket } from 'socket.io-client';
 
 interface ActivityOption {
   id: number;
@@ -37,15 +38,49 @@ export default function ServiceSheetForm() {
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
 
+  const loadActivities = useCallback(async () => {
+    if (!user?.token) return;
+    try {
+      const res = await fetch(buildApiUrl('activities'), {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      const data = res.ok ? await res.json() : [];
+      setActivities(Array.isArray(data) ? data : []);
+    } catch {
+      setActivities([]);
+    }
+  }, [user?.token]);
+
+  useEffect(() => {
+    loadActivities();
+  }, [loadActivities]);
+
   useEffect(() => {
     if (!user?.token) return;
-    fetch(buildApiUrl('activities'), {
-      headers: { Authorization: `Bearer ${user.token}` },
-    })
-      .then((res) => res.ok ? res.json() : [])
-      .then((data) => setActivities(Array.isArray(data) ? data : []))
-      .catch(() => setActivities([]));
-  }, [user?.token]);
+
+    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        loadActivities();
+      }, 300);
+    };
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['Activity', 'ServiceSheet'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      socket.disconnect();
+    };
+  }, [user?.token, loadActivities, API_URL]);
 
   const handleSave = async () => {
     if (!user?.token || !activityId) return;

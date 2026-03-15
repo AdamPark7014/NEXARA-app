@@ -309,6 +309,8 @@ export default function ClientTicketsPage() {
     };
   }, [sortedTickets, requests.length]);
 
+  const loadingPlaceholders = useMemo(() => Array.from({ length: 3 }, (_, index) => index), []);
+
   const resolveReportRange = () => {
     const now = new Date();
     if (reportRange === "today") {
@@ -921,7 +923,18 @@ export default function ClientTicketsPage() {
                 </div>
                 {error && <div className={styles.errorText}>{error}</div>}
               </div>
-              {loading && <div>cargando...</div>}
+              {loading && (
+                <div className={styles.loadingList}>
+                  {loadingPlaceholders.map((item) => (
+                    <div key={item} className={styles.loadingCard}>
+                      <div className={`${styles.skeleton} ${styles.skeletonTitle}`}></div>
+                      <div className={`${styles.skeleton} ${styles.skeletonLine}`}></div>
+                      <div className={`${styles.skeleton} ${styles.skeletonLine}`}></div>
+                      <div className={`${styles.skeleton} ${styles.skeletonLineShort}`}></div>
+                    </div>
+                  ))}
+                </div>
+              )}
               {sortedTickets.map((ticket) => (
                 <div key={ticket.id} className={`card ${styles.itemCard}`}>
                   <div className={styles.itemHeader}>

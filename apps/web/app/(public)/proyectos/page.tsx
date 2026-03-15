@@ -203,7 +203,26 @@ export default async function ProjectsPage() {
   };
 
   return (
-    <main className={`${styles.container} public-section-page`} aria-label="Catalogo de proyectos Nexara">
+    <main className={`${styles.container} public-section-page ultra-corp-page ultra-corp-proyectos ultra-corp-strict`} aria-label="Catalogo de proyectos Nexara">
+      <header className={styles.hero}>
+        <div>
+          <p className={styles.kicker}>PORTAFOLIO TECNOLOGICO</p>
+          <h1 className={styles.heroTitle}>Sectores donde ya generamos impacto real</h1>
+          <p className={styles.heroText}>
+            Este catalogo resume lineas de solucion y sectores atendidos para facilitar decisiones
+            de compra e implementacion con un enfoque empresarial.
+          </p>
+        </div>
+        <a
+          href={`${API_URL}/projects/catalog-pdf/download`}
+          className={styles.pdfButton}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Descargar PDF completo
+        </a>
+      </header>
+
       <section className={styles.block} aria-labelledby="sectores-principales-title">
         <h2 id="sectores-principales-title" className={styles.blockBand}>Sectores principales</h2>
         <div className={styles.blockBody}>
@@ -219,6 +238,9 @@ export default async function ProjectsPage() {
       </section>
 
       <section className={styles.bottomActions}>
+        <a href="/contacto" className={styles.consultButton}>
+          Solicitar asesoria para mi sector
+        </a>
         <a
           href={`${API_URL}/projects/catalog-pdf/download`}
           className={styles.pdfButton}

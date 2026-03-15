@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
+import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import styles from './FinesTable.module.css';
@@ -176,6 +177,33 @@ const FinesTable: React.FC<FinesTableProps> = ({
     if (!user?.token) return;
     loadFines();
   }, [user?.token, tipoFiltro, usuarioFiltro, estatusPago]);
+
+  useEffect(() => {
+    if (!user?.token) return;
+
+    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        loadFines();
+      }, 250);
+    };
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['Multa', 'Fine', 'Usuario', 'User'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      socket.disconnect();
+    };
+  }, [user?.token, API_URL, tipoFiltro, usuarioFiltro, estatusPago]);
 
   useEffect(() => {
     if (onRefresh) {

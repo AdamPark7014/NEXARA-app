@@ -1,5 +1,6 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import styles from './EvidenceReviewModal.module.css';
 
@@ -33,6 +34,38 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
     { value: 'SERVICE_SHEET_DATA', label: '📝 Paso 4: Plantilla Interna' },
     { value: 'EXIT_PHOTO', label: '🚪 Paso 5: Foto de Salida' },
   ];
+
+  useEffect(() => {
+    if (!user) return;
+
+    const socketUrl = (process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/$/, '');
+    const socket: Socket = io(socketUrl, {
+      auth: { token: user.token },
+      transports: ['websocket', 'polling'],
+    });
+
+    let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
+    const relevantModels = new Set(['activityevidence', 'activity']);
+
+    const onEntityUpdated = (event: { model?: string; entityId?: number | string }) => {
+      const normalizedModel = event?.model?.toLowerCase();
+      if (!normalizedModel || !relevantModels.has(normalizedModel)) return;
+      if (event.entityId !== undefined && Number(event.entityId) !== activityId) return;
+
+      if (refreshTimeout) clearTimeout(refreshTimeout);
+      refreshTimeout = setTimeout(() => {
+        onSuccess();
+      }, 350);
+    };
+
+    socket.on('entity:updated', onEntityUpdated);
+
+    return () => {
+      if (refreshTimeout) clearTimeout(refreshTimeout);
+      socket.off('entity:updated', onEntityUpdated);
+      socket.disconnect();
+    };
+  }, [activityId, onSuccess, user]);
 
   const handleSubmit = async () => {
     if (!user || !action) return;

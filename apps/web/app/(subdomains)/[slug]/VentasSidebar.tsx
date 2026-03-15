@@ -77,9 +77,7 @@ export default function VentasSidebar() {
           title={sidebarOpen ? "Contraer" : "Expandir"}
           aria-label="Toggle sidebar"
         >
-          <span className={styles.toggleGlyph} aria-hidden="true">
-            {sidebarOpen ? "◀" : "▶"}
-          </span>
+          {sidebarOpen ? "◀" : "▶"}
         </button>
       </div>
 

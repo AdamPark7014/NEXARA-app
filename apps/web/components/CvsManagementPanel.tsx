@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { io, Socket } from 'socket.io-client';
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import styles from "./CvsManagementPanel.module.css";
@@ -177,6 +178,33 @@ export default function CvsManagementPanel() {
   useEffect(() => {
     fetchRows();
   }, [user?.token]);
+
+  useEffect(() => {
+    if (!user?.token) return;
+
+    const socketUrl = apiBase.replace(/\/+api\/?$/, '');
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        fetchRows();
+      }, 250);
+    };
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['CvRecord', 'Cv', 'User'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      socket.disconnect();
+    };
+  }, [user?.token, search, category, stage, employmentStatus, onlyMine]);
 
   const grouped = useMemo(() => {
     const map = new Map<CvRow["stage"], CvRow[]>();

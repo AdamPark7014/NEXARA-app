@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
+import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import styles from './ToolRenewalsTable.module.css';
 
@@ -33,6 +34,7 @@ interface ToolRenewalsTableProps {
 
 const ToolRenewalsTable: React.FC<ToolRenewalsTableProps> = ({ refreshTrigger = 0 }) => {
   const { user } = useUser();
+  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const [renewals, setRenewals] = useState<ToolRenewal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +48,7 @@ const ToolRenewalsTable: React.FC<ToolRenewalsTableProps> = ({ refreshTrigger = 
     if (!user) return;
     setLoading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/tool-requests/renewals/pending`, {
+      const res = await fetch(`${API_URL}/tool-requests/renewals/pending`, {
         headers: { Authorization: `Bearer ${user.token}` },
       });
       if (!res.ok) throw new Error('Error al cargar renovaciones');
@@ -63,6 +65,33 @@ const ToolRenewalsTable: React.FC<ToolRenewalsTableProps> = ({ refreshTrigger = 
   useEffect(() => {
     fetchRenewals();
   }, [user, refreshTrigger]);
+
+  useEffect(() => {
+    if (!user?.token) return;
+
+    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        fetchRenewals();
+      }, 250);
+    };
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['ToolRenewal', 'ToolRequest'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      socket.disconnect();
+    };
+  }, [user?.token, API_URL, refreshTrigger]);
 
   const filteredRenewals = statusFilter === 'all'
     ? renewals
@@ -106,9 +135,9 @@ const ToolRenewalsTable: React.FC<ToolRenewalsTableProps> = ({ refreshTrigger = 
       let body = {};
 
       if (actionType === 'approve') {
-        endpoint = `${process.env.NEXT_PUBLIC_API_URL}/api/tool-requests/renewals/${selectedRenewalId}/approve`;
+        endpoint = `${API_URL}/tool-requests/renewals/${selectedRenewalId}/approve`;
       } else {
-        endpoint = `${process.env.NEXT_PUBLIC_API_URL}/api/tool-requests/renewals/${selectedRenewalId}/reject`;
+        endpoint = `${API_URL}/tool-requests/renewals/${selectedRenewalId}/reject`;
         body = { reason: rejectionReason };
       }
 

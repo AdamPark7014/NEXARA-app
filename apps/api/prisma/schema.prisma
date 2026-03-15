@@ -73,7 +73,6 @@ model Project {
   highlights String[]
   mainImage  String?  @db.VarChar(500)
   gallery    String[]
-  showInCatalog Boolean @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

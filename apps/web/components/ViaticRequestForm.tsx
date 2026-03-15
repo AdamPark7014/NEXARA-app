@@ -1,11 +1,13 @@
 "use client";
 import React, { useEffect, useRef, useState } from 'react';
+import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import styles from './ViaticRequestForm.module.css';
 
 
 const ViaticRequestForm = ({ actividadId }: { actividadId: number }) => {
   const { user } = useUser();
+  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const [monto, setMonto] = useState('');
   const [razon, setRazon] = useState('');
   const [ticket, setTicket] = useState<File | null>(null);
@@ -19,6 +21,37 @@ const ViaticRequestForm = ({ actividadId }: { actividadId: number }) => {
   useEffect(() => () => {
     if (ticketPreview) URL.revokeObjectURL(ticketPreview.url);
   }, [ticketPreview]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const socketUrl = (process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/$/, '');
+    const socket: Socket = io(socketUrl, {
+      auth: { token: user.token },
+      transports: ['websocket', 'polling'],
+    });
+
+    let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
+    const onEntityUpdated = (event: { model?: string; entity?: { actividadId?: number | string }; entityId?: number | string }) => {
+      const normalizedModel = event?.model?.toLowerCase();
+      if (normalizedModel !== 'viatico') return;
+      const eventActivityId = event.entity?.actividadId;
+      if (eventActivityId !== undefined && Number(eventActivityId) !== Number(actividadId)) return;
+
+      if (refreshTimeout) clearTimeout(refreshTimeout);
+      refreshTimeout = setTimeout(() => {
+        setError(null);
+      }, 300);
+    };
+
+    socket.on('entity:updated', onEntityUpdated);
+
+    return () => {
+      if (refreshTimeout) clearTimeout(refreshTimeout);
+      socket.off('entity:updated', onEntityUpdated);
+      socket.disconnect();
+    };
+  }, [actividadId, user]);
 
   const formatBytes = (size: number) => {
     if (size < 1024) return `${size} B`;
@@ -59,7 +92,7 @@ const ViaticRequestForm = ({ actividadId }: { actividadId: number }) => {
       formData.append('ticket', ticket!);
       formData.append('actividadId', String(actividadId));
       formData.append('usuarioId', String(user.id));
-      const res = await fetch(process.env.NEXT_PUBLIC_API_URL + '/api/viatics', {
+      const res = await fetch(`${API_URL}/viatics`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${user.token}` },
         body: formData,

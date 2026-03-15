@@ -1,7 +1,8 @@
 "use client";
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useUser } from './UserContext';
 import styles from './MyProfileForm.module.css';
+import { io, Socket } from 'socket.io-client';
 
 const requiredDocuments = [
   {
@@ -137,40 +138,71 @@ const MyProfileForm: React.FC = () => {
 
   const isSupportedFile = (file: File) => file.type.startsWith('image/') || file.type === 'application/pdf';
 
-  useEffect(() => {
+  const loadProfile = useCallback(async () => {
     if (!user?.token) return;
     setLoading(true);
-    fetch(buildApiUrl('users/profile/me'), {
-      headers: { Authorization: `Bearer ${user.token}` },
-    })
-      .then((res) => res.ok ? res.json() : null)
-      .then((data) => {
-        const perfil = data?.perfil || {};
-        setForm({
-          telefono: perfil.telefono || '',
-          fechaNacimiento: perfil.fechaNacimiento ? String(perfil.fechaNacimiento).slice(0, 10) : '',
-          direccion: perfil.direccion || '',
-          colonia: perfil.colonia || '',
-          ciudad: perfil.ciudad || '',
-          estado: perfil.estado || '',
-          codigoPostal: perfil.codigoPostal || '',
-          pais: perfil.pais || '',
-          curp: perfil.curp || '',
-          rfc: perfil.rfc || '',
-          ineNumero: perfil.ineNumero || '',
-          nss: perfil.nss || '',
-          contactoEmergenciaNombre: perfil.contactoEmergenciaNombre || '',
-          contactoEmergenciaTelefono: perfil.contactoEmergenciaTelefono || '',
-        });
-        setProfileStatus(perfil.estatus || 'Pendiente');
-        setProfileNotes(perfil.observaciones || '');
-        setDocuments(Array.isArray(data?.documentos) ? data.documentos : []);
-      })
-      .catch(() => {
-        setDocuments([]);
-      })
-      .finally(() => setLoading(false));
+    try {
+      const res = await fetch(buildApiUrl('users/profile/me'), {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      const data = res.ok ? await res.json() : null;
+      const perfil = data?.perfil || {};
+      setForm({
+        telefono: perfil.telefono || '',
+        fechaNacimiento: perfil.fechaNacimiento ? String(perfil.fechaNacimiento).slice(0, 10) : '',
+        direccion: perfil.direccion || '',
+        colonia: perfil.colonia || '',
+        ciudad: perfil.ciudad || '',
+        estado: perfil.estado || '',
+        codigoPostal: perfil.codigoPostal || '',
+        pais: perfil.pais || '',
+        curp: perfil.curp || '',
+        rfc: perfil.rfc || '',
+        ineNumero: perfil.ineNumero || '',
+        nss: perfil.nss || '',
+        contactoEmergenciaNombre: perfil.contactoEmergenciaNombre || '',
+        contactoEmergenciaTelefono: perfil.contactoEmergenciaTelefono || '',
+      });
+      setProfileStatus(perfil.estatus || 'Pendiente');
+      setProfileNotes(perfil.observaciones || '');
+      setDocuments(Array.isArray(data?.documentos) ? data.documentos : []);
+    } catch {
+      setDocuments([]);
+    } finally {
+      setLoading(false);
+    }
   }, [user?.token]);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
+
+  useEffect(() => {
+    if (!user?.token) return;
+
+    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        loadProfile();
+      }, 300);
+    };
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['User', 'UserProfile', 'UserDocument', 'Document'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      socket.disconnect();
+    };
+  }, [user?.token, API_URL, loadProfile]);
 
   const handleChange = (field: keyof ProfileForm, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -261,12 +293,7 @@ const MyProfileForm: React.FC = () => {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.message || 'Error al subir documentos');
       }
-      const updated = await fetch(buildApiUrl('users/profile/me'), {
-        headers: { Authorization: `Bearer ${user.token}` },
-      }).then((r) => r.ok ? r.json() : null);
-      setDocuments(Array.isArray(updated?.documentos) ? updated.documentos : []);
-      setProfileStatus(updated?.perfil?.estatus || 'Pendiente');
-      setProfileNotes(updated?.perfil?.observaciones || '');
+      await loadProfile();
       setDocFiles([]);
       docPreviews.forEach((entry) => URL.revokeObjectURL(entry.url));
       setDocPreviews([]);

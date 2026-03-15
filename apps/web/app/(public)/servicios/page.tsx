@@ -7,13 +7,57 @@ export const metadata = {
 };
 
 export default function ServiciosPage() {
+  const coreServices = [
+    {
+      title: "Infraestructura y conectividad",
+      text: "Diseno e implementacion de redes, energia, seguridad perimetral y plataformas de operacion.",
+    },
+    {
+      title: "Equipamiento empresarial",
+      text: "Suministro de hardware y perifericos con criterios de rendimiento, vida util y costo total.",
+    },
+    {
+      title: "Servicios gestionados",
+      text: "Monitoreo, soporte y mantenimiento continuo con acuerdos de nivel de servicio claros.",
+    },
+  ];
+
+  const workModel = [
+    "Levantamiento tecnico y operativo en sitio o remoto.",
+    "Plan de implementacion por fases con hitos de control.",
+    "Ejecucion con documentacion y transferencia de conocimiento.",
+    "Seguimiento posterior para estabilizacion y mejora continua.",
+  ];
+
+  const includeCards = [
+    {
+      title: "Soporte tecnico corporativo",
+      items: [
+        "Atencion especializada para operaciones multi-sucursal.",
+        "Ventanas de atencion y esquemas de escalamiento definidos.",
+        "Tiempos de respuesta y resolucion alineados a SLA.",
+        "Cobertura de campo segun alcance contratado.",
+      ],
+    },
+    {
+      title: "Arrendamiento y renovacion",
+      items: [
+        "Esquemas financieros para preservar flujo de efectivo.",
+        "Renovacion tecnologica sin inversiones iniciales elevadas.",
+        "Mantenimiento y soporte durante vigencia del contrato.",
+        "Planeacion de reemplazo con base en ciclo de vida.",
+      ],
+    },
+  ];
+
   return (
-    <main className={`${styles.container} public-section-page`} aria-label="Página de servicios">
+    <main className={`${styles.container} public-section-page ultra-corp-page ultra-corp-servicios ultra-corp-strict`} aria-label="Página de servicios">
       <header className={styles.headerBlock}>
+        <p className={styles.kicker}>SERVICIOS PROFESIONALES NEXARA</p>
         <h1 className={styles.pageTitle}>Servicios Nexara</h1>
         <p className={styles.pageLead}>
-          Integramos equipamiento, infraestructura y servicios de TI con enfoque operativo,
-          financiero y de continuidad para cada etapa de tu organización.
+          Construimos operaciones tecnologicas robustas para organizaciones que requieren
+          continuidad, control y crecimiento sostenible.
         </p>
       </header>
 
@@ -26,101 +70,89 @@ export default function ServiciosPage() {
       </nav>
 
       <section id="ofrecemos" className={styles.section}>
-        <h2 className={styles.sectionBand}>¿Qué ofrecemos?</h2>
-        <article className={styles.contentCard}>
-          <div className={styles.textCol}>
-            <ul className={styles.list}>
-              <li>Venta de computadoras, componentes y periféricos de marcas líderes.</li>
-              <li>Integración de soluciones TI: redes, seguridad, energía y cómputo.</li>
-              <li>Servicios profesionales: consultoría, implementación y soporte 24/7.</li>
-              <li>Proyectos a la medida con enfoque en resultados y continuidad.</li>
-            </ul>
-          </div>
-          <aside className={styles.imageSlot} aria-label="Espacio para imagen de servicios">
-            <div className={styles.imageSlotInner}>Espacio de imagen</div>
-          </aside>
-        </article>
+        <h2 className={styles.sectionBand}>Que ofrecemos</h2>
+        <div className={styles.serviceCards}>
+          {coreServices.map((service) => (
+            <article key={service.title} className={styles.serviceCard}>
+              <h3>{service.title}</h3>
+              <p>{service.text}</p>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section id="ejecucion" className={styles.section}>
-        <h2 className={styles.sectionBand}>¿Cómo lo ejecutamos?</h2>
-        <article className={styles.contentCard}>
-          <aside className={styles.imageSlot} aria-label="Espacio para imagen de ejecución">
-            <div className={styles.imageSlotInner}>Espacio de imagen</div>
-          </aside>
-          <div className={styles.textCol}>
-            <ul className={styles.list}>
-              <li>Gestión experta por ingenieros certificados y experimentados.</li>
-              <li>Metodologías ágiles para entrega en tiempo y forma.</li>
-              <li>Acompañamiento de punta a punta: diagnóstico, implementación y soporte.</li>
-              <li>Relación de confianza y comunicación clara con cada cliente.</li>
-            </ul>
-          </div>
+        <h2 className={styles.sectionBand}>Como lo ejecutamos</h2>
+        <article className={styles.executionCard}>
+          <ol className={styles.executionList}>
+            {workModel.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ol>
         </article>
       </section>
 
       <section id="beneficios" className={styles.section}>
-        <h2 className={styles.sectionBand}>¿Cuáles son los beneficios?</h2>
+        <h2 className={styles.sectionBand}>Beneficios para tu operacion</h2>
         <article className={styles.contentCard}>
           <div className={styles.textCol}>
             <ul className={styles.list}>
-              <li>Experiencia operativa y soluciones empresariales personalizadas.</li>
-              <li>Ejecución técnica con seguimiento para entregar resultados medibles.</li>
-              <li>Transferencia de conocimiento y adopción efectiva de cada iniciativa.</li>
-              <li>Análisis de contexto, riesgos y objetivos para priorizar iniciativas con impacto.</li>
-              <li>Ejecución por fases con gestión de hitos, documentación y estándares.</li>
+              <li>Reduccion de riesgos operativos mediante diseno y control tecnico.</li>
+              <li>Mayor disponibilidad y estabilidad en procesos criticos del negocio.</li>
+              <li>Visibilidad ejecutiva con indicadores para decision y mejora continua.</li>
+              <li>Un solo aliado para arquitectura, implementacion y soporte.</li>
+              <li>Escalabilidad real para acompanar crecimiento por etapas.</li>
             </ul>
           </div>
-          <aside className={styles.imageSlot} aria-label="Espacio para imagen de beneficios">
-            <div className={styles.imageSlotInner}>Espacio de imagen</div>
+          <aside className={styles.signalPanel} aria-label="Resultado operativo esperado">
+            <p className={styles.signalTitle}>Resultado esperado</p>
+            <p className={styles.signalText}>
+              Equipos directivos con mejor control de tecnologia, menores interrupciones y mayor
+              capacidad para crecer sin friccion operativa.
+            </p>
           </aside>
         </article>
       </section>
 
       <section id="integracion" className={styles.section}>
-        <h2 className={styles.sectionBand}>¿Dónde integrarlos?</h2>
+        <h2 className={styles.sectionBand}>Donde integrarlos</h2>
         <article className={styles.contentCard}>
-          <aside className={styles.imageSlot} aria-label="Espacio para imagen de integración">
-            <div className={styles.imageSlotInner}>Espacio de imagen</div>
-          </aside>
           <div className={styles.textCol}>
             <ul className={styles.list}>
-              <li>Equipamiento corporativo: cómputo, servidores y periféricos alineados a operación.</li>
-              <li>Infraestructura de red: diseño LAN/WAN, cableado y conectividad segura.</li>
-              <li>Seguridad informática: firewalls, respaldo y protección de activos críticos.</li>
-              <li>Monitoreo y soporte: continuidad, mantenimiento preventivo/correctivo y soporte técnico.</li>
+              <li>Centros administrativos, puntos de venta y sedes operativas distribuidas.</li>
+              <li>Areas de atencion con necesidades de continuidad y respuesta inmediata.</li>
+              <li>Plataformas de colaboracion, seguridad y productividad corporativa.</li>
+              <li>Entornos donde convergen tecnologia, procesos y personal de campo.</li>
             </ul>
           </div>
+          <aside className={styles.integrationNote}>
+            <h3>Integracion por capas</h3>
+            <p>
+              Priorizamos primero la estabilidad base (red, energia, seguridad), luego
+              incorporamos plataformas y automatizacion.
+            </p>
+          </aside>
         </article>
       </section>
 
       <section id="incluyen" className={styles.section}>
-        <h2 className={styles.sectionBand}>¿Qué incluyen sus servicios?</h2>
+        <h2 className={styles.sectionBand}>Que incluyen nuestros servicios</h2>
         <div className={styles.includesGrid}>
-          <article className={styles.includeCard}>
-            <h3>Soporte técnico</h3>
-            <ul className={styles.list}>
-              <li>Soporte especializado para empresas con operación multi-sucursal.</li>
-              <li>Sin importar la ubicación, con atención centralizada.</li>
-              <li>Respuesta menor a 4 horas en horario laboral.</li>
-              <li>Cubrimos viáticos y gastos de desplazamiento según contrato.</li>
-            </ul>
-          </article>
-
-          <article className={styles.includeCard}>
-            <h3>Arrendamiento de equipo</h3>
-            <ul className={styles.list}>
-              <li>Conservas flujo de efectivo y capital de trabajo.</li>
-              <li>Pagos mensuales fijos y deducibles de impuestos.</li>
-              <li>Renueva tecnología sin grandes inversiones iniciales.</li>
-              <li>Incluye soporte técnico y mantenimiento durante el contrato.</li>
-            </ul>
-          </article>
+          {includeCards.map((card) => (
+            <article key={card.title} className={styles.includeCard}>
+              <h3>{card.title}</h3>
+              <ul className={styles.list}>
+                {card.items.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </article>
+          ))}
         </div>
       </section>
 
       <section id="contacto" className={styles.finalCta}>
-        <h2>¿Listo para impulsar tu operación?</h2>
+        <h2>Listo para profesionalizar tu operacion tecnologica</h2>
         <p>Conversemos y diseñemos una propuesta de servicios alineada a tu negocio.</p>
         <div className={styles.ctaActions}>
           <Link href="/contacto" className={styles.primaryCta}>Contactar</Link>

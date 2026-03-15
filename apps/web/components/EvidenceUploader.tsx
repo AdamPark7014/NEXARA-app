@@ -1,7 +1,8 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useUser } from './UserContext';
 import styles from './EvidenceUploader.module.css';
+import { io, Socket } from 'socket.io-client';
 
 interface ActivityOption {
   id: number;
@@ -25,7 +26,7 @@ const EvidenceUploader = ({ actividadId }: { actividadId?: number }) => {
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/\.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
 
-  useEffect(() => {
+  const fetchActivities = useCallback(() => {
     if (!user?.token || actividadId) return;
     fetch(buildApiUrl('activities'), {
       headers: { Authorization: `Bearer ${user.token}` },
@@ -34,6 +35,37 @@ const EvidenceUploader = ({ actividadId }: { actividadId?: number }) => {
       .then((data) => setActividades(Array.isArray(data) ? data : []))
       .catch(() => setActividades([]));
   }, [user?.token, actividadId]);
+
+  useEffect(() => {
+    fetchActivities();
+  }, [fetchActivities]);
+
+  useEffect(() => {
+    if (!user?.token || actividadId) return;
+
+    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        fetchActivities();
+      }, 300);
+    };
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['Activity', 'Actividad', 'Evidence'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      socket.disconnect();
+    };
+  }, [API_URL, user?.token, actividadId, fetchActivities]);
 
   useEffect(() => () => {
     files.forEach((entry) => URL.revokeObjectURL(entry.url));

@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from 'react';
+import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import styles from './ToolInventoryPanel.module.css';
 
@@ -142,6 +143,33 @@ const ToolInventoryPanel: React.FC = () => {
   useEffect(() => {
     fetchItems();
   }, [user?.token, query, includeRetired]);
+
+  useEffect(() => {
+    if (!user?.token) return;
+
+    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        fetchItems();
+      }, 250);
+    };
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['ToolInventoryItem', 'ToolRequest'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      socket.disconnect();
+    };
+  }, [user?.token, API_URL, query, includeRetired]);
 
   const createItem = async (e: React.FormEvent) => {
     e.preventDefault();

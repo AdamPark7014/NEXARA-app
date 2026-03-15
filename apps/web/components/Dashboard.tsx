@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { io, Socket } from 'socket.io-client';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
@@ -42,6 +43,7 @@ type AttendanceRange = {
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
 const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
+const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, '');
 
 const toLocalDateInput = (date: Date) => date.toLocaleDateString('sv-SE');
 
@@ -204,81 +206,108 @@ export default function Dashboard() {
     }
   }, [availableUsers, isSuperAdmin, normalizedUserId, selectedUserId]);
 
-  useEffect(() => {
+  const fetchAll = useCallback(async () => {
     if (!user?.token) return;
     setLoading(true);
     setError(null);
 
-    const fetchAll = async () => {
-      try {
-        const headers = { Authorization: `Bearer ${user.token}` };
-        const params = new URLSearchParams({ from: weekRange.from, to: weekRange.to });
-        const canManageAttendance = hasPermission(user, PERMISSIONS.ATTENDANCE_MANAGE);
-        const canViewAttendance = hasPermission(user, PERMISSIONS.ATTENDANCE_VIEW);
+    try {
+      const headers = { Authorization: `Bearer ${user.token}` };
+      const params = new URLSearchParams({ from: weekRange.from, to: weekRange.to });
+      const canManageAttendance = hasPermission(user, PERMISSIONS.ATTENDANCE_MANAGE);
+      const canViewAttendance = hasPermission(user, PERMISSIONS.ATTENDANCE_VIEW);
 
-        const [viaticsRes, activitiesRes, attendanceRes] = await Promise.all([
-          fetch(buildApiUrl('viatics'), { headers }),
-          fetch(buildApiUrl('activities'), { headers }),
-          canManageAttendance
-            ? fetch(buildApiUrl(`attendance/hierarchy/range?${params.toString()}`), { headers })
-            : canViewAttendance
-              ? fetch(buildApiUrl(`attendance/range?${params.toString()}`), { headers })
-              : Promise.resolve(null),
-        ]);
+      const [viaticsRes, activitiesRes, attendanceRes] = await Promise.all([
+        fetch(buildApiUrl('viatics'), { headers }),
+        fetch(buildApiUrl('activities'), { headers }),
+        canManageAttendance
+          ? fetch(buildApiUrl(`attendance/hierarchy/range?${params.toString()}`), { headers })
+          : canViewAttendance
+            ? fetch(buildApiUrl(`attendance/range?${params.toString()}`), { headers })
+            : Promise.resolve(null),
+      ]);
 
-        const viaticsData = viaticsRes.ok ? ((await viaticsRes.json()) as Viatic[]) : [];
-        const activitiesData = activitiesRes.ok ? ((await activitiesRes.json()) as Activity[]) : [];
-        let attendancePayload: AttendanceRange | { totalMinutes?: number; days?: any[]; attendances?: any[] } | null = null;
-        if (attendanceRes) {
-          if (attendanceRes.ok) {
-            attendancePayload = await attendanceRes.json();
-          } else {
-            let attendanceMessage = `Error al consultar asistencia (${attendanceRes.status})`;
-            try {
-              const errorPayload = await attendanceRes.json();
-              if (errorPayload?.message) attendanceMessage = errorPayload.message;
-            } catch {
-              // Ignore JSON parse errors for non-JSON responses.
-            }
-            throw new Error(attendanceMessage);
-          }
-        }
-
-        setViatics(Array.isArray(viaticsData) ? viaticsData : []);
-        setActivities(Array.isArray(activitiesData) ? activitiesData : []);
-
-        if (canManageAttendance && attendancePayload) {
-          setAttendance(attendancePayload as AttendanceRange);
-        } else if (attendancePayload && user?.id) {
-          const normalizedUserId = Number(user.id);
-          const payload = attendancePayload as { totalMinutes?: number; days?: any[]; attendances?: any[] };
-          setAttendance({
-            rangeStart: weekRange.from,
-            rangeEnd: weekRange.to,
-            totalMinutesAll: payload.totalMinutes || 0,
-            totalUsers: 1,
-            users: [
-              {
-                userId: normalizedUserId,
-                userName: user.nombre,
-                totalMinutes: payload.totalMinutes || 0,
-                days: payload.days || [],
-                attendances: payload.attendances || [],
-              },
-            ],
-          });
+      const viaticsData = viaticsRes.ok ? ((await viaticsRes.json()) as Viatic[]) : [];
+      const activitiesData = activitiesRes.ok ? ((await activitiesRes.json()) as Activity[]) : [];
+      let attendancePayload: AttendanceRange | { totalMinutes?: number; days?: any[]; attendances?: any[] } | null = null;
+      if (attendanceRes) {
+        if (attendanceRes.ok) {
+          attendancePayload = await attendanceRes.json();
         } else {
-          setAttendance(null);
+          let attendanceMessage = `Error al consultar asistencia (${attendanceRes.status})`;
+          try {
+            const errorPayload = await attendanceRes.json();
+            if (errorPayload?.message) attendanceMessage = errorPayload.message;
+          } catch {
+            // Ignore JSON parse errors for non-JSON responses.
+          }
+          throw new Error(attendanceMessage);
         }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error desconocido');
-      } finally {
-        setLoading(false);
       }
+
+      setViatics(Array.isArray(viaticsData) ? viaticsData : []);
+      setActivities(Array.isArray(activitiesData) ? activitiesData : []);
+
+      if (canManageAttendance && attendancePayload) {
+        setAttendance(attendancePayload as AttendanceRange);
+      } else if (attendancePayload && user?.id) {
+        const normalizedUserId = Number(user.id);
+        const payload = attendancePayload as { totalMinutes?: number; days?: any[]; attendances?: any[] };
+        setAttendance({
+          rangeStart: weekRange.from,
+          rangeEnd: weekRange.to,
+          totalMinutesAll: payload.totalMinutes || 0,
+          totalUsers: 1,
+          users: [
+            {
+              userId: normalizedUserId,
+              userName: user.nombre,
+              totalMinutes: payload.totalMinutes || 0,
+              days: payload.days || [],
+              attendances: payload.attendances || [],
+            },
+          ],
+        });
+      } else {
+        setAttendance(null);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+    } finally {
+      setLoading(false);
+    }
+  }, [user, weekRange.from, weekRange.to]);
+
+  useEffect(() => {
+    if (!user?.token) return;
+    fetchAll();
+  }, [user?.token, fetchAll]);
+
+  useEffect(() => {
+    if (!user?.token) return;
+
+    const socket: Socket = io(getSocketBaseUrl(), { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        fetchAll();
+      }, 250);
     };
 
-    fetchAll();
-  }, [user, weekRange.from, weekRange.to]);
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['Viatico', 'Actividad', 'Activity', 'Attendance'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      socket.disconnect();
+    };
+  }, [user?.token, fetchAll]);
 
   if (!isMounted) return <div className="loadingCard">Cargando dashboard...</div>;
   if (loading) return <div className="loadingCard">Cargando dashboard...</div>;

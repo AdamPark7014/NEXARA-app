@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import ClientLocationPicker, { ClientLocationValue } from './ClientLocationPicker';
 import styles from './BranchesForm.module.css';
+import { io, Socket } from 'socket.io-client';
 
 export type Branch = {
   id: number;
@@ -93,6 +94,33 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
     setLogoPreview(url);
     return () => URL.revokeObjectURL(url);
   }, [logoFile]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    const socketUrl = apiUrl.replace(/[\/.]+$/, '').replace(/\/+api\/?$/, '');
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        onBranchSaved();
+      }, 300);
+    };
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['Branch', 'ClientBranch', 'ClientPortalBranch'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      socket.disconnect();
+    };
+  }, [token, apiUrl, onBranchSaved]);
 
   const getAssetUrl = (url?: string | null) => {
     if (!url) return '';

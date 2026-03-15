@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useUser } from '@/components/UserContext';
 import styles from './OrderTemplatesManager.module.css';
+import { io, Socket } from 'socket.io-client';
 
 type TemplateSections = {
   showClientInfo: boolean;
@@ -147,12 +148,7 @@ export default function OrderTemplatesManager() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<TemplateForm>(defaultForm());
 
-  useEffect(() => {
-    if (!user?.token) return;
-    fetchTemplates();
-  }, [user?.token]);
-
-  const fetchTemplates = async () => {
+  const fetchTemplates = useCallback(async () => {
     if (!user?.token) return;
     try {
       setLoading(true);
@@ -168,7 +164,39 @@ export default function OrderTemplatesManager() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiUrl, user?.token]);
+
+  useEffect(() => {
+    if (!user?.token) return;
+    fetchTemplates();
+  }, [user?.token, fetchTemplates]);
+
+  useEffect(() => {
+    if (!user?.token) return;
+
+    const socketUrl = apiUrl.replace(/\/+api\/?$/, '');
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        fetchTemplates();
+      }, 250);
+    };
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['OrderTemplate', 'CotizacionVenta'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      socket.disconnect();
+    };
+  }, [apiUrl, user?.token, fetchTemplates]);
 
   const onFormChange = (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,

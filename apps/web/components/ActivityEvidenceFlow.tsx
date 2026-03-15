@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useUser } from './UserContext';
 import styles from './ActivityEvidenceFlow.module.css';
+import { io, Socket } from 'socket.io-client';
 
 interface ActivityOption {
   id: number;
@@ -103,6 +104,7 @@ const ActivityEvidenceFlow = () => {
 
       if (res.ok) {
         const data = await res.json();
+        const currentActivity = actividades.find((activity) => activity.id === activityId);
         setFlowData({
           activityId,
           step: data.status,
@@ -120,7 +122,7 @@ const ActivityEvidenceFlow = () => {
           exitLongitude: data.exitLongitude,
         });
 
-        if ((data.activity?.workType || selectedActivity?.workType) === 'PREVENTIVE_INVENTORY') {
+        if ((data.activity?.workType || currentActivity?.workType) === 'PREVENTIVE_INVENTORY') {
           const invRes = await fetch(buildApiUrl(`inventories/activity/${activityId}`), {
             headers: { Authorization: `Bearer ${user!.token}` },
           });
@@ -171,6 +173,33 @@ const ActivityEvidenceFlow = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!user?.token || !selectedActivityId) return;
+
+    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        handleActivitySelect(Number(selectedActivityId));
+      }, 350);
+    };
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['ActivityEvidence', 'Inventory', 'Activity'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      socket.disconnect();
+    };
+  }, [user?.token, API_URL, selectedActivityId]);
 
   // Capturar foto desde cámara
   const capturePhoto = async (): Promise<string> => {

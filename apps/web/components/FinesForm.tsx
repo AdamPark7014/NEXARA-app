@@ -1,8 +1,9 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import styles from './FinesForm.module.css';
+import { io, Socket } from 'socket.io-client';
 
 const FINE_TYPES = {
   actividad: {
@@ -89,6 +90,58 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
 
+  const loadUsers = useCallback(async () => {
+    if (!user?.token || !permisoSi) return;
+
+    const headers = { Authorization: `Bearer ${user.token}` };
+    const canUseAssignable =
+      hasPermission(user, PERMISSIONS.USERS_MANAGE) ||
+      hasPermission(user, PERMISSIONS.CONSOLE_ADMIN);
+    const canUseHierarchy = hasPermission(user, PERMISSIONS.ATTENDANCE_MANAGE);
+
+    if (!canUseAssignable && !canUseHierarchy) {
+      setUsuarios([]);
+      return;
+    }
+
+    try {
+      if (canUseAssignable) {
+        const assignableRes = await fetch(buildApiUrl('users/assignable'), { headers });
+        const assignableData = assignableRes.ok ? await assignableRes.json() : [];
+        const assignableUsers = Array.isArray(assignableData) ? assignableData : [];
+
+        if (assignableUsers.length > 0) {
+          setUsuarios(assignableUsers);
+          return;
+        }
+      }
+
+      if (!canUseHierarchy) {
+        setUsuarios([]);
+        return;
+      }
+
+      const week = getWeekRange(new Date());
+      const params = new URLSearchParams({ from: week.from, to: week.to });
+      const hierarchyRes = await fetch(buildApiUrl(`attendance/hierarchy/range?${params.toString()}`), { headers });
+      const hierarchyData = hierarchyRes.ok ? await hierarchyRes.json() : null;
+      const fallbackUsers = Array.isArray(hierarchyData?.users)
+        ? hierarchyData.users
+            .map((item: any) => ({
+              id: Number(item.userId),
+              nombre: item.userName || `Usuario ${item.userId}`,
+              email: item.email || '',
+              role: item.role,
+            }))
+            .filter((item: User) => Number.isFinite(item.id) && item.id !== user.id)
+        : [];
+
+      setUsuarios(fallbackUsers);
+    } catch {
+      setUsuarios([]);
+    }
+  }, [user?.token, user, permisoSi, API_URL]);
+
   // Verificar permisos - Admin y SuperAdmin pueden crear multas
   useEffect(() => {
     if (user) {
@@ -99,60 +152,35 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
 
   // Cargar lista de usuarios asignables según jerarquía
   useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
+
+  useEffect(() => {
     if (!user?.token || !permisoSi) return;
 
-    const headers = { Authorization: `Bearer ${user.token}` };
-    const canUseAssignable =
-      hasPermission(user, PERMISSIONS.USERS_MANAGE) ||
-      hasPermission(user, PERMISSIONS.CONSOLE_ADMIN);
-    const canUseHierarchy = hasPermission(user, PERMISSIONS.ATTENDANCE_MANAGE);
+    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const loadUsers = async () => {
-      if (!canUseAssignable && !canUseHierarchy) {
-        setUsuarios([]);
-        return;
-      }
-
-      try {
-        if (canUseAssignable) {
-          const assignableRes = await fetch(buildApiUrl('users/assignable'), { headers });
-          const assignableData = assignableRes.ok ? await assignableRes.json() : [];
-          const assignableUsers = Array.isArray(assignableData) ? assignableData : [];
-
-          if (assignableUsers.length > 0) {
-            setUsuarios(assignableUsers);
-            return;
-          }
-        }
-
-        if (!canUseHierarchy) {
-          setUsuarios([]);
-          return;
-        }
-
-        const week = getWeekRange(new Date());
-        const params = new URLSearchParams({ from: week.from, to: week.to });
-        const hierarchyRes = await fetch(buildApiUrl(`attendance/hierarchy/range?${params.toString()}`), { headers });
-        const hierarchyData = hierarchyRes.ok ? await hierarchyRes.json() : null;
-        const fallbackUsers = Array.isArray(hierarchyData?.users)
-          ? hierarchyData.users
-              .map((item: any) => ({
-                id: Number(item.userId),
-                nombre: item.userName || `Usuario ${item.userId}`,
-                email: item.email || '',
-                role: item.role,
-              }))
-              .filter((item: User) => Number.isFinite(item.id) && item.id !== user.id)
-          : [];
-
-        setUsuarios(fallbackUsers);
-      } catch {
-        setUsuarios([]);
-      }
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        loadUsers();
+      }, 300);
     };
 
-    loadUsers();
-  }, [user, user?.token, permisoSi]);
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['Usuario', 'User', 'Asistencia', 'Attendance'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      socket.disconnect();
+    };
+  }, [user?.token, permisoSi, API_URL, loadUsers]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

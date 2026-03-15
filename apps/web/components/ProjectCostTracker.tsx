@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useUser } from './UserContext';
 import styles from './ProjectCostTracker.module.css';
+import { io, Socket } from 'socket.io-client';
 
 interface ProjectCosts {
   costProducts: number;
@@ -39,12 +40,7 @@ export default function ProjectCostTracker({
   const [error, setError] = useState<string | null>(null);
   const [syncingViaticos, setSyncingViaticos] = useState(false);
 
-  useEffect(() => {
-    if (!token) return;
-    loadCosts();
-  }, [token, projectId]);
-
-  const loadCosts = async () => {
+  const loadCosts = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/ventas/proyectos/${projectId}/costos`, {
@@ -68,7 +64,41 @@ export default function ProjectCostTracker({
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, projectId, onCostsUpdated]);
+
+  useEffect(() => {
+    if (!token) return;
+    loadCosts();
+  }, [token, loadCosts]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    const socketUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api')
+      .replace(/[\/.]+$/, '')
+      .replace(/\/+api\/?$/, '');
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        loadCosts();
+      }, 250);
+    };
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['ProyectoVenta', 'Project', 'Viatico', 'CotizacionVenta'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      socket.disconnect();
+    };
+  }, [token, loadCosts]);
 
   const handleSaveCosts = async () => {
     try {

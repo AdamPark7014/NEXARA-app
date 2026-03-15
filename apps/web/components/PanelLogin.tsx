@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { io, Socket } from "socket.io-client";
 import { useUser } from "./UserContext";
 import { hasPermission, PERMISSIONS } from "../lib/permissions";
 import { getDeviceIdentityHeaders } from "@/lib/device-identity";
@@ -25,6 +26,31 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
   const [showPassword, setShowPassword] = useState(false);
   const { setUser } = useUser();
   const router = useRouter();
+
+  useEffect(() => {
+    const socketUrl = (process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/$/, '');
+    const socket: Socket = io(socketUrl, { transports: ['websocket', 'polling'] });
+
+    let clearErrorTimeout: ReturnType<typeof setTimeout> | null = null;
+    const relevantModels = new Set(['user', 'role', 'department']);
+
+    const onEntityUpdated = (event: { model?: string }) => {
+      const normalizedModel = event?.model?.toLowerCase();
+      if (!normalizedModel || !relevantModels.has(normalizedModel)) return;
+
+      if (clearErrorTimeout) clearTimeout(clearErrorTimeout);
+      clearErrorTimeout = setTimeout(() => {
+        setError('');
+      }, 300);
+    };
+
+    socket.on('entity:updated', onEntityUpdated);
+    return () => {
+      if (clearErrorTimeout) clearTimeout(clearErrorTimeout);
+      socket.off('entity:updated', onEntityUpdated);
+      socket.disconnect();
+    };
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

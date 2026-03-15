@@ -1,7 +1,8 @@
 "use client";
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useUser } from './UserContext';
 import styles from './ToolRequestForm.module.css';
+import { io, Socket } from 'socket.io-client';
 
 interface ToolRequestFormProps {
   onSuccess?: () => void;
@@ -45,6 +46,34 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
   const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
   const [dragOverPhoto, setDragOverPhoto] = useState<'general' | 'specifications' | null>(null);
 
+  const searchInventory = useCallback(async (rawQuery: string) => {
+    const query = rawQuery.trim();
+    if (!user?.token || query.length < 2) {
+      setInventoryOptions([]);
+      return;
+    }
+
+    try {
+      setInventoryLoading(true);
+      const params = new URLSearchParams({ q: query });
+      const response = await fetch(buildApiUrl(`tool-requests/inventory/search?${params.toString()}`), {
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+        },
+      });
+
+      if (!response.ok) {
+        setInventoryOptions([]);
+        return;
+      }
+
+      const payload = await response.json();
+      setInventoryOptions(Array.isArray(payload) ? payload : []);
+    } finally {
+      setInventoryLoading(false);
+    }
+  }, [user?.token, API_URL]);
+
   const applyPhotoFile = (type: 'general' | 'specifications', file: File) => {
     if (!file.type.startsWith('image/')) {
       setError('Solo se permiten imágenes');
@@ -87,35 +116,46 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
   }, [photoStep]);
 
   useEffect(() => {
-    if (!user?.token || inventoryQuery.trim().length < 2) {
+    if (inventoryQuery.trim().length < 2) {
       setInventoryOptions([]);
       return;
     }
 
     const timeout = setTimeout(async () => {
-      try {
-        setInventoryLoading(true);
-        const params = new URLSearchParams({ q: inventoryQuery.trim() });
-        const response = await fetch(buildApiUrl(`tool-requests/inventory/search?${params.toString()}`), {
-          headers: {
-            Authorization: `Bearer ${user.token}`,
-          },
-        });
-
-        if (!response.ok) {
-          setInventoryOptions([]);
-          return;
-        }
-
-        const payload = await response.json();
-        setInventoryOptions(Array.isArray(payload) ? payload : []);
-      } finally {
-        setInventoryLoading(false);
-      }
+      searchInventory(inventoryQuery);
     }, 280);
 
     return () => clearTimeout(timeout);
-  }, [inventoryQuery, user?.token]);
+  }, [inventoryQuery, searchInventory]);
+
+  useEffect(() => {
+    if (!user?.token) return;
+
+    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        if (inventoryQuery.trim().length >= 2) {
+          searchInventory(inventoryQuery);
+        }
+      }, 300);
+    };
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['ToolInventoryItem', 'Inventory', 'Herramienta'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      socket.disconnect();
+    };
+  }, [user?.token, API_URL, inventoryQuery, searchInventory]);
 
   const validate = () => {
     if (!toolName || toolName.length < 3) {

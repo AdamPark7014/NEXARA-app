@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useUser } from './UserContext';
 import PDFViewer from './PDFViewer';
+import { io, Socket } from 'socket.io-client';
 import {
   getSalesAuditEvents,
   getSalesExecutiveInsights,
@@ -55,7 +56,7 @@ export default function SalesReportsDashboard({
     return `${styles.statusBadge} ${styles.statusOffTrack}`;
   };
 
-  const fetchMetrics = async () => {
+  const fetchMetrics = useCallback(async () => {
     if (!user?.token) return;
     setLoading(true);
     setError(null);
@@ -78,11 +79,40 @@ export default function SalesReportsDashboard({
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.token, currentPeriod]);
 
   useEffect(() => {
     fetchMetrics();
-  }, [user?.token, currentPeriod]);
+  }, [fetchMetrics]);
+
+  useEffect(() => {
+    if (!user?.token) return;
+
+    const socketUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api')
+      .replace(/[\/.]+$/, '')
+      .replace(/\/+api\/?$/, '');
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        fetchMetrics();
+      }, 300);
+    };
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['OportunidadVenta', 'Opportunity', 'CotizacionVenta', 'ProyectoVenta'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      socket.disconnect();
+    };
+  }, [user?.token, fetchMetrics]);
 
   const handlePeriodChange = (newPeriod: 'week' | 'month' | 'year') => {
     setCurrentPeriod(newPeriod);

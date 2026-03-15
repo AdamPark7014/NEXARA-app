@@ -1,7 +1,8 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useUser } from './UserContext';
 import styles from './VehicleRequestForm.module.css';
+import { io, Socket } from 'socket.io-client';
 
 
 
@@ -31,25 +32,67 @@ const VehicleRequestForm: React.FC<VehicleRequestFormProps> = ({ actividadId }) 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
 
-  useEffect(() => {
+  const fetchVehicles = useCallback(async () => {
     if (!user?.token) return;
-    fetch(buildApiUrl('vehicles/inventory'), {
-      headers: { Authorization: `Bearer ${user.token}` },
-    })
-      .then((res) => res.ok ? res.json() : [])
-      .then((data) => setVehicles(Array.isArray(data) ? data : []))
-      .catch(() => setVehicles([]));
-  }, [user?.token]);
+    try {
+      const res = await fetch(buildApiUrl('vehicles/inventory'), {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      const data = res.ok ? await res.json() : [];
+      setVehicles(Array.isArray(data) ? data : []);
+    } catch {
+      setVehicles([]);
+    }
+  }, [user?.token, API_URL]);
+
+  const fetchActivities = useCallback(async () => {
+    if (!user?.token || actividadId) return;
+    try {
+      const res = await fetch(buildApiUrl('activities'), {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      const data = res.ok ? await res.json() : [];
+      setActividades(Array.isArray(data) ? data : []);
+    } catch {
+      setActividades([]);
+    }
+  }, [user?.token, actividadId, API_URL]);
 
   useEffect(() => {
-    if (!user?.token || actividadId) return;
-    fetch(buildApiUrl('activities'), {
-      headers: { Authorization: `Bearer ${user.token}` },
-    })
-      .then((res) => res.ok ? res.json() : [])
-      .then((data) => setActividades(Array.isArray(data) ? data : []))
-      .catch(() => setActividades([]));
-  }, [user?.token, actividadId]);
+    fetchVehicles();
+  }, [fetchVehicles]);
+
+  useEffect(() => {
+    fetchActivities();
+  }, [fetchActivities]);
+
+  useEffect(() => {
+    if (!user?.token) return;
+
+    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        fetchVehicles();
+        fetchActivities();
+      }, 300);
+    };
+
+    socket.on('entity:updated', (payload: { model?: string }) => {
+      if (!payload?.model) return;
+      if (['Vehiculo', 'Vehicle', 'Actividad', 'Activity'].includes(payload.model)) {
+        scheduleRefresh();
+      }
+    });
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      socket.disconnect();
+    };
+  }, [user?.token, API_URL, fetchVehicles, fetchActivities]);
 
   const validate = () => {
     const actividadFinal = actividadId || actividadSeleccionada;
