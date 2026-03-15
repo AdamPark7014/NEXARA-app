@@ -232,12 +232,12 @@ export default function MyBranchesPage() {
         <ul className={consoleStyles.sidebarMenu}>
           <li className={consoleStyles.sidebarMenuItem}>
             <a href="..?tab=profile" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
-              Mi perfil corporativo
+              👤 Mi perfil corporativo
             </a>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
             <a href="." className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${consoleStyles.active}`}>
-              Gestión de sucursales
+              🏬 Gestión de sucursales
             </a>
           </li>
         </ul>
@@ -246,27 +246,27 @@ export default function MyBranchesPage() {
         <ul className={consoleStyles.sidebarMenu}>
           <li className={consoleStyles.sidebarMenuItem}>
             <a href="..?tab=tickets" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
-              Estado de tickets
+              🎫 Estado de tickets
             </a>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
             <a href="..?tab=new-ticket" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
-              Nueva solicitud
+              ➕ Nueva solicitud
             </a>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
             <a href="..?tab=profile" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
-              Perfil corporativo
+              🏢 Perfil corporativo
             </a>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
             <a href="." className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${consoleStyles.active}`}>
-              Mis sucursales
+              🗂️ Mis sucursales
             </a>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
             <button type="button" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`} onClick={handleLogout}>
-              Cerrar sesión
+              ⎋ Cerrar sesión
             </button>
           </li>
         </ul>
