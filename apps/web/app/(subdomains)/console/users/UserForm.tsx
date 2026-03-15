@@ -386,7 +386,7 @@ export default function UserForm({
           <label className="checkboxItem"><input type="checkbox" name="accesoGestionCvs" checked={form.accesoGestionCvs} onChange={handleChange} /> Gestión de CVs</label>
           <label className="checkboxItem"><input type="checkbox" name="accesoPanelVentas" checked={form.accesoPanelVentas} onChange={handleChange} /> Panel Ventas</label>
           {user?.isSuperAdmin && <label className="checkboxItem"><input type="checkbox" name="accesoContabilidad" checked={form.accesoContabilidad} onChange={handleChange} /> Panel Contabilidad</label>}
-          <label className="checkboxItem"><input type="checkbox" name="accesoCotizaciones" checked={form.accesoCotizaciones} onChange={handleChange} /> Panel Cotizaciones</label>
+          <label className="checkboxItem"><input type="checkbox" name="accesoCotizaciones" checked={form.accesoCotizaciones} onChange={handleChange} /> Pestaña de cotizaciones</label>
         </div>
       </div>
 
