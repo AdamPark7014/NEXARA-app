@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
+import { useTheme } from "@/components/ThemeContext";
 import { getAccessiblePanels } from "@/lib/panel-routing";
 import BranchesForm, { Branch } from "../../../../components/BranchesForm";
 import consoleStyles from "../../console/console.module.css";
@@ -28,6 +29,7 @@ type ClientProfile = {
 
 export default function MyBranchesPage() {
   const { user, logout } = useUser();
+  const { darkMode, toggleDarkMode } = useTheme();
   const router = useRouter();
   const canAccessTicketsPanel = Boolean(user && getAccessiblePanels(user).some((panel) => panel.key === "tickets"));
   // Inicializar sesión desde sessionStorage directamente
@@ -215,11 +217,6 @@ export default function MyBranchesPage() {
               : undefined
           }
         >
-        <div className={consoleStyles.sidebarLogo}>
-          <span className={consoleStyles.brandMark}>NEXARA</span>
-          <span className={consoleStyles.brandSub}>Portal</span>
-        </div>
-
         <div className={consoleStyles.sidebarUser}>
           <div className={consoleStyles.sidebarAvatar}>
             {session.client.logoUrl ? (
@@ -249,9 +246,9 @@ export default function MyBranchesPage() {
             </a>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
-            <a href="." className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${consoleStyles.active}`}>
+            <button type="button" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${consoleStyles.active}`}>
               🏬 Gestión de sucursales
-            </a>
+            </button>
           </li>
         </ul>
 
@@ -272,10 +269,18 @@ export default function MyBranchesPage() {
               🏢 Perfil corporativo
             </a>
           </li>
+        </ul>
+
+        <div className={consoleStyles.menuTitle}>Sesión</div>
+        <ul className={consoleStyles.sidebarMenu}>
           <li className={consoleStyles.sidebarMenuItem}>
-            <a href="." className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${consoleStyles.active}`}>
-              🗂️ Mis sucursales
-            </a>
+            <button
+              type="button"
+              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
+              onClick={toggleDarkMode}
+            >
+              {darkMode ? "☀️ Vista clara" : "🌙 Vista oscura"}
+            </button>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
             <button type="button" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`} onClick={handleLogout}>
