@@ -306,10 +306,6 @@ export default function BranchTicketsPage() {
               : undefined
           }
         >
-        <div className={consoleStyles.sidebarLogo}>
-          <span className={consoleStyles.brandMark}>NEXARA</span>
-          <span className={consoleStyles.brandSub}>Sucursal</span>
-        </div>
         <div className={consoleStyles.sidebarUser}>
           <div className={consoleStyles.sidebarAvatar}>
             <span className={consoleStyles.sidebarName}>{(profile?.name || session.branch.name).slice(0, 2).toUpperCase()}</span>

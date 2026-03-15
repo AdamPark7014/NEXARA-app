@@ -7,7 +7,7 @@ export default function LoginPage() {
     <PanelLogin
       redirectTo="/dashboard"
       title="Iniciar sesion"
-      subtitle="Accede a tu cuenta NEXARA para gestionar tu operacion diaria."
+      subtitle="Ingresa a tu cuenta de Nexara"
     />
   );
 }

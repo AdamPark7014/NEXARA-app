@@ -641,10 +641,6 @@ export default function ClientTicketsPage() {
               : undefined
           }
         >
-        <div className={consoleStyles.sidebarLogo}>
-          <span className={consoleStyles.brandMark}>NEXARA</span>
-          <span className={consoleStyles.brandSub}>Portal</span>
-        </div>
         <div className={consoleStyles.sidebarUser}>
           <div className={consoleStyles.sidebarAvatar}>
             {session.client.logoUrl ? (
