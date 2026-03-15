@@ -272,43 +272,43 @@ export default function VentasGestionVendedoresPage() {
       {error && <div className={styles.error}>{error}</div>}
 
       <div className={styles.kpiGrid}>
-        <article className={styles.kpiCard}>
-          <p className={styles.kpiLabel}>Pipeline activo</p>
+        <article className="card" style={{ display: "grid", gap: 6 }}>
+          <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-secondary)" }}>Pipeline activo</p>
           <h3>{formatMoney(metrics?.pipelineValue || 0)}</h3>
           <span>{metrics?.opportunityCount || 0} oportunidades</span>
         </article>
-        <article className={styles.kpiCard}>
-          <p className={styles.kpiLabel}>Ingreso total</p>
+        <article className="card" style={{ display: "grid", gap: 6 }}>
+          <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-secondary)" }}>Ingreso total</p>
           <h3>{formatMoney(metrics?.totalRevenue || 0)}</h3>
           <span>Margen promedio {Number(metrics?.averageMargin || 0).toFixed(1)}%</span>
         </article>
-        <article className={styles.kpiCard}>
-          <p className={styles.kpiLabel}>Vendedores activos</p>
+        <article className="card" style={{ display: "grid", gap: 6 }}>
+          <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-secondary)" }}>Vendedores activos</p>
           <h3>{attendanceInsights.activeUsers}</h3>
           <span>Con actividad operativa registrada</span>
         </article>
-        <article className={styles.kpiCard}>
-          <p className={styles.kpiLabel}>Puntualidad diaria</p>
+        <article className="card" style={{ display: "grid", gap: 6 }}>
+          <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-secondary)" }}>Puntualidad diaria</p>
           <h3>{attendanceInsights.punctualityRate.toFixed(0)}%</h3>
           <span>Entrada antes de 9:15 AM</span>
         </article>
-        <article className={styles.kpiCard}>
-          <p className={styles.kpiLabel}>Productividad media</p>
+        <article className="card" style={{ display: "grid", gap: 6 }}>
+          <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-secondary)" }}>Productividad media</p>
           <h3>{attendanceInsights.averageProductivity.toFixed(1)}</h3>
           <span>Score promedio del equipo</span>
         </article>
-        <article className={styles.kpiCard}>
-          <p className={styles.kpiLabel}>Vendedores en riesgo</p>
+        <article className="card" style={{ display: "grid", gap: 6 }}>
+          <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-secondary)" }}>Vendedores en riesgo</p>
           <h3>{Math.max(attendanceInsights.lowProductivityUsers, cockpit?.summary.coachingQueue || 0)}</h3>
           <span>Requieren coaching inmediato</span>
         </article>
       </div>
 
       <div className={styles.gridTwo}>
-        <article className={styles.card}>
+        <article className="card">
           <h2>Leaderboard comercial</h2>
           <div className={styles.tableWrapper}>
-            <table className={styles.table}>
+            <table className="table">
               <thead>
                 <tr>
                   <th>Vendedor</th>
@@ -340,7 +340,7 @@ export default function VentasGestionVendedoresPage() {
           </div>
         </article>
 
-        <article className={styles.card}>
+        <article className="card">
           <h2>Prioridades de coaching</h2>
           <ul className={styles.priorityList}>
             {(cockpit?.coachingPriorities || []).slice(0, 10).map((item) => (
@@ -357,10 +357,10 @@ export default function VentasGestionVendedoresPage() {
         </article>
       </div>
 
-      <article className={styles.card}>
+      <article className="card">
         <h2>Verificación diaria de productividad</h2>
         <div className={styles.tableWrapper}>
-          <table className={styles.table}>
+          <table className="table">
             <thead>
               <tr>
                 <th>Vendedor</th>
@@ -390,7 +390,7 @@ export default function VentasGestionVendedoresPage() {
         </div>
       </article>
 
-      <article className={styles.card}>
+      <article className="card">
         <h2>Focos rojos y acciones sugeridas</h2>
         <ul className={styles.alertList}>
           {riskRows.map((risk) => (
