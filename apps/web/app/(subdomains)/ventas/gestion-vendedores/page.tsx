@@ -342,17 +342,17 @@ export default function VentasGestionVendedoresPage() {
 
         <article className="card">
           <h2>Prioridades de coaching</h2>
-          <ul className={styles.priorityList}>
+          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
             {(cockpit?.coachingPriorities || []).slice(0, 10).map((item) => (
-              <li key={item.opportunityId} className={styles.priorityItem}>
+              <li key={item.opportunityId} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "10px 12px" }}>
                 <div>
                   <strong>{item.ownerName}</strong>
-                  <p>{item.title}</p>
+                  <p style={{ margin: 0 }}>{item.title}</p>
                 </div>
-                <span className={styles.riskPill}>Riesgo {item.riskScore}</span>
+                <span style={{ flexShrink: 0, fontSize: "0.75rem", padding: "3px 8px", borderRadius: 999, background: "rgba(241,139,31,0.14)", color: "#d3781b" }}>Riesgo {item.riskScore}</span>
               </li>
             ))}
-            {!cockpit?.coachingPriorities?.length && <li className={styles.empty}>Sin prioridades activas.</li>}
+            {!cockpit?.coachingPriorities?.length && <li style={{ opacity: 0.5, padding: "8px 0" }}>Sin prioridades activas.</li>}
           </ul>
         </article>
       </div>
@@ -392,15 +392,15 @@ export default function VentasGestionVendedoresPage() {
 
       <article className="card">
         <h2>Focos rojos y acciones sugeridas</h2>
-        <ul className={styles.alertList}>
+        <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
           {riskRows.map((risk) => (
-            <li key={risk.key} className={styles.alertItem}>
+            <li key={risk.key} className="card" style={{ display: "grid", gap: 4, padding: "10px 12px" }}>
               <strong>{risk.seller}</strong>
               <span>{risk.area}</span>
-              <p>{risk.signal}</p>
+              <p style={{ margin: 0 }}>{risk.signal}</p>
             </li>
           ))}
-          {riskRows.length === 0 && <li className={styles.empty}>Sin alertas críticas detectadas.</li>}
+          {riskRows.length === 0 && <li style={{ opacity: 0.5, padding: "8px 0" }}>Sin alertas críticas detectadas.</li>}
         </ul>
       </article>
     </section>
