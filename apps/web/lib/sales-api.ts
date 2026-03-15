@@ -265,9 +265,17 @@ type FetchInit = RequestInit & {
   token: string;
 };
 
-const getErrorMessage = (payload: unknown, fallback: string) => {
+const getErrorMessage = (payload: unknown, fallback: string, status?: number) => {
+  const serviceUnavailableMessage =
+    "Servicio temporalmente no disponible (502/5xx). Intenta de nuevo en unos minutos.";
+
   if (typeof payload === "string" && payload.trim()) {
-    return payload;
+    const text = payload.trim();
+    const isHtmlError = /<html|<!doctype/i.test(text);
+    if (isHtmlError) {
+      return status && status >= 500 ? serviceUnavailableMessage : fallback;
+    }
+    return text;
   }
   if (payload && typeof payload === "object") {
     const maybeMessage = (payload as { message?: unknown }).message;
@@ -304,7 +312,7 @@ const apiRequest = async <T>(path: string, init: FetchInit, fallbackError = "Err
   const payload = parseResponsePayload(text);
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(payload, fallbackError));
+    throw new Error(getErrorMessage(payload, fallbackError, response.status));
   }
 
   return payload as T;
