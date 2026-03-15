@@ -258,8 +258,13 @@ const ConsoleAttendanceTable = () => {
         headers: { Authorization: `Bearer ${user.token}` },
       });
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Error al cargar estadisticas");
+        const raw = await res.text();
+        const isHtmlError = /<html|<!doctype/i.test(raw);
+        const fallbackMessage =
+          res.status >= 500
+            ? "Servicio de asistencia temporalmente no disponible. Intenta de nuevo en unos minutos."
+            : "No se pudieron cargar las estadisticas de asistencia.";
+        throw new Error(isHtmlError ? fallbackMessage : raw?.trim() || fallbackMessage);
       }
       const payload = await res.json();
       console.log('📊 Datos de asistencia recibidos:', {

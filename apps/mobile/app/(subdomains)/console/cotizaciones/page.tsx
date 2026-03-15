@@ -812,7 +812,7 @@ export default function CotizacionesPage() {
       </section>
 
       <style jsx>{`
-        .quoteShell {
+        :global(.quoteShell) {
           --quote-surface: rgba(255, 255, 255, 0.96);
           --quote-panel: rgba(236, 246, 255, 0.92);
           --quote-border: rgba(15, 106, 214, 0.24);
@@ -824,7 +824,7 @@ export default function CotizacionesPage() {
           --quote-deep-2: rgba(213, 231, 252, 0.8);
         }
 
-        :global(body.dark) .quoteShell {
+        :global(body.dark .quoteShell) {
           --quote-surface: rgba(8, 22, 40, 0.94);
           --quote-panel: rgba(12, 32, 58, 0.92);
           --quote-border: rgba(64, 149, 235, 0.25);

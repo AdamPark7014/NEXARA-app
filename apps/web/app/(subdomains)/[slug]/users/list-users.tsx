@@ -328,7 +328,7 @@ export default function ListUsers() {
   return (
     <>
       <div style={tableWrapStyle}>
-        <table className="usersTable">
+        <table className="table">
           <colgroup>
             <col style={{ width: "82px" }} />
             <col style={{ width: "27%" }} />
