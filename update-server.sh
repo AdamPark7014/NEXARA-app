@@ -5,6 +5,16 @@
 
 set -e
 
+# Forzar builds en serie para evitar sobrecarga/memoria por paralelismo.
+BUILD_MODE="serial"
+
+run_build_serial() {
+  local target="$1"
+  shift
+  echo "🧱 Compilando ${target} en serie (${BUILD_MODE})..."
+  "$@"
+}
+
 echo "🔄 Actualizando NEXARA-app desde GitHub..."
 
 # 1. Ir al directorio del proyecto
@@ -49,7 +59,7 @@ npm install --legacy-peer-deps
 npx prisma generate
 npx prisma migrate deploy
 node ../../scripts/clear-build-cache.js api
-npm run build
+run_build_serial "Backend" npm run build
 
 # 7. Actualizar Frontend (Web)
 echo "🎨 Actualizando Frontend..."
@@ -57,7 +67,7 @@ cd ../web
 rm -rf .next node_modules package-lock.json
 npm install --legacy-peer-deps
 node ../../scripts/clear-build-cache.js web
-NODE_OPTIONS="--max_old_space_size=2048" npm run build
+run_build_serial "Frontend Web" env NODE_OPTIONS="--max_old_space_size=2048" npm run build
 
 # 8. Actualizar Frontend (Mobile)
 echo "📱 Actualizando Frontend Mobile..."
@@ -65,7 +75,7 @@ cd ../mobile
 rm -rf .next node_modules package-lock.json
 npm install --legacy-peer-deps
 node ../../scripts/clear-build-cache.js mobile
-NODE_OPTIONS="--max_old_space_size=2048" npm run build
+run_build_serial "Frontend Mobile" env NODE_OPTIONS="--max_old_space_size=2048" npm run build
 
 # 9. Reiniciar servicios con PM2
 echo "🚀 Reiniciando servicios..."
