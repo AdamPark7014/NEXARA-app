@@ -92,7 +92,7 @@ export default function PanelHubPage() {
           {filteredPanels.map((panel) => (
             <article key={panel.key} className={styles.card}>
               <div className={styles.cardHeader}>
-                <h2 className={styles.cardTitle}>{panel.name}</h2>
+                <h2 className={styles.cardTitle}><span className={styles.cardIcon}>{panel.icon}</span>{panel.name}</h2>
                 <span className={styles.pill}>Disponible</span>
               </div>
               <p className={styles.cardDescription}>{panel.description}</p>

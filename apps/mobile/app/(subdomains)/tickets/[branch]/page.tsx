@@ -327,7 +327,7 @@ export default function BranchTicketsPage() {
                 setMobileMenuOpen(false);
               }}
             >
-              Nueva solicitud
+              ➕ Nueva solicitud
             </button>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
@@ -339,7 +339,7 @@ export default function BranchTicketsPage() {
                 setMobileMenuOpen(false);
               }}
             >
-              Inventarios
+              🧰 Inventarios
             </button>
           </li>
         </ul>
@@ -348,7 +348,7 @@ export default function BranchTicketsPage() {
         <ul className={consoleStyles.sidebarMenu}>
           <li className={consoleStyles.sidebarMenuItem}>
             <button type="button" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`} onClick={handleLogout}>
-              Cerrar sesión
+              ⎋ Cerrar sesión
             </button>
           </li>
         </ul>
