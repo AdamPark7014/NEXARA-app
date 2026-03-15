@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
+import { useTheme } from "@/components/ThemeContext";
 import { getAccessiblePanels } from "@/lib/panel-routing";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
 import TicketsInventoryManager from "@/components/TicketsInventoryManager";
@@ -91,6 +92,7 @@ type PendingFeedback = {
 
 export default function ClientTicketsPage() {
   const { user, logout } = useUser();
+  const { darkMode, toggleDarkMode } = useTheme();
   const router = useRouter();
   const canAccessTicketsPanel = useMemo(() => getAccessiblePanels(user).some((panel) => panel.key === "tickets"), [user]);
   // Inicializar sesión desde sessionStorage directamente
@@ -722,6 +724,15 @@ export default function ClientTicketsPage() {
 
         <div className={consoleStyles.menuTitle}>Sesión</div>
         <ul className={consoleStyles.sidebarMenu}>
+          <li className={consoleStyles.sidebarMenuItem}>
+            <button
+              type="button"
+              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
+              onClick={toggleDarkMode}
+            >
+              {darkMode ? "☀️ Vista clara" : "🌙 Vista oscura"}
+            </button>
+          </li>
           <li className={consoleStyles.sidebarMenuItem}>
             <a
               href="/paneles"

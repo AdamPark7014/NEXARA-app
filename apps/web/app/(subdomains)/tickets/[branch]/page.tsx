@@ -4,6 +4,7 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import PanelLogin from "@/components/PanelLogin";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
 import TicketsInventoryManager from "@/components/TicketsInventoryManager";
+import { useTheme } from "@/components/ThemeContext";
 import consoleStyles from "../../console/console.module.css";
 import styles from "../tickets.module.css";
 
@@ -37,6 +38,7 @@ type BranchRequest = {
 };
 
 export default function BranchTicketsPage() {
+  const { darkMode, toggleDarkMode } = useTheme();
   const [session, setSession] = useState<BranchSession | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -335,6 +337,15 @@ export default function BranchTicketsPage() {
 
         <div className={consoleStyles.menuTitle}>Sesión</div>
         <ul className={consoleStyles.sidebarMenu}>
+          <li className={consoleStyles.sidebarMenuItem}>
+            <button
+              type="button"
+              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
+              onClick={toggleDarkMode}
+            >
+              {darkMode ? "☀️ Vista clara" : "🌙 Vista oscura"}
+            </button>
+          </li>
           <li className={consoleStyles.sidebarMenuItem}>
             <button type="button" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`} onClick={handleLogout}>
               ⎋ Cerrar sesión

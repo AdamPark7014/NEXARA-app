@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
+import { useTheme } from "@/components/ThemeContext";
 import { getAccessiblePanels } from "@/lib/panel-routing";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
 import TicketsInventoryManager from "@/components/TicketsInventoryManager";
@@ -39,6 +40,7 @@ type BranchRequest = {
 
 export default function BranchTicketsPage() {
   const { user, logout } = useUser();
+  const { darkMode, toggleDarkMode } = useTheme();
   const canAccessTicketsPanel = Boolean(user && getAccessiblePanels(user).some((panel) => panel.key === "tickets"));
   const [session, setSession] = useState<BranchSession | null>(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -346,6 +348,15 @@ export default function BranchTicketsPage() {
 
         <div className={consoleStyles.menuTitle}>Sesión</div>
         <ul className={consoleStyles.sidebarMenu}>
+          <li className={consoleStyles.sidebarMenuItem}>
+            <button
+              type="button"
+              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
+              onClick={toggleDarkMode}
+            >
+              {darkMode ? "☀️ Vista clara" : "🌙 Vista oscura"}
+            </button>
+          </li>
           <li className={consoleStyles.sidebarMenuItem}>
             <button type="button" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`} onClick={handleLogout}>
               ⎋ Cerrar sesión

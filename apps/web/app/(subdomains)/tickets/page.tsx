@@ -4,6 +4,7 @@ import { io, Socket } from "socket.io-client";
 import PanelLogin from "@/components/PanelLogin";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
 import TicketsInventoryManager from "@/components/TicketsInventoryManager";
+import { useTheme } from "@/components/ThemeContext";
 import consoleStyles from "../console/console.module.css";
 import styles from "./tickets.module.css";
 
@@ -92,6 +93,7 @@ type PendingFeedback = {
 };
 
 export default function ClientTicketsPage() {
+  const { darkMode, toggleDarkMode } = useTheme();
   // Inicializar sesión desde sessionStorage directamente
   const [session, setSession] = useState<ClientSession | null>(() => {
     if (typeof window !== "undefined") {
@@ -721,6 +723,15 @@ export default function ClientTicketsPage() {
 
         <div className={consoleStyles.menuTitle}>Sesión</div>
         <ul className={consoleStyles.sidebarMenu}>
+          <li className={consoleStyles.sidebarMenuItem}>
+            <button
+              type="button"
+              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
+              onClick={toggleDarkMode}
+            >
+              {darkMode ? "☀️ Vista clara" : "🌙 Vista oscura"}
+            </button>
+          </li>
           <li className={consoleStyles.sidebarMenuItem}>
             <button
               type="button"
