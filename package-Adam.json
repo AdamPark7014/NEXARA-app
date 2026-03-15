@@ -1,0 +1,46 @@
+{
+  "name": "nexara-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/api",
+    "apps/web",
+    "apps/mobile"
+  ],
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
+    "@types/mocha": "^10.0.10",
+    "@types/multer": "^2.0.0",
+    "turbo": "^1.13.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev --parallel --filter=api --filter=web",
+    "dev:all": "turbo run dev --parallel",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:api": "npm run dev --workspace=apps/api",
+    "build": "turbo run build",
+    "start": "turbo run start",
+    "local:setup": "npm run prisma:generate --workspace=apps/api && npm run prisma:deploy --workspace=apps/api && npm run prisma:seed --workspace=apps/api",
+    "local:status": "npm run prisma:status --workspace=apps/api",
+    "local:dev": "turbo run dev --parallel"
+  },
+  "dependencies": {
+    "@nestjs/jwt": "^10.0.0",
+    "@nestjs/platform-socket.io": "^10.0.0",
+    "@nestjs/schedule": "^6.1.0",
+    "@nestjs/websockets": "^10.0.0",
+    "axios": "^1.13.2",
+    "basic-ftp": "^5.1.0",
+    "class-validator": "^0.14.3",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "multer": "^2.0.2",
+    "socket.io": "^4.8.3",
+    "winston": "^3.19.0",
+    "zod": "^4.3.5"
+  },
+  "overrides": {
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  }
+}

@@ -1,0 +1,1 @@
+.wrapper {  display: grid;  gap: 8px;}.label {  font-size: 12px;  color: var(--text-secondary);}.mapContainer {  border-radius: 12px;  overflow: hidden;  border: 1px solid rgba(15, 106, 214, 0.2);}.status {  font-size: 11px;  color: var(--text-secondary);}

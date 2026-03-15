@@ -1,0 +1,1 @@
+"C:\Program Files\nodejs\node.exe" C:\Users\adpoz\OneDrive\Documentos\SOFTWARE\NEXARA-app\node_modules\next\dist\server\lib\start-server.js

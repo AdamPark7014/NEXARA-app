@@ -63,14 +63,15 @@ export default function ContactoPage() {
   };
 
   return (
-    <main className={styles.container} aria-label="Página de contacto">
+    <main className={`${styles.container} ultra-corp-page ultra-corp-contacto ultra-corp-strict`} aria-label="Página de contacto">
       {/* Hero Section */}
       <section className={styles.hero}>
         <div className={styles.heroContent}>
+          <p className={styles.heroKicker}>NEXARA CONTACT CENTER</p>
           <h1 className={styles.heroTitle}>Contáctanos</h1>
           <p className={styles.heroSubtitle}>
-            Estamos listos para ayudarte a impulsar tu proyecto tecnológico.
-            Conversemos sobre tus necesidades y diseñemos juntos la solución ideal.
+            Estamos listos para ayudarte a impulsar tu proyecto tecnologico.
+            Cuanto mas contexto nos compartas, mas precisa sera nuestra propuesta.
           </p>
         </div>
       </section>
@@ -151,7 +152,7 @@ export default function ContactoPage() {
 
           {/* Quick Links */}
           <div className={styles.quickLinks}>
-            <h4>Enlaces rápidos</h4>
+            <h4>Enlaces rapidos</h4>
             <ul>
               <li>
                 <Link href="/nexara">Sobre nosotros</Link>
@@ -164,13 +165,22 @@ export default function ContactoPage() {
               </li>
             </ul>
           </div>
+
+          <div className={styles.quickLinks}>
+            <h4>Antes de contactarnos</h4>
+            <ul>
+              <li><span>1.</span> Describe el objetivo de negocio.</li>
+              <li><span>2.</span> Indica urgencia y fecha objetivo.</li>
+              <li><span>3.</span> Comparte alcance estimado o numero de sedes.</li>
+            </ul>
+          </div>
         </aside>
 
         {/* Contact Form */}
         <section className={styles.formSection}>
           <div className={styles.formHeader}>
-            <h2>Envíanos un mensaje</h2>
-            <p>Completa el formulario y nos pondremos en contacto contigo lo antes posible.</p>
+            <h2>Envia tu requerimiento</h2>
+            <p>Completa el formulario y un especialista te respondera con una ruta de accion clara.</p>
           </div>
 
           {!submitted ? (
@@ -192,7 +202,7 @@ export default function ContactoPage() {
 
                 <div className={styles.formField}>
                   <label htmlFor="contact-email">
-                    Correo electrónico <span className={styles.required}>*</span>
+                    Correo electronico <span className={styles.required}>*</span>
                   </label>
                   <input
                     id="contact-email"
@@ -231,7 +241,7 @@ export default function ContactoPage() {
 
               <div className={styles.formField}>
                 <label htmlFor="contact-category">
-                  ¿En qué podemos ayudarte? <span className={styles.required}>*</span>
+                  En que podemos ayudarte <span className={styles.required}>*</span>
                 </label>
                 <select
                   id="contact-category"
@@ -254,7 +264,7 @@ export default function ContactoPage() {
                   name="subject"
                   type="text"
                   required
-                  placeholder="Ej: Cotización de servicios, Problema con mi cuenta..."
+                  placeholder="Ej: Cotizacion de servicios, problema con mi cuenta..."
                   disabled={loading}
                 />
               </div>
@@ -309,7 +319,7 @@ export default function ContactoPage() {
               </button>
 
               <p className={styles.formNote}>
-                Al enviar este formulario, aceptas nuestra política de privacidad.
+                Al enviar este formulario, aceptas nuestra politica de privacidad.
               </p>
             </form>
           ) : (
@@ -322,8 +332,8 @@ export default function ContactoPage() {
               </div>
               <h3>¡Mensaje enviado exitosamente!</h3>
               <p>
-                Gracias por contactarnos. Hemos recibido tu mensaje y uno de nuestros
-                asesores se pondrá en contacto contigo dentro de las próximas 24 horas.
+                Gracias por contactarnos. Hemos recibido tu mensaje y un especialista
+                se pondra en contacto contigo dentro de las proximas 24 horas.
               </p>
               <div className={styles.successActions}>
                 <Link href="/" className={styles.primaryButton}>

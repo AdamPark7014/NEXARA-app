@@ -1,0 +1,582 @@
+:root {
+  --font-base: "Manrope", "Segoe UI", "Inter", "Helvetica Neue", sans-serif;
+  --font-heading: "Space Grotesk", "Manrope", "Segoe UI", sans-serif;
+
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+
+  --elev-1: 0 10px 24px rgba(8, 24, 42, 0.1);
+  --elev-2: 0 18px 40px rgba(8, 24, 42, 0.16);
+  --ring-soft: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent);
+
+  --control-height: 42px;
+  --control-padding-y: 0.62rem;
+  --control-padding-x: 0.75rem;
+  --table-cell-y: 0.75rem;
+  --table-cell-x: 0.75rem;
+
+  --content-max: 1240px;
+  --page-padding-x: clamp(14px, 3vw, 44px);
+  --page-padding-y: clamp(16px, 2vw, 28px);
+  --panel-padding-x: clamp(16px, 2.2vw, 28px);
+  --panel-padding-y: clamp(18px, 2.2vw, 28px);
+  --panel-gap: clamp(14px, 1.8vw, 22px);
+  --panel-sidebar-width: 280px;
+  --header-offset: 16px;
+  --public-header-height: 72px;
+  --panel-title-leading: 1.28;
+  --panel-title-tracking: -0.01em;
+  --panel-font-family: var(--font-base);
+
+  --motion-fast: 0.18s;
+  --motion-base: 0.28s;
+  --motion-slow: 0.44s;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Light theme: refined corporate palette with enhanced sophistication */
+body,
+body.light {
+  --background: #f8f9fc;
+  --background-elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f4f7fb;
+  --surface-3: #edf3f9;
+
+  --foreground: #0f1c2e;
+  --text-primary: #0f1c2e;
+  --text-secondary: #445668;
+  --text-tertiary: #6b7a8f;
+
+  --primary: #15a99d;
+  --primary-strong: #0b7a72;
+  --secondary: #36bcae;
+  --accent: #d66533;
+  --accent-strong: #c24e1e;
+  --support: #79d8ce;
+  --success: #1a8d6f;
+  --warning: #e67e15;
+  --danger: #c9423d;
+  --error: var(--danger);
+  --info: var(--primary);
+
+  --surface-light: color-mix(in srgb, var(--surface) 92%, var(--background));
+  --bg-secondary: color-mix(in srgb, var(--surface-2) 88%, var(--background));
+  --muted: color-mix(in srgb, var(--border) 68%, transparent);
+
+  --border: rgba(12, 71, 69, 0.14);
+  --border-strong: rgba(12, 71, 69, 0.26);
+  --shadow: 0 14px 32px rgba(10, 30, 52, 0.13);
+  --focus: rgba(21, 169, 157, 0.34);
+  --surface-clean: color-mix(in srgb, var(--surface) 96%, var(--background));
+  --surface-clean-soft: color-mix(in srgb, var(--surface-2) 92%, var(--background));
+  --stroke-clean: color-mix(in srgb, var(--primary) 20%, transparent);
+
+  /* Header / menu tokens with refined gradients and depth */
+  --header-bg: linear-gradient(142deg, #109b90 0%, #1fb0a4 40%, #6ed8cd 100%);
+  --header-border: rgba(110, 216, 205, 0.42);
+  --header-text: #ffffff;
+  --header-link: #ffffff;
+  --header-link-hover-bg: rgba(255, 255, 255, 0.18);
+  --header-link-active-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.16));
+
+  --menu-bg: linear-gradient(170deg, #0f9187 0%, #1ca79b 54%, #137f76 100%);
+  --menu-text: #ffffff;
+  --menu-muted: rgba(232, 255, 251, 0.86);
+  --menu-item-bg: rgba(255, 255, 255, 0.08);
+  --menu-item-hover-bg: rgba(255, 255, 255, 0.16);
+  --menu-item-active-bg: linear-gradient(135deg, rgba(121, 216, 206, 0.44), rgba(255, 255, 255, 0.24));
+
+  --public-title-gradient: linear-gradient(138deg, #0b7a72 0%, #15a99d 48%, #36bcae 100%);
+
+  --state-success-bg: color-mix(in srgb, var(--success) 12%, transparent);
+  --state-success-border: color-mix(in srgb, var(--success) 32%, transparent);
+  --state-success-text: color-mix(in srgb, var(--success) 88%, #0a3328);
+
+  --state-warning-bg: color-mix(in srgb, var(--warning) 13%, transparent);
+  --state-warning-border: color-mix(in srgb, var(--warning) 32%, transparent);
+  --state-warning-text: color-mix(in srgb, var(--warning) 90%, #482a0f);
+
+  --state-danger-bg: color-mix(in srgb, var(--danger) 12%, transparent);
+  --state-danger-border: color-mix(in srgb, var(--danger) 32%, transparent);
+  --state-danger-text: color-mix(in srgb, var(--danger) 88%, #481d1a);
+
+  --state-info-bg: color-mix(in srgb, var(--primary) 12%, transparent);
+  --state-info-border: color-mix(in srgb, var(--primary) 32%, transparent);
+  --state-info-text: color-mix(in srgb, var(--primary) 88%, #103835);
+
+  --brand-glass-primary: color-mix(in srgb, var(--primary) 16%, transparent);
+  --brand-glass-secondary: color-mix(in srgb, var(--secondary) 13%, transparent);
+
+  color-scheme: light;
+}
+
+/* Dark theme: sophisticated depth with enhanced elegance */
+body.dark {
+  --background: #090f19;
+  --background-elevated: #0f1721;
+  --surface: #11202f;
+  --surface-2: #152938;
+  --surface-3: #1b3546;
+
+  --foreground: #eaf4ff;
+  --text-primary: #eaf4ff;
+  --text-secondary: #c5d7eb;
+  --text-tertiary: #91acc7;
+
+  --primary: #64c0d4;
+  --primary-strong: #47aec4;
+  --secondary: #1f9f83;
+  --accent: #ed8219;
+  --accent-strong: #ff9427;
+  --support: #7fd4e8;
+  --success: #2fb896;
+  --warning: #f19f34;
+  --danger: #d46d6d;
+  --error: var(--danger);
+  --info: var(--primary);
+
+  --surface-light: color-mix(in srgb, var(--surface) 90%, var(--background));
+  --bg-secondary: color-mix(in srgb, var(--surface-2) 86%, var(--background));
+  --muted: color-mix(in srgb, var(--border) 68%, transparent);
+
+  --border: rgba(100, 160, 205, 0.22);
+  --border-strong: rgba(120, 180, 225, 0.38);
+  --shadow: 0 18px 42px rgba(0, 0, 0, 0.62);
+  --focus: rgba(100, 192, 212, 0.4);
+  --surface-clean: color-mix(in srgb, var(--surface) 94%, var(--background));
+  --surface-clean-soft: color-mix(in srgb, var(--surface-2) 90%, var(--background));
+  --stroke-clean: color-mix(in srgb, var(--primary) 24%, transparent);
+
+  --header-bg: linear-gradient(142deg, #0f2233 0%, #153247 46%, #1b415a 100%);
+  --header-border: rgba(102, 170, 205, 0.3);
+  --header-text: #e8f4ff;
+  --header-link: #e8f4ff;
+  --header-link-hover-bg: rgba(100, 192, 212, 0.14);
+  --header-link-active-bg: linear-gradient(135deg, rgba(73, 156, 186, 0.4), rgba(24, 61, 86, 0.54));
+
+  --menu-bg: linear-gradient(170deg, #0e1e2d 0%, #123044 54%, #10273a 100%);
+  --menu-text: #eaf5ff;
+  --menu-muted: rgba(205, 224, 242, 0.78);
+  --menu-item-bg: rgba(100, 192, 212, 0.08);
+  --menu-item-hover-bg: rgba(100, 192, 212, 0.14);
+  --menu-item-active-bg: linear-gradient(135deg, rgba(73, 156, 186, 0.42), rgba(34, 88, 120, 0.52));
+
+  --public-title-gradient: linear-gradient(138deg, #7fd4e8 0%, var(--success) 48%, var(--accent) 100%);
+
+  --state-success-bg: color-mix(in srgb, var(--success) 20%, transparent);
+  --state-success-border: color-mix(in srgb, var(--success) 42%, transparent);
+  --state-success-text: color-mix(in srgb, var(--success) 78%, #e2f9f1);
+
+  --state-warning-bg: color-mix(in srgb, var(--warning) 20%, transparent);
+  --state-warning-border: color-mix(in srgb, var(--warning) 42%, transparent);
+  --state-warning-text: color-mix(in srgb, var(--warning) 78%, #fff3de);
+
+  --state-danger-bg: color-mix(in srgb, var(--danger) 20%, transparent);
+  --state-danger-border: color-mix(in srgb, var(--danger) 42%, transparent);
+  --state-danger-text: color-mix(in srgb, var(--danger) 80%, #ffe6e6);
+
+  --state-info-bg: color-mix(in srgb, var(--primary) 20%, transparent);
+  --state-info-border: color-mix(in srgb, var(--primary) 42%, transparent);
+  --state-info-text: color-mix(in srgb, var(--primary) 80%, #e4f5ff);
+
+  --brand-glass-primary: color-mix(in srgb, var(--primary) 22%, transparent);
+  --brand-glass-secondary: color-mix(in srgb, var(--secondary) 17%, transparent);
+
+  color-scheme: dark;
+}
+
+body.density-compact {
+  --control-height: 36px;
+  --control-padding-y: 0.44rem;
+  --control-padding-x: 0.62rem;
+  --table-cell-y: 0.56rem;
+  --table-cell-x: 0.62rem;
+}
+
+body.density-cozy {
+  --control-height: 42px;
+  --control-padding-y: 0.62rem;
+  --control-padding-x: 0.75rem;
+  --table-cell-y: 0.75rem;
+  --table-cell-x: 0.75rem;
+}
+
+body {
+  font-family: var(--font-base);
+  color: var(--foreground);
+  line-height: 1.58;
+  letter-spacing: 0.003em;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background:
+    radial-gradient(circle at 8% -10%, rgba(121, 216, 206, 0.1), transparent 42%),
+    radial-gradient(circle at 94% -10%, rgba(67, 184, 171, 0.08), transparent 40%),
+    linear-gradient(180deg, var(--background) 0%, color-mix(in srgb, var(--surface-2) 90%, var(--background)) 100%);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: -20% -10% auto auto;
+  width: min(42vw, 520px);
+  aspect-ratio: 1;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(circle, color-mix(in srgb, var(--primary) 18%, transparent), transparent 64%);
+  filter: blur(18px);
+  opacity: 0.72;
+  animation: nexara-float 14s ease-in-out infinite;
+}
+
+@keyframes nexara-float {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-18px, 20px, 0) scale(1.06);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes nexara-fade-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.public-layout-wrapper {
+  min-height: 100vh;
+}
+
+.public-layout-content {
+  padding-top: var(--public-header-height);
+}
+
+/* Global polish pass for consistent, clean, professional feel */
+:where(button, .button, [type="button"], [type="submit"]) {
+  border-radius: var(--radius-md);
+  transition:
+    transform var(--motion-fast) ease,
+    box-shadow var(--motion-base) ease,
+    filter var(--motion-fast) ease,
+    background-color var(--motion-base) ease,
+    border-color var(--motion-base) ease;
+}
+
+:where(button, .button, .button-primary, .button-secondary, [type="button"], [type="submit"]):hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px color-mix(in srgb, var(--shadow) 52%, transparent);
+}
+
+:where(button, .button, .button-primary, .button-secondary, [type="button"], [type="submit"]):active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
+}
+
+:where(input, select, textarea) {
+  border-radius: var(--radius-sm);
+  transition:
+    border-color var(--motion-base) ease,
+    box-shadow var(--motion-base) ease,
+    background-color var(--motion-base) ease;
+}
+
+:where(.card, [class*="card"], [class*="Card"]) {
+  animation: nexara-fade-up var(--motion-slow) ease both;
+}
+
+:where(.card, [class*="card"], [class*="Card"]):hover {
+  box-shadow: 0 16px 32px color-mix(in srgb, var(--shadow) 58%, transparent);
+}
+
+/* Home landing sections controlled globally via data-ui attributes */
+body :where([data-ui="landing-news"],
+[data-ui="landing-metrics"],
+[data-ui="landing-qa"],
+[data-ui="landing-capabilities"],
+[data-ui="landing-solutions"],
+[data-ui="landing-delivery"],
+[data-ui="landing-clients"],
+[data-ui="landing-cta"],
+[data-ui="landing-recent-projects"]) {
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, transparent) !important;
+  border-radius: var(--radius-lg) !important;
+  background: linear-gradient(160deg, var(--surface-clean), var(--surface-clean-soft)) !important;
+  box-shadow:
+    var(--elev-1),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 55%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--primary) 8%, transparent) !important;
+}
+
+body :where([data-ui="metric-card"],
+[data-ui="capability-card"],
+[data-ui="solution-card"],
+[data-ui="delivery-card"],
+[data-ui="client-card"]) {
+  border-radius: var(--radius-md) !important;
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent) !important;
+  background: color-mix(in srgb, var(--surface) 97%, transparent) !important;
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--shadow) 56%, transparent) !important;
+}
+
+body :where([data-ui="landing-quicknav"]) {
+  border: 1px solid color-mix(in srgb, var(--primary) 26%, transparent) !important;
+  border-radius: 999px !important;
+  background: color-mix(in srgb, var(--surface) 94%, transparent) !important;
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--shadow) 45%, transparent) !important;
+}
+
+/* Extra pass: professional aqua styling for Inicio internals */
+body [data-ui="landing-recent-projects"] article,
+body [data-ui="landing-news"] [id="news-active-slide"],
+body [data-ui="landing-qa"],
+body [data-ui="landing-cta"] {
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent) !important;
+  border-radius: var(--radius-md) !important;
+  background: color-mix(in srgb, var(--surface) 96%, transparent) !important;
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--shadow) 54%, transparent) !important;
+}
+
+body [data-ui="landing-recent-projects"] :where(h2, h3),
+body [data-ui="landing-news"] :where(h2, h3),
+body [data-ui="landing-capabilities"] :where(h2, h3),
+body [data-ui="landing-solutions"] :where(h2, h3),
+body [data-ui="landing-delivery"] :where(h2, h3),
+body [data-ui="landing-clients"] :where(h2, h3),
+body [data-ui="landing-qa"] :where(h2, h3),
+body [data-ui="landing-cta"] :where(h2, h3) {
+  color: color-mix(in srgb, var(--foreground) 94%, var(--primary)) !important;
+  letter-spacing: -0.015em;
+}
+
+body [data-ui="landing-quicknav"] a {
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent) !important;
+  background: color-mix(in srgb, var(--surface) 94%, transparent) !important;
+  color: color-mix(in srgb, var(--foreground) 92%, var(--primary)) !important;
+  border-radius: 999px !important;
+  font-weight: 700 !important;
+}
+
+body [data-ui="landing-quicknav"] a:hover,
+body [data-ui="landing-quicknav"] a:focus-visible {
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface)) !important;
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent) !important;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-heading);
+  letter-spacing: -0.015em;
+  line-height: 1.18;
+  margin: 0 0 var(--space-3);
+  color: var(--text-primary);
+}
+
+h1 {
+  font-size: clamp(1.9rem, 2.8vw, 2.7rem);
+}
+
+h2 {
+  font-size: clamp(1.55rem, 2.3vw, 2.1rem);
+}
+
+h3 {
+  font-size: clamp(1.2rem, 1.9vw, 1.55rem);
+}
+
+h4 {
+  font-size: clamp(1.02rem, 1.4vw, 1.2rem);
+}
+
+p {
+  margin: 0 0 var(--space-3);
+  color: var(--text-secondary);
+}
+
+small,
+.text-small {
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
+  margin: var(--space-4) 0;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  color: var(--accent);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Keep keyboard focus visible even if local modules reset outlines. */
+:where(a, button, [role="button"], input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Respect reduced-motion preferences across all routes and subdomains. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-play-state: paused !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  body::before {
+    animation: none !important;
+  }
+}
+
+::selection {
+  background: rgba(121, 216, 206, 0.32);
+  color: var(--text-primary);
+}
+
+@media (max-width: 640px) {
+  :root {
+    --public-header-height: 66px;
+  }
+}
+
+/* Mobile stability pass: avoid clipped menus, sidebars and horizontal cut-offs. */
+@media (max-width: 900px) {
+  :root {
+    --page-padding-x: clamp(10px, 3.2vw, 16px);
+    --panel-padding-x: clamp(10px, 3.2vw, 16px);
+    --panel-padding-y: clamp(10px, 3.2vw, 16px);
+    --panel-gap: 12px;
+    --control-height: 40px;
+  }
+
+  body {
+    line-height: 1.5;
+  }
+
+  :where(main, section, article) {
+    max-width: 100%;
+    margin-inline: auto;
+  }
+
+  html,
+  body {
+    max-width: 100vw;
+    overflow-x: clip;
+  }
+
+  :where(main, section, article, aside, [class*="layout"], [class*="Layout"], [class*="content"], [class*="Content"]) {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  :where(img, svg, video, canvas, iframe) {
+    max-width: 100%;
+    height: auto;
+  }
+
+  :where(table, .table) {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+
+  :where(.modal, [class*="modal"], [class*="Modal"], [class*="drawer"], [class*="Drawer"], [role="dialog"]) {
+    max-width: calc(100vw - 16px);
+  }
+
+  :where(.sidebarContent, [class*="sidebarContent"], [class*="menuContent"], [class*="drawerContent"], [class*="panelContent"]) {
+    min-height: 0;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  :where(.card, [class*="card"], [class*="Card"]) {
+    border-radius: 14px;
+    border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+    background: color-mix(in srgb, var(--surface) 96%, transparent);
+  }
+
+  :where(h1) {
+    letter-spacing: -0.018em;
+  }
+
+  :where(h2, h3) {
+    letter-spacing: -0.014em;
+  }
+}
+

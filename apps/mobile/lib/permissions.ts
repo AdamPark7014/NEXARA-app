@@ -1,0 +1,66 @@
+export const PERMISSIONS = {
+  CONSOLE_ACCESS: 'console.access',
+  CONSOLE_ADMIN: 'console.admin',
+  PANEL_WEB: 'panel.web',
+  PANEL_VENTAS: 'panel.ventas',
+  SALES_VIEW: 'sales.view',
+  SALES_MANAGE: 'sales.manage',
+  SALES_REPORTS_VIEW: 'sales.reports.view',
+  SALES_REPORTS_EXPORT: 'sales.reports.export',
+  SALES_TEMPLATES_MANAGE: 'sales.templates.manage',
+  SALES_AUDIT_VIEW: 'sales.audit.view',
+  ACTIVITIES_VIEW: 'activities.view',
+  ACTIVITIES_MANAGE: 'activities.manage',
+  ACTIVITIES_EXPORT: 'activities.export',
+  EVIDENCES_VIEW: 'evidences.view',
+  EVIDENCES_CREATE: 'evidences.create',
+  EVIDENCES_REVIEW: 'evidences.review',
+  EVIDENCES_EXPORT: 'evidences.export',
+  VIATICS_VIEW: 'viatics.view',
+  VIATICS_CREATE: 'viatics.create',
+  VIATICS_MANAGE: 'viatics.manage',
+  VIATICS_EXPORT: 'viatics.export',
+  VIATICS_IMPORT: 'viatics.import',
+  VEHICLES_VIEW: 'vehicles.view',
+  VEHICLES_REQUEST: 'vehicles.request',
+  VEHICLES_REVIEW: 'vehicles.review',
+  VEHICLES_INVENTORY: 'vehicles.inventory',
+  VEHICLES_EXPORT: 'vehicles.export',
+  ATTENDANCE_VIEW: 'attendance.view',
+  ATTENDANCE_MANAGE: 'attendance.manage',
+  GPS_VIEW: 'gps.view',
+  GPS_MANAGE: 'gps.manage',
+  USERS_MANAGE: 'users.manage',
+  USERS_REVIEW: 'users.review',
+  CONTABILIDAD_VIEW: 'contabilidad.view',
+  CONTABILIDAD_MANAGE: 'contabilidad.manage',
+  COTIZACIONES_ACCESS: 'cotizaciones.access',
+  CVS_MANAGE: 'cvs.manage',
+  CVS_ADMIN_REVIEW: 'cvs.admin.review',
+  CVS_SUPERADMIN_REVIEW: 'cvs.superadmin.review',
+  TOOLS_VIEW: 'tools.view',
+  TOOLS_REQUEST: 'tools.request',
+  TOOLS_MANAGE: 'tools.manage',
+  TOOLS_INVENTORY: 'tools.inventory',
+  FINES_VIEW: 'fines.view',
+  FINES_MANAGE: 'fines.manage',
+} as const;
+
+export type Permission = typeof PERMISSIONS[keyof typeof PERMISSIONS];
+
+export type UserPermissions = {
+  isSuperAdmin?: boolean;
+  permissions?: string[];
+};
+
+export const hasPermission = (user: UserPermissions | null | undefined, permission: string) => {
+  if (!user) return false;
+  if (user.isSuperAdmin) return true;
+  return Boolean(user.permissions?.includes(permission));
+};
+
+export const hasAnyPermission = (user: UserPermissions | null | undefined, permissions: string[]) => {
+  if (!user) return false;
+  if (user.isSuperAdmin) return true;
+  return permissions.some((permission) => user.permissions?.includes(permission));
+};

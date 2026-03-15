@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsArray, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CreateProjectDto {
   @IsString()
@@ -32,8 +32,4 @@ export class CreateProjectDto {
   @IsArray()
   @IsString({ each: true })
   highlights!: string[];
-
-  @IsOptional()
-  @IsBoolean()
-  showInCatalog?: boolean;
 }

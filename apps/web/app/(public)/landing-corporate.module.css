@@ -1,8 +1,10 @@
 .root {
   --landing-clean-surface: color-mix(in srgb, var(--surface) 96%, var(--background));
   --landing-clean-surface-soft: color-mix(in srgb, var(--surface) 92%, var(--background));
-  --landing-clean-border: color-mix(in srgb, var(--primary) 20%, transparent);
-  --landing-clean-shadow: 0 10px 22px color-mix(in srgb, var(--shadow) 58%, transparent);
+  --landing-clean-border: color-mix(in srgb, var(--primary) 24%, transparent);
+  --landing-clean-shadow: 0 14px 28px color-mix(in srgb, var(--shadow) 58%, transparent);
+  --landing-hero-card-bg:
+    linear-gradient(145deg, color-mix(in srgb, #ffffff 78%, transparent), color-mix(in srgb, #f4fbff 64%, transparent));
 }
 
 .root {
@@ -18,56 +20,52 @@
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 7;
-  width: clamp(640px, 66vw, 860px);
+  width: clamp(680px, 70vw, 920px);
   max-width: calc(100% - 52px);
-  min-height: clamp(220px, 28vw, 300px);
+  min-height: clamp(240px, 30vw, 330px);
   display: grid;
-  grid-template-columns: minmax(92px, 112px) minmax(0, 1fr);
-  gap: clamp(14px, 2.2vw, 26px);
+  grid-template-columns: minmax(94px, 120px) minmax(0, 1fr);
+  gap: clamp(14px, 2.2vw, 28px);
   align-items: center;
   align-content: center;
-  padding: clamp(20px, 2.4vw, 30px) clamp(22px, 2.8vw, 34px);
-  border-radius: 10px;
-  border: 1px solid color-mix(in srgb, #ffffff 72%, var(--primary));
-  background: linear-gradient(
-    128deg,
-    color-mix(in srgb, #ffffff 62%, transparent) 0%,
-    color-mix(in srgb, #f6ffff 54%, transparent) 100%
-  );
-  backdrop-filter: blur(11px) saturate(112%);
+  padding: clamp(22px, 2.8vw, 34px) clamp(22px, 2.8vw, 38px);
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, #ffffff 70%, var(--primary));
+  background: var(--landing-hero-card-bg);
+  backdrop-filter: blur(14px) saturate(120%);
   box-shadow:
-    0 10px 24px color-mix(in srgb, var(--shadow) 12%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #ffffff 46%, transparent);
+    0 18px 36px color-mix(in srgb, var(--shadow) 26%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 52%, transparent);
 }
 
 .heroTopCardLogo {
-  width: 112px;
-  height: 112px;
+  width: 116px;
+  height: 116px;
   object-fit: contain;
 }
 
 .heroTopCardContent {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   align-content: center;
   height: 100%;
 }
 
 .heroTopCardTitle {
   margin: 0;
-  color: color-mix(in srgb, var(--primary-strong) 88%, var(--foreground));
-  font-size: 1.28rem;
+  color: color-mix(in srgb, var(--primary-strong) 90%, var(--foreground));
+  font-size: 1.2rem;
   line-height: 1;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.15em;
   font-weight: 800;
 }
 
 .heroTopCardText {
   margin: 0;
-  color: color-mix(in srgb, var(--foreground) 94%, #1f3d52);
-  max-width: 64ch;
-  font-size: 1.34rem;
-  line-height: 1.54;
+  color: color-mix(in srgb, var(--foreground) 92%, #1f3d52);
+  max-width: 62ch;
+  font-size: clamp(1rem, 1.7vw, 1.4rem);
+  line-height: 1.55;
   text-wrap: pretty;
 }
 
@@ -99,7 +97,7 @@
 .root :global([data-ui="landing-quicknav"]) {
   width: 100% !important;
   max-width: var(--content-max) !important;
-  margin: 14px auto 4px !important;
+  margin: 16px auto 6px !important;
   justify-content: center !important;
   overflow: visible !important;
 }
@@ -113,7 +111,7 @@
 .root :global([data-ui="landing-clients"]),
 .root :global([data-ui="landing-cta"]) {
   max-width: var(--content-max);
-  margin: 22px auto 0;
+  margin: 24px auto 0;
   border-radius: 20px;
 }
 
@@ -139,7 +137,7 @@
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
-  padding-top: 10px !important;
+  padding-top: 12px !important;
 }
 
 .root :global([data-ui="landing-news"] [id="news-active-slide"]) {
@@ -156,6 +154,21 @@
   border: 0 !important;
   box-shadow: none !important;
   padding-top: 8px !important;
+}
+
+/* Final anti-collision guard against legacy full-bleed rules in page.module.css */
+.root :global([data-ui="landing-news"]),
+.root :global([data-ui="landing-metrics"]),
+.root :global([data-ui="landing-qa"]),
+.root :global([data-ui="landing-capabilities"]),
+.root :global([data-ui="landing-solutions"]),
+.root :global([data-ui="landing-delivery"]),
+.root :global([data-ui="landing-clients"]),
+.root :global([data-ui="landing-cta"]) {
+  width: 100% !important;
+  max-width: var(--content-max) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
 }
 
 @media (max-width: 768px) {
@@ -191,7 +204,7 @@
 
   .heroTopCardTitle {
     font-size: 0.84rem;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
     line-height: 1.1;
   }
 
@@ -237,43 +250,6 @@
   .root :global([data-ui="landing-cta"]) {
     margin-top: 16px;
     border-radius: 14px;
-  }
-
-  .root :global([data-ui="solution-card"]) {
-    text-align: center;
-  }
-}
-
-:global(body.dark) .heroTopCardTitle {
-  color: #0f4f67;
-}
-
-:global(body.dark) .heroTopCardText {
-  color: #101820;
-  text-shadow: none;
-}
-
-/* Final anti-collision guard against legacy full-bleed rules in page.module.css */
-.root :global([data-ui="landing-news"]),
-.root :global([data-ui="landing-metrics"]),
-.root :global([data-ui="landing-qa"]),
-.root :global([data-ui="landing-capabilities"]),
-.root :global([data-ui="landing-solutions"]),
-.root :global([data-ui="landing-delivery"]),
-.root :global([data-ui="landing-clients"]),
-.root :global([data-ui="landing-cta"]) {
-  width: 100% !important;
-  max-width: var(--content-max) !important;
-  margin-left: auto !important;
-  margin-right: auto !important;
-}
-
-@media (max-width: 768px) {
-  .root :global([data-ui="landing-quicknav"]) {
-    flex-wrap: nowrap !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-    scroll-snap-type: none !important;
   }
 }
 

@@ -9,6 +9,7 @@
     "dist",
     "test",
     "**/*.spec.ts",
-    "**/*.e2e-spec.ts"
+    "**/*.e2e-spec.ts",
+    "**/*-Adam.ts"
   ]
 }

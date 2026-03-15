@@ -1,0 +1,295 @@
+:root {
+  --content-max: 100%;
+  --page-padding-x: clamp(10px, 3.8vw, 20px);
+  --page-padding-y: clamp(10px, 3.2vw, 20px);
+  --panel-padding-x: clamp(10px, 3.2vw, 18px);
+  --panel-padding-y: clamp(10px, 3.2vw, 18px);
+  --panel-gap: clamp(10px, 3vw, 16px);
+  --panel-sidebar-width: 100%;
+  --mobile-hit-target: 44px;
+  --mobile-stack-gap: 10px;
+}
+
+@media (max-width: 1024px) {
+  html,
+  body {
+    font-size: 15px;
+  }
+
+  body {
+    overflow-x: hidden;
+    overscroll-behavior-y: contain;
+  }
+
+  table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    min-height: var(--mobile-hit-target);
+  }
+
+  a,
+  [role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"] {
+    min-height: var(--mobile-hit-target);
+  }
+
+  [class*="sidebar"],
+  [class*="Sidebar"] {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    position: static !important;
+  }
+
+  [class*="grid"],
+  [class*="Grid"],
+  [class*="panelGrid"],
+  [class*="cardsGrid"],
+  [class*="layoutGrid"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  [class*="toolbar"],
+  [class*="Toolbar"],
+  [class*="actions"],
+  [class*="Actions"] {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mobile-stack-gap);
+  }
+
+  [class*="toolbar"] > *,
+  [class*="Toolbar"] > *,
+  [class*="actions"] > *,
+  [class*="Actions"] > * {
+    flex: 1 1 170px;
+    min-width: 0;
+  }
+
+  [class*="card"],
+  [class*="Card"] {
+    border-radius: 14px;
+  }
+
+  [class*="consoleMain"],
+  [class*="salesMain"],
+  [class*="webPanelMain"],
+  [class*="workspaceContent"] {
+    min-width: 0;
+  }
+
+  [class*="panel"],
+  [class*="Panel"],
+  [class*="card"],
+  [class*="Card"] {
+    padding: clamp(10px, 2.8vw, 16px);
+  }
+}
+
+@media (max-width: 960px) {
+  [class*="workspaceHeader"],
+  [class*="salesWorkspaceHeader"],
+  [class*="consoleTopbar"],
+  [class*="panelHero"] {
+    border-radius: 12px;
+    padding: 12px !important;
+    gap: 10px;
+  }
+
+  [class*="workspaceMeta"],
+  [class*="salesWorkspaceMeta"],
+  [class*="consoleTopbarActions"] {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  [class*="quickLinksRow"],
+  [class*="salesQuickLinks"],
+  [class*="panelTabs"],
+  [class*="webPanelNav"] {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  [class*="quickLink"],
+  [class*="salesQuickLink"],
+  [class*="panelTab"],
+  [class*="navLink"],
+  [class*="menuLink"] {
+    min-height: var(--mobile-hit-target);
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+@media (max-width: 640px) {
+  html,
+  body {
+    font-size: 14px;
+  }
+
+  h1 {
+    font-size: clamp(1.35rem, 6vw, 1.7rem) !important;
+    line-height: 1.15 !important;
+  }
+
+  h2 {
+    font-size: clamp(1.1rem, 4.8vw, 1.35rem) !important;
+  }
+
+  [class*="header"],
+  [class*="Header"] {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  }
+
+  [class*="content"],
+  [class*="Content"],
+  main {
+    padding-left: max(10px, env(safe-area-inset-left)) !important;
+    padding-right: max(10px, env(safe-area-inset-right)) !important;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom)) !important;
+  }
+
+  [class*="tableWrap"],
+  [class*="TableWrap"] {
+    margin-left: -4px;
+    margin-right: -4px;
+  }
+
+  [class*="consoleMain"],
+  [class*="salesMain"],
+  [class*="webPanelMain"] {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+
+  [class*="consoleLayout"],
+  [class*="salesRoot"],
+  [class*="webPanelRoot"],
+  [class*="contaRoot"],
+  [class*="ticketsConsole"] {
+    gap: 8px;
+  }
+
+  [class*="sidebar"],
+  [class*="Sidebar"] {
+    border-radius: 14px !important;
+  }
+
+  [class*="modal"],
+  [class*="Modal"] {
+    width: min(100vw - 16px, 100%) !important;
+    max-height: 92vh !important;
+  }
+
+  [class*="toolbar"] > *,
+  [class*="Toolbar"] > *,
+  [class*="actions"] > *,
+  [class*="Actions"] > * {
+    flex-basis: 100%;
+  }
+
+  [class*="badge"],
+  [class*="Badge"],
+  [class*="chip"],
+  [class*="Chip"] {
+    min-height: 30px;
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+@media (max-width: 420px) {
+  h1 {
+    font-size: clamp(1.25rem, 7vw, 1.45rem) !important;
+  }
+
+  h2 {
+    font-size: clamp(1rem, 5.3vw, 1.2rem) !important;
+  }
+
+  [class*="tableWrap"],
+  [class*="TableWrap"] {
+    margin-left: -6px;
+    margin-right: -6px;
+  }
+}
+
+/* Professional mobile rendering pass */
+@media (max-width: 900px) {
+  :root {
+    --page-padding-x: max(12px, env(safe-area-inset-left));
+    --panel-padding-x: 12px;
+    --panel-padding-y: 12px;
+    --panel-gap: 10px;
+    --control-height: 44px;
+  }
+
+  body {
+    line-height: 1.48;
+    background:
+      radial-gradient(circle at 14% -14%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 42%),
+      radial-gradient(circle at 96% 2%, color-mix(in srgb, var(--secondary) 12%, transparent), transparent 44%),
+      linear-gradient(180deg, var(--background), var(--surface-2));
+  }
+
+  main {
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto;
+  }
+
+  :where(.card, [class*="card"], [class*="Card"]) {
+    border-radius: 14px !important;
+    border: 1px solid color-mix(in srgb, var(--border) 90%, transparent) !important;
+    background: color-mix(in srgb, var(--surface) 95%, transparent) !important;
+    box-shadow:
+      0 10px 24px color-mix(in srgb, var(--shadow) 46%, transparent),
+      inset 0 1px 0 color-mix(in srgb, #fff 52%, transparent) !important;
+  }
+
+  :where(.button-primary, .button-secondary, button, [type="button"], [type="submit"]) {
+    min-height: 44px !important;
+    font-weight: 650;
+    letter-spacing: 0.01em;
+  }
+
+  :where(input, select, textarea) {
+    min-height: 44px !important;
+    border: 1px solid color-mix(in srgb, var(--border-strong) 72%, transparent);
+    background: color-mix(in srgb, var(--surface) 96%, transparent);
+  }
+
+  :where(label) {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  :where(.table, table) {
+    border-radius: 12px;
+    border: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
+    background: color-mix(in srgb, var(--surface) 96%, transparent);
+  }
+
+  :where(.badge, [class*="badge"], [class*="Badge"]) {
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    border-radius: 999px;
+  }
+}
