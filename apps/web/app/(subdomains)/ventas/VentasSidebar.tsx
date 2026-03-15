@@ -293,14 +293,6 @@ export default function VentasSidebar() {
 
       {/* Botón de tema */}
       <div className={styles.themeSection}>
-        <Link
-          href="/paneles"
-          className={styles.themeButton}
-          onClick={closeMenu}
-        >
-          <span className={styles.themeIcon}>⇄</span>
-          {showExpandedContent && <span>Cambiar panel</span>}
-        </Link>
         <button
           onClick={toggleDarkMode}
           className={styles.themeButton}

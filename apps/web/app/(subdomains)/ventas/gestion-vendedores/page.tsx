@@ -11,7 +11,7 @@ import {
   type SalesMetrics,
   type SalesVendorStats,
 } from "@/lib/sales-api";
-import styles from "./page.module.css";
+
 
 type AttendanceEvent = { type: string; timestamp: string };
 
@@ -73,10 +73,10 @@ const statusLabel = (status?: "on-track" | "risk" | "off-track") => {
   return "Off-track";
 };
 
-const statusClass = (status?: "on-track" | "risk" | "off-track") => {
-  if (status === "on-track") return styles.statusOnTrack;
-  if (status === "risk") return styles.statusRisk;
-  return styles.statusOffTrack;
+const badgeClass = (status?: "on-track" | "risk" | "off-track") => {
+  if (status === "on-track") return "badge-success";
+  if (status === "risk") return "badge-warning";
+  return "badge-danger";
 };
 
 const getFirstEntry = (attendances: AttendanceEvent[]) => {
@@ -230,12 +230,12 @@ export default function VentasGestionVendedoresPage() {
       .slice(0, 8);
   }, [vendorStats]);
 
-  if (!user) return <div className={styles.loading}>Cargando usuario...</div>;
+  if (!user) return <div style={{ padding: 16 }}>Cargando usuario...</div>;
 
   if (!canManageSellers) {
     return (
-      <section className={styles.page}>
-        <div className={styles.lockedCard}>
+      <section style={{ display: "grid", gap: 18, padding: "12px 4px 28px", position: "relative" }}>
+        <div className="card">
           <h1>Gestión de vendedores</h1>
           <p>Este panel es exclusivo para perfiles admin/superadmin o con permisos de gestión.</p>
         </div>
@@ -243,25 +243,25 @@ export default function VentasGestionVendedoresPage() {
     );
   }
 
-  if (loading) return <div className={styles.loading}>Cargando panel ejecutivo...</div>;
+  if (loading) return <div style={{ padding: 16 }}>Cargando panel ejecutivo...</div>;
 
   return (
-    <section className={styles.page}>
-      <header className={styles.header}>
+    <section style={{ display: "grid", gap: 18, padding: "12px 4px 28px", position: "relative" }}>
+      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
         <div>
-          <p className={styles.kicker}>Ventas · Control Ejecutivo</p>
-          <h1 className={styles.title}>Gestión integral de vendedores</h1>
-          <p className={styles.subtitle}>
+          <p style={{ margin: 0, letterSpacing: "0.12em", textTransform: "uppercase", fontSize: 11, color: "var(--text-secondary)" }}>Ventas · Control Ejecutivo</p>
+          <h1 style={{ margin: "4px 0" }}>Gestión integral de vendedores</h1>
+          <p style={{ margin: 0, color: "var(--text-secondary)", maxWidth: 760 }}>
             Supervisión de cumplimiento comercial y productividad diaria en una sola vista ({periodLabel}).
           </p>
         </div>
-        <div className={styles.periodButtons}>
+        <div style={{ display: "flex", gap: 8 }}>
           {(["week", "month", "year"] as const).map((item) => (
             <button
               key={item}
               type="button"
               onClick={() => setPeriod(item)}
-              className={`${styles.periodBtn} ${period === item ? styles.periodBtnActive : ""}`}
+              className={period === item ? "btn" : "button-secondary"}
             >
               {item === "week" ? "Semana" : item === "month" ? "Mes" : "Año"}
             </button>
@@ -269,9 +269,9 @@ export default function VentasGestionVendedoresPage() {
         </div>
       </header>
 
-      {error && <div className={styles.error}>{error}</div>}
+      {error && <div className="card" style={{ color: "var(--state-danger-text, #d54444)" }}>{error}</div>}
 
-      <div className={styles.kpiGrid}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12 }}>
         <article className="card" style={{ display: "grid", gap: 6 }}>
           <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-secondary)" }}>Pipeline activo</p>
           <h3>{formatMoney(metrics?.pipelineValue || 0)}</h3>
@@ -304,10 +304,10 @@ export default function VentasGestionVendedoresPage() {
         </article>
       </div>
 
-      <div className={styles.gridTwo}>
+      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 12 }}>
         <article className="card">
           <h2>Leaderboard comercial</h2>
-          <div className={styles.tableWrapper}>
+          <div style={{ overflowX: "auto" }}>
             <table className="table">
               <thead>
                 <tr>
@@ -324,7 +324,7 @@ export default function VentasGestionVendedoresPage() {
                     <td>{Number(seller.performance || 0).toFixed(1)}</td>
                     <td>{formatMoney(seller.revenue || 0)}</td>
                     <td>
-                      <span className={`${styles.statusBadge} ${statusClass(seller.status)}`}>
+                      <span className={badgeClass(seller.status)} style={{ padding: "4px 8px", borderRadius: 999, fontSize: "0.72rem", fontWeight: 700, display: "inline-block" }}>
                         {statusLabel(seller.status)}
                       </span>
                     </td>
@@ -359,7 +359,7 @@ export default function VentasGestionVendedoresPage() {
 
       <article className="card">
         <h2>Verificación diaria de productividad</h2>
-        <div className={styles.tableWrapper}>
+        <div style={{ overflowX: "auto" }}>
           <table className="table">
             <thead>
               <tr>

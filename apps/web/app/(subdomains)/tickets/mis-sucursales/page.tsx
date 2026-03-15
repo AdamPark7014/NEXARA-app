@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
+import Link from "next/link";
 import PanelLogin from "@/components/PanelLogin";
 import BranchesForm, { Branch } from "../../../../components/BranchesForm";
 import { useTheme } from "@/components/ThemeContext";
@@ -228,9 +229,9 @@ export default function MyBranchesPage() {
         <div className={consoleStyles.menuTitle}>Cuenta corporativa</div>
         <ul className={consoleStyles.sidebarMenu}>
           <li className={consoleStyles.sidebarMenuItem}>
-            <a href="..?tab=profile" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
+            <Link href="/?tab=profile" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
               🪪 Mi perfil corporativo
-            </a>
+            </Link>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
             <button type="button" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${consoleStyles.active}`}>
@@ -242,19 +243,19 @@ export default function MyBranchesPage() {
         <div className={consoleStyles.menuTitle}>Servicio y solicitudes</div>
         <ul className={consoleStyles.sidebarMenu}>
           <li className={consoleStyles.sidebarMenuItem}>
-            <a href="..?tab=tickets" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
+            <Link href="/?tab=tickets" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
               🎫 Estado de tickets
-            </a>
+            </Link>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
-            <a href="..?tab=new-ticket" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
+            <Link href="/?tab=new-ticket" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
               ➕ Nueva solicitud
-            </a>
+            </Link>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
-            <a href="..?tab=inventarios" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
+            <Link href="/?tab=inventories" className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}>
               🧰 Inventarios
-            </a>
+            </Link>
           </li>
         </ul>
 
