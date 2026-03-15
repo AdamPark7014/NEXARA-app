@@ -4,6 +4,7 @@ export type PanelKey = "console" | "ventas" | "contabilidad" | "web" | "tickets"
 
 export type MobilePanelOption = {
   key: PanelKey;
+  icon: string;
   name: string;
   description: string;
   entryPath: string;
@@ -14,30 +15,35 @@ export const PANEL_COOKIE_NAME = "nexara_mobile_panel";
 const PANEL_ORDER: MobilePanelOption[] = [
   {
     key: "console",
+    icon: "🧩",
     name: "Consola",
     description: "Operacion central, usuarios y control jerarquico.",
     entryPath: "/dashboard",
   },
   {
     key: "ventas",
+    icon: "📈",
     name: "Ventas",
     description: "Pipeline comercial, leads y oportunidades.",
     entryPath: "/dashboard",
   },
   {
     key: "contabilidad",
+    icon: "💼",
     name: "Contabilidad",
     description: "Pagos, viaticos, horas y control financiero.",
     entryPath: "/dashboard",
   },
   {
     key: "web",
+    icon: "🌐",
     name: "Web",
     description: "Gestion de contenido, clientes y proyectos web.",
     entryPath: "/dashboard",
   },
   {
     key: "tickets",
+    icon: "🎫",
     name: "Tickets",
     description: "Seguimiento de solicitudes, sucursales e inventarios.",
     entryPath: "/tickets",

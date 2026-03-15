@@ -108,6 +108,19 @@
   margin: 0;
   font-size: 1rem;
   color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cardIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary) 16%, transparent);
 }
 
 .cardDescription {

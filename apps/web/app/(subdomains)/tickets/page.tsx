@@ -12,6 +12,11 @@ type ClientSession = {
   client: { id: number; name: string; logoUrl?: string | null };
 };
 
+type BranchSession = {
+  token: string;
+  branch: { id: number; name: string; branchNumber?: string | null; clientId: number; clientName?: string | null };
+};
+
 type Ticket = {
   id: number;
   anNumber: string;
@@ -275,6 +280,14 @@ export default function ClientTicketsPage() {
     window.sessionStorage.setItem("clientSession", JSON.stringify(nextSession));
     setSession(nextSession);
     setError(null);
+  };
+
+  const handleBranchLogin = (data: { access_token: string; branch: BranchSession["branch"] }) => {
+    const nextSession: BranchSession = { token: data.access_token, branch: data.branch };
+    window.sessionStorage.setItem("branchSession", JSON.stringify(nextSession));
+    setError(null);
+    const slug = data.branch.branchNumber || `branch-${data.branch.id}`;
+    window.location.replace(`/${slug}`);
   };
 
   const sortedTickets = useMemo(() => {
@@ -560,8 +573,10 @@ export default function ClientTicketsPage() {
     return (
       <div className={styles.authWrap}>
         <PanelLogin
+          mode="tickets"
           redirectTo="/"
           onClientLogin={handleClientLogin}
+          onBranchLogin={handleBranchLogin}
           title="Iniciar sesion"
           subtitle="Ingresa a tu cuenta de Nexara"
         />
@@ -650,7 +665,7 @@ export default function ClientTicketsPage() {
                 setMobileMenuOpen(false);
               }}
             >
-              Mi perfil corporativo
+              🪪 Mi perfil corporativo
             </button>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
@@ -659,7 +674,7 @@ export default function ClientTicketsPage() {
               className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
               onClick={() => setMobileMenuOpen(false)}
             >
-              Gestión de sucursales
+              🏬 Gestión de sucursales
             </a>
           </li>
         </ul>
@@ -675,7 +690,7 @@ export default function ClientTicketsPage() {
                 setMobileMenuOpen(false);
               }}
             >
-              Estado de tickets
+              🎫 Estado de tickets
             </button>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
@@ -687,7 +702,7 @@ export default function ClientTicketsPage() {
                 setMobileMenuOpen(false);
               }}
             >
-              Nueva solicitud
+              ➕ Nueva solicitud
             </button>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
@@ -699,7 +714,7 @@ export default function ClientTicketsPage() {
                 setMobileMenuOpen(false);
               }}
             >
-              Inventarios
+              🧰 Inventarios
             </button>
           </li>
         </ul>
@@ -712,7 +727,7 @@ export default function ClientTicketsPage() {
               className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
               onClick={handleLogout}
             >
-              Cerrar sesión
+              ⎋ Cerrar sesión
             </button>
           </li>
         </ul>

@@ -11,7 +11,7 @@ import { getDeviceIdentityHeaders } from "@/lib/device-identity";
 type PanelLoginProps = {
   redirectTo: string;
   requiredPermission?: string;
-  mode?: "console" | "client" | "branch";
+  mode?: "console" | "client" | "branch" | "tickets";
   onClientLogin?: (data: { access_token: string; client: { id: number; name: string; logoUrl?: string | null } }) => void;
   onBranchLogin?: (data: { access_token: string; branch: { id: number; name: string; branchNumber?: string | null; clientId: number; clientName?: string | null } }) => void;
   title?: string;
@@ -59,21 +59,52 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
     try {
       const deviceHeaders = await getDeviceIdentityHeaders();
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+      const payload = {
+        email,
+        password,
+        ...(requiredPermission === PERMISSIONS.PANEL_VENTAS ? { panel: "ventas" } : {}),
+      };
+
+      const loginToEndpoint = async (endpoint: string) => {
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...deviceHeaders },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        return { res, data };
+      };
+
+      if (mode === "tickets") {
+        const clientAttempt = await loginToEndpoint(`${API_URL}/client-auth/login`);
+        if (clientAttempt.res.ok) {
+          onClientLogin?.(clientAttempt.data);
+          router.replace(redirectTo);
+          return;
+        }
+
+        const branchAttempt = await loginToEndpoint(`${API_URL}/branch-auth/login`);
+        if (branchAttempt.res.ok) {
+          onBranchLogin?.(branchAttempt.data);
+          if (!onBranchLogin) router.replace(redirectTo);
+          return;
+        }
+
+        throw new Error(
+          branchAttempt.data?.message ||
+            clientAttempt.data?.message ||
+            branchAttempt.data?.error ||
+            clientAttempt.data?.error ||
+            "Credenciales incorrectas",
+        );
+      }
+
       const endpoint = mode === "client"
         ? `${API_URL}/client-auth/login`
         : mode === "branch"
           ? `${API_URL}/branch-auth/login`
           : `${API_URL}/auth/login`;
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...deviceHeaders },
-        body: JSON.stringify({
-          email,
-          password,
-          ...(requiredPermission === PERMISSIONS.PANEL_VENTAS ? { panel: "ventas" } : {}),
-        }),
-      });
-      const data = await res.json();
+      const { res, data } = await loginToEndpoint(endpoint);
       if (!res.ok) throw new Error(data.message || data.error || "Credenciales incorrectas");
 
       if (mode === "client") {

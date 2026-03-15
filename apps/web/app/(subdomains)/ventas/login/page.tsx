@@ -8,8 +8,8 @@ export default function VentasLoginPage() {
     <PanelLogin
       redirectTo="/dashboard"
       requiredPermission={PERMISSIONS.PANEL_VENTAS}
-      title="Panel de Ventas"
-      subtitle="Accede a tu pipeline, oportunidades y reportes comerciales."
+      title="Iniciar sesion"
+      subtitle="Ingresa a tu cuenta de Nexara"
     />
   );
 }

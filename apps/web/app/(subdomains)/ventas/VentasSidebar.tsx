@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import styles from "./VentasSidebar.module.css";
 import { useUser } from "@/components/UserContext";
 import { useTheme } from "@/components/ThemeContext";
@@ -44,7 +44,8 @@ const sectionOrder = [
 export default function VentasSidebar() {
   const MOBILE_BREAKPOINT = 768;
   const pathname = usePathname();
-  const { user } = useUser();
+  const router = useRouter();
+  const { user, logout } = useUser();
   const { darkMode, toggleDarkMode } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -80,6 +81,12 @@ export default function VentasSidebar() {
   }, [isMenuOpen]);
 
   const closeMenu = () => setIsMenuOpen(false);
+
+  const handleLogout = () => {
+    logout();
+    closeMenu();
+    router.replace("/login");
+  };
 
   const canManageSellers = isSalesManagerUser(user);
   const userRoleLabel = getRoleLabel(user);
@@ -286,6 +293,14 @@ export default function VentasSidebar() {
 
       {/* Botón de tema */}
       <div className={styles.themeSection}>
+        <Link
+          href="/paneles"
+          className={styles.themeButton}
+          onClick={closeMenu}
+        >
+          <span className={styles.themeIcon}>⇄</span>
+          {showExpandedContent && <span>Cambiar panel</span>}
+        </Link>
         <button
           onClick={toggleDarkMode}
           className={styles.themeButton}
@@ -294,6 +309,16 @@ export default function VentasSidebar() {
         >
           <span className={styles.themeIcon}>{darkMode ? '🌙' : '☀️'}</span>
           {showExpandedContent && <span>{darkMode ? 'Modo Oscuro' : 'Modo Claro'}</span>}
+        </button>
+
+        <button
+          onClick={handleLogout}
+          className={styles.themeButton}
+          data-collapsed={showExpandedContent ? 'false' : 'true'}
+          aria-label="Cerrar sesion"
+        >
+          <span className={styles.themeIcon}>⎋</span>
+          {showExpandedContent && <span>Cerrar sesion</span>}
         </button>
       </div>
 
