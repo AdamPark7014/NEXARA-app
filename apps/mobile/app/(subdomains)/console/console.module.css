@@ -256,6 +256,7 @@
 .menuLink {
 	display: flex;
 	align-items: center;
+	gap: 0.52rem;
 	min-height: 40px;
 	border-radius: 11px;
 	padding: 0.52rem 0.7rem;
@@ -266,6 +267,19 @@
 	background: var(--menu-item-bg);
 	border: 1px solid transparent;
 	transition: background-color 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+.menuLinkIcon {
+	width: 1.15rem;
+	text-align: center;
+	font-size: 0.95rem;
+	line-height: 1;
+	flex-shrink: 0;
+}
+
+.menuLinkText {
+	flex: 1;
+	min-width: 0;
 }
 
 .menuLink:hover {

@@ -83,6 +83,7 @@ export default function Sidebar() {
   const userRoleLabel = getRoleLabel(user);
 
   type MenuItem = {
+    icon: string;
     label: string;
     href: string;
     permissions?: string[];
@@ -106,33 +107,33 @@ export default function Sidebar() {
   };
 
   const profileItems: MenuItem[] = [
-    { label: "Mi perfil", href: "/my-profile", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "👤", label: "Mi perfil", href: "/my-profile", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
   ];
 
   const operationItems: MenuItem[] = [
-    { label: "Resumen ejecutivo", href: "/dashboard", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Operación: actividades", href: "/activities", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Evidencias de servicio", href: "/evidences", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Viáticos operativos", href: "/viatics", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Control vehicular", href: "/vehicles", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Monitoreo GPS", href: "/gps", permissions: [PERMISSIONS.GPS_VIEW] },
+    { icon: "📊", label: "Resumen ejecutivo", href: "/dashboard", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🗂️", label: "Operación: actividades", href: "/activities", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "📸", label: "Evidencias de servicio", href: "/evidences", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "💼", label: "Viáticos operativos", href: "/viatics", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🚗", label: "Control vehicular", href: "/vehicles", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🛰️", label: "Monitoreo GPS", href: "/gps", permissions: [PERMISSIONS.GPS_VIEW] },
   ];
 
   const peopleItems: MenuItem[] = [
-    { label: "Asistencia", href: "/attendance", permissions: [PERMISSIONS.ATTENDANCE_VIEW] },
-    { label: "Multas y sanciones", href: "/fines", anyPermissions: [PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Gestión de CVs", href: "/cvs", anyPermissions: [PERMISSIONS.CVS_MANAGE, PERMISSIONS.CVS_ADMIN_REVIEW, PERMISSIONS.CVS_SUPERADMIN_REVIEW, PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Gestión de usuarios", href: "/users", permissions: [PERMISSIONS.USERS_MANAGE] },
+    { icon: "🕒", label: "Asistencia", href: "/attendance", permissions: [PERMISSIONS.ATTENDANCE_VIEW] },
+    { icon: "⚖️", label: "Multas y sanciones", href: "/fines", anyPermissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "📄", label: "Gestión de CVs", href: "/cvs", anyPermissions: [PERMISSIONS.CVS_MANAGE, PERMISSIONS.CVS_ADMIN_REVIEW, PERMISSIONS.CVS_SUPERADMIN_REVIEW, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🧑‍💼", label: "Gestión de usuarios", href: "/users", permissions: [PERMISSIONS.USERS_MANAGE] },
   ];
 
   const commercialItems: MenuItem[] = [
-    { label: "Clientes corporativos", href: "/clients", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
-    { label: "Cotizaciones", href: "/cotizaciones", permissions: [PERMISSIONS.COTIZACIONES_ACCESS] },
-    { label: "Gestión comercial", href: "/gestion-vendedores", anyPermissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🏢", label: "Clientes corporativos", href: "/clients", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🧾", label: "Cotizaciones", href: "/cotizaciones", permissions: [PERMISSIONS.COTIZACIONES_ACCESS] },
+    { icon: "📈", label: "Gestión comercial", href: "/gestion-vendedores", anyPermissions: [PERMISSIONS.CONSOLE_ADMIN] },
   ];
 
   const systemItems: MenuItem[] = [
-    { label: "Herramientas internas", href: "/tools", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🛠️", label: "Herramientas internas", href: "/tools", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
   ];
 
   const groups: MenuGroup[] = [
@@ -175,8 +176,8 @@ export default function Sidebar() {
       id: "fallback",
       title: "Menú principal",
       items: [
-        { label: "Mi perfil", href: "/my-profile" },
-        { label: "Resumen ejecutivo", href: "/dashboard" },
+        { icon: "👤", label: "Mi perfil", href: "/my-profile" },
+        { icon: "📊", label: "Resumen ejecutivo", href: "/dashboard" },
       ],
     },
   ];
@@ -303,7 +304,8 @@ export default function Sidebar() {
                         className={isItemActive ? `${styles.menuLink} ${styles.active}` : styles.menuLink}
                         onClick={closeMenu}
                       >
-                        {item.label}
+                        <span className={styles.menuLinkIcon} aria-hidden="true">{item.icon}</span>
+                        <span className={styles.menuLinkText}>{item.label}</span>
                       </Link>
                     </li>
                   );
