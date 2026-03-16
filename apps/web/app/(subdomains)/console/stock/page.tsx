@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
@@ -7,40 +7,37 @@ import HelpTab from "@/components/HelpTab";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
-import { useMemo } from "react";
-
 interface StockLevel {
   id: number;
-    <RoleGuard anyPermissions={[PERMISSIONS.STOCK_VIEW, PERMISSIONS.STOCK_MANAGE]}>
-      <div style={{ display: "grid", gap: 24 }}>
-        <HelpTab module="stock" user={user} />
-        <div className="card" style={{ padding: 16 }}>
-          <h1 style={{ color: "var(--primary)", marginBottom: 8 }}>📦 Inventario / Stock</h1>
-          <p style={{ color: "var(--text-secondary)" }}>
-            Niveles de inventario, movimientos de stock y alertas de reabastecimiento.
-          </p>
-        </div>
-        {/* KPI Cards */}
-        {!loading && levels.length > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-            <div className="card" style={{ padding: 14 }}>
-              <p style={{ color: "var(--text-secondary)", fontSize: 12 }}>Productos en stock</p>
-              <p style={{ fontSize: 24, fontWeight: 700, color: "var(--primary)" }}>{stats.totalItems}</p>
-            </div>
-            <div className="card" style={{ padding: 14 }}>
-              <p style={{ color: "var(--text-secondary)", fontSize: 12 }}>Unidades totales</p>
-              <p style={{ fontSize: 24, fontWeight: 700 }}>{stats.totalUnits.toLocaleString()}</p>
-            </div>
-            <div className="card" style={{ padding: 14 }}>
-              <p style={{ color: "var(--text-secondary)", fontSize: 12 }}>Valor de inventario</p>
-              <p style={{ fontSize: 22, fontWeight: 700, color: "var(--success)" }}>${fmt(stats.totalValue)}</p>
-            </div>
-          </div>
-        )}
-        {/* ...existing code... */}
-      </div>
-    </RoleGuard>
-  );
+  productName: string;
+  sku: string;
+  warehouseName: string;
+  quantity: number;
+  minQuantity: number;
+  maxQuantity: number | null;
+  unitCost: number;
+}
+
+interface StockMovement {
+  id: number;
+  type: string;
+  productName: string;
+  quantity: number;
+  reference: string | null;
+  createdAt: string;
+}
+
+export default function StockPage() {
+  const { user } = useUser();
+  const [levels, setLevels] = useState<StockLevel[]>([]);
+  const [movements, setMovements] = useState<StockMovement[]>([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<"levels" | "movements" | "alerts">("levels");
+
+  useEffect(() => {
+    if (!user?.token) return;
+    const headers = { Authorization: `Bearer ${user.token}` };
     Promise.all([
       fetch(`${API_URL}/stock/levels`, { headers }).then((r) => r.json()),
       fetch(`${API_URL}/stock/movements`, { headers }).then((r) => r.json()),
@@ -78,13 +75,13 @@ interface StockLevel {
   return (
     <RoleGuard anyPermissions={[PERMISSIONS.STOCK_VIEW, PERMISSIONS.STOCK_MANAGE]}>
       <div style={{ display: "grid", gap: 24 }}>
+        <HelpTab module="stock" user={user} />
         <div className="card" style={{ padding: 16 }}>
           <h1 style={{ color: "var(--primary)", marginBottom: 8 }}>📦 Inventario / Stock</h1>
           <p style={{ color: "var(--text-secondary)" }}>
             Niveles de inventario, movimientos de stock y alertas de reabastecimiento.
           </p>
         </div>
-
         {/* KPI Cards */}
         {!loading && levels.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
@@ -106,15 +103,11 @@ interface StockLevel {
             </div>
           </div>
         )}
-
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <button onClick={() => setTab("levels")} style={tabStyle("levels")}>Niveles</button>
           <button onClick={() => setTab("movements")} style={tabStyle("movements")}>Movimientos</button>
-          <button onClick={() => setTab("alerts")} style={tabStyle("alerts")}>
-            ⚠️ Alertas {alerts.length > 0 && `(${alerts.length})`}
-          </button>
+          <button onClick={() => setTab("alerts")} style={tabStyle("alerts")}>⚠️ Alertas {alerts.length > 0 && `(${alerts.length})`}</button>
         </div>
-
         {loading ? (
           <p style={{ textAlign: "center", color: "var(--text-secondary)" }}>Cargando...</p>
         ) : tab === "levels" ? (

@@ -36,22 +36,61 @@ export default function EmployeePaymentsPage() {
       if (filterFrom) params.append('from', filterFrom);
       if (filterTo) params.append('to', filterTo);
       const qs = params.toString();
-      // ...existing code...
-              </thead>
-              <tbody>
-                {payments.map(p => (
-                  <tr key={p.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '8px 6px' }}>{p.id}</td>
-                    <td style={{ padding: '8px 6px' }}>{p.user?.nombre || `User #${p.userId}`}</td>
-                    <td style={{ padding: '8px 6px' }}>{p.concepto || '—'}</td>
-                    <td style={{ padding: '8px 6px', fontWeight: 600 }}>${(p.monto || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
-                    <td style={{ padding: '8px 6px' }}>{p.tipo || '—'}</td>
-                    <td style={{ padding: '8px 6px' }}>{p.fecha ? new Date(p.fecha).toLocaleDateString('es-MX') : '—'}</td>
-                    <td style={{ padding: '8px 6px' }}>{p.referencia || '—'}</td>
+      const response = await fetch(buildApiUrl(url) + '?' + qs);
+      const data = await response.json();
+      setPayments(data);
+    } catch (error) {
+      console.error('Error loading payments:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPayments();
+  }, []);
+
+  return (
+    <RoleGuard anyPermissions={[PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE, PERMISSIONS.CONSOLE_ADMIN]}>
+      <div style={{ display: 'grid', gap: 24 }}>
+        <HelpTab module="employee-payments" user={user} />
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+          {loading ? (
+            <div style={{ padding: '20px', textAlign: 'center' }}>
+              <p>loading...</p>
+            </div>
+          ) : (
+            <div style={{ padding: '20px', textAlign: 'center' }}>
+              <h2>Employee Payments</h2>
+              <table style={{ border: '1px solid var(--border)', width: '100%' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ padding: '8px 6px' }}>ID</th>
+                    <th style={{ padding: '8px 6px' }}>User</th>
+                    <th style={{ padding: '8px 6px' }}>Concepto</th>
+                    <th style={{ padding: '8px 6px', fontWeight: 600 }}>
+                      Monto
+                    </th>
+                    <th style={{ padding: '8px 6px' }}>Tipo</th>
+                    <th style={{ padding: '8px 6px' }}>Fecha</th>
+                    <th style={{ padding: '8px 6px' }}>Referencia</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {payments.map(p => (
+                    <tr key={p.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '8px 6px' }}>{p.id}</td>
+                      <td style={{ padding: '8px 6px' }}>{p.user?.nombre || `User #${p.userId}`}</td>
+                      <td style={{ padding: '8px 6px' }}>{p.concepto || '—'}</td>
+                      <td style={{ padding: '8px 6px', fontWeight: 600 }}>${(p.monto || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
+                      <td style={{ padding: '8px 6px' }}>{p.tipo || '—'}</td>
+                      <td style={{ padding: '8px 6px' }}>{p.fecha ? new Date(p.fecha).toLocaleDateString('es-MX') : '—'}</td>
+                      <td style={{ padding: '8px 6px' }}>{p.referencia || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>

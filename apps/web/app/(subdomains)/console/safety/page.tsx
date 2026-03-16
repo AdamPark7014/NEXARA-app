@@ -17,7 +17,13 @@ export default function SafetyPage() {
 
   useEffect(() => {
     if (!user?.token) return;
+    setLoading(true);
     const headers = { Authorization: `Bearer ${user.token}` };
+    Promise.all([
+      fetch(`${API_URL}/safety/incidents`, { headers }).then(r => r.json()),
+      fetch(`${API_URL}/safety/permits`, { headers }).then(r => r.json()),
+      fetch(`${API_URL}/safety/training`, { headers }).then(r => r.json()),
+    ])
       .then(([inc, per, tr]) => {
         setIncidents(Array.isArray(inc) ? inc : inc.data || []);
         setPermits(Array.isArray(per) ? per : per.data || []);
@@ -25,11 +31,26 @@ export default function SafetyPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-              )
-            )}
+  }, [user]);
+
+  return (
+    <RoleGuard anyPermissions={[PERMISSIONS.SAFETY_VIEW, PERMISSIONS.SAFETY_MANAGE, PERMISSIONS.CONSOLE_ADMIN]}>
+      <div style={{ maxWidth: 1400, margin: '0 auto', padding: 24 }}>
+        <HelpTab module="safety" user={user} />
+        <div className="card" style={{ padding: 16, marginBottom: 16 }}>
+          <h1 style={{ color: 'var(--primary)', marginBottom: 8 }}>🦺 Seguridad e Higiene</h1>
+          <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
+            <button onClick={() => setTab('incidents')} style={{ background: tab === 'incidents' ? 'var(--primary)' : 'var(--bg-secondary)', color: tab === 'incidents' ? '#fff' : 'var(--text-primary)', border: 'none', borderRadius: 6, padding: '8px 16px', fontWeight: 500, cursor: 'pointer' }}>Incidentes</button>
+            <button onClick={() => setTab('permits')} style={{ background: tab === 'permits' ? 'var(--primary)' : 'var(--bg-secondary)', color: tab === 'permits' ? '#fff' : 'var(--text-primary)', border: 'none', borderRadius: 6, padding: '8px 16px', fontWeight: 500, cursor: 'pointer' }}>Permisos</button>
+            <button onClick={() => setTab('training')} style={{ background: tab === 'training' ? 'var(--primary)' : 'var(--bg-secondary)', color: tab === 'training' ? '#fff' : 'var(--text-primary)', border: 'none', borderRadius: 6, padding: '8px 16px', fontWeight: 500, cursor: 'pointer' }}>Capacitación</button>
           </div>
-        </RoleGuard>
-      );
+        </div>
+        {tab === 'incidents' ? (
+          loading ? (
+            <div className="card" style={{ padding: 24, textAlign: "center" }}>
+              <p>Cargando incidentes...</p>
+            </div>
+          ) : incidents.length === 0 ? (
             <div className="card" style={{ padding: 24, textAlign: "center" }}>
               <p style={{ color: "var(--text-secondary)" }}>No hay incidentes reportados.</p>
             </div>
@@ -66,7 +87,11 @@ export default function SafetyPage() {
             </div>
           )
         ) : tab === "permits" ? (
-          permits.length === 0 ? (
+          loading ? (
+            <div className="card" style={{ padding: 24, textAlign: "center" }}>
+              <p>Cargando permisos...</p>
+            </div>
+          ) : permits.length === 0 ? (
             <div className="card" style={{ padding: 24, textAlign: "center" }}>
               <p style={{ color: "var(--text-secondary)" }}>No hay permisos de trabajo.</p>
             </div>
@@ -101,7 +126,11 @@ export default function SafetyPage() {
             </div>
           )
         ) : (
-          training.length === 0 ? (
+          loading ? (
+            <div className="card" style={{ padding: 24, textAlign: "center" }}>
+              <p>Cargando capacitaciones...</p>
+            </div>
+          ) : training.length === 0 ? (
             <div className="card" style={{ padding: 24, textAlign: "center" }}>
               <p style={{ color: "var(--text-secondary)" }}>No hay capacitaciones registradas.</p>
             </div>

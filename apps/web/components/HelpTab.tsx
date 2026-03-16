@@ -24,7 +24,7 @@ function getProfile(user: any): string {
   return "ingeniero";
 }
 
-export default function HelpTab({ module, user }: { module: string; user: any }) {
+export default function HelpTab({ module, user }: { module: string; user?: any }) {
   const profile = getProfile(user);
   const content = helpContent[module]?.[profile] || "No hay ayuda disponible para este módulo.";
   const [open, setOpen] = React.useState(false);

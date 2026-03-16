@@ -15,6 +15,7 @@ import { createUser } from "./api";
 export type UserRole = {
   id: number;
   nombre: string;
+  superadmin?: boolean;
   accesoConsole?: boolean;
   accesoConsoleAdmin?: boolean;
   accesoGestionWeb?: boolean;
@@ -334,11 +335,12 @@ export default function UserForm({
           department: "",
           avatarUrl: "",
           roleNombre: "",
-          accesoConsole: false,
-          accesoConsoleAdmin: false,
+          superadmin: false,
+          admin: false,
+          ingeniero: false,
+          vendedor: false,
           accesoGestionWeb: false,
           accesoGestionCvs: false,
-          accesoPanelVentas: false,
           accesoContabilidad: false,
           accesoCotizaciones: false,
         });
@@ -414,11 +416,11 @@ export default function UserForm({
       <div className="field">
         <label className="label">Accesos permitidos</label>
         <div className="checkboxGrid">
-          <label className="checkboxItem"><input type="checkbox" name="accesoConsole" checked={form.accesoConsole} onChange={handleChange} /> Consola usuario</label>
-          {user?.isSuperAdmin && <label className="checkboxItem"><input type="checkbox" name="accesoConsoleAdmin" checked={form.accesoConsoleAdmin} onChange={handleChange} /> Consola admin</label>}
+          <label className="checkboxItem"><input type="checkbox" name="ingeniero" checked={form.ingeniero} onChange={handleChange} /> Consola usuario</label>
+          {user?.isSuperAdmin && <label className="checkboxItem"><input type="checkbox" name="admin" checked={form.admin} onChange={handleChange} /> Consola admin</label>}
           <label className="checkboxItem"><input type="checkbox" name="accesoGestionWeb" checked={form.accesoGestionWeb} onChange={handleChange} /> Panel Web</label>
           <label className="checkboxItem"><input type="checkbox" name="accesoGestionCvs" checked={form.accesoGestionCvs} onChange={handleChange} /> Gestión de CVs</label>
-          <label className="checkboxItem"><input type="checkbox" name="accesoPanelVentas" checked={form.accesoPanelVentas} onChange={handleChange} /> Panel Ventas</label>
+          <label className="checkboxItem"><input type="checkbox" name="vendedor" checked={form.vendedor} onChange={handleChange} /> Panel Ventas</label>
           {user?.isSuperAdmin && <label className="checkboxItem"><input type="checkbox" name="accesoContabilidad" checked={form.accesoContabilidad} onChange={handleChange} /> Panel Contabilidad</label>}
           <label className="checkboxItem"><input type="checkbox" name="accesoCotizaciones" checked={form.accesoCotizaciones} onChange={handleChange} /> Pestaña de cotizaciones</label>
         </div>

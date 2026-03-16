@@ -20,3 +20,5 @@ export const RoleGuard = ({ permissions, anyPermissions, children }: RoleGuardPr
   }
   return <>{children}</>;
 };
+
+export default RoleGuard;

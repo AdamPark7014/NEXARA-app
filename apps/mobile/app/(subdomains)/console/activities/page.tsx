@@ -2,6 +2,7 @@
 import ActivitiesTable from '../../../../components/ActivitiesTable';
 import MyActivitiesTable from '../../../../components/MyActivitiesTable';
 import FinesTable from '../../../../components/FinesTable';
+import HelpTab from '@/components/HelpTab';
 import { RoleGuard } from '../../../../components/RoleGuard';
 import { useUser } from '../../../../components/UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
@@ -10,14 +11,13 @@ export default function ActivitiesPage() {
   const { user } = useUser();
   const isAdmin = hasPermission(user, PERMISSIONS.CONSOLE_ADMIN);
   const isSuperAdmin = user?.isSuperAdmin;
-
   return (
     <RoleGuard permissions={[PERMISSIONS.CONSOLE_ACCESS]}>
       <div style={{ display: 'grid', gap: 24 }}>
         {/* Admin y superadmin ven tabla de gestion */}
         {isAdmin && (
           <div>
-            <h2 style={{ marginBottom: 16 }}>{isSuperAdmin ? 'Actividades de Todos' : 'Gestión de Actividades'}</h2>
+            <h2 style={{ marginBottom: 16 }}>{isSuperAdmin ? 'Actividades de Todos' : 'Gestion de Actividades'}</h2>
             <ActivitiesTable />
           </div>
         )}
@@ -33,6 +33,7 @@ export default function ActivitiesPage() {
             </div>
           </div>
         )}
+        <HelpTab module="activities" user={user} />
       </div>
     </RoleGuard>
   );

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
+import HelpTab from '@/components/HelpTab';
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
@@ -56,6 +57,7 @@ export default function BankingPage() {
   return (
     <RoleGuard anyPermissions={[PERMISSIONS.BANKING_VIEW, PERMISSIONS.BANKING_MANAGE]}>
       <div style={{ display: "grid", gap: 24 }}>
+        <HelpTab module="banking" user={user} />
         <div className="card" style={{ padding: 16 }}>
           <h1 style={{ color: "var(--primary)", marginBottom: 8 }}>🏦 Banca — Banorte & SPEI</h1>
           <p style={{ color: "var(--text-secondary)" }}>

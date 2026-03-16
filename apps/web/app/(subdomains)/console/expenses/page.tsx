@@ -19,13 +19,29 @@ interface Expense {
   user?: { nombre: string };
 }
 
-// ...existing code...
+function statusColor(status?: string) {
+  switch (status) {
+    case 'aprobado': return '#22c55e';
+    case 'pendiente': return '#f59e0b';
+    case 'rechazado': return '#ef4444';
+    default: return 'var(--text-secondary)';
+  }
+}
 
 export default function ExpensesPage() {
   const { user } = useUser();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
-  // ...existing code...
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(buildApiUrl('expenses'), { headers: { Authorization: user?.token ? `Bearer ${user.token}` : '' } })
+      .then(res => res.json())
+      .then(data => setExpenses(Array.isArray(data) ? data : data.data || []))
+      .catch(() => setExpenses([]))
+      .finally(() => setLoading(false));
+  }, [user]);
+
   const total = expenses.reduce((acc, e) => acc + (e.monto || 0), 0);
   const pendientes = expenses.filter(e => e.estado === 'pendiente').length;
   const aprobados = expenses.filter(e => e.estado === 'aprobado').length;
@@ -79,46 +95,6 @@ export default function ExpensesPage() {
                 {expenses.map((e) => (
                   <tr key={e.id} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ padding: '8px 6px', fontFamily: 'monospace' }}>{e.id}</td>
-                    <td style={{ padding: '8px 6px' }}>{e.user?.nombre || e.userId}</td>
-                    <td style={{ padding: '8px 6px' }}>{e.concepto}</td>
-                    <td style={{ padding: '8px 6px' }}>{e.categoria}</td>
-                    <td style={{ padding: '8px 6px' }}>${e.monto?.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
-                    <td style={{ padding: '8px 6px', color: statusColor(e.estado) }}>{e.estado || 'pendiente'}</td>
-                    <td style={{ padding: '8px 6px' }}>{e.fecha}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-    </RoleGuard>
-  );
-
-        {/* Table */}
-        <div className="card" style={{ padding: 16, overflowX: 'auto' }}>
-          <h2 style={{ marginBottom: 12, color: 'var(--primary)' }}>📊 Control de Gastos Operativos</h2>
-          {loading ? (
-            <p>Cargando gastos...</p>
-          ) : expenses.length === 0 ? (
-            <p style={{ color: 'var(--text-secondary)' }}>No se encontraron gastos registrados.</p>
-          ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
-                  <th style={{ padding: '8px 6px' }}>ID</th>
-                  <th style={{ padding: '8px 6px' }}>Solicitante</th>
-                  <th style={{ padding: '8px 6px' }}>Concepto</th>
-                  <th style={{ padding: '8px 6px' }}>Categoría</th>
-                  <th style={{ padding: '8px 6px' }}>Monto</th>
-                  <th style={{ padding: '8px 6px' }}>Estado</th>
-                  <th style={{ padding: '8px 6px' }}>Fecha</th>
-                </tr>
-              </thead>
-              <tbody>
-                {expenses.map(e => (
-                  <tr key={e.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '8px 6px' }}>{e.id}</td>
                     <td style={{ padding: '8px 6px' }}>{e.user?.nombre || `User #${e.userId}`}</td>
                     <td style={{ padding: '8px 6px' }}>{e.concepto}</td>
                     <td style={{ padding: '8px 6px' }}>{e.categoria || '—'}</td>
@@ -128,7 +104,7 @@ export default function ExpensesPage() {
                         {e.estado || 'pendiente'}
                       </span>
                     </td>
-                    <td style={{ padding: '8px 6px' }}>{e.fecha ? new Date(e.fecha).toLocaleDateString('es-MX') : e.createdAt ? new Date(e.createdAt).toLocaleDateString('es-MX') : '—'}</td>
+                    <td style={{ padding: '8px 6px' }}>{e.fecha ? new Date(e.fecha).toLocaleDateString('es-MX') : '—'}</td>
                   </tr>
                 ))}
               </tbody>

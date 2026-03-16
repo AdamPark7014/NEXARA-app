@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import styles from "../../console.module.css";
 import { useUser } from "@/components/UserContext";
 import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions";
+import HelpTab from '@/components/HelpTab';
 
 type BorrowTool = {
   id: number;
@@ -202,6 +203,7 @@ export default function MyToolsPage() {
 
   return (
     <div className={styles.pageContainer}>
+      <HelpTab module="tools-my-tools" user={user} />
       <div className={styles.pageHeader}>
         <h1>Mis herramientas</h1>
         <p>Solicita y revisa las herramientas que tienes asignadas</p>

@@ -31,8 +31,7 @@ export default function WorkProjectsPage() {
     setLoading(true);
     try {
       const res = await fetch(buildApiUrl('work-projects'), {
-        headers: { Authorization: `Bearer ${user?.token}` },
-        <HelpTab module="work-projects" user={user} />
+        headers: { Authorization: `Bearer ${user?.token}` }
       });
       if (res.ok) {
         const data = await res.json();

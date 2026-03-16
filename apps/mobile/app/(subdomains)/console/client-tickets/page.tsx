@@ -1,7 +1,13 @@
 "use client";
 import React from 'react';
 import { ClientTicketsPanel } from './ClientTicketsPanel';
+import HelpTab from '@/components/HelpTab';
 
 export default function ClientTicketsPage() {
-  return <ClientTicketsPanel />;
+  return (
+    <>
+      <HelpTab module="client-tickets" />
+      <ClientTicketsPanel />
+    </>
+  );
 }

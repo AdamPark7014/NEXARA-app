@@ -53,6 +53,7 @@ export default function MaintenancePage() {
   return (
     <RoleGuard anyPermissions={[PERMISSIONS.MAINTENANCE_VIEW, PERMISSIONS.MAINTENANCE_MANAGE]}>
       <div style={{ display: "grid", gap: 24 }}>
+        <HelpTab module="maintenance" user={user} />
         <div className="card" style={{ padding: 16 }}>
           <h1 style={{ color: "var(--primary)", marginBottom: 8 }}>🔩 Órdenes de Mantenimiento</h1>
           <p style={{ color: "var(--text-secondary)" }}>
