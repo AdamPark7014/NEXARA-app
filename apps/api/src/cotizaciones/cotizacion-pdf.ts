@@ -121,7 +121,7 @@ export const generateCotizacionPdf = (payload: CotizacionPdfPayload): Promise<Bu
         doc.image(logo, margin, 26, { width: 120 });
       }
 
-      doc.fillColor(colors.navy).fontSize(22).font('Helvetica-Bold').text('Cotizacion', margin + 140, 30, {
+      doc.fillColor(colors.navy).fontSize(22).font('Helvetica-Bold').text('Cotización', margin + 140, 30, {
         width: 240,
       });
       doc.fontSize(11).font('Helvetica').fillColor(colors.muted).text('Propuesta comercial de tecnología', margin + 140, 58, {

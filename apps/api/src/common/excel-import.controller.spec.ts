@@ -4,18 +4,24 @@ import { PrismaService } from '../prisma/prisma.service.js';
 
 describe('ExcelImportController', () => {
   let controller: ExcelImportController;
-  let prisma: PrismaService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ExcelImportController],
       providers: [
-        { provide: PrismaService, useValue: { viatic: { createMany: jest.fn().mockResolvedValue({ count: 1 }) } } },
+        {
+          provide: PrismaService,
+          useValue: {
+            expense: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
+            vehicleControl: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
+            activity: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
+            evidence: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
+          },
+        },
       ],
     }).compile();
 
     controller = module.get<ExcelImportController>(ExcelImportController);
-    prisma = module.get<PrismaService>(PrismaService);
   });
 
   it('should throw if no file uploaded', async () => {

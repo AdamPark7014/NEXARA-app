@@ -18,12 +18,16 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { ViaticosService } from './viaticos.service.js';
 import { UsersService } from '../users/users.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { ExcelExportService } from '../common/excel-export.service.js';
+import { ExcelImportService } from '../common/excel-import.service.js';
 
 @Controller('viatics')
 export class ViaticosController {
   constructor(
     private readonly viaticosService: ViaticosService,
     private readonly usersService: UsersService,
+    private readonly excelExport: ExcelExportService,
+    private readonly excelImport: ExcelImportService,
   ) {}
 
   // Endpoint para obtener todos los viáticos
@@ -38,8 +42,14 @@ export class ViaticosController {
   @Get('export/:format')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VIATICS_EXPORT] })
-  async export(@Param('format') format: string, @Res() res: Response) {
-    const data: any[] = [];
+  async export(@CurrentUser() user: any, @Param('format') format: string, @Res() res: Response) {
+    const data = await this.viaticosService.findAll(user);
+    if (format === 'xlsx') {
+      const buffer = await this.excelExport.exportToExcel(data, 'viatics');
+      res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.attachment('viaticos.xlsx');
+      return res.send(buffer);
+    }
     if (format === 'csv') {
       res.header('Content-Type', 'text/csv');
       res.attachment('viaticos.csv');
@@ -63,13 +73,12 @@ export class ViaticosController {
         .json({ message: 'Archivo requerido' });
     }
     try {
-      JSON.parse(file.buffer.toString());
-      // importMany removed
-      return res.json({ message: 'Importación no implementada', count: 0 });
+      const result = await this.excelImport.importExcel('viatic', file.buffer);
+      return res.json(result);
     } catch (e) {
       return res
         .status(HttpStatus.BAD_REQUEST)
-        .json({ message: 'Archivo inválido o error de importación' });
+        .json({ message: e instanceof Error ? e.message : 'Archivo inválido o error de importación' });
     }
   }
 

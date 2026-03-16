@@ -22,12 +22,16 @@ import { UsersService } from '../users/users.service.js';
 import { CreateActivityDto } from './dto/create-activity.dto.js';
 import { UpdateActivityDto } from './dto/update-activity.dto.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { ExcelExportService } from '../common/excel-export.service.js';
+import { ExcelImportService } from '../common/excel-import.service.js';
 
 @Controller('activities')
 export class ActivitiesController {
   constructor(
     private readonly activitiesService: ActivitiesService,
     private readonly usersService: UsersService,
+    private readonly excelExport: ExcelExportService,
+    private readonly excelImport: ExcelImportService,
   ) {}
 
   // Exportar actividades (CSV o JSON)
@@ -55,6 +59,12 @@ export class ActivitiesController {
     } else {
       data = await this.activitiesService.findByResponsible(user.id);
     }
+    if (format === 'xlsx') {
+      const buffer = await this.excelExport.exportToExcel(data, 'activities');
+      res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.attachment('actividades.xlsx');
+      return res.send(buffer);
+    }
     if (format === 'csv') {
       const csv = this.activitiesService.toCSV(data);
       res.header('Content-Type', 'text/csv');
@@ -79,11 +89,11 @@ export class ActivitiesController {
       throw new BadRequestException('Archivo requerido');
     }
     try {
-      const json = JSON.parse(file.buffer.toString());
-      this.activitiesService.importMany(json);
-      return { message: 'Importación no implementada', count: 0 };
+      return await this.excelImport.importExcel('activity', file.buffer);
     } catch (e) {
-      throw new BadRequestException('Archivo inválido o error de importación');
+      throw new BadRequestException(
+        e instanceof Error ? e.message : 'Archivo inválido o error de importación',
+      );
     }
   }
 

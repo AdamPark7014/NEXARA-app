@@ -17,10 +17,16 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { Patch, Delete, Body } from '@nestjs/common';
 import { EvidencesService } from './evidences.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { ExcelExportService } from '../common/excel-export.service.js';
+import { ExcelImportService } from '../common/excel-import.service.js';
 
 @Controller('evidences')
 export class EvidencesController {
-  constructor(private readonly evidencesService: EvidencesService) {}
+  constructor(
+    private readonly evidencesService: EvidencesService,
+    private readonly excelExport: ExcelExportService,
+    private readonly excelImport: ExcelImportService,
+  ) {}
 
   @Get()
   @UseGuards(RbacGuard)
@@ -73,6 +79,12 @@ export class EvidencesController {
     res: Response,
   ) {
     const data = await this.evidencesService.findForHierarchy(user);
+    if (format === 'xlsx') {
+      const buffer = await this.excelExport.exportToExcel(data, 'evidences');
+      res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.attachment('evidencias.xlsx');
+      return res.send(buffer);
+    }
     if (format === 'csv') {
       const csv = this.evidencesService.toCSV(data);
       res.header('Content-Type', 'text/csv');
@@ -99,7 +111,13 @@ export class EvidencesController {
       const result = await this.evidencesService.importMany(json);
       return { message: 'Importación exitosa', count: result.length };
     } catch (e) {
-      throw new BadRequestException('Archivo inválido o error de importación');
+      try {
+        return await this.excelImport.importExcel('evidence', file.buffer);
+      } catch (excelError) {
+        throw new BadRequestException(
+          excelError instanceof Error ? excelError.message : 'Archivo inválido o error de importación',
+        );
+      }
     }
   }
 

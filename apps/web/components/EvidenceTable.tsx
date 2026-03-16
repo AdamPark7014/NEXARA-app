@@ -227,14 +227,6 @@ const EvidenceTable: React.FC<{ mode?: 'admin' | 'user'; title?: string | null }
             >
               Exportar Excel
             </button>
-            <button className="button-primary" onClick={() => fileInputRef.current?.click()}>Importar Excel</button>
-            <input
-              type="file"
-              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              ref={fileInputRef}
-              className={styles.hiddenInput}
-              onChange={handleImport}
-            />
           </>
         )}
       </div>
