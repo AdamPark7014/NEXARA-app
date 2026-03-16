@@ -45,6 +45,7 @@ export default function DocumentsPage() {
   return (
     <RoleGuard anyPermissions={[PERMISSIONS.DOCUMENTS_VIEW, PERMISSIONS.DOCUMENTS_MANAGE]}>
       <div style={{ display: "grid", gap: 24 }}>
+        <HelpTab module="documents" user={user} />
         <div className="card" style={{ padding: 16 }}>
           <h1 style={{ color: "var(--primary)", marginBottom: 8 }}>📁 Gestión Documental</h1>
           <p style={{ color: "var(--text-secondary)" }}>

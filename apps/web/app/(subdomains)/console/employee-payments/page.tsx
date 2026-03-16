@@ -36,28 +36,9 @@ export default function EmployeePaymentsPage() {
       if (filterFrom) params.append('from', filterFrom);
       if (filterTo) params.append('to', filterTo);
       const qs = params.toString();
-        <RoleGuard anyPermissions={[PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE, PERMISSIONS.CONSOLE_ADMIN]}>
-          <div style={{ display: 'grid', gap: 24 }}>
-            <HelpTab module="employee-payments" user={user} />
-            {/* KPI Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr)), gap: 16 }}>
-              <div className="card" style={{ padding: 16, textAlign: 'center' }}>
-                <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--primary)' }}>{payments.length}</div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Pagos registrados</div>
-              </div>
-              <div className="card" style={{ padding: 16, textAlign: 'center' }}>
-                <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--success, #22c55e)' }}>
-                  ${totalMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                </div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Total pagado</div>
-              </div>
-              <div className="card" style={{ padding: 16, textAlign: 'center' }}>
-                <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--warning, #f59e0b)' }}>
-                  {payments.length > 0 ? `$${(totalMonto / payments.length).toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '$0.00'}
-                </div>
-                <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Promedio por pago</div>
-              </div>
-            </div>
+      // ...existing code...
+              // ...existing code...
+              const totalMonto = payments.reduce((acc, p) => acc + (p.monto || 0), 0);
             {/* Filters */}
             <div className="card" style={{ padding: 16, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
               <label style={{ fontSize: 13 }}>Desde:</label>
@@ -65,29 +46,29 @@ export default function EmployeePaymentsPage() {
               <label style={{ fontSize: 13 }}>Hasta:</label>
               <input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)' }} />
               <button onClick={loadPayments} style={{ padding: '6px 16px', borderRadius: 6, background: 'var(--primary)', color: '#fff', border: 'none', cursor: 'pointer' }}>
-                Filtrar
-              </button>
-            </div>
-            {/* Table */}
-            <div className="card" style={{ padding: 16, overflowX: 'auto' }}>
-              <h2 style={{ marginBottom: 12, color: 'var(--primary)' }}>💰 Registro de Pagos a Empleados</h2>
-              {loading ? (
-                <p>Cargando pagos...</p>
-              ) : payments.length === 0 ? (
-                <p style={{ color: 'var(--text-secondary)' }}>No se encontraron pagos en el periodo seleccionado.</p>
-              ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-                  <thead>
-                    <tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
-                      <th style={{ padding: '8px 6px' }}>ID</th>
-                      <th style={{ padding: '8px 6px' }}>Empleado</th>
-                      <th style={{ padding: '8px 6px' }}>Concepto</th>
-                      <th style={{ padding: '8px 6px' }}>Monto</th>
-                      <th style={{ padding: '8px 6px' }}>Fecha</th>
-                      <th style={{ padding: '8px 6px' }}>Tipo</th>
-                      <th style={{ padding: '8px 6px' }}>Referencia</th>
-                      <th style={{ padding: '8px 6px' }}>Notas</th>
-                    </tr>
+                return (
+                  <RoleGuard anyPermissions={[PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE, PERMISSIONS.CONSOLE_ADMIN]}>
+                    <div style={{ display: 'grid', gap: 24 }}>
+                      <HelpTab module="employee-payments" user={user} />
+                      {/* KPI Cards */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+                        <div className="card" style={{ padding: 16, textAlign: 'center' }}>
+                          <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--primary)' }}>{payments.length}</div>
+                          <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Pagos registrados</div>
+                        </div>
+                        <div className="card" style={{ padding: 16, textAlign: 'center' }}>
+                          <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--success, #22c55e)' }}>
+                            ${totalMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          </div>
+                          <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Total pagado</div>
+                        </div>
+                        <div className="card" style={{ padding: 16, textAlign: 'center' }}>
+                          <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--warning, #f59e0b)' }}>
+                            {payments.length > 0 ? `$${(totalMonto / payments.length).toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '$0.00'}
+                          </div>
+                          <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Promedio por pago</div>
+                        </div>
+                      </div>
                   </thead>
                   <tbody>
                     {payments.map((p) => (
