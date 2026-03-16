@@ -6,6 +6,7 @@ import * as express from 'express';
 import * as path from 'path';
 import cluster = require('cluster');
 import * as os from 'os';
+
 import {
   createInMemoryIpBanList,
   createInMemoryRateLimiter,
@@ -22,9 +23,20 @@ import {
   isSafeFetchSite,
   resolveCorsOrigin,
 } from './common/security/security.utils';
+
+const toPositiveInt = (rawValue: string | undefined, fallback: number): number => {
+  const parsed = Number(rawValue);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+};
+
+const readPositiveIntEnv = (name: string, fallback: number): number => {
+  return toPositiveInt(process.env[name], fallback);
+};
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const httpServer = app.getHttpAdapter().getInstance();
+  app.enableShutdownHooks();
 
   httpServer.disable('x-powered-by');
   httpServer.set('trust proxy', 1);
@@ -46,7 +58,7 @@ async function bootstrap() {
     next();
   });
 
-  const maxConcurrentRequests = Number(process.env['MAX_CONCURRENT_REQUESTS'] || 5000);
+  const maxConcurrentRequests = readPositiveIntEnv('MAX_CONCURRENT_REQUESTS', 5000);
   let activeRequests = 0;
 
   app.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
@@ -75,9 +87,38 @@ async function bootstrap() {
     next();
   });
 
+  const appRequestTimeoutMs = readPositiveIntEnv('APP_REQUEST_TIMEOUT_MS', 120_000);
+  app.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
+    const requestIdHeader = request.headers['x-request-id'];
+    const requestId = Array.isArray(requestIdHeader)
+      ? requestIdHeader[0]
+      : typeof requestIdHeader === 'string'
+        ? requestIdHeader
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+    response.setHeader('X-Request-Id', requestId);
+
+    const timeoutRef = setTimeout(() => {
+      if (response.headersSent) {
+        response.end();
+        return;
+      }
+
+      response.status(408).json({
+        statusCode: 408,
+        message: 'Request timeout',
+        requestId,
+      });
+    }, appRequestTimeoutMs);
+
+    response.on('finish', () => clearTimeout(timeoutRef));
+    response.on('close', () => clearTimeout(timeoutRef));
+    next();
+  });
+
   const ipPenaltyBox = createInMemoryIpBanList({
-    maxStrikes: Number(process.env['IP_BAN_MAX_STRIKES'] || 6),
-    banWindowMs: Number(process.env['IP_BAN_WINDOW_MS'] || 60 * 60_000),
+    maxStrikes: readPositiveIntEnv('IP_BAN_MAX_STRIKES', 6),
+    banWindowMs: readPositiveIntEnv('IP_BAN_WINDOW_MS', 60 * 60_000),
   });
 
   app.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
@@ -219,14 +260,14 @@ async function bootstrap() {
   );
 
   const globalLimiter = createInMemoryRateLimiter({
-    maxHits: Number(process.env['GLOBAL_RATE_LIMIT_MAX'] || 300),
-    windowMs: Number(process.env['GLOBAL_RATE_LIMIT_WINDOW_MS'] || 60_000),
+    maxHits: readPositiveIntEnv('GLOBAL_RATE_LIMIT_MAX', 300),
+    windowMs: readPositiveIntEnv('GLOBAL_RATE_LIMIT_WINDOW_MS', 60_000),
     keyGenerator: (ip) => `global:${ip}`,
   });
 
   const authLimiter = createInMemoryRateLimiter({
-    maxHits: Number(process.env['AUTH_RATE_LIMIT_MAX'] || 25),
-    windowMs: Number(process.env['AUTH_RATE_LIMIT_WINDOW_MS'] || 15 * 60_000),
+    maxHits: readPositiveIntEnv('AUTH_RATE_LIMIT_MAX', 25),
+    windowMs: readPositiveIntEnv('AUTH_RATE_LIMIT_WINDOW_MS', 15 * 60_000),
     keyGenerator: (ip, path) => `auth:${ip}:${path}`,
   });
 
@@ -237,7 +278,7 @@ async function bootstrap() {
     const isAuthPath = /^\/api\/(auth|client-auth|branch-auth)\b/i.test(pathname);
     const limiterResult = isAuthPath ? authLimiter(ip, pathname) : globalLimiter(ip, pathname);
 
-    response.setHeader('X-RateLimit-Limit', `${isAuthPath ? Number(process.env['AUTH_RATE_LIMIT_MAX'] || 25) : Number(process.env['GLOBAL_RATE_LIMIT_MAX'] || 300)}`);
+    response.setHeader('X-RateLimit-Limit', `${isAuthPath ? readPositiveIntEnv('AUTH_RATE_LIMIT_MAX', 25) : readPositiveIntEnv('GLOBAL_RATE_LIMIT_MAX', 300)}`);
     response.setHeader('X-RateLimit-Remaining', `${limiterResult.remaining}`);
     response.setHeader('X-RateLimit-Reset', `${Math.ceil(Date.now() / 1000) + Math.ceil(limiterResult.retryAfterMs / 1000)}`);
 
@@ -366,9 +407,9 @@ async function bootstrap() {
   const port = process.env['PORT'] || 3001;
   const server = await app.listen(port);
 
-  const requestTimeoutMs = Number(process.env['HTTP_REQUEST_TIMEOUT_MS'] || 30_000);
-  const keepAliveTimeoutMs = Number(process.env['HTTP_KEEPALIVE_TIMEOUT_MS'] || 65_000);
-  const headersTimeoutMs = Number(process.env['HTTP_HEADERS_TIMEOUT_MS'] || 66_000);
+  const requestTimeoutMs = readPositiveIntEnv('HTTP_REQUEST_TIMEOUT_MS', 30_000);
+  const keepAliveTimeoutMs = readPositiveIntEnv('HTTP_KEEPALIVE_TIMEOUT_MS', 65_000);
+  const headersTimeoutMs = readPositiveIntEnv('HTTP_HEADERS_TIMEOUT_MS', 66_000);
 
   if (server && typeof (server as any).setTimeout === 'function') {
     (server as any).setTimeout(requestTimeoutMs);
@@ -379,6 +420,42 @@ async function bootstrap() {
   if (server && typeof (server as any).headersTimeout === 'number') {
     (server as any).headersTimeout = headersTimeoutMs;
   }
+
+  let isShuttingDown = false;
+  const shutdownGraceMs = readPositiveIntEnv('SHUTDOWN_GRACE_MS', 15_000);
+  const gracefulShutdown = (signal: string) => {
+    if (isShuttingDown) {
+      return;
+    }
+    isShuttingDown = true;
+    console.error(`[shutdown] signal received: ${signal}`);
+
+    const forceExitRef = setTimeout(() => {
+      console.error('[shutdown] force exit after timeout');
+      process.exit(1);
+    }, shutdownGraceMs);
+
+    server.close((error?: Error) => {
+      clearTimeout(forceExitRef);
+      if (error) {
+        console.error('[shutdown] close error:', error);
+        process.exit(1);
+        return;
+      }
+      console.error('[shutdown] server closed gracefully');
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('unhandledRejection', (reason) => {
+    console.error('[process] unhandledRejection:', reason);
+  });
+  process.on('uncaughtException', (error) => {
+    console.error('[process] uncaughtException:', error);
+    gracefulShutdown('uncaughtException');
+  });
 
   console.log(`🚀 API running on http://localhost:${port}/api`);
 }
@@ -395,13 +472,26 @@ const bootstrapWithCluster = async () => {
   if (clusterApi.isPrimary) {
     const availableCpus = typeof os.availableParallelism === 'function' ? os.availableParallelism() : os.cpus().length;
     const defaultWorkers = Math.max(1, availableCpus - 1);
-    const workerCount = Math.max(1, Number(process.env['CLUSTER_WORKERS'] || defaultWorkers));
+    const workerCount = readPositiveIntEnv('CLUSTER_WORKERS', defaultWorkers);
+    const maxRestartsPerMinute = readPositiveIntEnv('CLUSTER_MAX_RESTARTS_PER_MIN', workerCount * 4);
+    const recentRestarts: number[] = [];
 
     for (let index = 0; index < workerCount; index += 1) {
       clusterApi.fork();
     }
 
     clusterApi.on('exit', () => {
+      const now = Date.now();
+      while (recentRestarts.length > 0 && now - recentRestarts[0] > 60_000) {
+        recentRestarts.shift();
+      }
+
+      if (recentRestarts.length >= maxRestartsPerMinute) {
+        console.error('[cluster] restart limit reached; skipping worker respawn to avoid crash loop');
+        return;
+      }
+
+      recentRestarts.push(now);
       clusterApi.fork();
     });
 
