@@ -225,7 +225,7 @@ const ContabilidadHorasTable = () => {
         const fallbackMessage =
           res.status >= 500
             ? "Servicio de asistencia temporalmente no disponible. Intenta de nuevo en unos minutos."
-            : "No se pudieron cargar las estadisticas de asistencia.";
+            : "No se pudieron cargar las estadísticas de asistencia.";
         throw new Error(isHtmlError ? fallbackMessage : raw?.trim() || fallbackMessage);
       }
       const payload = await res.json();
@@ -314,7 +314,7 @@ const ContabilidadHorasTable = () => {
       <header className={styles.hero}>
         <div>
           <p className={styles.kicker}>Analitica financiera</p>
-          <h2 className={styles.title}>Estadisticas de asistencia</h2>
+          <h2 className={styles.title}>Estadísticas de asistencia</h2>
           <p className={styles.subtitle}>
             Observa jornadas, productividad y actividad diaria con detalle profesional.
           </p>

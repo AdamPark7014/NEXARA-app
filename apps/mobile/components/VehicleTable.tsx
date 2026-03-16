@@ -376,7 +376,7 @@ const VehicleTable = () => {
         />
         <select className="input" value={pageSize} onChange={e => setPageSize(Number(e.target.value))}>
           {[10, 20, 50].map(size => (
-            <option key={size} value={size}>{size} por pagina</option>
+            <option key={size} value={size}>{size} por página</option>
           ))}
         </select>
       </div>

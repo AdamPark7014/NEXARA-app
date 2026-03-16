@@ -277,7 +277,7 @@ const ContabilidadViaticTable = () => {
         <select className={styles.input} value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
           {[10, 20, 50].map((size) => (
             <option key={size} value={size}>
-              {size} por pagina
+              {size} por página
             </option>
           ))}
         </select>
@@ -437,7 +437,7 @@ const ContabilidadViaticTable = () => {
         >
           Anterior
         </button>
-        <span className={styles.pageInfo} style={isMobile ? { fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap" } : undefined}>Pagina {page} de {totalPages || 1}</span>
+        <span className={styles.pageInfo} style={isMobile ? { fontSize: "14px", fontWeight: 600, whiteSpace: "nowrap" } : undefined}>Página {page} de {totalPages || 1}</span>
         <button
           className={styles.ghostButton}
           onClick={() => setPage((p) => Math.min(totalPages, p + 1))}

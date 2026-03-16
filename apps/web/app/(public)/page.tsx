@@ -622,7 +622,7 @@ export default function Home() {
             </div>
           ) : (
             <div className={styles.newsEmpty} role="status" aria-live="polite">
-              <span className={styles.newsEmptyBadge}>ACTUALIZACION EN CURSO</span>
+              <span className={styles.newsEmptyBadge}>ACTUALIZACIÓN EN CURSO</span>
               <p className={styles.newsEmptyTitle}>Próximamente publicaremos actualizaciones estratégicas.</p>
               <p className={styles.newsEmptyText}>Muy pronto verás aquí novedades, ofertas y casos relevantes para toma de decisiones empresariales.</p>
             </div>

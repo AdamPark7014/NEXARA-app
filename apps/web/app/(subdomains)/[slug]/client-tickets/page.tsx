@@ -244,7 +244,7 @@ export default function ClientTicketsPage() {
                     <span className="badge">Mostrando: {filteredActivities.length}</span>
                     <span className="badge">Finalizados: {closed.length}</span>
                     <span className="badge">Promedio: {avgDuration ? `${avgDuration} min` : '-'}</span>
-                    <span className="badge">Calificacion prom: {avgRating ?? '-'}</span>
+                    <span className="badge">Calificación prom: {avgRating ?? '-'}</span>
                     <button className="button-secondary" onClick={() => handleReportDownload(client.id)}>Generar reporte PDF</button>
                     <button className="button-primary" onClick={() => setExpandedClient(expandedClient === client.id ? null : client.id)}>
                       {expandedClient === client.id ? 'Ocultar' : 'Ver tickets'}
@@ -275,13 +275,13 @@ export default function ClientTicketsPage() {
                           <div>Atendio: {activity.responsable?.nombre || '-'}</div>
                           <div>Inicio: {formatDateTime(activity.fechaInicio)}</div>
                           <div>Cierre: {formatDateTime(activity.fechaFinalizacion)}</div>
-                          <div>Duracion: {formatDuration(activity.fechaInicio || activity.fechaAsignacion, activity.fechaFinalizacion)}</div>
+                          <div>Duración: {formatDuration(activity.fechaInicio || activity.fechaAsignacion, activity.fechaFinalizacion)}</div>
                         </div>
                         {activity.clientFeedback && (
                           <div style={{ display: 'grid', gap: 6, padding: 10, borderRadius: 12, border: '1px solid rgba(15,106,214,0.14)', background: 'rgba(15,106,214,0.05)' }}>
                             <div style={{ fontWeight: 600 }}>Encuesta del cliente</div>
                             <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                              Calificacion: {activity.clientFeedback.rating ?? '-'}
+                              Calificación: {activity.clientFeedback.rating ?? '-'}
                             </div>
                             <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                               Llego a tiempo: {formatAnswer(activity.clientFeedback.wasOnTime)} · Atención amable: {formatAnswer(activity.clientFeedback.wasFriendly)} · Problema resuelto: {formatAnswer(activity.clientFeedback.wasSolved)}

@@ -197,7 +197,7 @@ export const generateClientReportPdf = async (payload: ClientReportPayload): Pro
 
     drawSectionTitle('Detalle de tickets');
 
-    const header = ['AN', 'Sucursal', 'Estatus', 'Prioridad', 'Eficiencia', 'Atendio', 'Inicio', 'Cierre', 'Dur.'];
+    const header = ['AN', 'Sucursal', 'Estatus', 'Prioridad', 'Eficiencia', 'Atendió', 'Inicio', 'Cierre', 'Dur.'];
     const baseWidths = [44, 92, 56, 56, 56, 78, 64, 64, 50];
     const totalBaseWidth = baseWidths.reduce((acc, value) => acc + value, 0);
     const scale = contentWidth / totalBaseWidth;

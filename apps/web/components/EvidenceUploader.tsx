@@ -222,7 +222,7 @@ const EvidenceUploader = ({ actividadId }: { actividadId?: number }) => {
           Seleccionar archivo
         </label>
         <div className={`${styles.helperText} ${styles.helperBottom}`}>
-          {files.length > 0 ? `${files.length} archivo(s) seleccionados` : 'Ningun archivo seleccionado'}
+          {files.length > 0 ? `${files.length} archivo(s) seleccionados` : 'Ningún archivo seleccionado'}
         </div>
       </div>
       {files.length > 0 && (

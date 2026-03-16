@@ -232,7 +232,7 @@ export default function FloatingContactForm() {
                 >
                   {loading ? "Enviando solicitud..." : "Solicitar contacto"}
                 </button>
-                <p className={styles.footNote}>Al enviar aceptas recibir comunicacion de seguimiento sobre tu solicitud.</p>
+                <p className={styles.footNote}>Al enviar aceptas recibir comunicación de seguimiento sobre tu solicitud.</p>
               </form>
             ) : (
               <div className={styles.success}>
