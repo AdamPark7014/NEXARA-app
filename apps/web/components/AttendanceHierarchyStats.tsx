@@ -223,7 +223,7 @@ const AttendanceHierarchyStats: React.FC = () => {
 
       if (!res.ok) {
         const errorText = await res.text();
-        let message = 'Error al cargar estadisticas';
+        let message = 'Error al cargar estadísticas';
         try {
           const errorJson = JSON.parse(errorText);
           message = errorJson.message || message;
@@ -292,8 +292,8 @@ const AttendanceHierarchyStats: React.FC = () => {
   if (!hasPermission(user, PERMISSIONS.ATTENDANCE_MANAGE)) {
     return (
       <div className={styles.noPermission}>
-        No tienes permisos para ver el panel de estadisticas de asistencia.
-        (Requerido: permiso de administracion de asistencia)
+        No tienes permisos para ver el panel de estadísticas de asistencia.
+        (Requerido: permiso de administración de asistencia)
       </div>
     );
   }
@@ -311,7 +311,7 @@ const AttendanceHierarchyStats: React.FC = () => {
   return (
     <div className={styles.wrapper}>
       <div className={`card ${styles.heroCard}`}>
-        <h2 className={styles.heroTitle}>Estadisticas de Asistencia</h2>
+        <h2 className={styles.heroTitle}>Estadísticas de Asistencia</h2>
         <div className={styles.heroSubtitle}>
           Visualiza tiempos, entradas/salidas y promedio de jornadas por usuario.
         </div>
@@ -562,7 +562,7 @@ const AttendanceHierarchyStats: React.FC = () => {
                                 <div className={styles.fileSummary}>
                                   {(paymentDrafts[userStat.userId]?.files || []).length > 0
                                     ? `${paymentDrafts[userStat.userId].files.length} archivo(s) seleccionados`
-                                    : 'Ningun archivo seleccionado'}
+                                    : 'Ningún archivo seleccionado'}
                                 </div>
                                 {(paymentDrafts[userStat.userId]?.files || []).length > 0 && (
                                   <div className={styles.fileList}>
@@ -630,7 +630,7 @@ const AttendanceHierarchyStats: React.FC = () => {
                                   <table className={`table ${styles.smallTable}`}>
                                     <thead>
                                       <tr>
-                                        <th>Calificacion</th>
+                                        <th>Calificación</th>
                                         <th>Comentario</th>
                                         <th>Fecha</th>
                                       </tr>

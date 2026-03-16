@@ -191,7 +191,7 @@ export const generateServiceSheetPdf = async (payload: ServiceSheetPayload): Pro
 
     const scheduleLines = [
       { label: 'Inicio', value: formatDateTime(payload.startedAt) },
-      { label: 'Termino', value: formatDateTime(payload.finishedAt) },
+      { label: 'Término', value: formatDateTime(payload.finishedAt) },
       { label: 'Gerente', value: payload.managerName || '-' },
       { label: 'Cargo', value: payload.managerRole || '-' },
     ];

@@ -350,7 +350,7 @@ export default function ContabilidadProyectos() {
             <div>
               <h2 className={styles.sectionTitle}>Detalle financiero</h2>
               <p className={styles.sectionSubtitle}>
-                Selecciona un proyecto para ver avances, gastos y nomina.
+                Selecciona un proyecto para ver avances, gastos y nómina.
               </p>
             </div>
             {selected && <span className={styles.badge}>{selected.status}</span>}
@@ -461,7 +461,7 @@ export default function ContabilidadProyectos() {
                 </div>
 
                 <div>
-                  <h4 className={styles.subTitle}>Nomina</h4>
+                  <h4 className={styles.subTitle}>Nómina</h4>
                   <div className={styles.list}>
                     {selected.payroll?.slice(0, 5).map((item) => (
                       <div key={item.id} className={styles.listItem}>

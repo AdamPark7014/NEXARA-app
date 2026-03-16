@@ -279,7 +279,7 @@ export default function ContabilidadPagos() {
               Seleccionar archivos
             </label>
             <span>
-              {files.length > 0 ? `${files.length} archivo(s) listos` : "Ningun archivo seleccionado"}
+              {files.length > 0 ? `${files.length} archivo(s) listos` : "Ningún archivo seleccionado"}
             </span>
           </div>
 

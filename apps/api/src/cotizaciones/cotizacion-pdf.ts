@@ -341,9 +341,9 @@ export const generateCotizacionPdf = (payload: CotizacionPdfPayload): Promise<Bu
     const summaryHeight = drawSummaryBox(margin + contentWidth - summaryWidth, summaryY, summaryWidth);
 
     doc.y = summaryY + summaryHeight + 14;
-    drawSectionTitle('Terminos y notas');
+    drawSectionTitle('Términos y notas');
     doc.fillColor(colors.text).fontSize(10).font('Helvetica');
-    if (payload.paymentTerms) doc.text(`Terminos de pago: ${payload.paymentTerms}`);
+    if (payload.paymentTerms) doc.text(`Términos de pago: ${payload.paymentTerms}`);
     if (payload.deliveryTime) doc.text(`Tiempo de entrega: ${payload.deliveryTime}`);
     if (payload.note) doc.text(`Notas: ${payload.note}`);
 

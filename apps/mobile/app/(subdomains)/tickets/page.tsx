@@ -783,7 +783,7 @@ export default function ClientTicketsPage() {
                         </div>
                         <div className={styles.grid180}>
                           <div>
-                            <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Calificacion (1-5)</label>
+                            <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Calificación (1-5)</label>
                             <select
                               className="input"
                               value={feedbackDrafts[activity.id]?.rating || ""}

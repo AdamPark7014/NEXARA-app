@@ -328,7 +328,7 @@ const EvidenceTable: React.FC<{ mode?: 'admin' | 'user'; title?: string | null }
                       value={reviewDrafts[evi.id]?.calificacion || ''}
                       onChange={(event) => updateReviewDraft(evi.id, { calificacion: event.target.value })}
                     >
-                      <option value="">Calificacion</option>
+                      <option value="">Calificación</option>
                       {calificacionOptions.map((opt) => (
                         <option key={opt} value={opt}>{opt}</option>
                       ))}

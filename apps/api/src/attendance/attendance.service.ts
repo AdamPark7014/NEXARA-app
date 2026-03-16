@@ -462,7 +462,7 @@ export class AttendanceService {
     }
     if (!currentUser.isSuperAdmin && !currentUser.permissions?.includes(PERMISSIONS.ATTENDANCE_MANAGE)) {
       throw new ForbiddenException(
-        'Tu nivel no te permite ver estadisticas de otros usuarios',
+        'Tu nivel no te permite ver estadísticas de otros usuarios',
       );
     }
 

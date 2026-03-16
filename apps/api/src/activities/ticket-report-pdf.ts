@@ -199,9 +199,9 @@ export const generateTicketReportPdf = async (payload: TicketReportPayload): Pro
 
     const operationLines = [
       { label: 'Inicio', value: formatDateTime(payload.startedAt) },
-      { label: 'Termino', value: formatDateTime(payload.finishedAt) },
-      { label: 'Duracion', value: formatDuration(payload.startedAt || null, payload.finishedAt || null) },
-      { label: 'Atendio', value: payload.responsableName || '-' },
+      { label: 'Término', value: formatDateTime(payload.finishedAt) },
+      { label: 'Duración', value: formatDuration(payload.startedAt || null, payload.finishedAt || null) },
+      { label: 'Atendió', value: payload.responsableName || '-' },
       { label: 'Gerente', value: payload.managerName || '-' },
     ];
 

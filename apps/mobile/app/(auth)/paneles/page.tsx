@@ -75,7 +75,7 @@ export default function PanelHubPage() {
 
       {panels.length === 0 ? (
         <div className={styles.empty}>
-          Tu cuenta no tiene paneles habilitados por el momento. Contacta a superadministracion para asignar permisos.
+          Tu cuenta no tiene paneles habilitados por el momento. Contacta a superadministración para asignar permisos.
         </div>
       ) : (
         <>
