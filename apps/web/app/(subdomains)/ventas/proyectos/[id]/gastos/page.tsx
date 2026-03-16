@@ -61,9 +61,9 @@ export default function ProjectExpensesPage() {
 
   const [loading, setLoading] = useState(true);
   const [expenses, setExpenses] = useState<ProjectExpense | null>(null);
-  const [viaticos, setViaticos] = useState<Viatico[]>([]);
-  const [availableViaticos, setAvailableViaticos] = useState<AvailableViatico[]>([]);
-  const [selectedViaticos, setSelectedViaticos] = useState<number[]>([]);
+  const [viaticos, setViáticos] = useState<Viatico[]>([]);
+  const [availableViáticos, setAvailableViáticos] = useState<AvailableViatico[]>([]);
+  const [selectedViáticos, setSelectedViáticos] = useState<number[]>([]);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignLoading, setAssignLoading] = useState(false);
 
@@ -88,7 +88,7 @@ export default function ProjectExpensesPage() {
         setExpenses(await expensesRes.json());
       }
       if (viaticosRes.ok) {
-        setViaticos(await viaticosRes.json());
+        setViáticos(await viaticosRes.json());
       }
     } catch (error) {
       console.error('Error fetching expenses:', error);
@@ -97,21 +97,21 @@ export default function ProjectExpensesPage() {
     }
   };
 
-  const fetchAvailableViaticos = async () => {
+  const fetchAvailableViáticos = async () => {
     try {
       const res = await fetch(`${apiUrl}/viaticos?projectId=null`, {
         headers: { Authorization: `Bearer ${user?.token}` },
       });
       if (res.ok) {
-        setAvailableViaticos(await res.json());
+        setAvailableViáticos(await res.json());
       }
     } catch (error) {
       console.error('Error fetching available viaticos:', error);
     }
   };
 
-  const handleAssignViaticos = async () => {
-    if (selectedViaticos.length === 0) return;
+  const handleAssignViáticos = async () => {
+    if (selectedViáticos.length === 0) return;
     try {
       setAssignLoading(true);
       const res = await fetch(`${apiUrl}/ventas/proyectos/${projectId}/viaticos/assign`, {
@@ -120,10 +120,10 @@ export default function ProjectExpensesPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${user?.token}`,
         },
-        body: JSON.stringify({ viaticIds: selectedViaticos }),
+        body: JSON.stringify({ viaticIds: selectedViáticos }),
       });
       if (res.ok) {
-        setSelectedViaticos([]);
+        setSelectedViáticos([]);
         setShowAssignModal(false);
         fetchProjectExpenses();
       }
@@ -253,14 +253,14 @@ export default function ProjectExpensesPage() {
         </div>
       </div>
 
-      {/* Viaticos Section */}
+      {/* Viáticos Section */}
       <div className={styles.viaticosSection}>
         <div className={styles.sectionHeader}>
           <h2>Viáticos Asignados ({viaticos.length})</h2>
           <button
             className={styles.addBtn}
             onClick={() => {
-              fetchAvailableViaticos();
+              fetchAvailableViáticos();
               setShowAssignModal(true);
             }}
           >
@@ -322,20 +322,20 @@ export default function ProjectExpensesPage() {
             </div>
 
             <div className={styles.modalBody}>
-              {availableViaticos.length === 0 ? (
+              {availableViáticos.length === 0 ? (
                 <p className={styles.noData}>No hay viáticos disponibles para asignar</p>
               ) : (
                 <div className={styles.checkboxList}>
-                  {availableViaticos.map(v => (
+                  {availableViáticos.map(v => (
                     <label key={v.id} className={styles.checkboxItem}>
                       <input
                         type="checkbox"
-                        checked={selectedViaticos.includes(v.id)}
+                        checked={selectedViáticos.includes(v.id)}
                         onChange={e => {
                           if (e.target.checked) {
-                            setSelectedViaticos([...selectedViaticos, v.id]);
+                            setSelectedViáticos([...selectedViáticos, v.id]);
                           } else {
-                            setSelectedViaticos(selectedViaticos.filter(id => id !== v.id));
+                            setSelectedViáticos(selectedViáticos.filter(id => id !== v.id));
                           }
                         }}
                       />
@@ -356,10 +356,10 @@ export default function ProjectExpensesPage() {
               </button>
               <button
                 className={styles.confirmBtn}
-                onClick={handleAssignViaticos}
-                disabled={selectedViaticos.length === 0 || assignLoading}
+                onClick={handleAssignViáticos}
+                disabled={selectedViáticos.length === 0 || assignLoading}
               >
-                {assignLoading ? 'Asignando...' : `Asignar (${selectedViaticos.length})`}
+                {assignLoading ? 'Asignando...' : `Asignar (${selectedViáticos.length})`}
               </button>
             </div>
           </div>
@@ -368,3 +368,5 @@ export default function ProjectExpensesPage() {
     </div>
   );
 }
+
+

@@ -108,7 +108,7 @@ export class BranchPortalController {
     @Body() body: any,
   ) {
     const description = body.description?.trim();
-    if (!description) throw new BadRequestException('Descripcion requerida');
+    if (!description) throw new BadRequestException('Descripción requerida');
 
     const branch = await this.prisma['serviceClientBranch'].findFirst({
       where: { id: user.branchId, clientId: user.clientId, isActive: true },

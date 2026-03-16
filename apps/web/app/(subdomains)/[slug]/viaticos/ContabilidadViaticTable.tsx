@@ -115,7 +115,7 @@ const ContabilidadViaticTable = () => {
       body: formData,
     });
     if (!res.ok) {
-      setImportMsg("Error al importar viaticos");
+      setImportMsg("Error al importar viáticos");
       return;
     }
     const data = await res.json();
@@ -218,7 +218,7 @@ const ContabilidadViaticTable = () => {
       <header className={styles.cardHeader}>
         <div>
           <p className={styles.kicker}>Panel financiero</p>
-          <h2 className={styles.title}>Viaticos</h2>
+          <h2 className={styles.title}>Viáticos</h2>
           <p className={styles.subtitle}>Total filtrado: {formatCurrency(totals.total)} · {totals.count} items</p>
         </div>
         {hasPermission(user, PERMISSIONS.VIATICS_EXPORT) && (
@@ -232,7 +232,7 @@ const ContabilidadViaticTable = () => {
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement("a");
                 a.href = url;
-                a.download = "viaticos.xlsx";
+                a.download = "viáticos.xlsx";
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
@@ -455,3 +455,5 @@ const ContabilidadViaticTable = () => {
 };
 
 export default ContabilidadViaticTable;
+
+

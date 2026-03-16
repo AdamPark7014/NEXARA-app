@@ -135,7 +135,7 @@ export default function ContactosWeb() {
     if (sendResponse && sendChannel === "WHATSAPP") {
       const phoneDigits = (selectedMessage.phone || "").replace(/\D/g, "");
       if (!phoneDigits) {
-        setError("Este contacto no tiene telefono para WhatsApp.");
+        setError("Este contacto no tiene teléfono para WhatsApp.");
         return;
       }
     }
@@ -209,9 +209,9 @@ export default function ContactosWeb() {
       <header className={styles.header}>
         <div>
           <p className={styles.kicker}>Panel Web</p>
-          <h1 className={styles.title}>Gestion inteligente de contactos</h1>
+          <h1 className={styles.title}>Gestión inteligente de contactos</h1>
           <p className={styles.subtitle}>
-            Centraliza contactos de /contacto y el formulario flotante. Responde y da seguimiento desde aqui.
+            Centraliza contactos de /contacto y el formulario flotante. Responde y da seguimiento desde aquí.
           </p>
         </div>
         <div className={styles.headerStats}>
@@ -372,7 +372,7 @@ export default function ContactosWeb() {
                   <textarea
                     value={responseText}
                     onChange={(event) => setResponseText(event.target.value)}
-                    placeholder="Escribe aqui la respuesta o notas internas..."
+                    placeholder="Escribe aquí la respuesta o notas internas..."
                     rows={6}
                   />
                   {error && <p className={styles.error}>{error}</p>}

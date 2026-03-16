@@ -141,7 +141,7 @@ export default function FloatingContactForm() {
 
             <div className={styles.panelMeta}>
               <span>Respuesta en horario laboral</span>
-              <span>Atencion comercial y tecnica</span>
+              <span>Atención comercial y técnica</span>
             </div>
 
             {!submitted ? (
@@ -250,3 +250,4 @@ export default function FloatingContactForm() {
     </>
   );
 }
+

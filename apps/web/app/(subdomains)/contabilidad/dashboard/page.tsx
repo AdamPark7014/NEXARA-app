@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
@@ -579,7 +579,7 @@ export default function ContabilidadDashboard() {
           </div>
           <div className={styles.miniChart}>
             <div className={styles.barRow}>
-              <span className={styles.barLabel}>Viaticos</span>
+              <span className={styles.barLabel}>Viáticos</span>
               <div className={styles.barTrack}>
                 <div
                   className={styles.barFill}
@@ -695,3 +695,4 @@ export default function ContabilidadDashboard() {
     </section>
   );
 }
+

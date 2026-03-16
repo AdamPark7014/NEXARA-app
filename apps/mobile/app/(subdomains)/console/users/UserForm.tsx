@@ -182,8 +182,8 @@ export default function UserForm({
         accesoConsoleAdmin: isConsoleAdmin,
         accesoActividades: enableConsoleModules,
         accesoEvidencias: enableConsoleModules,
-        accesoViaticos: enableConsoleModules,
-        accesoVehiculos: enableConsoleModules,
+        accesoViáticos: enableConsoleModules,
+        accesoVehículos: enableConsoleModules,
         accesoAsistencia: enableConsoleModules,
         accesoGps: enableConsoleModules,
         accesoGestionUsuarios: isConsoleAdmin,
@@ -326,7 +326,7 @@ export default function UserForm({
       <div className="formHeader">
         <div>
           <h3 className="formTitle">{isEdit ? "Editar Usuario" : "Crear Usuario"}</h3>
-          <p className="formSubtitle">Gestiona datos, permisos y fotografia del perfil.</p>
+          <p className="formSubtitle">Gestiona datos, permisos y fotografía del perfil.</p>
         </div>
         {user?.isSuperAdmin && <span className="formBadge">Superadmin</span>}
       </div>
@@ -410,7 +410,7 @@ export default function UserForm({
           {preview ? (
             <Image src={preview} alt="preview" width={86} height={86} className="previewAvatar" unoptimized />
           ) : (
-            <span>Arrastra una imagen aqui o haz click</span>
+            <span>Arrastra una imagen aquí o haz click</span>
           )}
         </div>
         {preview && (
@@ -719,3 +719,4 @@ export default function UserForm({
     </form>
   );
 }
+

@@ -291,7 +291,7 @@ export default function WebPanel() {
             <div className={styles.cardHeader}>
               <div>
                 <h3 className={styles.cardTitle}>Accesos directos</h3>
-                <p className={styles.cardSubtitle}>Enlaces rapidos para tus tareas diarias.</p>
+                <p className={styles.cardSubtitle}>Enlaces rápidos para tus tareas diarias.</p>
               </div>
             </div>
             <div className={styles.actionGrid}>

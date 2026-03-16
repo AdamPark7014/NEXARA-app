@@ -191,7 +191,6 @@ export default function MyBranchesPage() {
             className={consoleStyles.sidebarOverlay}
             onClick={() => setMobileMenuOpen(false)}
             role="presentation"
-            style={{ zIndex: 12001 }}
           ></div>
         )}
 
@@ -200,22 +199,6 @@ export default function MyBranchesPage() {
           className={consoleStyles.sidebarContent}
           id="tickets-branches-sidebar-menu"
           data-open={isMobile && mobileMenuOpen ? "true" : undefined}
-          style={
-            isMobile && mobileMenuOpen
-              ? {
-                  position: "fixed",
-                  top: "64px",
-                  left: "8px",
-                  right: "8px",
-                  zIndex: 12002,
-                  display: "flex",
-                  opacity: 1,
-                  visibility: "visible",
-                  transform: "translateY(0) scale(1)",
-                  pointerEvents: "auto",
-                }
-              : undefined
-          }
         >
         <div className={consoleStyles.sidebarUser}>
           <div className={consoleStyles.sidebarAvatar}>

@@ -486,14 +486,14 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
               <Image src="/logo-nexara.png" alt="Nexara" width={64} height={64} className="logoImage" priority />
             </div>
             <p className="brandName">Nexara</p>
-            <h1 className="title">{title || "Iniciar sesion"}</h1>
+            <h1 className="title">{title || "Iniciar sesión"}</h1>
             <p className="subtitle">{subtitle || "Ingresa a tu cuenta de Nexara"}</p>
           </div>
 
           <form className="form" onSubmit={handleLogin}>
             <div className="input-group">
               <label className="input-label" htmlFor="email">
-                Correo electronico
+                Correo electrónico
               </label>
               <div className="input-wrapper">
                 <svg className="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -514,7 +514,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
 
             <div className="input-group">
               <label className="input-label" htmlFor="password">
-                Contrasena
+                Contraseña
               </label>
               <div className="input-wrapper">
                 <svg className="input-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -534,7 +534,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
                   type="button"
                   className="password-toggle"
                   onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? "Ocultar contrasena" : "Mostrar contrasena"}
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                 >
                   {showPassword ? (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -552,7 +552,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
 
             <button type="submit" className="submit-button" disabled={isLoading}>
               {isLoading && <span className="loader"></span>}
-              {isLoading ? "Iniciando sesion..." : "Entrar"}
+              {isLoading ? "Iniciando sesión..." : "Entrar"}
             </button>
 
             {error && (
@@ -563,10 +563,11 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           </form>
 
           <div className="footer">
-            <p className="footer-text">Tecnologia que impulsa tu negocio</p>
+            <p className="footer-text">Tecnología que impulsa tu negocio</p>
           </div>
         </div>
       </div>
     </>
   );
 }
+

@@ -214,7 +214,7 @@ export default function ListUsers() {
   const handleViewProfile = async (u: User) => {
     if (!user?.token) return;
     if (!hasPermission(user, PERMISSIONS.USERS_REVIEW)) {
-      alert('No tienes permisos para ver la informacion de este usuario.');
+      alert('No tienes permisos para ver la información de este usuario.');
       return;
     }
     if (!user.isSuperAdmin && user.departmentId && u.department?.id && user.departmentId !== u.department.id) {
@@ -371,7 +371,7 @@ export default function ListUsers() {
                       className="tableAction tableActionInfo"
                       onClick={() => handleViewProfile(u)}
                     >
-                      Ver informacion
+                      Ver información
                     </button>
                   ) : (
                     <span style={{ color: 'var(--muted)', fontSize: 12 }}>Sin permisos</span>
@@ -461,12 +461,12 @@ export default function ListUsers() {
                     />
                     <div className="profileHintText">El rechazo y observaciones de documentos se realiza por cada documento.</div>
                     <div className="profileActionRow">
-                      <button className="button-primary" onClick={() => handleProfileReview('Aprobado')}>Aprobar informacion general</button>
+                      <button className="button-primary" onClick={() => handleProfileReview('Aprobado')}>Aprobar información general</button>
                     </div>
                   </div>
                   <div className="profileCard">
                     <div className="profileSectionTitle">Datos personales</div>
-                    <div>Telefono: {profileData?.perfil?.telefono || '-'}</div>
+                    <div>Teléfono: {profileData?.perfil?.telefono || '-'}</div>
                     <div>Fecha nacimiento: {profileData?.perfil?.fechaNacimiento || '-'}</div>
                     <div>CURP: {profileData?.perfil?.curp || '-'}</div>
                     <div>RFC: {profileData?.perfil?.rfc || '-'}</div>
@@ -474,7 +474,7 @@ export default function ListUsers() {
                     <div>NSS: {profileData?.perfil?.nss || '-'}</div>
                   </div>
                   <div className="profileCard">
-                    <div className="profileSectionTitle">Direccion</div>
+                    <div className="profileSectionTitle">Dirección</div>
                     <div>{profileData?.perfil?.direccion || '-'}</div>
                     <div>{profileData?.perfil?.colonia || '-'} | {profileData?.perfil?.codigoPostal || '-'}</div>
                     <div>{profileData?.perfil?.ciudad || '-'}, {profileData?.perfil?.estado || '-'}</div>
@@ -988,3 +988,4 @@ export default function ListUsers() {
     </>
   );
 }
+

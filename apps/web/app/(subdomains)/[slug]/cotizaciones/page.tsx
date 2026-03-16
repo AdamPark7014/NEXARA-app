@@ -54,8 +54,8 @@ const seedItems: QuoteItem[] = [
   {
     id: "item-1",
     category: "Hardware",
-    name: "Servicio de implementacion",
-    description: "Configuracion inicial, onboarding y alineacion de objetivos.",
+    name: "Servicio de implementación",
+    description: "Configuración inicial, onboarding y alineación de objetivos.",
     scope: "Planeacion, despliegue y handover.",
     brand: "Nexara",
     model: "Suite Pro",
@@ -122,12 +122,12 @@ const emptyMeta: QuoteMeta = {
   clientPhone: "",
   clientAddress: "",
   projectName: "",
-  scope: "Implementacion, capacitacion y soporte operativo.",
+  scope: "Implementación, capacitación y soporte operativo.",
   validUntil: "",
   paymentTerms: "50% anticipo · 50% contra entrega",
   deliveryTime: "4 semanas despues de la firma",
   preparedBy: "Equipo Nexara",
-  preparedRole: "Direccion Comercial",
+  preparedRole: "Dirección Comercial",
   currency: "MXN",
   depositPercent: 50,
   note: "Incluye SLA, onboarding y capacitacion inicial.",
@@ -296,7 +296,7 @@ export default function CotizacionesPage() {
 
   const handleSave = async () => {
     if (!user?.token) {
-      setSaveMessage("Inicia sesion para guardar.");
+      setSaveMessage("Inicia sesión para guardar.");
       return null;
     }
     setIsSaving(true);
@@ -378,7 +378,7 @@ export default function CotizacionesPage() {
         <header className="quoteHeader">
           <div>
             <p className="eyebrow">Panel Console</p>
-            <h1>Gestion de Cotizaciones</h1>
+            <h1>Gestión de Cotizaciones</h1>
             <p className="subline">Diseña, envia y firma cotizaciones en una sola vista.</p>
           </div>
           <div className="headerActions">
@@ -420,7 +420,7 @@ export default function CotizacionesPage() {
               </div>
               <div className="fieldGrid">
                 <label className="field">
-                  Numero de cotizacion
+                  Número de cotización
                   <input value={meta.quoteNumber} onChange={(e) => updateMeta("quoteNumber", e.target.value)} />
                 </label>
                 <label className="field">
@@ -450,12 +450,12 @@ export default function CotizacionesPage() {
                   <input value={meta.clientEmail} onChange={(e) => updateMeta("clientEmail", e.target.value)} placeholder="correo@empresa.com" />
                 </label>
                 <label className="field">
-                  Telefono
+                  Teléfono
                   <input value={meta.clientPhone} onChange={(e) => updateMeta("clientPhone", e.target.value)} placeholder="55 0000 0000" />
                 </label>
                 <label className="field full">
-                  Direccion
-                  <input value={meta.clientAddress} onChange={(e) => updateMeta("clientAddress", e.target.value)} placeholder="Calle, ciudad, pais" />
+                  Dirección
+                  <input value={meta.clientAddress} onChange={(e) => updateMeta("clientAddress", e.target.value)} placeholder="Calle, ciudad, país" />
                 </label>
               </div>
             </div>
@@ -465,7 +465,7 @@ export default function CotizacionesPage() {
               <div className="fieldGrid">
                 <label className="field">
                   Nombre del proyecto
-                  <input value={meta.projectName} onChange={(e) => updateMeta("projectName", e.target.value)} placeholder="Implementacion Nexara" />
+                  <input value={meta.projectName} onChange={(e) => updateMeta("projectName", e.target.value)} placeholder="Implementación Nexara" />
                 </label>
                 <label className="field">
                   Moneda
@@ -542,7 +542,7 @@ export default function CotizacionesPage() {
                   <span>IEPS %</span>
                   <span>Ret %</span>
                   <span>Subtotal</span>
-                  <span>Accion</span>
+                  <span>Acción</span>
                 </div>
 
                 {items.map((item, index) => {
@@ -615,7 +615,7 @@ export default function CotizacionesPage() {
                       <div className="detailRow">
                         <label>
                           Descripcion
-                          <input value={item.description} onChange={(e) => updateItem(item.id, "description", e.target.value)} placeholder="Especificacion tecnica" />
+                          <input value={item.description} onChange={(e) => updateItem(item.id, "description", e.target.value)} placeholder="Especificación técnica" />
                         </label>
                         <label>
                           Alcance
@@ -706,12 +706,12 @@ export default function CotizacionesPage() {
                 <div className="previewValue">{meta.clientCompany || "Empresa"}</div>
                 <div className="previewMeta">{meta.clientName || "Contacto"}</div>
                 <div className="previewMeta">{meta.clientEmail || "correo@empresa.com"}</div>
-                <div className="previewMeta">{meta.clientPhone || "Telefono"}</div>
+                <div className="previewMeta">{meta.clientPhone || "Teléfono"}</div>
               </div>
               <div>
                 <div className="previewLabel">Proyecto</div>
                 <div className="previewValue">{meta.projectName || "Proyecto"}</div>
-                <div className="previewMeta">{meta.clientAddress || "Direccion"}</div>
+                <div className="previewMeta">{meta.clientAddress || "Dirección"}</div>
                 <div className="previewMeta">Estado: {status === "draft" ? "Borrador" : status === "sent" ? "Enviada" : "Aprobada"}</div>
               </div>
             </div>
@@ -815,5 +815,7 @@ export default function CotizacionesPage() {
     </RoleGuard>
   );
 }
+
+
 
 

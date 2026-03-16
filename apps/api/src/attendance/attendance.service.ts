@@ -447,7 +447,7 @@ export class AttendanceService {
   }
 
   /**
-   * Obtiene usuarios accesibles segun la jerarquia del usuario actual
+  * Obtiene usuarios accesibles según la jerarquía del usuario actual
    * - Superadmin (gerencia/developer): Ve todos los usuarios
    * - Console admin (ATTENDANCE_MANAGE): Ve todos los usuarios
    * - Otros: No tiene acceso a esta funcion

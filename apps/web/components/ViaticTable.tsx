@@ -188,7 +188,7 @@ const ViaticTable = () => {
               const url = window.URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
-              a.download = 'viaticos.xlsx';
+              a.download = 'viáticos.xlsx';
               document.body.appendChild(a);
               a.click();
               a.remove();
@@ -310,3 +310,4 @@ const ViaticTable = () => {
 };
 
 export default ViaticTable;
+

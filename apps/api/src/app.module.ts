@@ -93,3 +93,4 @@ import { InventoriesModule } from './inventories/inventories.module.js';
   ],
 })
 export class AppModule {}
+

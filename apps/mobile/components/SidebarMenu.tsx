@@ -52,10 +52,10 @@ const SidebarMenu = () => {
           <li className={`menu-item ${isActive('/console/my-evidences') ? 'active' : ''}`}><Link className="menuLink" href="/console/my-evidences">Mis Evidencias</Link></li>
         )}
         {hasPermission(user, PERMISSIONS.VIATICS_VIEW) && (
-          <li className={`menu-item ${isActive('/console/my-viatics') ? 'active' : ''}`}><Link className="menuLink" href="/console/my-viatics">Mis Viaticos</Link></li>
+          <li className={`menu-item ${isActive('/console/my-viatics') ? 'active' : ''}`}><Link className="menuLink" href="/console/my-viatics">Mis Viáticos</Link></li>
         )}
         {hasPermission(user, PERMISSIONS.VEHICLES_VIEW) && (
-          <li className={`menu-item ${isActive('/console/my-vehicles') ? 'active' : ''}`}><Link className="menuLink" href="/console/my-vehicles">Mis Vehiculos</Link></li>
+          <li className={`menu-item ${isActive('/console/my-vehicles') ? 'active' : ''}`}><Link className="menuLink" href="/console/my-vehicles">Mis Vehículos</Link></li>
         )}
         {hasPermission(user, PERMISSIONS.GPS_VIEW) && (
           <li className={`menu-item ${isActive('/console/gps') ? 'active' : ''}`}><Link className="menuLink" href="/console/gps">Mapa GPS</Link></li>
@@ -71,3 +71,4 @@ const SidebarMenu = () => {
 };
 
 export default SidebarMenu;
+

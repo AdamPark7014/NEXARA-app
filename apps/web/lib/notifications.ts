@@ -1,7 +1,7 @@
 // Utilidad para notificaciones push en navegador
 export const registeredServiceWorker = async () => {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    console.warn('Esta navegador no soporta Service Workers o Push Notifications');
+    console.warn('Este navegador no soporta Service Workers o Push Notifications');
     return false;
   }
 

@@ -244,11 +244,11 @@ const GpsMap = () => {
         try {
           await sendLocation(payload);
         } catch {
-          setError('No se pudo enviar la ubicacion.');
+          setError('No se pudo enviar la ubicación.');
         }
       },
       () => {
-        setError('No se pudo obtener la ubicacion. Revisa los permisos.');
+        setError('No se pudo obtener la ubicación. Revisa los permisos.');
       },
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
     );
@@ -272,7 +272,7 @@ const GpsMap = () => {
           );
         });
       } catch {
-        setError('Debes habilitar la ubicacion para compartir en tiempo real.');
+        setError('Debes habilitar la ubicación para compartir en tiempo real.');
         return;
       }
     }
@@ -291,14 +291,14 @@ const GpsMap = () => {
     }
     const data = await res.json();
     setConsent(Boolean(data?.consent));
-    setStatusMsg(nextValue ? 'Compartiendo ubicacion en tiempo real.' : 'Ubicacion compartida desactivada.');
+    setStatusMsg(nextValue ? 'Compartiendo ubicación en tiempo real.' : 'Ubicación compartida desactivada.');
   };
 
   useEffect(() => {
     if (!user?.token) return;
     setLoading(true);
     Promise.all([refreshMe(), refreshTeam()])
-      .catch(() => setError('No se pudo cargar la informacion de GPS.'))
+      .catch(() => setError('No se pudo cargar la información de GPS.'))
       .finally(() => setLoading(false));
   }, [user?.token]);
 
@@ -498,7 +498,7 @@ const GpsMap = () => {
             <div className={styles.subtitle}>
               {isHighLevel
                 ? 'Vista gerencial con el resumen del equipo en tiempo real.'
-                : 'La ubicacion se comparte automaticamente al registrar entrada.'}
+                : 'La ubicación se comparte automáticamente al registrar entrada.'}
             </div>
           </div>
           {!isHighLevel && (
@@ -513,12 +513,12 @@ const GpsMap = () => {
           <div className={styles.helperText}>
             {isHighLevel
               ? 'Solo visualizas a usuarios con consentimiento y nivel inferior.'
-              : 'Solo puedes ver tu ubicacion y, si eres administrador, la de usuarios bajo tu jerarquia.'}
+              : 'Solo puedes ver tu ubicación y, si eres administrador, la de usuarios bajo tu jerarquía.'}
           </div>
           {!isHighLevel && (
             <div className={styles.syncStatus}>
               <span className={`${styles.dot} ${consent ? styles.dotActive : styles.dotPaused}`} />
-              {loading ? 'Sincronizando...' : consent ? 'Ubicacion activa' : 'Ubicacion pausada'}
+              {loading ? 'Sincronizando...' : consent ? 'Ubicación activa' : 'Ubicación pausada'}
             </div>
           )}
         </div>
@@ -530,15 +530,15 @@ const GpsMap = () => {
         <div className={`card ${styles.sectionCard}`}>
         <div className={styles.rowBetweenSmall}>
           <div>
-            <h3 className={styles.sectionTitle}>Mi ubicacion</h3>
+            <h3 className={styles.sectionTitle}>Mi ubicación</h3>
             <div className={styles.helperText}>
               {myLocation?.ultimaActualizacion
-                ? `Ultima actualizacion: ${new Date(myLocation.ultimaActualizacion).toLocaleString()}`
-                : 'Sin ubicacion registrada'}
+                ? `Última actualización: ${new Date(myLocation.ultimaActualizacion).toLocaleString()}`
+                : 'Sin ubicación registrada'}
             </div>
           </div>
           <div className={styles.helperText}>
-            {loading ? 'Cargando...' : consent ? 'En tiempo real' : 'Ubicacion privada'}
+            {loading ? 'Cargando...' : consent ? 'En tiempo real' : 'Ubicación privada'}
           </div>
         </div>
         <div className={styles.statsGrid}>
@@ -603,7 +603,7 @@ const GpsMap = () => {
                     {location.usuario?.department?.nombre || 'Sin departamento'}
                   </div>
                   <div className={styles.teamUpdated}>
-                    Ultima ubicacion: {location.ultimaActualizacion ? new Date(location.ultimaActualizacion).toLocaleString() : '-'}
+                    Última ubicación: {location.ultimaActualizacion ? new Date(location.ultimaActualizacion).toLocaleString() : '-'}
                   </div>
                 </div>
               ))
@@ -618,3 +618,5 @@ const GpsMap = () => {
 };
 
 export default GpsMap;
+
+

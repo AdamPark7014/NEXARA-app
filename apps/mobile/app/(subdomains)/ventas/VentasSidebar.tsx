@@ -192,7 +192,6 @@ export default function VentasSidebar() {
           className={styles.sidebarOverlay}
           onClick={closeMenu}
           role="presentation"
-          style={{ zIndex: 12001 }}
         />
       )}
 
@@ -201,22 +200,6 @@ export default function VentasSidebar() {
         className={styles.sidebarContent}
         id="ventas-sidebar-menu"
         data-open={isMobile && isMenuOpen ? "true" : undefined}
-        style={
-          isMobile && isMenuOpen
-            ? {
-                position: "fixed",
-                top: "58px",
-                left: "6px",
-                right: "6px",
-                zIndex: 12002,
-                display: "flex",
-                opacity: 1,
-                visibility: "visible",
-                transform: "translateY(0) scale(1)",
-                pointerEvents: "auto",
-              }
-            : undefined
-        }
       >
 
       {/* User Info Card */}
@@ -232,7 +215,6 @@ export default function VentasSidebar() {
           <div className={styles.userInfo}>
             <p className={styles.userName}>{user.nombre}</p>
             <p className={styles.userRole}>{userRoleLabel}</p>
-            {canManageSellers && <span className={styles.badgeAdmin}>Gestor</span>}
           </div>
         </div>
       )}
@@ -315,10 +297,10 @@ export default function VentasSidebar() {
           onClick={handleLogout}
           className={styles.themeButton}
           data-collapsed={showExpandedContent ? 'false' : 'true'}
-          aria-label="Cerrar sesion"
+          aria-label="Cerrar sesión"
         >
           <span className={styles.themeIcon}>⎋</span>
-          {showExpandedContent && <span>Cerrar sesion</span>}
+          {showExpandedContent && <span>Cerrar sesión</span>}
         </button>
       </div>
 

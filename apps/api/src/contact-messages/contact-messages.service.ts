@@ -283,7 +283,7 @@ export class ContactMessagesService {
                 </p>
                 <p style="margin:0;">Saludos,</p>
                 <p style="margin:4px 0 0;font-weight:700;color:#12233b;">Equipo Nexara</p>
-                <p style="margin:4px 0 0;">Telefono: +52 1 55 3650 5044</p>
+                <p style="margin:4px 0 0;">Teléfono: +52 1 55 3650 5044</p>
                 <p style="margin:4px 0 0;"><a href="${baseUrl}" style="color:#2b7de9;text-decoration:none;">nexara.com.mx</a></p>
               </td>
             </tr>
@@ -291,7 +291,7 @@ export class ContactMessagesService {
           <p style="text-align:center;color:#8a97ad;font-size:12px;margin:12px 0 0;">Este mensaje fue enviado desde el panel de Nexara.</p>
         </div>
       `;
-      const textContent = `Hola ${existing.name},\n\nGracias por escribirnos. A continuacion te compartimos nuestra respuesta:\n\n${responseMessage}\n\nQuieres agendar una llamada? Escribenos por WhatsApp: ${waUrl}\n\nSaludos,\nEquipo Nexara\nTelefono: +52 1 55 3650 5044\n${baseUrl}`;
+      const textContent = `Hola ${existing.name},\n\nGracias por escribirnos. A continuación te compartimos nuestra respuesta:\n\n${responseMessage}\n\n¿Quieres agendar una llamada? Escríbenos por WhatsApp: ${waUrl}\n\nSaludos,\nEquipo Nexara\nTeléfono: +52 1 55 3650 5044\n${baseUrl}`;
       await this.sendResponseEmail({
         toEmail: existing.email,
         subject,

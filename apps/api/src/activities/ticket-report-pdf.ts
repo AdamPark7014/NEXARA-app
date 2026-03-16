@@ -194,7 +194,7 @@ export const generateTicketReportPdf = async (payload: TicketReportPayload): Pro
       { label: 'Sucursal', value: payload.branchName || '-' },
       { label: 'No. sucursal', value: payload.branchNumber || '-' },
       { label: 'Ciudad/Estado', value: [payload.branchCity, payload.branchState].filter(Boolean).join(', ') || '-' },
-      { label: 'Direccion', value: payload.branchAddress || '-' },
+      { label: 'Dirección', value: payload.branchAddress || '-' },
     ];
 
     const operationLines = [
@@ -268,7 +268,7 @@ export const generateTicketReportPdf = async (payload: TicketReportPayload): Pro
         ? getMapsUrl(evidence.latitud, evidence.longitud)
         : null;
       if (mapsUrl) {
-        doc.fillColor(colors.blue).fontSize(7).text('Ver ubicacion de llegada', x, y + evidenceSize + 16, {
+        doc.fillColor(colors.blue).fontSize(7).text('Ver ubicación de llegada', x, y + evidenceSize + 16, {
           width: evidenceSize,
           link: mapsUrl,
           underline: true,
@@ -285,3 +285,5 @@ export const generateTicketReportPdf = async (payload: TicketReportPayload): Pro
     doc.end();
   });
 };
+
+

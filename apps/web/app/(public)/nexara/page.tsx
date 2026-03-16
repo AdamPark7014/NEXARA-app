@@ -43,14 +43,14 @@ export default function NexaraPage() {
   ];
 
   return (
-    <main className={`${styles.container} public-section-page ultra-corp-page ultra-corp-nexara ultra-corp-strict`} aria-label="Pagina sobre Nexara">
+    <main className={`${styles.container} public-section-page ultra-corp-page ultra-corp-nexara ultra-corp-strict`} aria-label="Página sobre Nexara">
       <header className={styles.hero}>
         <div className={styles.heroContent}>
           <p className={styles.kicker}>NEXARA INGENIEROS</p>
           <h1 className={styles.pageTitle}>Convertimos infraestructura en ventaja operativa</h1>
           <p className={styles.pageLead}>
-            Somos un equipo de integracion tecnologica que conecta estrategia, ejecucion y
-            continuidad para organizaciones que no pueden detener su operacion.
+            Somos un equipo de integración tecnológica que conecta estrategia, ejecución y
+            continuidad para organizaciones que no pueden detener su operación.
           </p>
           <div className={styles.heroActions}>
             <Link href="/contacto" className={styles.primaryCta}>Hablar con un especialista</Link>
@@ -69,20 +69,20 @@ export default function NexaraPage() {
           </div>
           <div className={styles.statCard}>
             <strong>Nacional</strong>
-            <span>cobertura operativa en Mexico</span>
+            <span>cobertura operativa en México</span>
           </div>
         </aside>
       </header>
 
       <nav className={styles.quickNav} aria-label="Accesos rápidos">
-        <a href="#quienes" className={styles.quickNavLink}>Quienes somos</a>
+        <a href="#quienes" className={styles.quickNavLink}>Quiénes somos</a>
         <a href="#fundamentos" className={styles.quickNavLink}>Fundamentos</a>
-        <a href="#metodo" className={styles.quickNavLink}>Metodo</a>
+        <a href="#metodo" className={styles.quickNavLink}>Método</a>
         <a href="#cobertura" className={styles.quickNavLink}>Cobertura</a>
       </nav>
 
       <section id="quienes" className={styles.section}>
-        <h2 className={styles.sectionTitle}>Quienes somos</h2>
+        <h2 className={styles.sectionTitle}>Quiénes somos</h2>
         <article className={styles.identityCard}>
           <Image
             src="/logo-nexara.png"
@@ -92,10 +92,10 @@ export default function NexaraPage() {
             className={styles.identityLogo}
           />
           <div className={styles.identityContent}>
-            <h3>Integracion orientada a resultados</h3>
+            <h3>Integración orientada a resultados</h3>
             <p>
-              En Nexara alineamos tecnologia, procesos y personas para resolver problemas reales de
-              operacion. Combinamos experiencia de campo, disciplina de ejecucion y una cultura de
+              En Nexara alineamos tecnología, procesos y personas para resolver problemas reales de
+              operación. Combinamos experiencia de campo, disciplina de ejecución y una cultura de
               servicio que privilegia la continuidad del negocio.
             </p>
           </div>
@@ -103,10 +103,10 @@ export default function NexaraPage() {
       </section>
 
       <section id="fundamentos" className={styles.section}>
-        <h2 className={styles.sectionTitle}>Mision, vision y principios</h2>
+        <h2 className={styles.sectionTitle}>Misión, visión y principios</h2>
         <div className={styles.fundamentalsGrid}>
           <article className={styles.infoCard}>
-            <h3 className={styles.cardTitle}>Mision</h3>
+            <h3 className={styles.cardTitle}>Misión</h3>
             <p>
               Integrar soluciones TI confiables y sostenibles para que cada cliente opere con
               continuidad, seguridad y eficiencia medible.
@@ -114,10 +114,10 @@ export default function NexaraPage() {
           </article>
 
           <article className={styles.infoCard}>
-            <h3 className={styles.cardTitle}>Vision</h3>
+            <h3 className={styles.cardTitle}>Visión</h3>
             <p>
-              Ser el aliado tecnologico de referencia para organizaciones que requieren un nivel
-              profesional alto, ejecucion impecable y mejora continua.
+              Ser el aliado tecnológico de referencia para organizaciones que requieren un nivel
+              profesional alto, ejecución impecable y mejora continua.
             </p>
           </article>
 
@@ -135,7 +135,7 @@ export default function NexaraPage() {
       </section>
 
       <section id="metodo" className={styles.section}>
-        <h2 className={styles.sectionTitle}>Como trabajamos</h2>
+        <h2 className={styles.sectionTitle}>Cómo trabajamos</h2>
         <div className={styles.methodGrid}>
           {timeline.map((item, index) => (
             <article key={item.stage} className={styles.methodCard}>
@@ -152,21 +152,21 @@ export default function NexaraPage() {
         <div className={styles.mapCard}>
           <Image
             src="/mapa-operaciones.png"
-            alt="Mapa de cobertura de Nexara en Mexico"
+            alt="Mapa de cobertura de Nexara en México"
             width={1200}
             height={700}
             className={styles.mapImage}
             priority
           />
           <p className={styles.mapCaption}>
-            Operamos proyectos con equipos propios y red de soporte para despliegues en multiples
-            estados del pais.
+            Operamos proyectos con equipos propios y red de soporte para despliegues en múltiples
+            estados del país.
           </p>
         </div>
       </section>
 
       <section className={styles.finalCta}>
-        <h2>Listos para impulsar tu siguiente etapa tecnologica</h2>
+        <h2>Listos para impulsar tu siguiente etapa tecnológica</h2>
         <p>Conversemos y definamos la solución ideal para tu empresa.</p>
         <div className={styles.heroCtas}>
           <Link href="/contacto" className={styles.primaryCta}>Contactar</Link>
@@ -176,3 +176,4 @@ export default function NexaraPage() {
     </main>
   );
 }
+

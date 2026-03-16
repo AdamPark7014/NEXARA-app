@@ -850,9 +850,9 @@ export class VentasService {
   }
 
   /**
-   * Sincroniza viaticos del proyecto con costViaticos
+    * Sincroniza viaticos del proyecto con costViaticos
    */
-  async syncViaticosToProject(projectId: number, user?: any) {
+    async syncViaticosToProject(projectId: number, user?: any) {
     const project = await this.prisma.salesProject.findUnique({
       where: { id: projectId },
       include: { viaticos: true, opportunity: true },
@@ -2014,3 +2014,5 @@ export class VentasService {
     return pdfBuffer;
   }
 }
+
+

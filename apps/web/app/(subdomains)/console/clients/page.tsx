@@ -249,11 +249,11 @@ export default function ClientsPage() {
                 <input className="input" placeholder="Nombre del cliente" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
                 <input className="input" placeholder="Contacto" value={editForm.contactName} onChange={(e) => setEditForm({ ...editForm, contactName: e.target.value })} />
                 <input className="input" placeholder="Email contacto" value={editForm.contactEmail} onChange={(e) => setEditForm({ ...editForm, contactEmail: e.target.value })} />
-                <input className="input" placeholder="Telefono" value={editForm.contactPhone} onChange={(e) => setEditForm({ ...editForm, contactPhone: e.target.value })} />
-                <input className="input" placeholder="Direccion" value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} />
+                <input className="input" placeholder="Teléfono" value={editForm.contactPhone} onChange={(e) => setEditForm({ ...editForm, contactPhone: e.target.value })} />
+                <input className="input" placeholder="Dirección" value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} />
                 <input className="input" placeholder="Ciudad" value={editForm.city} onChange={(e) => setEditForm({ ...editForm, city: e.target.value })} />
                 <input className="input" placeholder="Estado" value={editForm.state} onChange={(e) => setEditForm({ ...editForm, state: e.target.value })} />
-                <input className="input" placeholder="Pais" value={editForm.country} onChange={(e) => setEditForm({ ...editForm, country: e.target.value })} />
+                <input className="input" placeholder="País" value={editForm.country} onChange={(e) => setEditForm({ ...editForm, country: e.target.value })} />
                 <input className="input" placeholder="Codigo de cuenta" value={editForm.accountCode} onChange={(e) => setEditForm({ ...editForm, accountCode: e.target.value })} />
                 <input className="input" placeholder="Email portal" value={editForm.portalEmail} onChange={(e) => setEditForm({ ...editForm, portalEmail: e.target.value })} />
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -347,7 +347,7 @@ export default function ClientsPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
                   <div>
                     <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Logo del cliente</div>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Arrastra la imagen aqui o subela manualmente.</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Arrastra la imagen aquí o súbela manualmente.</div>
                   </div>
                   <button className="button-secondary" type="button" onClick={() => editLogoInputRef.current?.click()}>
                     Seleccionar imagen
@@ -520,3 +520,4 @@ export default function ClientsPage() {
     </RoleGuard>
   );
 }
+

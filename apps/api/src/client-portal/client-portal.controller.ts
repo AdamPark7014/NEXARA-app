@@ -57,7 +57,7 @@ export class ClientPortalController {
     const name = body.name?.trim();
     if (!name) throw new BadRequestException('Nombre de sucursal requerido');
     const branchNumber = body.branchNumber?.trim();
-    if (!branchNumber) throw new BadRequestException('Numero de sucursal requerido');
+    if (!branchNumber) throw new BadRequestException('Número de sucursal requerido');
     const latitud = body.latitud ? Number(body.latitud) : undefined;
     const longitud = body.longitud ? Number(body.longitud) : undefined;
     const portalEmail = body.portalEmail?.trim().toLowerCase();
@@ -110,7 +110,7 @@ export class ClientPortalController {
     const longitud = body.longitud ? Number(body.longitud) : undefined;
     const branchNumberInput = body.branchNumber?.trim();
     const branchNumber = branchNumberInput || branch.branchNumber;
-    if (!branchNumber) throw new BadRequestException('Numero de sucursal requerido');
+    if (!branchNumber) throw new BadRequestException('Número de sucursal requerido');
     const portalEmailInput = body.portalEmail?.trim().toLowerCase();
     const portalEmail = portalEmailInput || branch.portalEmail;
     if (!portalEmail) throw new BadRequestException('Usuario de sucursal requerido');
@@ -254,7 +254,7 @@ export class ClientPortalController {
   @Post('requests')
   async createRequest(@CurrentUser() user: any, @Body() body: any) {
     const description = body.description?.trim();
-    if (!description) throw new BadRequestException('Descripcion requerida');
+    if (!description) throw new BadRequestException('Descripción requerida');
 
     const branchId = body.branchId ? Number(body.branchId) : undefined;
     let branchData: any = null;

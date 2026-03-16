@@ -694,7 +694,7 @@ const AttendanceHierarchyStats: React.FC = () => {
 
           {data.users.length === 0 && (
             <div className={styles.emptyUsers}>
-              No hay usuarios para mostrar en este rango segun tu nivel jerarquico
+              No hay usuarios para mostrar en este rango según tu nivel jerárquico
             </div>
           )}
         </>

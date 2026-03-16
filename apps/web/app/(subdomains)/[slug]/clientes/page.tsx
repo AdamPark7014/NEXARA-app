@@ -205,11 +205,11 @@ export default function VentasClientesPage() {
           <input className={styles.input} name="legalName" value={form.legalName} onChange={handleChange} placeholder="Razon social" />
           <input className={styles.input} name="taxId" value={form.taxId} onChange={handleChange} placeholder="RFC" />
           <input className={styles.input} name="billingEmail" value={form.billingEmail} onChange={handleChange} placeholder="Correo de facturacion" />
-          <input className={styles.input} name="billingPhone" value={form.billingPhone} onChange={handleChange} placeholder="Telefono" />
+          <input className={styles.input} name="billingPhone" value={form.billingPhone} onChange={handleChange} placeholder="Teléfono" />
           <input className={styles.input} name="industry" value={form.industry} onChange={handleChange} placeholder="Industria" />
           <input className={styles.input} name="website" value={form.website} onChange={handleChange} placeholder="Sitio web" />
           <input className={styles.input} name="status" value={form.status} onChange={handleChange} placeholder="Estado" />
-          <textarea className={styles.input} name="fiscalAddress" value={form.fiscalAddress} onChange={handleChange} placeholder="Direccion fiscal" rows={2} />
+          <textarea className={styles.input} name="fiscalAddress" value={form.fiscalAddress} onChange={handleChange} placeholder="Dirección fiscal" rows={2} />
           <textarea className={styles.input} name="notes" value={form.notes} onChange={handleChange} placeholder="Notas comerciales" rows={2} />
         </div>
         <div className={styles.buttonRow}>
@@ -242,7 +242,7 @@ export default function VentasClientesPage() {
             <svg width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M24 4v32m16-12l-16 16-16-16" />
             </svg>
-            <p className={styles.dropZoneMain}>Arrastra PDFs aqui</p>
+            <p className={styles.dropZoneMain}>Arrastra PDFs aquí</p>
             <p className={styles.dropZoneSub}>o selecciona archivos del equipo</p>
             <input type="file" accept="application/pdf" multiple onChange={handleDocPick} className={styles.fileInput} />
           </div>
@@ -303,3 +303,4 @@ export default function VentasClientesPage() {
     </section>
   );
 }
+

@@ -53,11 +53,11 @@ export class GpsController {
     if (location.usuarioId === user.id) return location;
 
     if (!user.isSuperAdmin && !user.permissions?.includes(PERMISSIONS.GPS_MANAGE)) {
-      throw new ForbiddenException('No tienes permisos para ver esta ubicacion');
+      throw new ForbiddenException('No tienes permisos para ver esta ubicación');
     }
 
     if (!location.usuario?.locationConsent) {
-      throw new ForbiddenException('El usuario no comparte su ubicacion');
+      throw new ForbiddenException('El usuario no comparte su ubicación');
     }
 
     if (!user.isSuperAdmin && user.departmentId && location.usuario?.departmentId !== user.departmentId) {

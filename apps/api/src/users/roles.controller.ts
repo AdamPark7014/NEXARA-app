@@ -31,7 +31,7 @@ export class RolesController {
     );
 
     if (hasCvsAccess && hasAdminFlags) {
-      throw new BadRequestException('Gestion CVs debe ser un rol no administrativo');
+      throw new BadRequestException('Gestión CVs debe ser un rol no administrativo');
     }
 
     if (hasCvsAccess) {

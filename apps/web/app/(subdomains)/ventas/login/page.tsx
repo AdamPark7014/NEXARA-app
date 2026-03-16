@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import PanelLogin from "@/components/PanelLogin";
 import { PERMISSIONS } from "@/lib/permissions";
@@ -8,8 +8,9 @@ export default function VentasLoginPage() {
     <PanelLogin
       redirectTo="/dashboard"
       requiredPermission={PERMISSIONS.PANEL_VENTAS}
-      title="Iniciar sesion"
+      title="Iniciar sesión"
       subtitle="Ingresa a tu cuenta de Nexara"
     />
   );
 }
+

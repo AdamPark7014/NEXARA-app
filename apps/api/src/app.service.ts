@@ -16,7 +16,7 @@ export class AppService {
         evidenciasAprobadas,
         totalViaticos,
         viaticosPorEstatus,
-        totalVehiculos,
+        totalVehículos,
         vehiculosPorEstatus
       ] = await Promise.all([
         this.prisma['activity'].count(),
@@ -48,7 +48,7 @@ export class AppService {
           })),
         },
         vehiculos: {
-          total: totalVehiculos,
+          total: totalVehículos,
           porEstatus: vehiculosPorEstatus.map((v: any) => ({
             estatus: v.estatusAprobacion,
             cantidad: v._count._all,
@@ -106,3 +106,5 @@ export class AppService {
     return { actividades: a, evidencias: e };
   }
 }
+
+

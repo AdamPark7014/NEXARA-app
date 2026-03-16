@@ -17,7 +17,7 @@ const PANEL_ORDER: MobilePanelOption[] = [
     key: "console",
     icon: "🧩",
     name: "Consola",
-    description: "Operacion central, usuarios y control jerarquico.",
+    description: "Operación central, usuarios y control jerárquico.",
     entryPath: "/dashboard",
   },
   {
@@ -31,14 +31,14 @@ const PANEL_ORDER: MobilePanelOption[] = [
     key: "contabilidad",
     icon: "💼",
     name: "Contabilidad",
-    description: "Pagos, viaticos, horas y control financiero.",
+    description: "Pagos, viáticos, horas y control financiero.",
     entryPath: "/dashboard",
   },
   {
     key: "web",
     icon: "🌐",
     name: "Web",
-    description: "Gestion de contenido, clientes y proyectos web.",
+    description: "Gestión de contenido, clientes y proyectos web.",
     entryPath: "/dashboard",
   },
   {

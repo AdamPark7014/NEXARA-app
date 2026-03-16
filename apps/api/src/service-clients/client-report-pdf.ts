@@ -134,7 +134,7 @@ export const generateClientReportPdf = async (payload: ClientReportPayload): Pro
       doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(20).text('Reporte de Tickets', titleX, 30, {
         width: Math.max(140, titleWidth),
       });
-      doc.fontSize(10).font('Helvetica').fillColor(colors.muted).text('Resumen ejecutivo de atencion', titleX, 56, {
+      doc.fontSize(10).font('Helvetica').fillColor(colors.muted).text('Resumen ejecutivo de atención', titleX, 56, {
         width: Math.max(140, titleWidth),
       });
 
@@ -156,7 +156,7 @@ export const generateClientReportPdf = async (payload: ClientReportPayload): Pro
       const rows = [
         ['Total tickets', String(payload.totalTickets)],
         ['Finalizados', String(payload.closedTickets)],
-        ['Promedio de atencion', formatDuration(payload.avgDurationMin)],
+        ['Promedio de atención', formatDuration(payload.avgDurationMin)],
       ];
 
       const height = padding * 2 + rows.length * 18;
@@ -351,3 +351,4 @@ export const generateClientReportPdf = async (payload: ClientReportPayload): Pro
     doc.end();
   });
 };
+

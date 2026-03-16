@@ -103,7 +103,7 @@ const navLinks = [
   { name: 'Inicio', href: '/' },
   { name: 'Sobre nosotros', href: '/nexara' },
   { name: 'Servicios', href: '/servicios' },
-  { name: 'Catalogo', href: '/proyectos' },
+  { name: 'Catálogo', href: '/proyectos' },
   { name: 'Contacto', href: '/contacto' },
 ];
 

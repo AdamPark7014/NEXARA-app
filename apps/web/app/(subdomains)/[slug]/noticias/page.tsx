@@ -456,7 +456,7 @@ export default function NoticiasPanel() {
                       }
                     }}
                   >
-                    <p className={styles.dropHint}>Arrastra la portada aqui o haz click</p>
+                    <p className={styles.dropHint}>Arrastra la portada aquí o haz click</p>
                   </div>
                   <input
                     ref={coverInputRef}
@@ -507,7 +507,7 @@ export default function NoticiasPanel() {
                       }
                     }}
                   >
-                    <p className={styles.dropHint}>Arrastra imagenes aqui o haz click</p>
+                    <p className={styles.dropHint}>Arrastra imágenes aquí o haz click</p>
                   </div>
                   <input
                     ref={galleryInputRef}
@@ -532,7 +532,7 @@ export default function NoticiasPanel() {
                 onChange={(event) =>
                   setNewsForm((prev) => ({ ...prev, tags: event.target.value }))
                 }
-                placeholder="innovacion, alianzas, energia"
+                placeholder="innovacion, alianzas, energía"
               />
             </label>
             <label className={styles.field}>
@@ -663,7 +663,7 @@ export default function NoticiasPanel() {
           <div>
             <h2 className={styles.cardTitle}>Suscriptores de newsletter</h2>
             <p className={styles.cardSubtitle}>
-              Revisa quienes llegan desde el footer y los formularios de contacto.
+              Revisa quiénes llegan desde el footer y los formularios de contacto.
             </p>
           </div>
           <div className={styles.toolbar}>
@@ -718,3 +718,4 @@ export default function NoticiasPanel() {
     </section>
   );
 }
+

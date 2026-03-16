@@ -8,7 +8,7 @@ export default function MyVehiclesPage() {
     <RoleGuard permissions={[PERMISSIONS.CONSOLE_ACCESS]}>
       <div style={{ display: 'grid', gap: 16 }}>
         <div className="card" style={{ padding: 16 }}>
-          <h1 style={{ color: 'var(--primary)', marginBottom: 8 }}>Mis Vehiculos</h1>
+          <h1 style={{ color: 'var(--primary)', marginBottom: 8 }}>Mis Vehículos</h1>
           <p style={{ color: 'var(--text-secondary)' }}>
             Solicita un vehiculo y adjunta tu evidencia de entrega.
           </p>
@@ -19,3 +19,4 @@ export default function MyVehiclesPage() {
     </RoleGuard>
   );
 }
+

@@ -42,3 +42,78 @@
 .sidebarOpen .toggleGlyph {
   transform: translateX(-1px);
 }
+
+/* Mobile menu polish: cleaner hierarchy, safer touch targets, better focus */
+.hamburgerButton:focus-visible,
+.toggleBtn:focus-visible,
+.navLink:focus-visible,
+.themeButton:focus-visible,
+.navSearchInput:focus-visible,
+.navSearchClear:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary) 65%, white);
+  outline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+  .hamburgerButton {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    border-color: color-mix(in srgb, var(--primary) 34%, transparent);
+    box-shadow: 0 8px 18px color-mix(in srgb, var(--shadow) 36%, transparent);
+  }
+
+  .ventasSidebar[data-mobile='true'][data-open='true'] .sidebarOverlay {
+    background: color-mix(in srgb, var(--foreground) 24%, transparent);
+    backdrop-filter: blur(8px);
+  }
+
+  .ventasSidebar[data-mobile='true'][data-open='true'] .sidebarContent,
+  .mobileOpen .sidebarContent,
+  .sidebarContent[data-open='true'] {
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    top: max(58px, env(safe-area-inset-top));
+    border-radius: 16px;
+    border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+    box-shadow: 0 22px 40px color-mix(in srgb, var(--shadow) 52%, transparent);
+  }
+
+  .sectionTitle {
+    letter-spacing: 0.16em;
+    font-size: 0.69rem;
+  }
+
+  .navList {
+    gap: 7px;
+  }
+
+  .navLink {
+    min-height: 44px;
+    border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+    border-left-width: 3px;
+  }
+
+  .navLinkActive {
+    border-color: color-mix(in srgb, var(--primary) 46%, var(--border));
+  }
+
+  .themeButton,
+  .navSearchInput,
+  .navSearchClear {
+    min-height: 42px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hamburgerButton,
+  .hamburgerLine,
+  .sidebarContent,
+  .navLink,
+  .navIndicator,
+  .statusIndicator,
+  .statusIndicatorSmall {
+    transition: none !important;
+    animation: none !important;
+  }
+}

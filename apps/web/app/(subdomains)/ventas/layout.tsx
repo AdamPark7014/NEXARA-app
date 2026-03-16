@@ -6,13 +6,14 @@ import { usePathname } from "next/navigation";
 import VentasSidebar from "./VentasSidebar";
 import styles from "./layout.module.css";
 import { useUser } from "@/components/UserContext";
-import { isSalesManagerUser } from "@/lib/panel-user";
+import { getRoleLabel, isSalesManagerUser } from "@/lib/panel-user";
 import { getSalesVendorStats, type SalesVendorStats } from "@/lib/sales-api";
 
 export default function VentasLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user } = useUser();
   const canManageSellers = isSalesManagerUser(user);
+  const roleLabel = getRoleLabel(user);
   const [workspaceDateLabel, setWorkspaceDateLabel] = useState("");
   const [vendorStats, setVendorStats] = useState<SalesVendorStats[]>([]);
   const selectedOwnerId =
@@ -87,7 +88,7 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
             </div>
             <div className={styles.salesWorkspaceMeta}>
               <span className={styles.salesWorkspacePill}>{user?.nombre || "Equipo comercial"}</span>
-              {canManageSellers && <span className={styles.salesWorkspacePill}>Modo gestor</span>}
+              <span className={styles.salesWorkspacePill}>{roleLabel}</span>
               <span className={styles.salesWorkspacePill}>{workspaceDateLabel}</span>
             </div>
           </div>
