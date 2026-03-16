@@ -4,6 +4,7 @@ import Sidebar from "./Sidebar";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import NotificationCenter from "@/components/NotificationCenter";
+import { setActivePanel } from "@/lib/panel-routing";
 
 const formatConsoleTitle = (pathname: string) => {
   const normalized = pathname.replace(/^\/+/, "").split("?")[0];
@@ -26,6 +27,40 @@ const formatConsoleTitle = (pathname: string) => {
     tools: "Herramientas internas",
     profile: "Perfil",
     "my-profile": "Mi perfil",
+    "my-activities": "Mis actividades",
+    "my-evidences": "Mis evidencias",
+    "my-vehicles": "Mis vehículos",
+    "my-viatics": "Mis viáticos",
+    "lunch-breaks": "Breaks y comidas",
+    "client-tickets": "Tickets de clientes",
+    "gestion-vendedores": "Gestión comercial",
+    warehouse: "Almacenes",
+    stock: "Inventario / Stock",
+    procurement: "Compras y requisiciones",
+    manufacturing: "Manufactura / BOM",
+    production: "Órdenes de producción",
+    quality: "Control de calidad",
+    assets: "Activos y equipos",
+    maintenance: "Órdenes de mantenimiento",
+    accounting: "Contabilidad general",
+    invoicing: "Facturación CFDI",
+    banking: "Banca y conciliaciones",
+    safety: "Seguridad industrial",
+    documents: "Gestión documental",
+    workflow: "Flujos de aprobación",
+    audit: "Auditoría",
+    analytics: "BI y Analytics",
+    "employee-payments": "Nómina y pagos",
+    expenses: "Gastos operativos",
+    "work-projects": "Proyectos de obra",
+    news: "Noticias y comunicados",
+    "contact-messages": "Mensajes de contacto",
+    "service-clients": "Clientes de servicio",
+    newsletter: "Newsletter",
+    "my-lunch-breaks": "Mis breaks y comidas",
+    settings: "Configuración del sistema",
+    "service-sheets": "Hojas de servicio",
+    "my-preferences": "Mis preferencias",
   };
   return dictionary[last] || last.replace(/-/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 };
@@ -39,8 +74,9 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   useEffect(() => {
     const now = new Date();
     setViewSubtitle(`Consola NEXARA · ${now.toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" })}`);
+    setActivePanel("console");
   }, []);
-  // Si estamos en /dashboard/login o /login, no renderizar el layout del dashboard
+  // Si estamos en rutas de autenticacion, no renderizar shell de consola
   if (pathname && (pathname.includes("/login") || pathname.includes("/auth"))) {
     return <>{children}</>;
   }

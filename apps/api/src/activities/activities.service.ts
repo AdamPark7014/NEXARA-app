@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { CreateActivityDto } from './dto/create-activity.dto.js';
 import { UpdateActivityDto } from './dto/update-activity.dto.js';
+import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { generateTicketReportPdf } from './ticket-report-pdf.js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -76,10 +77,23 @@ export class ActivitiesService {
     return activity;
   }
 
-  async findAll() {
-    return this.prisma['activity'].findMany({
-      include: { creador: true, responsable: true, client: true, serviceSheet: true, activityEvidence: true },
-    });
+  async findAll(query?: PaginationQueryDto) {
+    const where: any = {};
+    if (query?.search) {
+      where.OR = [
+        { titulo: { contains: query.search, mode: 'insensitive' } },
+        { anNumber: { contains: query.search, mode: 'insensitive' } },
+      ];
+    }
+    const include = { creador: true, responsable: true, client: true, serviceSheet: true, activityEvidence: true };
+    if (query?.limit) {
+      const [data, total] = await Promise.all([
+        this.prisma['activity'].findMany({ where, include, skip: query.skip, take: query.take, orderBy: { fechaAsignacion: 'desc' } }),
+        this.prisma['activity'].count({ where }),
+      ]);
+      return buildPaginatedResponse(data, total, query);
+    }
+    return this.prisma['activity'].findMany({ where, include });
   }
 
   async findAllDetailed() {

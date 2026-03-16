@@ -6,6 +6,7 @@ import {
   Param,
   Delete,
   Put,
+  Query,
   UseInterceptors,
   UploadedFile,
   BadRequestException,
@@ -21,6 +22,7 @@ import { createReadStream } from 'fs';
 import { ClientsService } from './clients.service.js';
 import { CreateClientDto } from './dto/create-client.dto.js';
 import { UpdateClientDto } from './dto/update-client.dto.js';
+import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 
 interface MulterFile {
   fieldname: string;
@@ -48,8 +50,8 @@ export class ClientsController {
   }
 
   @Get()
-  findAll() {
-    return this.clientsService.findAll();
+  findAll(@Query() query: PaginationQueryDto) {
+    return this.clientsService.findAll(query);
   }
 
   @Get(':id')

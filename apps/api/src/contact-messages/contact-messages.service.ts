@@ -1,5 +1,6 @@
 import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CreateContactMessageDto } from './dto/create-contact-message.dto.js';
 import { InboundContactMessageDto } from './dto/inbound-contact-message.dto.js';
@@ -65,15 +66,23 @@ export class ContactMessagesService {
     return message;
   }
 
-  async findAll(status?: string, category?: string) {
+  async findAll(status?: string, category?: string, query?: PaginationQueryDto) {
     const normalizedStatus = this.normalizeStatus(status);
     const normalizedCategory = category?.toUpperCase().trim();
     const validCategory = normalizedCategory === 'SOPORTE' || normalizedCategory === 'VENTAS' ? normalizedCategory : undefined;
     const where: any = {};
     if (normalizedStatus) where.status = normalizedStatus;
     if (validCategory) where.category = validCategory;
+    const finalWhere = Object.keys(where).length ? where : undefined;
+    if (query?.limit) {
+      const [data, total] = await Promise.all([
+        this.db.contactMessage.findMany({ where: finalWhere, orderBy: { createdAt: 'desc' }, skip: query.skip, take: query.take }),
+        this.db.contactMessage.count({ where: finalWhere }),
+      ]);
+      return buildPaginatedResponse(data, total, query);
+    }
     return await this.db.contactMessage.findMany({
-      where: Object.keys(where).length ? where : undefined,
+      where: finalWhere,
       orderBy: { createdAt: 'desc' },
     });
   }

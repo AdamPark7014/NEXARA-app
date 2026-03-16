@@ -7,6 +7,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   Res,
   UploadedFile,
@@ -25,6 +26,7 @@ import { UsersService } from '../users/users.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
 import { ExcelImportService } from '../common/excel-import.service.js';
+import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 
 @Controller('vehicles')
 export class VehiclesController {
@@ -39,9 +41,9 @@ export class VehiclesController {
   @Get()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VEHICLES_VIEW] })
-  async findAll(@CurrentUser() user: any) {
+  async findAll(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
     if (user.isSuperAdmin) {
-      return this.vehiclesService.findAll();
+      return this.vehiclesService.findAll(query);
     } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
       // Admin consola: ve sus propios vehículos + vehículos de usuarios normales
       const allDeptUsers = await this.usersService.findByDepartment(user.departmentId);
@@ -207,8 +209,8 @@ export class VehiclesController {
   @Get('inventory')
   @UseGuards(RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.VEHICLES_VIEW, PERMISSIONS.VEHICLES_REQUEST, PERMISSIONS.VEHICLES_INVENTORY] })
-  listInventory() {
-    return this.vehiclesService.listAssets();
+  listInventory(@Query() query: PaginationQueryDto) {
+    return this.vehiclesService.listAssets(query);
   }
 
   @Post('inventory')
@@ -250,9 +252,9 @@ export class VehiclesController {
     @Param('format') format: string,
     @Res() res: Response,
   ) {
-    let data;
+    let result: any;
     if (user.isSuperAdmin) {
-      data = await this.vehiclesService.findAll();
+      result = await this.vehiclesService.findAll();
     } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
       // Admin consola: ve sus propios vehículos + vehículos de usuarios normales
       const allDeptUsers = await this.usersService.findByDepartment(user.departmentId);
@@ -262,10 +264,11 @@ export class VehiclesController {
           .filter((u: any) => u.role && !u.role.accesoConsoleAdmin)
           .map((u: any) => u.id),
       ];
-      data = await this.vehiclesService.findByAllowedUsers(allowedUserIds);
+      result = await this.vehiclesService.findByAllowedUsers(allowedUserIds);
     } else {
-      data = await this.vehiclesService.findByResponsible(user.id);
+      result = await this.vehiclesService.findByResponsible(user.id);
     }
+    const data: any[] = Array.isArray(result) ? result : result.data;
     if (format === 'xlsx') {
       const buffer = await this.excelExport.exportToExcel(data, 'vehicles');
       res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

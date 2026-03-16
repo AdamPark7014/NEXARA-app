@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 // Removed unused imports for missing DTOs
 
@@ -70,13 +71,28 @@ export class VehiclesService {
     return this.prisma['vehicleAsset'].delete({ where: { id } });
   }
 
-  listAssets() {
+  async listAssets(query?: PaginationQueryDto) {
+    if (query?.limit) {
+      const [data, total] = await Promise.all([
+        this.prisma['vehicleAsset'].findMany({ orderBy: { createdAt: 'desc' }, skip: query.skip, take: query.take }),
+        this.prisma['vehicleAsset'].count(),
+      ]);
+      return buildPaginatedResponse(data, total, query);
+    }
     return this.prisma['vehicleAsset'].findMany({ orderBy: { createdAt: 'desc' } });
   }
 
-  findAll() {
+  async findAll(query?: PaginationQueryDto) {
+    const include = { actividad: true, solicitante: true, vehiculo: true, entregaRevisadoPor: true };
+    if (query?.limit) {
+      const [data, total] = await Promise.all([
+        this.prisma['vehicleControl'].findMany({ include, orderBy: { fechaSolicitud: 'desc' }, skip: query.skip, take: query.take }),
+        this.prisma['vehicleControl'].count(),
+      ]);
+      return buildPaginatedResponse(data, total, query);
+    }
     return this.prisma['vehicleControl'].findMany({
-      include: { actividad: true, solicitante: true, vehiculo: true, entregaRevisadoPor: true },
+      include,
       orderBy: { fechaSolicitud: 'desc' },
     });
   }

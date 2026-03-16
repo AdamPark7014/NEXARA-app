@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { BrevoService } from '../contact-messages/brevo.service.js';
 import { NewsletterSubscribeDto } from './dto/newsletter-subscribe.dto.js';
 
@@ -53,17 +54,25 @@ export class NewsletterService {
     return subscriber;
   }
 
-  async list(search?: string) {
+  async list(search?: string, query?: PaginationQueryDto) {
     const term = search?.trim();
+    const where = term
+      ? {
+          OR: [
+            { email: { contains: term, mode: 'insensitive' as const } },
+            { name: { contains: term, mode: 'insensitive' as const } },
+          ],
+        }
+      : undefined;
+    if (query?.limit) {
+      const [data, total] = await Promise.all([
+        this.db.newsletterSubscriber.findMany({ where, orderBy: { subscribedAt: 'desc' }, skip: query.skip, take: query.take }),
+        this.db.newsletterSubscriber.count({ where }),
+      ]);
+      return buildPaginatedResponse(data, total, query);
+    }
     return this.db.newsletterSubscriber.findMany({
-      where: term
-        ? {
-            OR: [
-              { email: { contains: term, mode: 'insensitive' } },
-              { name: { contains: term, mode: 'insensitive' } },
-            ],
-          }
-        : undefined,
+      where,
       orderBy: { subscribedAt: 'desc' },
     });
   }

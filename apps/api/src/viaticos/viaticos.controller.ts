@@ -6,6 +6,7 @@ import {
   Post,
   Param,
   Patch,
+  Query,
   Res,
   UploadedFile,
   UseGuards,
@@ -18,6 +19,7 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { ViaticosService } from './viaticos.service.js';
 import { UsersService } from '../users/users.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
 import { ExcelImportService } from '../common/excel-import.service.js';
 
@@ -34,8 +36,8 @@ export class ViaticosController {
   @Get()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VIATICS_VIEW] })
-  async findAll(@CurrentUser() user: any) {
-    return this.viaticosService.findAll(user);
+  async findAll(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
+    return this.viaticosService.findAll(user, query);
   }
 
   // Exportar viáticos (CSV o JSON)
@@ -43,7 +45,8 @@ export class ViaticosController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VIATICS_EXPORT] })
   async export(@CurrentUser() user: any, @Param('format') format: string, @Res() res: Response) {
-    const data = await this.viaticosService.findAll(user);
+    const result = await this.viaticosService.findAll(user);
+    const data: any[] = Array.isArray(result) ? result : (result as any).data;
     if (format === 'xlsx') {
       const buffer = await this.excelExport.exportToExcel(data, 'viatics');
       res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

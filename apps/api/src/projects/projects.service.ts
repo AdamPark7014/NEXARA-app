@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CreateProjectDto } from './dto/create-project.dto.js';
 import { UpdateProjectDto } from './dto/update-project.dto.js';
@@ -91,7 +92,15 @@ export class ProjectsService {
     return project;
   }
 
-  async findAll() {
+  async findAll(query?: PaginationQueryDto) {
+    if (query?.limit) {
+      const where = query.search ? { title: { contains: query.search, mode: 'insensitive' as const } } : undefined;
+      const [data, total] = await Promise.all([
+        this.db.project.findMany({ where, orderBy: { createdAt: 'desc' }, skip: query.skip, take: query.take }),
+        this.db.project.count({ where }),
+      ]);
+      return buildPaginatedResponse(data, total, query);
+    }
     return this.db.project.findMany({
       orderBy: { createdAt: 'desc' },
     });

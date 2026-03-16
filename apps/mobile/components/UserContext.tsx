@@ -50,6 +50,19 @@ const normalizeUser = (value: unknown): User | null => {
 	};
 };
 
+const isTokenExpired = (token: string): boolean => {
+	try {
+		const parts = token.split('.');
+		if (parts.length !== 3) return true;
+		const payload = JSON.parse(atob(parts[1]));
+		if (!payload.exp) return false;
+		// Consider expired if less than 60 seconds remaining
+		return payload.exp * 1000 < Date.now() + 60_000;
+	} catch {
+		return true;
+	}
+};
+
 const safeGetStoredUser = (): User | null => {
 	if (typeof window === 'undefined') return null;
 
@@ -109,13 +122,34 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 	useEffect(() => {
 		const storedUser = safeGetStoredUser();
 		if (storedUser) {
-			setUser(storedUser);
+			if (isTokenExpired(storedUser.token)) {
+				safePersistUser(null);
+			} else {
+				setUser(storedUser);
+			}
 		}
 	}, []);
 
 	useEffect(() => {
 		safePersistUser(user);
 	}, [user]);
+
+	// Cross-tab sync: if another tab logs out, reflect it here
+	useEffect(() => {
+		const handleStorage = (e: StorageEvent) => {
+			if (e.key !== USER_STORAGE_KEY) return;
+			if (!e.newValue) {
+				setUser(null);
+			} else {
+				const parsed = normalizeUser((() => { try { return JSON.parse(e.newValue); } catch { return null; } })());
+				if (parsed && !isTokenExpired(parsed.token)) {
+					setUser(parsed);
+				}
+			}
+		};
+		window.addEventListener('storage', handleStorage);
+		return () => window.removeEventListener('storage', handleStorage);
+	}, []);
 
 	const logout = () => {
 		clearActivePanel();

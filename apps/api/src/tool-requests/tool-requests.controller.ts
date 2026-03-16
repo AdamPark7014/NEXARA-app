@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
+import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import {
@@ -244,8 +245,8 @@ export class ToolRequestsController {
   // Obtener todas las solicitudes (admin/superadmin)
   @Get()
   @RBAC({ permissions: [PERMISSIONS.TOOLS_MANAGE] })
-  async findAll(@CurrentUser() user: any) {
-    return this.toolRequestsService.findAll(user);
+  async findAll(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
+    return this.toolRequestsService.findAll(user, query);
   }
 
   // Obtener solicitudes del usuario actual

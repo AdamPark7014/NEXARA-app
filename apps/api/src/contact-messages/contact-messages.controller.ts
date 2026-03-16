@@ -12,6 +12,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ContactMessagesService } from './contact-messages.service.js';
+import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { CreateContactMessageDto } from './dto/create-contact-message.dto.js';
 import { InboundContactMessageDto } from './dto/inbound-contact-message.dto.js';
 import { UpdateContactMessageDto } from './dto/update-contact-message.dto.js';
@@ -38,8 +39,8 @@ export class ContactMessagesController {
   }
 
   @Get()
-  findAll(@Query('status') status?: string, @Query('category') category?: string) {
-    return this.contactMessagesService.findAll(status, category);
+  findAll(@Query('status') status?: string, @Query('category') category?: string, @Query() query?: PaginationQueryDto) {
+    return this.contactMessagesService.findAll(status, category, query);
   }
 
   @Get(':id')

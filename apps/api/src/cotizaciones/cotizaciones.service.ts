@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { CotizacionStatus, Prisma } from '@prisma/client';
 import { CreateCotizacionDto } from './dto/create-cotizacion.dto.js';
 import { UpdateCotizacionDto } from './dto/update-cotizacion.dto.js';
@@ -178,10 +179,19 @@ export class CotizacionesService {
     }
   }
 
-  async findAll() {
+  async findAll(query?: PaginationQueryDto) {
+    const include = { items: true, createdBy: true };
+    if (query?.limit) {
+      const where = query.search ? { OR: [{ quoteNumber: { contains: query.search, mode: 'insensitive' as const } }, { clientName: { contains: query.search, mode: 'insensitive' as const } }] } : undefined;
+      const [data, total] = await Promise.all([
+        this.db.cotizacion.findMany({ where, orderBy: { createdAt: 'desc' }, include, skip: query.skip, take: query.take }),
+        this.db.cotizacion.count({ where }),
+      ]);
+      return buildPaginatedResponse(data, total, query);
+    }
     return this.db.cotizacion.findMany({
       orderBy: { createdAt: 'desc' },
-      include: { items: true, createdBy: true },
+      include,
     });
   }
 

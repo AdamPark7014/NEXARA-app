@@ -1,5 +1,6 @@
 import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CreateEvidenceDto } from './dto/create-evidence.dto.js';
@@ -145,16 +146,29 @@ export class EvidencesService {
     departmentId: number;
     permissions?: string[];
     isSuperAdmin?: boolean;
-  }) {
+  }, query?: PaginationQueryDto) {
     const userIds = await this.getAccessibleUserIds(currentUser);
-    return this.prisma['evidence'].findMany({
-      where: { userId: { in: userIds } },
-      include: this.buildInclude(),
-      orderBy: { subidoEn: 'desc' },
-    });
+    const where = { userId: { in: userIds } };
+    const include = this.buildInclude();
+    const orderBy = { subidoEn: 'desc' as const };
+    if (query?.limit) {
+      const [data, total] = await Promise.all([
+        this.prisma['evidence'].findMany({ where, include, orderBy, skip: query.skip, take: query.take }),
+        this.prisma['evidence'].count({ where }),
+      ]);
+      return buildPaginatedResponse(data, total, query);
+    }
+    return this.prisma['evidence'].findMany({ where, include, orderBy });
   }
 
-  findAll() {
+  async findAll(query?: PaginationQueryDto) {
+    if (query?.limit) {
+      const [data, total] = await Promise.all([
+        this.prisma['evidence'].findMany({ include: this.buildInclude(), orderBy: { subidoEn: 'desc' }, skip: query.skip, take: query.take }),
+        this.prisma['evidence'].count(),
+      ]);
+      return buildPaginatedResponse(data, total, query);
+    }
     return this.prisma['evidence'].findMany({
       include: this.buildInclude(),
       orderBy: { subidoEn: 'desc' },

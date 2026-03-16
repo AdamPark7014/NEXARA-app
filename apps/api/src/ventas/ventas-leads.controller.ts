@@ -17,6 +17,7 @@ import { UpdateSalesLeadDto } from './dto/update-sales-lead.dto.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 
 const SALES_VIEW_ACCESS = [PERMISSIONS.SALES_VIEW, PERMISSIONS.PANEL_VENTAS];
 const SALES_MANAGE_ACCESS = [PERMISSIONS.SALES_MANAGE, PERMISSIONS.PANEL_VENTAS];
@@ -43,8 +44,8 @@ export class VentasLeadsController {
   @Get()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
-  findAll(@CurrentUser() user: any, @Query('ownerId') ownerId?: string) {
-    return this.ventasService.listLeads(user, ownerId ? Number(ownerId) : undefined);
+  findAll(@CurrentUser() user: any, @Query('ownerId') ownerId?: string, @Query() query?: PaginationQueryDto) {
+    return this.ventasService.listLeads(user, ownerId ? Number(ownerId) : undefined, query);
   }
 
   @Get(':id')

@@ -81,14 +81,18 @@ export const getConfiguredCorsOrigins = (): string[] => {
 };
 
 export const isOriginAllowed = (origin?: string | null): boolean => {
+  // No origin header = same-origin request (server-to-server, curl, etc.)
   if (!origin) {
     return true;
   }
 
   const localhostPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(?::\d+)?$/i;
   const localhostSubdomainPattern = /^https?:\/\/[a-z0-9-]+\.localhost(?::\d+)?$/i;
-  if (localhostPattern.test(origin) || localhostSubdomainPattern.test(origin)) {
-    return true;
+
+  if (process.env.NODE_ENV !== 'production') {
+    if (localhostPattern.test(origin) || localhostSubdomainPattern.test(origin)) {
+      return true;
+    }
   }
 
   const corsOrigins = getConfiguredCorsOrigins();
@@ -113,7 +117,12 @@ export const isOriginAllowed = (origin?: string | null): boolean => {
     return true;
   }
 
-  return anyLocalSubdomainPattern.test(origin);
+  // Allow any *.localhost subdomain only outside production
+  if (process.env.NODE_ENV !== 'production') {
+    return anyLocalSubdomainPattern.test(origin);
+  }
+
+  return false;
 };
 
 export const resolveCorsOrigin = (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {
@@ -291,6 +300,16 @@ export const createInMemoryIpBanList = (options: {
     }
   };
 
+  // Periodic sweep to prevent unbounded Map growth
+  setInterval(() => {
+    const currentTime = Date.now();
+    for (const [ip, entry] of store) {
+      if (entry.bannedUntil <= currentTime && entry.strikes <= 0) {
+        store.delete(ip);
+      }
+    }
+  }, 5 * 60_000).unref();
+
   const addStrike = (ip: string, weight = 1) => {
     const currentTime = now();
     const current = store.get(ip) || { strikes: 0, bannedUntil: 0 };
@@ -351,6 +370,16 @@ export const createInMemoryRateLimiter = (options: {
   keyGenerator?: (ip: string, path: string) => string;
 }) => {
   const store = new Map<string, RateLimitEntry>();
+
+  // Periodic sweep to prevent unbounded Map growth
+  setInterval(() => {
+    const currentTime = Date.now();
+    for (const [key, entry] of store) {
+      if (entry.resetAt <= currentTime) {
+        store.delete(key);
+      }
+    }
+  }, 5 * 60_000).unref();
 
   return (ip: string, path: string) => {
     const now = Date.now();

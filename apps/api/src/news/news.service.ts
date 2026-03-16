@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { CreateNewsPostDto } from './dto/create-news-post.dto.js';
 import { UpdateNewsPostDto } from './dto/update-news-post.dto.js';
 import { NewsStatus } from '@prisma/client';
@@ -71,24 +72,29 @@ export class NewsService {
     return post;
   }
 
-  async list(search?: string, status?: string) {
+  async list(search?: string, status?: string, query?: PaginationQueryDto) {
     const term = search?.trim();
     const normalizedStatus = this.normalizeStatus(status);
+    const where = {
+      ...(term
+        ? {
+            OR: [
+              { title: { contains: term, mode: 'insensitive' as const } },
+              { summary: { contains: term, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+      ...(normalizedStatus ? { status: normalizedStatus } : {}),
+    };
 
-    return this.db.newsPost.findMany({
-      where: {
-        ...(term
-          ? {
-              OR: [
-                { title: { contains: term, mode: 'insensitive' } },
-                { summary: { contains: term, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
-        ...(normalizedStatus ? { status: normalizedStatus } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    if (query?.limit) {
+      const [data, total] = await Promise.all([
+        this.db.newsPost.findMany({ where, orderBy: { createdAt: 'desc' }, skip: query.skip, take: query.take }),
+        this.db.newsPost.count({ where }),
+      ]);
+      return buildPaginatedResponse(data, total, query);
+    }
+    return this.db.newsPost.findMany({ where, orderBy: { createdAt: 'desc' } });
   }
 
   async findOne(id: number) {

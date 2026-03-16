@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { CreateServiceClientDto } from './dto/create-service-client.dto.js';
 import { UpdateServiceClientDto } from './dto/update-service-client.dto.js';
 import * as bcrypt from 'bcryptjs';
@@ -218,7 +219,15 @@ export class ServiceClientsService {
     return { client };
   }
 
-  async findAll() {
+  async findAll(query?: PaginationQueryDto) {
+    if (query?.limit) {
+      const where = query.search ? { OR: [{ companyName: { contains: query.search, mode: 'insensitive' as const } }, { contactName: { contains: query.search, mode: 'insensitive' as const } }] } : undefined;
+      const [data, total] = await Promise.all([
+        this.db.serviceClient.findMany({ where, orderBy: { createdAt: 'desc' }, skip: query.skip, take: query.take }),
+        this.db.serviceClient.count({ where }),
+      ]);
+      return buildPaginatedResponse(data, total, query);
+    }
     return this.db.serviceClient.findMany({ orderBy: { createdAt: 'desc' } });
   }
 

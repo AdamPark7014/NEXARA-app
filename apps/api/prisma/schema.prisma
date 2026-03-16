@@ -33,6 +33,20 @@ model Product {
   tipoCambio      Float?
   brand           Brand?          @relation(fields: [brandId], references: [id])
   sources         ProductSource[]
+
+  // === ERP Industrial Relations ===
+  invoiceItems          InvoiceItem[]
+  stockLevels           StockLevel[]
+  stockMovements        StockMovement[]
+  lots                  Lot[]
+  purchaseReqItems      PurchaseRequisitionItem[]
+  purchaseOrderItems    PurchaseOrderItem[]
+  boms                  BillOfMaterials[]       @relation("ProductBOM")
+  bomComponents         BOMComponent[]          @relation("BOMComponentProduct")
+  productionOrders      ProductionOrder[]
+  qualityInspections    QualityInspection[]
+  ncrs                  NonConformanceReport[]
+  maintenanceParts      MaintenanceOrderPart[]
 }
 
 model ProductSource {
@@ -100,6 +114,7 @@ model WorkProject {
   description   String?
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
+  deletedAt     DateTime?
   expenses      WorkProjectExpense[]
   payroll       WorkProjectPayroll[]
   logs          WorkProjectLog[]
@@ -208,6 +223,12 @@ model Supplier {
   orderItems       OrderItem[]
   supplierProducts SupplierProduct[]
 
+  // === ERP Industrial Relations ===
+  invoices              Invoice[]              @relation("SupplierInvoices")
+  lots                  Lot[]                  @relation("LotSupplier")
+  purchaseOrders        PurchaseOrder[]        @relation("SupplierPurchaseOrders")
+  evaluations           SupplierEvaluation[]   @relation("SupplierEvaluations")
+
   @@map("suppliers")
 }
 
@@ -274,13 +295,37 @@ model Role {
   accesoPanelVentas      Boolean @default(false)
   accesoContabilidad     Boolean @default(false)
   accesoCotizaciones     Boolean @default(false)
-  users          User[]
+
+  // === ERP Industrial Access ===
+  accesoInventario       Boolean @default(false)
+  accesoCompras          Boolean @default(false)
+  accesoManufactura      Boolean @default(false)
+  accesoCalidad          Boolean @default(false)
+  accesoMantenimiento    Boolean @default(false)
+  accesoSeguridad        Boolean @default(false)
+  accesoDocumentos       Boolean @default(false)
+  accesoWorkflow         Boolean @default(false)
+  accesoAuditoria        Boolean @default(false)
+  accesoBI               Boolean @default(false)
+  accesoBanca            Boolean @default(false)
+  accesoMultas           Boolean @default(false)
+  accesoClientes         Boolean @default(false)
+  accesoLunchBreaks      Boolean @default(false)
+
+  users              User[]
+
+  // === ERP Industrial Relations ===
+  workflowSteps      WorkflowStep[]  @relation("WorkflowStepRole")
 }
 
 model Department {
   id     Int    @id @default(autoincrement())
   nombre String @unique @db.VarChar(100)
   users  User[]
+
+  // === ERP Industrial Relations ===
+  costCenters           CostCenter[]
+  purchaseRequisitions  PurchaseRequisition[]
 }
 
 model User {
@@ -343,6 +388,49 @@ model User {
   cvsRecruiterReviewed CvCandidate[] @relation("CvRecruiterReviewedBy")
   cvsAdminReviewed CvCandidate[]    @relation("CvAdminReviewedBy")
   cvsSuperadminReviewed CvCandidate[] @relation("CvSuperadminReviewedBy")
+
+  // === ERP Industrial Relations ===
+  fiscalPeriodsClosed     FiscalPeriod[]          @relation("FiscalPeriodClosedBy")
+  journalEntriesCreated   JournalEntry[]          @relation("JournalEntryCreator")
+  invoicesCreated         Invoice[]               @relation("InvoiceCreator")
+  paymentsCreated         Payment[]               @relation("PaymentCreator")
+  reconciliations         BankReconciliation[]    @relation("ReconciliationUser")
+  warehousesManaged       Warehouse[]             @relation("WarehouseManager")
+  stockMovementsCreated   StockMovement[]         @relation("StockMovementCreator")
+  requisitionsRequested   PurchaseRequisition[]   @relation("RequisitionRequester")
+  requisitionsApproved    PurchaseRequisition[]   @relation("RequisitionApprover")
+  purchaseOrdersCreated   PurchaseOrder[]         @relation("PurchaseOrderCreator")
+  purchaseOrdersApproved  PurchaseOrder[]         @relation("PurchaseOrderApprover")
+  goodsReceiptsReceived   GoodsReceipt[]          @relation("GoodsReceiptReceiver")
+  supplierEvaluations     SupplierEvaluation[]    @relation("SupplierEvaluator")
+  bomsApproved            BillOfMaterials[]       @relation("BOMApprover")
+  productionOrdersCreated ProductionOrder[]       @relation("ProductionOrderCreator")
+  productionLogs          ProductionLog[]         @relation("ProductionLogOperator")
+  qualityInspections      QualityInspection[]     @relation("QualityInspector")
+  ncrsReported            NonConformanceReport[]  @relation("NCRReportedBy")
+  ncrsAssigned            NonConformanceReport[]  @relation("NCRAssignedTo")
+  assetsResponsible       Asset[]                 @relation("AssetResponsible")
+  maintenanceAssigned     MaintenanceOrder[]      @relation("MaintenanceAssignee")
+  maintenanceCreated      MaintenanceOrder[]      @relation("MaintenanceCreator")
+  safetyIncidentsReported SafetyIncident[]        @relation("IncidentReporter")
+  safetyIncidentsAssigned SafetyIncident[]        @relation("IncidentAssignee")
+  workPermitsRequested    WorkPermit[]            @relation("PermitRequester")
+  workPermitsApproved     WorkPermit[]            @relation("PermitApprover")
+  trainingRecords         TrainingRecord[]        @relation("UserTraining")
+  documentsCreated        ManagedDocument[]       @relation("DocumentCreator")
+  documentsApproved       ManagedDocument[]       @relation("DocumentApprover")
+  documentVersionsCreated DocumentVersion[]       @relation("DocumentVersionCreator")
+  workflowStepsApprover   WorkflowStep[]          @relation("WorkflowStepApprover")
+  workflowsStarted        WorkflowInstance[]      @relation("WorkflowStarter")
+  workflowApprovals       WorkflowApproval[]      @relation("ApprovalDecider")
+  auditLogs               AuditLog[]              @relation("AuditLogUser")
+  preferences             UserPreference[]        @relation("UserPreferences")
+
+  // === HR Relations ===
+  leaveRequests           LeaveRequest[]          @relation("LeaveRequester")
+  leaveApprovals          LeaveRequest[]          @relation("LeaveApprover")
+  performanceReviews      PerformanceReview[]     @relation("ReviewedUser")
+  performanceReviewsGiven PerformanceReview[]     @relation("Reviewer")
 }
 
 enum CvEmploymentStatus {
@@ -490,6 +578,7 @@ model Activity {
   vehicleControls      VehicleControl[]
   Viatico              Viatico[]
   inventorySnapshot    InventorySnapshot?
+  deletedAt            DateTime?
 }
 
 enum ActivityWorkType {
@@ -833,6 +922,7 @@ model Expense {
   ticketEvidenciaUrl String?
   estatusPago        String   @default("Pendiente") @db.VarChar(30)
   fechaSolicitud     DateTime @default(now())
+  deletedAt          DateTime?
   actividad          Activity @relation(fields: [actividadId], references: [id])
   usuario            User     @relation(fields: [usuarioId], references: [id])
 }
@@ -860,6 +950,7 @@ model Viatico {
   ticketEvidenciaUrl String?
   estatus            String    @default("Pendiente") @db.VarChar(30)
   fechaSolicitud     DateTime  @default(now())
+  deletedAt          DateTime?
   Activity           Activity? @relation(fields: [actividadId], references: [id])
   User               User      @relation(fields: [usuarioId], references: [id])
   project            SalesProject? @relation(fields: [projectId], references: [id])
@@ -1048,6 +1139,7 @@ model Cotizacion {
   createdById    Int?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
+  deletedAt      DateTime?
   items          CotizacionItem[]
   createdBy      User?            @relation(fields: [createdById], references: [id])
   salesQuotes    SalesOpportunityQuote[]
@@ -1131,6 +1223,9 @@ model SalesClient {
   opportunities  SalesOpportunity[]
   owner          User?     @relation("SalesClientOwner", fields: [ownerId], references: [id])
   serviceClient  ServiceClient? @relation(fields: [serviceClientId], references: [id])
+
+  // === ERP Industrial Relations ===
+  invoices       Invoice[]
 
   @@map("sales_clients")
 }
@@ -1623,5 +1718,1519 @@ model ToolRequestNotification {
   @@index([usuarioId, isRead])
   @@index([toolRequestId, type])
   @@map("tool_request_notifications")
+}
+
+// ============================================================================
+// ERP INDUSTRIAL - CONTABILIDAD (Accounting / General Ledger)
+// ============================================================================
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum JournalEntryStatus {
+  DRAFT
+  POSTED
+  REVERSED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+  CREDITED
+}
+
+enum InvoiceType {
+  ACCOUNTS_RECEIVABLE
+  ACCOUNTS_PAYABLE
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CHECK
+  CREDIT_CARD
+  SPEI
+  DOMICILIACION
+  CARD_DEBIT
+  DIGITAL_WALLET
+  COMPENSATION
+  OTHER
+}
+
+// SAT: Uso de CFDI (catálogo c_UsoCFDI)
+enum CfdiUsage {
+  G01 // Adquisición de mercancías
+  G02 // Devoluciones, descuentos o bonificaciones
+  G03 // Gastos en general
+  I01 // Construcciones
+  I02 // Mobiliario y equipo de oficina
+  I03 // Equipo de transporte
+  I04 // Equipo de cómputo
+  I05 // Dados, troqueles, moldes, matrices
+  I06 // Comunicaciones telefónicas
+  I07 // Comunicaciones satelitales
+  I08 // Otra maquinaria y equipo
+  D01 // Honorarios médicos
+  D02 // Gastos médicos por incapacidad
+  D03 // Gastos funerales
+  D04 // Donativos
+  D05 // Intereses de créditos hipotecarios
+  D06 // Aportaciones voluntarias al SAR
+  D07 // Primas de seguros
+  D08 // Gastos de transportación escolar
+  D10 // Pagos por servicios educativos
+  P01 // Por definir
+  S01 // Sin efectos fiscales
+  CP01 // Pagos
+}
+
+// SAT: Régimen fiscal (catálogo c_RegimenFiscal)
+enum FiscalRegime {
+  R601 // General de Ley Personas Morales
+  R603 // Personas Morales con Fines no Lucrativos
+  R605 // Sueldos y Salarios
+  R606 // Arrendamiento
+  R607 // Régimen de Enajenación o Adquisición de Bienes
+  R608 // Demás ingresos
+  R610 // Residentes en el Extranjero sin EP
+  R611 // Ingresos por Dividendos
+  R612 // Personas Físicas con Actividades Empresariales y Profesionales
+  R614 // Ingresos por intereses
+  R615 // Régimen de los ingresos por obtención de premios
+  R616 // Sin obligaciones fiscales
+  R620 // Sociedades Cooperativas de Producción
+  R621 // Incorporación Fiscal
+  R622 // Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras
+  R623 // Opcional para Grupos de Sociedades
+  R624 // Coordinados
+  R625 // RESICO Personas Físicas
+  R626 // RESICO Personas Morales
+}
+
+// SAT: Forma de pago (catálogo c_FormaPago)
+enum SatPaymentForm {
+  FP01 // Efectivo
+  FP02 // Cheque nominativo
+  FP03 // Transferencia electrónica de fondos (SPEI)
+  FP04 // Tarjeta de crédito
+  FP05 // Monedero electrónico
+  FP06 // Dinero electrónico
+  FP08 // Vales de despensa
+  FP12 // Dación en pago
+  FP13 // Pago por subrogación
+  FP14 // Pago por consignación
+  FP15 // Condonación
+  FP17 // Compensación
+  FP23 // Novación
+  FP24 // Confusión
+  FP25 // Remisión de deuda
+  FP26 // Prescripción o caducidad
+  FP27 // A satisfacción del acreedor
+  FP28 // Tarjeta de débito
+  FP29 // Tarjeta de servicios
+  FP30 // Aplicación de anticipos
+  FP31 // Intermediario pagos
+  FP99 // Por definir
+}
+
+// SAT: Método de pago
+enum SatPaymentMethod {
+  PUE // Pago en una sola exhibición
+  PPD // Pago en parcialidades o diferido
+}
+
+enum BankReconciliationStatus {
+  PENDING
+  MATCHED
+  UNMATCHED
+  ADJUSTED
+}
+
+model Account {
+  id            Int         @id @default(autoincrement())
+  code          String      @unique @db.VarChar(30)
+  name          String      @db.VarChar(200)
+  type          AccountType
+  parentId      Int?
+  description   String?
+  isActive      Boolean     @default(true)
+  currency      String      @default("MXN") @db.VarChar(10)
+  balance       Decimal     @default(0) @db.Decimal(16, 2)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  parent        Account?    @relation("AccountHierarchy", fields: [parentId], references: [id])
+  children      Account[]   @relation("AccountHierarchy")
+  debitEntries  JournalEntryLine[] @relation("DebitAccount")
+  creditEntries JournalEntryLine[] @relation("CreditAccount")
+  costCenterDefaults CostCenter[] @relation("CostCenterDefaultAccount")
+
+  @@index([type])
+  @@index([parentId])
+  @@map("accounts")
+}
+
+model FiscalPeriod {
+  id          Int       @id @default(autoincrement())
+  name        String    @db.VarChar(60)
+  startDate   DateTime  @db.Date
+  endDate     DateTime  @db.Date
+  isClosed    Boolean   @default(false)
+  closedAt    DateTime?
+  closedById  Int?
+  createdAt   DateTime  @default(now())
+  closedBy    User?     @relation("FiscalPeriodClosedBy", fields: [closedById], references: [id])
+  journalEntries JournalEntry[]
+
+  @@unique([startDate, endDate])
+  @@map("fiscal_periods")
+}
+
+model JournalEntry {
+  id              Int                @id @default(autoincrement())
+  entryNumber     String             @unique @db.VarChar(30)
+  date            DateTime           @db.Date
+  description     String
+  reference       String?            @db.VarChar(100)
+  status          JournalEntryStatus @default(DRAFT)
+  fiscalPeriodId  Int?
+  reversalOfId    Int?               @unique
+  totalDebit      Decimal            @default(0) @db.Decimal(16, 2)
+  totalCredit     Decimal            @default(0) @db.Decimal(16, 2)
+  createdById     Int?
+  postedAt        DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  fiscalPeriod    FiscalPeriod?      @relation(fields: [fiscalPeriodId], references: [id])
+  reversalOf      JournalEntry?      @relation("JournalReversal", fields: [reversalOfId], references: [id])
+  reversedBy      JournalEntry?      @relation("JournalReversal")
+  createdBy       User?              @relation("JournalEntryCreator", fields: [createdById], references: [id])
+  lines           JournalEntryLine[]
+
+  @@index([date])
+  @@index([status])
+  @@map("journal_entries")
+}
+
+model JournalEntryLine {
+  id              Int          @id @default(autoincrement())
+  journalEntryId  Int
+  debitAccountId  Int
+  creditAccountId Int?
+  description     String?      @db.VarChar(300)
+  debit           Decimal      @default(0) @db.Decimal(16, 2)
+  credit          Decimal      @default(0) @db.Decimal(16, 2)
+  costCenterId    Int?
+  journalEntry    JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  debitAccount    Account      @relation("DebitAccount", fields: [debitAccountId], references: [id])
+  creditAccount   Account?     @relation("CreditAccount", fields: [creditAccountId], references: [id])
+  costCenter      CostCenter?  @relation(fields: [costCenterId], references: [id])
+
+  @@index([journalEntryId])
+  @@index([debitAccountId])
+  @@map("journal_entry_lines")
+}
+
+model CostCenter {
+  id               Int       @id @default(autoincrement())
+  code             String    @unique @db.VarChar(30)
+  name             String    @db.VarChar(200)
+  departmentId     Int?
+  defaultAccountId Int?
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  department       Department? @relation(fields: [departmentId], references: [id])
+  defaultAccount   Account?  @relation("CostCenterDefaultAccount", fields: [defaultAccountId], references: [id])
+  journalLines     JournalEntryLine[]
+  budgets          Budget[]
+
+  @@map("cost_centers")
+}
+
+model Invoice {
+  id              Int           @id @default(autoincrement())
+  invoiceNumber   String        @unique @db.VarChar(40)
+  type            InvoiceType
+  status          InvoiceStatus @default(DRAFT)
+  issueDate       DateTime      @db.Date
+  dueDate         DateTime      @db.Date
+  clientId        Int?
+  supplierId      Int?
+  subtotal        Decimal       @default(0) @db.Decimal(14, 2)
+  taxAmount       Decimal       @default(0) @db.Decimal(14, 2)
+  totalAmount     Decimal       @default(0) @db.Decimal(14, 2)
+  paidAmount      Decimal       @default(0) @db.Decimal(14, 2)
+  currency        String        @default("MXN") @db.VarChar(10)
+  notes           String?
+  // ── CFDI 4.0 / SAT fields ──
+  cfdiUuid        String?       @db.VarChar(80)
+  cfdiXml         String?
+  pdfUrl          String?       @db.VarChar(500)
+  cfdiVersion     String?       @default("4.0") @db.VarChar(5)
+  cfdiSerie       String?       @db.VarChar(25)
+  cfdiFolio       String?       @db.VarChar(40)
+  cfdiUsage       CfdiUsage?    @default(G03)
+  satPaymentForm  SatPaymentForm? @default(FP99)
+  satPaymentMethod SatPaymentMethod? @default(PUE)
+  emisorRfc       String?       @db.VarChar(13)
+  emisorName      String?       @db.VarChar(300)
+  emisorRegime    FiscalRegime? @default(R601)
+  receptorRfc     String?       @db.VarChar(13)
+  receptorName    String?       @db.VarChar(300)
+  receptorRegime  FiscalRegime?
+  receptorZipCode String?       @db.VarChar(5)
+  exchangeRate    Decimal?      @db.Decimal(10, 4)
+  cfdiStampDate   DateTime?
+  satCertNumber   String?       @db.VarChar(30)
+  cfdiRelationType String?     @db.VarChar(5)
+  cfdiRelatedUuids String?     // Comma-separated UUIDs of related CFDI
+  isCancelled     Boolean       @default(false)
+  cancelledAt     DateTime?
+  cancelReason    String?       @db.VarChar(5)
+  substitutionUuid String?     @db.VarChar(80)
+  // ── end CFDI ──
+  createdById     Int?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  deletedAt       DateTime?
+  client          SalesClient?  @relation(fields: [clientId], references: [id])
+  supplier        Supplier?     @relation("SupplierInvoices", fields: [supplierId], references: [id])
+  createdBy       User?         @relation("InvoiceCreator", fields: [createdById], references: [id])
+  items           InvoiceItem[]
+  payments        Payment[]
+
+  @@index([type, status])
+  @@index([dueDate])
+  @@index([cfdiUuid])
+  @@index([emisorRfc])
+  @@index([receptorRfc])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id            Int     @id @default(autoincrement())
+  invoiceId     Int
+  description   String  @db.VarChar(300)
+  quantity      Decimal @db.Decimal(12, 4)
+  unitPrice     Decimal @db.Decimal(14, 2)
+  taxRate       Decimal @default(0) @db.Decimal(5, 2)
+  total         Decimal @db.Decimal(14, 2)
+  productId     Int?
+  // ── SAT catalog fields ──
+  satProductKey String? @db.VarChar(10)   // ClaveProdServ (catálogo SAT)
+  satUnitKey    String? @db.VarChar(5)    // ClaveUnidad (catálogo SAT)
+  unitName      String? @db.VarChar(50)   // e.g. "Pieza", "Servicio"
+  discount      Decimal @default(0) @db.Decimal(14, 2)
+  taxBase       Decimal? @db.Decimal(14, 2)
+  ivaRate       Decimal? @db.Decimal(5, 2) // IVA 16%, 8%, 0%
+  ivaAmount     Decimal? @db.Decimal(14, 2)
+  iepsRate      Decimal? @db.Decimal(5, 2)
+  iepsAmount    Decimal? @db.Decimal(14, 2)
+  isrRetRate    Decimal? @db.Decimal(5, 2)
+  isrRetAmount  Decimal? @db.Decimal(14, 2)
+  ivaRetRate    Decimal? @db.Decimal(5, 4)
+  ivaRetAmount  Decimal? @db.Decimal(14, 2)
+  // ── end SAT ──
+  invoice       Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product       Product? @relation(fields: [productId], references: [id])
+
+  @@map("invoice_items")
+}
+
+model Payment {
+  id            Int           @id @default(autoincrement())
+  invoiceId     Int
+  amount        Decimal       @db.Decimal(14, 2)
+  paymentDate   DateTime      @db.Date
+  method        PaymentMethod @default(SPEI)
+  reference     String?       @db.VarChar(100)
+  bankAccountId Int?
+  notes         String?
+  // ── MX payment fields ──
+  satPaymentForm SatPaymentForm? @default(FP03) // SPEI por defecto
+  speiTrackingKey String?     @db.VarChar(30)
+  exchangeRate  Decimal?      @db.Decimal(10, 4)
+  operationNumber String?     @db.VarChar(50)
+  cfdiPaymentUuid String?     @db.VarChar(80)  // UUID del complemento de pago
+  // ── end MX ──
+  createdById   Int?
+  createdAt     DateTime      @default(now())
+  invoice       Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  bankAccount   BankAccount?  @relation(fields: [bankAccountId], references: [id])
+  createdBy     User?         @relation("PaymentCreator", fields: [createdById], references: [id])
+
+  @@index([invoiceId])
+  @@map("payments")
+}
+
+model BankAccount {
+  id             Int       @id @default(autoincrement())
+  name           String    @db.VarChar(200)
+  bankName       String    @db.VarChar(200)
+  accountNumber  String    @db.VarChar(40)
+  clabe          String?   @db.VarChar(20)
+  currency       String    @default("MXN") @db.VarChar(10)
+  currentBalance Decimal   @default(0) @db.Decimal(16, 2)
+  isActive       Boolean   @default(true)
+  // ── Banorte / MX banking fields ──
+  bankCode       String?   @db.VarChar(10)   // Clave bancaria (e.g. "072" = Banorte)
+  rfc            String?   @db.VarChar(13)
+  accountType    String?   @db.VarChar(30)   // "CHEQUES", "INVERSION", "NOMINA"
+  branch         String?   @db.VarChar(10)
+  lastSyncAt     DateTime?
+  speiEnabled    Boolean   @default(true)
+  cepUrl         String?   @db.VarChar(500)  // URL para Comprobante Electrónico de Pago
+  // ── end banking ──
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  payments       Payment[]
+  reconciliations BankReconciliation[]
+  transactions   BankTransaction[]
+
+  @@map("bank_accounts")
+}
+
+model BankTransaction {
+  id              Int       @id @default(autoincrement())
+  bankAccountId   Int
+  transactionDate DateTime  @db.Date
+  description     String    @db.VarChar(500)
+  amount          Decimal   @db.Decimal(14, 2)
+  isDebit         Boolean
+  externalRef     String?   @db.VarChar(100)
+  // ── MX SPEI fields ──
+  speiTrackingKey String?   @db.VarChar(30)   // Clave de rastreo SPEI
+  speiCep         String?                     // CEP XML content
+  counterpartyRfc String?   @db.VarChar(13)
+  counterpartyName String?  @db.VarChar(300)
+  counterpartyClabe String? @db.VarChar(20)
+  counterpartyBank String?  @db.VarChar(100)
+  concept         String?   @db.VarChar(200)
+  beneficiaryRef  String?   @db.VarChar(7)    // Referencia numérica Banorte
+  // ── end SPEI ──
+  importedAt      DateTime  @default(now())
+  bankAccount     BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  reconciliation  BankReconciliation?
+
+  @@index([bankAccountId, transactionDate])
+  @@index([speiTrackingKey])
+  @@map("bank_transactions")
+}
+
+model BankReconciliation {
+  id                Int                      @id @default(autoincrement())
+  bankAccountId     Int
+  bankTransactionId Int                      @unique
+  status            BankReconciliationStatus @default(PENDING)
+  matchedAmount     Decimal?                 @db.Decimal(14, 2)
+  notes             String?
+  reconciledAt      DateTime?
+  reconciledById    Int?
+  createdAt         DateTime                 @default(now())
+  bankAccount       BankAccount              @relation(fields: [bankAccountId], references: [id])
+  bankTransaction   BankTransaction          @relation(fields: [bankTransactionId], references: [id])
+  reconciledBy      User?                    @relation("ReconciliationUser", fields: [reconciledById], references: [id])
+
+  @@index([bankAccountId, status])
+  @@map("bank_reconciliations")
+}
+
+model Budget {
+  id            Int       @id @default(autoincrement())
+  name          String    @db.VarChar(200)
+  costCenterId  Int
+  year          Int
+  month         Int?
+  plannedAmount Decimal   @db.Decimal(14, 2)
+  actualAmount  Decimal   @default(0) @db.Decimal(14, 2)
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  costCenter    CostCenter @relation(fields: [costCenterId], references: [id])
+
+  @@unique([costCenterId, year, month])
+  @@map("budgets")
+}
+
+// ============================================================================
+// ERP INDUSTRIAL - INVENTARIO AVANZADO (Advanced Warehouse Inventory)
+// ============================================================================
+
+enum StockMovementType {
+  RECEIPT
+  DISPATCH
+  TRANSFER
+  ADJUSTMENT
+  RETURN
+  SCRAP
+  PRODUCTION_IN
+  PRODUCTION_OUT
+}
+
+enum ValuationMethod {
+  FIFO
+  LIFO
+  WEIGHTED_AVERAGE
+}
+
+model Warehouse {
+  id          Int       @id @default(autoincrement())
+  code        String    @unique @db.VarChar(20)
+  name        String    @db.VarChar(200)
+  address     String?
+  city        String?   @db.VarChar(120)
+  state       String?   @db.VarChar(120)
+  managerId   Int?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  manager     User?     @relation("WarehouseManager", fields: [managerId], references: [id])
+  locations   WarehouseLocation[]
+  stockLevels StockLevel[]
+  movementsFrom StockMovement[] @relation("MovementFromWarehouse")
+  movementsTo   StockMovement[] @relation("MovementToWarehouse")
+
+  @@map("warehouses")
+}
+
+model WarehouseLocation {
+  id          Int       @id @default(autoincrement())
+  warehouseId Int
+  code        String    @db.VarChar(30)
+  name        String    @db.VarChar(120)
+  aisle       String?   @db.VarChar(20)
+  rack        String?   @db.VarChar(20)
+  shelf       String?   @db.VarChar(20)
+  bin         String?   @db.VarChar(20)
+  createdAt   DateTime  @default(now())
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  stockLevels StockLevel[]
+
+  @@unique([warehouseId, code])
+  @@map("warehouse_locations")
+}
+
+model StockLevel {
+  id            Int       @id @default(autoincrement())
+  productId     Int
+  warehouseId   Int
+  locationId    Int?
+  quantity      Decimal   @default(0) @db.Decimal(14, 4)
+  reservedQty   Decimal   @default(0) @db.Decimal(14, 4)
+  reorderPoint  Decimal   @default(0) @db.Decimal(14, 4)
+  minStock      Decimal   @default(0) @db.Decimal(14, 4)
+  maxStock      Decimal   @default(0) @db.Decimal(14, 4)
+  unitCost      Decimal   @default(0) @db.Decimal(14, 4)
+  valuationMethod ValuationMethod @default(WEIGHTED_AVERAGE)
+  lastCountDate DateTime?
+  updatedAt     DateTime  @updatedAt
+  product       Product   @relation(fields: [productId], references: [id])
+  warehouse     Warehouse @relation(fields: [warehouseId], references: [id])
+  location      WarehouseLocation? @relation(fields: [locationId], references: [id])
+  lotStocks     LotStock[]
+
+  @@unique([productId, warehouseId, locationId])
+  @@index([warehouseId])
+  @@map("stock_levels")
+}
+
+model StockMovement {
+  id                Int               @id @default(autoincrement())
+  movementNumber    String            @unique @db.VarChar(30)
+  type              StockMovementType
+  productId         Int
+  fromWarehouseId   Int?
+  toWarehouseId     Int?
+  quantity          Decimal           @db.Decimal(14, 4)
+  unitCost          Decimal           @default(0) @db.Decimal(14, 4)
+  totalCost         Decimal           @default(0) @db.Decimal(14, 2)
+  lotId             Int?
+  reference         String?           @db.VarChar(200)
+  notes             String?
+  purchaseOrderId   Int?
+  productionOrderId Int?
+  createdById       Int?
+  createdAt         DateTime          @default(now())
+  product           Product           @relation(fields: [productId], references: [id])
+  fromWarehouse     Warehouse?        @relation("MovementFromWarehouse", fields: [fromWarehouseId], references: [id])
+  toWarehouse       Warehouse?        @relation("MovementToWarehouse", fields: [toWarehouseId], references: [id])
+  lot               Lot?              @relation(fields: [lotId], references: [id])
+  purchaseOrder     PurchaseOrder?    @relation(fields: [purchaseOrderId], references: [id])
+  productionOrder   ProductionOrder?  @relation(fields: [productionOrderId], references: [id])
+  createdBy         User?             @relation("StockMovementCreator", fields: [createdById], references: [id])
+
+  @@index([productId, type])
+  @@index([createdAt])
+  @@map("stock_movements")
+}
+
+model Lot {
+  id              Int       @id @default(autoincrement())
+  lotNumber       String    @unique @db.VarChar(60)
+  productId       Int
+  expirationDate  DateTime?
+  manufacturingDate DateTime?
+  supplierId      Int?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  product         Product   @relation(fields: [productId], references: [id])
+  supplier        Supplier? @relation("LotSupplier", fields: [supplierId], references: [id])
+  movements       StockMovement[]
+  lotStocks       LotStock[]
+  qualityInspections QualityInspection[]
+
+  @@index([productId])
+  @@map("lots")
+}
+
+model LotStock {
+  id           Int        @id @default(autoincrement())
+  lotId        Int
+  stockLevelId Int
+  quantity     Decimal    @db.Decimal(14, 4)
+  lot          Lot        @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  stockLevel   StockLevel @relation(fields: [stockLevelId], references: [id], onDelete: Cascade)
+
+  @@unique([lotId, stockLevelId])
+  @@map("lot_stocks")
+}
+
+// ============================================================================
+// ERP INDUSTRIAL - COMPRAS (Procurement)
+// ============================================================================
+
+enum PurchaseRequisitionStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  ORDERED
+  CANCELLED
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  SENT
+  CONFIRMED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  INVOICED
+  CANCELLED
+}
+
+model PurchaseRequisition {
+  id              Int                        @id @default(autoincrement())
+  reqNumber       String                     @unique @db.VarChar(30)
+  title           String                     @db.VarChar(200)
+  description     String?
+  status          PurchaseRequisitionStatus   @default(DRAFT)
+  priority        String                     @default("NORMAL") @db.VarChar(20)
+  requiredDate    DateTime?                  @db.Date
+  departmentId    Int?
+  requestedById   Int
+  approvedById    Int?
+  approvedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  department      Department?                @relation(fields: [departmentId], references: [id])
+  requestedBy     User                       @relation("RequisitionRequester", fields: [requestedById], references: [id])
+  approvedBy      User?                      @relation("RequisitionApprover", fields: [approvedById], references: [id])
+  items           PurchaseRequisitionItem[]
+  purchaseOrders  PurchaseOrder[]
+
+  @@index([status])
+  @@map("purchase_requisitions")
+}
+
+model PurchaseRequisitionItem {
+  id              Int                  @id @default(autoincrement())
+  requisitionId   Int
+  productId       Int?
+  description     String               @db.VarChar(300)
+  quantity        Decimal              @db.Decimal(14, 4)
+  estimatedCost   Decimal?             @db.Decimal(14, 2)
+  notes           String?
+  requisition     PurchaseRequisition  @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  product         Product?             @relation(fields: [productId], references: [id])
+
+  @@map("purchase_requisition_items")
+}
+
+model PurchaseOrder {
+  id               Int                 @id @default(autoincrement())
+  poNumber         String              @unique @db.VarChar(30)
+  status           PurchaseOrderStatus @default(DRAFT)
+  supplierId       Int
+  requisitionId    Int?
+  orderDate        DateTime            @db.Date
+  expectedDate     DateTime?           @db.Date
+  subtotal         Decimal             @default(0) @db.Decimal(14, 2)
+  taxAmount        Decimal             @default(0) @db.Decimal(14, 2)
+  totalAmount      Decimal             @default(0) @db.Decimal(14, 2)
+  currency         String              @default("MXN") @db.VarChar(10)
+  paymentTerms     String?             @db.VarChar(200)
+  shippingAddress  String?
+  notes            String?
+  createdById      Int?
+  approvedById     Int?
+  approvedAt       DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  deletedAt        DateTime?
+  supplier         Supplier            @relation("SupplierPurchaseOrders", fields: [supplierId], references: [id])
+  requisition      PurchaseRequisition? @relation(fields: [requisitionId], references: [id])
+  createdBy        User?               @relation("PurchaseOrderCreator", fields: [createdById], references: [id])
+  approvedBy       User?               @relation("PurchaseOrderApprover", fields: [approvedById], references: [id])
+  items            PurchaseOrderItem[]
+  receipts         GoodsReceipt[]
+  stockMovements   StockMovement[]
+
+  @@index([supplierId, status])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              Int           @id @default(autoincrement())
+  purchaseOrderId Int
+  productId       Int?
+  description     String        @db.VarChar(300)
+  quantity        Decimal       @db.Decimal(14, 4)
+  receivedQty     Decimal       @default(0) @db.Decimal(14, 4)
+  unitPrice       Decimal       @db.Decimal(14, 2)
+  taxRate         Decimal       @default(0) @db.Decimal(5, 2)
+  total           Decimal       @db.Decimal(14, 2)
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product         Product?      @relation(fields: [productId], references: [id])
+  receiptItems    GoodsReceiptItem[]
+
+  @@map("purchase_order_items")
+}
+
+model GoodsReceipt {
+  id              Int           @id @default(autoincrement())
+  receiptNumber   String        @unique @db.VarChar(30)
+  purchaseOrderId Int
+  receiptDate     DateTime      @db.Date
+  notes           String?
+  receivedById    Int?
+  createdAt       DateTime      @default(now())
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  receivedBy      User?         @relation("GoodsReceiptReceiver", fields: [receivedById], references: [id])
+  items           GoodsReceiptItem[]
+
+  @@index([purchaseOrderId])
+  @@map("goods_receipts")
+}
+
+model GoodsReceiptItem {
+  id                  Int              @id @default(autoincrement())
+  goodsReceiptId      Int
+  purchaseOrderItemId Int
+  quantityReceived    Decimal          @db.Decimal(14, 4)
+  quantityRejected    Decimal          @default(0) @db.Decimal(14, 4)
+  lotNumber           String?          @db.VarChar(60)
+  notes               String?
+  goodsReceipt        GoodsReceipt     @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  purchaseOrderItem   PurchaseOrderItem @relation(fields: [purchaseOrderItemId], references: [id])
+
+  @@map("goods_receipt_items")
+}
+
+model SupplierEvaluation {
+  id            Int       @id @default(autoincrement())
+  supplierId    Int
+  evaluationDate DateTime @db.Date
+  qualityScore  Int       @default(0)
+  deliveryScore Int       @default(0)
+  priceScore    Int       @default(0)
+  serviceScore  Int       @default(0)
+  overallScore  Decimal   @default(0) @db.Decimal(5, 2)
+  notes         String?
+  evaluatedById Int?
+  createdAt     DateTime  @default(now())
+  supplier      Supplier  @relation("SupplierEvaluations", fields: [supplierId], references: [id])
+  evaluatedBy   User?     @relation("SupplierEvaluator", fields: [evaluatedById], references: [id])
+
+  @@index([supplierId])
+  @@map("supplier_evaluations")
+}
+
+// ============================================================================
+// ERP INDUSTRIAL - MANUFACTURA / PRODUCCIÓN
+// ============================================================================
+
+enum ProductionOrderStatus {
+  PLANNED
+  RELEASED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model BillOfMaterials {
+  id              Int       @id @default(autoincrement())
+  productId       Int
+  version         String    @default("1.0") @db.VarChar(20)
+  name            String    @db.VarChar(200)
+  description     String?
+  standardQty     Decimal   @default(1) @db.Decimal(14, 4)
+  unitOfMeasure   String    @default("PZA") @db.VarChar(20)
+  isActive        Boolean   @default(true)
+  approvedById    Int?
+  approvedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  product         Product   @relation("ProductBOM", fields: [productId], references: [id])
+  approvedBy      User?     @relation("BOMApprover", fields: [approvedById], references: [id])
+  components      BOMComponent[]
+  routings        ProductionRouting[]
+  productionOrders ProductionOrder[]
+
+  @@unique([productId, version])
+  @@map("bills_of_materials")
+}
+
+model BOMComponent {
+  id              Int              @id @default(autoincrement())
+  bomId           Int
+  componentProductId Int
+  quantity        Decimal          @db.Decimal(14, 4)
+  unitOfMeasure   String           @default("PZA") @db.VarChar(20)
+  scrapPercent    Decimal          @default(0) @db.Decimal(5, 2)
+  notes           String?
+  sortOrder       Int              @default(0)
+  bom             BillOfMaterials  @relation(fields: [bomId], references: [id], onDelete: Cascade)
+  componentProduct Product         @relation("BOMComponentProduct", fields: [componentProductId], references: [id])
+
+  @@index([bomId])
+  @@map("bom_components")
+}
+
+model WorkCenter {
+  id              Int       @id @default(autoincrement())
+  code            String    @unique @db.VarChar(20)
+  name            String    @db.VarChar(200)
+  description     String?
+  costPerHour     Decimal   @default(0) @db.Decimal(12, 2)
+  capacityPerHour Decimal   @default(1) @db.Decimal(10, 2)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  routings        ProductionRouting[]
+  productionLogs  ProductionLog[]
+
+  @@map("work_centers")
+}
+
+model ProductionRouting {
+  id             Int              @id @default(autoincrement())
+  bomId          Int
+  operationNumber Int
+  workCenterId   Int
+  operationName  String           @db.VarChar(200)
+  description    String?
+  setupTimeMin   Int              @default(0)
+  runTimeMin     Int              @default(0)
+  sortOrder      Int              @default(0)
+  bom            BillOfMaterials  @relation(fields: [bomId], references: [id], onDelete: Cascade)
+  workCenter     WorkCenter       @relation(fields: [workCenterId], references: [id])
+
+  @@unique([bomId, operationNumber])
+  @@map("production_routings")
+}
+
+model ProductionOrder {
+  id                Int                   @id @default(autoincrement())
+  orderNumber       String                @unique @db.VarChar(30)
+  bomId             Int
+  productId         Int
+  status            ProductionOrderStatus @default(PLANNED)
+  plannedQty        Decimal               @db.Decimal(14, 4)
+  completedQty      Decimal               @default(0) @db.Decimal(14, 4)
+  scrapQty          Decimal               @default(0) @db.Decimal(14, 4)
+  plannedStartDate  DateTime?             @db.Date
+  plannedEndDate    DateTime?             @db.Date
+  actualStartDate   DateTime?
+  actualEndDate     DateTime?
+  estimatedCost     Decimal               @default(0) @db.Decimal(14, 2)
+  actualCost        Decimal               @default(0) @db.Decimal(14, 2)
+  priority          String                @default("NORMAL") @db.VarChar(20)
+  notes             String?
+  createdById       Int?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  deletedAt         DateTime?
+  bom               BillOfMaterials       @relation(fields: [bomId], references: [id])
+  product           Product               @relation(fields: [productId], references: [id])
+  createdBy         User?                 @relation("ProductionOrderCreator", fields: [createdById], references: [id])
+  logs              ProductionLog[]
+  stockMovements    StockMovement[]
+
+  @@index([status])
+  @@map("production_orders")
+}
+
+model ProductionLog {
+  id                Int              @id @default(autoincrement())
+  productionOrderId Int
+  workCenterId      Int
+  operatorId        Int?
+  operationName     String           @db.VarChar(200)
+  startTime         DateTime
+  endTime           DateTime?
+  quantityProduced  Decimal          @default(0) @db.Decimal(14, 4)
+  quantityScrapped  Decimal          @default(0) @db.Decimal(14, 4)
+  laborCost         Decimal          @default(0) @db.Decimal(12, 2)
+  materialCost      Decimal          @default(0) @db.Decimal(12, 2)
+  overheadCost      Decimal          @default(0) @db.Decimal(12, 2)
+  notes             String?
+  createdAt         DateTime         @default(now())
+  productionOrder   ProductionOrder  @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  workCenter        WorkCenter       @relation(fields: [workCenterId], references: [id])
+  operator          User?            @relation("ProductionLogOperator", fields: [operatorId], references: [id])
+
+  @@index([productionOrderId])
+  @@map("production_logs")
+}
+
+// ============================================================================
+// ERP INDUSTRIAL - CALIDAD (Quality Management)
+// ============================================================================
+
+enum QualityInspectionType {
+  INCOMING
+  IN_PROCESS
+  FINAL
+  RANDOM
+}
+
+enum QualityInspectionResult {
+  PASSED
+  FAILED
+  CONDITIONAL
+}
+
+enum NCRStatus {
+  OPEN
+  INVESTIGATING
+  CORRECTIVE_ACTION
+  RESOLVED
+  CLOSED
+}
+
+enum NCRSeverity {
+  MINOR
+  MAJOR
+  CRITICAL
+}
+
+model QualityInspection {
+  id              Int                       @id @default(autoincrement())
+  inspectionNumber String                   @unique @db.VarChar(30)
+  type            QualityInspectionType
+  result          QualityInspectionResult?
+  productId       Int?
+  lotId           Int?
+  purchaseOrderId Int?
+  productionOrderId Int?
+  inspectedQty    Decimal                   @db.Decimal(14, 4)
+  passedQty       Decimal                   @default(0) @db.Decimal(14, 4)
+  failedQty       Decimal                   @default(0) @db.Decimal(14, 4)
+  inspectionDate  DateTime                  @db.Date
+  inspectorId     Int?
+  notes           String?
+  reportUrl       String?                   @db.VarChar(500)
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+  deletedAt       DateTime?
+  product         Product?                  @relation(fields: [productId], references: [id])
+  lot             Lot?                      @relation(fields: [lotId], references: [id])
+  inspector       User?                     @relation("QualityInspector", fields: [inspectorId], references: [id])
+  checklistItems  QualityChecklistItem[]
+  ncrs            NonConformanceReport[]
+
+  @@index([type, result])
+  @@map("quality_inspections")
+}
+
+model QualityChecklistItem {
+  id             Int                @id @default(autoincrement())
+  inspectionId   Int
+  parameter      String             @db.VarChar(200)
+  specification  String?            @db.VarChar(300)
+  actualValue    String?            @db.VarChar(300)
+  passed         Boolean            @default(true)
+  notes          String?
+  sortOrder      Int                @default(0)
+  inspection     QualityInspection  @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  @@map("quality_checklist_items")
+}
+
+model NonConformanceReport {
+  id               Int                @id @default(autoincrement())
+  ncrNumber        String             @unique @db.VarChar(30)
+  status           NCRStatus          @default(OPEN)
+  severity         NCRSeverity        @default(MINOR)
+  title            String             @db.VarChar(300)
+  description      String
+  rootCause        String?
+  correctiveAction String?
+  preventiveAction String?
+  inspectionId     Int?
+  productId        Int?
+  reportedById     Int
+  assignedToId     Int?
+  resolvedAt       DateTime?
+  closedAt         DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  deletedAt        DateTime?
+  inspection       QualityInspection? @relation(fields: [inspectionId], references: [id])
+  product          Product?           @relation(fields: [productId], references: [id])
+  reportedBy       User               @relation("NCRReportedBy", fields: [reportedById], references: [id])
+  assignedTo       User?              @relation("NCRAssignedTo", fields: [assignedToId], references: [id])
+
+  @@index([status, severity])
+  @@map("non_conformance_reports")
+}
+
+// ============================================================================
+// ERP INDUSTRIAL - MANTENIMIENTO (CMMS)
+// ============================================================================
+
+enum MaintenanceType {
+  PREVENTIVE
+  CORRECTIVE
+  PREDICTIVE
+}
+
+enum MaintenanceStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  OVERDUE
+}
+
+enum AssetStatus {
+  OPERATIONAL
+  UNDER_MAINTENANCE
+  OUT_OF_SERVICE
+  DECOMMISSIONED
+}
+
+model Asset {
+  id              Int          @id @default(autoincrement())
+  code            String       @unique @db.VarChar(30)
+  name            String       @db.VarChar(200)
+  description     String?
+  category        String?      @db.VarChar(100)
+  location        String?      @db.VarChar(200)
+  manufacturer    String?      @db.VarChar(200)
+  model           String?      @db.VarChar(200)
+  serialNumber    String?      @db.VarChar(100)
+  purchaseDate    DateTime?    @db.Date
+  purchaseCost    Decimal?     @db.Decimal(14, 2)
+  warrantyExpiry  DateTime?    @db.Date
+  expectedLifeYears Int?
+  status          AssetStatus  @default(OPERATIONAL)
+  imageUrl        String?      @db.VarChar(500)
+  responsibleId   Int?
+  parentAssetId   Int?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  deletedAt       DateTime?
+  responsible     User?        @relation("AssetResponsible", fields: [responsibleId], references: [id])
+  parentAsset     Asset?       @relation("AssetHierarchy", fields: [parentAssetId], references: [id])
+  childAssets     Asset[]      @relation("AssetHierarchy")
+  maintenanceOrders MaintenanceOrder[]
+  maintenanceSchedules MaintenanceSchedule[]
+
+  @@index([status])
+  @@map("assets")
+}
+
+model MaintenanceSchedule {
+  id              Int       @id @default(autoincrement())
+  assetId         Int
+  type            MaintenanceType @default(PREVENTIVE)
+  title           String    @db.VarChar(200)
+  description     String?
+  frequencyDays   Int
+  lastExecutedAt  DateTime?
+  nextDueDate     DateTime  @db.Date
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  asset           Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  maintenanceOrders MaintenanceOrder[]
+
+  @@index([nextDueDate])
+  @@map("maintenance_schedules")
+}
+
+model MaintenanceOrder {
+  id               Int               @id @default(autoincrement())
+  orderNumber      String            @unique @db.VarChar(30)
+  assetId          Int
+  scheduleId       Int?
+  type             MaintenanceType
+  status           MaintenanceStatus @default(PLANNED)
+  priority         String            @default("NORMAL") @db.VarChar(20)
+  title            String            @db.VarChar(200)
+  description      String?
+  diagnosis        String?
+  workPerformed    String?
+  plannedDate      DateTime          @db.Date
+  completedDate    DateTime?
+  downTimeMinutes  Int?
+  laborCost        Decimal           @default(0) @db.Decimal(12, 2)
+  partsCost        Decimal           @default(0) @db.Decimal(12, 2)
+  totalCost        Decimal           @default(0) @db.Decimal(12, 2)
+  assignedToId     Int?
+  createdById      Int?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  deletedAt        DateTime?
+  asset            Asset             @relation(fields: [assetId], references: [id])
+  schedule         MaintenanceSchedule? @relation(fields: [scheduleId], references: [id])
+  assignedTo       User?             @relation("MaintenanceAssignee", fields: [assignedToId], references: [id])
+  createdBy        User?             @relation("MaintenanceCreator", fields: [createdById], references: [id])
+  parts            MaintenanceOrderPart[]
+
+  @@index([assetId, status])
+  @@map("maintenance_orders")
+}
+
+model MaintenanceOrderPart {
+  id                  Int              @id @default(autoincrement())
+  maintenanceOrderId  Int
+  productId           Int?
+  partName            String           @db.VarChar(200)
+  quantity            Decimal          @db.Decimal(14, 4)
+  unitCost            Decimal          @default(0) @db.Decimal(14, 2)
+  totalCost           Decimal          @default(0) @db.Decimal(14, 2)
+  maintenanceOrder    MaintenanceOrder @relation(fields: [maintenanceOrderId], references: [id], onDelete: Cascade)
+  product             Product?         @relation(fields: [productId], references: [id])
+
+  @@map("maintenance_order_parts")
+}
+
+// ============================================================================
+// ERP INDUSTRIAL - SEGURIDAD INDUSTRIAL (EHS / Safety)
+// ============================================================================
+
+enum IncidentSeverity {
+  NEAR_MISS
+  FIRST_AID
+  MEDICAL
+  LOST_TIME
+  FATALITY
+}
+
+enum IncidentStatus {
+  REPORTED
+  INVESTIGATING
+  CORRECTIVE_ACTION
+  CLOSED
+}
+
+enum WorkPermitType {
+  HOT_WORK
+  CONFINED_SPACE
+  HEIGHTS
+  ELECTRICAL
+  EXCAVATION
+  GENERAL
+}
+
+enum WorkPermitStatus {
+  REQUESTED
+  APPROVED
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+model SafetyIncident {
+  id              Int              @id @default(autoincrement())
+  incidentNumber  String           @unique @db.VarChar(30)
+  title           String           @db.VarChar(300)
+  description     String
+  severity        IncidentSeverity
+  status          IncidentStatus   @default(REPORTED)
+  incidentDate    DateTime
+  location        String?          @db.VarChar(200)
+  rootCause       String?
+  correctiveAction String?
+  reportedById    Int
+  assignedToId    Int?
+  resolvedAt      DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  reportedBy      User             @relation("IncidentReporter", fields: [reportedById], references: [id])
+  assignedTo      User?            @relation("IncidentAssignee", fields: [assignedToId], references: [id])
+
+  @@index([severity, status])
+  @@map("safety_incidents")
+}
+
+model WorkPermit {
+  id              Int              @id @default(autoincrement())
+  permitNumber    String           @unique @db.VarChar(30)
+  type            WorkPermitType
+  status          WorkPermitStatus @default(REQUESTED)
+  title           String           @db.VarChar(200)
+  description     String?
+  location        String?          @db.VarChar(200)
+  validFrom       DateTime
+  validTo         DateTime
+  requestedById   Int
+  approvedById    Int?
+  approvedAt      DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  requestedBy     User             @relation("PermitRequester", fields: [requestedById], references: [id])
+  approvedBy      User?            @relation("PermitApprover", fields: [approvedById], references: [id])
+
+  @@index([type, status])
+  @@map("work_permits")
+}
+
+model TrainingRecord {
+  id              Int       @id @default(autoincrement())
+  userId          Int
+  courseName      String    @db.VarChar(200)
+  description     String?
+  provider        String?   @db.VarChar(200)
+  completedDate   DateTime  @db.Date
+  expirationDate  DateTime? @db.Date
+  certificateUrl  String?   @db.VarChar(500)
+  score           Decimal?  @db.Decimal(5, 2)
+  status          String    @default("VALID") @db.VarChar(30)
+  createdAt       DateTime  @default(now())
+  user            User      @relation("UserTraining", fields: [userId], references: [id])
+
+  @@index([userId, expirationDate])
+  @@map("training_records")
+}
+
+// ============================================================================
+// ERP INDUSTRIAL - GESTIÓN DOCUMENTAL (DMS)
+// ============================================================================
+
+enum DocumentStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  OBSOLETE
+}
+
+model DocumentCategory {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique @db.VarChar(100)
+  description String?
+  parentId    Int?
+  createdAt   DateTime  @default(now())
+  parent      DocumentCategory? @relation("DocCategoryHierarchy", fields: [parentId], references: [id])
+  children    DocumentCategory[] @relation("DocCategoryHierarchy")
+  documents   ManagedDocument[]
+
+  @@map("document_categories")
+}
+
+model ManagedDocument {
+  id              Int            @id @default(autoincrement())
+  documentNumber  String         @unique @db.VarChar(40)
+  title           String         @db.VarChar(300)
+  description     String?
+  categoryId      Int?
+  status          DocumentStatus @default(DRAFT)
+  currentVersion  Int            @default(1)
+  fileUrl         String?        @db.VarChar(500)
+  mimeType        String?        @db.VarChar(100)
+  fileSizeBytes   Int?
+  retentionDays   Int?
+  expiresAt       DateTime?
+  createdById     Int
+  approvedById    Int?
+  approvedAt      DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  category        DocumentCategory? @relation(fields: [categoryId], references: [id])
+  createdBy       User           @relation("DocumentCreator", fields: [createdById], references: [id])
+  approvedBy      User?          @relation("DocumentApprover", fields: [approvedById], references: [id])
+  versions        DocumentVersion[]
+
+  @@index([status])
+  @@map("managed_documents")
+}
+
+model DocumentVersion {
+  id            Int             @id @default(autoincrement())
+  documentId    Int
+  versionNumber Int
+  fileUrl       String          @db.VarChar(500)
+  changelog     String?
+  createdById   Int
+  createdAt     DateTime        @default(now())
+  document      ManagedDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdBy     User            @relation("DocumentVersionCreator", fields: [createdById], references: [id])
+
+  @@unique([documentId, versionNumber])
+  @@map("document_versions")
+}
+
+// ============================================================================
+// ERP INDUSTRIAL - WORKFLOW ENGINE
+// ============================================================================
+
+enum WorkflowStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ESCALATED
+}
+
+model WorkflowDefinition {
+  id             Int            @id @default(autoincrement())
+  name           String         @unique @db.VarChar(200)
+  description    String?
+  entityType     String         @db.VarChar(100)
+  status         WorkflowStatus @default(ACTIVE)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  steps          WorkflowStep[]
+  instances      WorkflowInstance[]
+
+  @@map("workflow_definitions")
+}
+
+model WorkflowStep {
+  id              Int                  @id @default(autoincrement())
+  workflowId      Int
+  stepNumber      Int
+  name            String               @db.VarChar(200)
+  description     String?
+  approverRoleId  Int?
+  approverUserId  Int?
+  autoApproveCondition String?
+  timeoutHours    Int?
+  sortOrder       Int                  @default(0)
+  workflow        WorkflowDefinition   @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  approverRole    Role?                @relation("WorkflowStepRole", fields: [approverRoleId], references: [id])
+  approverUser    User?                @relation("WorkflowStepApprover", fields: [approverUserId], references: [id])
+  approvals       WorkflowApproval[]
+
+  @@unique([workflowId, stepNumber])
+  @@map("workflow_steps")
+}
+
+model WorkflowInstance {
+  id              Int                  @id @default(autoincrement())
+  workflowId      Int
+  entityId        Int
+  entityType      String               @db.VarChar(100)
+  currentStep     Int                  @default(1)
+  isComplete      Boolean              @default(false)
+  isCancelled     Boolean              @default(false)
+  startedById     Int
+  startedAt       DateTime             @default(now())
+  completedAt     DateTime?
+  workflow        WorkflowDefinition   @relation(fields: [workflowId], references: [id])
+  startedBy       User                 @relation("WorkflowStarter", fields: [startedById], references: [id])
+  approvals       WorkflowApproval[]
+
+  @@index([entityType, entityId])
+  @@map("workflow_instances")
+}
+
+model WorkflowApproval {
+  id             Int             @id @default(autoincrement())
+  instanceId     Int
+  stepId         Int
+  status         ApprovalStatus  @default(PENDING)
+  comments       String?
+  decidedById    Int?
+  decidedAt      DateTime?
+  createdAt      DateTime        @default(now())
+  instance       WorkflowInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  step           WorkflowStep    @relation(fields: [stepId], references: [id])
+  decidedBy      User?           @relation("ApprovalDecider", fields: [decidedById], references: [id])
+
+  @@index([instanceId, status])
+  @@map("workflow_approvals")
+}
+
+// ============================================================================
+// ERP INDUSTRIAL - AUDIT TRAIL
+// ============================================================================
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  entityType  String   @db.VarChar(100)
+  entityId    Int
+  action      String   @db.VarChar(50)
+  changes     Json?
+  previousData Json?
+  userId      Int?
+  ipAddress   String?  @db.VarChar(45)
+  userAgent   String?  @db.VarChar(500)
+  createdAt   DateTime @default(now())
+  user        User?    @relation("AuditLogUser", fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ============================================================================
+// ERP INDUSTRIAL - BI / ANALYTICS (KPI Snapshots)
+// ============================================================================
+
+model KpiSnapshot {
+  id          Int      @id @default(autoincrement())
+  kpiName     String   @db.VarChar(100)
+  kpiCategory String   @db.VarChar(60)
+  value       Decimal  @db.Decimal(16, 4)
+  unit        String?  @db.VarChar(30)
+  periodStart DateTime @db.Date
+  periodEnd   DateTime @db.Date
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([kpiName, periodStart])
+  @@index([kpiCategory])
+  @@map("kpi_snapshots")
+}
+
+// ============================================================================
+// CONFIGURACIÓN DEL SISTEMA
+// ============================================================================
+
+model SystemSetting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique @db.VarChar(120)
+  value     String   @db.Text
+  category  String   @db.VarChar(60)
+  label     String?  @db.VarChar(200)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@map("system_settings")
+}
+
+model UserPreference {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  key       String   @db.VarChar(120)
+  value     String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation("UserPreferences", fields: [userId], references: [id])
+
+  @@unique([userId, key])
+  @@index([userId])
+  @@map("user_preferences")
+}
+
+// ============================================================================
+// HR MODULE — Leave Requests & Performance Reviews
+// ============================================================================
+
+enum LeaveType {
+  VACATION
+  SICK
+  PERSONAL
+  MATERNITY
+  PATERNITY
+  BEREAVEMENT
+  UNPAID
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model LeaveRequest {
+  id              Int         @id @default(autoincrement())
+  userId          Int
+  type            LeaveType
+  status          LeaveStatus @default(PENDING)
+  startDate       DateTime    @db.Date
+  endDate         DateTime    @db.Date
+  days            Float
+  reason          String?     @db.Text
+  approvedById    Int?
+  approvedAt      DateTime?
+  rejectionReason String?     @db.VarChar(500)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  user       User  @relation("LeaveRequester", fields: [userId], references: [id])
+  approvedBy User? @relation("LeaveApprover", fields: [approvedById], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([startDate, endDate])
+  @@map("leave_requests")
+}
+
+enum ReviewPeriod {
+  MONTHLY
+  QUARTERLY
+  SEMI_ANNUAL
+  ANNUAL
+}
+
+enum ReviewStatus {
+  DRAFT
+  SUBMITTED
+  ACKNOWLEDGED
+}
+
+model PerformanceReview {
+  id                  Int          @id @default(autoincrement())
+  userId              Int
+  reviewerId          Int
+  period              ReviewPeriod
+  reviewDate          DateTime     @db.Date
+  overallRating       Float
+  strengths           String?      @db.Text
+  areasOfImprovement  String?      @db.Text
+  goals               String?      @db.Text
+  status              ReviewStatus @default(DRAFT)
+  comments            String?      @db.Text
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  user     User @relation("ReviewedUser", fields: [userId], references: [id])
+  reviewer User @relation("Reviewer", fields: [reviewerId], references: [id])
+
+  @@index([userId])
+  @@index([reviewerId])
+  @@index([period, reviewDate])
+  @@map("performance_reviews")
 }
 

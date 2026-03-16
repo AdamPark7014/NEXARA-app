@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import * as bcrypt from 'bcryptjs';
@@ -27,37 +28,29 @@ export class UsersService {
     return this.superAdminEmails.includes(normalized);
   }
 
-  findAllVisible(currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean }) {
+  async findAllVisible(currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean }, query?: PaginationQueryDto) {
     const excludeSuperAdmins = {
       NOT: { email: { in: this.superAdminEmails } },
     };
+    const include = { role: true, department: true };
 
-    // SuperAdmin ve todos excepto superadmins
+    let where: any;
     if (currentUser.isSuperAdmin) {
-      return this.prisma['user'].findMany({
-        where: excludeSuperAdmins,
-        include: { role: true, department: true },
-      });
+      where = excludeSuperAdmins;
+    } else if (this.canManageUsers(currentUser)) {
+      where = { AND: [{ role: { accesoConsoleAdmin: false } }, excludeSuperAdmins] };
+    } else {
+      where = { id: currentUser.id, ...excludeSuperAdmins };
     }
 
-    // Admin ve todos los usuarios normales (sin accesoConsoleAdmin), sin restricción de departamento
-    if (this.canManageUsers(currentUser)) {
-      return this.prisma['user'].findMany({
-        where: {
-          AND: [
-            { role: { accesoConsoleAdmin: false } }, // Solo usuarios normales
-            excludeSuperAdmins,
-          ],
-        },
-        include: { role: true, department: true },
-      });
+    if (query?.limit) {
+      const [data, total] = await Promise.all([
+        this.prisma['user'].findMany({ where, include, skip: query.skip, take: query.take }),
+        this.prisma['user'].count({ where }),
+      ]);
+      return buildPaginatedResponse(data, total, query);
     }
-
-    // Usuario normal solo ve a sí mismo
-    return this.prisma['user'].findMany({
-      where: { id: currentUser.id, ...excludeSuperAdmins },
-      include: { role: true, department: true },
-    });
+    return this.prisma['user'].findMany({ where, include });
   }
   constructor(private readonly prisma: PrismaService) {}
 
@@ -110,9 +103,18 @@ export class UsersService {
   }
 
 
-  findAll() {
+  async findAll(query?: PaginationQueryDto) {
+    const include = { role: true, department: true };
+    if (query?.limit) {
+      const where = query.search ? { OR: [{ nombre: { contains: query.search, mode: 'insensitive' as const } }, { email: { contains: query.search, mode: 'insensitive' as const } }] } : undefined;
+      const [data, total] = await Promise.all([
+        this.prisma['user'].findMany({ where, include, skip: query.skip, take: query.take, orderBy: { fechaCreacion: 'desc' } }),
+        this.prisma['user'].count({ where }),
+      ]);
+      return buildPaginatedResponse(data, total, query);
+    }
     return this.prisma['user'].findMany({
-      include: { role: true, department: true },
+      include,
     });
   }
 

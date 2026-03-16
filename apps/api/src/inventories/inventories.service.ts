@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import fs from 'fs/promises';
 import path from 'path';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { generateInventoryReportPdf } from './inventory-report-pdf.js';
 
 type SyncInventoryInput = {
@@ -89,20 +90,30 @@ export class InventoriesService {
       });
   }
 
-  async list(filters?: { clientId?: number; branchId?: number; status?: string }) {
+  async list(filters?: { clientId?: number; branchId?: number; status?: string }, query?: PaginationQueryDto) {
     const where: Record<string, any> = {};
     if (filters?.clientId) where.clientId = filters.clientId;
     if (filters?.branchId) where.branchId = filters.branchId;
     if (filters?.status) where.status = filters.status;
 
+    const include = {
+      client: true,
+      branch: true,
+      activity: { select: { id: true, anNumber: true, titulo: true, workType: true, estatus: true } },
+      request: { select: { id: true, requestType: true, status: true } },
+    };
+
+    if (query?.limit) {
+      const [data, total] = await Promise.all([
+        this.prisma.inventorySnapshot.findMany({ where, include, orderBy: { updatedAt: 'desc' }, skip: query.skip, take: query.take }),
+        this.prisma.inventorySnapshot.count({ where }),
+      ]);
+      return buildPaginatedResponse(data, total, query);
+    }
+
     return this.prisma.inventorySnapshot.findMany({
       where,
-      include: {
-        client: true,
-        branch: true,
-        activity: { select: { id: true, anNumber: true, titulo: true, workType: true, estatus: true } },
-        request: { select: { id: true, requestType: true, status: true } },
-      },
+      include,
       orderBy: { updatedAt: 'desc' },
     });
   }

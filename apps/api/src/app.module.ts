@@ -43,6 +43,24 @@ import { ToolRequestsModule } from './tool-requests/tool-requests.module.js';
 import { LunchBreaksModule } from './lunch-breaks/lunch-breaks.module.js';
 import { CvsModule } from './cvs/cvs.module.js';
 import { InventoriesModule } from './inventories/inventories.module.js';
+import { AccountingModule } from './accounting/accounting.module.js';
+import { WarehouseModule } from './warehouse/warehouse.module.js';
+import { ProcurementModule } from './procurement/procurement.module.js';
+import { ManufacturingModule } from './manufacturing/manufacturing.module.js';
+import { QualityModule } from './quality/quality.module.js';
+import { MaintenanceModule } from './maintenance/maintenance.module.js';
+import { WorkflowModule } from './workflow/workflow.module.js';
+import { AuditModule } from './audit/audit.module.js';
+import { AnalyticsModule } from './analytics/analytics.module.js';
+import { SafetyModule } from './safety/safety.module.js';
+import { DocumentsModule } from './documents/documents.module.js';
+import { HealthModule } from './health/health.module';
+import { SettingsModule } from './settings/settings.module';
+import { UserPreferencesModule } from './user-preferences/user-preferences.module';
+import { EmailModule } from './common/email/email.module.js';
+import { CronModule } from './common/cron/cron.module.js';
+import { HrModule } from './hr/hr.module.js';
+import { SearchModule } from './search/search.module.js';
 
 @Module({
   imports: [
@@ -82,6 +100,25 @@ import { InventoriesModule } from './inventories/inventories.module.js';
     LunchBreaksModule,
     CvsModule,
     InventoriesModule,
+    // ── ERP Industrial Modules ──
+    AccountingModule,
+    WarehouseModule,
+    ProcurementModule,
+    ManufacturingModule,
+    QualityModule,
+    MaintenanceModule,
+    WorkflowModule,
+    AuditModule,
+    AnalyticsModule,
+    SafetyModule,
+    DocumentsModule,
+    HealthModule,
+    SettingsModule,
+    UserPreferencesModule,
+    EmailModule,
+    CronModule,
+    HrModule,
+    SearchModule,
   ],
   controllers: [AppController, ExcelExportController, ExcelImportController],
   providers: [
