@@ -23,12 +23,16 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { VehiclesService } from './vehicles.service.js';
 import { UsersService } from '../users/users.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { ExcelExportService } from '../common/excel-export.service.js';
+import { ExcelImportService } from '../common/excel-import.service.js';
 
 @Controller('vehicles')
 export class VehiclesController {
   constructor(
     private readonly vehiclesService: VehiclesService,
     private readonly usersService: UsersService,
+    private readonly excelExport: ExcelExportService,
+    private readonly excelImport: ExcelImportService,
   ) {}
 
   // Endpoint para obtener todos los vehículos
@@ -262,6 +266,12 @@ export class VehiclesController {
     } else {
       data = await this.vehiclesService.findByResponsible(user.id);
     }
+    if (format === 'xlsx') {
+      const buffer = await this.excelExport.exportToExcel(data, 'vehicles');
+      res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.attachment('vehiculos.xlsx');
+      return res.send(buffer);
+    }
     if (format === 'csv') {
       const csv = this.vehiclesService.toCSV(data);
       res.header('Content-Type', 'text/csv');
@@ -293,17 +303,22 @@ export class VehiclesController {
       const result = await this.vehiclesService.importMany(json);
       return res.status(HttpStatus.OK).json({ imported: typeof result === 'number' ? result : 0 });
     } catch (err) {
-      let errorMsg = '';
-      if (err instanceof Error) {
-        errorMsg = err.message;
-      } else if (typeof err === 'object' && err !== null && 'message' in err) {
-        errorMsg = (err as any).message;
-      } else {
-        errorMsg = String(err);
+      try {
+        const result = await this.excelImport.importExcel('vehicle', file.buffer);
+        return res.status(HttpStatus.OK).json(result);
+      } catch (excelErr) {
+        let errorMsg = '';
+        if (excelErr instanceof Error) {
+          errorMsg = excelErr.message;
+        } else if (typeof excelErr === 'object' && excelErr !== null && 'message' in excelErr) {
+          errorMsg = (excelErr as any).message;
+        } else {
+          errorMsg = String(excelErr);
+        }
+        return res
+          .status(HttpStatus.BAD_REQUEST)
+          .json({ message: 'Error al importar', error: errorMsg });
       }
-      return res
-        .status(HttpStatus.BAD_REQUEST)
-        .json({ message: 'Error al importar', error: errorMsg });
     }
   }
 }

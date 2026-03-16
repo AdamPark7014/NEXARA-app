@@ -241,16 +241,6 @@ const ContabilidadViaticTable = () => {
             >
               Exportar Excel
             </button>
-            <button className={styles.ghostButton} onClick={() => fileInputRef.current?.click()}>
-              Importar Excel
-            </button>
-            <input
-              type="file"
-              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              ref={fileInputRef}
-              className={styles.hiddenInput}
-              onChange={handleImport}
-            />
           </div>
         )}
       </header>

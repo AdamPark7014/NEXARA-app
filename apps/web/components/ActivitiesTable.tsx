@@ -571,14 +571,6 @@ const ActivitiesTable: React.FC = () => {
                 >
                   Exportar Excel
                 </button>
-                <button className="button-primary" onClick={() => fileInputRef.current?.click()}>Importar Excel</button>
-                <input
-                  type="file"
-                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                  ref={fileInputRef}
-                  className="activities-file-input"
-                  onChange={handleImport}
-                />
               </div>
             )}
           </div>

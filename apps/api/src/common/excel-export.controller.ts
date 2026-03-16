@@ -34,7 +34,7 @@ export class ExcelExportController {
         Object.fromEntries(Object.entries(row).filter(([k]) => fieldList.includes(k))),
       );
     }
-    const buffer = this.excelExport.exportToExcel(data, model);
+    const buffer = await this.excelExport.exportToExcel(data, model);
     res.setHeader('Content-Disposition', `attachment; filename=${model}s.xlsx`);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.send(buffer);

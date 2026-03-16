@@ -5,7 +5,6 @@ import ExcelJS from 'exceljs';
 
 describe('ExcelImportController (console models)', () => {
   let controller: ExcelImportController;
-  let prisma: PrismaService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -14,8 +13,8 @@ describe('ExcelImportController (console models)', () => {
         {
           provide: PrismaService,
           useValue: {
-            viatic: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
-            vehicle: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
+            expense: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
+            vehicleControl: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
             activity: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
             evidence: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
           },
@@ -23,17 +22,16 @@ describe('ExcelImportController (console models)', () => {
       ],
     }).compile();
     controller = module.get<ExcelImportController>(ExcelImportController);
-    prisma = module.get<PrismaService>(PrismaService);
   });
 
   it('should import Excel for viatic', async () => {
     const data = [{
-      actividad: 'A1',
+      actividadId: 1,
+      usuarioId: 2,
       montoSolicitado: 100,
       razonGasto: 'Transporte',
       ticketEvidenciaUrl: 'http://url',
-      estatusPago: 'pendiente',
-      usuario: 'user1',
+      estatusPago: 'Pendiente',
     }];
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Sheet1');

@@ -10,6 +10,7 @@ import { AppService } from './app.service';
 import { ExcelExportController } from './common/excel-export.controller';
 import { ExcelExportService } from './common/excel-export.service';
 import { ExcelImportController } from './common/excel-import.controller';
+import { ExcelImportService } from './common/excel-import.service';
 import { ClientsModule } from './clients/clients.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
@@ -86,6 +87,7 @@ import { InventoriesModule } from './inventories/inventories.module.js';
   providers: [
     AppService,
     ExcelExportService,
+    ExcelImportService,
     {
       provide: APP_FILTER,
       useFactory: () => new AllExceptionsFilter(appLogger),

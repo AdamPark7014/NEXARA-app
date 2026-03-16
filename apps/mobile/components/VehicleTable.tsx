@@ -402,14 +402,6 @@ const VehicleTable = () => {
             >
               Exportar Excel
             </button>
-            <button className="button-secondary" onClick={() => fileInputRef.current?.click()}>Importar Excel</button>
-            <input
-              type="file"
-              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              ref={fileInputRef}
-              className={styles.hiddenInput}
-              onChange={handleImport}
-            />
           </>
         )}
       </div>
