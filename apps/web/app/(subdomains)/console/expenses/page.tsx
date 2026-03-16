@@ -17,6 +17,20 @@ interface Expense {
   fecha?: string;
   userId: number;
   user?: { nombre: string };
+}
+
+// ...existing code...
+
+export default function ExpensesPage() {
+  const { user } = useUser();
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
+  // ...existing code...
+  const total = expenses.reduce((acc, e) => acc + (e.monto || 0), 0);
+  const pendientes = expenses.filter(e => e.estado === 'pendiente').length;
+  const aprobados = expenses.filter(e => e.estado === 'aprobado').length;
+
+  return (
     <RoleGuard anyPermissions={[PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE, PERMISSIONS.CONSOLE_ADMIN]}>
       <div style={{ display: 'grid', gap: 24 }}>
         <HelpTab module="expenses" user={user} />

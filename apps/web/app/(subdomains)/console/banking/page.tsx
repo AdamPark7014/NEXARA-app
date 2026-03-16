@@ -23,7 +23,6 @@ export default function BankingPage() {
   useEffect(() => {
     if (!user?.token) return;
     fetch(`${API_URL}/accounting/banking/accounts`, { headers })
-        <HelpTab module="banking" user={user} />
       .then((r) => r.json())
       .then((d) => setBankAccounts(Array.isArray(d) ? d : d.data || []))
       .catch(() => {})
@@ -58,6 +57,7 @@ export default function BankingPage() {
   return (
     <RoleGuard anyPermissions={[PERMISSIONS.BANKING_VIEW, PERMISSIONS.BANKING_MANAGE]}>
       <div style={{ display: "grid", gap: 24 }}>
+        <HelpTab module="banking" user={user} />
         <div className="card" style={{ padding: 16 }}>
           <h1 style={{ color: "var(--primary)", marginBottom: 8 }}>🏦 Banca — Banorte & SPEI</h1>
           <p style={{ color: "var(--text-secondary)" }}>
