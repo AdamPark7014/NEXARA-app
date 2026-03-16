@@ -37,59 +37,6 @@ export default function EmployeePaymentsPage() {
       if (filterTo) params.append('to', filterTo);
       const qs = params.toString();
       // ...existing code...
-              // ...existing code...
-              const totalMonto = payments.reduce((acc, p) => acc + (p.monto || 0), 0);
-            {/* Filters */}
-            <div className="card" style={{ padding: 16, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-              <label style={{ fontSize: 13 }}>Desde:</label>
-              <input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)' }} />
-              <label style={{ fontSize: 13 }}>Hasta:</label>
-              <input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)' }} />
-              <button onClick={loadPayments} style={{ padding: '6px 16px', borderRadius: 6, background: 'var(--primary)', color: '#fff', border: 'none', cursor: 'pointer' }}>
-                return (
-                  <RoleGuard anyPermissions={[PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE, PERMISSIONS.CONSOLE_ADMIN]}>
-                    <div style={{ display: 'grid', gap: 24 }}>
-                      <HelpTab module="employee-payments" user={user} />
-                      {/* KPI Cards */}
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-                        <div className="card" style={{ padding: 16, textAlign: 'center' }}>
-                          <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--primary)' }}>{payments.length}</div>
-                          <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Pagos registrados</div>
-                        </div>
-                        <div className="card" style={{ padding: 16, textAlign: 'center' }}>
-                          <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--success, #22c55e)' }}>
-                            ${totalMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                          </div>
-                          <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Total pagado</div>
-                        </div>
-                        <div className="card" style={{ padding: 16, textAlign: 'center' }}>
-                          <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--warning, #f59e0b)' }}>
-                            {payments.length > 0 ? `$${(totalMonto / payments.length).toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '$0.00'}
-                          </div>
-                          <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Promedio por pago</div>
-                        </div>
-                      </div>
-                  </thead>
-                  <tbody>
-                    {payments.map((p) => (
-                      <tr key={p.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                        <td style={{ padding: '8px 6px', fontFamily: 'monospace' }}>{p.id}</td>
-                        <td style={{ padding: '8px 6px' }}>{p.user?.nombre || p.userId}</td>
-                        <td style={{ padding: '8px 6px' }}>{p.concepto}</td>
-                        <td style={{ padding: '8px 6px' }}>${p.monto?.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
-                        <td style={{ padding: '8px 6px' }}>{p.fecha}</td>
-                        <td style={{ padding: '8px 6px' }}>{p.tipo}</td>
-                        <td style={{ padding: '8px 6px' }}>{p.referencia}</td>
-                        <td style={{ padding: '8px 6px' }}>{p.notas}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        </RoleGuard>
-      );
               </thead>
               <tbody>
                 {payments.map(p => (

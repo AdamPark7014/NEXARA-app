@@ -18,80 +18,13 @@ export default function SafetyPage() {
   useEffect(() => {
     if (!user?.token) return;
     const headers = { Authorization: `Bearer ${user.token}` };
-    Promise.all([
-      fetch(`${API_URL}/safety/incidents`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/safety/permits`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/safety/training`, { headers }).then((r) => r.json()),
-    ])
       .then(([inc, per, tr]) => {
-        <RoleGuard anyPermissions={[PERMISSIONS.SAFETY_VIEW, PERMISSIONS.SAFETY_MANAGE]}>
-          <div style={{ display: "grid", gap: 24 }}>
-            <HelpTab module="safety" user={user} />
-            <div className="card" style={{ padding: 16 }}>
-              <h1 style={{ color: "var(--primary)", marginBottom: 8 }}>🦺 Seguridad Industrial</h1>
-              <p style={{ color: "var(--text-secondary)" }}>
-                Incidentes, permisos de trabajo y capacitaciones de seguridad.
-              </p>
-            </div>
-            {/* KPI Cards */}
-            {!loading && (incidents.length > 0 || permits.length > 0 || training.length > 0) && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
-                <div className="card" style={{ padding: 14 }}>
-                  <p style={{ color: "var(--text-secondary)", fontSize: 12 }}>Incidentes abiertos</p>
-                  <p style={{ fontSize: 24, fontWeight: 700, color: openIncidents > 0 ? "var(--danger)" : "var(--success)" }}>{openIncidents}</p>
-                  <p style={{ fontSize: 11, color: "var(--text-secondary)" }}>{incidents.length} totales</p>
-                </div>
-                <div className="card" style={{ padding: 14 }}>
-                  <p style={{ color: "var(--text-secondary)", fontSize: 12 }}>Permisos activos</p>
-                  <p style={{ fontSize: 24, fontWeight: 700, color: "var(--success)" }}>{activePermits}</p>
-                  <p style={{ fontSize: 11, color: "var(--text-secondary)" }}>{permits.length} totales</p>
-                </div>
-                <div className="card" style={{ padding: 14 }}>
-                  <p style={{ color: "var(--text-secondary)", fontSize: 12 }}>Capacitaciones</p>
-                  <p style={{ fontSize: 24, fontWeight: 700, color: "var(--primary)" }}>{training.length}</p>
-                </div>
-                <div className="card" style={{ padding: 14 }}>
-                  <p style={{ color: "var(--text-secondary)", fontSize: 12 }}>Certs. vencidos</p>
-                  <p style={{ fontSize: 24, fontWeight: 700, color: expiredTraining > 0 ? "var(--danger)" : "var(--success)" }}>{expiredTraining}</p>
-                </div>
-              </div>
-            )}
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button onClick={() => setTab("incidents")} style={tabStyle("incidents")}>🚨 Incidentes</button>
-              <button onClick={() => setTab("permits")} style={tabStyle("permits")}>📋 Permisos de Trabajo</button>
-              <button onClick={() => setTab("training")} style={tabStyle("training")}>🎓 Capacitaciones</button>
-            </div>
-            {loading ? (
-              <p style={{ textAlign: "center", color: "var(--text-secondary)" }}>Cargando...</p>
-            ) : tab === "incidents" ? (
-              incidents.length === 0 ? (
-                <div className="card" style={{ padding: 24, textAlign: "center" }}>
-                  <p style={{ color: "var(--text-secondary)" }}>No hay incidentes reportados.</p>
-                </div>
-              ) : (
-                <div className="card" style={{ overflowX: "auto" }}>
-                  {/* ...existing code... */}
-                </div>
-              )
-            ) : tab === "permits" ? (
-              permits.length === 0 ? (
-                <div className="card" style={{ padding: 24, textAlign: "center" }}>
-                  <p style={{ color: "var(--text-secondary)" }}>No hay permisos activos.</p>
-                </div>
-              ) : (
-                <div className="card" style={{ overflowX: "auto" }}>
-                  {/* ...existing code... */}
-                </div>
-              )
-            ) : (
-              training.length === 0 ? (
-                <div className="card" style={{ padding: 24, textAlign: "center" }}>
-                  <p style={{ color: "var(--text-secondary)" }}>No hay capacitaciones registradas.</p>
-                </div>
-              ) : (
-                <div className="card" style={{ overflowX: "auto" }}>
-                  {/* ...existing code... */}
-                </div>
+        setIncidents(Array.isArray(inc) ? inc : inc.data || []);
+        setPermits(Array.isArray(per) ? per : per.data || []);
+        setTraining(Array.isArray(tr) ? tr : tr.data || []);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
               )
             )}
           </div>
