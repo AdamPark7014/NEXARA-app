@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { RoleGuard } from '../../../../components/RoleGuard';
 import { useUser } from '../../../../components/UserContext';
 import { PERMISSIONS } from '@/lib/permissions';
+import HelpTab from '@/components/HelpTab';
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
 const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
@@ -106,6 +107,7 @@ export default function NewsPage() {
             </table>
           )}
         </div>
+        <HelpTab module="news" user={user} />
       </div>
     </RoleGuard>
   );

@@ -79,8 +79,11 @@ export default function Sidebar() {
 
   if (!user) return null;
 
-  const isSuperAdmin = user.isSuperAdmin;
-  const isAdmin = isPlatformAdmin(user);
+  // Nueva lógica de roles principales
+  const isSuperAdmin = user.superadmin || user.isSuperAdmin;
+  const isAdmin = user.admin && !isSuperAdmin;
+  const isIngeniero = user.ingeniero && !isSuperAdmin && !isAdmin;
+  const isVendedor = user.vendedor && !isSuperAdmin && !isAdmin && !isIngeniero;
   const userRoleLabel = getRoleLabel(user);
 
   type MenuItem = {
@@ -97,7 +100,37 @@ export default function Sidebar() {
     items: MenuItem[];
   };
 
+  // Sidebar dinámico según perfil
   const canAccessItem = (item: MenuItem) => {
+    // Superadmin: solo vistas globales, nunca personales
+    if (isSuperAdmin) {
+      if (item.href.startsWith('/my-')) return false;
+      return true;
+    }
+    // Admin: solo gestión, nunca vistas personales ni ventas ni contabilidad completa
+    if (isAdmin) {
+      if (item.href.startsWith('/my-')) return false;
+      if (["/ventas", "/accounting", "/newsletter", "/news", "/gestion-pagina-web"].some((p) => item.href.startsWith(p))) return false;
+      if (item.href === "/cotizaciones" && !user.accesoCotizaciones) return false;
+      if (item.href === "/cvs" && !user.accesoGestionCvs) return false;
+      return true;
+    }
+    // Ingeniero: solo vistas personales y módulos extra habilitados
+    if (isIngeniero) {
+      if (!item.href.startsWith('/my-') && !["/cotizaciones", "/cvs", "/ventas"].includes(item.href)) return false;
+      if (item.href === "/cotizaciones" && !user.accesoCotizaciones) return false;
+      if (item.href === "/cvs" && !user.accesoGestionCvs) return false;
+      if (item.href === "/ventas" && !user.vendedor) return false;
+      return true;
+    }
+    // Vendedor: solo ventas y módulos extra habilitados
+    if (isVendedor) {
+      if (item.href !== "/ventas" && !["/cotizaciones", "/cvs"].includes(item.href)) return false;
+      if (item.href === "/cotizaciones" && !user.accesoCotizaciones) return false;
+      if (item.href === "/cvs" && !user.accesoGestionCvs) return false;
+      return true;
+    }
+    // Por defecto, usar permisos
     if (item.permissions && !item.permissions.every((permission) => hasPermission(user, permission))) {
       return false;
     }
@@ -107,20 +140,28 @@ export default function Sidebar() {
     return true;
   };
 
-  const profileItems: MenuItem[] = [
-    { icon: "👤", label: "Mi perfil", href: "/my-profile", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "⚙️", label: "Mis preferencias", href: "/my-preferences", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-  ];
+  // Solo perfiles no globales ven vistas personales
+  const profileItems: MenuItem[] = [];
+  if (!isSuperAdmin && !isAdmin) {
+    profileItems.push(
+      { icon: "👤", label: "Mi perfil", href: "/my-profile", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+      { icon: "⚙️", label: "Mis preferencias", href: "/my-preferences", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] }
+    );
+  }
 
   // ── Empleado (auto-servicio) ──────────────────────────
-  const employeeItems: MenuItem[] = [
-    { icon: "📊", label: "Resumen ejecutivo", href: "/dashboard", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "📋", label: "Mis actividades", href: "/my-activities", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "📸", label: "Mis evidencias", href: "/my-evidences", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "💼", label: "Mis viáticos", href: "/my-viatics", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "🚗", label: "Mis vehículos", href: "/my-vehicles", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "🍽️", label: "Breaks y comidas", href: "/my-lunch-breaks", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-  ];
+  // Solo ingeniero ve vistas personales
+  const employeeItems: MenuItem[] = [];
+  if (isIngeniero) {
+    employeeItems.push(
+      { icon: "📊", label: "Resumen ejecutivo", href: "/dashboard" },
+      { icon: "📋", label: "Mis actividades", href: "/my-activities" },
+      { icon: "📸", label: "Mis evidencias", href: "/my-evidences" },
+      { icon: "💼", label: "Mis viáticos", href: "/my-viatics" },
+      { icon: "🚗", label: "Mis vehículos", href: "/my-vehicles" },
+      { icon: "🍽️", label: "Breaks y comidas", href: "/my-lunch-breaks" }
+    );
+  }
 
   // ── Operación (supervisión) ────────────────────────────
   const operationItems: MenuItem[] = [

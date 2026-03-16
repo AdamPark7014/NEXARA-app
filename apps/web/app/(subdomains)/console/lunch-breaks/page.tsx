@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useUser } from '@/components/UserContext';
 import LunchBreakForm from '@/components/LunchBreakForm';
 import LunchBreaksTable from '@/components/LunchBreaksTable';
+import HelpTab from '@/components/HelpTab';
 
 const LunchBreakPage = () => {
   const { user } = useUser();
@@ -114,6 +115,7 @@ const LunchBreakPage = () => {
       {(activeTab === 'history' || isSuperAdmin) && (
         <LunchBreaksTable key={refreshKey} />
       )}
+      <HelpTab module="lunch-breaks" user={user} />
     </div>
   );
 };

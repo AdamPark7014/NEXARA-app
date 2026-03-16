@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
+import HelpTab from "@/components/HelpTab";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
@@ -22,6 +23,7 @@ export default function BankingPage() {
   useEffect(() => {
     if (!user?.token) return;
     fetch(`${API_URL}/accounting/banking/accounts`, { headers })
+        <HelpTab module="banking" user={user} />
       .then((r) => r.json())
       .then((d) => setBankAccounts(Array.isArray(d) ? d : d.data || []))
       .catch(() => {})

@@ -5,6 +5,7 @@ import FinesTable from '../../../../components/FinesTable';
 import { RoleGuard } from '../../../../components/RoleGuard';
 import { useUser } from '../../../../components/UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
+import HelpTab from '@/components/HelpTab';
 
 export default function ActivitiesPage() {
   const { user } = useUser();
@@ -33,6 +34,7 @@ export default function ActivitiesPage() {
             </div>
           </div>
         )}
+        <HelpTab module="activities" user={user} />
       </div>
     </RoleGuard>
   );

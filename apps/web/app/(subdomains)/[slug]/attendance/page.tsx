@@ -4,6 +4,7 @@ import ConsoleAttendanceTable from './ConsoleAttendanceTable';
 import { RoleGuard } from '../../../../components/RoleGuard';
 import { useUser } from '../../../../components/UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
+import HelpTab from '@/components/HelpTab';
 
 export default function AttendancePage() {
   const { user } = useUser();
@@ -12,9 +13,13 @@ export default function AttendancePage() {
     return (
       <RoleGuard permissions={[PERMISSIONS.ATTENDANCE_VIEW]}>
         <AttendanceForm />
+        <HelpTab module="attendance" user={user} />
       </RoleGuard>
     );
   }
 
-  return <ConsoleAttendanceTable />;
+  return <>
+    <ConsoleAttendanceTable />
+    <HelpTab module="attendance" user={user} />
+  </>;
 }

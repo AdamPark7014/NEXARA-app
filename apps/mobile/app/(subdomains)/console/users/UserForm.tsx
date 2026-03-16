@@ -70,11 +70,12 @@ export default function UserForm({
     avatarUrl: initialUser?.avatarUrl || "",
     // Rol personalizado
     roleNombre: initialUser?.role?.nombre || (!isEdit ? prefillRole : ""),
-    accesoConsole: initialUser?.role?.accesoConsole || false,
-    accesoConsoleAdmin: initialUser?.role?.accesoConsoleAdmin || false,
+    superadmin: initialUser?.role?.superadmin || false,
+    admin: initialUser?.role?.accesoConsoleAdmin || false,
+    ingeniero: initialUser?.role?.accesoConsole || false,
+    vendedor: initialUser?.role?.accesoPanelVentas || false,
     accesoGestionWeb: initialUser?.role?.accesoGestionWeb || false,
     accesoGestionCvs: initialUser?.role?.accesoGestionCvs || false,
-    accesoPanelVentas: initialUser?.role?.accesoPanelVentas || false,
     accesoContabilidad: initialUser?.role?.accesoContabilidad || false,
     accesoCotizaciones: initialUser?.role?.accesoCotizaciones || false,
   });
@@ -100,17 +101,58 @@ export default function UserForm({
     const { name, value, type } = target;
     const nextValue = type === "checkbox" ? target.checked : value;
     setForm((prev) => {
-      const nextForm = { ...prev, [name]: nextValue };
-      if (name === "department") {
-        nextForm.departmentId = "";
+      let nextForm = { ...prev, [name]: nextValue };
+      // Lógica de exclusividad de roles principales
+      if (name === "superadmin" && nextValue) {
+        nextForm = { ...nextForm, admin: false, ingeniero: false, vendedor: false };
+      } else if (name === "admin" && nextValue) {
+        nextForm = { ...nextForm, superadmin: false, ingeniero: false, vendedor: false };
+      } else if (name === "ingeniero" && nextValue) {
+        nextForm = { ...nextForm, superadmin: false, admin: false, vendedor: false };
+      } else if (name === "vendedor" && nextValue) {
+        nextForm = { ...nextForm, superadmin: false, admin: false, ingeniero: false };
       }
-      if (name === "accesoConsoleAdmin" && target.checked) {
-        nextForm.accesoConsole = true;
-        nextForm.accesoGestionCvs = false;
+      // Restricciones de accesos según rol
+      if (nextForm.superadmin) {
+        nextForm = {
+          ...nextForm,
+          accesoGestionWeb: true,
+          accesoGestionCvs: true,
+          accesoContabilidad: true,
+          accesoCotizaciones: true,
+          // superadmin no puede ser admin, ingeniero ni vendedor
+          admin: false,
+          ingeniero: false,
+          vendedor: false,
+        };
       }
-      if (name === 'accesoGestionCvs' && target.checked) {
-        nextForm.accesoConsole = true;
-        nextForm.accesoConsoleAdmin = false;
+      if (nextForm.admin) {
+        // admin solo puede tener acceso a cotizaciones o cvs
+        nextForm = {
+          ...nextForm,
+          accesoGestionWeb: false,
+          accesoContabilidad: false,
+          vendedor: false,
+          ingeniero: false,
+          superadmin: false,
+        };
+      }
+      if (nextForm.ingeniero) {
+        // ingeniero puede tener acceso a vendedor, cotizaciones o cvs
+        nextForm = {
+          ...nextForm,
+          admin: false,
+          superadmin: false,
+        };
+      }
+      if (nextForm.vendedor) {
+        // vendedor puede tener acceso a cotizaciones o cvs
+        nextForm = {
+          ...nextForm,
+          admin: false,
+          ingeniero: false,
+          superadmin: false,
+        };
       }
       return nextForm;
     });
@@ -173,23 +215,15 @@ export default function UserForm({
     e.preventDefault();
     setLoading(true);
     try {
-      const isConsoleUser = form.accesoConsole || form.accesoConsoleAdmin || form.accesoGestionCvs;
-      const isConsoleAdmin = form.accesoConsoleAdmin;
-      const enableConsoleModules = isConsoleUser || isConsoleAdmin;
+      // Construir el payload de rol según la nueva lógica
       const rolePayload = {
         nombre: form.roleNombre,
-        accesoConsole: isConsoleUser,
-        accesoConsoleAdmin: isConsoleAdmin,
-        accesoActividades: enableConsoleModules,
-        accesoEvidencias: enableConsoleModules,
-        accesoViáticos: enableConsoleModules,
-        accesoVehículos: enableConsoleModules,
-        accesoAsistencia: enableConsoleModules,
-        accesoGps: enableConsoleModules,
-        accesoGestionUsuarios: isConsoleAdmin,
+        superadmin: form.superadmin,
+        admin: form.admin,
+        ingeniero: form.ingeniero,
+        vendedor: form.vendedor,
         accesoGestionWeb: form.accesoGestionWeb,
         accesoGestionCvs: form.accesoGestionCvs,
-        accesoPanelVentas: form.accesoPanelVentas,
         accesoContabilidad: form.accesoContabilidad,
         accesoCotizaciones: form.accesoCotizaciones,
       };

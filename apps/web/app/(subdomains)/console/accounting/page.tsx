@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
+import HelpTab from '@/components/HelpTab';
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
 
@@ -44,6 +45,7 @@ export default function AccountingPage() {
   return (
     <RoleGuard anyPermissions={[PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE]}>
       <div style={{ display: "grid", gap: 24 }}>
+        <HelpTab module="accounting" user={user} />
         <div className="card" style={{ padding: 16 }}>
           <h1 style={{ color: "var(--primary)", marginBottom: 8 }}>📒 Contabilidad General</h1>
           <p style={{ color: "var(--text-secondary)" }}>

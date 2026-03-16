@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
+import HelpTab from "@/components/HelpTab";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
@@ -50,13 +51,13 @@ export default function ProductionPage() {
   return (
     <RoleGuard anyPermissions={[PERMISSIONS.PRODUCTION_MANAGE, PERMISSIONS.MANUFACTURING_VIEW]}>
       <div style={{ display: "grid", gap: 24 }}>
+        <HelpTab module="production" user={user} />
         <div className="card" style={{ padding: 16 }}>
           <h1 style={{ color: "var(--primary)", marginBottom: 8 }}>🏭 Órdenes de Producción</h1>
           <p style={{ color: "var(--text-secondary)" }}>
             Planificación, seguimiento y control de órdenes de producción en planta.
           </p>
         </div>
-
         {/* KPI Cards */}
         {!loading && orders.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
@@ -81,7 +82,6 @@ export default function ProductionPage() {
             </div>
           </div>
         )}
-
         {/* Status Filters */}
         {!loading && orders.length > 0 && (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -94,7 +94,6 @@ export default function ProductionPage() {
             ))}
           </div>
         )}
-
         {loading ? (
           <p style={{ textAlign: "center", color: "var(--text-secondary)" }}>Cargando...</p>
         ) : filtered.length === 0 ? (

@@ -21,15 +21,27 @@ export class RbacGuard extends AuthGuard('jwt') {
     const rbac: RbacOptions = this.reflector.get<RbacOptions>('rbac', context.getHandler()) || {};
     const user = request.user;
     if (!user) throw new ForbiddenException('No user in request');
-    if (user.isSuperAdmin) return true;
+    // Superadmin acceso total
+    if (user.superadmin || user.isSuperAdmin) return true;
 
+    // Lógica de exclusión por rol principal
+    if (rbac.permissions || rbac.anyPermissions) {
+      // Si el endpoint requiere permisos de admin, ingeniero o vendedor, validar el rol principal
+      if (rbac.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) && !user.admin) {
+        throw new ForbiddenException('Solo administradores pueden acceder');
+      }
+      if (rbac.permissions?.includes(PERMISSIONS.PANEL_VENTAS) && !user.vendedor) {
+        throw new ForbiddenException('Solo vendedores pueden acceder');
+      }
+      if (rbac.permissions?.includes(PERMISSIONS.CONSOLE_ACCESS) && !user.ingeniero) {
+        throw new ForbiddenException('Solo ingenieros pueden acceder');
+      }
+    }
     const permissions: string[] = user.permissions || [];
-
     if (rbac.permissions && rbac.permissions.length > 0) {
       const hasAll = rbac.permissions.every((permission) => permissions.includes(permission));
       if (!hasAll) throw new ForbiddenException('No tienes permisos para esta acción');
     }
-
     if (rbac.anyPermissions && rbac.anyPermissions.length > 0) {
       const hasAny = rbac.anyPermissions.some((permission) => permissions.includes(permission));
       if (!hasAny) throw new ForbiddenException('No tienes permisos para esta acción');

@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from 'react';
 import { RoleGuard } from '../../../../components/RoleGuard';
+import HelpTab from '@/components/HelpTab';
 import { useUser } from '../../../../components/UserContext';
 import { PERMISSIONS } from '@/lib/permissions';
 
