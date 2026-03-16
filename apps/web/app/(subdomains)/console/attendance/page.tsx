@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import AttendanceForm from '../../../../components/AttendanceForm';
 import ConsoleAttendanceTable from './ConsoleAttendanceTable';
+import HelpTab from '@/components/HelpTab';
 import FinesTable from '../../../../components/FinesTable';
 import LunchBreakForm from '../../../../components/LunchBreakForm';
 import LunchBreaksTable from '../../../../components/LunchBreaksTable';

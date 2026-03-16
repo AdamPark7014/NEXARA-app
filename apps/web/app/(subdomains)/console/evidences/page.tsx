@@ -4,6 +4,7 @@ import ActivityEvidenceFlow from '@/components/ActivityEvidenceFlow';
 import { RoleGuard } from '../../../../components/RoleGuard';
 import { useUser } from '../../../../components/UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
+import HelpTab from '@/components/HelpTab';
 
 export default function EvidencesPage() {
   const { user } = useUser();
@@ -13,6 +14,7 @@ export default function EvidencesPage() {
   return (
     <RoleGuard permissions={[PERMISSIONS.CONSOLE_ACCESS]}>
       <div style={{ display: 'grid', gap: 24 }}>
+        <HelpTab module="evidences" user={user} />
         {/* Admin y superadmin ven tabla de gestion de todas las evidencias */}
         {isAdmin && (
           <EvidenceTable

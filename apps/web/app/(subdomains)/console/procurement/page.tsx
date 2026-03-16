@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
+import HelpTab from '@/components/HelpTab';
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { useMemo } from "react";

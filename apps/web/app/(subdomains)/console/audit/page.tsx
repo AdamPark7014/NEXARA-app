@@ -2,6 +2,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
+import HelpTab from '@/components/HelpTab';
 import { PERMISSIONS } from "@/lib/permissions";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
@@ -149,6 +150,7 @@ export default function AuditPage() {
             </table>
           </div>
         )}
+        <HelpTab module="audit" user={user} />
       </div>
     </RoleGuard>
   );

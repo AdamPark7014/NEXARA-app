@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { RoleGuard } from '@/components/RoleGuard';
 import { PERMISSIONS } from '@/lib/permissions';
 import { useUser } from '@/components/UserContext';
+import HelpTab from '@/components/HelpTab';
 import ClientCreationForm from '@/components/ClientCreationForm';
 import { ClientTicketsPanel } from '../client-tickets/ClientTicketsPanel';
 
@@ -516,6 +517,7 @@ export default function ClientsPage() {
         )}
 
         {activeTab === 'tickets' && <ClientTicketsPanel embedded />}
+        <HelpTab module="clients" user={user} />
       </div>
     </RoleGuard>
   );

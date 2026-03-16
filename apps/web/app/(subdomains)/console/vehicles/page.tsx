@@ -6,6 +6,7 @@ import FinesTable from '../../../../components/FinesTable';
 import { RoleGuard } from '../../../../components/RoleGuard';
 import { useUser } from '../../../../components/UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
+import HelpTab from '@/components/HelpTab';
 
 export default function VehiclesPage() {
   const { user } = useUser();
@@ -47,6 +48,7 @@ export default function VehiclesPage() {
             </div>
           </div>
         )}
+        <HelpTab module="vehicles" user={user} />
       </div>
     </RoleGuard>
   );

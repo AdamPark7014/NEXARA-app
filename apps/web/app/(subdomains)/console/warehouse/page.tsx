@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
+import HelpTab from '@/components/HelpTab';
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
@@ -130,6 +131,7 @@ export default function WarehousePage() {
             </table>
           </div>
         )}
+        <HelpTab module="warehouse" user={user} />
       </div>
     </RoleGuard>
   );

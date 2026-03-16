@@ -4,6 +4,7 @@ import ViaticRequestForm from '@/components/ViaticRequestForm';
 import { RoleGuard } from '../../../../components/RoleGuard';
 import { useUser } from '../../../../components/UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
+import HelpTab from '@/components/HelpTab';
 
 export default function ViaticsPage() {
   const { user } = useUser();
@@ -15,6 +16,7 @@ export default function ViaticsPage() {
   return (
     <RoleGuard permissions={[PERMISSIONS.CONSOLE_ACCESS]}>
       <div style={{ display: 'grid', gap: 24 }}>
+        <HelpTab module="viatics" user={user} />
         {/* Admin y superadmin ven tabla de gestion */}
         {isAdmin && (
           <div>

@@ -3,6 +3,7 @@ import React, { useMemo, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { PERMISSIONS } from "@/lib/permissions";
 import { useUser } from "@/components/UserContext";
+import HelpTab from '@/components/HelpTab';
 
 type QuoteItem = {
   id: string;
@@ -390,6 +391,7 @@ export default function CotizacionesPage() {
           </div>
         </header>
 
+        <HelpTab module="cotizaciones" user={user} />
         {saveMessage && <p className="saveMessage">{saveMessage}</p>}
 
         <div className="statsRow">

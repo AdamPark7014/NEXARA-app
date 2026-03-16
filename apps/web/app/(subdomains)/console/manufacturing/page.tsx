@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
+import HelpTab from "@/components/HelpTab";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
@@ -19,6 +20,7 @@ export default function ManufacturingPage() {
     Promise.all([
       fetch(`${API_URL}/manufacturing/bom`, { headers }).then((r) => r.json()),
       fetch(`${API_URL}/manufacturing/bom/work-centers/all`, { headers }).then((r) => r.json()),
+          <HelpTab module="manufacturing" user={user} />
     ])
       .then(([b, wc]) => {
         setBoms(Array.isArray(b) ? b : b.data || []);
