@@ -33,7 +33,7 @@ export default function AttendancePage() {
         <h1 style={{ fontSize: isMobile ? 22 : 28, fontWeight: 600, color: 'var(--primary)', marginBottom: isMobile ? 14 : 24 }}>
           📋 Gestión de Asistencia
         </h1>
-
+        <HelpTab module="attendance" user={user} />
         {/* Tabs principales */}
         <div style={{ display: isMobile ? 'grid' : 'flex', gridTemplateColumns: isMobile ? '1fr' : undefined, gap: 12, marginBottom: 18, borderBottom: isMobile ? 'none' : '2px solid var(--muted)', paddingBottom: 0 }}>
           <button

@@ -4,6 +4,7 @@ import { useState } from "react";
 import styles from "../../console.module.css";
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
+import HelpTab from '@/components/HelpTab';
 
 export default function ToolsHistoryPage() {
   const { user } = useUser();
@@ -25,6 +26,7 @@ export default function ToolsHistoryPage() {
 
   return (
     <div className={styles.pageContainer}>
+      <HelpTab module="tools-history" user={user} />
       <div className={styles.pageHeader}>
         <h1>Historial de Herramientas</h1>
         <p>

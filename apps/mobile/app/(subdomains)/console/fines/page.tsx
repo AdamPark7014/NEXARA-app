@@ -7,6 +7,7 @@ import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import FinesForm from "@/components/FinesForm";
 import FinesTable from "@/components/FinesTable";
 import { RoleGuard } from "@/components/RoleGuard";
+import HelpTab from "@/components/HelpTab";
 
 export default function FinesPage() {
   const { user } = useUser();
@@ -48,6 +49,7 @@ export default function FinesPage() {
             <FinesTable key={refreshKey} showUser={false} usuarioId={user?.id} />
           </div>
         )}
+        <HelpTab module="fines" user={user} />
       </div>
     </RoleGuard>
   );

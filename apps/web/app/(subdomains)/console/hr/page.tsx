@@ -84,6 +84,7 @@ export default function HrPage() {
   return (
     <RoleGuard anyPermissions={[PERMISSIONS.HR_VIEW, PERMISSIONS.HR_MANAGE]}>
       <div style={{ display: "grid", gap: 24 }}>
+        <HelpTab module="hr" user={user} />
         <div className="card" style={{ padding: 16 }}>
           <h1 style={{ color: "var(--primary)", marginBottom: 8 }}>👥 Recursos Humanos</h1>
           <p style={{ color: "var(--text-secondary)" }}>

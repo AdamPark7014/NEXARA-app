@@ -1,4 +1,6 @@
 "use client";
+
+import HelpTab from '@/components/HelpTab';
 import React, { useEffect, useState } from 'react';
 import { RoleGuard } from '../../../../components/RoleGuard';
 import { useUser } from '../../../../components/UserContext';
@@ -96,6 +98,7 @@ export default function ServiceSheetsPage() {
   return (
     <RoleGuard permissions={[PERMISSIONS.CONSOLE_ACCESS]}>
       <div style={{ display: 'grid', gap: 24 }}>
+        <HelpTab module="service-sheets" user={user} />
         {/* KPI cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
           <div className="card" style={{ padding: 16, textAlign: 'center' }}>

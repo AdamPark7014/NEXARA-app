@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { RoleGuard } from '../../../../components/RoleGuard';
 import { useUser } from '../../../../components/UserContext';
 import { PERMISSIONS } from '@/lib/permissions';
+import HelpTab from '../../../../components/HelpTab';
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
 const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
@@ -56,6 +57,7 @@ export default function ContactMessagesPage() {
   return (
     <RoleGuard permissions={[PERMISSIONS.CONSOLE_ADMIN]}>
       <div style={{ display: 'grid', gap: 24 }}>
+        <HelpTab module="contact-messages" user={user} />
         {/* KPI Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
           <div className="card" style={{ padding: 16, textAlign: 'center' }}>

@@ -80,10 +80,13 @@ export default function Sidebar() {
   if (!user) return null;
 
   // Nueva lógica de roles principales
-  const isSuperAdmin = user.superadmin || user.isSuperAdmin;
-  const isAdmin = user.admin && !isSuperAdmin;
-  const isIngeniero = user.ingeniero && !isSuperAdmin && !isAdmin;
-  const isVendedor = user.vendedor && !isSuperAdmin && !isAdmin && !isIngeniero;
+  const role = String(user.role || '').toLowerCase();
+  const hasConsoleAdmin = isPlatformAdmin(user);
+  const extraAccess = user as typeof user & { accesoCotizaciones?: boolean; accesoGestionCvs?: boolean };
+  const isSuperAdmin = Boolean(user.isSuperAdmin);
+  const isAdmin = !isSuperAdmin && hasConsoleAdmin;
+  const isIngeniero = !isSuperAdmin && !isAdmin && role.includes('ingenier');
+  const isVendedor = !isSuperAdmin && !isAdmin && !isIngeniero;
   const userRoleLabel = getRoleLabel(user);
 
   type MenuItem = {
@@ -111,23 +114,23 @@ export default function Sidebar() {
     if (isAdmin) {
       if (item.href.startsWith('/my-')) return false;
       if (["/ventas", "/accounting", "/newsletter", "/news", "/gestion-pagina-web"].some((p) => item.href.startsWith(p))) return false;
-      if (item.href === "/cotizaciones" && !user.accesoCotizaciones) return false;
-      if (item.href === "/cvs" && !user.accesoGestionCvs) return false;
+      if (item.href === "/cotizaciones" && !extraAccess.accesoCotizaciones) return false;
+      if (item.href === "/cvs" && !extraAccess.accesoGestionCvs) return false;
       return true;
     }
     // Ingeniero: solo vistas personales y módulos extra habilitados
     if (isIngeniero) {
       if (!item.href.startsWith('/my-') && !["/cotizaciones", "/cvs", "/ventas"].includes(item.href)) return false;
-      if (item.href === "/cotizaciones" && !user.accesoCotizaciones) return false;
-      if (item.href === "/cvs" && !user.accesoGestionCvs) return false;
-      if (item.href === "/ventas" && !user.vendedor) return false;
+      if (item.href === "/cotizaciones" && !extraAccess.accesoCotizaciones) return false;
+      if (item.href === "/cvs" && !extraAccess.accesoGestionCvs) return false;
+      if (item.href === "/ventas" && !role.includes('vended')) return false;
       return true;
     }
     // Vendedor: solo ventas y módulos extra habilitados
     if (isVendedor) {
       if (item.href !== "/ventas" && !["/cotizaciones", "/cvs"].includes(item.href)) return false;
-      if (item.href === "/cotizaciones" && !user.accesoCotizaciones) return false;
-      if (item.href === "/cvs" && !user.accesoGestionCvs) return false;
+      if (item.href === "/cotizaciones" && !extraAccess.accesoCotizaciones) return false;
+      if (item.href === "/cvs" && !extraAccess.accesoGestionCvs) return false;
       return true;
     }
     // Por defecto, usar permisos

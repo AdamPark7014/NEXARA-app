@@ -51,6 +51,7 @@ export default function AuditPage() {
   return (
     <RoleGuard anyPermissions={[PERMISSIONS.AUDIT_VIEW]}>
       <div style={{ display: "grid", gap: 24 }}>
+        <HelpTab module="audit" user={user} />
         <div className="card" style={{ padding: 16 }}>
           <h1 style={{ color: "var(--primary)", marginBottom: 8 }}>🔒 Auditoría y Trazabilidad</h1>
           <p style={{ color: "var(--text-secondary)" }}>

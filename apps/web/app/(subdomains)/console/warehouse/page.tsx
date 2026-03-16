@@ -46,6 +46,7 @@ export default function WarehousePage() {
   return (
     <RoleGuard anyPermissions={[PERMISSIONS.WAREHOUSE_VIEW, PERMISSIONS.WAREHOUSE_MANAGE]}>
       <div style={{ display: "grid", gap: 24 }}>
+        <HelpTab module="warehouse" user={user} />
         <div className="card" style={{ padding: 16 }}>
           <h1 style={{ color: "var(--primary)", marginBottom: 8 }}>🏭 Almacenes</h1>
           <p style={{ color: "var(--text-secondary)" }}>

@@ -55,6 +55,7 @@ export default function ToolsPage() {
   return (
     <RoleGuard permissions={[PERMISSIONS.CONSOLE_ACCESS]}>
       <div style={{ display: "grid", gap: 18 }}>
+        <HelpTab module="tools" user={user} />
         <h1 style={{ color: 'var(--primary)', marginBottom: 0 }}>🧰 Gestión de Herramientas</h1>
 
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(5, minmax(0, 1fr))', gap: 10 }}>
@@ -105,7 +106,6 @@ export default function ToolsPage() {
         {canSeeManagement && activeTab === 'fines' && (
           <FinesTable tipo="herramienta" showUser={true} />
         )}
-        <HelpTab module="tools" user={user} />
       </div>
     </RoleGuard>
   );

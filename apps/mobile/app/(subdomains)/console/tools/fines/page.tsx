@@ -4,6 +4,7 @@ import { useState } from "react";
 import styles from "../../console.module.css";
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
+import HelpTab from '@/components/HelpTab';
 
 export default function FinesManagementPage() {
   const { user } = useUser();
@@ -32,6 +33,7 @@ export default function FinesManagementPage() {
 
   return (
     <div className={styles.pageContainer}>
+      <HelpTab module="tools-fines" user={user} />
       <div className={styles.pageHeader}>
         <h1>Gestión de Multas</h1>
         <p>Crear y administrar multas asignadas a usuarios</p>

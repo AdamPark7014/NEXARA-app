@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useUser } from '@/components/UserContext';
 import LunchBreakForm from '@/components/LunchBreakForm';
 import LunchBreaksTable from '@/components/LunchBreaksTable';
+import HelpTab from '../../../../components/HelpTab';
 
 const LunchBreakPage = () => {
   const { user } = useUser();
@@ -26,6 +27,7 @@ const LunchBreakPage = () => {
 
   return (
     <div style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? 12 : 24 }}>
+      <HelpTab module="lunch-breaks" user={user} />
       <h1 style={{ fontSize: isMobile ? 22 : 28, fontWeight: 600, color: 'var(--primary)', marginBottom: isMobile ? 14 : 24 }}>
         🍽️ Gestión de Horas de Comida
       </h1>

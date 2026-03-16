@@ -1,7 +1,13 @@
 "use client";
 
 import PanelLogin from "@/components/PanelLogin";
+import HelpTab from '@/components/HelpTab';
 
 export default function ConsoleLoginPage() {
-  return <PanelLogin redirectTo="/dashboard" />;
+  return (
+    <>
+      <HelpTab module="login" />
+      <PanelLogin redirectTo="/dashboard" />
+    </>
+  );
 }
