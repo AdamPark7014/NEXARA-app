@@ -1,4 +1,5 @@
 import { Injectable, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { PERMISSIONS } from './permissions';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 
