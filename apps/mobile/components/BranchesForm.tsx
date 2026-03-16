@@ -194,7 +194,7 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
       return;
     }
     if (!branchDraft.branchNumber.trim()) {
-      setError('El numero de sucursal es obligatorio');
+      setError('El número de sucursal es obligatorio');
       return;
     }
     if (!branchDraft.portalEmail.trim()) {
@@ -459,7 +459,7 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
           />
           <input
             className="input"
-            placeholder="Numero de sucursal"
+            placeholder="Número de sucursal"
             value={branchDraft.branchNumber}
             onChange={(e) => setBranchDraft({ ...branchDraft, branchNumber: e.target.value })}
           />
@@ -468,10 +468,10 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
         {/* Ubicación */}
         <div>
           <label className={styles.fieldLabel}>
-            Ubicacion de la sucursal
+            Ubicación de la sucursal
           </label>
           <ClientLocationPicker
-            label="Busca la ubicacion en Google Maps"
+            label="Busca la ubicación en Google Maps"
             value={{
               address: branchDraft.address,
               placeId: branchDraft.placeId,
@@ -713,3 +713,4 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
 };
 
 export default BranchesForm;
+

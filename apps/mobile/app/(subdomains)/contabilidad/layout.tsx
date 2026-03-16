@@ -149,7 +149,6 @@ export default function ContabilidadLayout({ children }: { children: React.React
           className={styles.mobileBackdrop}
           onClick={() => setMobileMenuOpen(false)}
           aria-label="Cerrar menú"
-          style={{ zIndex: 12001 }}
         />
       )}
 
@@ -157,17 +156,6 @@ export default function ContabilidadLayout({ children }: { children: React.React
       <aside
         id="conta-mobile-menu"
         className={`${consoleStyles.sidebar} ${styles.contaSidebar} ${mobileMenuOpen ? styles.contaSidebarOpen : ""}`}
-        style={
-          isMobile
-            ? {
-                zIndex: 12002,
-                opacity: 1,
-                visibility: "visible",
-                transform: "translateY(0) scale(1)",
-                pointerEvents: "auto",
-              }
-            : undefined
-        }
       >
         <div className={consoleStyles.sidebarLogo}>
           <span className={consoleStyles.brandMark}>NEXARA</span>

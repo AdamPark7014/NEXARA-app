@@ -530,7 +530,7 @@ export default function Dashboard() {
 
         <div className="kpiCard kpiDelay4">
           <div className="kpiHeader">
-            <span className="kpiEyebrow">Viaticos</span>
+            <span className="kpiEyebrow">Viáticos</span>
             <span className="kpiPill">Semana</span>
           </div>
           <div className="kpiValue">{formatCurrency(viaticTotals.amount)}</div>
@@ -616,7 +616,7 @@ export default function Dashboard() {
         <div className="analysisCard">
           <div className="analysisHeader">
             <div>
-              <div className="analysisEyebrow">Viaticos</div>
+              <div className="analysisEyebrow">Viáticos</div>
               <h3 className="analysisTitle">Pagos por estatus</h3>
             </div>
             <span className="analysisPill">{viaticTotals.total} registros</span>
@@ -635,7 +635,7 @@ export default function Dashboard() {
                   <XAxis dataKey="estatus" stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
                   <YAxis allowDecimals={false} stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="cantidad" name="Viaticos" fill="url(#viaticFill)" radius={[8, 8, 0, 0]} barSize={26} />
+                  <Bar dataKey="cantidad" name="Viáticos" fill="url(#viaticFill)" radius={[8, 8, 0, 0]} barSize={26} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -1033,3 +1033,4 @@ export default function Dashboard() {
     </div>
   );
 }
+

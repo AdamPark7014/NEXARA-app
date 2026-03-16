@@ -11,13 +11,14 @@ import styles from "../tickets.module.css";
 
 type BranchSession = {
   token: string;
-  branch: { id: number; name: string; branchNumber?: string | null; clientId: number; clientName?: string | null };
+  branch: { id: number; name: string; branchNumber?: string | null; clientId: number; clientName?: string | null; logoUrl?: string | null };
 };
 
 type BranchProfile = {
   id: number;
   name: string;
   branchNumber?: string | null;
+  logoUrl?: string | null;
   address?: string | null;
   city?: string | null;
   state?: string | null;
@@ -282,7 +283,6 @@ export default function BranchTicketsPage() {
             className={consoleStyles.sidebarOverlay}
             onClick={() => setMobileMenuOpen(false)}
             role="presentation"
-            style={{ zIndex: 12001 }}
           ></div>
         )}
 
@@ -291,26 +291,20 @@ export default function BranchTicketsPage() {
           className={consoleStyles.sidebarContent}
           id="tickets-branch-sidebar-menu"
           data-open={isMobile && mobileMenuOpen ? "true" : undefined}
-          style={
-            isMobile && mobileMenuOpen
-              ? {
-                  position: "fixed",
-                  top: "64px",
-                  left: "8px",
-                  right: "8px",
-                  zIndex: 12002,
-                  display: "flex",
-                  opacity: 1,
-                  visibility: "visible",
-                  transform: "translateY(0) scale(1)",
-                  pointerEvents: "auto",
-                }
-              : undefined
-          }
         >
         <div className={consoleStyles.sidebarUser}>
           <div className={consoleStyles.sidebarAvatar}>
-            <span className={consoleStyles.sidebarName}>{(profile?.name || session.branch.name).slice(0, 2).toUpperCase()}</span>
+            {profile?.logoUrl || session.branch.logoUrl ? (
+              <img
+                className={consoleStyles.avatarImage}
+                src={getAssetUrl(profile?.logoUrl || session.branch.logoUrl || "")}
+                alt={profile?.name || session.branch.name}
+                width={64}
+                height={64}
+              />
+            ) : (
+              <span className={consoleStyles.sidebarName}>{(profile?.name || session.branch.name).slice(0, 2).toUpperCase()}</span>
+            )}
           </div>
           <div className={consoleStyles.sidebarName}>{profile?.name || session.branch.name}</div>
           <div className={consoleStyles.sidebarEmail}>{profile?.client?.name || session.branch.clientName || "Cliente corporativo"}</div>
@@ -475,7 +469,7 @@ export default function BranchTicketsPage() {
                 style={{ display: "none" }}
               />
               <div className={styles.mutedText} style={{ marginBottom: 8 }}>
-                Arrastra tus archivos aqui o
+                Arrastra tus archivos aquí o
               </div>
               <label htmlFor="branch-evidence-file" className="button-secondary" style={{ cursor: "pointer" }}>
                 Seleccionar archivo

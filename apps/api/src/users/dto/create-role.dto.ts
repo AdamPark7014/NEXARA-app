@@ -65,3 +65,5 @@ export class CreateRoleDto {
   @IsOptional()
   accesoCotizaciones?: boolean = false;
 }
+
+

@@ -108,7 +108,7 @@ export type SalesProjectDetail = {
   name: string;
   budget: number;
   costProducts: number;
-  costViaticos: number;
+  costViáticos: number;
   costOperativo: number;
   margin: number;
   status: string;
@@ -578,7 +578,7 @@ export const createSalesProject = async (
     name: string;
     budget: number;
     costProducts: number;
-    costViaticos: number;
+    costViáticos: number;
     costOperativo: number;
     status: string;
   },
@@ -678,3 +678,4 @@ export const setSalesQuota = async (token: string, payload: SalesQuotaPayload) =
     'Error al configurar cuota de ventas',
   );
 };
+

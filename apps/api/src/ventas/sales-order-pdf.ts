@@ -88,7 +88,7 @@ export const generateSalesOrderPdf = (payload: SalesOrderPayload): Buffer => {
       value: formatCurrency(Number(payload.costProducts)),
     },
     {
-      label: "Costo Viáticos",
+      label: "Costo Viaticos",
       value: formatCurrency(Number(payload.costViaticos)),
     },
     {
@@ -157,3 +157,5 @@ const formatCurrency = (value: number): string => {
     maximumFractionDigits: 2,
   }).format(value);
 };
+
+

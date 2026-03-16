@@ -350,7 +350,7 @@ const MyProfileForm: React.FC = () => {
         <h3 className={styles.sectionTitle}>Datos personales</h3>
         <div className={styles.grid}>
           <div>
-            <label className={styles.label}>Telefono</label>
+            <label className={styles.label}>Teléfono</label>
             <input className="input" value={form.telefono} onChange={(e) => handleChange('telefono', e.target.value)} />
           </div>
           <div>
@@ -366,7 +366,7 @@ const MyProfileForm: React.FC = () => {
             <input className="input" value={form.rfc} onChange={(e) => handleChange('rfc', e.target.value)} />
           </div>
           <div>
-            <label className={styles.label}>INE (numero)</label>
+            <label className={styles.label}>INE (número)</label>
             <input className="input" value={form.ineNumero} onChange={(e) => handleChange('ineNumero', e.target.value)} />
           </div>
           <div>
@@ -377,14 +377,14 @@ const MyProfileForm: React.FC = () => {
       </div>
 
       <div className={`card ${styles.sectionCard}`}>
-        <h3 className={styles.sectionTitle}>Direccion</h3>
+        <h3 className={styles.sectionTitle}>Dirección</h3>
         <div className={styles.grid}>
-          <input className="input" placeholder="Direccion" value={form.direccion} onChange={(e) => handleChange('direccion', e.target.value)} />
+          <input className="input" placeholder="Dirección" value={form.direccion} onChange={(e) => handleChange('direccion', e.target.value)} />
           <input className="input" placeholder="Colonia" value={form.colonia} onChange={(e) => handleChange('colonia', e.target.value)} />
           <input className="input" placeholder="Ciudad" value={form.ciudad} onChange={(e) => handleChange('ciudad', e.target.value)} />
           <input className="input" placeholder="Estado" value={form.estado} onChange={(e) => handleChange('estado', e.target.value)} />
-          <input className="input" placeholder="Codigo postal" value={form.codigoPostal} onChange={(e) => handleChange('codigoPostal', e.target.value)} />
-          <input className="input" placeholder="Pais" value={form.pais} onChange={(e) => handleChange('pais', e.target.value)} />
+          <input className="input" placeholder="Código postal" value={form.codigoPostal} onChange={(e) => handleChange('codigoPostal', e.target.value)} />
+          <input className="input" placeholder="País" value={form.pais} onChange={(e) => handleChange('pais', e.target.value)} />
         </div>
       </div>
 
@@ -392,7 +392,7 @@ const MyProfileForm: React.FC = () => {
         <h3 className={styles.sectionTitle}>Contacto de emergencia</h3>
         <div className={styles.grid}>
           <input className="input" placeholder="Nombre" value={form.contactoEmergenciaNombre} onChange={(e) => handleChange('contactoEmergenciaNombre', e.target.value)} />
-          <input className="input" placeholder="Telefono" value={form.contactoEmergenciaTelefono} onChange={(e) => handleChange('contactoEmergenciaTelefono', e.target.value)} />
+          <input className="input" placeholder="Teléfono" value={form.contactoEmergenciaTelefono} onChange={(e) => handleChange('contactoEmergenciaTelefono', e.target.value)} />
         </div>
       </div>
 
@@ -419,7 +419,7 @@ const MyProfileForm: React.FC = () => {
               onDrop={handleDrop}
               className={`${styles.dropzone} ${dragActive ? styles.dropzoneActive : ''}`}
             >
-              <div className={styles.dropTitle}>Arrastra y suelta el documento aqui</div>
+              <div className={styles.dropTitle}>Arrastra y suelta el documento aquí</div>
               <div className={styles.dropHint}>
                 O selecciona el archivo manualmente.
               </div>
@@ -512,3 +512,4 @@ const MyProfileForm: React.FC = () => {
 };
 
 export default MyProfileForm;
+

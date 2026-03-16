@@ -219,7 +219,7 @@ export default function ClientesWeb() {
           <p className={styles.kicker}>Panel web</p>
           <h1 className={styles.title}>Clientes y testimonios</h1>
           <p className={styles.subtitle}>
-            Gestiona el portafolio de clientes con su imagen, descripcion y contexto del trabajo.
+            Gestiona el portafolio de clientes con su imagen, descripción y contexto del trabajo.
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -238,7 +238,7 @@ export default function ClientesWeb() {
               </h2>
               <p className={styles.cardSubtitle}>
                 {selectedClient
-                  ? `Ultima actualizacion: ${formatDate(selectedClient.updatedAt)}`
+                  ? `Última actualización: ${formatDate(selectedClient.updatedAt)}`
                   : "Completa los datos para publicar un cliente."}
               </p>
             </div>
@@ -303,7 +303,7 @@ export default function ClientesWeb() {
               />
               <div>
                 <p className={styles.dropTitle}>
-                  Arrastra y suelta la imagen aqui o selecciona un archivo
+                  Arrastra y suelta la imagen aquí o selecciona un archivo
                 </p>
                 <p className={styles.dropHint}>PNG, JPG o WEBP. Recomendado 1200px.</p>
               </div>
@@ -384,7 +384,7 @@ export default function ClientesWeb() {
                   <div>
                     <p className={styles.listTitle}>{client.name}</p>
                     <p className={styles.listDesc}>
-                      {client.description || "Sin descripcion"}
+                      {client.description || "Sin descripción"}
                     </p>
                   </div>
                   <span className={styles.listMeta}>{formatDate(client.createdAt)}</span>

@@ -249,10 +249,10 @@ const EvidenceTable: React.FC<{ mode?: 'admin' | 'user'; title?: string | null }
             <th>Responsable</th>
             <th>Archivo</th>
             <th>Comentarios</th>
-            <th>Ubicacion</th>
+            <th>Ubicación</th>
             <th>Revision</th>
             {hasPermission(user, PERMISSIONS.EVIDENCES_REVIEW) && <th>Acciones</th>}
-            {mode === 'user' && <th>Gestion</th>}
+            {mode === 'user' && <th>Gestión</th>}
           </tr>
         </thead>
         <tbody className={styles.tableBody}>
@@ -307,7 +307,7 @@ const EvidenceTable: React.FC<{ mode?: 'admin' | 'user'; title?: string | null }
                 <div>{evi.comentarios || '-'}</div>
                 <div className={styles.cellSubtext}>{evi.tipoEvidencia}</div>
               </td>
-              <td className={styles.dataCell} data-label="Ubicacion">
+              <td className={styles.dataCell} data-label="Ubicación">
                 {getMapsUrl(evi.latitud, evi.longitud) ? (
                   <a className="link" href={getMapsUrl(evi.latitud, evi.longitud)} target="_blank" rel="noopener noreferrer">Ver mapa</a>
                 ) : (
@@ -348,7 +348,7 @@ const EvidenceTable: React.FC<{ mode?: 'admin' | 'user'; title?: string | null }
                 </td>
               )}
               {mode === 'user' && (
-                <td className={styles.dataCell} data-label="Gestion">
+                <td className={styles.dataCell} data-label="Gestión">
                   {evi.estatus === 'Pendiente' ? (
                     <button
                       className="button-secondary"

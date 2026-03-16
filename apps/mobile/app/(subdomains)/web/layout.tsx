@@ -97,10 +97,10 @@ export default function WebPanelLayout({ children }: { children: React.ReactNode
               router.replace("/login");
             }}
             className={styles.themeButton}
-            aria-label="Cerrar sesion"
+            aria-label="Cerrar sesión"
           >
             <span className={styles.themeIcon}>⎋</span>
-            <span>Cerrar sesion</span>
+            <span>Cerrar sesión</span>
           </button>
         </div>
         <div className={styles.webPanelFooter}>

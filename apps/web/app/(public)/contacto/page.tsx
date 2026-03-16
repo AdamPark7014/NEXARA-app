@@ -70,8 +70,8 @@ export default function ContactoPage() {
           <p className={styles.heroKicker}>NEXARA CONTACT CENTER</p>
           <h1 className={styles.heroTitle}>Contáctanos</h1>
           <p className={styles.heroSubtitle}>
-            Estamos listos para ayudarte a impulsar tu proyecto tecnologico.
-            Cuanto mas contexto nos compartas, mas precisa sera nuestra propuesta.
+            Estamos listos para ayudarte a impulsar tu proyecto tecnológico.
+            Cuanto más contexto nos compartas, más precisa será nuestra propuesta.
           </p>
         </div>
       </section>
@@ -152,7 +152,7 @@ export default function ContactoPage() {
 
           {/* Quick Links */}
           <div className={styles.quickLinks}>
-            <h4>Enlaces rapidos</h4>
+            <h4>Enlaces rápidos</h4>
             <ul>
               <li>
                 <Link href="/nexara">Sobre nosotros</Link>
@@ -171,7 +171,7 @@ export default function ContactoPage() {
             <ul>
               <li><span>1.</span> Describe el objetivo de negocio.</li>
               <li><span>2.</span> Indica urgencia y fecha objetivo.</li>
-              <li><span>3.</span> Comparte alcance estimado o numero de sedes.</li>
+              <li><span>3.</span> Comparte alcance estimado o número de sedes.</li>
             </ul>
           </div>
         </aside>
@@ -180,7 +180,7 @@ export default function ContactoPage() {
         <section className={styles.formSection}>
           <div className={styles.formHeader}>
             <h2>Envia tu requerimiento</h2>
-            <p>Completa el formulario y un especialista te respondera con una ruta de accion clara.</p>
+            <p>Completa el formulario y un especialista te responderá con una ruta de acción clara.</p>
           </div>
 
           {!submitted ? (
@@ -202,7 +202,7 @@ export default function ContactoPage() {
 
                 <div className={styles.formField}>
                   <label htmlFor="contact-email">
-                    Correo electronico <span className={styles.required}>*</span>
+                    Correo electrónico <span className={styles.required}>*</span>
                   </label>
                   <input
                     id="contact-email"
@@ -241,7 +241,7 @@ export default function ContactoPage() {
 
               <div className={styles.formField}>
                 <label htmlFor="contact-category">
-                  En que podemos ayudarte <span className={styles.required}>*</span>
+                  En qué podemos ayudarte <span className={styles.required}>*</span>
                 </label>
                 <select
                   id="contact-category"

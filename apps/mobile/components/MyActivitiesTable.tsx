@@ -290,7 +290,7 @@ const MyActivitiesTable: React.FC = () => {
                       <td>{a.indicaciones || '-'}</td>
                       <td>
                         {getMapsUrl(a) ? (
-                          <a href={getMapsUrl(a)} target="_blank" rel="noreferrer">Como llegar</a>
+                          <a href={getMapsUrl(a)} target="_blank" rel="noreferrer">Cómo llegar</a>
                         ) : (
                           '-'
                         )}

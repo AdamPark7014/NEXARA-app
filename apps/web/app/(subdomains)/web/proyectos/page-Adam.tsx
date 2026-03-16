@@ -422,7 +422,7 @@ export default function ProyectosWeb() {
       <header className={styles.header}>
         <div>
           <p className={styles.kicker}>Panel Web</p>
-          <h1 className={styles.title}>Gestion de Proyectos</h1>
+          <h1 className={styles.title}>Gestión de Proyectos</h1>
           <p className={styles.subtitle}>Edita en tiempo real los proyectos visibles en /proyectos.</p>
         </div>
         <div className={styles.headerActions}>
@@ -517,7 +517,7 @@ export default function ProyectosWeb() {
                 checked={form.showInCatalog}
                 onChange={(event) => setForm((prev) => ({ ...prev, showInCatalog: event.target.checked }))}
               />
-              <span>Mostrar proyecto en el catalogo</span>
+              <span>Mostrar proyecto en el catálogo</span>
             </label>
           </div>
 
@@ -647,7 +647,7 @@ export default function ProyectosWeb() {
                   }
                 }}
               >
-                <p className={styles.dropHint}>Arrastra la imagen principal aqui o haz click</p>
+                <p className={styles.dropHint}>Arrastra la imagen principal aquí o haz click</p>
               </div>
               <input
                 ref={mainInputRef}
@@ -710,7 +710,7 @@ export default function ProyectosWeb() {
                   }
                 }}
               >
-                <p className={styles.dropHint}>Arrastra 8 imagenes aqui o haz click</p>
+                <p className={styles.dropHint}>Arrastra 8 imágenes aquí o haz click</p>
               </div>
               <input
                 ref={galleryInputRef}

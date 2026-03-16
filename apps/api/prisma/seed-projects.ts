@@ -11,7 +11,7 @@ async function main() {
       summary:
         'Modernizamos la conectividad de una cadena nacional, habilitando experiencias sin friccion en piso de venta y cajas autonomas.',
       impact: '99.95% de disponibilidad y 35% menos tickets de red',
-      services: ['Diseno LAN/WAN', 'SD-WAN', 'Soporte NOC'],
+      services: ['Diseño LAN/WAN', 'SD-WAN', 'Soporte NOC'],
       tags: ['WiFi 6', 'SD-WAN', 'Zero Trust', 'Observabilidad'],
       highlights: [
         'Cobertura WiFi 6 optimizada para inventarios en tiempo real',
@@ -37,7 +37,7 @@ async function main() {
       sector: 'Servicios financieros',
       summary:
         'Extendimos el datacenter a la nube con landing zones seguras y automatizadas, acelerando el time-to-market de nuevos productos.',
-      impact: 'Lanzamientos 3x mas rapidos y 28% menos costo operativo',
+      impact: 'Lanzamientos 3x más rápidos y 28% menos costo operativo',
       services: ['Cloud landing zone', 'Infra as Code', 'Monitoreo'],
       tags: ['Azure', 'Kubernetes', 'GitOps', 'FinOps'],
       highlights: [
@@ -63,9 +63,9 @@ async function main() {
       title: 'Centro de datos modular para fintech',
       sector: 'Fintech & pagos',
       summary:
-        'Disenamos e implementamos un core de mision critica con redundancia completa y monitoreo continuo orientado a SLA.',
+        'Diseñamos e implementamos un core de misión crítica con redundancia completa y monitoreo continuo orientado a SLA.',
       impact: 'SLA 99.98% y soporte con respuesta <4h',
-      services: ['Computo y energia', 'Virtualizacion', 'Soporte 24/7'],
+      services: ['Computo y energía', 'Virtualizacion', 'Soporte 24/7'],
       tags: ['VMware', 'DRP', 'Alta disponibilidad', 'SLA'],
       highlights: [
         'Arquitectura modular con crecimiento por demanda',
@@ -114,3 +114,4 @@ main()
     process.exit(1);
   })
   .finally(() => prisma.$disconnect());
+

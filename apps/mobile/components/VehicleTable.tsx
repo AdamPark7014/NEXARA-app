@@ -703,7 +703,7 @@ const VehicleTable = () => {
       {success && <div className={styles.successText}>{success}</div>}
       {hasPermission(user, PERMISSIONS.VEHICLES_INVENTORY) && (
         <div className={`card ${styles.inventoryCard}`}>
-          <h3 className={styles.inventoryTitle}>Inventario de vehiculos</h3>
+          <h3 className={styles.inventoryTitle}>Inventario de vehículos</h3>
           <div className={styles.inventoryForm}>
             <input
               className="input"
@@ -730,7 +730,7 @@ const VehicleTable = () => {
               </div>
             ))}
             {inventory.length === 0 && (
-              <div className={styles.inventoryEmpty}>Aun no hay vehiculos registrados.</div>
+              <div className={styles.inventoryEmpty}>Aún no hay vehículos registrados.</div>
             )}
           </div>
         </div>
@@ -740,3 +740,4 @@ const VehicleTable = () => {
 };
 
 export default VehicleTable;
+

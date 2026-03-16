@@ -124,7 +124,7 @@ export const generateCotizacionPdf = (payload: CotizacionPdfPayload): Promise<Bu
       doc.fillColor(colors.navy).fontSize(22).font('Helvetica-Bold').text('Cotizacion', margin + 140, 30, {
         width: 240,
       });
-      doc.fontSize(11).font('Helvetica').fillColor(colors.muted).text('Propuesta comercial de tecnologia', margin + 140, 58, {
+      doc.fontSize(11).font('Helvetica').fillColor(colors.muted).text('Propuesta comercial de tecnología', margin + 140, 58, {
         width: 260,
       });
 
@@ -244,8 +244,8 @@ export const generateCotizacionPdf = (payload: CotizacionPdfPayload): Promise<Bu
       { label: 'Empresa', value: toText(payload.clientCompany) },
       { label: 'Contacto', value: toText(payload.clientName) },
       { label: 'Email', value: toText(payload.clientEmail) },
-      { label: 'Telefono', value: toText(payload.clientPhone) },
-      { label: 'Direccion', value: toText(payload.clientAddress) },
+      { label: 'Teléfono', value: toText(payload.clientPhone) },
+      { label: 'Dirección', value: toText(payload.clientAddress) },
     ];
 
     const projectLines = [
@@ -354,3 +354,4 @@ export const generateCotizacionPdf = (payload: CotizacionPdfPayload): Promise<Bu
     doc.end();
   });
 };
+

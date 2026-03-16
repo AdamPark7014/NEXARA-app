@@ -123,7 +123,7 @@ const VehicleRequestForm: React.FC<VehicleRequestFormProps> = ({ actividadId }) 
     try {
       if (!validate()) return;
       if (!user?.token) {
-        setError('No hay sesion activa');
+        setError('No hay sesión activa');
         return;
       }
 
@@ -240,3 +240,4 @@ const VehicleRequestForm: React.FC<VehicleRequestFormProps> = ({ actividadId }) 
 };
 
 export default VehicleRequestForm;
+

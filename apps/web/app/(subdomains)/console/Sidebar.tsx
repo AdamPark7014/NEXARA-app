@@ -226,7 +226,6 @@ export default function Sidebar() {
           className={styles.sidebarOverlay}
           onClick={closeMenu}
           role="presentation"
-          style={{ zIndex: 12001 }}
         ></div>
       )}
 
@@ -236,22 +235,6 @@ export default function Sidebar() {
         className={styles.sidebarContent}
         id="sidebar-menu"
         data-open={isMobile && isMenuOpen ? 'true' : undefined}
-        style={
-          isMobile && isMenuOpen
-            ? {
-                position: 'fixed',
-                top: '64px',
-                left: '8px',
-                right: '8px',
-                zIndex: 12002,
-                display: 'flex',
-                opacity: 1,
-                visibility: 'visible',
-                transform: 'translateY(0) scale(1)',
-                pointerEvents: 'auto',
-              }
-            : undefined
-        }
       >
         <div className={styles.sidebarUser}>
           <div className={styles.sidebarAvatar}>
@@ -329,9 +312,9 @@ export default function Sidebar() {
               type="button"
               onClick={handleLogout}
               className={styles.logoutButton}
-              aria-label="Cerrar sesion"
+              aria-label="Cerrar sesión"
             >
-              Cerrar sesion
+              Cerrar sesión
             </button>
           </div>
         </div>

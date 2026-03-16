@@ -96,14 +96,14 @@ const EvidenceUploader = ({ actividadId }: { actividadId?: number }) => {
         const coords = await new Promise<GeolocationCoordinates>((resolve, reject) => {
           navigator.geolocation.getCurrentPosition(
             (pos) => resolve(pos.coords),
-            () => reject(new Error('No se pudo obtener la ubicacion')),
+            () => reject(new Error('No se pudo obtener la ubicación')),
             { enableHighAccuracy: true, timeout: 15000 }
           );
         });
         formData.append('latitud', String(coords.latitude));
         formData.append('longitud', String(coords.longitude));
       } catch {
-        setLocationError('No se pudo obtener la ubicacion.');
+        setLocationError('No se pudo obtener la ubicación.');
         setLoading(false);
         return;
       }
@@ -216,7 +216,7 @@ const EvidenceUploader = ({ actividadId }: { actividadId?: number }) => {
           onChange={(e) => handleFileSelect(Array.from(e.target.files || []))}
         />
         <div className={styles.helperText}>
-          Arrastra tus archivos aqui o
+          Arrastra tus archivos aquí o
         </div>
         <label htmlFor="evidence-file" className={`button-secondary ${styles.fileTrigger}`}>
           Seleccionar archivo
@@ -283,3 +283,4 @@ const EvidenceUploader = ({ actividadId }: { actividadId?: number }) => {
 };
 
 export default EvidenceUploader;
+

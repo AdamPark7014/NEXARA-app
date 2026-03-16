@@ -35,7 +35,7 @@ export default function ClientsPage() {
               <th>Cliente</th>
               <th>Contacto</th>
               <th>Email</th>
-              <th>Telefono</th>
+              <th>Teléfono</th>
               <th>Activo</th>
             </tr>
           </thead>

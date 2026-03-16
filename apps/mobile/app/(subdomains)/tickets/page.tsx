@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import React, { useEffect, useMemo, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { useRouter } from "next/navigation";
@@ -617,7 +617,6 @@ export default function ClientTicketsPage() {
             className={consoleStyles.sidebarOverlay}
             onClick={() => setMobileMenuOpen(false)}
             role="presentation"
-            style={{ zIndex: 12001 }}
           ></div>
         )}
 
@@ -626,22 +625,6 @@ export default function ClientTicketsPage() {
           className={consoleStyles.sidebarContent}
           id="tickets-sidebar-menu"
           data-open={isMobile && mobileMenuOpen ? "true" : undefined}
-          style={
-            isMobile && mobileMenuOpen
-              ? {
-                  position: "fixed",
-                  top: "64px",
-                  left: "8px",
-                  right: "8px",
-                  zIndex: 12002,
-                  display: "flex",
-                  opacity: 1,
-                  visibility: "visible",
-                  transform: "translateY(0) scale(1)",
-                  pointerEvents: "auto",
-                }
-              : undefined
-          }
         >
         <div className={consoleStyles.sidebarUser}>
           <div className={consoleStyles.sidebarAvatar}>
@@ -930,7 +913,7 @@ export default function ClientTicketsPage() {
                     <span>Cierre: {ticket.fechaFinalizacion || "-"}</span>
                     {arrivalEvidenceFor(ticket)?.latitud && arrivalEvidenceFor(ticket)?.longitud && (
                       <span>
-                        Ubicacion llegada: <a href={getMapsUrl(arrivalEvidenceFor(ticket)?.latitud, arrivalEvidenceFor(ticket)?.longitud)} target="_blank" rel="noreferrer">ver mapa</a>
+                        Ubicación llegada: <a href={getMapsUrl(arrivalEvidenceFor(ticket)?.latitud, arrivalEvidenceFor(ticket)?.longitud)} target="_blank" rel="noreferrer">ver mapa</a>
                       </span>
                     )}
                   </div>
@@ -1035,7 +1018,7 @@ export default function ClientTicketsPage() {
                   />
                   <input
                     className="input"
-                    placeholder="Numero de sucursal"
+                    placeholder="Número de sucursal"
                     value={requestDraft.branchNumber}
                     onChange={(e) => setRequestDraft((prev) => ({ ...prev, branchNumber: e.target.value }))}
                   />
@@ -1054,19 +1037,19 @@ export default function ClientTicketsPage() {
                 </div>
                 <input
                   className="input"
-                  placeholder="Direccion"
+                  placeholder="Dirección"
                   value={requestDraft.address}
                   onChange={(e) => setRequestDraft((prev) => ({ ...prev, address: e.target.value }))}
                 />
                 <textarea
                   className="input"
                   rows={3}
-                  placeholder={requestDraft.requestType === "PREVENTIVE_INVENTORY" ? "Descripcion del mantenimiento e inventario a ejecutar" : "Descripcion del problema"}
+                  placeholder={requestDraft.requestType === "PREVENTIVE_INVENTORY" ? "Descripción del mantenimiento e inventario a ejecutar" : "Descripción del problema"}
                   value={requestDraft.description}
                   onChange={(e) => setRequestDraft((prev) => ({ ...prev, description: e.target.value }))}
                 />
                 <ClientLocationPicker
-                  label="Ubicacion del ticket"
+                  label="Ubicación del ticket"
                   value={{
                     address: requestDraft.address,
                     placeId: requestDraft.placeId,
@@ -1106,7 +1089,7 @@ export default function ClientTicketsPage() {
                       <div className={styles.mutedText}>Asignado a: {request.activity.anNumber}</div>
                     )}
                     {request.latitud && request.longitud && (
-                      <a href={getMapsUrl(request.latitud, request.longitud)} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>Ver ubicacion</a>
+                      <a href={getMapsUrl(request.latitud, request.longitud)} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>Ver ubicación</a>
                     )}
                     {request.latitud && request.longitud && (
                       <iframe
@@ -1203,3 +1186,5 @@ export default function ClientTicketsPage() {
     </div>
   );
 }
+
+

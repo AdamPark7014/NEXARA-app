@@ -440,7 +440,7 @@ export default function Home() {
                 >
                   Descargar PDF
                 </a>
-                <a href="/proyectos" className={styles.recentProjectsPdfCta}>Ver catalogo</a>
+                <a href="/proyectos" className={styles.recentProjectsPdfCta}>Ver catálogo</a>
               </div>
             </div>
             <div>
@@ -448,7 +448,7 @@ export default function Home() {
                 Proyectos recientes
               </h2>
               <p className={styles.recentProjectsSubtitle}>
-                Cargamos solo los ultimos proyectos publicados para mostrar lo mas reciente.
+                Cargamos solo los últimos proyectos publicados para mostrar lo más reciente.
               </p>
             </div>
           </div>

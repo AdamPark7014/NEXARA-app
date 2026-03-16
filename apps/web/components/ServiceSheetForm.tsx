@@ -302,8 +302,8 @@ export default function ServiceSheetForm() {
         <div className={styles.sectionTitle}>Encuesta de calidad</div>
         {[
           { key: 'engineerIdentified', label: 'El ingeniero se identifico' },
-          { key: 'friendlyAttention', label: 'La atencion fue amable' },
-          { key: 'solutionSatisfied', label: 'Satisfecho con la solucion' },
+          { key: 'friendlyAttention', label: 'La atención fue amable' },
+          { key: 'solutionSatisfied', label: 'Satisfecho con la solución' },
         ].map((item) => (
           <div key={item.key} className={styles.questionRow}>
             <span className={`${styles.questionText} ${isMobile ? styles.questionTextMobile : ''}`}>{item.label}</span>
@@ -379,3 +379,4 @@ export default function ServiceSheetForm() {
     </div>
   );
 }
+

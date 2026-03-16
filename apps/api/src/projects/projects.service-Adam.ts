@@ -266,7 +266,7 @@ export class ProjectsService {
 
       const x = margin;
       const y = doc.y;
-      const visibility = project.showInCatalog ? 'Visible en catalogo' : 'No visible en catalogo';
+      const visibility = project.showInCatalog ? 'Visible en catálogo' : 'No visible en catálogo';
 
       doc.save();
       doc.roundedRect(x, y, cardWidth, cardHeight, 12).fill('#f7fbff');
@@ -283,7 +283,7 @@ export class ProjectsService {
         .fontSize(10)
         .text(`Sector: ${project.sector}`, x + 14, y + 60)
         .text(`Slug: ${project.slug}`)
-        .text(`Estado catalogo: ${visibility}`)
+        .text(`Estado catálogo: ${visibility}`)
         .text(`Creado: ${project.createdAt.toLocaleDateString('es-MX')}`);
 
       const mediaY = y + 126;

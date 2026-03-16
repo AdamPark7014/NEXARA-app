@@ -296,11 +296,11 @@ const AttendanceForm = () => {
         try {
           await sendGpsLocation(payload);
         } catch {
-          setError('No se pudo enviar la ubicacion.');
+          setError('No se pudo enviar la ubicación.');
         }
       },
       () => {
-        setError('No se pudo obtener la ubicacion. Revisa los permisos.');
+        setError('No se pudo obtener la ubicación. Revisa los permisos.');
       },
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
     );
@@ -715,3 +715,4 @@ const AttendanceForm = () => {
 };
 
 export default AttendanceForm;
+

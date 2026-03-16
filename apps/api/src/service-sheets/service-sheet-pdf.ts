@@ -186,7 +186,7 @@ export const generateServiceSheetPdf = async (payload: ServiceSheetPayload): Pro
       { label: 'Sucursal', value: payload.branchName || '-' },
       { label: 'No. sucursal', value: payload.branchNumber || '-' },
       { label: 'Ciudad/Estado', value: [payload.branchCity, payload.branchState].filter(Boolean).join(', ') || '-' },
-      { label: 'Direccion', value: payload.branchAddress || '-' },
+      { label: 'Dirección', value: payload.branchAddress || '-' },
     ];
 
     const scheduleLines = [
@@ -262,8 +262,8 @@ export const generateServiceSheetPdf = async (payload: ServiceSheetPayload): Pro
     const yesNo = (value?: boolean | null) => (value === true ? 'Si' : value === false ? 'No' : '-');
     const surveyRows = [
       ['Ingeniero se identifico', yesNo(survey.engineerIdentified)],
-      ['Atencion fue amable', yesNo(survey.friendlyAttention)],
-      ['Satisfecho con la solucion', yesNo(survey.solutionSatisfied)],
+      ['Atención fue amable', yesNo(survey.friendlyAttention)],
+      ['Satisfecho con la solución', yesNo(survey.solutionSatisfied)],
     ];
     surveyRows.forEach(([label, value]) => {
       doc.fillColor(colors.muted).fontSize(9).text(label, margin, doc.y, { width: 170 });
@@ -276,3 +276,4 @@ export const generateServiceSheetPdf = async (payload: ServiceSheetPayload): Pro
     doc.end();
   });
 };
+

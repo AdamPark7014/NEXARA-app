@@ -13,3 +13,4 @@ import { NotificationsModule } from '../notifications/notifications.module.js';
   exports: [ViaticosService],
 })
 export class ViaticosModule {}
+

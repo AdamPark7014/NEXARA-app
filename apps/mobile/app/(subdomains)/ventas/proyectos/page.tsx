@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -36,7 +36,7 @@ export default function VentasProyectosPage() {
     name: "",
     budget: 0,
     costProducts: 0,
-    costViaticos: 0,
+    costViáticos: 0,
     costOperativo: 0,
     status: "PLANNED",
   });
@@ -93,7 +93,7 @@ export default function VentasProyectosPage() {
         name: form.name,
         budget: form.budget,
         costProducts: form.costProducts,
-        costViaticos: form.costViaticos,
+        costViáticos: form.costViáticos,
         costOperativo: form.costOperativo,
         status: form.status,
       };
@@ -103,7 +103,7 @@ export default function VentasProyectosPage() {
         name: "",
         budget: 0,
         costProducts: 0,
-        costViaticos: 0,
+        costViáticos: 0,
         costOperativo: 0,
         status: "PLANNED",
       });
@@ -160,7 +160,7 @@ export default function VentasProyectosPage() {
           <input className={styles.input} name="name" value={form.name} onChange={handleChange} placeholder="Nombre del proyecto" />
           <input className={styles.input} name="budget" value={form.budget} onChange={handleChange} type="number" placeholder="Presupuesto" />
           <input className={styles.input} name="costProducts" value={form.costProducts} onChange={handleChange} type="number" placeholder="Costo producto" />
-          <input className={styles.input} name="costViaticos" value={form.costViaticos} onChange={handleChange} type="number" placeholder="Costo viaticos" />
+          <input className={styles.input} name="costViáticos" value={form.costViáticos} onChange={handleChange} type="number" placeholder="Costo viáticos" />
           <input className={styles.input} name="costOperativo" value={form.costOperativo} onChange={handleChange} type="number" placeholder="Costo operativo" />
           <select className={styles.input} name="status" value={form.status} onChange={handleChange}>
             <option value="PLANNED">Planeado</option>
@@ -246,3 +246,5 @@ export default function VentasProyectosPage() {
     </section>
   );
 }
+
+

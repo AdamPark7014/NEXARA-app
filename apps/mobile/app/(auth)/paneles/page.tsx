@@ -66,7 +66,7 @@ export default function PanelHubPage() {
         <h1 className={styles.title}>
           {getGreeting()}, {user.nombre}
         </h1>
-        <p className={styles.subtitle}>Tu jornada esta lista. El dia de hoy, ¿a que panel deseas ingresar?</p>
+        <p className={styles.subtitle}>Tu jornada está lista. El día de hoy, ¿a qué panel deseas ingresar?</p>
         <div className={styles.metaRow}>
           <span>{now.toLocaleDateString("es-MX", { weekday: "long", day: "2-digit", month: "long" })}</span>
           <span>{now.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
@@ -108,7 +108,7 @@ export default function PanelHubPage() {
           </div>
           {filteredPanels.length === 0 && (
             <div className={styles.empty}>
-              No hay paneles que coincidan con tu busqueda.
+              No hay paneles que coincidan con tu búsqueda.
             </div>
           )}
         </>
@@ -123,7 +123,7 @@ export default function PanelHubPage() {
             router.replace("/login");
           }}
         >
-          Cerrar sesion
+          Cerrar sesión
         </button>
       </div>
     </section>

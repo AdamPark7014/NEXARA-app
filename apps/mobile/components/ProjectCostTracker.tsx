@@ -7,7 +7,7 @@ import { io, Socket } from 'socket.io-client';
 
 interface ProjectCosts {
   costProducts: number;
-  costViaticos: number;
+  costViáticos: number;
   costOperativo: number;
   totalCost: number;
   budget: number;
@@ -33,12 +33,12 @@ export default function ProjectCostTracker({
   const [isEditing, setIsEditing] = useState(false);
   const [editValues, setEditValues] = useState({
     costProducts: '0',
-    costViaticos: '0',
+    costViáticos: '0',
     costOperativo: '0',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [syncingViaticos, setSyncingViaticos] = useState(false);
+  const [syncingViáticos, setSyncingViáticos] = useState(false);
 
   const loadCosts = useCallback(async () => {
     try {
@@ -55,7 +55,7 @@ export default function ProjectCostTracker({
       setCosts(data);
       setEditValues({
         costProducts: String(data.costProducts),
-        costViaticos: String(data.costViaticos),
+        costViáticos: String(data.costViáticos),
         costOperativo: String(data.costOperativo),
       });
       await onCostsUpdated?.();
@@ -113,7 +113,7 @@ export default function ProjectCostTracker({
         },
         body: JSON.stringify({
           costProducts: Number(editValues.costProducts),
-          costViaticos: Number(editValues.costViaticos),
+          costViáticos: Number(editValues.costViáticos),
           costOperativo: Number(editValues.costOperativo),
         }),
       });
@@ -133,9 +133,9 @@ export default function ProjectCostTracker({
     }
   };
 
-  const handleSyncViaticos = async () => {
+  const handleSyncViáticos = async () => {
     try {
-      setSyncingViaticos(true);
+      setSyncingViáticos(true);
       setError(null);
 
       const response = await fetch(`/api/ventas/proyectos/${projectId}/sync-viaticos`, {
@@ -151,14 +151,14 @@ export default function ProjectCostTracker({
       setCosts(data);
       setEditValues({
         costProducts: String(data.costProducts),
-        costViaticos: String(data.costViaticos),
+        costViáticos: String(data.costViáticos),
         costOperativo: String(data.costOperativo),
       });
       await onCostsUpdated?.();
     } catch (err) {
       setError('Error syncing viaticos: ' + (err instanceof Error ? err.message : 'Unknown'));
     } finally {
-      setSyncingViaticos(false);
+      setSyncingViáticos(false);
     }
   };
 
@@ -218,8 +218,8 @@ export default function ProjectCostTracker({
               <div className={styles.costValue}>${costs.costProducts.toFixed(2)}</div>
             </div>
             <div className={styles.costCard}>
-              <div className={styles.costLabel}>Viaticos</div>
-              <div className={styles.costValue}>${costs.costViaticos.toFixed(2)}</div>
+              <div className={styles.costLabel}>Viáticos</div>
+              <div className={styles.costValue}>${costs.costViáticos.toFixed(2)}</div>
             </div>
             <div className={styles.costCard}>
               <div className={styles.costLabel}>Operativo</div>
@@ -283,11 +283,11 @@ export default function ProjectCostTracker({
               ✏️ Editar Costos
             </button>
             <button
-              onClick={handleSyncViaticos}
+              onClick={handleSyncViáticos}
               className={styles.syncButton}
-              disabled={syncingViaticos}
+              disabled={syncingViáticos}
             >
-              {syncingViaticos ? '⏳ Sincronizando...' : '🔄 Sincronizar Viaticos'}
+              {syncingViáticos ? '⏳ Sincronizando...' : '🔄 Sincronizar Viáticos'}
             </button>
             <button
               onClick={validateBudget}
@@ -318,14 +318,14 @@ export default function ProjectCostTracker({
             </div>
 
             <div className={styles.formGroup}>
-              <label>Costo de Viaticos</label>
+              <label>Costo de Viáticos</label>
               <div className={styles.inputWrapper}>
                 <span className={styles.prefix}>$</span>
                 <input
                   type="number"
-                  value={editValues.costViaticos}
+                  value={editValues.costViáticos}
                   onChange={(e) =>
-                    setEditValues({ ...editValues, costViaticos: e.target.value })
+                    setEditValues({ ...editValues, costViáticos: e.target.value })
                   }
                   min="0"
                   disabled={loading}
@@ -362,7 +362,7 @@ export default function ProjectCostTracker({
                 <strong>
                   ${(
                     Number(editValues.costProducts) +
-                    Number(editValues.costViaticos) +
+                    Number(editValues.costViáticos) +
                     Number(editValues.costOperativo)
                   ).toFixed(2)}
                 </strong>
@@ -370,7 +370,7 @@ export default function ProjectCostTracker({
               <div
                 className={`${styles.row} ${
                   Number(editValues.costProducts) +
-                    Number(editValues.costViaticos) +
+                    Number(editValues.costViáticos) +
                     Number(editValues.costOperativo) >
                   budget
                     ? styles.rowWarning
@@ -382,7 +382,7 @@ export default function ProjectCostTracker({
                   ${(
                     budget -
                     (Number(editValues.costProducts) +
-                      Number(editValues.costViaticos) +
+                      Number(editValues.costViáticos) +
                       Number(editValues.costOperativo))
                   ).toFixed(2)}
                 </strong>
@@ -414,3 +414,5 @@ export default function ProjectCostTracker({
     </div>
   );
 }
+
+

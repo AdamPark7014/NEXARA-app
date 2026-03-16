@@ -293,7 +293,7 @@ export default function ContabilidadDashboard() {
         </div>
         <div className={styles.actions}>
           <Link className={styles.primaryButton} href="/viaticos">
-            Revisar viaticos
+            Revisar viáticos
           </Link>
           <Link className={styles.secondaryButton} href="/capital">
             Ajustar capital
@@ -327,7 +327,7 @@ export default function ContabilidadDashboard() {
 
       <div className={styles.metricsGrid}>
         <div className={styles.metricCard}>
-          <p className={styles.metricLabel}>Viaticos activos</p>
+          <p className={styles.metricLabel}>Viáticos activos</p>
           <h2 className={styles.metricValue}>{formatCurrency(viaticTotals.total)}</h2>
           <p className={styles.metricMeta}>
             {viaticTotals.pending} pendientes · {viaticTotals.approved} aprobados
@@ -358,7 +358,7 @@ export default function ContabilidadDashboard() {
             <div>
               <h3 className={styles.cardTitle}>Movimientos recientes</h3>
               <p className={styles.cardSubtitle}>
-                Lo ultimo en viaticos y multas para reaccionar rapido.
+                Lo último en viáticos y multas para reaccionar rápido.
               </p>
             </div>
             <span className={styles.badge}>{latestViatics.length + penalties.list.length} items</span>
@@ -368,7 +368,7 @@ export default function ContabilidadDashboard() {
               <div key={`viatic-${item.id}`} className={styles.activityItem}>
                 <div>
                   <span className={styles.activityLabel}>Viatico</span>
-                  <p className={styles.activityTitle}>{item.razonGasto || "Sin descripcion"}</p>
+                  <p className={styles.activityTitle}>{item.razonGasto || "Sin descripción"}</p>
                   <p className={styles.activityMeta}>
                     {item.usuario?.nombre || "Sin usuario"} · {formatCurrency(item.montoSolicitado || 0)}
                   </p>
@@ -405,7 +405,7 @@ export default function ContabilidadDashboard() {
           </div>
           <div className={styles.miniChart}>
             <div className={styles.barRow}>
-              <span className={styles.barLabel}>Viaticos</span>
+              <span className={styles.barLabel}>Viáticos</span>
               <div className={styles.barTrack}>
                 <div
                   className={styles.barFill}
@@ -457,3 +457,5 @@ export default function ContabilidadDashboard() {
     </section>
   );
 }
+
+

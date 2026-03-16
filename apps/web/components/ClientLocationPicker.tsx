@@ -187,7 +187,7 @@ export default function ClientLocationPicker({ label, value, onChange, height = 
               lng: place.geometry.location.lng(),
             });
             mapInstance.current?.setCenter(place.geometry.location);
-            setStatus("Ubicacion actualizada");
+            setStatus("Ubicación actualizada");
           });
         }
       })
@@ -223,7 +223,7 @@ export default function ClientLocationPicker({ label, value, onChange, height = 
       <input
         ref={inputRef}
         className="input"
-        placeholder="Busca la ubicacion en Google Maps"
+        placeholder="Busca la ubicación en Google Maps"
         value={inputValue}
         onChange={(event) => setInputValue(event.target.value)}
       />
@@ -232,3 +232,4 @@ export default function ClientLocationPicker({ label, value, onChange, height = 
     </div>
   );
 }
+

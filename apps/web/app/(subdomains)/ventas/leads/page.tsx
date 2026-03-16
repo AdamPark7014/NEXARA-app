@@ -118,7 +118,7 @@ export default function VentasLeadsPage() {
           <input className={styles.input} name="name" value={form.name} onChange={handleChange} placeholder="Contacto" />
           <input className={styles.input} name="company" value={form.company} onChange={handleChange} placeholder="Empresa" />
           <input className={styles.input} name="email" value={form.email} onChange={handleChange} placeholder="Correo" />
-          <input className={styles.input} name="phone" value={form.phone} onChange={handleChange} placeholder="Telefono" />
+          <input className={styles.input} name="phone" value={form.phone} onChange={handleChange} placeholder="Teléfono" />
           <input className={styles.input} name="source" value={form.source} onChange={handleChange} placeholder="Origen" />
           <select className={styles.input} name="status" value={form.status} onChange={handleChange}>
             <option value="NEW">Nuevo</option>

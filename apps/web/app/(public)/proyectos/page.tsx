@@ -3,9 +3,9 @@ import styles from "./page.module.css";
 import { buildApiUrl, getApiBase } from "@/lib/api-base";
 
 export const metadata = {
-  title: "Catalogo | Nexara",
+  title: "Catálogo | Nexara",
   description:
-    "Catalogo de sectores y proyectos tecnologicos de Nexara con descarga PDF dinamica.",
+    "Catálogo de sectores y proyectos tecnológicos de Nexara con descarga PDF dinámica.",
 };
 
 export const dynamic = "force-dynamic";
@@ -63,7 +63,7 @@ const sectorTemplates: SectorTemplate[] = [
     title: "Computo empresarial",
     image: "/servicios/square-1.jpg",
     bullets: [
-      "Suministro y configuracion de equipos listos para operacion y crecimiento.",
+      "Suministro y configuración de equipos listos para operación y crecimiento.",
       "Accesorios: laptops, workstations y servidores.",
     ],
     group: "main",
@@ -73,7 +73,7 @@ const sectorTemplates: SectorTemplate[] = [
     title: "Redes y conectividad",
     image: "/servicios/square-2.jpg",
     bullets: [
-      "Diseno e implementacion de redes estables, seguras y administrables.",
+      "Diseño e implementación de redes estables, seguras y administrables.",
       "Accesorios: switches, access points y cableado.",
     ],
     group: "main",
@@ -83,7 +83,7 @@ const sectorTemplates: SectorTemplate[] = [
     title: "Videovigilancia y seguridad",
     image: "/servicios/square-3.jpg",
     bullets: [
-      "Cobertura integral para proteger activos fisicos y digitales.",
+      "Cobertura integral para proteger activos físicos y digitales.",
       "Accesorios: CCTV, control de acceso y monitoreo.",
     ],
     group: "main",
@@ -93,8 +93,8 @@ const sectorTemplates: SectorTemplate[] = [
     title: "Licenciamiento",
     image: "/servicios/square-4.jpg",
     bullets: [
-      "Gestion de licencias y cumplimiento para operar con software legal y actualizado.",
-      "Accesorios: productividad, seguridad y colaboracion.",
+      "Gestión de licencias y cumplimiento para operar con software legal y actualizado.",
+      "Accesorios: productividad, seguridad y colaboración.",
     ],
     group: "main",
   },
@@ -103,7 +103,7 @@ const sectorTemplates: SectorTemplate[] = [
     title: "Gubernamental",
     image: "/soluciones/rect-a.jpg",
     bullets: [
-      "Modernizamos entornos publicos con infraestructura segura, equipamiento y soporte operativo continuo.",
+      "Modernizamos entornos públicos con infraestructura segura, equipamiento y soporte operativo continuo.",
     ],
     group: "other",
   },
@@ -121,7 +121,7 @@ const sectorTemplates: SectorTemplate[] = [
     title: "Pymes",
     image: "/soluciones/rect-c.jpg",
     bullets: [
-      "Disenamos paquetes tecnologicos escalables para crecer sin frenar la operacion.",
+      "Diseñamos paquetes tecnológicos escalables para crecer sin frenar la operación.",
     ],
     group: "other",
   },
@@ -130,7 +130,7 @@ const sectorTemplates: SectorTemplate[] = [
     title: "Salud",
     image: "/soluciones/rect-d.jpg",
     bullets: [
-      "Aseguramos continuidad y proteccion de informacion en clinicas y centros medicos.",
+      "Aseguramos continuidad y protección de información en clínicas y centros médicos.",
     ],
     group: "other",
   },
@@ -139,7 +139,7 @@ const sectorTemplates: SectorTemplate[] = [
     title: "Industrial",
     image: "/soluciones/rect-e.jpg",
     bullets: [
-      "Integracion de TI para plantas y operaciones con foco en control, seguridad y productividad.",
+      "Integración de TI para plantas y operaciones con foco en control, seguridad y productividad.",
     ],
     group: "other",
   },
@@ -203,14 +203,14 @@ export default async function ProjectsPage() {
   };
 
   return (
-    <main className={`${styles.container} public-section-page ultra-corp-page ultra-corp-proyectos ultra-corp-strict`} aria-label="Catalogo de proyectos Nexara">
+    <main className={`${styles.container} public-section-page ultra-corp-page ultra-corp-proyectos ultra-corp-strict`} aria-label="Catálogo de proyectos Nexara">
       <header className={styles.hero}>
         <div>
-          <p className={styles.kicker}>PORTAFOLIO TECNOLOGICO</p>
+          <p className={styles.kicker}>PORTAFOLIO TECNOLÓGICO</p>
           <h1 className={styles.heroTitle}>Sectores donde ya generamos impacto real</h1>
           <p className={styles.heroText}>
-            Este catalogo resume lineas de solucion y sectores atendidos para facilitar decisiones
-            de compra e implementacion con un enfoque empresarial.
+            Este catálogo resume líneas de solución y sectores atendidos para facilitar decisiones
+            de compra e implementación con un enfoque empresarial.
           </p>
         </div>
         <a
@@ -239,7 +239,7 @@ export default async function ProjectsPage() {
 
       <section className={styles.bottomActions}>
         <a href="/contacto" className={styles.consultButton}>
-          Solicitar asesoria para mi sector
+          Solicitar asesoría para mi sector
         </a>
         <a
           href={`${API_URL}/projects/catalog-pdf/download`}
@@ -253,3 +253,4 @@ export default async function ProjectsPage() {
     </main>
   );
 }
+

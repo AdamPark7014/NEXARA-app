@@ -191,7 +191,7 @@ const ViaticRequestForm = ({ actividadId }: { actividadId: number }) => {
           onDrop={handleDrop}
           className={`${styles.dropzone} ${dragActive ? styles.dropzoneActive : ''}`}
         >
-          <div className={styles.dropTitle}>Arrastra y suelta tu ticket aqui</div>
+          <div className={styles.dropTitle}>Arrastra y suelta tu ticket aquí</div>
           <div className={styles.dropHint}>
             Acepta imagenes o PDF.
           </div>

@@ -50,7 +50,7 @@ export default function ContabilidadViatics() {
       <header className={styles.header}>
         <div>
           <p className={styles.kicker}>Contabilidad</p>
-          <h1 className={styles.title}>Viaticos y gastos</h1>
+          <h1 className={styles.title}>Viáticos y gastos</h1>
           <p className={styles.subtitle}>
             Supervisa solicitudes, aprobaciones y comprobantes con impacto en caja.
           </p>
@@ -76,3 +76,4 @@ export default function ContabilidadViatics() {
     </section>
   );
 }
+

@@ -293,7 +293,7 @@ export default function ContabilidadProyectos() {
           />
           <textarea
             className={styles.textarea}
-            placeholder="Descripcion y alcance"
+            placeholder="Descripción y alcance"
             value={newProject.description}
             onChange={(event) => setNewProject((prev) => ({ ...prev, description: event.target.value }))}
           />
@@ -361,7 +361,7 @@ export default function ContabilidadProyectos() {
               <div className={styles.detailRow}>
                 <div>
                   <h3 className={styles.detailTitle}>{selected.title}</h3>
-                  <p className={styles.detailMeta}>{selected.description || "Sin descripcion"}</p>
+                  <p className={styles.detailMeta}>{selected.description || "Sin descripción"}</p>
                 </div>
                 <div className={styles.progressBlock}>
                   <div>

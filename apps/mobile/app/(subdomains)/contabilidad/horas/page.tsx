@@ -12,7 +12,7 @@ export default function ContabilidadHoras() {
           <p className={styles.kicker}>Contabilidad</p>
           <h1 className={styles.title}>Horas trabajadas</h1>
           <p className={styles.subtitle}>
-            Analisis de jornadas y productividad por usuario para control de costos.
+            Análisis de jornadas y productividad por usuario para control de costos.
           </p>
         </div>
       </header>

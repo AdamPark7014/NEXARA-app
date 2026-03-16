@@ -14,12 +14,7 @@ export const isPlatformAdmin = (user: PanelUser | null | undefined) => {
 
 export const isSalesManagerUser = (user: PanelUser | null | undefined) => {
   if (!user) return false;
-  if (isPlatformAdmin(user)) return true;
-  return hasAnyPermission(user, [
-    PERMISSIONS.SALES_MANAGE,
-    PERMISSIONS.USERS_MANAGE,
-    PERMISSIONS.ATTENDANCE_MANAGE,
-  ]);
+  return isPlatformAdmin(user);
 };
 
 export const getRoleLabel = (user: PanelUser | null | undefined) => {

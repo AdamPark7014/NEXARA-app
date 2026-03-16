@@ -230,10 +230,10 @@ export function ClientTicketsPanel({ embedded = false }: { embedded?: boolean })
     <div style={{ display: 'grid', gap: 16 }}>
       <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2 style={{ margin: 0, color: 'var(--primary)' }}>{panelMode === 'tickets' ? 'Gestion de tickets por cliente' : 'Inventarios y mantenimientos por cliente'}</h2>
+          <h2 style={{ margin: 0, color: 'var(--primary)' }}>{panelMode === 'tickets' ? 'Gestión de tickets por cliente' : 'Inventarios y mantenimientos por cliente'}</h2>
           <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
             {panelMode === 'tickets'
-              ? 'Visualiza estatus, evidencias y tiempos de atencion por cuenta.'
+              ? 'Visualiza estatus, evidencias y tiempos de atención por cuenta.'
               : 'Consulta historial de inventarios por sucursal con comparativa de equipos.'}
           </div>
         </div>
@@ -361,7 +361,7 @@ export function ClientTicketsPanel({ embedded = false }: { embedded?: boolean })
                             Calificacion: {activity.clientFeedback.rating ?? '-'}
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                            Llego a tiempo: {formatAnswer(activity.clientFeedback.wasOnTime)} · Atencion amable: {formatAnswer(activity.clientFeedback.wasFriendly)} · Problema resuelto: {formatAnswer(activity.clientFeedback.wasSolved)}
+                            Llego a tiempo: {formatAnswer(activity.clientFeedback.wasOnTime)} · Atención amable: {formatAnswer(activity.clientFeedback.wasFriendly)} · Problema resuelto: {formatAnswer(activity.clientFeedback.wasSolved)}
                           </div>
                           {activity.clientFeedback.comments && (
                             <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Comentarios: {activity.clientFeedback.comments}</div>
@@ -404,7 +404,7 @@ export function ClientTicketsPanel({ embedded = false }: { embedded?: boolean })
                               <div style={{ padding: 8, fontSize: 12 }}>{evidence.tipoEvidencia}</div>
                               {evidence.latitud && evidence.longitud && (
                                 <div style={{ padding: '0 8px 8px', fontSize: 12 }}>
-                                  <a href={getMapsUrl(evidence.latitud, evidence.longitud)} target="_blank" rel="noreferrer">Ver ubicacion</a>
+                                  <a href={getMapsUrl(evidence.latitud, evidence.longitud)} target="_blank" rel="noreferrer">Ver ubicación</a>
                                 </div>
                               )}
                             </div>
@@ -473,3 +473,5 @@ export function ClientTicketsPanel({ embedded = false }: { embedded?: boolean })
     </RoleGuard>
   );
 }
+
+
