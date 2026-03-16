@@ -12,6 +12,7 @@ import {
   UseInterceptors,
   BadRequestException,
   Res,
+  Query,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -21,6 +22,7 @@ import { ActivitiesService } from './activities.service.js';
 import { UsersService } from '../users/users.service.js';
 import { CreateActivityDto } from './dto/create-activity.dto.js';
 import { UpdateActivityDto } from './dto/update-activity.dto.js';
+import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
 import { ExcelImportService } from '../common/excel-import.service.js';
@@ -43,9 +45,9 @@ export class ActivitiesController {
     @Param('format') format: string,
     res: Response,
   ) {
-    let data;
+    let result: any;
     if (user.isSuperAdmin) {
-      data = await this.activitiesService.findAll();
+      result = await this.activitiesService.findAll();
     } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
       // Admin consola: ve sus propias actividades + actividades de usuarios normales (sin accesoConsoleAdmin)
       const allDeptUsers = await this.usersService.findByDepartment(user.departmentId);
@@ -55,10 +57,11 @@ export class ActivitiesController {
           .filter(u => u.role && !u.role.accesoConsoleAdmin)
           .map(u => u.id),
       ];
-      data = await this.activitiesService.findByAllowedUsers(allowedUserIds);
+      result = await this.activitiesService.findByAllowedUsers(allowedUserIds);
     } else {
-      data = await this.activitiesService.findByResponsible(user.id);
+      result = await this.activitiesService.findByResponsible(user.id);
     }
+    const data: any[] = Array.isArray(result) ? result : result.data;
     if (format === 'xlsx') {
       const buffer = await this.excelExport.exportToExcel(data, 'activities');
       res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -136,9 +139,9 @@ export class ActivitiesController {
   @Get()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_VIEW] })
-  async findAll(@CurrentUser() user: any) {
+  async findAll(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
     if (user.isSuperAdmin) {
-      return this.activitiesService.findAll();
+      return this.activitiesService.findAll(query);
     } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
       // Admin consola: ve sus propias actividades + actividades de usuarios normales (sin accesoConsoleAdmin)
       const allDeptUsers = await this.usersService.findByDepartment(user.departmentId);

@@ -64,6 +64,51 @@ export class CreateRoleDto {
   @IsBoolean()
   @IsOptional()
   accesoCotizaciones?: boolean = false;
+
+  // === ERP Industrial ===
+  @IsBoolean()
+  @IsOptional()
+  accesoInventario?: boolean = false;
+
+  @IsBoolean()
+  @IsOptional()
+  accesoCompras?: boolean = false;
+
+  @IsBoolean()
+  @IsOptional()
+  accesoManufactura?: boolean = false;
+
+  @IsBoolean()
+  @IsOptional()
+  accesoCalidad?: boolean = false;
+
+  @IsBoolean()
+  @IsOptional()
+  accesoMantenimiento?: boolean = false;
+
+  @IsBoolean()
+  @IsOptional()
+  accesoSeguridad?: boolean = false;
+
+  @IsBoolean()
+  @IsOptional()
+  accesoDocumentos?: boolean = false;
+
+  @IsBoolean()
+  @IsOptional()
+  accesoWorkflow?: boolean = false;
+
+  @IsBoolean()
+  @IsOptional()
+  accesoAuditoria?: boolean = false;
+
+  @IsBoolean()
+  @IsOptional()
+  accesoBI?: boolean = false;
+
+  @IsBoolean()
+  @IsOptional()
+  accesoBanca?: boolean = false;
 }
 
 

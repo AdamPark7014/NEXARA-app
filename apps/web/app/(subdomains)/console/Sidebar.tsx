@@ -18,6 +18,7 @@ export default function Sidebar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileOpenGroups, setMobileOpenGroups] = useState<string[]>([]);
+  const [brandLogoSrc, setBrandLogoSrc] = useState("/icon.png");
 
   // Detectar si es móvil
   useEffect(() => {
@@ -108,32 +109,92 @@ export default function Sidebar() {
 
   const profileItems: MenuItem[] = [
     { icon: "👤", label: "Mi perfil", href: "/my-profile", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "⚙️", label: "Mis preferencias", href: "/my-preferences", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
   ];
 
-  const operationItems: MenuItem[] = [
+  // ── Empleado (auto-servicio) ──────────────────────────
+  const employeeItems: MenuItem[] = [
     { icon: "📊", label: "Resumen ejecutivo", href: "/dashboard", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "🗂️", label: "Operación: actividades", href: "/activities", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "📸", label: "Evidencias de servicio", href: "/evidences", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "💼", label: "Viáticos operativos", href: "/viatics", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "🚗", label: "Control vehicular", href: "/vehicles", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "📋", label: "Mis actividades", href: "/my-activities", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "📸", label: "Mis evidencias", href: "/my-evidences", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "💼", label: "Mis viáticos", href: "/my-viatics", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🚗", label: "Mis vehículos", href: "/my-vehicles", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🍽️", label: "Breaks y comidas", href: "/my-lunch-breaks", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+  ];
+
+  // ── Operación (supervisión) ────────────────────────────
+  const operationItems: MenuItem[] = [
+    { icon: "🗂️", label: "Operación: actividades", href: "/activities", anyPermissions: [PERMISSIONS.ACTIVITIES_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "📸", label: "Evidencias de servicio", href: "/evidences", anyPermissions: [PERMISSIONS.EVIDENCES_REVIEW, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "💼", label: "Viáticos operativos", href: "/viatics", anyPermissions: [PERMISSIONS.VIATICS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🚗", label: "Control vehicular", href: "/vehicles", anyPermissions: [PERMISSIONS.VEHICLES_REVIEW, PERMISSIONS.VEHICLES_INVENTORY, PERMISSIONS.CONSOLE_ADMIN] },
     { icon: "🛰️", label: "Monitoreo GPS", href: "/gps", permissions: [PERMISSIONS.GPS_VIEW] },
+    { icon: "📋", label: "Hojas de servicio", href: "/service-sheets", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
   ];
 
   const peopleItems: MenuItem[] = [
-    { icon: "🕒", label: "Asistencia", href: "/attendance", permissions: [PERMISSIONS.ATTENDANCE_VIEW] },
-    { icon: "⚖️", label: "Multas y sanciones", href: "/fines", anyPermissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🕒", label: "Asistencia", href: "/attendance", anyPermissions: [PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.ATTENDANCE_MANAGE] },
+    { icon: "🍽️", label: "Gestión de breaks", href: "/lunch-breaks", anyPermissions: [PERMISSIONS.LUNCH_BREAKS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "⚖️", label: "Multas y sanciones", href: "/fines", anyPermissions: [PERMISSIONS.FINES_VIEW, PERMISSIONS.FINES_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
     { icon: "📄", label: "Gestión de CVs", href: "/cvs", anyPermissions: [PERMISSIONS.CVS_MANAGE, PERMISSIONS.CVS_ADMIN_REVIEW, PERMISSIONS.CVS_SUPERADMIN_REVIEW, PERMISSIONS.CONSOLE_ADMIN] },
     { icon: "🧑‍💼", label: "Gestión de usuarios", href: "/users", permissions: [PERMISSIONS.USERS_MANAGE] },
+    { icon: "👥", label: "Permisos y evaluaciones", href: "/hr", anyPermissions: [PERMISSIONS.HR_VIEW, PERMISSIONS.HR_MANAGE] },
   ];
 
   const commercialItems: MenuItem[] = [
-    { icon: "🏢", label: "Clientes corporativos", href: "/clients", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🏢", label: "Clientes corporativos", href: "/clients", anyPermissions: [PERMISSIONS.CLIENTS_VIEW, PERMISSIONS.CLIENTS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🔧", label: "Clientes de servicio", href: "/service-clients", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🎫", label: "Tickets de clientes", href: "/client-tickets", anyPermissions: [PERMISSIONS.CLIENTS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
     { icon: "🧾", label: "Cotizaciones", href: "/cotizaciones", permissions: [PERMISSIONS.COTIZACIONES_ACCESS] },
-    { icon: "📈", label: "Gestión comercial", href: "/gestion-vendedores", anyPermissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "📈", label: "Gestión comercial", href: "/gestion-vendedores", anyPermissions: [PERMISSIONS.SALES_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "📬", label: "Mensajes de contacto", href: "/contact-messages", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
   ];
 
   const systemItems: MenuItem[] = [
-    { icon: "🛠️", label: "Herramientas internas", href: "/tools", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🛠️", label: "Herramientas internas", href: "/tools", anyPermissions: [PERMISSIONS.TOOLS_VIEW, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "📰", label: "Noticias y comunicados", href: "/news", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "📧", label: "Newsletter", href: "/newsletter", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🔧", label: "Configuración del sistema", href: "/settings", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+  ];
+
+  // ── ERP Industrial ──────────────────────────────────────
+  const inventoryItems: MenuItem[] = [
+    { icon: "🏭", label: "Almacenes", href: "/warehouse", anyPermissions: [PERMISSIONS.WAREHOUSE_VIEW, PERMISSIONS.WAREHOUSE_MANAGE] },
+    { icon: "📦", label: "Inventario / Stock", href: "/stock", anyPermissions: [PERMISSIONS.STOCK_VIEW, PERMISSIONS.STOCK_MANAGE] },
+    { icon: "🛒", label: "Compras y requisiciones", href: "/procurement", anyPermissions: [PERMISSIONS.PROCUREMENT_VIEW, PERMISSIONS.PROCUREMENT_MANAGE] },
+    { icon: "📊", label: "Dashboard compras", href: "/procurement/dashboard", anyPermissions: [PERMISSIONS.PROCUREMENT_VIEW, PERMISSIONS.PROCUREMENT_MANAGE] },
+  ];
+
+  const productionItems: MenuItem[] = [
+    { icon: "⚙️", label: "Manufactura / BOM", href: "/manufacturing", anyPermissions: [PERMISSIONS.MANUFACTURING_VIEW, PERMISSIONS.BOM_MANAGE] },
+    { icon: "🏭", label: "Ordenes de produccion", href: "/production", anyPermissions: [PERMISSIONS.PRODUCTION_MANAGE, PERMISSIONS.MANUFACTURING_VIEW] },
+    { icon: "📅", label: "Planificacion produccion", href: "/production/schedule", anyPermissions: [PERMISSIONS.MANUFACTURING_VIEW, PERMISSIONS.PRODUCTION_MANAGE] },
+    { icon: "✅", label: "Control de calidad", href: "/quality", anyPermissions: [PERMISSIONS.QUALITY_VIEW, PERMISSIONS.QUALITY_INSPECT] },
+    { icon: "📊", label: "Dashboard calidad", href: "/quality/dashboard", anyPermissions: [PERMISSIONS.QUALITY_VIEW, PERMISSIONS.QUALITY_INSPECT] },
+  ];
+
+  const maintenanceItems: MenuItem[] = [
+    { icon: "🔧", label: "Activos y equipos", href: "/assets", anyPermissions: [PERMISSIONS.ASSETS_VIEW, PERMISSIONS.ASSETS_MANAGE] },
+    { icon: "�", label: "Depreciación de activos", href: "/assets/depreciation", anyPermissions: [PERMISSIONS.ASSETS_VIEW, PERMISSIONS.ASSETS_MANAGE] },
+    { icon: "�📋", label: "Ordenes de mantenimiento", href: "/maintenance", anyPermissions: [PERMISSIONS.MAINTENANCE_VIEW, PERMISSIONS.MAINTENANCE_MANAGE] },
+  ];
+
+  const financeItems: MenuItem[] = [
+    { icon: "📒", label: "Contabilidad (GL)", href: "/accounting", anyPermissions: [PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE] },
+    { icon: "💰", label: "Nómina y pagos", href: "/employee-payments", anyPermissions: [PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "📊", label: "Gastos operativos", href: "/expenses", anyPermissions: [PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🏗️", label: "Proyectos de obra", href: "/work-projects", anyPermissions: [PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🧾", label: "Facturacion", href: "/invoicing", anyPermissions: [PERMISSIONS.INVOICING_VIEW, PERMISSIONS.INVOICING_MANAGE] },
+    { icon: "🏦", label: "Banca y conciliaciones", href: "/banking", anyPermissions: [PERMISSIONS.BANKING_VIEW, PERMISSIONS.BANKING_MANAGE] },
+    { icon: "📈", label: "Reportes financieros", href: "/accounting/reports", anyPermissions: [PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE] },
+  ];
+
+  const complianceItems: MenuItem[] = [
+    { icon: "🦺", label: "Seguridad industrial", href: "/safety", anyPermissions: [PERMISSIONS.SAFETY_VIEW, PERMISSIONS.SAFETY_MANAGE] },
+    { icon: "📑", label: "Gestion documental", href: "/documents", anyPermissions: [PERMISSIONS.DOCUMENTS_VIEW, PERMISSIONS.DOCUMENTS_MANAGE] },
+    { icon: "🔄", label: "Flujos de aprobacion", href: "/workflow", anyPermissions: [PERMISSIONS.WORKFLOW_VIEW, PERMISSIONS.WORKFLOW_MANAGE] },
+    { icon: "🔍", label: "Auditoria", href: "/audit", permissions: [PERMISSIONS.AUDIT_VIEW] },
+    { icon: "📊", label: "BI y Analytics", href: "/analytics", anyPermissions: [PERMISSIONS.BI_VIEW, PERMISSIONS.BI_MANAGE] },
   ];
 
   const groups: MenuGroup[] = [
@@ -143,8 +204,13 @@ export default function Sidebar() {
       items: profileItems,
     },
     {
+      id: "employee",
+      title: "Mi espacio de trabajo",
+      items: employeeItems,
+    },
+    {
       id: "operations",
-      title: "Operación y seguimiento",
+      title: "Supervisión operativa",
       items: operationItems,
     },
     {
@@ -159,8 +225,33 @@ export default function Sidebar() {
     },
     {
       id: "system",
-      title: "Administración interna",
+      title: "Administracion interna",
       items: systemItems,
+    },
+    {
+      id: "inventory",
+      title: "Inventario y compras",
+      items: inventoryItems,
+    },
+    {
+      id: "production",
+      title: "Produccion y calidad",
+      items: productionItems,
+    },
+    {
+      id: "maintenance",
+      title: "Mantenimiento (CMMS)",
+      items: maintenanceItems,
+    },
+    {
+      id: "finance",
+      title: "Finanzas y banca",
+      items: financeItems,
+    },
+    {
+      id: "compliance",
+      title: "Cumplimiento y BI",
+      items: complianceItems,
     },
   ];
 
@@ -199,7 +290,12 @@ export default function Sidebar() {
       {/* Header del Sidebar con Logo y Hamburguesa */}
       <div className={styles.sidebarHeader}>
         <div className={styles.sidebarLogo}>
-          <img src="/logo-nexara.png" alt="NEXARA" className={styles.brandLogo} />
+          <img
+            src={brandLogoSrc}
+            alt="NEXARA"
+            className={styles.brandLogo}
+            onError={() => setBrandLogoSrc("/icon.png")}
+          />
           <span className={styles.brandMark}>NEXARA</span>
           {isMobile && <span className={styles.brandSub}>Consola</span>}
         </div>
@@ -299,6 +395,13 @@ export default function Sidebar() {
         ))}
         <div className={styles.sidebarFooter}>
           <div className={styles.sidebarFooterActions}>
+            <Link
+              href="/paneles"
+              className={styles.menuLink}
+              onClick={closeMenu}
+            >
+              Cambiar panel
+            </Link>
             <button
               onClick={toggleDarkMode}
               className={styles.themeSwitcher}

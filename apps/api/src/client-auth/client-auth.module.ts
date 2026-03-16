@@ -4,12 +4,17 @@ import { PrismaModule } from '../prisma/prisma.module.js';
 import { ClientAuthController } from './client-auth.controller.js';
 import { ClientAuthService } from './client-auth.service.js';
 
+const jwtSecret = process.env['JWT_SECRET'];
+if (!jwtSecret) {
+  throw new Error('JWT_SECRET environment variable is required');
+}
+
 @Module({
   imports: [
     PrismaModule,
     JwtModule.register({
-      secret: process.env['JWT_SECRET'] || 'default_secret',
-      signOptions: { expiresIn: '7d' },
+      secret: jwtSecret,
+      signOptions: { expiresIn: '4h' },
     }),
   ],
   controllers: [ClientAuthController],

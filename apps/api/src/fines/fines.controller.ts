@@ -6,6 +6,7 @@ import {
   Delete,
   Param,
   Body,
+  Query,
   UseGuards,
   ForbiddenException,
 } from '@nestjs/common';
@@ -14,6 +15,7 @@ import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { FinesService, CreateFineDto, UpdateFineDto } from './fines.service';
 import { PERMISSIONS } from '../common/permissions.js';
+import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 
 @Controller('fines')
 @UseGuards(RbacGuard)
@@ -31,7 +33,7 @@ export class FinesController {
 
   @Get()
   @UseGuards(AuthGuard('jwt'))
-  async findAll(@CurrentUser() user: any) {
+  async findAll(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
     // Solo admins ven todas las multas
     if (
       !user?.isSuperAdmin &&
@@ -40,7 +42,7 @@ export class FinesController {
       return this.finesService.findByUser(user?.id || 0);
     }
     // Pasar el usuario para aplicar filtros jerárquicos
-    return this.finesService.findAll(user);
+    return this.finesService.findAll(user, query);
   }
 
   @Get('user/:usuarioId')

@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { CreateEmployeePaymentDto } from './dto/create-employee-payment.dto.js';
 import { PERMISSIONS } from '../common/permissions.js';
 
@@ -29,6 +30,7 @@ export class EmployeePaymentsService {
   async findAll(
     user: { id: number; departmentId: number; isSuperAdmin?: boolean; permissions?: string[] },
     filters: { from?: string; to?: string; userId?: number },
+    query?: PaginationQueryDto,
   ) {
     const fromDate = this.toDate(filters.from);
     const toDate = this.toDate(filters.to);
@@ -50,6 +52,14 @@ export class EmployeePaymentsService {
 
     if (!this.canViewAll(user)) {
       where.user = { departmentId: user.departmentId };
+    }
+
+    if (query?.limit) {
+      const [data, total] = await Promise.all([
+        this.prisma.employeePayment.findMany({ where, include: { user: true, createdBy: true }, orderBy: { createdAt: 'desc' }, skip: query.skip, take: query.take }),
+        this.prisma.employeePayment.count({ where }),
+      ]);
+      return buildPaginatedResponse(data, total, query);
     }
 
     return this.prisma.employeePayment.findMany({

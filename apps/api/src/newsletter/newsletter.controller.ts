@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { NewsletterService } from './newsletter.service.js';
 import { NewsletterSubscribeDto } from './dto/newsletter-subscribe.dto.js';
+import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 
 @Controller('newsletter')
 export class NewsletterController {
@@ -12,7 +13,7 @@ export class NewsletterController {
   }
 
   @Get()
-  list(@Query('search') search?: string) {
-    return this.newsletterService.list(search);
+  list(@Query('search') search?: string, @Query() query?: PaginationQueryDto) {
+    return this.newsletterService.list(search, query);
   }
 }

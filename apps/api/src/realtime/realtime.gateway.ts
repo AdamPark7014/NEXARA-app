@@ -1,5 +1,6 @@
 import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server } from 'socket.io';
+import * as jwt from 'jsonwebtoken';
 import {
   createInMemoryWsConnectionGuard,
   getClientIpFromRequestMeta,
@@ -45,6 +46,33 @@ export class RealtimeGateway {
     const connectionAttempt = wsConnectionGuard.open(ip);
     if (!connectionAttempt.allowed) {
       client.disconnect(true);
+      return;
+    }
+
+    // ── JWT Authentication ──────────────────────────────
+    const token =
+      client?.handshake?.auth?.token ||
+      client?.handshake?.headers?.authorization?.replace(/^Bearer\s+/i, '');
+    const secret = process.env['JWT_SECRET'];
+
+    if (!token || !secret) {
+      client.disconnect(true);
+      return;
+    }
+
+    try {
+      const payload = jwt.verify(token, secret) as Record<string, unknown>;
+      const userId = payload.sub;
+      const departmentId = payload.departmentId;
+
+      // Join user and department rooms for scoped broadcasts
+      if (userId) client.join(`user:${userId}`);
+      if (departmentId) client.join(`dept:${departmentId}`);
+      client.join('authenticated');
+      (client as any).__userId = userId;
+      (client as any).__departmentId = departmentId;
+    } catch {
+      client.disconnect(true);
     }
   }
 
@@ -56,7 +84,18 @@ export class RealtimeGateway {
     wsConnectionGuard.close(ip);
   }
 
+  /** Emit to all authenticated clients (default). */
   emit(event: string, payload: unknown) {
-    this.server.emit(event, payload);
+    this.server.to('authenticated').emit(event, payload);
+  }
+
+  /** Emit to a specific user room. */
+  emitToUser(userId: number | string, event: string, payload: unknown) {
+    this.server.to(`user:${userId}`).emit(event, payload);
+  }
+
+  /** Emit to a specific department room. */
+  emitToDepartment(departmentId: number | string, event: string, payload: unknown) {
+    this.server.to(`dept:${departmentId}`).emit(event, payload);
   }
 }

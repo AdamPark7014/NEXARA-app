@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 
 @Injectable()
@@ -59,49 +60,37 @@ export class ViaticosService {
     return viatico;
   }
 
-  async findAll(currentUser?: any) {
-    // SuperAdmin ve todos los viáticos
+  async findAll(currentUser?: any, query?: PaginationQueryDto) {
+    const include = { Activity: true, User: true };
+    let where: any = undefined;
+
     if (currentUser?.isSuperAdmin) {
-      const data = await this.prisma['viatico'].findMany({
-        include: { Activity: true, User: true },
-      });
-      return data.map((row: any) => ({
-        ...row,
-        actividad: row.Activity,
-        usuario: row.User,
-      }));
-    }
-
-    // Admin solo ve viáticos de usuarios regulares de su departamento
-    if (currentUser?.permissions?.includes('CONSOLE_ADMIN')) {
-      const data = await this.prisma['viatico'].findMany({
-        where: {
-          User: {
-            AND: [
-              { departmentId: currentUser.departmentId },
-              { role: { accesoConsoleAdmin: false } },
-            ],
-          },
+      where = undefined;
+    } else if (currentUser?.permissions?.includes('CONSOLE_ADMIN')) {
+      where = {
+        User: {
+          AND: [
+            { departmentId: currentUser.departmentId },
+            { role: { accesoConsoleAdmin: false } },
+          ],
         },
-        include: { Activity: true, User: true },
-      });
-      return data.map((row: any) => ({
-        ...row,
-        actividad: row.Activity,
-        usuario: row.User,
-      }));
+      };
+    } else {
+      where = { usuarioId: currentUser?.id };
     }
 
-    // Usuario normal solo ve sus propios viáticos
-    const data = await this.prisma['viatico'].findMany({
-      where: { usuarioId: currentUser?.id },
-      include: { Activity: true, User: true },
-    });
-    return data.map((row: any) => ({
-      ...row,
-      actividad: row.Activity,
-      usuario: row.User,
-    }));
+    const mapRow = (row: any) => ({ ...row, actividad: row.Activity, usuario: row.User });
+
+    if (query?.limit) {
+      const [data, total] = await Promise.all([
+        this.prisma['viatico'].findMany({ where, include, orderBy: { fechaSolicitud: 'desc' }, skip: query.skip, take: query.take }),
+        this.prisma['viatico'].count({ where }),
+      ]);
+      return buildPaginatedResponse(data.map(mapRow), total, query);
+    }
+
+    const data = await this.prisma['viatico'].findMany({ where, include });
+    return data.map(mapRow);
   }
 
   async findByDepartment(departmentId: number) {

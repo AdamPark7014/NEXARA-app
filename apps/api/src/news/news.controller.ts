@@ -20,6 +20,7 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import { createReadStream } from 'fs';
 import { NewsService } from './news.service.js';
+import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { CreateNewsPostDto } from './dto/create-news-post.dto.js';
 import { UpdateNewsPostDto } from './dto/update-news-post.dto.js';
 
@@ -64,8 +65,8 @@ export class NewsController {
   }
 
   @Get()
-  list(@Query('search') search?: string, @Query('status') status?: string) {
-    return this.newsService.list(search, status);
+  list(@Query('search') search?: string, @Query('status') status?: string, @Query() query?: PaginationQueryDto) {
+    return this.newsService.list(search, status, query);
   }
 
   @Get('image/:filename')

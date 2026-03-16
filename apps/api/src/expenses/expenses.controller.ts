@@ -8,8 +8,10 @@ import {
   Delete,
   UseGuards,
   ForbiddenException,
+  Query,
 } from '@nestjs/common';
 import { ExpensesService } from './expenses.service.js';
+import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { CreateExpenseDto } from './dto/create-expense.dto.js';
 import { UpdateExpenseDto } from './dto/update-expense.dto.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
@@ -33,11 +35,11 @@ export class ExpensesController {
   @Get()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
-  findAll(@CurrentUser() user: any) {
+  findAll(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
     if (user.isSuperAdmin) {
-      return this.expensesService.findAll();
+      return this.expensesService.findAll(query);
     } else {
-      return this.expensesService.findByDepartment(user.departmentId);
+      return this.expensesService.findByDepartment(user.departmentId, query);
     }
   }
 

@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { CotizacionesService } from '../cotizaciones/cotizaciones.service.js';
 import { PdfGeneratorService } from './pdf-generator.service.js';
 import { generateSalesReportPdf } from './sales-report-pdf.js';
@@ -253,11 +254,20 @@ export class VentasService {
     });
   }
 
-  async listClients(user?: any, ownerId?: number) {
+  async listClients(user?: any, ownerId?: number, query?: PaginationQueryDto) {
+    const where = this.buildScopedOwnerWhere(user, ownerId);
+    const include = { documents: true, opportunities: true };
+    if (query?.limit) {
+      const [data, total] = await Promise.all([
+        this.prisma.salesClient.findMany({ where, orderBy: { updatedAt: 'desc' }, include, skip: query.skip, take: query.take }),
+        this.prisma.salesClient.count({ where }),
+      ]);
+      return buildPaginatedResponse(data, total, query);
+    }
     return this.prisma.salesClient.findMany({
-      where: this.buildScopedOwnerWhere(user, ownerId),
+      where,
       orderBy: { updatedAt: 'desc' },
-      include: { documents: true, opportunities: true },
+      include,
     });
   }
 
@@ -338,11 +348,20 @@ export class VentasService {
     });
   }
 
-  async listLeads(user?: any, ownerId?: number) {
+  async listLeads(user?: any, ownerId?: number, query?: PaginationQueryDto) {
+    const where = this.buildScopedOwnerWhere(user, ownerId);
+    const include = { client: true, opportunities: true };
+    if (query?.limit) {
+      const [data, total] = await Promise.all([
+        this.prisma.salesLead.findMany({ where, orderBy: { updatedAt: 'desc' }, include, skip: query.skip, take: query.take }),
+        this.prisma.salesLead.count({ where }),
+      ]);
+      return buildPaginatedResponse(data, total, query);
+    }
     return this.prisma.salesLead.findMany({
-      where: this.buildScopedOwnerWhere(user, ownerId),
+      where,
       orderBy: { updatedAt: 'desc' },
-      include: { client: true, opportunities: true },
+      include,
     });
   }
 
@@ -402,11 +421,20 @@ export class VentasService {
     });
   }
 
-  async listOpportunities(user?: any, ownerId?: number) {
+  async listOpportunities(user?: any, ownerId?: number, query?: PaginationQueryDto) {
+    const where = this.buildScopedOwnerWhere(user, ownerId);
+    const include = { client: true, lead: true, notes: true, evidences: true, quotes: true };
+    if (query?.limit) {
+      const [data, total] = await Promise.all([
+        this.prisma.salesOpportunity.findMany({ where, orderBy: { updatedAt: 'desc' }, include, skip: query.skip, take: query.take }),
+        this.prisma.salesOpportunity.count({ where }),
+      ]);
+      return buildPaginatedResponse(data, total, query);
+    }
     return this.prisma.salesOpportunity.findMany({
-      where: this.buildScopedOwnerWhere(user, ownerId),
+      where,
       orderBy: { updatedAt: 'desc' },
-      include: { client: true, lead: true, notes: true, evidences: true, quotes: true },
+      include,
     });
   }
 
@@ -538,11 +566,20 @@ export class VentasService {
     });
   }
 
-  async listProjects(user?: any, ownerId?: number) {
+  async listProjects(user?: any, ownerId?: number, query?: PaginationQueryDto) {
+    const where = this.buildScopedProjectOwnerWhere(user, ownerId);
+    const include = { opportunity: true };
+    if (query?.limit) {
+      const [data, total] = await Promise.all([
+        this.prisma.salesProject.findMany({ where, orderBy: { updatedAt: 'desc' }, include, skip: query.skip, take: query.take }),
+        this.prisma.salesProject.count({ where }),
+      ]);
+      return buildPaginatedResponse(data, total, query);
+    }
     return this.prisma.salesProject.findMany({
-      where: this.buildScopedProjectOwnerWhere(user, ownerId),
+      where,
       orderBy: { updatedAt: 'desc' },
-      include: { opportunity: true },
+      include,
     });
   }
 
@@ -1289,7 +1326,14 @@ export class VentasService {
     });
   }
 
-  async listOrderTemplates() {
+  async listOrderTemplates(query?: PaginationQueryDto) {
+    if (query?.limit) {
+      const [data, total] = await Promise.all([
+        this.prisma.orderTemplate.findMany({ orderBy: { createdAt: 'desc' }, include: { createdBy: true }, skip: query.skip, take: query.take }),
+        this.prisma.orderTemplate.count(),
+      ]);
+      return buildPaginatedResponse(data, total, query);
+    }
     return this.prisma.orderTemplate.findMany({
       orderBy: { createdAt: 'desc' },
       include: { createdBy: true },

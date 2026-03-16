@@ -31,6 +31,7 @@ import {
   SuperadminReviewCvDto,
 } from './dto/review-cv.dto.js';
 import { CvsService } from './cvs.service.js';
+import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 
 @Controller('cvs')
 @UseGuards(AuthGuard('jwt'), RbacGuard)
@@ -100,8 +101,9 @@ export class CvsController {
     @Query('stage') stage?: string,
     @Query('employmentStatus') employmentStatus?: string,
     @Query('onlyMine') onlyMine?: string,
+    @Query() pagination?: PaginationQueryDto,
   ) {
-    return this.cvsService.list(user, { search, category, stage, employmentStatus, onlyMine });
+    return this.cvsService.list(user, { search, category, stage, employmentStatus, onlyMine }, pagination);
   }
 
   @Get('summary/stats')

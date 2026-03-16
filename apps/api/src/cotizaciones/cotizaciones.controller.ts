@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Query, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { CotizacionesService } from './cotizaciones.service.js';
 import { CreateCotizacionDto } from './dto/create-cotizacion.dto.js';
@@ -8,6 +8,7 @@ import { SignCotizacionDto } from './dto/sign-cotizacion.dto.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 
 @Controller('cotizaciones')
 export class CotizacionesController {
@@ -23,8 +24,8 @@ export class CotizacionesController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
   @Get()
-  findAll() {
-    return this.cotizacionesService.findAll();
+  findAll(@Query() query: PaginationQueryDto) {
+    return this.cotizacionesService.findAll(query);
   }
 
   @UseGuards(RbacGuard)

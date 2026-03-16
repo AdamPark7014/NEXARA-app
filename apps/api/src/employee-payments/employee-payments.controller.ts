@@ -16,6 +16,7 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { EmployeePaymentsService } from './employee-payments.service.js';
 import { CreateEmployeePaymentDto } from './dto/create-employee-payment.dto.js';
+import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 
 @Controller('employee-payments')
 export class EmployeePaymentsController {
@@ -29,12 +30,13 @@ export class EmployeePaymentsController {
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('userId') userId?: string,
+    @Query() query?: PaginationQueryDto,
   ) {
     const parsedUserId = userId ? Number(userId) : undefined;
     if (userId && Number.isNaN(parsedUserId)) {
       throw new BadRequestException('Empleado invalido');
     }
-    return this.service.findAll(user, { from, to, userId: parsedUserId });
+    return this.service.findAll(user, { from, to, userId: parsedUserId }, query);
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)

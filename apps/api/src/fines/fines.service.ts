@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
 
@@ -61,69 +62,51 @@ export class FinesService {
     return fine;
   }
 
-  async findAll(currentUser?: any) {
-    // SuperAdmin ve todas las multas
+  async findAll(currentUser?: any, query?: PaginationQueryDto) {
+    const include = {
+      usuario: {
+        select: {
+          id: true,
+          nombre: true,
+          email: true,
+          departmentId: true,
+          role: {
+            select: {
+              id: true,
+              nombre: true,
+              accesoConsoleAdmin: true,
+            },
+          },
+        },
+      },
+    };
+
+    let where: any = undefined;
+
     if (currentUser?.isSuperAdmin) {
-      return this.prisma.fine.findMany({
-        include: {
-          usuario: {
-            select: {
-              id: true,
-              nombre: true,
-              email: true,
-              departmentId: true,
-              role: {
-                select: {
-                  id: true,
-                  nombre: true,
-                  accesoConsoleAdmin: true,
-                },
-              },
-            },
-          },
+      where = undefined;
+    } else if (currentUser?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
+      where = {
+        usuario: {
+          AND: [
+            { departmentId: currentUser.departmentId },
+            { role: { accesoConsoleAdmin: false } },
+          ],
         },
-        orderBy: {
-          fechaCreacion: 'desc',
-        },
-      });
+      };
+    } else {
+      return [];
     }
 
-    // Admin solo ve multas de usuarios regulares de su departamento
-    if (currentUser?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
-      return this.prisma.fine.findMany({
-        where: {
-          usuario: {
-            AND: [
-              { departmentId: currentUser.departmentId },
-              { role: { accesoConsoleAdmin: false } },
-            ],
-          },
-        },
-        include: {
-          usuario: {
-            select: {
-              id: true,
-              nombre: true,
-              email: true,
-              departmentId: true,
-              role: {
-                select: {
-                  id: true,
-                  nombre: true,
-                  accesoConsoleAdmin: true,
-                },
-              },
-            },
-          },
-        },
-        orderBy: {
-          fechaCreacion: 'desc',
-        },
-      });
+    if (query?.limit) {
+      const [data, total] = await Promise.all([
+        this.prisma.fine.findMany({ where, include, orderBy: { fechaCreacion: 'desc' }, skip: query.skip, take: query.take }),
+        this.prisma.fine.count({ where }),
+      ]);
+      return buildPaginatedResponse(data, total, query);
     }
 
-    // Fallback: devolver vacío
-    return [];
+    return this.prisma.fine.findMany({ where, include, orderBy: { fechaCreacion: 'desc' } });
   }
 
   async findByUser(usuarioId: number) {

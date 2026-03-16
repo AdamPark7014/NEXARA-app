@@ -206,7 +206,7 @@ export default function Dashboard() {
     }
   }, [availableUsers, isSuperAdmin, normalizedUserId, selectedUserId]);
 
-  const fetchAll = useCallback(async () => {
+  const fetchAll = useCallback(async (signal?: AbortSignal) => {
     if (!user?.token) return;
     setLoading(true);
     setError(null);
@@ -218,12 +218,12 @@ export default function Dashboard() {
       const canViewAttendance = hasPermission(user, PERMISSIONS.ATTENDANCE_VIEW);
 
       const [viaticsRes, activitiesRes, attendanceRes] = await Promise.all([
-        fetch(buildApiUrl('viatics'), { headers }),
-        fetch(buildApiUrl('activities'), { headers }),
+        fetch(buildApiUrl('viatics'), { headers, signal }),
+        fetch(buildApiUrl('activities'), { headers, signal }),
         canManageAttendance
-          ? fetch(buildApiUrl(`attendance/hierarchy/range?${params.toString()}`), { headers })
+          ? fetch(buildApiUrl(`attendance/hierarchy/range?${params.toString()}`), { headers, signal })
           : canViewAttendance
-            ? fetch(buildApiUrl(`attendance/range?${params.toString()}`), { headers })
+            ? fetch(buildApiUrl(`attendance/range?${params.toString()}`), { headers, signal })
             : Promise.resolve(null),
       ]);
 
@@ -280,13 +280,18 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!user?.token) return;
-    fetchAll();
+    const controller = new AbortController();
+    fetchAll(controller.signal);
+    return () => controller.abort();
   }, [user?.token, fetchAll]);
 
   useEffect(() => {
     if (!user?.token) return;
 
-    const socket: Socket = io(getSocketBaseUrl(), { transports: ['polling', 'websocket'] });
+    const socket: Socket = io(getSocketBaseUrl(), {
+      transports: ['polling', 'websocket'],
+      auth: { token: user.token },
+    });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
     const scheduleRefresh = () => {

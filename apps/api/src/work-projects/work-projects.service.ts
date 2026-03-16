@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, WorkProjectStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { CreateWorkProjectDto } from './dto/create-work-project.dto.js';
 import { UpdateWorkProjectDto } from './dto/update-work-project.dto.js';
 import { CreateWorkProjectExpenseDto } from './dto/create-work-project-expense.dto.js';
@@ -57,14 +58,19 @@ export class WorkProjectsService {
     });
   }
 
-  async findAll() {
+  async findAll(query?: PaginationQueryDto) {
+    const include = { expenses: { orderBy: { incurredAt: 'desc' } as const }, payroll: { orderBy: { paidAt: 'desc' } as const }, logs: { orderBy: { createdAt: 'desc' } as const } };
+    if (query?.limit) {
+      const where = query.search ? { title: { contains: query.search, mode: 'insensitive' as const } } : undefined;
+      const [data, total] = await Promise.all([
+        this.prisma.workProject.findMany({ where, orderBy: { createdAt: 'desc' }, include, skip: query.skip, take: query.take }),
+        this.prisma.workProject.count({ where }),
+      ]);
+      return buildPaginatedResponse(data, total, query);
+    }
     return this.prisma.workProject.findMany({
       orderBy: { createdAt: 'desc' },
-      include: {
-        expenses: { orderBy: { incurredAt: 'desc' } },
-        payroll: { orderBy: { paidAt: 'desc' } },
-        logs: { orderBy: { createdAt: 'desc' } },
-      },
+      include,
     });
   }
 

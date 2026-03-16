@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { PERMISSIONS } from '../common/permissions.js';
 
 type CurrentUser = {
@@ -118,6 +119,7 @@ export class CvsService {
       employmentStatus?: string;
       onlyMine?: string;
     },
+    pagination?: PaginationQueryDto,
   ) {
     this.ensureRecruiterAccess(user);
 
@@ -141,16 +143,23 @@ export class CvsService {
       ];
     }
 
-    const rows = await this.cv.findMany({
-      where,
-      orderBy: [{ stage: 'asc' }, { sortOrder: 'asc' }, { updatedAt: 'desc' }],
-      include: {
-        createdBy: { select: { id: true, nombre: true, email: true } },
-        recruiterReviewedBy: { select: { id: true, nombre: true, email: true } },
-        adminReviewedBy: { select: { id: true, nombre: true, email: true } },
-        superadminReviewedBy: { select: { id: true, nombre: true, email: true } },
-      },
-    });
+    const include = {
+      createdBy: { select: { id: true, nombre: true, email: true } },
+      recruiterReviewedBy: { select: { id: true, nombre: true, email: true } },
+      adminReviewedBy: { select: { id: true, nombre: true, email: true } },
+      superadminReviewedBy: { select: { id: true, nombre: true, email: true } },
+    };
+    const orderBy = [{ stage: 'asc' as const }, { sortOrder: 'asc' as const }, { updatedAt: 'desc' as const }];
+
+    if (pagination?.limit) {
+      const [data, total] = await Promise.all([
+        this.cv.findMany({ where, orderBy, include, skip: pagination.skip, take: pagination.take }),
+        this.cv.count({ where }),
+      ]);
+      return buildPaginatedResponse(data, total, pagination);
+    }
+
+    const rows = await this.cv.findMany({ where, orderBy, include });
 
     return rows;
   }

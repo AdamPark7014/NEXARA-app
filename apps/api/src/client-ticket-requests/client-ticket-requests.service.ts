@@ -1,16 +1,25 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ActivityWorkType, ClientTicketStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 
 @Injectable()
 export class ClientTicketRequestsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(status?: ClientTicketStatus) {
+  async findAll(status?: ClientTicketStatus, query?: PaginationQueryDto) {
     const where = status ? { status } : undefined;
+    const include = { client: true, branch: true, activity: true };
+    if (query?.limit) {
+      const [data, total] = await Promise.all([
+        this.prisma['clientTicketRequest'].findMany({ where, include, orderBy: { createdAt: 'desc' }, skip: query.skip, take: query.take }),
+        this.prisma['clientTicketRequest'].count({ where }),
+      ]);
+      return buildPaginatedResponse(data, total, query);
+    }
     return this.prisma['clientTicketRequest'].findMany({
       where,
-      include: { client: true, branch: true, activity: true },
+      include,
       orderBy: { createdAt: 'desc' },
     });
   }

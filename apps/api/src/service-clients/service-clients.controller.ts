@@ -7,6 +7,7 @@ import {
   ParseIntPipe,
   Post,
   Put,
+  Query,
   Res,
   Req,
   UploadedFile,
@@ -24,6 +25,7 @@ import { CreateServiceClientDto } from './dto/create-service-client.dto.js';
 import { UpdateServiceClientDto } from './dto/update-service-client.dto.js';
 import { ServiceClientsService } from './service-clients.service.js';
 import { Request } from 'express';
+import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 
 // Resuelve la ruta absoluta a /uploads/clients en la raíz del proyecto y asegura su existencia
 const ensureUploadsDir = () => {
@@ -87,8 +89,8 @@ export class ServiceClientsController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
   @Get()
-  findAll() {
-    return this.serviceClientsService.findAll();
+  findAll(@Query() query: PaginationQueryDto) {
+    return this.serviceClientsService.findAll(query);
   }
 
   @UseGuards(RbacGuard)

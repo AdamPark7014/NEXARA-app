@@ -2,7 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { ValidationPipe } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as express from 'express';
+import * as fs from 'fs';
 import * as path from 'path';
 import cluster = require('cluster');
 import * as os from 'os';
@@ -41,9 +43,9 @@ async function bootstrap() {
   httpServer.disable('x-powered-by');
   httpServer.set('trust proxy', 1);
 
-  // Aumentar límite de payload para fotos base64
-  app.use(express.json({ limit: '50mb' }));
-  app.use(express.urlencoded({ limit: '50mb', extended: true }));
+  // Límite de payload para fotos base64
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ limit: '10mb', extended: true }));
   app.use((request: express.Request, response: express.Response, next: express.NextFunction) => {
     response.setHeader('X-Frame-Options', 'DENY');
     response.setHeader('X-Content-Type-Options', 'nosniff');
@@ -321,7 +323,6 @@ async function bootstrap() {
   });
 
   // Servir archivos estáticos desde uploads (en raíz del proyecto)
-  const fs = require('fs');
   
   // Helper para resolver la raíz del proyecto tomando como referencia el folder "apps"
   const resolveProjectRoot = () => {
@@ -334,54 +335,53 @@ async function bootstrap() {
     return path.resolve(__dirname, '../../..');
   };
 
-  // Log __dirname para debugging
-  console.error(`[DEBUG] __dirname: ${__dirname}`);
   const projectRoot = resolveProjectRoot();
-  console.error(`[DEBUG] Project root resolved: ${projectRoot}`);
 
   const uploadsPath = path.join(projectRoot, 'uploads');
   const clientsPath = path.join(uploadsPath, 'clients');
   const cvsPath = path.join(uploadsPath, 'cvs');
   
-  console.error(`[DEBUG] Calculated uploads path: ${uploadsPath}`);
-  console.error(`[DEBUG] Calculated clients path: ${clientsPath}`);
-  console.error(`[DEBUG] Calculated cvs path: ${cvsPath}`);
-  
   try {
     // Asegurar que el directorio uploads existe
     if (!fs.existsSync(uploadsPath)) {
       fs.mkdirSync(uploadsPath, { recursive: true });
-      console.error(`✅ Created uploads directory: ${uploadsPath}`);
-    } else {
-      console.error(`✅ Uploads directory exists: ${uploadsPath}`);
     }
     
     // Asegurar que el subdirectorio clients existe
     if (!fs.existsSync(clientsPath)) {
       fs.mkdirSync(clientsPath, { recursive: true });
-      console.error(`✅ Created clients directory: ${clientsPath}`);
-    } else {
-      console.error(`✅ Clients directory exists: ${clientsPath}`);
     }
 
     // Asegurar que el subdirectorio cvs existe
     if (!fs.existsSync(cvsPath)) {
       fs.mkdirSync(cvsPath, { recursive: true });
-      console.error(`✅ Created cvs directory: ${cvsPath}`);
-    } else {
-      console.error(`✅ Cvs directory exists: ${cvsPath}`);
     }
-    
-    // Verificar que realmente existe antes de servir
-    const stats = fs.statSync(uploadsPath);
-    console.error(`✅ Uploads directory is accessible (isDirectory: ${stats.isDirectory()})`);
-    
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
-    console.error(`❌ ERROR setting up uploads directory: ${errorMsg}`);
-    console.error(err);
+    console.error(`Error setting up uploads directory: ${errorMsg}`);
   }
   
+  // Proteger /uploads con autenticación JWT
+  app.use('/uploads', (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ statusCode: 401, message: 'Authentication required' });
+      return;
+    }
+    const token = authHeader.slice(7);
+    const secret = process.env['JWT_SECRET'];
+    if (!secret) {
+      res.status(500).json({ statusCode: 500, message: 'Server configuration error' });
+      return;
+    }
+    try {
+      require('jsonwebtoken').verify(token, secret);
+      next();
+    } catch {
+      res.status(401).json({ statusCode: 401, message: 'Invalid or expired token' });
+    }
+  });
+
   app.use(
     '/uploads',
     express.static(uploadsPath, {
@@ -396,7 +396,34 @@ async function bootstrap() {
       },
     }),
   );
-  console.error(`✅ Express static middleware registered for /uploads -> ${uploadsPath}`);
+
+  // ── Swagger / OpenAPI ─────────────────────────────────────
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('NEXARA ERP Industrial')
+    .setDescription('API del sistema ERP industrial NEXARA — gestión de operaciones, RRHH, finanzas, manufactura, calidad, mantenimiento y más.')
+    .setVersion('1.0.0')
+    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'JWT')
+    .addTag('auth', 'Autenticación y tokens')
+    .addTag('users', 'Gestión de usuarios y roles')
+    .addTag('operations', 'Actividades, evidencias, viáticos, vehículos, GPS')
+    .addTag('hr', 'Asistencia, breaks, multas, nómina, CVs')
+    .addTag('commercial', 'Clientes, cotizaciones, ventas')
+    .addTag('inventory', 'Almacenes, stock, compras')
+    .addTag('manufacturing', 'BOM, producción, calidad')
+    .addTag('finance', 'Contabilidad, facturación, banca')
+    .addTag('compliance', 'Seguridad, documentos, workflow, auditoría, BI')
+    .addTag('system', 'Configuración, health, notificaciones')
+    .build();
+
+  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/docs', app, swaggerDocument, {
+    swaggerOptions: {
+      persistAuthorization: true,
+      docExpansion: 'none',
+      filter: true,
+      tagsSorter: 'alpha',
+    },
+  });
 
   // Prefijo global '/api' para todas las rutas, pero excluir la ruta de uploads
   app.setGlobalPrefix('api', {

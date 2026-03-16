@@ -8,56 +8,121 @@ export class AppService {
 
   // Dashboard: métricas agregadas
   async getDashboardStats() {
-    try {
-      const [
-        totalActividades,
-        actividadesPorEstatus,
-        totalEvidencias,
-        evidenciasAprobadas,
-        totalViaticos,
-        viaticosPorEstatus,
-        totalVehículos,
-        vehiculosPorEstatus
-      ] = await Promise.all([
-        this.prisma['activity'].count(),
-        this.prisma['activity'].groupBy({ by: ['estatus'], _count: { _all: true } }),
-        this.prisma['evidence'].count(),
-        this.prisma['evidence'].count({ where: { aprobada: true } }),
-        this.prisma['expense'].count(),
-        this.prisma['expense'].groupBy({ by: ['estatusPago'], _count: { _all: true } }),
-        this.prisma['vehicleControl'].count(),
-        this.prisma['vehicleControl'].groupBy({ by: ['estatusAprobacion'], _count: { _all: true } })
-      ]);
-      return {
-        actividades: {
-          total: totalActividades,
-          porEstatus: actividadesPorEstatus.map((e: any) => ({
-            estatus: e.estatus,
-            cantidad: e._count._all,
-          })),
-        },
-        evidencias: {
-          total: totalEvidencias,
-          aprobadas: evidenciasAprobadas,
-        },
-        viaticos: {
-          total: totalViaticos,
-          porEstatus: viaticosPorEstatus.map((v: any) => ({
-            estatus: v.estatusPago,
-            cantidad: v._count._all,
-          })),
-        },
-        vehiculos: {
-          total: totalVehículos,
-          porEstatus: vehiculosPorEstatus.map((v: any) => ({
-            estatus: v.estatusAprobacion,
-            cantidad: v._count._all,
-          })),
-        },
-      };
-    } catch (error) {
-      throw new InternalServerErrorException((error as Error).message || 'Error desconocido');
-    }
+    const [
+      totalActividades,
+      actividadesPorEstatus,
+      totalEvidencias,
+      evidenciasAprobadas,
+      totalViaticos,
+      viaticosPorEstatus,
+      totalVehículos,
+      vehiculosPorEstatus,
+      totalUsuarios,
+      usuariosActivos,
+      totalClientes,
+      totalServiceClients,
+      totalCotizaciones,
+      totalExpenses,
+      totalFines,
+      totalPurchaseOrders,
+      pendingPurchaseOrders,
+      totalProductionOrders,
+      activeProductionOrders,
+      totalMaintenanceOrders,
+      openMaintenanceOrders,
+      totalQualityInspections,
+      totalSafetyIncidents,
+      totalWorkflows,
+      pendingWorkflows,
+    ] = await Promise.all([
+      this.prisma.activity.count(),
+      this.prisma.activity.groupBy({ by: ['estatus'], _count: { _all: true } }),
+      this.prisma.evidence.count(),
+      this.prisma.evidence.count({ where: { aprobada: true } }),
+      this.prisma.expense.count(),
+      this.prisma.expense.groupBy({ by: ['estatusPago'], _count: { _all: true } }),
+      this.prisma.vehicleControl.count(),
+      this.prisma.vehicleControl.groupBy({ by: ['estatusAprobacion'], _count: { _all: true } }),
+      this.prisma.user.count(),
+      this.prisma.user.count(),
+      this.prisma.client.count(),
+      this.prisma.serviceClient.count(),
+      this.prisma.cotizacion.count(),
+      this.prisma.expense.count(),
+      this.prisma.fine.count(),
+      this.prisma.purchaseOrder.count(),
+      this.prisma.purchaseOrder.count({ where: { status: 'DRAFT' } }),
+      this.prisma.productionOrder.count(),
+      this.prisma.productionOrder.count({ where: { status: { in: ['IN_PROGRESS', 'RELEASED'] } } }),
+      this.prisma.maintenanceOrder.count(),
+      this.prisma.maintenanceOrder.count({ where: { status: { in: ['PLANNED', 'IN_PROGRESS'] } } }),
+      this.prisma.qualityInspection.count(),
+      this.prisma.safetyIncident.count(),
+      this.prisma.workflowInstance.count(),
+      this.prisma.workflowInstance.count({ where: { isComplete: false, isCancelled: false } }),
+    ]);
+    return {
+      actividades: {
+        total: totalActividades,
+        porEstatus: actividadesPorEstatus.map((e: any) => ({
+          estatus: e.estatus,
+          cantidad: e._count._all,
+        })),
+      },
+      evidencias: {
+        total: totalEvidencias,
+        aprobadas: evidenciasAprobadas,
+      },
+      viaticos: {
+        total: totalViaticos,
+        porEstatus: viaticosPorEstatus.map((v: any) => ({
+          estatus: v.estatusPago,
+          cantidad: v._count._all,
+        })),
+      },
+      vehiculos: {
+        total: totalVehículos,
+        porEstatus: vehiculosPorEstatus.map((v: any) => ({
+          estatus: v.estatusAprobacion,
+          cantidad: v._count._all,
+        })),
+      },
+      rrhh: {
+        totalUsuarios,
+        usuariosActivos,
+      },
+      comercial: {
+        totalClientes,
+        totalServiceClients,
+        totalCotizaciones,
+      },
+      finanzas: {
+        totalExpenses,
+        totalFines,
+      },
+      compras: {
+        totalPurchaseOrders,
+        pendingPurchaseOrders,
+      },
+      produccion: {
+        totalProductionOrders,
+        activeProductionOrders,
+      },
+      mantenimiento: {
+        totalMaintenanceOrders,
+        openMaintenanceOrders,
+      },
+      calidad: {
+        totalQualityInspections,
+      },
+      seguridad: {
+        totalSafetyIncidents,
+      },
+      workflows: {
+        total: totalWorkflows,
+        pending: pendingWorkflows,
+      },
+    };
   }
 
   async exportAll() {

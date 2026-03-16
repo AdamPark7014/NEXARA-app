@@ -9,6 +9,7 @@ import {
   UploadedFile,
   UploadedFiles,
   BadRequestException,
+  Query,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
@@ -17,6 +18,7 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { Patch, Delete, Body } from '@nestjs/common';
 import { EvidencesService } from './evidences.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
 import { ExcelImportService } from '../common/excel-import.service.js';
 
@@ -31,8 +33,8 @@ export class EvidencesController {
   @Get()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.EVIDENCES_VIEW] })
-  findAll(@CurrentUser() user: any) {
-    return this.evidencesService.findForHierarchy(user);
+  findAll(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
+    return this.evidencesService.findForHierarchy(user, query);
   }
 
   @Post()
@@ -78,7 +80,8 @@ export class EvidencesController {
     @Param('format') format: string,
     res: Response,
   ) {
-    const data = await this.evidencesService.findForHierarchy(user);
+    const result = await this.evidencesService.findForHierarchy(user);
+    const data: any[] = Array.isArray(result) ? result : (result as any).data;
     if (format === 'xlsx') {
       const buffer = await this.excelExport.exportToExcel(data, 'evidences');
       res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

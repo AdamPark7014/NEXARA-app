@@ -5,6 +5,7 @@ import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { InventoriesService } from './inventories.service.js';
+import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 
 @Controller('inventories')
 @UseGuards(RbacGuard)
@@ -17,12 +18,13 @@ export class InventoriesController {
     @Query('clientId') clientId?: string,
     @Query('branchId') branchId?: string,
     @Query('status') status?: string,
+    @Query() query?: PaginationQueryDto,
   ) {
     return this.inventoriesService.list({
       clientId: clientId ? Number(clientId) : undefined,
       branchId: branchId ? Number(branchId) : undefined,
       status: status ? String(status).toUpperCase() : undefined,
-    });
+    }, query);
   }
 
   @Get('activity/:activityId')

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, ForbiddenException, UploadedFile, UploadedFiles, UseInterceptors, BadRequestException, NotFoundException, Res } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, ForbiddenException, UploadedFile, UploadedFiles, UseInterceptors, BadRequestException, NotFoundException, Res, Query } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
@@ -11,6 +11,7 @@ import { getUsersUploadDir, getUserDocsUploadDir } from '../common/upload-paths.
 import { createReadStream, existsSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { Response } from 'express';
+import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 
 @Controller('users')
 export class UsersController {
@@ -68,8 +69,8 @@ export class UsersController {
   @Get()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
-  async findAll(@CurrentUser() user: any) {
-    return this.usersService.findAllVisible(user);
+  async findAll(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
+    return this.usersService.findAllVisible(user, query);
   }
 
   @Get('assignable')

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
 
@@ -163,95 +164,40 @@ export class ToolRequestsService {
     return toolRequest;
   }
 
-  async findAll(currentUser?: any) {
-    // SuperAdmin ve todas las solicitudes
+  async findAll(currentUser?: any, query?: PaginationQueryDto) {
+    const include = {
+      usuario: {
+        select: { id: true, nombre: true, email: true, departmentId: true, department: { select: { id: true, nombre: true } }, role: { select: { id: true, nombre: true, accesoConsoleAdmin: true } } },
+      },
+      approver: { select: { id: true, nombre: true, email: true } },
+    };
+
+    let where: any = undefined;
+
     if (currentUser?.isSuperAdmin) {
-      return this.prisma.toolRequest.findMany({
-        include: {
-          usuario: {
-            select: {
-              id: true,
-              nombre: true,
-              email: true,
-              departmentId: true,
-              department: {
-                select: {
-                  id: true,
-                  nombre: true,
-                },
-              },
-              role: {
-                select: {
-                  id: true,
-                  nombre: true,
-                  accesoConsoleAdmin: true,
-                },
-              },
-            },
-          },
-          approver: {
-            select: {
-              id: true,
-              nombre: true,
-              email: true,
-            },
-          },
+      where = undefined;
+    } else if (currentUser?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
+      where = {
+        usuario: {
+          AND: [
+            { departmentId: currentUser.departmentId },
+            { role: { accesoConsoleAdmin: false } },
+          ],
         },
-        orderBy: {
-          requestDate: 'desc',
-        },
-      });
+      };
+    } else {
+      return [];
     }
 
-    // Admin solo ve solicitudes de usuarios regulares de su departamento
-    if (currentUser?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
-      return this.prisma.toolRequest.findMany({
-        where: {
-          usuario: {
-            AND: [
-              { departmentId: currentUser.departmentId },
-              { role: { accesoConsoleAdmin: false } },
-            ],
-          },
-        },
-        include: {
-          usuario: {
-            select: {
-              id: true,
-              nombre: true,
-              email: true,
-              departmentId: true,
-              department: {
-                select: {
-                  id: true,
-                  nombre: true,
-                },
-              },
-              role: {
-                select: {
-                  id: true,
-                  nombre: true,
-                  accesoConsoleAdmin: true,
-                },
-              },
-            },
-          },
-          approver: {
-            select: {
-              id: true,
-              nombre: true,
-              email: true,
-            },
-          },
-        },
-        orderBy: {
-          requestDate: 'desc',
-        },
-      });
+    if (query?.limit) {
+      const [data, total] = await Promise.all([
+        this.prisma.toolRequest.findMany({ where, include, orderBy: { requestDate: 'desc' }, skip: query.skip, take: query.take }),
+        this.prisma.toolRequest.count({ where }),
+      ]);
+      return buildPaginatedResponse(data, total, query);
     }
 
-    // Fallback: devolver vacío
-    return [];
+    return this.prisma.toolRequest.findMany({ where, include, orderBy: { requestDate: 'desc' } });
   }
 
   async findByUser(usuarioId: number) {

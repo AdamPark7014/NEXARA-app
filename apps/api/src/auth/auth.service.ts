@@ -81,6 +81,13 @@ export class AuthService {
         PERMISSIONS.SALES_TEMPLATES_MANAGE,
         PERMISSIONS.SALES_AUDIT_VIEW,
         PERMISSIONS.CVS_ADMIN_REVIEW,
+        PERMISSIONS.FINES_VIEW,
+        PERMISSIONS.FINES_MANAGE,
+        PERMISSIONS.CLIENTS_VIEW,
+        PERMISSIONS.CLIENTS_MANAGE,
+        PERMISSIONS.LUNCH_BREAKS_VIEW,
+        PERMISSIONS.LUNCH_BREAKS_MANAGE,
+        PERMISSIONS.COTIZACIONES_ACCESS,
       );
     }
 
@@ -115,7 +122,110 @@ export class AuthService {
       permissions.push(PERMISSIONS.COTIZACIONES_ACCESS);
     }
     if (role?.accesoAsistencia) {
-      permissions.push(PERMISSIONS.ATTENDANCE_VIEW);
+      permissions.push(PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.ATTENDANCE_MANAGE);
+    }
+    if (role?.accesoActividades) {
+      permissions.push(
+        PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.ACTIVITIES_MANAGE,
+        PERMISSIONS.ACTIVITIES_EXPORT, PERMISSIONS.ACTIVITIES_IMPORT,
+      );
+    }
+    if (role?.accesoEvidencias) {
+      permissions.push(
+        PERMISSIONS.EVIDENCES_VIEW, PERMISSIONS.EVIDENCES_CREATE,
+        PERMISSIONS.EVIDENCES_REVIEW, PERMISSIONS.EVIDENCES_EXPORT,
+        PERMISSIONS.EVIDENCES_IMPORT,
+      );
+    }
+    if (role?.accesoViaticos) {
+      permissions.push(
+        PERMISSIONS.VIATICS_VIEW, PERMISSIONS.VIATICS_CREATE,
+        PERMISSIONS.VIATICS_MANAGE, PERMISSIONS.VIATICS_EXPORT,
+        PERMISSIONS.VIATICS_IMPORT,
+      );
+    }
+    if (role?.accesoVehiculos) {
+      permissions.push(
+        PERMISSIONS.VEHICLES_VIEW, PERMISSIONS.VEHICLES_REQUEST,
+        PERMISSIONS.VEHICLES_REVIEW, PERMISSIONS.VEHICLES_INVENTORY,
+        PERMISSIONS.VEHICLES_EXPORT, PERMISSIONS.VEHICLES_IMPORT,
+      );
+    }
+    if (role?.accesoGps) {
+      permissions.push(PERMISSIONS.GPS_VIEW, PERMISSIONS.GPS_MANAGE);
+    }
+
+    // ── ERP Industrial Permissions ──────────────────────────────
+    if (role?.accesoInventario) {
+      permissions.push(
+        PERMISSIONS.WAREHOUSE_VIEW, PERMISSIONS.WAREHOUSE_MANAGE,
+        PERMISSIONS.STOCK_VIEW, PERMISSIONS.STOCK_MANAGE,
+      );
+    }
+    if (role?.accesoCompras) {
+      permissions.push(
+        PERMISSIONS.PROCUREMENT_VIEW, PERMISSIONS.PROCUREMENT_REQUEST,
+        PERMISSIONS.PROCUREMENT_APPROVE, PERMISSIONS.PROCUREMENT_MANAGE,
+      );
+    }
+    if (role?.accesoManufactura) {
+      permissions.push(
+        PERMISSIONS.MANUFACTURING_VIEW, PERMISSIONS.MANUFACTURING_MANAGE,
+        PERMISSIONS.BOM_MANAGE, PERMISSIONS.PRODUCTION_MANAGE,
+      );
+    }
+    if (role?.accesoCalidad) {
+      permissions.push(
+        PERMISSIONS.QUALITY_VIEW, PERMISSIONS.QUALITY_MANAGE,
+        PERMISSIONS.QUALITY_INSPECT,
+      );
+    }
+    if (role?.accesoMantenimiento) {
+      permissions.push(
+        PERMISSIONS.MAINTENANCE_VIEW, PERMISSIONS.MAINTENANCE_MANAGE,
+        PERMISSIONS.ASSETS_VIEW, PERMISSIONS.ASSETS_MANAGE,
+      );
+    }
+    if (role?.accesoSeguridad) {
+      permissions.push(
+        PERMISSIONS.SAFETY_VIEW, PERMISSIONS.SAFETY_MANAGE,
+        PERMISSIONS.SAFETY_PERMITS,
+      );
+    }
+    if (role?.accesoDocumentos) {
+      permissions.push(
+        PERMISSIONS.DOCUMENTS_VIEW, PERMISSIONS.DOCUMENTS_MANAGE,
+        PERMISSIONS.DOCUMENTS_APPROVE,
+      );
+    }
+    if (role?.accesoWorkflow) {
+      permissions.push(
+        PERMISSIONS.WORKFLOW_VIEW, PERMISSIONS.WORKFLOW_MANAGE,
+      );
+    }
+    if (role?.accesoAuditoria) {
+      permissions.push(PERMISSIONS.AUDIT_VIEW);
+    }
+    if (role?.accesoBI) {
+      permissions.push(PERMISSIONS.BI_VIEW, PERMISSIONS.BI_MANAGE);
+    }
+    if (role?.accesoBanca) {
+      permissions.push(
+        PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE,
+        PERMISSIONS.ACCOUNTING_POST, PERMISSIONS.ACCOUNTING_CLOSE_PERIOD,
+        PERMISSIONS.INVOICING_VIEW, PERMISSIONS.INVOICING_MANAGE,
+        PERMISSIONS.BANKING_VIEW, PERMISSIONS.BANKING_MANAGE,
+        PERMISSIONS.BANKING_RECONCILE,
+      );
+    }
+    if (role?.accesoMultas) {
+      permissions.push(PERMISSIONS.FINES_VIEW, PERMISSIONS.FINES_MANAGE);
+    }
+    if (role?.accesoClientes) {
+      permissions.push(PERMISSIONS.CLIENTS_VIEW, PERMISSIONS.CLIENTS_MANAGE);
+    }
+    if (role?.accesoLunchBreaks) {
+      permissions.push(PERMISSIONS.LUNCH_BREAKS_VIEW, PERMISSIONS.LUNCH_BREAKS_MANAGE);
     }
 
     if (isSuperAdmin) {
@@ -168,7 +278,7 @@ export class AuthService {
 
   async validateUser(email: string, password: string) {
     const normalizedEmail = email.trim();
-    const user = await this.prisma['user'].findFirst({
+    const user = await this.prisma.user.findFirst({
       where: {
         email: {
           equals: normalizedEmail,
@@ -211,9 +321,9 @@ export class AuthService {
         id: user.id,
         nombre: user.nombre,
         email: user.email,
-        role: user.role.nombre,
+        role: user.role?.nombre ?? '',
         roleId: user.roleId,
-        department: user.department.nombre,
+        department: user.department?.nombre ?? '',
         departmentId: user.departmentId,
         permissions,
         isSuperAdmin,

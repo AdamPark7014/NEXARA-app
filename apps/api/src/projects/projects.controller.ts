@@ -8,6 +8,7 @@ import {
   ParseIntPipe,
   Post,
   Put,
+  Query,
   Res,
   UploadedFiles,
   UseInterceptors,
@@ -19,6 +20,7 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import { createReadStream } from 'fs';
 import { ProjectsService } from './projects.service.js';
+import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { CreateProjectDto } from './dto/create-project.dto.js';
 import { UpdateProjectDto } from './dto/update-project.dto.js';
 
@@ -66,8 +68,8 @@ export class ProjectsController {
   }
 
   @Get()
-  findAll() {
-    return this.projectsService.findAll();
+  findAll(@Query() query: PaginationQueryDto) {
+    return this.projectsService.findAll(query);
   }
 
   @Get('image/:filename')

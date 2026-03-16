@@ -47,6 +47,86 @@ export const PERMISSIONS = {
   TOOLS_REQUEST: 'tools.request',
   TOOLS_MANAGE: 'tools.manage',
   TOOLS_INVENTORY: 'tools.inventory',
+  FINES_VIEW: 'fines.view',
+  FINES_MANAGE: 'fines.manage',
+  LUNCH_BREAKS_VIEW: 'lunch_breaks.view',
+  LUNCH_BREAKS_MANAGE: 'lunch_breaks.manage',
+  CLIENTS_VIEW: 'clients.view',
+  CLIENTS_MANAGE: 'clients.manage',
+
+  // === ERP Industrial Permissions ===
+  // Accounting
+  ACCOUNTING_VIEW: 'accounting.view',
+  ACCOUNTING_MANAGE: 'accounting.manage',
+  ACCOUNTING_POST: 'accounting.post',
+  ACCOUNTING_CLOSE_PERIOD: 'accounting.close_period',
+
+  // Invoicing
+  INVOICING_VIEW: 'invoicing.view',
+  INVOICING_MANAGE: 'invoicing.manage',
+
+  // Banking
+  BANKING_VIEW: 'banking.view',
+  BANKING_MANAGE: 'banking.manage',
+  BANKING_RECONCILE: 'banking.reconcile',
+
+  // Advanced Inventory
+  WAREHOUSE_VIEW: 'warehouse.view',
+  WAREHOUSE_MANAGE: 'warehouse.manage',
+  STOCK_VIEW: 'stock.view',
+  STOCK_MANAGE: 'stock.manage',
+
+  // Procurement
+  PROCUREMENT_VIEW: 'procurement.view',
+  PROCUREMENT_REQUEST: 'procurement.request',
+  PROCUREMENT_APPROVE: 'procurement.approve',
+  PROCUREMENT_MANAGE: 'procurement.manage',
+
+  // Manufacturing
+  MANUFACTURING_VIEW: 'manufacturing.view',
+  MANUFACTURING_MANAGE: 'manufacturing.manage',
+  BOM_MANAGE: 'bom.manage',
+  PRODUCTION_MANAGE: 'production.manage',
+
+  // Quality
+  QUALITY_VIEW: 'quality.view',
+  QUALITY_MANAGE: 'quality.manage',
+  QUALITY_INSPECT: 'quality.inspect',
+
+  // Maintenance (CMMS)
+  MAINTENANCE_VIEW: 'maintenance.view',
+  MAINTENANCE_MANAGE: 'maintenance.manage',
+  ASSETS_VIEW: 'assets.view',
+  ASSETS_MANAGE: 'assets.manage',
+
+  // Safety / EHS
+  SAFETY_VIEW: 'safety.view',
+  SAFETY_MANAGE: 'safety.manage',
+  SAFETY_PERMITS: 'safety.permits',
+
+  // Document Management
+  DOCUMENTS_VIEW: 'documents.view',
+  DOCUMENTS_MANAGE: 'documents.manage',
+  DOCUMENTS_APPROVE: 'documents.approve',
+
+  // Workflow Engine
+  WORKFLOW_VIEW: 'workflow.view',
+  WORKFLOW_MANAGE: 'workflow.manage',
+
+  // Audit
+  AUDIT_VIEW: 'audit.view',
+
+  // BI / Analytics
+  BI_VIEW: 'bi.view',
+  BI_MANAGE: 'bi.manage',
+
+  // HR
+  HR_VIEW: 'hr.view',
+  HR_MANAGE: 'hr.manage',
+  HR_APPROVE_LEAVE: 'hr.approve.leave',
+
+  // Global Search
+  SEARCH_VIEW: 'search.view',
 } as const;
 
 export type Permission = typeof PERMISSIONS[keyof typeof PERMISSIONS];

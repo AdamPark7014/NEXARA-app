@@ -7,6 +7,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
@@ -16,6 +17,7 @@ import { UpdateOrderTemplateDto } from './dto/update-order-template.dto.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
+import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 
 const SALES_VIEW_ACCESS = [PERMISSIONS.SALES_VIEW, PERMISSIONS.PANEL_VENTAS];
 const SALES_TEMPLATE_ACCESS = [PERMISSIONS.SALES_TEMPLATES_MANAGE, PERMISSIONS.SALES_MANAGE, PERMISSIONS.PANEL_VENTAS];
@@ -42,8 +44,8 @@ export class VentasOrderTemplatesController {
   @Get()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
-  findAll() {
-    return this.ventasService.listOrderTemplates();
+  findAll(@Query() query: PaginationQueryDto) {
+    return this.ventasService.listOrderTemplates(query);
   }
 
   @Get('default')

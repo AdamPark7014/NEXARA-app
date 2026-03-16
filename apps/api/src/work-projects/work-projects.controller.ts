@@ -7,12 +7,14 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { WorkProjectsService } from './work-projects.service.js';
+import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { CreateWorkProjectDto } from './dto/create-work-project.dto.js';
 import { UpdateWorkProjectDto } from './dto/update-work-project.dto.js';
 import { CreateWorkProjectExpenseDto } from './dto/create-work-project-expense.dto.js';
@@ -26,8 +28,8 @@ export class WorkProjectsController {
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_VIEW] })
   @Get()
-  findAll() {
-    return this.service.findAll();
+  findAll(@Query() query: PaginationQueryDto) {
+    return this.service.findAll(query);
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)
