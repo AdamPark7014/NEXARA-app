@@ -10,6 +10,7 @@ API_PORT="${API_PORT:-3001}"
 WEB_PORT="${WEB_PORT:-3000}"
 MOBILE_PORT="${MOBILE_PORT:-3002}"
 MOBILE_APP_URL="${MOBILE_APP_URL:-https://mobile.nexara.com.mx}"
+SKIP_CAP_SYNC="${SKIP_CAP_SYNC:-0}"
 
 start_or_restart_pm2() {
   local app_name="$1"
@@ -112,8 +113,20 @@ node ../../scripts/clear-build-cache.js mobile
 run_build_serial "Frontend Mobile" env NODE_OPTIONS="--max_old_space_size=2048" npm run build
 
 # Sincronizar shell nativo Capacitor con URL productiva
-echo "🔗 Sincronizando Capacitor (mobile shell)..."
-CAPACITOR_APP_URL="$MOBILE_APP_URL" npm run cap:build:shell
+if [ "$SKIP_CAP_SYNC" = "1" ]; then
+  echo "⏭️ Omitiendo sync de Capacitor (SKIP_CAP_SYNC=1)."
+else
+  NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
+  if [ "$NODE_MAJOR" -lt 22 ]; then
+    echo "⚠️ Omitiendo sync de Capacitor: Node $(node -v) < 22 requerido por @capacitor/cli@8"
+    echo "   Si necesitas sincronizar shell nativo en este servidor, actualiza Node a v22+ o usa SKIP_CAP_SYNC=1"
+  else
+    echo "🔗 Sincronizando Capacitor (mobile shell)..."
+    if ! CAPACITOR_APP_URL="$MOBILE_APP_URL" npm run cap:build:shell; then
+      echo "⚠️ Falló sync de Capacitor, pero el deploy continuará para web/api/mobile"
+    fi
+  fi
+fi
 
 # 10. Reiniciar servicios con PM2
 echo "🚀 Reiniciando servicios..."
