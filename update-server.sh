@@ -24,6 +24,20 @@ start_or_restart_pm2() {
   fi
 }
 
+recreate_pm2_process() {
+  local app_name="$1"
+  shift
+
+  if pm2 describe "$app_name" >/dev/null 2>&1; then
+    echo "♻️ Recreando ${app_name} con configuración limpia..."
+    pm2 delete "$app_name" || true
+  else
+    echo "🚀 Iniciando ${app_name}..."
+  fi
+
+  pm2 start "$@" --name "$app_name"
+}
+
 # Forzar builds en serie para evitar sobrecarga/memoria por paralelismo.
 BUILD_MODE="serial"
 
@@ -105,8 +119,8 @@ CAPACITOR_APP_URL="$MOBILE_APP_URL" npm run cap:build:shell
 echo "🚀 Reiniciando servicios..."
 cd "$PROJECT_DIR"
 start_or_restart_pm2 "nexara-api" apps/api/dist/main.js
-start_or_restart_pm2 "nexara-web" npm -- start --prefix apps/web
-start_or_restart_pm2 "nexara-mobile" npm -- start --prefix apps/mobile -- -p "$MOBILE_PORT"
+recreate_pm2_process "nexara-web" npm --cwd "$PROJECT_DIR/apps/web" -- start
+recreate_pm2_process "nexara-mobile" env PORT="$MOBILE_PORT" npm --cwd "$PROJECT_DIR/apps/mobile" -- start -- --port "$MOBILE_PORT"
 
 # Persistir procesos PM2 para reinicios del servidor
 echo "💾 Guardando estado PM2..."
