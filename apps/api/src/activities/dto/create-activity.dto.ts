@@ -6,7 +6,7 @@ import {
   IsDateString,
   IsEnum,
 } from 'class-validator';
-import { ActivityWorkType, TicketType } from '@prisma/client';
+import { ActivityType, ActivityWorkType, TicketType } from '@prisma/client';
 
 export class CreateActivityDto {
   @IsOptional()
@@ -34,6 +34,10 @@ export class CreateActivityDto {
   prioridad?: string;
 
   @IsOptional()
+  @IsEnum(ActivityType)
+  activityType?: ActivityType;
+
+  @IsOptional()
   @IsEnum(TicketType)
   ticketType?: TicketType;
 
@@ -44,6 +48,10 @@ export class CreateActivityDto {
   @IsOptional()
   @IsInt()
   clientId?: number;
+
+  @IsOptional()
+  @IsInt()
+  projectId?: number;
 
   @IsOptional()
   @IsString()

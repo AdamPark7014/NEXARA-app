@@ -4,10 +4,18 @@ import { ServiceSheetsService } from './service-sheets.service.js';
 import { UpsertServiceSheetDto } from './dto/upsert-service-sheet.dto.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { CurrentUser } from '../common/current-user.decorator.js';
 
 @Controller('service-sheets')
 export class ServiceSheetsController {
   constructor(private readonly serviceSheetsService: ServiceSheetsService) {}
+
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
+  @Get()
+  findAll(@CurrentUser() user: any) {
+    return this.serviceSheetsService.findAll(user);
+  }
 
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })

@@ -3,7 +3,26 @@
 # 🚀 Script para actualizar NEXARA-app en Digital Ocean
 # Ejecutar estos comandos EN EL SERVIDOR después de conectarte con SSH
 
-set -e
+set -euo pipefail
+
+PROJECT_DIR="/var/www/nexara-app"
+API_PORT="${API_PORT:-3001}"
+WEB_PORT="${WEB_PORT:-3000}"
+MOBILE_PORT="${MOBILE_PORT:-3002}"
+MOBILE_APP_URL="${MOBILE_APP_URL:-https://mobile.nexara.com.mx}"
+
+start_or_restart_pm2() {
+  local app_name="$1"
+  shift
+
+  if pm2 describe "$app_name" >/dev/null 2>&1; then
+    echo "🔄 Reiniciando ${app_name}..."
+    pm2 restart "$app_name" --update-env
+  else
+    echo "🚀 Iniciando ${app_name}..."
+    pm2 start "$@" --name "$app_name"
+  fi
+}
 
 # Forzar builds en serie para evitar sobrecarga/memoria por paralelismo.
 BUILD_MODE="serial"
@@ -18,7 +37,7 @@ run_build_serial() {
 echo "🔄 Actualizando NEXARA-app desde GitHub..."
 
 # 1. Ir al directorio del proyecto
-cd /var/www/nexara-app
+cd "$PROJECT_DIR"
 
 # 2. Hacer backup rápido de .env EN UN LUGAR SEGURO (fuera de git clean)
 echo "💾 Haciendo backup de archivos .env..."
@@ -52,41 +71,55 @@ if ! grep -q "DATABASE_URL" apps/api/.env 2>/dev/null; then
   exit 1
 fi
 
-# 6. Actualizar Backend (API)
+# 6. Instalar dependencias del monorepo (workspaces)
+echo "📦 Instalando dependencias del monorepo..."
+npm install --legacy-peer-deps
+
+# 7. Actualizar Backend (API)
 echo "🔧 Actualizando Backend..."
 cd apps/api
-npm install --legacy-peer-deps
 npx prisma generate
 npx prisma migrate deploy
 node ../../scripts/clear-build-cache.js api
 run_build_serial "Backend" npm run build
 
-# 7. Actualizar Frontend (Web)
+# 8. Actualizar Frontend (Web)
 echo "🎨 Actualizando Frontend..."
 cd ../web
-rm -rf .next node_modules package-lock.json
-npm install --legacy-peer-deps
+rm -rf .next
 node ../../scripts/clear-build-cache.js web
 run_build_serial "Frontend Web" env NODE_OPTIONS="--max_old_space_size=2048" npm run build
 
-# 8. Actualizar Frontend (Mobile)
+# 9. Actualizar Frontend (Mobile)
 echo "📱 Actualizando Frontend Mobile..."
 cd ../mobile
-rm -rf .next node_modules package-lock.json
-npm install --legacy-peer-deps
+rm -rf .next
 node ../../scripts/clear-build-cache.js mobile
 run_build_serial "Frontend Mobile" env NODE_OPTIONS="--max_old_space_size=2048" npm run build
 
-# 9. Reiniciar servicios con PM2
-echo "🚀 Reiniciando servicios..."
-cd /var/www/nexara-app
-pm2 restart nexara-api || pm2 start apps/api/dist/main.js --name nexara-api
-pm2 restart nexara-web || pm2 start npm --name nexara-web -- start --prefix apps/web
-pm2 restart nexara-mobile || pm2 start npm --name nexara-mobile -- start --prefix apps/mobile -- -p 3002
+# Sincronizar shell nativo Capacitor con URL productiva
+echo "🔗 Sincronizando Capacitor (mobile shell)..."
+CAPACITOR_APP_URL="$MOBILE_APP_URL" npm run cap:build:shell
 
-# 10. Verificar estado
+# 10. Reiniciar servicios con PM2
+echo "🚀 Reiniciando servicios..."
+cd "$PROJECT_DIR"
+start_or_restart_pm2 "nexara-api" apps/api/dist/main.js
+start_or_restart_pm2 "nexara-web" npm -- start --prefix apps/web
+start_or_restart_pm2 "nexara-mobile" npm -- start --prefix apps/mobile -- -p "$MOBILE_PORT"
+
+# Persistir procesos PM2 para reinicios del servidor
+echo "💾 Guardando estado PM2..."
+pm2 save
+
+# 11. Verificar estado
 echo "✅ Verificando servicios..."
 pm2 list
+
+echo "🔎 Verificando endpoints locales..."
+curl -fsS "http://127.0.0.1:${API_PORT}/api" >/dev/null && echo "✅ API OK en :${API_PORT}" || echo "⚠️ API no respondió en :${API_PORT}"
+curl -fsS "http://127.0.0.1:${WEB_PORT}" >/dev/null && echo "✅ WEB OK en :${WEB_PORT}" || echo "⚠️ WEB no respondió en :${WEB_PORT}"
+curl -fsS "http://127.0.0.1:${MOBILE_PORT}" >/dev/null && echo "✅ MOBILE OK en :${MOBILE_PORT}" || echo "⚠️ MOBILE no respondió en :${MOBILE_PORT}"
 
 echo ""
 echo "🎉 ¡Actualización completada!"

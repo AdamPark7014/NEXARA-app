@@ -3,7 +3,7 @@ import { ClientTicketStatus } from '@prisma/client';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { ClientTicketRequestsService } from './client-ticket-requests.service.js';
-import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
+import { ClientTicketRequestsQueryDto } from './dto/client-ticket-requests-query.dto.js';
 
 @Controller('client-ticket-requests')
 @UseGuards(RbacGuard)
@@ -20,8 +20,8 @@ export class ClientTicketRequestsController {
 
   @Get()
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
-  findAll(@Query('status') status?: string, @Query() query?: PaginationQueryDto) {
-    return this.service.findAll(this.normalizeStatus(status), query);
+  findAll(@Query() query: ClientTicketRequestsQueryDto) {
+    return this.service.findAll(this.normalizeStatus(query.status), query);
   }
 
   @Patch(':id/assign')

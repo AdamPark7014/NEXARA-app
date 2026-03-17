@@ -12,7 +12,7 @@ type ConnectionEntry = {
   active: number;
 };
 
-const DEFAULT_ALLOWED_SUBDOMAINS = ['consola', 'console', 'ventas', 'web', 'contabilidad', 'tickets'];
+const DEFAULT_ALLOWED_SUBDOMAINS = ['consola', 'console', 'ventas', 'web', 'contabilidad', 'tickets', 'mobile'];
 const DEFAULT_ALLOWED_HOST_PATTERNS: RegExp[] = [
   /^localhost(?::\d+)?$/i,
   /^127\.0\.0\.1(?::\d+)?$/i,

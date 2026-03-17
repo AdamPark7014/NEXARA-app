@@ -4,11 +4,14 @@ import { RoleGuard } from "@/components/RoleGuard";
 import CvsManagementPanel from "@/components/CvsManagementPanel";
 import { PERMISSIONS } from "@/lib/permissions";
 import HelpTab from "@/components/HelpTab";
+import { useUser } from "@/components/UserContext";
 
 export default function CvsPage() {
+  const { user } = useUser();
+
   return (
     <RoleGuard anyPermissions={[PERMISSIONS.CVS_MANAGE, PERMISSIONS.CVS_ADMIN_REVIEW, PERMISSIONS.CVS_SUPERADMIN_REVIEW, PERMISSIONS.CONSOLE_ADMIN]}>
-      <HelpTab module="cvs" />
+      <HelpTab module="cvs" user={user} />
       <CvsManagementPanel />
     </RoleGuard>
   );

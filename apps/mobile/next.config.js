@@ -1,8 +1,14 @@
 const path = require('path');
 
+// When CAPACITOR=1, build as static export for Capacitor (APK/IPA)
+const isCapacitor = process.env.CAPACITOR === '1';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+
+  // Static export when building for Capacitor (APK / iOS)
+  ...(isCapacitor && { output: 'export' }),
   
   // Habilitar SWC para compilación más rápida
   swcMinify: true,
@@ -20,6 +26,7 @@ const nextConfig = {
     'web.localhost',
     'contabilidad.localhost',
     'tickets.localhost',
+    'mobile.localhost',
     'ingenieros.localhost',
     'http://consola.localhost:3000',
     'http://console.localhost:3000',
@@ -27,6 +34,7 @@ const nextConfig = {
     'http://web.localhost:3000',
     'http://contabilidad.localhost:3000',
     'http://tickets.localhost:3000',
+    'http://mobile.localhost:3000',
     'http://ingenieros.localhost:3000',
   ],
   
@@ -113,9 +121,8 @@ const nextConfig = {
     return config;
   },
   
-  // Support para subdominios
-  // El middleware se encarga de la reescritura de URLs
-  
+  // Support para subdominios (solo en modo web; Capacitor no usa rewrites ni headers)
+  ...(!isCapacitor && {
   async rewrites() {
     return {
       fallback: [
@@ -126,7 +133,9 @@ const nextConfig = {
       ],
     };
   },
+  }),
 
+  ...(!isCapacitor && {
   async headers() {
     const isDev = process.env.NODE_ENV !== 'production';
     const scriptSrc = isDev ? "'self' 'unsafe-inline' 'unsafe-eval'" : "'self' 'unsafe-inline'";
@@ -165,6 +174,7 @@ const nextConfig = {
       },
     ];
   },
+  }),
 
 
 };

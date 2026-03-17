@@ -101,6 +101,7 @@ const ActivitiesTable: React.FC = () => {
 
   const [assignableUsers, setAssignableUsers] = useState<{ id: number; nombre: string; role?: { nombre: string } }[]>([]);
   const [clients, setClients] = useState<{ id: number; name: string; logoUrl?: string | null }[]>([]);
+  const [operationalProjects, setOperationalProjects] = useState<{ id: number; title: string; status: string; client: { id: number; name: string } }[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const [nextAn, setNextAn] = useState<string>('');
@@ -116,7 +117,9 @@ const ActivitiesTable: React.FC = () => {
     fechaInicio: '',
     fechaMaxima: '',
     fechaEntregaEsperada: '',
+    activityType: 'CLIENT' as 'CLIENT' | 'INTERNAL',
     clientId: '',
+    projectId: '',
     ticketType: 'PREVENTIVO',
     workType: 'ISSUE',
     branchName: '',
@@ -144,6 +147,16 @@ const ActivitiesTable: React.FC = () => {
       .then((res) => res.ok ? res.json() : [])
       .then((data) => setClients(Array.isArray(data) ? data : []))
       .catch(() => setClients([]));
+  };
+
+  const fetchOperationalProjects = () => {
+    if (!user?.token) return;
+    fetch(buildApiUrl('operational-projects'), {
+      headers: { Authorization: `Bearer ${user.token}` },
+    })
+      .then((res) => res.ok ? res.json() : [])
+      .then((data) => setOperationalProjects(Array.isArray(data) ? data : []))
+      .catch(() => setOperationalProjects([]));
   };
 
   const fetchTicketRequests = () => {
@@ -202,6 +215,7 @@ const ActivitiesTable: React.FC = () => {
     fetchActivities();
     fetchNextAn();
     fetchClients();
+    fetchOperationalProjects();
     fetchTicketRequests();
   }, [user?.token]);
 
@@ -209,6 +223,7 @@ const ActivitiesTable: React.FC = () => {
     fetchAssignableUsers();
     fetchNextAn();
     fetchClients();
+    fetchOperationalProjects();
     fetchTicketRequests();
   }, [user?.token]);
 
@@ -263,6 +278,7 @@ const ActivitiesTable: React.FC = () => {
     setPendingRequestId(request.id);
     setNewActivity((prev) => ({
       ...prev,
+      activityType: 'CLIENT',
       titulo: request.branchName
         ? `${isPreventiveInventory ? 'Mantenimiento e inventario' : 'Ticket'} ${request.branchName}`
         : isPreventiveInventory
@@ -311,9 +327,11 @@ const ActivitiesTable: React.FC = () => {
       indicaciones: newActivity.indicaciones || undefined,
       prioridad: newActivity.prioridad,
       estatus: newActivity.estatus,
-      ticketType: newActivity.ticketType,
+      activityType: newActivity.activityType,
+      ticketType: newActivity.activityType === 'CLIENT' ? newActivity.ticketType : 'OTRO',
       workType: newActivity.workType,
-      clientId: newActivity.clientId ? Number(newActivity.clientId) : undefined,
+      clientId: newActivity.activityType === 'CLIENT' && newActivity.clientId ? Number(newActivity.clientId) : undefined,
+      projectId: newActivity.activityType === 'INTERNAL' && newActivity.projectId ? Number(newActivity.projectId) : undefined,
       branchName: newActivity.branchName || undefined,
       branchNumber: newActivity.branchNumber || undefined,
       branchCity: newActivity.branchCity || undefined,
@@ -369,7 +387,9 @@ const ActivitiesTable: React.FC = () => {
       fechaInicio: '',
       fechaMaxima: '',
       fechaEntregaEsperada: '',
+      activityType: 'CLIENT',
       clientId: '',
+      projectId: '',
       ticketType: 'PREVENTIVO',
       workType: 'ISSUE',
       branchName: '',
@@ -471,17 +491,40 @@ const ActivitiesTable: React.FC = () => {
             <div className={`activities-form-grid ${isMobile ? 'is-mobile' : ''}`}>
               <input className="input" placeholder="AN (auto)" value={nextAn || 'Calculando...'} disabled />
               <input className="input" placeholder="Titulo" value={newActivity.titulo} onChange={(e) => setNewActivity({ ...newActivity, titulo: e.target.value })} />
-              <select className="input" value={newActivity.ticketType} onChange={(e) => setNewActivity({ ...newActivity, ticketType: e.target.value })}>
-                <option value="PREVENTIVO">Preventivo</option>
-                <option value="CORRECTIVO">Correctivo</option>
-                <option value="EMERGENCIA">Emergencia</option>
-                <option value="INSTALACION">Instalacion</option>
-                <option value="OTRO">Otro</option>
+              <select className="input" value={newActivity.activityType} onChange={(e) => setNewActivity({ ...newActivity, activityType: e.target.value as 'CLIENT' | 'INTERNAL' })}>
+                <option value="CLIENT">Actividad para Cliente</option>
+                <option value="INTERNAL">Actividad Interna (Proyecto)</option>
               </select>
-              <select className="input" value={newActivity.workType} onChange={(e) => setNewActivity({ ...newActivity, workType: e.target.value })}>
-                <option value="ISSUE">Flujo: Ticket por problema</option>
-                <option value="PREVENTIVE_INVENTORY">Flujo: Mantenimiento e inventario</option>
-              </select>
+              {newActivity.activityType === 'CLIENT' ? (
+                <>
+                  <select className="input" value={newActivity.ticketType} onChange={(e) => setNewActivity({ ...newActivity, ticketType: e.target.value })}>
+                    <option value="PREVENTIVO">Tipo: Preventivo</option>
+                    <option value="CORRECTIVO">Tipo: Correctivo</option>
+                    <option value="EMERGENCIA">Tipo: Emergencia</option>
+                    <option value="INSTALACION">Tipo: Instalacion</option>
+                    <option value="OTRO">Tipo: Otro</option>
+                  </select>
+                  <select className="input" value={newActivity.clientId} onChange={(e) => setNewActivity({ ...newActivity, clientId: e.target.value })}>
+                    <option value="">Seleccionar cliente...</option>
+                    {clients.map((client) => (
+                      <option key={client.id} value={client.id}>{client.name}</option>
+                    ))}
+                  </select>
+                </>
+              ) : (
+                <>
+                  <select className="input" value={newActivity.projectId} onChange={(e) => setNewActivity({ ...newActivity, projectId: e.target.value })}>
+                    <option value="">Seleccionar proyecto...</option>
+                    {operationalProjects.filter(p => p.status === 'ACTIVE').map((project) => (
+                      <option key={project.id} value={project.id}>{project.title} ({project.client.name})</option>
+                    ))}
+                  </select>
+                  <select className="input" value={newActivity.workType} onChange={(e) => setNewActivity({ ...newActivity, workType: e.target.value })}>
+                    <option value="ISSUE">Flujo: Tickets de problemas</option>
+                    <option value="PREVENTIVE_INVENTORY">Flujo: Mantenimiento e inventario</option>
+                  </select>
+                </>
+              )}
               <select className="input" value={newActivity.responsableId} onChange={(e) => setNewActivity({ ...newActivity, responsableId: e.target.value })}>
                 <option value="">Responsable</option>
                 {assignableUsers.map((u) => (
@@ -490,23 +533,21 @@ const ActivitiesTable: React.FC = () => {
                   </option>
                 ))}
               </select>
-              <select className="input" value={newActivity.clientId} onChange={(e) => setNewActivity({ ...newActivity, clientId: e.target.value })}>
-                <option value="">Actividad interna (sin cliente)</option>
-                {clients.map((client) => (
-                  <option key={client.id} value={client.id}>{client.name}</option>
-                ))}
-              </select>
               <select className="input" value={newActivity.prioridad} onChange={(e) => setNewActivity({ ...newActivity, prioridad: e.target.value })}>
                 {prioridadList.map((p) => <option key={p} value={p}>{p}</option>)}
               </select>
               <select className="input" value={newActivity.estatus} onChange={(e) => setNewActivity({ ...newActivity, estatus: e.target.value })}>
                 {estatusList.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
-              <input className="input" placeholder="Sucursal" value={newActivity.branchName} onChange={(e) => setNewActivity({ ...newActivity, branchName: e.target.value })} />
-              <input className="input" placeholder="Número sucursal" value={newActivity.branchNumber} onChange={(e) => setNewActivity({ ...newActivity, branchNumber: e.target.value })} />
-              <input className="input" placeholder="Ciudad" value={newActivity.branchCity} onChange={(e) => setNewActivity({ ...newActivity, branchCity: e.target.value })} />
-              <input className="input" placeholder="Estado" value={newActivity.branchState} onChange={(e) => setNewActivity({ ...newActivity, branchState: e.target.value })} />
-              <input className="input" placeholder="Dirección sucursal" value={newActivity.branchAddress} onChange={(e) => setNewActivity({ ...newActivity, branchAddress: e.target.value })} />
+              {newActivity.activityType === 'CLIENT' && (
+                <>
+                  <input className="input" placeholder="Sucursal" value={newActivity.branchName} onChange={(e) => setNewActivity({ ...newActivity, branchName: e.target.value })} />
+                  <input className="input" placeholder="Número sucursal" value={newActivity.branchNumber} onChange={(e) => setNewActivity({ ...newActivity, branchNumber: e.target.value })} />
+                  <input className="input" placeholder="Ciudad" value={newActivity.branchCity} onChange={(e) => setNewActivity({ ...newActivity, branchCity: e.target.value })} />
+                  <input className="input" placeholder="Estado" value={newActivity.branchState} onChange={(e) => setNewActivity({ ...newActivity, branchState: e.target.value })} />
+                  <input className="input" placeholder="Dirección sucursal" value={newActivity.branchAddress} onChange={(e) => setNewActivity({ ...newActivity, branchAddress: e.target.value })} />
+                </>
+              )}
               <input className="input" type="number" placeholder="Tiempo estimado (min)" value={newActivity.tiempoEstimadoMin} onChange={(e) => setNewActivity({ ...newActivity, tiempoEstimadoMin: e.target.value })} />
               <input className="input" type="number" placeholder="Tiempo maximo (min)" value={newActivity.tiempoMaximoMin} onChange={(e) => setNewActivity({ ...newActivity, tiempoMaximoMin: e.target.value })} />
               <div>

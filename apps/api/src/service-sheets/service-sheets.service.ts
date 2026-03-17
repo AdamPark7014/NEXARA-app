@@ -6,6 +6,7 @@ import { UpsertServiceSheetDto } from './dto/upsert-service-sheet.dto.js';
 import { generateServiceSheetPdf } from './service-sheet-pdf.js';
 import fs from 'fs/promises';
 import path from 'path';
+import { PERMISSIONS } from '../common/permissions.js';
 
 @Injectable()
 export class ServiceSheetsService {
@@ -47,6 +48,56 @@ export class ServiceSheetsService {
     return sheet;
   }
 
+  async findAll(user: any) {
+    const isSuperAdmin = Boolean(user?.isSuperAdmin);
+    const isConsoleAdmin = Boolean(user?.permissions?.includes?.(PERMISSIONS.CONSOLE_ADMIN));
+    const departmentId = user?.departmentId;
+    const userId = user?.id;
+
+    let where: Prisma.ServiceSheetWhereInput | undefined;
+    if (isSuperAdmin) {
+      where = undefined;
+    } else if (isConsoleAdmin && departmentId) {
+      where = {
+        activity: {
+          responsable: {
+            departmentId,
+          },
+        },
+      };
+    } else if (userId) {
+      where = {
+        activity: {
+          responsableId: userId,
+        },
+      };
+    } else {
+      where = { id: -1 };
+    }
+
+    const sheets = await this.prisma['serviceSheet'].findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+      include: {
+        activity: {
+          include: {
+            client: true,
+            responsable: true,
+          },
+        },
+      },
+    });
+
+    return sheets.map((sheet) => ({
+      ...sheet,
+      clientName: sheet.activity?.client?.name || null,
+      technicianName: sheet.activity?.responsable?.nombre || null,
+      serviceType: sheet.activity?.ticketType || null,
+      status: sheet.activity?.estatus || null,
+    }));
+  }
+
   async findByActivity(activityId: number) {
     const sheet = await this.prisma['serviceSheet'].findUnique({ where: { activityId } });
     if (!sheet) throw new NotFoundException('Hoja de servicio no encontrada');
@@ -60,6 +111,16 @@ export class ServiceSheetsService {
     });
     if (!activity || !activity.serviceSheet) {
       throw new NotFoundException('Hoja de servicio no encontrada');
+    }
+
+    if (activity.serviceSheet.pdfUrl) {
+      const existingPath = path.resolve(process.cwd(), activity.serviceSheet.pdfUrl.replace(/^\//, ''));
+      try {
+        const existingPdf = await fs.readFile(existingPath);
+        return existingPdf;
+      } catch {
+        // If file is missing/corrupt, regenerate below.
+      }
     }
 
     const equipmentList = Array.isArray(activity.serviceSheet.equipmentList)

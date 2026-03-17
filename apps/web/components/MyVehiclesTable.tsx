@@ -42,6 +42,13 @@ const MyVehiclesTable: React.FC = () => {
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
   const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, '');
+  const extractList = <T,>(payload: unknown): T[] => {
+    if (Array.isArray(payload)) return payload as T[];
+    if (payload && typeof payload === 'object' && Array.isArray((payload as { data?: unknown[] }).data)) {
+      return (payload as { data: T[] }).data;
+    }
+    return [];
+  };
 
   const fetchRequests = () => {
     if (!user?.token) return;
@@ -50,7 +57,7 @@ const MyVehiclesTable: React.FC = () => {
       headers: { Authorization: `Bearer ${user.token}` },
     })
       .then((res) => res.ok ? res.json() : [])
-      .then((data) => setRequests(Array.isArray(data) ? data : []))
+      .then((data) => setRequests(extractList<VehicleRequest>(data)))
       .catch(() => setRequests([]))
       .finally(() => setLoading(false));
   };

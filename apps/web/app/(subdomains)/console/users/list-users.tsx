@@ -162,12 +162,18 @@ export default function ListUsers() {
         return r.json();
       })
       .then((data) => {
-        const filtered = Array.isArray(data)
-          ? data.filter((item) => {
+        const rawUsers = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.data)
+            ? data.data
+            : Array.isArray(data?.items)
+              ? data.items
+              : [];
+
+        const filtered = rawUsers.filter((item: any) => {
               const email = String(item?.email || '').toLowerCase();
               return email !== 'gerencia@nexara.com.mx' && email !== 'developer@nexara.com.mx';
-            })
-          : [];
+            });
         setUsers(filtered);
         setLoading(false);
       })
