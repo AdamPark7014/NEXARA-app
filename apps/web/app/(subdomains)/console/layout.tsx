@@ -56,6 +56,7 @@ const formatConsoleTitle = (pathname: string) => {
     news: "Noticias y comunicados",
     "contact-messages": "Mensajes de contacto",
     "service-clients": "Clientes de servicio",
+    projects: "Proyectos operacionales",
     newsletter: "Newsletter",
     "my-lunch-breaks": "Mis breaks y comidas",
     settings: "Configuración del sistema",

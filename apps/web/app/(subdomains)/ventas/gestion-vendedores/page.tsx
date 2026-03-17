@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import HelpTab from "@/components/HelpTab";
 import { useUser } from "@/components/UserContext";
 import { isSalesManagerUser } from "@/lib/panel-user";
 import {
@@ -35,6 +36,15 @@ type AttendanceRangeResponse = {
   totalMinutesAll: number;
   avgMinutesPerUser: number;
   users: AttendanceUserStat[];
+};
+
+type OperationalProjectSummary = {
+  id: number;
+  title: string;
+  status: "ACTIVE" | "ON_HOLD" | "COMPLETED";
+  vendor?: { id: number; nombre: string };
+  client?: { id: number; name: string };
+  activities?: Array<{ id: number }>;
 };
 
 type Period = "week" | "month" | "year";
@@ -97,6 +107,7 @@ export default function VentasGestionVendedoresPage() {
   const [vendorStats, setVendorStats] = useState<SalesVendorStats[]>([]);
   const [cockpit, setCockpit] = useState<SalesManagerCockpit | null>(null);
   const [attendance, setAttendance] = useState<AttendanceRangeResponse | null>(null);
+  const [operationalProjects, setOperationalProjects] = useState<OperationalProjectSummary[]>([]);
 
   const canManageSellers = isSalesManagerUser(user);
 
@@ -115,11 +126,14 @@ export default function VentasGestionVendedoresPage() {
       const { from, to } = getRangeForPeriod(period);
 
       try {
-        const [metricsData, vendorData, cockpitData, attendanceRes] = await Promise.all([
+        const [metricsData, vendorData, cockpitData, attendanceRes, projectsRes] = await Promise.all([
           getSalesMetrics(user.token, period),
           getSalesVendorStats(user.token, period),
           getSalesManagerCockpit(user.token, period),
           fetch(`${API_URL}/attendance/hierarchy/range?from=${from}&to=${to}`, {
+            headers: { Authorization: `Bearer ${user.token}` },
+          }),
+          fetch(`${API_URL}/operational-projects`, {
             headers: { Authorization: `Bearer ${user.token}` },
           }),
         ]);
@@ -148,10 +162,13 @@ export default function VentasGestionVendedoresPage() {
           };
         }
 
+        const projectsData = projectsRes.ok ? ((await projectsRes.json()) as OperationalProjectSummary[]) : [];
+
         setMetrics(metricsData);
         setVendorStats(vendorData);
         setCockpit(cockpitData);
         setAttendance(attendancePayload);
+        setOperationalProjects(Array.isArray(projectsData) ? projectsData : []);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Error al cargar la gestión de vendedores");
       } finally {
@@ -230,6 +247,29 @@ export default function VentasGestionVendedoresPage() {
       .slice(0, 8);
   }, [vendorStats]);
 
+  const projectRowsByVendor = useMemo(() => {
+    const grouped = new Map<number, { vendorName: string; total: number; active: number; onHold: number; completed: number; activities: number }>();
+    for (const project of operationalProjects) {
+      const vendorId = Number(project.vendor?.id || 0);
+      if (!vendorId) continue;
+      const current = grouped.get(vendorId) || {
+        vendorName: project.vendor?.nombre || `Vendedor ${vendorId}`,
+        total: 0,
+        active: 0,
+        onHold: 0,
+        completed: 0,
+        activities: 0,
+      };
+      current.total += 1;
+      current.activities += project.activities?.length || 0;
+      if (project.status === "ACTIVE") current.active += 1;
+      if (project.status === "ON_HOLD") current.onHold += 1;
+      if (project.status === "COMPLETED") current.completed += 1;
+      grouped.set(vendorId, current);
+    }
+    return Array.from(grouped.values()).sort((a, b) => b.active - a.active || b.total - a.total);
+  }, [operationalProjects]);
+
   if (!user) return <div style={{ padding: 16 }}>Cargando usuario...</div>;
 
   if (!canManageSellers) {
@@ -247,6 +287,7 @@ export default function VentasGestionVendedoresPage() {
 
   return (
     <section style={{ display: "grid", gap: 18, padding: "12px 4px 28px", position: "relative" }}>
+      <HelpTab module="sales-management" user={user} />
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
         <div>
           <p style={{ margin: 0, letterSpacing: "0.12em", textTransform: "uppercase", fontSize: 11, color: "var(--text-secondary)" }}>Ventas · Control Ejecutivo</p>
@@ -356,6 +397,41 @@ export default function VentasGestionVendedoresPage() {
           </ul>
         </article>
       </div>
+
+      <article className="card">
+        <h2>Proyectos operacionales por vendedor</h2>
+        <div style={{ overflowX: "auto" }}>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Vendedor</th>
+                <th>Total proyectos</th>
+                <th>Activos</th>
+                <th>En pausa</th>
+                <th>Cerrados</th>
+                <th>Actividades</th>
+              </tr>
+            </thead>
+            <tbody>
+              {projectRowsByVendor.length === 0 && (
+                <tr>
+                  <td colSpan={6} style={{ color: "var(--text-secondary)" }}>Sin proyectos operacionales registrados.</td>
+                </tr>
+              )}
+              {projectRowsByVendor.map((row) => (
+                <tr key={row.vendorName}>
+                  <td>{row.vendorName}</td>
+                  <td>{row.total}</td>
+                  <td>{row.active}</td>
+                  <td>{row.onHold}</td>
+                  <td>{row.completed}</td>
+                  <td>{row.activities}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </article>
 
       <article className="card">
         <h2>Verificación diaria de productividad</h2>

@@ -528,6 +528,10 @@ export default function CvsManagementPanel() {
                 <span className={styles.columnCount}>{cards.length}</span>
               </header>
 
+              {cards.length === 0 && (
+                <div className={styles.emptyColumn}>Sin CVs en esta etapa</div>
+              )}
+
               {cards.map((row) => (
                 <article
                   key={row.id}

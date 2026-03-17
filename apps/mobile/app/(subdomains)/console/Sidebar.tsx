@@ -143,8 +143,7 @@ export default function Sidebar() {
 
   const commercialItems: MenuItem[] = [
     { icon: "🏢", label: "Clientes corporativos", href: "/clients", anyPermissions: [PERMISSIONS.CLIENTS_VIEW, PERMISSIONS.CLIENTS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "🔧", label: "Clientes de servicio", href: "/service-clients", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "🎫", label: "Tickets de clientes", href: "/client-tickets", anyPermissions: [PERMISSIONS.CLIENTS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🧩", label: "Proyectos", href: "/projects", anyPermissions: [PERMISSIONS.ACTIVITIES_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
     { icon: "🧾", label: "Cotizaciones", href: "/cotizaciones", permissions: [PERMISSIONS.COTIZACIONES_ACCESS] },
     { icon: "📈", label: "Gestión comercial", href: "/gestion-vendedores", anyPermissions: [PERMISSIONS.SALES_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
     { icon: "📬", label: "Mensajes de contacto", href: "/contact-messages", permissions: [PERMISSIONS.CONSOLE_ADMIN] },

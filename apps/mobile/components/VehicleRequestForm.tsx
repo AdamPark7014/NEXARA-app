@@ -31,6 +31,13 @@ const VehicleRequestForm: React.FC<VehicleRequestFormProps> = ({ actividadId }) 
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
+  const extractList = <T,>(payload: unknown): T[] => {
+    if (Array.isArray(payload)) return payload as T[];
+    if (payload && typeof payload === 'object' && Array.isArray((payload as { data?: unknown[] }).data)) {
+      return (payload as { data: T[] }).data;
+    }
+    return [];
+  };
 
   const fetchVehicles = useCallback(async () => {
     if (!user?.token) return;
@@ -39,7 +46,7 @@ const VehicleRequestForm: React.FC<VehicleRequestFormProps> = ({ actividadId }) 
         headers: { Authorization: `Bearer ${user.token}` },
       });
       const data = res.ok ? await res.json() : [];
-      setVehicles(Array.isArray(data) ? data : []);
+      setVehicles(extractList<{ id: number; nombre: string; placas?: string | null; estatus?: string }>(data));
     } catch {
       setVehicles([]);
     }
@@ -52,7 +59,7 @@ const VehicleRequestForm: React.FC<VehicleRequestFormProps> = ({ actividadId }) 
         headers: { Authorization: `Bearer ${user.token}` },
       });
       const data = res.ok ? await res.json() : [];
-      setActividades(Array.isArray(data) ? data : []);
+      setActividades(extractList<ActivityOption>(data));
     } catch {
       setActividades([]);
     }

@@ -49,6 +49,13 @@ const VehicleTable = () => {
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
   const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, '');
+  const extractList = <T,>(payload: unknown): T[] => {
+    if (Array.isArray(payload)) return payload as T[];
+    if (payload && typeof payload === 'object' && Array.isArray((payload as { data?: unknown[] }).data)) {
+      return (payload as { data: T[] }).data;
+    }
+    return [];
+  };
 
 
   // Importar vehículos
@@ -78,7 +85,8 @@ const VehicleTable = () => {
       headers: { Authorization: `Bearer ${user.token}` },
     })
       .then((res) => res.json())
-      .then(data => Array.isArray(data) ? setVehicles(data) : setVehicles([]));
+      .then((data) => setVehicles(extractList<Vehicle>(data)))
+      .catch(() => setVehicles([]));
   };
 
   const fetchInventory = () => {
@@ -87,7 +95,7 @@ const VehicleTable = () => {
       headers: { Authorization: `Bearer ${user.token}` },
     })
       .then((res) => res.ok ? res.json() : [])
-      .then((data) => setInventory(Array.isArray(data) ? data : []))
+      .then((data) => setInventory(extractList<{ id: number; nombre: string; placas?: string | null; estatus?: string; activo?: boolean }>(data)))
       .catch(() => setInventory([]));
   };
 
@@ -202,7 +210,7 @@ const VehicleTable = () => {
       const updated = await fetch(buildApiUrl('vehicles'), {
         headers: { Authorization: `Bearer ${user.token}` },
       }).then(r => r.json());
-      setVehicles(updated);
+      setVehicles(extractList<Vehicle>(updated));
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
@@ -273,13 +281,17 @@ const VehicleTable = () => {
       return;
     }
     setError(null);
+    const payload = {
+      nombre: inventoryDraft.nombre.trim(),
+      placas: inventoryDraft.placas.trim(),
+    };
     const res = await fetch(buildApiUrl('vehicles/inventory'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${user.token}`,
       },
-      body: JSON.stringify({ nombre: inventoryDraft.nombre, placas: inventoryDraft.placas }),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -287,6 +299,7 @@ const VehicleTable = () => {
       return;
     }
     setInventoryDraft({ nombre: '', placas: '' });
+    setSuccess('Vehículo agregado al inventario');
     fetchInventory();
   };
 
