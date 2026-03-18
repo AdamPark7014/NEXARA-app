@@ -30,27 +30,34 @@ export default function ContabilidadLayout({ children }: { children: React.React
   const isSuperAdmin = Boolean(user?.isSuperAdmin);
   const isAdmin = isPlatformAdmin(user);
 
+  const withContaPrefix = (href: string) => {
+    if (!href.startsWith('/')) return `/contabilidad/${href}`;
+    if (href === '/paneles' || href === '/login') return href;
+    if (href === '/contabilidad' || href.startsWith('/contabilidad/')) return href;
+    return `/contabilidad${href}`;
+  };
+
   const navGroups = [
     {
       title: "Panorama financiero",
       items: [
-        { label: "Resumen ejecutivo", href: "/dashboard" },
-        { label: "Capital y liquidez", href: "/capital" },
+        { label: "Resumen ejecutivo", href: withContaPrefix("/dashboard") },
+        { label: "Capital y liquidez", href: withContaPrefix("/capital") },
       ],
     },
     {
       title: "RRHH y control de personal",
       items: [
-        { label: "Control de horas", href: "/horas" },
-        { label: "Viáticos", href: "/viaticos" },
-        { label: "Multas y sanciones", href: "/multas" },
+        { label: "Control de horas", href: withContaPrefix("/horas") },
+        { label: "Viáticos", href: withContaPrefix("/viaticos") },
+        { label: "Multas y sanciones", href: withContaPrefix("/multas") },
       ],
     },
     {
       title: "Operación contable",
       items: [
-        { label: "Pagos y dispersión", href: "/pagos" },
-        { label: "Proyectos y costos", href: "/proyectos" },
+        { label: "Pagos y dispersión", href: withContaPrefix("/pagos") },
+        { label: "Proyectos y costos", href: withContaPrefix("/proyectos") },
       ],
     },
   ];

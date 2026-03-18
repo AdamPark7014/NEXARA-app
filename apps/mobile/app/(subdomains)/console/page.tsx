@@ -16,7 +16,7 @@ export default function ConsolePanel() {
       return;
     }
     setActivePanel("console");
-    router.replace("/dashboard");
+    router.replace("/console/dashboard");
   }, [router, user]);
   return null;
 }

@@ -23,12 +23,19 @@ export default function WebPanelLayout({ children }: { children: React.ReactNode
     setActivePanel("web");
   }, []);
 
+  const withWebPrefix = (href: string) => {
+    if (!href.startsWith('/')) return `/web/${href}`;
+    if (href === '/paneles' || href === '/login') return href;
+    if (href === '/web' || href.startsWith('/web/')) return href;
+    return `/web${href}`;
+  };
+
   const navItems = [
-    { label: "Dashboard", href: "/dashboard" },
-    { label: "Clientes", href: "/clientes" },
-    { label: "Proyectos", href: "/proyectos" },
-    { label: "Contactos", href: "/contactos" },
-    { label: "Noticias", href: "/noticias" },
+    { label: "Dashboard", href: withWebPrefix("/dashboard") },
+    { label: "Clientes", href: withWebPrefix("/clientes") },
+    { label: "Proyectos", href: withWebPrefix("/proyectos") },
+    { label: "Contactos", href: withWebPrefix("/contactos") },
+    { label: "Noticias", href: withWebPrefix("/noticias") },
   ];
 
   // Si estamos en login, no renderizar el sidebar

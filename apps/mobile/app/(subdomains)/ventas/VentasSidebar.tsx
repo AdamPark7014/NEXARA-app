@@ -16,21 +16,28 @@ interface MenuItem {
   description?: string;
 }
 
+const withVentasPrefix = (href: string) => {
+  if (!href.startsWith('/')) return `/ventas/${href}`;
+  if (href === '/paneles' || href === '/login') return href;
+  if (href === '/ventas' || href.startsWith('/ventas/')) return href;
+  return `/ventas${href}`;
+};
+
 const menuItems: MenuItem[] = [
-  { label: "Dashboard", icon: "📊", href: "/dashboard", section: "Cuenta y panorama", description: "Visión general de ventas" },
+  { label: "Dashboard", icon: "📊", href: withVentasPrefix("/dashboard"), section: "Cuenta y panorama", description: "Visión general de ventas" },
 
-  { label: "Leads", icon: "🎯", href: "/leads", section: "Prospección comercial", description: "Gestiona leads potenciales" },
-  { label: "Oportunidades", icon: "💼", href: "/oportunidades", section: "Prospección comercial", description: "Oportunidades comerciales" },
+  { label: "Leads", icon: "🎯", href: withVentasPrefix("/leads"), section: "Prospección comercial", description: "Gestiona leads potenciales" },
+  { label: "Oportunidades", icon: "💼", href: withVentasPrefix("/oportunidades"), section: "Prospección comercial", description: "Oportunidades comerciales" },
 
-  { label: "Clientes", icon: "👥", href: "/clientes", section: "Clientes y ejecución", description: "Base de datos de clientes" },
-  { label: "Proyectos", icon: "📁", href: "/proyectos", section: "Clientes y ejecución", description: "Proyectos en desarrollo" },
-  { label: "Cotizaciones", icon: "📄", href: "/cotizaciones", section: "Clientes y ejecución", description: "Gestiona cotizaciones" },
-  { label: "Plantillas", icon: "🎨", href: "/plantillas", section: "Clientes y ejecución", description: "Plantillas de órdenes PDF" },
+  { label: "Clientes", icon: "👥", href: withVentasPrefix("/clientes"), section: "Clientes y ejecución", description: "Base de datos de clientes" },
+  { label: "Proyectos", icon: "📁", href: withVentasPrefix("/proyectos"), section: "Clientes y ejecución", description: "Proyectos en desarrollo" },
+  { label: "Cotizaciones", icon: "📄", href: withVentasPrefix("/cotizaciones"), section: "Clientes y ejecución", description: "Gestiona cotizaciones" },
+  { label: "Plantillas", icon: "🎨", href: withVentasPrefix("/plantillas"), section: "Clientes y ejecución", description: "Plantillas de órdenes PDF" },
 
-  { label: "Notificaciones", icon: "🔔", href: "/notificaciones", section: "Comunicación y seguimiento", description: "Centro de notificaciones" },
+  { label: "Notificaciones", icon: "🔔", href: withVentasPrefix("/notificaciones"), section: "Comunicación y seguimiento", description: "Centro de notificaciones" },
 
-  { label: "Reportes", icon: "📈", href: "/reportes", section: "Análisis y estrategia", description: "Reportes detallados" },
-  { label: "Crecimiento", icon: "📶", href: "/crecimiento", section: "Análisis y estrategia", description: "Análisis de crecimiento" },
+  { label: "Reportes", icon: "📈", href: withVentasPrefix("/reportes"), section: "Análisis y estrategia", description: "Reportes detallados" },
+  { label: "Crecimiento", icon: "📶", href: withVentasPrefix("/crecimiento"), section: "Análisis y estrategia", description: "Análisis de crecimiento" },
 ];
 
 const sectionOrder = [

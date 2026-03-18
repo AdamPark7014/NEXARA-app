@@ -18,11 +18,11 @@ export default function VentasIndex() {
     setActivePanel("ventas");
 
     if (isSalesManagerUser(user)) {
-      router.replace("/gestion-vendedores");
+      router.replace("/ventas/gestion-vendedores");
       return;
     }
 
-    router.replace("/dashboard");
+    router.replace("/ventas/dashboard");
   }, [router, user]);
 
   return null;
