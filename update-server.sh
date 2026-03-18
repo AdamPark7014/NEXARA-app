@@ -11,6 +11,9 @@ WEB_PORT="${WEB_PORT:-3000}"
 MOBILE_PORT="${MOBILE_PORT:-3002}"
 MOBILE_APP_URL="${MOBILE_APP_URL:-https://nexara.com.mx/login}"
 SKIP_CAP_SYNC="${SKIP_CAP_SYNC:-0}"
+HEALTHCHECK_RETRIES="${HEALTHCHECK_RETRIES:-30}"
+HEALTHCHECK_DELAY="${HEALTHCHECK_DELAY:-2}"
+HEALTHCHECK_TIMEOUT="${HEALTHCHECK_TIMEOUT:-8}"
 
 start_or_restart_pm2() {
   local app_name="$1"
@@ -33,6 +36,32 @@ run_build_serial() {
   shift
   echo "🧱 Compilando ${target} en serie (${BUILD_MODE})..."
   "$@"
+}
+
+wait_for_endpoint() {
+  local label="$1"
+  local url="$2"
+  local retries="$3"
+  local delay="$4"
+  local timeout="$5"
+
+  local attempt=1
+  while [ "$attempt" -le "$retries" ]; do
+    if curl -fsS --max-time "$timeout" "$url" >/dev/null; then
+      echo "✅ ${label} OK (${url})"
+      return 0
+    fi
+
+    if [ "$attempt" -lt "$retries" ]; then
+      echo "⏳ ${label} aún no responde (${attempt}/${retries}). Reintentando en ${delay}s..."
+      sleep "$delay"
+    fi
+
+    attempt=$((attempt + 1))
+  done
+
+  echo "❌ ${label} no respondió tras ${retries} intentos (${url})"
+  return 1
 }
 
 echo "🔄 Actualizando NEXARA-app desde GitHub..."
@@ -135,9 +164,23 @@ echo "✅ Verificando servicios..."
 pm2 list
 
 echo "🔎 Verificando endpoints locales..."
-curl -fsS "http://127.0.0.1:${API_PORT}/api" >/dev/null && echo "✅ API OK en :${API_PORT}" || echo "⚠️ API no respondió en :${API_PORT}"
-curl -fsS "http://127.0.0.1:${WEB_PORT}" >/dev/null && echo "✅ WEB OK en :${WEB_PORT}" || echo "⚠️ WEB no respondió en :${WEB_PORT}"
-curl -fsS "http://127.0.0.1:${MOBILE_PORT}" >/dev/null && echo "✅ MOBILE OK en :${MOBILE_PORT}" || echo "⚠️ MOBILE no respondió en :${MOBILE_PORT}"
+if wait_for_endpoint "API" "http://127.0.0.1:${API_PORT}/api/health" "$HEALTHCHECK_RETRIES" "$HEALTHCHECK_DELAY" "$HEALTHCHECK_TIMEOUT"; then
+  echo "✅ API OK en :${API_PORT}"
+else
+  echo "⚠️ API no respondió en :${API_PORT}"
+fi
+
+if wait_for_endpoint "WEB" "http://127.0.0.1:${WEB_PORT}" "$HEALTHCHECK_RETRIES" "$HEALTHCHECK_DELAY" "$HEALTHCHECK_TIMEOUT"; then
+  echo "✅ WEB OK en :${WEB_PORT}"
+else
+  echo "⚠️ WEB no respondió en :${WEB_PORT}"
+fi
+
+if wait_for_endpoint "MOBILE" "http://127.0.0.1:${MOBILE_PORT}" "$HEALTHCHECK_RETRIES" "$HEALTHCHECK_DELAY" "$HEALTHCHECK_TIMEOUT"; then
+  echo "✅ MOBILE OK en :${MOBILE_PORT}"
+else
+  echo "⚠️ MOBILE no respondió en :${MOBILE_PORT}"
+fi
 
 echo ""
 echo "🎉 ¡Actualización completada!"
