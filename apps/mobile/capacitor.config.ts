@@ -1,6 +1,6 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
-const appUrl = process.env.CAPACITOR_APP_URL || 'https://mobile.nexara.com.mx';
+const appUrl = process.env.CAPACITOR_APP_URL || 'https://nexara.com.mx/login';
 
 const config: CapacitorConfig = {
   // Bundle ID — must match the ID you register in Play Store / App Store

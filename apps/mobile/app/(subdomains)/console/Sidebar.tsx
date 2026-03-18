@@ -272,7 +272,20 @@ export default function Sidebar() {
     },
   ];
 
-  const groupsToRender = visibleGroups.length > 0 ? visibleGroups : fallbackGroups;
+  const withConsolePrefix = (href: string) => {
+    if (!href.startsWith('/')) return `/console/${href}`;
+    if (href === '/paneles' || href === '/login') return href;
+    if (href === '/console' || href.startsWith('/console/')) return href;
+    return `/console${href}`;
+  };
+
+  const groupsToRender = (visibleGroups.length > 0 ? visibleGroups : fallbackGroups).map((group) => ({
+    ...group,
+    items: group.items.map((item) => ({
+      ...item,
+      href: withConsolePrefix(item.href),
+    })),
+  }));
 
   const isPathActive = (href: string) => pathname === href || (pathname?.startsWith(`${href}/`) ?? false);
 

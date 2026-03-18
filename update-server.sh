@@ -9,7 +9,7 @@ PROJECT_DIR="/var/www/nexara-app"
 API_PORT="${API_PORT:-3001}"
 WEB_PORT="${WEB_PORT:-3000}"
 MOBILE_PORT="${MOBILE_PORT:-3002}"
-MOBILE_APP_URL="${MOBILE_APP_URL:-https://mobile.nexara.com.mx}"
+MOBILE_APP_URL="${MOBILE_APP_URL:-https://nexara.com.mx/login}"
 SKIP_CAP_SYNC="${SKIP_CAP_SYNC:-0}"
 
 start_or_restart_pm2() {
