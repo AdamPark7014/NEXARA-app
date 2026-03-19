@@ -20,6 +20,7 @@ interface NewsPost {
   id: number;
   title: string;
   slug: string;
+  status?: string;
   summary?: string | null;
   content: string;
   coverImageUrl?: string | null;
@@ -285,7 +286,7 @@ export default function Home() {
 
   const fetchNews = async () => {
     try {
-      const response = await fetch(buildApiUrl("news?status=PUBLISHED"));
+      const response = await fetch(buildApiUrl("news"));
       if (!response.ok) return;
       const raw = (await response.json()) as unknown;
       const rows = Array.isArray(raw) ? raw : [];
@@ -304,7 +305,11 @@ export default function Home() {
           updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : undefined,
         } as NewsPost;
       });
-      setNews(normalized);
+      const published = normalized.filter((item) => {
+        const status = String((item.status ?? "")).toUpperCase();
+        return !status || status === "PUBLISHED";
+      });
+      setNews(published);
     } catch (err) {
       console.error("Error al cargar noticias:", err);
     }
