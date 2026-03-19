@@ -43,6 +43,13 @@ type Highlight = {
   href: string;
 };
 
+const withWebPrefix = (href: string) => {
+  if (!href.startsWith("/")) return `/web/${href}`;
+  if (href === "/paneles" || href === "/login") return href;
+  if (href === "/web" || href.startsWith("/web/")) return href;
+  return `/web${href}`;
+};
+
 const formatDate = (value?: string | null) =>
   value ? new Date(value).toLocaleString() : "Sin fecha";
 
@@ -147,7 +154,7 @@ export default function WebPanel() {
         label: "Cliente reciente",
         title: latestClient.name,
         meta: formatDate(latestClient.createdAt),
-        href: "/clientes",
+        href: withWebPrefix("/clientes"),
       });
     }
     if (latestProject) {
@@ -155,7 +162,7 @@ export default function WebPanel() {
         label: "Proyecto reciente",
         title: latestProject.title,
         meta: `${latestProject.sector} · ${formatDate(latestProject.createdAt)}`,
-        href: "/proyectos",
+        href: withWebPrefix("/proyectos"),
       });
     }
     if (latestContact) {
@@ -165,7 +172,7 @@ export default function WebPanel() {
         meta: `${latestContact.company || latestContact.email} · ${formatDate(
           latestContact.createdAt
         )}`,
-        href: "/contactos",
+        href: withWebPrefix("/contactos"),
       });
     }
     if (latestNews) {
@@ -173,7 +180,7 @@ export default function WebPanel() {
         label: "Noticia reciente",
         title: latestNews.title,
         meta: `${latestNews.status} · ${formatDate(latestNews.createdAt)}`,
-        href: "/noticias",
+        href: withWebPrefix("/noticias"),
       });
     }
     return items;
@@ -198,10 +205,10 @@ export default function WebPanel() {
           </p>
         </div>
         <div className={styles.headerActions}>
-          <Link className={styles.primaryButton} href="/noticias">
+          <Link className={styles.primaryButton} href={withWebPrefix("/noticias")}>
             Crear noticia
           </Link>
-          <Link className={styles.secondaryButton} href="/contactos">
+          <Link className={styles.secondaryButton} href={withWebPrefix("/contactos")}>
             Ver contactos
           </Link>
         </div>
@@ -214,7 +221,7 @@ export default function WebPanel() {
               <h2 className={styles.cardValue}>{clients.length}</h2>
               <p className={styles.cardMeta}>Último: {latestClient?.name || "Sin registros"}</p>
             </div>
-            <Link className={styles.cardLink} href="/clientes">
+            <Link className={styles.cardLink} href={withWebPrefix("/clientes")}>
               Gestionar
             </Link>
           </div>
@@ -227,7 +234,7 @@ export default function WebPanel() {
                 {latestProject ? latestProject.title : "Sin registros"}
               </p>
             </div>
-            <Link className={styles.cardLink} href="/proyectos">
+            <Link className={styles.cardLink} href={withWebPrefix("/proyectos")}>
               Gestionar
             </Link>
           </div>
@@ -238,7 +245,7 @@ export default function WebPanel() {
               <h2 className={styles.cardValue}>{contacts.length}</h2>
               <p className={styles.cardMeta}>Abiertos: {openContacts}</p>
             </div>
-            <Link className={styles.cardLink} href="/contactos">
+            <Link className={styles.cardLink} href={withWebPrefix("/contactos")}>
               Gestionar
             </Link>
           </div>
@@ -249,7 +256,7 @@ export default function WebPanel() {
               <h2 className={styles.cardValue}>{news.length}</h2>
               <p className={styles.cardMeta}>Publicadas: {publishedNews}</p>
             </div>
-            <Link className={styles.cardLink} href="/noticias">
+            <Link className={styles.cardLink} href={withWebPrefix("/noticias")}>
               Gestionar
             </Link>
           </div>
@@ -295,19 +302,19 @@ export default function WebPanel() {
               </div>
             </div>
             <div className={styles.actionGrid}>
-              <Link className={styles.actionTile} href="/clientes">
+              <Link className={styles.actionTile} href={withWebPrefix("/clientes")}>
                 <span>Clientes</span>
                 <strong>Actualizar portafolio</strong>
               </Link>
-              <Link className={styles.actionTile} href="/proyectos">
+              <Link className={styles.actionTile} href={withWebPrefix("/proyectos")}>
                 <span>Proyectos</span>
                 <strong>Editar contenido</strong>
               </Link>
-              <Link className={styles.actionTile} href="/contactos">
+              <Link className={styles.actionTile} href={withWebPrefix("/contactos")}>
                 <span>Contactos</span>
                 <strong>Responder mensajes</strong>
               </Link>
-              <Link className={styles.actionTile} href="/noticias">
+              <Link className={styles.actionTile} href={withWebPrefix("/noticias")}>
                 <span>Noticias</span>
                 <strong>Publicar novedades</strong>
               </Link>

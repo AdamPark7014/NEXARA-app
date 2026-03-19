@@ -121,7 +121,7 @@ export default function VentasSidebar() {
       items.push({
         label: "Gestión Vendedores",
         icon: "🧠",
-        href: "/gestion-vendedores",
+        href: withVentasPrefix("/gestion-vendedores"),
         section: "Análisis y estrategia",
         description: "Control ejecutivo y productividad diaria",
       });
