@@ -45,6 +45,19 @@ interface HomeProject {
   createdAt: string;
 }
 
+const normalizeNewsGallery = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
+};
+
+const getNewsImages = (post: NewsPost | null): string[] => {
+  if (!post) return [];
+  const cover = typeof post.coverImageUrl === "string" && post.coverImageUrl.trim().length > 0
+    ? [post.coverImageUrl]
+    : [];
+  return [...cover, ...normalizeNewsGallery(post.galleryUrls)];
+};
+
 const API_URL = getApiBase();
 
 // Función para normalizar URLs de imágenes
@@ -274,8 +287,24 @@ export default function Home() {
     try {
       const response = await fetch(buildApiUrl("news?status=PUBLISHED"));
       if (!response.ok) return;
-      const data = (await response.json()) as NewsPost[];
-      setNews(data);
+      const raw = (await response.json()) as unknown;
+      const rows = Array.isArray(raw) ? raw : [];
+      const normalized = rows.map((entry) => {
+        const item = (entry ?? {}) as Partial<NewsPost>;
+        return {
+          id: Number(item.id) || 0,
+          title: typeof item.title === "string" ? item.title : "Sin título",
+          slug: typeof item.slug === "string" ? item.slug : "",
+          summary: typeof item.summary === "string" ? item.summary : null,
+          content: typeof item.content === "string" ? item.content : "",
+          coverImageUrl: typeof item.coverImageUrl === "string" ? item.coverImageUrl : null,
+          galleryUrls: normalizeNewsGallery(item.galleryUrls),
+          publishedAt: typeof item.publishedAt === "string" ? item.publishedAt : null,
+          createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
+          updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : undefined,
+        } as NewsPost;
+      });
+      setNews(normalized);
     } catch (err) {
       console.error("Error al cargar noticias:", err);
     }
@@ -364,14 +393,27 @@ export default function Home() {
     setSelectedImage(0);
   };
 
-  const renderParagraphs = (text: string) =>
-    text
+  const renderParagraphs = (text?: string | null) => {
+    const safeText = typeof text === "string" ? text : "";
+    const chunks = safeText
       .split(/\n{2,}/)
-      .map((chunk, index) => (
-        <p key={index} className={styles.newsModalParagraph}>
-          {chunk.trim()}
-        </p>
-      ));
+      .map((chunk) => chunk.trim())
+      .filter(Boolean);
+
+    if (!chunks.length) {
+      return [
+        <p key="empty" className={styles.newsModalParagraph}>
+          Sin contenido disponible.
+        </p>,
+      ];
+    }
+
+    return chunks.map((chunk, index) => (
+      <p key={index} className={styles.newsModalParagraph}>
+        {chunk}
+      </p>
+    ));
+  };
 
   return (
     <div className={`${styles.page} ${corporateStyles.root} ultra-corp-home ultra-corp-strict`}>
@@ -786,7 +828,7 @@ export default function Home() {
                     {formatNewsDate(selectedNews.publishedAt || selectedNews.createdAt)}
                   </span>
                   <span className={styles.newsModalCounter}>
-                    {Math.max(1, [selectedNews.coverImageUrl, ...selectedNews.galleryUrls].filter(Boolean).length)} imagenes
+                    {Math.max(1, getNewsImages(selectedNews).length)} imagenes
                   </span>
                 </div>
                 <div className={styles.newsModalBody}>
@@ -798,7 +840,7 @@ export default function Home() {
                   <img
                     src={
                       normalizeNewsImageUrl(
-                        selectedNews.galleryUrls[selectedImage] || selectedNews.coverImageUrl || undefined,
+                        getNewsImages(selectedNews)[selectedImage] || getNewsImages(selectedNews)[0] || undefined,
                         selectedNews.updatedAt || selectedNews.createdAt,
                       ) || "/soluciones/rect-b.jpg"
                     }
@@ -806,8 +848,7 @@ export default function Home() {
                   />
                 </div>
                 <div className={styles.newsModalGallery}>
-                  {[selectedNews.coverImageUrl, ...selectedNews.galleryUrls]
-                    .filter(Boolean)
+                  {getNewsImages(selectedNews)
                     .slice(0, 8)
                     .map((image, index) => (
                       <button
