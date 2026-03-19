@@ -51,7 +51,36 @@ const getProjects = async (): Promise<Project[]> => {
   try {
     const response = await fetch(buildApiUrl("projects"), { cache: "no-store" });
     if (!response.ok) return [];
-    return (await response.json()) as Project[];
+
+    const raw = (await response.json()) as unknown;
+    if (!Array.isArray(raw)) return [];
+
+    return raw.map((entry) => {
+      const item = (entry ?? {}) as Partial<Project>;
+      return {
+        id: Number(item.id) || 0,
+        slug: typeof item.slug === "string" ? item.slug : "",
+        title: typeof item.title === "string" ? item.title : "Proyecto sin titulo",
+        sector: typeof item.sector === "string" ? item.sector : "General",
+        summary: typeof item.summary === "string" ? item.summary : "",
+        impact: typeof item.impact === "string" ? item.impact : "",
+        services: Array.isArray(item.services)
+          ? item.services.filter((value): value is string => typeof value === "string")
+          : [],
+        tags: Array.isArray(item.tags)
+          ? item.tags.filter((value): value is string => typeof value === "string")
+          : [],
+        highlights: Array.isArray(item.highlights)
+          ? item.highlights.filter((value): value is string => typeof value === "string")
+          : [],
+        mainImage: typeof item.mainImage === "string" ? item.mainImage : null,
+        showInCatalog: Boolean(item.showInCatalog),
+        createdAt:
+          typeof item.createdAt === "string" && item.createdAt.trim().length > 0
+            ? item.createdAt
+            : new Date().toISOString(),
+      };
+    });
   } catch {
     return [];
   }
