@@ -32,10 +32,13 @@ export default function BrandsCarousel() {
 
       updateLoopWidth();
 
-      const resizeObserver = new ResizeObserver(() => {
-        updateLoopWidth();
-      });
-      resizeObserver.observe(track);
+      let resizeObserver: ResizeObserver | null = null;
+      if (typeof window !== 'undefined' && 'ResizeObserver' in window) {
+        resizeObserver = new ResizeObserver(() => {
+          updateLoopWidth();
+        });
+        resizeObserver.observe(track);
+      }
 
       const animate = (timestamp: number) => {
         const deltaSeconds = (timestamp - lastTimestamp) / 1000;
@@ -54,7 +57,7 @@ export default function BrandsCarousel() {
 
       return () => {
         window.cancelAnimationFrame(frameId);
-        resizeObserver.disconnect();
+        resizeObserver?.disconnect();
         track.style.transform = '';
       };
     };

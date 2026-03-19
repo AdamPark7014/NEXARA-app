@@ -23,13 +23,16 @@ export default function CertificationsCarousel() {
 
     updateLoopWidth();
 
-    const resizeObserver = new ResizeObserver(() => {
-      updateLoopWidth();
-      if (loopWidth > 0) {
-        position = position % loopWidth;
-      }
-    });
-    resizeObserver.observe(track);
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof window !== 'undefined' && 'ResizeObserver' in window) {
+      resizeObserver = new ResizeObserver(() => {
+        updateLoopWidth();
+        if (loopWidth > 0) {
+          position = position % loopWidth;
+        }
+      });
+      resizeObserver.observe(track);
+    }
 
     const animate = (timestamp: number) => {
       const deltaSeconds = (timestamp - lastTimestamp) / 1000;
@@ -47,7 +50,7 @@ export default function CertificationsCarousel() {
 
     return () => {
       window.cancelAnimationFrame(frameId);
-      resizeObserver.disconnect();
+      resizeObserver?.disconnect();
       track.style.transform = '';
     };
   }, []);
