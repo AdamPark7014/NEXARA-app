@@ -46,6 +46,43 @@ interface HomeProject {
   createdAt: string;
 }
 
+const normalizeStringArray = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
+};
+
+const normalizeClient = (value: unknown): Client => {
+  const item = (value ?? {}) as Partial<Client>;
+  return {
+    id: Number(item.id) || 0,
+    name: typeof item.name === "string" ? item.name : "Cliente sin nombre",
+    description: typeof item.description === "string" ? item.description : undefined,
+    imageUrl: typeof item.imageUrl === "string" ? item.imageUrl : undefined,
+  };
+};
+
+const normalizeProject = (value: unknown): HomeProject => {
+  const item = (value ?? {}) as Partial<HomeProject>;
+  return {
+    id: Number(item.id) || 0,
+    slug: typeof item.slug === "string" ? item.slug : "",
+    title: typeof item.title === "string" ? item.title : "Proyecto sin titulo",
+    sector: typeof item.sector === "string" ? item.sector : "General",
+    summary: typeof item.summary === "string" ? item.summary : null,
+    impact: typeof item.impact === "string" ? item.impact : null,
+    services: normalizeStringArray(item.services),
+    tags: normalizeStringArray(item.tags),
+    highlights: normalizeStringArray(item.highlights),
+    gallery: normalizeStringArray(item.gallery),
+    showInCatalog: Boolean(item.showInCatalog),
+    mainImage: typeof item.mainImage === "string" ? item.mainImage : null,
+    createdAt:
+      typeof item.createdAt === "string" && item.createdAt.trim().length > 0
+        ? item.createdAt
+        : new Date().toISOString(),
+  };
+};
+
 const normalizeNewsGallery = (value: unknown): string[] => {
   if (!Array.isArray(value)) return [];
   return value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
@@ -319,8 +356,8 @@ export default function Home() {
     try {
       const response = await fetch(buildApiUrl("clients"));
       if (response.ok) {
-        const data = await response.json();
-        setClients(data);
+        const raw = (await response.json()) as unknown;
+        setClients(Array.isArray(raw) ? raw.map(normalizeClient) : []);
       }
     } catch (err) {
       console.error("Error al cargar clientes:", err);
@@ -370,8 +407,8 @@ export default function Home() {
     try {
       const response = await fetch(buildApiUrl("projects"));
       if (!response.ok) return;
-      const data = (await response.json()) as HomeProject[];
-      setProjects(data);
+      const raw = (await response.json()) as unknown;
+      setProjects(Array.isArray(raw) ? raw.map(normalizeProject) : []);
     } catch (err) {
       console.error("Error al cargar proyectos:", err);
       setProjects([]);
