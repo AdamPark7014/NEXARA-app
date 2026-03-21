@@ -89,7 +89,12 @@ export default function BranchTicketsPage() {
 
   useEffect(() => {
     const saved = typeof window !== "undefined" ? window.sessionStorage.getItem("branchSession") : null;
-    if (saved) setSession(JSON.parse(saved));
+    if (!saved) return;
+    try {
+      setSession(JSON.parse(saved));
+    } catch {
+      window.sessionStorage.removeItem("branchSession");
+    }
   }, []);
 
   useEffect(() => {

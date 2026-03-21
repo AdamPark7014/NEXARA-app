@@ -363,6 +363,11 @@ async function bootstrap() {
   
   // Proteger /uploads con autenticación JWT
   app.use('/uploads', (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method.toUpperCase())) {
+      next();
+      return;
+    }
+
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       res.status(401).json({ statusCode: 401, message: 'Authentication required' });
