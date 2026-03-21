@@ -8,7 +8,7 @@ export class PaginationQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  page?: number = 1;
+  page?: number;
 
   @ApiPropertyOptional({ description: 'Registros por página', default: 20, minimum: 1, maximum: 100 })
   @IsOptional()
@@ -16,7 +16,7 @@ export class PaginationQueryDto {
   @IsInt()
   @Min(1)
   @Max(100)
-  limit?: number = 20;
+  limit?: number;
 
   @ApiPropertyOptional({ description: 'Término de búsqueda' })
   @IsOptional()
@@ -31,7 +31,7 @@ export class PaginationQueryDto {
   @ApiPropertyOptional({ description: 'Dirección de orden', enum: ['asc', 'desc'], default: 'desc' })
   @IsOptional()
   @IsString()
-  sortOrder?: 'asc' | 'desc' = 'desc';
+  sortOrder?: 'asc' | 'desc';
 
   /** Skip value for Prisma */
   get skip(): number {

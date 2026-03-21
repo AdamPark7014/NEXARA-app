@@ -32,7 +32,13 @@ export default function MyBranchesPage() {
   const [session, setSession] = useState<ClientSession | null>(() => {
     if (typeof window !== "undefined") {
       const saved = window.sessionStorage.getItem("clientSession");
-      return saved ? JSON.parse(saved) : null;
+      if (!saved) return null;
+      try {
+        return JSON.parse(saved);
+      } catch {
+        window.sessionStorage.removeItem("clientSession");
+        return null;
+      }
     }
     return null;
   });
