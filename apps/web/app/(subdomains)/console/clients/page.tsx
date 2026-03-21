@@ -58,7 +58,7 @@ export default function ClientsPage() {
       headers: { Authorization: `Bearer ${user.token}` },
     })
       .then((res) => res.ok ? res.json() : [])
-      .then((data) => setClients(Array.isArray(data) ? data : []))
+      .then((data) => setClients(Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : [])))
       .catch(() => setClients([]));
   };
 
