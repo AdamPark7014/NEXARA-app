@@ -142,7 +142,7 @@ export function ClientTicketsPanel({ embedded = false }: { embedded?: boolean })
     const activitiesData = activitiesRes.ok ? await activitiesRes.json() : [];
     const inventoriesData = inventoriesRes.ok ? await inventoriesRes.json() : [];
 
-    setClients(Array.isArray(clientsData) ? clientsData : []);
+    setClients(Array.isArray(clientsData) ? clientsData : (Array.isArray(clientsData?.data) ? clientsData.data : []));
     setActivities(Array.isArray(activitiesData) ? activitiesData : []);
     setInventories(Array.isArray(inventoriesData) ? inventoriesData : []);
     setLoading(false);

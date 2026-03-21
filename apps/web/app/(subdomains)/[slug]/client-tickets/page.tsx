@@ -123,7 +123,7 @@ export default function ClientTicketsPage() {
     const clientsData = clientsRes.ok ? await clientsRes.json() : [];
     const activitiesData = activitiesRes.ok ? await activitiesRes.json() : [];
 
-    setClients(Array.isArray(clientsData) ? clientsData : []);
+    setClients(Array.isArray(clientsData) ? clientsData : (Array.isArray(clientsData?.data) ? clientsData.data : []));
     setActivities(Array.isArray(activitiesData) ? activitiesData : []);
     setLoading(false);
   };

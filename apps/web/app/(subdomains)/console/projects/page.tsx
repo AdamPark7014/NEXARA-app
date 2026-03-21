@@ -74,7 +74,7 @@ export default function ConsoleProjectsPage() {
       const usersData = usersRes.ok ? await usersRes.json() : [];
 
       setProjects(Array.isArray(projectsData) ? projectsData : []);
-      setClients(Array.isArray(clientsData) ? clientsData : []);
+      setClients(Array.isArray(clientsData) ? clientsData : (Array.isArray(clientsData?.data) ? clientsData.data : []));
       setUsers(Array.isArray(usersData) ? usersData : []);
     } catch {
       setProjects([]);
