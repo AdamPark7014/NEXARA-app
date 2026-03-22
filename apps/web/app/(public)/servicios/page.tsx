@@ -1,9 +1,28 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import styles from "./page.module.css";
 
-export const metadata = {
-  title: "Servicios | Nexara",
-  description: "Soluciones y servicios tecnológicos integrales para empresas en México.",
+const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
+
+export const metadata: Metadata = {
+  title: "Servicios de Tecnologia Empresarial | Nexara",
+  description: "Infraestructura, ciberseguridad, equipamiento y servicios gestionados para empresas que exigen continuidad operativa.",
+  alternates: {
+    canonical: "/servicios",
+  },
+  openGraph: {
+    type: "website",
+    url: `${siteUrl}/servicios`,
+    title: "Servicios de Tecnologia Empresarial | Nexara",
+    description: "Servicios integrales de tecnologia para operaciones empresariales de alta demanda en Mexico.",
+    images: [{ url: "/logo-nexara.png", width: 1200, height: 630, alt: "Servicios Nexara" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Servicios de Tecnologia Empresarial | Nexara",
+    description: "Arquitectura, soporte y operacion TI para escalar empresas con control.",
+    images: ["/logo-nexara.png"],
+  },
 };
 
 export default function ServiciosPage() {
