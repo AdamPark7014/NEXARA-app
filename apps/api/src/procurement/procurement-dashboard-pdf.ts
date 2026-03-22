@@ -107,7 +107,7 @@ export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPay
       }
 
       const titleX = margin + 104;
-      const metaX = pageWidth - margin - 150;
+      const metaX = pageWidth - margin - 170;
       doc.fillColor(colors.navy).fontSize(20).font('Helvetica-Bold')
         .text('Reporte de Compras', titleX, 30, { width: 220 });
       doc.fontSize(10).font('Helvetica').fillColor(colors.muted)
@@ -116,11 +116,17 @@ export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPay
       const from = payload.fromDate ? formatDate(payload.fromDate) : '-';
       const to = payload.toDate ? formatDate(payload.toDate) : formatDate(new Date());
       doc.save();
-      doc.roundedRect(metaX - 10, 24, 160, 44, 6).fill('#FFFFFF');
+      doc.roundedRect(metaX - 12, 20, 182, 62, 6).fill('#FFFFFF');
       doc.restore();
-      doc.fillColor(colors.text).fontSize(10)
-        .text(`Periodo: ${from} - ${to}`, metaX, 34, { width: 140, align: 'left' })
-        .text(`Generado: ${formatDate(new Date())}`, metaX, 49, { width: 140, align: 'left' });
+      doc.fillColor(colors.text).fontSize(9).font('Helvetica-Bold')
+        .text('Periodo', metaX, 30, { width: 150, align: 'left' });
+      doc.fillColor(colors.text).fontSize(10).font('Helvetica')
+        .text(`${from} -`, metaX, 43, { width: 150, align: 'left', lineBreak: true })
+        .text(`${to}`, metaX, 55, { width: 150, align: 'left' });
+      doc.fillColor(colors.text).fontSize(9).font('Helvetica-Bold')
+        .text('Generado', metaX + 92, 30, { width: 64, align: 'left' });
+      doc.fillColor(colors.text).fontSize(10).font('Helvetica')
+        .text(formatDate(new Date()), metaX + 92, 43, { width: 64, align: 'left' });
     };
 
     // ── Section title ──────────────────────────────────────────────────────
