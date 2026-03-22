@@ -106,7 +106,48 @@ const helpContent: Record<string, Record<string, string>> = {
     ingeniero: `Si tu perfil participa en reclutamiento, aquí puedes subir CVs, revisar candidatos y dar seguimiento por etapas hasta su resolución.`,
     vendedor: `Si tienes acceso, aquí puedes consultar el estado de candidatos y sus documentos CV en el flujo de selección. Si no ves acciones esperadas, revisa permisos con administración.`
   },
-  // ...agregar más módulos aquí...
+  procurement: {
+    superadmin: `Aquí puedes supervisar todo el proceso de compras de la organización. Revisa requisiciones, órdenes de compra, proveedores registrados y estados de aprobación. Controla el flujo desde la solicitud hasta la entrega y valida cumplimiento de proveedores.`,
+    admin: `Aquí gestionas las compras de tu área. Puedes crear requisiciones, generar órdenes de compra, registrar proveedores, revisar pendientes de aprobación y dar seguimiento al estado de cada compra. Filtra por almacén destino para mejor control.`,
+    ingeniero: `Aquí solicitas compras para materiales o insumos necesarios en tus actividades. Completa la requisición con descripción, cantidad y almacén destino, luego sigue el estado de tu solicitud hasta que sea aprobada o convertida en orden de compra.`,
+    vendedor: `Si tu perfil tiene acceso, aquí puedes solicitar y consultar el estado de compras. Completa tus requisiciones y revisa si fueron aprobadas. Si no ves opciones de registro o tienes dudas, contacta a tu administrador.`
+  },
+  stock: {
+    superadmin: `Aquí puedes supervisar el inventario completo de la organización por almacén. Revisa niveles de stock, movimientos de entrada y salida, alertas de reabastecimiento y controla el inventario consumible para proyectos, ventas e insumos operacionales.`,
+    admin: `Aquí gestionas el inventario de tu área. Consulta niveles por almacén, registra movimientos de entrada y salida, revisa productos con stock bajo y valida la información para mantener un inventario actualizado y confiable.`,
+    ingeniero: `Aquí puedes consultar los niveles de stock disponibles por almacén. Si necesitas registrar un movimiento o ajuste de inventario, coordina con tu administrador o usa los permisos que tengas configurados.`,
+    vendedor: `Si tu perfil tiene acceso, aquí puedes consultar disponibilidad de stock por almacén para propósitos comerciales. Si necesitas información específica o no ves datos esperados, revisa con tu administrador.`
+  },
+  warehouse: {
+    superadmin: `Aquí puedes supervisar y administrar todos los almacenes de la organización. Crea almacenes nuevos, registra ubicaciones, códigos y direcciones, y controla la asignación de inventario por almacén. Visualiza la estructura logística completa.`,
+    admin: `Aquí gestionas los almacenes de tu área. Puedes crear nuevos almacenes, actualizar ubicaciones y códigos, y revisar qué inventario está asignado a cada almacén para coordinar operaciones logísticas.`,
+    ingeniero: `Aquí consultas los almacenes disponibles en la organización, su ubicación y la información de contacto cuando sea relevante para tu operación en campo o logística interna.`,
+    vendedor: `Si tienes acceso, aquí puedes consultar la lista de almacenes para referencia comercial o logística. Si necesitas crear o editar almacenes, coordina con tu administrador.`
+  },
+  tools: {
+    superadmin: `Aquí gestionas el inventario de herramientas internas de la organización: cámaras, monitores, laptops, equipos de medición y otros activos para uso operativo. Controla disponibilidad, asignaciones, mantenimiento y registro de devoluciones.`,
+    admin: `Aquí puedes revisar las herramientas disponibles para tu equipo, registrar asignaciones, solicitar herramientas necesarias y dar seguimiento a devoluciones. Mantén actualizado el estado de cada herramienta en tu área.`,
+    ingeniero: `Aquí consultas las herramientas disponibles en tu organización y puedes solicitar el equipo que necesitas para tus actividades en campo. Revisa el estado de tus solicitudes y coordina devoluciones con tu administrador.`,
+    vendedor: `Si tu perfil tiene acceso, aquí puedes consultar herramientas disponibles y solicitar el equipo que requieras. Si no ves opciones o tienes dudas, coordina con tu administrador.`
+  },
+  news: {
+    superadmin: `Aquí publicas noticias y comunicados internos para toda la organización. Crea anuncios, novedades operativas, cambios de política o información importante que todos deben conocer. Controla la visibilidad y fecha de publicación de cada comunicado.`,
+    admin: `Aquí puedes revisar los comunicados publicados en tu área y crear nuevas noticias relevantes para el equipo. Asegúrate de mantener la información actualizada y clara para que el equipo esté informado de cambios importantes.`,
+    ingeniero: `Aquí consultas las noticias y comunicados de la organización para estar al tanto de cambios, nuevas políticas, oportunidades o información que afecte tu trabajo. Revisa regularmente para no perder actualizaciones importantes.`,
+    vendedor: `Aquí puedes leer los últimos comunicados y noticias de la organización, incluyendo cambios comerciales, nuevas iniciativas o información relevante para tu operación. Mantente informado de las novedades.`
+  },
+  newsletter: {
+    superadmin: `Esta sección muestra el listado de personas suscritas al newsletter de la organización. Verás tres contadores: total de suscriptores registrados, cuántos están activos (recibirán correos) y cuántos están inactivos (dados de baja). Usa el buscador para filtrar por email o nombre. Actualmente solo gestiona la lista; para enviar boletines deberás usar la herramienta de correo externa configurada en tu proveedor de email.`,
+    admin: `Aquí consultas la lista de suscriptores al newsletter. Puedes buscar por email o nombre para verificar si alguien está registrado, ver si su estado es Activo o Inactivo, y revisar cuándo se registró. Si necesitas agregar o eliminar suscriptores, solicítalo al superadmin.`,
+    ingeniero: `Esta sección muestra quiénes están suscritos a los comunicados de la organización. Solo lectura para tu perfil; si quieres suscribirte o darte de baja, comunícate con tu administrador.`,
+    vendedor: `Aquí puedes ver el listado de suscriptores al newsletter de la empresa. Si tienes acceso, podrás buscar contactos registrados. Para cambiar tu suscripción habla con tu administrador.`
+  },
+  settings: {
+    superadmin: `Este módulo funciona con pares de clave-valor agrupados en categorías (General, Empresa, Fiscal, Notificaciones, Seguridad). Cada clave es un identificador técnico (ej: company_name) y su valor es el dato real que usa el sistema. Para editar: localiza la configuración en su categoría, cambia el valor en el campo de texto y presiona Guardar. Para crear una nueva: al fondo del panel escribe la clave (sin espacios, usa guiones bajos), el valor y opcionalmente una etiqueta legible, luego presiona Agregar. Para eliminar: presiona el ícono de basura. Los cambios se aplican inmediatamente en todo el sistema. La categoría Empresa almacena datos como nombre, RFC, dirección; Fiscal los datos fiscales; Notificaciones los umbrales de alertas; Seguridad los parámetros de acceso y contraseñas.`,
+    admin: `Esta sección muestra los parámetros de configuración del sistema. Está organizada en categorías: General (comportamiento base), Empresa (nombre, RFC, dirección), Fiscal (datos fiscales), Notificaciones (umbrales de alertas), Seguridad. Solo el superadmin puede modificarlos. Si detectas que alguna configuración es incorrecta — por ejemplo el nombre de empresa, dirección o algún umbral de alerta — notifícalo al superadmin indicando la clave y el valor correcto.`,
+    ingeniero: `Aquí puedes ver la configuración del sistema que afecta al funcionamiento global de la aplicación. Solo lectura para tu perfil. Si necesitas cambiar algo específico (como horarios o notificaciones que afecten tu trabajo), solicítalo al administrador indicando qué configuración necesita cambio.`,
+    vendedor: `Esta sección contiene parámetros del sistema. Solo es editable por administradores. Si identificas datos incorrectos que afecten tu operación comercial (como nombre de empresa en documentos), contacta a tu administrador.`
+  },
 };
 
 function getProfile(user: any): string {
@@ -117,6 +158,40 @@ function getProfile(user: any): string {
   return "ingeniero";
 }
 
+const moduleNames: Record<string, string> = {
+  procurement: "Compras y Requisiciones",
+  stock: "Inventario / Stock",
+  warehouse: "Almacenes",
+  attendance: "Asistencia",
+  "lunch-breaks": "Breaks de Comida",
+  fines: "Multas",
+  activities: "Actividades",
+  users: "Usuarios",
+  hr: "Recursos Humanos",
+  clients: "Clientes",
+  cotizaciones: "Cotizaciones",
+  "contact-messages": "Mensajes de Contacto",
+  "sales-management": "Gestión Comercial",
+  projects: "Proyectos",
+  evidences: "Evidencias",
+  viatics: "Viáticos",
+  vehicles: "Vehículos",
+  "service-sheets": "Hojas de Servicio",
+  gps: "GPS en Vivo",
+  cvs: "CVs / Candidatos",
+  workflow: "Flujo de Trabajo",
+  "work-projects": "Proyectos de Trabajo",
+  maintenance: "Mantenimiento",
+  audit: "Auditoría",
+  invoicing: "Facturación",
+  newsletter: "Boletín",
+  "client-tickets": "Tickets de Clientes",
+  production: "Producción",
+  news: "Noticias y Comunicados",
+  tools: "Herramientas Internas",
+  settings: "Configuración del Sistema",
+};
+
 export default function HelpTab({ module, user }: { module: string; user?: any }) {
   const { darkMode } = useTheme();
   if (module === "login") return null;
@@ -124,7 +199,7 @@ export default function HelpTab({ module, user }: { module: string; user?: any }
   const profile = getProfile(user);
   const content = helpContent[module]?.[profile] || "No hay ayuda disponible para este módulo.";
   const [open, setOpen] = React.useState(false);
-  const moduleLabel = module.replace(/-/g, " ");
+  const moduleLabel = moduleNames[module] || module.replace(/-/g, " ");
 
   const buttonStyle: React.CSSProperties = {
     width: 54,

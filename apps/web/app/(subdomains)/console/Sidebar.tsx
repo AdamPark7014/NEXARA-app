@@ -153,11 +153,12 @@ export default function Sidebar() {
   }
 
   // ── Empleado (auto-servicio) ──────────────────────────
-  // Solo ingeniero ve vistas personales
-  const employeeItems: MenuItem[] = [];
+  const employeeItems: MenuItem[] = [
+    { icon: "📊", label: "Resumen ejecutivo", href: "/dashboard", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+  ];
+  // Solo ingeniero ve vistas personales adicionales
   if (isIngeniero) {
     employeeItems.push(
-      { icon: "📊", label: "Resumen ejecutivo", href: "/dashboard" },
       { icon: "📋", label: "Mis actividades", href: "/my-activities" },
       { icon: "📸", label: "Mis evidencias", href: "/my-evidences" },
       { icon: "💼", label: "Mis viáticos", href: "/my-viatics" },
