@@ -225,10 +225,6 @@ export default async function ProjectsPage() {
     const project = sortedProjects[index];
     return {
       key: template.key,
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(catalogSchema) }}
-        />
       id: project ? String(project.id) : template.key,
       slug: project?.slug,
       title: template.title,
@@ -278,6 +274,10 @@ export default async function ProjectsPage() {
 
   return (
     <main className={`${styles.container} public-section-page ultra-corp-page ultra-corp-proyectos ultra-corp-strict`} aria-label="Catálogo de proyectos Nexara">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(catalogSchema) }}
+      />
       <header className={styles.hero}>
         <div>
           <p className={styles.kicker}>PORTAFOLIO TECNOLÓGICO</p>
