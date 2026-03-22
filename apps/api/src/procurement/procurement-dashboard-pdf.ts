@@ -24,7 +24,7 @@ export type ProcurementDashboardPayload = {
     id: number;
     supplierName: string;
     orderDate: Date;
-    expectedDate: Date;
+    expectedDate: Date | null;
     totalAmount: number;
     status: string;
   }>;
