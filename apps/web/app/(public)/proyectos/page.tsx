@@ -2,6 +2,7 @@ import Image from "next/image";
 import type { Metadata } from "next";
 import styles from "./page.module.css";
 import { buildApiUrl, getApiBase } from "@/lib/api-base";
+import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 
 const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
 
@@ -311,11 +312,12 @@ export default async function ProjectsPage() {
       </section>
 
       <section className={styles.bottomActions}>
-        <a href="/contacto" className={styles.consultButton}>
+        <a href="/contacto" data-track-conversion="projects_consult_cta" className={styles.consultButton}>
           Solicitar asesoría para mi sector
         </a>
         <a
           href={`${API_URL}/projects/catalog-pdf/download`}
+          data-track-conversion="projects_catalog_pdf"
           className={styles.pdfButton}
           target="_blank"
           rel="noopener noreferrer"
@@ -323,6 +325,8 @@ export default async function ProjectsPage() {
           Descargar PDF completo de proyectos
         </a>
       </section>
+
+      <SeoInterlinkHub title="Explora soluciones por industria" currentPath="/proyectos" maxItems={12} />
     </main>
   );
 }
