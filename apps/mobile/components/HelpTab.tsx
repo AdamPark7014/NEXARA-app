@@ -106,6 +106,36 @@ const helpContent: Record<string, Record<string, string>> = {
     ingeniero: `Si tu perfil participa en reclutamiento, aquí puedes subir CVs, revisar candidatos y dar seguimiento por etapas hasta su resolución.`,
     vendedor: `Si tienes acceso, aquí puedes consultar el estado de candidatos y sus documentos CV en el flujo de selección. Si no ves acciones esperadas, revisa permisos con administración.`
   },
+  manufacturing: {
+    superadmin: `Aquí defines la base técnica de manufactura: listas de materiales (BOM) y centros de trabajo. Flujo recomendado: 1) crea centros de trabajo con capacidad/costo, 2) crea BOM por producto y versión, 3) valida componentes y merma. Este módulo alimenta directamente la creación de órdenes de producción y su planeación.`,
+    admin: `Aquí configuras BOMs y centros de trabajo de tu operación. Registra códigos claros, capacidad por hora y costo para que la planificación calcule correctamente cargas y tiempos. Si una orden no aparece bien, revisa primero que su BOM y centro estén dados de alta.`,
+    ingeniero: `Aquí consultas la estructura de fabricación del producto (BOM) y los centros disponibles. Úsalo para confirmar componentes, cantidades base y recursos antes de ejecutar una orden de producción.`,
+    vendedor: `Normalmente este módulo es de configuración interna de planta. Si tu perfil tiene acceso, úsalo solo para consulta de estructura de producto y tiempos de manufactura estimados.`
+  },
+  production: {
+    superadmin: `Aquí gestionas el ciclo operativo de órdenes de producción: alta, arranque y cierre. Campos clave: productId, bomId, cantidad planeada, fechas planeadas y prioridad. Flujo: crear orden -> iniciar cuando entra a piso -> completar con cantidad producida real.`,
+    admin: `Aquí creas y das seguimiento a órdenes de producción. Para capturar correctamente: selecciona BOM, define cantidad, fechas y prioridad. Usa Iniciar para pasar de PLANNED a IN_PROGRESS y Completar para cerrar con la producción real.`,
+    ingeniero: `Aquí puedes revisar el avance de órdenes por estatus y porcentaje de cumplimiento. Verifica cantidad planificada vs completada y fechas para detectar atrasos o desviaciones.`,
+    vendedor: `Este módulo muestra estado productivo de órdenes para conocer capacidad y fechas de entrega. Generalmente es de consulta para tu perfil.`
+  },
+  "production-schedule": {
+    superadmin: `Aquí analizas la programación de planta por rango de fechas. Usa filtros Desde/Hasta para revisar carga operativa, órdenes activas y utilización de centros de trabajo; te ayuda a balancear capacidad y evitar sobrecarga.`,
+    admin: `Aquí planificas la producción diaria/semanal. Filtra por fechas para ver órdenes programadas y porcentaje de utilización por centro; si un centro se satura, redistribuye operaciones.`,
+    ingeniero: `Aquí consultas la secuencia de órdenes y la utilización de centros para coordinar ejecución en piso. Prioriza órdenes críticas y verifica ventanas de inicio/fin.`,
+    vendedor: `Si tienes acceso, aquí puedes consultar calendario productivo para estimar compromisos de entrega con clientes.`
+  },
+  quality: {
+    superadmin: `Aquí controlas la calidad de punta a punta: inspecciones, checklists y no conformidades (NCR). Flujo: crea inspección con criterios -> registra hallazgos -> si aplica, levanta NCR con severidad y acciones correctivas/preventivas.`,
+    admin: `Aquí operas control de calidad del área. Puedes capturar inspecciones con checklist, crear NCR y dar seguimiento por estatus para cerrar hallazgos. Asegúrate de documentar causa raíz y acciones para trazabilidad.`,
+    ingeniero: `Aquí registras o consultas inspecciones y resultados de calidad. Cuando detectes desviaciones, reporta no conformidad con evidencia y descripción clara para corrección rápida.`,
+    vendedor: `Este módulo suele ser de consulta para entender incidencias de calidad que puedan impactar entregas o satisfacción del cliente.`
+  },
+  "quality-dashboard": {
+    superadmin: `Aquí visualizas KPIs de calidad: inspecciones totales, tasa de aprobación, NCR abiertas y críticas. Úsalo para decisiones ejecutivas y priorización de acciones correctivas.`,
+    admin: `Aquí monitoreas el desempeño de calidad del equipo mediante indicadores y NCR recientes. Sirve para detectar focos rojos y dar seguimiento oportuno.`,
+    ingeniero: `Aquí puedes revisar indicadores de calidad y tendencias de no conformidades para prevenir recurrencias en la operación.`,
+    vendedor: `Si tienes acceso, este tablero te ayuda a entender el estado de calidad general y posibles riesgos para clientes.`
+  },
   procurement: {
     superadmin: `Aquí puedes supervisar todo el proceso de compras de la organización. Revisa requisiciones, órdenes de compra, proveedores registrados y estados de aprobación. Controla el flujo desde la solicitud hasta la entrega y valida cumplimiento de proveedores.`,
     admin: `Aquí gestionas las compras de tu área. Puedes crear requisiciones, generar órdenes de compra, registrar proveedores, revisar pendientes de aprobación y dar seguimiento al estado de cada compra. Filtra por almacén destino para mejor control.`,
@@ -186,7 +216,11 @@ const moduleNames: Record<string, string> = {
   invoicing: "Facturación",
   newsletter: "Boletín",
   "client-tickets": "Tickets de Clientes",
+  manufacturing: "Manufactura / BOM",
   production: "Producción",
+  "production-schedule": "Planificación de Producción",
+  quality: "Control de Calidad",
+  "quality-dashboard": "Dashboard de Calidad",
   news: "Noticias y Comunicados",
   tools: "Herramientas Internas",
   settings: "Configuración del Sistema",
