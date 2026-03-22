@@ -36,6 +36,8 @@ export default function StockPage() {
   const [levels, setLevels] = useState<StockLevel[]>([]);
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [alerts, setAlerts] = useState<any[]>([]);
+  const [warehouses, setWarehouses] = useState<Array<{ id: number; code: string; name: string }>>([]);
+  const [warehouseFilterId, setWarehouseFilterId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"levels" | "movements" | "alerts">("levels");
 
@@ -49,20 +51,28 @@ export default function StockPage() {
   const loadData = useCallback(() => {
     if (!user?.token) return;
     const headers = { Authorization: `Bearer ${user.token}` };
+    const warehouseParam = warehouseFilterId ? `warehouseId=${warehouseFilterId}` : "";
+    const withQuery = (path: string) => `${API_URL}${path}${warehouseParam ? (path.includes("?") ? "&" : "?") + warehouseParam : ""}`;
     setLoading(true);
     Promise.all([
-      fetch(`${API_URL}/stock/levels`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/stock/movements`, { headers }).then((r) => r.json()),
+      fetch(withQuery(`/stock/levels`), { headers }).then((r) => r.json()),
+      fetch(withQuery(`/stock/movements`), { headers }).then((r) => r.json()),
       fetch(`${API_URL}/stock/alerts/low-stock`, { headers }).then((r) => r.json()),
+      fetch(`${API_URL}/warehouse`, { headers }).then((r) => r.json()),
     ])
-      .then(([l, m, a]) => {
+      .then(([l, m, a, w]) => {
         setLevels(Array.isArray(l) ? l : l.data || []);
         setMovements(Array.isArray(m) ? m : m.data || []);
-        setAlerts(Array.isArray(a) ? a : a.data || []);
+        const rawAlerts = Array.isArray(a) ? a : a.data || [];
+        const filteredAlerts = warehouseFilterId
+          ? rawAlerts.filter((item: any) => String(item.warehouseId || item.warehouse?.id || "") === warehouseFilterId)
+          : rawAlerts;
+        setAlerts(filteredAlerts);
+        setWarehouses(Array.isArray(w) ? w : w.data || []);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [user?.token]);
+  }, [user?.token, warehouseFilterId]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -77,13 +87,16 @@ export default function StockPage() {
   }, [levels]);
 
   const uniqueWarehouses = useMemo(() => {
+    if (warehouses.length > 0) {
+      return warehouses.map((w) => ({ id: w.id, name: `${w.code} - ${w.name}` }));
+    }
     const seen = new Set<number>();
     return levels.reduce<Array<{ id: number; name: string }>>((acc, l: any) => {
       const w = l.warehouse ?? { id: l.warehouseId, name: l.warehouseName };
       if (w.id && !seen.has(w.id)) { seen.add(w.id); acc.push(w); }
       return acc;
     }, []);
-  }, [levels]);
+  }, [levels, warehouses]);
 
   const submitMovement = async () => {
     if (!movForm.productId || !movForm.warehouseId || !movForm.quantity) return;
@@ -151,6 +164,21 @@ export default function StockPage() {
             </button>
           )}
         </div>
+
+        {!loading && (
+          <div className="card" style={{ padding: 12, display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
+            <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Filtrar por almacén</label>
+            <select
+              value={warehouseFilterId}
+              onChange={(e) => setWarehouseFilterId(e.target.value)}
+              style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-primary)", color: "var(--text-primary)" }}>
+              <option value="">Todos los almacenes</option>
+              {warehouses.map((w) => (
+                <option key={w.id} value={String(w.id)}>{w.code} - {w.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
         {/* KPI Cards */}
         {!loading && levels.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>

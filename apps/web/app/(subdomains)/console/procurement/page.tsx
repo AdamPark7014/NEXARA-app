@@ -28,7 +28,9 @@ export default function ProcurementPage() {
   const { user } = useUser();
   const [requisitions, setRequisitions] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
-  const [suppliers, setSuppliers] = useState<Array<{ id: number; name: string }>>([]);
+  const [suppliers, setSuppliers] = useState<Array<{ id: number; name: string; description?: string | null; apiUrl?: string | null }>>([]);
+  const [warehouses, setWarehouses] = useState<Array<{ id: number; code: string; name: string }>>([]);
+  const [warehouseFilterId, setWarehouseFilterId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"requisitions" | "orders" | "suppliers">("requisitions");
 
@@ -37,6 +39,9 @@ export default function ProcurementPage() {
   const [showOCModal, setShowOCModal] = useState(false);
   const [reqForm, setReqForm] = useState(emptyReqForm());
   const [ocForm, setOCForm] = useState(emptyOCForm());
+  const [reqWarehouseId, setReqWarehouseId] = useState<string>("");
+  const [ocWarehouseId, setOcWarehouseId] = useState<string>("");
+  const [supplierForm, setSupplierForm] = useState({ name: "", description: "", apiUrl: "" });
   const [saving, setSaving] = useState(false);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
 
@@ -52,11 +57,13 @@ export default function ProcurementPage() {
       fetch(`${API_URL}/procurement/requisitions`, { headers }).then((r) => r.json()),
       fetch(`${API_URL}/procurement/purchase-orders`, { headers }).then((r) => r.json()),
       fetch(`${API_URL}/procurement/purchase-orders/suppliers`, { headers }).then((r) => r.json()),
+      fetch(`${API_URL}/warehouse`, { headers }).then((r) => r.json()),
     ])
-      .then(([req, ord, sup]) => {
+      .then(([req, ord, sup, wh]) => {
         setRequisitions(Array.isArray(req) ? req : req.data || []);
         setOrders(Array.isArray(ord) ? ord : ord.data || []);
         setSuppliers(Array.isArray(sup) ? sup : []);
+        setWarehouses(Array.isArray(wh) ? wh : wh.data || []);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -77,6 +84,12 @@ export default function ProcurementPage() {
 
   const submitRequisition = async () => {
     if (!reqForm.title.trim() || reqForm.items.some((i) => !i.description.trim())) return;
+    const normalizedItems = reqForm.items.map((i) => i.description.trim().toLowerCase());
+    if (new Set(normalizedItems).size !== normalizedItems.length) {
+      alert("Hay artículos repetidos en la requisición.");
+      return;
+    }
+    const warehouseTag = reqWarehouseId ? `[WH:${reqWarehouseId}]` : "";
     setSaving(true);
     try {
       const res = await fetch(`${API_URL}/procurement/requisitions`, {
@@ -84,7 +97,7 @@ export default function ProcurementPage() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${user?.token}` },
         body: JSON.stringify({
           title: reqForm.title,
-          description: reqForm.description || undefined,
+          description: [reqForm.description || "", warehouseTag].filter(Boolean).join("\n") || undefined,
           priority: reqForm.priority,
           requiredDate: reqForm.requiredDate || undefined,
           items: reqForm.items.map((i) => ({
@@ -97,6 +110,7 @@ export default function ProcurementPage() {
       if (!res.ok) throw new Error();
       setShowReqModal(false);
       setReqForm(emptyReqForm());
+      setReqWarehouseId("");
       loadData();
     } catch {
       alert("Error al crear la requisición");
@@ -118,6 +132,13 @@ export default function ProcurementPage() {
 
   const submitOC = async () => {
     if (!ocForm.supplierName.trim() || ocForm.items.some((i) => !i.description.trim() || !i.unitPrice)) return;
+    const normalizedItems = ocForm.items.map((i) => i.description.trim().toLowerCase());
+    if (new Set(normalizedItems).size !== normalizedItems.length) {
+      alert("Hay artículos repetidos en la orden de compra.");
+      return;
+    }
+    const selectedWarehouse = warehouses.find((w) => String(w.id) === ocWarehouseId);
+    const warehouseTag = selectedWarehouse ? `[WH:${selectedWarehouse.id}] ${selectedWarehouse.code} - ${selectedWarehouse.name}` : "";
     setSaving(true);
     try {
       const res = await fetch(`${API_URL}/procurement/purchase-orders`, {
@@ -127,7 +148,8 @@ export default function ProcurementPage() {
           supplierName: ocForm.supplierName,
           orderDate: ocForm.orderDate,
           expectedDate: ocForm.expectedDate || undefined,
-          notes: ocForm.notes || undefined,
+          shippingAddress: warehouseTag || undefined,
+          notes: [warehouseTag, ocForm.notes].filter(Boolean).join("\n") || undefined,
           items: ocForm.items.map((i) => ({
             description: i.description,
             quantity: Number(i.quantity),
@@ -138,9 +160,34 @@ export default function ProcurementPage() {
       if (!res.ok) throw new Error();
       setShowOCModal(false);
       setOCForm(emptyOCForm());
+      setOcWarehouseId("");
       loadData();
     } catch {
       alert("Error al crear la orden de compra");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const submitSupplier = async () => {
+    if (!supplierForm.name.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_URL}/procurement/purchase-orders/suppliers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${user?.token}` },
+        body: JSON.stringify({
+          name: supplierForm.name,
+          description: supplierForm.description || undefined,
+          apiUrl: supplierForm.apiUrl || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      setSupplierForm({ name: "", description: "", apiUrl: "" });
+      loadData();
+      setTab("suppliers");
+    } catch {
+      alert("Error al registrar proveedor");
     } finally {
       setSaving(false);
     }
@@ -200,9 +247,20 @@ export default function ProcurementPage() {
   };
   const labelStyle: React.CSSProperties = { fontSize: 12, color: "var(--text-secondary)", marginBottom: 4, display: "block" };
 
+  const hasWarehouseMarker = (text?: string | null, id?: string) => {
+    if (!id) return true;
+    return (text || "").includes(`[WH:${id}]`);
+  };
+
+  const filteredRequisitions = requisitions.filter((r: any) => hasWarehouseMarker(r.description, warehouseFilterId));
+  const filteredOrders = orders.filter((o: any) =>
+    hasWarehouseMarker(o.shippingAddress, warehouseFilterId) || hasWarehouseMarker(o.notes, warehouseFilterId)
+  );
+
   return (
     <RoleGuard anyPermissions={[PERMISSIONS.PROCUREMENT_VIEW, PERMISSIONS.PROCUREMENT_MANAGE]}>
       <div style={{ display: "grid", gap: 24 }}>
+        <HelpTab module="procurement" user={user} />
         {/* Header */}
         <div className="card" style={{ padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <div>
@@ -254,11 +312,26 @@ export default function ProcurementPage() {
           <button onClick={() => setTab("suppliers")} style={tabStyle("suppliers")}>🏢 Proveedores</button>
         </div>
 
+        {!loading && (
+          <div className="card" style={{ padding: 12, display: "grid", gap: 8 }}>
+            <label style={{ fontSize: 12, color: "var(--text-secondary)" }}>Filtrar compras por almacén destino</label>
+            <select
+              value={warehouseFilterId}
+              onChange={(e) => setWarehouseFilterId(e.target.value)}
+              style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border-color)", background: "var(--bg-primary)", color: "var(--text-primary)" }}>
+              <option value="">Todos los almacenes</option>
+              {warehouses.map((w) => (
+                <option key={w.id} value={String(w.id)}>{w.code} - {w.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Content */}
         {loading ? (
           <p style={{ textAlign: "center", color: "var(--text-secondary)" }}>Cargando...</p>
         ) : tab === "requisitions" ? (
-          requisitions.length === 0 ? (
+          filteredRequisitions.length === 0 ? (
             <div className="card" style={{ padding: 32, textAlign: "center" }}>
               <p style={{ color: "var(--text-secondary)", marginBottom: 12 }}>No hay requisiciones registradas.</p>
               {canRequest && (
@@ -282,7 +355,7 @@ export default function ProcurementPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {requisitions.map((r: any) => (
+                  {filteredRequisitions.map((r: any) => (
                     <tr key={r.id}>
                       <td><strong>REQ-{r.id}</strong></td>
                       <td>{r.title}</td>
@@ -321,7 +394,7 @@ export default function ProcurementPage() {
             </div>
           )
         ) : tab === "orders" ? (
-          orders.length === 0 ? (
+          filteredOrders.length === 0 ? (
             <div className="card" style={{ padding: 32, textAlign: "center" }}>
               <p style={{ color: "var(--text-secondary)", marginBottom: 12 }}>No hay órdenes de compra.</p>
               {canManage && (
@@ -343,7 +416,7 @@ export default function ProcurementPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.map((o: any) => (
+                  {filteredOrders.map((o: any) => (
                     <tr key={o.id}>
                       <td><strong>OC-{o.id}</strong></td>
                       <td>{o.supplierName || o.supplier?.name || "—"}</td>
@@ -361,8 +434,56 @@ export default function ProcurementPage() {
             </div>
           )
         ) : (
-          <div className="card" style={{ padding: 24, textAlign: "center" }}>
-            <p style={{ color: "var(--text-secondary)" }}>Módulo de evaluación de proveedores disponible próximamente.</p>
+          <div style={{ display: "grid", gap: 12 }}>
+            <div className="card" style={{ padding: 16 }}>
+              <h3 style={{ margin: "0 0 10px", color: "var(--primary)" }}>Registrar Proveedor</h3>
+              <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+                <div>
+                  <label style={labelStyle}>Nombre *</label>
+                  <input style={inputStyle} value={supplierForm.name} onChange={(e) => setSupplierForm((f) => ({ ...f, name: e.target.value }))} placeholder="Ej. Proveedora del Norte" />
+                </div>
+                <div>
+                  <label style={labelStyle}>URL / API</label>
+                  <input style={inputStyle} value={supplierForm.apiUrl} onChange={(e) => setSupplierForm((f) => ({ ...f, apiUrl: e.target.value }))} placeholder="https://..." />
+                </div>
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={labelStyle}>Descripción</label>
+                  <textarea style={{ ...inputStyle, minHeight: 60, resize: "vertical" }} value={supplierForm.description} onChange={(e) => setSupplierForm((f) => ({ ...f, description: e.target.value }))} placeholder="Materiales, tiempos de entrega, notas..." />
+                </div>
+              </div>
+              <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
+                <button onClick={submitSupplier} disabled={saving || !canManage} style={{ padding: "8px 16px", background: "var(--primary)", color: "#fff", border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer" }}>
+                  {saving ? "Guardando..." : "Guardar proveedor"}
+                </button>
+              </div>
+            </div>
+
+            <div className="card" style={{ overflow: "auto" }}>
+              {suppliers.length === 0 ? (
+                <div style={{ padding: 24, textAlign: "center" }}>
+                  <p style={{ color: "var(--text-secondary)" }}>No hay proveedores registrados.</p>
+                </div>
+              ) : (
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Proveedor</th>
+                      <th>Descripción</th>
+                      <th>URL / API</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {suppliers.map((s) => (
+                      <tr key={s.id}>
+                        <td><strong>{s.name}</strong></td>
+                        <td>{s.description || "—"}</td>
+                        <td>{s.apiUrl || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
         )}
 
@@ -396,6 +517,13 @@ export default function ProcurementPage() {
                     <input type="date" style={inputStyle} value={reqForm.requiredDate} onChange={(e) => setReqForm((f) => ({ ...f, requiredDate: e.target.value }))} />
                   </div>
                 </div>
+                <div>
+                  <label style={labelStyle}>Almacén destino</label>
+                  <select style={inputStyle} value={reqWarehouseId} onChange={(e) => setReqWarehouseId(e.target.value)}>
+                    <option value="">Sin especificar</option>
+                    {warehouses.map((w) => <option key={w.id} value={String(w.id)}>{w.code} - {w.name}</option>)}
+                  </select>
+                </div>
 
                 {/* Items */}
                 <div>
@@ -428,7 +556,7 @@ export default function ProcurementPage() {
               </div>
 
               <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-                <button onClick={() => { setShowReqModal(false); setReqForm(emptyReqForm()); }} style={{ padding: "8px 20px", background: "var(--bg-secondary)", color: "var(--text-primary)", border: "none", borderRadius: 8, cursor: "pointer" }}>
+                <button onClick={() => { setShowReqModal(false); setReqForm(emptyReqForm()); setReqWarehouseId(""); }} style={{ padding: "8px 20px", background: "var(--bg-secondary)", color: "var(--text-primary)", border: "none", borderRadius: 8, cursor: "pointer" }}>
                   Cancelar
                 </button>
                 <button onClick={submitRequisition} disabled={saving} style={{ padding: "8px 20px", background: "var(--primary)", color: "#fff", border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer" }}>
@@ -470,6 +598,13 @@ export default function ProcurementPage() {
                   </div>
                 </div>
                 <div>
+                  <label style={labelStyle}>Almacén para entrada de stock</label>
+                  <select style={inputStyle} value={ocWarehouseId} onChange={(e) => setOcWarehouseId(e.target.value)}>
+                    <option value="">Sin especificar</option>
+                    {warehouses.map((w) => <option key={w.id} value={String(w.id)}>{w.code} - {w.name}</option>)}
+                  </select>
+                </div>
+                <div>
                   <label style={labelStyle}>Notas</label>
                   <textarea style={{ ...inputStyle, minHeight: 56, resize: "vertical" }} value={ocForm.notes} onChange={(e) => setOCForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Condiciones, observaciones..." />
                 </div>
@@ -505,7 +640,7 @@ export default function ProcurementPage() {
               </div>
 
               <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-                <button onClick={() => { setShowOCModal(false); setOCForm(emptyOCForm()); }} style={{ padding: "8px 20px", background: "var(--bg-secondary)", color: "var(--text-primary)", border: "none", borderRadius: 8, cursor: "pointer" }}>
+                <button onClick={() => { setShowOCModal(false); setOCForm(emptyOCForm()); setOcWarehouseId(""); }} style={{ padding: "8px 20px", background: "var(--bg-secondary)", color: "var(--text-primary)", border: "none", borderRadius: 8, cursor: "pointer" }}>
                   Cancelar
                 </button>
                 <button onClick={submitOC} disabled={saving} style={{ padding: "8px 20px", background: "var(--success)", color: "#fff", border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer" }}>

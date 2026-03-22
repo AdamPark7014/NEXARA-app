@@ -92,8 +92,27 @@ export class ProcurementService {
   async listSuppliers() {
     return this.prisma.supplier.findMany({
       where: { isActive: true },
-      select: { id: true, name: true },
+      select: { id: true, name: true, description: true, apiUrl: true },
       orderBy: { name: 'asc' },
+    });
+  }
+
+  async createSupplier(dto: { name: string; description?: string; apiUrl?: string }) {
+    const name = dto.name?.trim();
+    if (!name) throw new BadRequestException('Nombre de proveedor requerido');
+    return this.prisma.supplier.upsert({
+      where: { name },
+      update: {
+        description: dto.description?.trim() || undefined,
+        apiUrl: dto.apiUrl?.trim() || undefined,
+        isActive: true,
+      },
+      create: {
+        name,
+        description: dto.description?.trim() || null,
+        apiUrl: dto.apiUrl?.trim() || null,
+      },
+      select: { id: true, name: true, description: true, apiUrl: true },
     });
   }
 
@@ -331,6 +350,119 @@ export class ProcurementService {
         supplierId: s.supplierId,
         avgScore: Number(s._avg.overallScore || 0),
         evaluationCount: s._count,
+      })),
+    };
+  }
+
+  async getProcurementDashboardForPdf(fromDate?: string, toDate?: string) {
+    const from = fromDate ? new Date(fromDate) : new Date(new Date().setDate(new Date().getDate() - 30));
+    const to = toDate ? new Date(toDate) : new Date();
+
+    const [
+      pendingReqs,
+      activePOs,
+      overdueDeliveries,
+      totalSpend,
+      topSuppliers,
+      requisitions,
+      orders,
+    ] = await Promise.all([
+      this.prisma.purchaseRequisition.count({
+        where: { status: 'SUBMITTED', createdAt: { gte: from, lte: to } },
+      }),
+      this.prisma.purchaseOrder.count({
+        where: {
+          status: { in: ['DRAFT', 'CONFIRMED', 'PARTIALLY_RECEIVED'] },
+          orderDate: { gte: from, lte: to },
+        },
+      }),
+      this.prisma.purchaseOrder.count({
+        where: {
+          status: { in: ['CONFIRMED', 'PARTIALLY_RECEIVED'] },
+          expectedDate: { lt: new Date(), gte: from, lte: to },
+        },
+      }),
+      this.prisma.purchaseOrder.aggregate({
+        where: {
+          status: { notIn: ['CANCELLED'] },
+          orderDate: { gte: from, lte: to },
+        },
+        _sum: { totalAmount: true },
+      }),
+      this.prisma.supplierEvaluation.groupBy({
+        by: ['supplierId'],
+        where: { createdAt: { gte: from, lte: to } },
+        _avg: { overallScore: true },
+        _count: true,
+        orderBy: { _avg: { overallScore: 'desc' } },
+        take: 5,
+      }),
+      this.prisma.purchaseRequisition.findMany({
+        where: { createdAt: { gte: from, lte: to } },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          priority: true,
+          status: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      }),
+      this.prisma.purchaseOrder.findMany({
+        where: { orderDate: { gte: from, lte: to } },
+        select: {
+          id: true,
+          poNumber: true,
+          orderDate: true,
+          expectedDate: true,
+          totalAmount: true,
+          status: true,
+          supplier: { select: { name: true } },
+        },
+        orderBy: { orderDate: 'desc' },
+        take: 50,
+      }),
+    ]);
+
+    const topSuppliersWithNames = await Promise.all(
+      topSuppliers.map(async (s) => {
+        const supplier = await this.prisma.supplier.findUnique({
+          where: { id: s.supplierId },
+          select: { name: true },
+        });
+        return {
+          supplierName: supplier?.name || `Proveedor #${s.supplierId}`,
+          evaluationCount: s._count,
+          avgScore: Number(s._avg.overallScore || 0),
+        };
+      })
+    );
+
+    return {
+      fromDate,
+      toDate,
+      pendingRequisitions: pendingReqs,
+      activePurchaseOrders: activePOs,
+      overdueDeliveries,
+      totalSpend: Number(totalSpend._sum.totalAmount || 0),
+      topSuppliers: topSuppliersWithNames,
+      requisitions: requisitions.map((r) => ({
+        id: r.id,
+        title: r.title,
+        description: r.description || '',
+        priority: r.priority || 'NORMAL',
+        status: r.status || 'SUBMITTED',
+        createdAt: r.createdAt,
+      })),
+      orders: orders.map((o) => ({
+        id: o.id,
+        supplierName: o.supplier?.name || 'N/A',
+        orderDate: o.orderDate,
+        expectedDate: o.expectedDate,
+        totalAmount: Number(o.totalAmount || 0),
+        status: o.status || 'DRAFT',
       })),
     };
   }

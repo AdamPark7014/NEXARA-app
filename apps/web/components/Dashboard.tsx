@@ -272,9 +272,14 @@ export default function Dashboard() {
         setAttendance(null);
       }
     } catch (err) {
+      if (signal?.aborted) return;
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      if (err instanceof Error && /aborted/i.test(err.message)) return;
       setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
   }, [user, weekRange.from, weekRange.to]);
 

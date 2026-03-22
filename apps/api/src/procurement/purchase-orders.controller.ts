@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Patch, Param, Query, Body, UseGuards, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Query, Body, UseGuards, ParseIntPipe, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { ProcurementService } from './procurement.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
+import { generateProcurementDashboardPdf } from './procurement-dashboard-pdf.js';
 
 @Controller('procurement/purchase-orders')
 @UseGuards(RbacGuard)
@@ -14,6 +16,12 @@ export class PurchaseOrdersController {
   @RBAC({ permissions: [PERMISSIONS.PROCUREMENT_VIEW] })
   listSuppliers() {
     return this.svc.listSuppliers();
+  }
+
+  @Post('suppliers')
+  @RBAC({ permissions: [PERMISSIONS.PROCUREMENT_MANAGE] })
+  createSupplier(@Body() dto: any) {
+    return this.svc.createSupplier(dto);
   }
 
   @Post()
@@ -32,6 +40,29 @@ export class PurchaseOrdersController {
   @RBAC({ permissions: [PERMISSIONS.PROCUREMENT_VIEW] })
   dashboard() {
     return this.svc.getProcurementDashboard();
+  }
+
+  @Get('dashboard/pdf')
+  @RBAC({ permissions: [PERMISSIONS.PROCUREMENT_VIEW] })
+  async dashboardPdf(
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Res() res: Response
+  ) {
+    try {
+      const data = await this.svc.getProcurementDashboardForPdf(fromDate, toDate);
+      const payload = {
+        ...data,
+        fromDate: fromDate ?? data.fromDate ?? new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10),
+        toDate: toDate ?? data.toDate ?? new Date().toISOString().slice(0, 10),
+      };
+      const pdf = await generateProcurementDashboardPdf(payload);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=reporte-compras-${new Date().toISOString().slice(0, 10)}.pdf`);
+      res.send(pdf);
+    } catch (error) {
+      res.status(500).json({ error: 'Error al generar PDF' });
+    }
   }
 
   @Get(':id')
