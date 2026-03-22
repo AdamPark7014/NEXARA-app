@@ -97,7 +97,6 @@ const getNewsImages = (post: NewsPost | null): string[] => {
 };
 
 const API_URL = getApiBase();
-const SITE_URL = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
 
 // Función para normalizar URLs de imágenes
 // Convierte filenames y rutas relativas a URLs completas del API
@@ -425,59 +424,6 @@ export default function Home() {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 3);
 
-  const organizationSchema = {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    name: "NEXARA",
-    url: SITE_URL,
-    logo: `${SITE_URL}/logo-nexara.png`,
-    contactPoint: [
-      {
-        "@type": "ContactPoint",
-        telephone: "+52-55-3650-5044",
-        contactType: "customer service",
-        areaServed: "MX",
-        availableLanguage: ["es", "en"],
-      },
-    ],
-    sameAs: [
-      "https://www.linkedin.com/company/nexara",
-    ],
-  };
-
-  const websiteSchema = {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    name: "NEXARA",
-    url: SITE_URL,
-    inLanguage: "es-MX",
-    potentialAction: {
-      "@type": "ContactAction",
-      target: `${SITE_URL}/contacto`,
-      name: "Solicitar asesoria",
-    },
-  };
-
-  const serviceSchema = {
-    "@context": "https://schema.org",
-    "@type": "Service",
-    serviceType: "ERP Industrial y Servicios Tecnologicos Empresariales",
-    provider: {
-      "@type": "Organization",
-      name: "NEXARA",
-      url: SITE_URL,
-    },
-    areaServed: {
-      "@type": "Country",
-      name: "Mexico",
-    },
-    offers: {
-      "@type": "Offer",
-      availability: "https://schema.org/InStock",
-      url: `${SITE_URL}/servicios`,
-    },
-  };
-
   const openNewsModal = (item: NewsPost) => {
     previousFocusRef.current = document.activeElement as HTMLElement | null;
     setSelectedNews(item);
@@ -513,18 +459,6 @@ export default function Home() {
 
   return (
     <div className={`${styles.page} ${corporateStyles.root} ultra-corp-home ultra-corp-strict`}>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceSchema) }}
-      />
       <main className={styles.main} aria-label="Inicio Nexara">
         <div data-ui="landing-hero-wrap" className={styles.heroWrapper}>
           <aside
