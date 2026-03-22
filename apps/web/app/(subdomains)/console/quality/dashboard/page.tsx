@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
+import HelpTab from "@/components/HelpTab";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
@@ -32,6 +33,7 @@ export default function QualityDashboardPage() {
   return (
     <RoleGuard anyPermissions={[PERMISSIONS.QUALITY_VIEW, PERMISSIONS.QUALITY_INSPECT]}>
       <div style={{ display: "grid", gap: 24 }}>
+        <HelpTab module="quality" user={user} />
         <div className="card" style={{ padding: 16 }}>
           <h1 style={{ color: "var(--primary)", marginBottom: 8 }}>📊 Dashboard de Calidad</h1>
           <p style={{ color: "var(--text-secondary)" }}>Resumen de inspecciones y reportes de no conformidad.</p>
