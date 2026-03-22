@@ -9,6 +9,13 @@ export const metadata: Metadata = {
   title: "Catalogo de Proyectos | Nexara",
   description:
     "Casos y catalogo de proyectos tecnologicos implementados por Nexara para sectores empresariales y operativos.",
+  keywords: [
+    "casos de exito tecnologia",
+    "proyectos ERP industrial",
+    "portafolio de proyectos TI",
+    "implementaciones empresariales",
+    "catalogo tecnologico",
+  ],
   alternates: {
     canonical: "/proyectos",
   },
@@ -199,10 +206,28 @@ export default async function ProjectsPage() {
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 
+  const catalogSchema = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: "Catalogo de proyectos Nexara",
+    url: `${siteUrl}/proyectos`,
+    numberOfItems: sortedProjects.length,
+    itemListElement: sortedProjects.slice(0, 10).map((project, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: project.title,
+      url: `${siteUrl}/proyectos#${project.slug || project.id}`,
+    })),
+  };
+
   const sectors = sectorTemplates.map((template, index) => {
     const project = sortedProjects[index];
     return {
       key: template.key,
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(catalogSchema) }}
+        />
       id: project ? String(project.id) : template.key,
       slug: project?.slug,
       title: template.title,

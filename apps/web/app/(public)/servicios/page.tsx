@@ -7,6 +7,14 @@ const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").re
 export const metadata: Metadata = {
   title: "Servicios de Tecnologia Empresarial | Nexara",
   description: "Infraestructura, ciberseguridad, equipamiento y servicios gestionados para empresas que exigen continuidad operativa.",
+  keywords: [
+    "servicios TI empresariales",
+    "ciberseguridad para empresas",
+    "infraestructura tecnologica",
+    "servicios gestionados",
+    "soporte tecnologico corporativo",
+    "ERP industrial Mexico",
+  ],
   alternates: {
     canonical: "/servicios",
   },
@@ -26,6 +34,20 @@ export const metadata: Metadata = {
 };
 
 export default function ServiciosPage() {
+  const serviceSchema = {
+    "@context": "https://schema.org",
+    "@type": "ProfessionalService",
+    name: "Nexara Servicios de Tecnologia Empresarial",
+    url: `${siteUrl}/servicios`,
+    areaServed: "MX",
+    serviceType: "Infraestructura TI, ciberseguridad, soporte y servicios gestionados",
+    provider: {
+      "@type": "Organization",
+      name: "NEXARA",
+      url: siteUrl,
+    },
+  };
+
   const coreServices = [
     {
       title: "Infraestructura y conectividad",
@@ -71,6 +93,10 @@ export default function ServiciosPage() {
 
   return (
     <main className={`${styles.container} public-section-page ultra-corp-page ultra-corp-servicios ultra-corp-strict`} aria-label="Página de servicios">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceSchema) }}
+      />
       <header className={styles.headerBlock}>
         <p className={styles.kicker}>SERVICIOS PROFESIONALES NEXARA</p>
         <h1 className={styles.pageTitle}>Servicios Nexara</h1>
