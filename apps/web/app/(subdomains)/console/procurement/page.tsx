@@ -181,14 +181,6 @@ export default function ProcurementPage() {
     return { totalReq: requisitions.length, pendingReq, approvedReq, totalOrders, orderValue };
   }, [requisitions, orders]);
 
-  const stats = useMemo(() => {
-    const pendingReq = requisitions.filter((r) => r.status === "PENDING").length;
-    const approvedReq = requisitions.filter((r) => r.status === "APPROVED").length;
-    const totalOrders = orders.length;
-    const orderValue = orders.reduce((s: number, o: any) => s + Number(o.totalAmount || 0), 0);
-    return { totalReq: requisitions.length, pendingReq, approvedReq, totalOrders, orderValue };
-  }, [requisitions, orders]);
-
   const fmt = (n: number) => Number(n || 0).toLocaleString("es-MX", { minimumFractionDigits: 2 });
 
   const tabStyle = (t: string) => ({
