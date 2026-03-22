@@ -1,4 +1,5 @@
+import { permanentRedirect } from "next/navigation";
 
 export default function NexaraIngenierosPage() {
-	return <div>Nexara Ingenieros</div>;
+  permanentRedirect("/nexara");
 }

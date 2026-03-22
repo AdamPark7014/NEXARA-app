@@ -8,6 +8,13 @@ const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").re
 export const metadata: Metadata = {
   title: "Nexara | Sobre Nosotros",
   description: "Conoce Nexara: mision, vision, principios de trabajo y cobertura para proyectos tecnologicos empresariales en Mexico.",
+  keywords: [
+    "sobre Nexara",
+    "empresa de tecnologia en Mexico",
+    "integracion tecnologica empresarial",
+    "equipo de ingenieria TI",
+    "consultoria tecnologica",
+  ],
   alternates: {
     canonical: "/nexara",
   },
@@ -27,6 +34,20 @@ export const metadata: Metadata = {
 };
 
 export default function NexaraPage() {
+  const aboutSchema = {
+    "@context": "https://schema.org",
+    "@type": "AboutPage",
+    url: `${siteUrl}/nexara`,
+    name: "Sobre Nexara",
+    mainEntity: {
+      "@type": "Organization",
+      name: "NEXARA",
+      url: siteUrl,
+      logo: `${siteUrl}/logo-nexara.png`,
+      description: "Empresa de integracion tecnologica enfocada en continuidad operativa y resultados empresariales.",
+    },
+  };
+
   const principles = [
     {
       title: "Ingeniería aplicable",
@@ -63,6 +84,10 @@ export default function NexaraPage() {
 
   return (
     <main className={`${styles.container} public-section-page ultra-corp-page ultra-corp-nexara ultra-corp-strict`} aria-label="Página sobre Nexara">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(aboutSchema) }}
+      />
       <header className={styles.hero}>
         <div className={styles.heroContent}>
           <p className={styles.kicker}>NEXARA INGENIEROS</p>
