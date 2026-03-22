@@ -1,10 +1,78 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
+import { RecordPublicLandingEventDto } from './dto/record-public-landing-event.dto.js';
 
 @Injectable()
 export class AnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private normalizeLandingKey(raw: string) {
+    return raw
+      .toLowerCase()
+      .replace(/[^a-z0-9:/_-]/g, '-')
+      .slice(0, 90);
+  }
+
+  async recordPublicLandingEvent(dto: RecordPublicLandingEventDto) {
+    const now = new Date();
+    const key = this.normalizeLandingKey(dto.landingKey || 'unknown');
+
+    return this.prisma.kpiSnapshot.create({
+      data: {
+        kpiName: `landing:${key}`,
+        kpiCategory: 'PUBLIC_TRAFFIC',
+        value: new Prisma.Decimal(1),
+        unit: dto.eventType,
+        periodStart: now,
+        periodEnd: now,
+        metadata: {
+          eventName: dto.eventName || null,
+          landingPath: dto.landingPath || null,
+          referrer: dto.referrer || null,
+          ...(dto.metadata || {}),
+        },
+      },
+    });
+  }
+
+  async getPublicLandingSummary(days: number = 30) {
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const rows = await this.prisma.$queryRaw<Array<{ landing: string; event: string | null; total: bigint }>>`
+      SELECT
+        "kpiName" AS landing,
+        "unit" AS event,
+        COUNT(*)::bigint AS total
+      FROM "kpi_snapshots"
+      WHERE "kpiCategory" = 'PUBLIC_TRAFFIC'
+        AND "createdAt" >= ${since}
+      GROUP BY "kpiName", "unit"
+      ORDER BY total DESC
+    `;
+
+    const summaryMap = new Map<string, { views: number; clicks: number; conversions: number }>();
+
+    for (const row of rows) {
+      const landing = String(row.landing || 'landing:unknown');
+      const current = summaryMap.get(landing) || { views: 0, clicks: 0, conversions: 0 };
+      const total = Number(row.total || 0n);
+      if (row.event === 'view') current.views += total;
+      if (row.event === 'click') current.clicks += total;
+      if (row.event === 'conversion') current.conversions += total;
+      summaryMap.set(landing, current);
+    }
+
+    return Array.from(summaryMap.entries()).map(([landing, values]) => {
+      const ctr = values.views > 0 ? +(values.clicks / values.views * 100).toFixed(2) : 0;
+      const conversionRate = values.views > 0 ? +(values.conversions / values.views * 100).toFixed(2) : 0;
+      return {
+        landing,
+        ...values,
+        ctr,
+        conversionRate,
+      };
+    });
+  }
 
   // ── KPI Snapshots ─────────────────────────────────────────────────
   async recordKpi(dto: {

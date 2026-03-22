@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import styles from "./page.module.css";
 import { buildApiUrl } from "@/lib/api-base";
+import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 
 export default function ContactoPage() {
   const [submitted, setSubmitted] = useState(false);
@@ -296,6 +297,7 @@ export default function ContactoPage() {
 
               <button
                 type="submit"
+                data-track-conversion="contact_submit"
                 className={styles.submitButton}
                 disabled={loading}
               >
@@ -364,7 +366,7 @@ export default function ContactoPage() {
           <div>
             <h3>¿Necesitas atención urgente?</h3>
             <p>Nuestro equipo está disponible para soporte 24/7</p>
-            <a href="tel:+525536505044" className={styles.ctaButton}>
+            <a href="tel:+525536505044" data-track-conversion="contact_call_now" className={styles.ctaButton}>
               Llamar ahora
             </a>
           </div>
@@ -381,11 +383,15 @@ export default function ContactoPage() {
           <div>
             <h3>¿Buscas una cotización?</h3>
             <p>Conoce nuestras soluciones y servicios especializados</p>
-            <Link href="/servicios" className={styles.ctaButton}>
+            <Link href="/servicios" data-track-conversion="contact_view_services" className={styles.ctaButton}>
               Ver soluciones
             </Link>
           </div>
         </div>
+      </section>
+
+      <section style={{ marginTop: 18 }}>
+        <SeoInterlinkHub title="Explora rutas de soluciones" currentPath="/contacto" maxItems={10} />
       </section>
     </main>
   );

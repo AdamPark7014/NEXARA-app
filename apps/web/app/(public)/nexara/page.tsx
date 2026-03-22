@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
 import styles from "./page.module.css";
+import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 
 const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
 
@@ -97,8 +98,8 @@ export default function NexaraPage() {
             continuidad para organizaciones que no pueden detener su operación.
           </p>
           <div className={styles.heroActions}>
-            <Link href="/contacto" className={styles.primaryCta}>Hablar con un especialista</Link>
-            <Link href="/proyectos" className={styles.secondaryCta}>Ver casos publicados</Link>
+            <Link href="/contacto" data-track-conversion="about_primary_cta" className={styles.primaryCta}>Hablar con un especialista</Link>
+            <Link href="/proyectos" data-track-conversion="about_projects_cta" className={styles.secondaryCta}>Ver casos publicados</Link>
           </div>
         </div>
 
@@ -213,10 +214,12 @@ export default function NexaraPage() {
         <h2>Listos para impulsar tu siguiente etapa tecnológica</h2>
         <p>Conversemos y definamos la solución ideal para tu empresa.</p>
         <div className={styles.heroCtas}>
-          <Link href="/contacto" className={styles.primaryCta}>Contactar</Link>
-          <Link href="https://wa.me/525536505044" className={styles.secondaryCta} target="_blank" rel="noopener noreferrer">WhatsApp</Link>
+          <Link href="/contacto" data-track-conversion="about_footer_contact" className={styles.primaryCta}>Contactar</Link>
+          <Link href="https://wa.me/525536505044" data-track-conversion="about_footer_whatsapp" className={styles.secondaryCta} target="_blank" rel="noopener noreferrer">WhatsApp</Link>
         </div>
       </section>
+
+      <SeoInterlinkHub title="Casos de uso y soluciones relacionadas" currentPath="/nexara" maxItems={8} />
     </main>
   );
 }

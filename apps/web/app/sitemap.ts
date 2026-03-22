@@ -1,5 +1,6 @@
 export const revalidate = 3600;
 import type { MetadataRoute } from "next";
+import { getProgrammaticLandings } from "@/lib/seo/programmatic-landings";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
@@ -86,5 +87,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  return staticPages;
+  const programmaticPages: MetadataRoute.Sitemap = getProgrammaticLandings().map(({ industry, service }) => ({
+    url: `${baseUrl}/soluciones/${industry.slug}/${service.slug}`,
+    lastModified: now,
+    changeFrequency: "weekly",
+    priority: 0.78,
+  }));
+
+  return [...staticPages, ...programmaticPages];
 }

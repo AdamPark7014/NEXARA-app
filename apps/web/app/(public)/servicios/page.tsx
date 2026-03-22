@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import styles from "./page.module.css";
+import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 
 const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
 
@@ -200,12 +201,14 @@ export default function ServiciosPage() {
         <h2>Listo para profesionalizar tu operación tecnológica</h2>
         <p>Conversemos y diseñemos una propuesta de servicios alineada a tu negocio.</p>
         <div className={styles.ctaActions}>
-          <Link href="/contacto" className={styles.primaryCta}>Contactar</Link>
-          <Link href="https://wa.me/525536505044" className={styles.secondaryCta} target="_blank" rel="noopener noreferrer">
+          <Link href="/contacto" data-track-conversion="services_primary_cta" className={styles.primaryCta}>Contactar</Link>
+          <Link href="https://wa.me/525536505044" data-track-conversion="services_whatsapp_cta" className={styles.secondaryCta} target="_blank" rel="noopener noreferrer">
             WhatsApp
           </Link>
         </div>
       </section>
+
+      <SeoInterlinkHub title="Soluciones recomendadas por industria" currentPath="/servicios" maxItems={10} />
     </main>
   );
 }
