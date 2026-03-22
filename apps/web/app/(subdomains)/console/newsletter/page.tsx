@@ -47,6 +47,7 @@ export default function NewsletterPage() {
 
   return (
     <RoleGuard permissions={[PERMISSIONS.CONSOLE_ADMIN]}>
+      <HelpTab module="newsletter" user={user} />
       <div style={{ display: 'grid', gap: 24 }}>
         {/* KPI Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
