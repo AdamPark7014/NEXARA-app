@@ -1,11 +1,13 @@
 "use client";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
-import { PERMISSIONS } from "@/lib/permissions";
+import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import HelpTab from "@/components/HelpTab";
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/\.]+$/, "");
+
+const emptyMov = () => ({ type: "IN", productId: "", warehouseId: "", quantity: 1, unitCost: "", reference: "", notes: "" });
 
 interface StockLevel {
   id: number;
@@ -16,6 +18,8 @@ interface StockLevel {
   minQuantity: number;
   maxQuantity: number | null;
   unitCost: number;
+  product?: { id: number; name: string; sku: string };
+  warehouse?: { id: number; name: string };
 }
 
 interface StockMovement {
@@ -35,9 +39,17 @@ export default function StockPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"levels" | "movements" | "alerts">("levels");
 
-  useEffect(() => {
+  // Modal state
+  const [showMovModal, setShowMovModal] = useState(false);
+  const [movForm, setMovForm] = useState(emptyMov());
+  const [saving, setSaving] = useState(false);
+
+  const canManage = hasPermission(user, PERMISSIONS.STOCK_MANAGE);
+
+  const loadData = useCallback(() => {
     if (!user?.token) return;
     const headers = { Authorization: `Bearer ${user.token}` };
+    setLoading(true);
     Promise.all([
       fetch(`${API_URL}/stock/levels`, { headers }).then((r) => r.json()),
       fetch(`${API_URL}/stock/movements`, { headers }).then((r) => r.json()),
@@ -51,6 +63,56 @@ export default function StockPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [user?.token]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // Unique products and warehouses derived from levels (for selects)
+  const uniqueProducts = useMemo(() => {
+    const seen = new Set<number>();
+    return levels.reduce<Array<{ id: number; name: string; sku: string }>>((acc, l: any) => {
+      const p = l.product ?? { id: l.productId, name: l.productName, sku: l.sku };
+      if (p.id && !seen.has(p.id)) { seen.add(p.id); acc.push(p); }
+      return acc;
+    }, []);
+  }, [levels]);
+
+  const uniqueWarehouses = useMemo(() => {
+    const seen = new Set<number>();
+    return levels.reduce<Array<{ id: number; name: string }>>((acc, l: any) => {
+      const w = l.warehouse ?? { id: l.warehouseId, name: l.warehouseName };
+      if (w.id && !seen.has(w.id)) { seen.add(w.id); acc.push(w); }
+      return acc;
+    }, []);
+  }, [levels]);
+
+  const submitMovement = async () => {
+    if (!movForm.productId || !movForm.warehouseId || !movForm.quantity) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_URL}/stock/movements`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${user?.token}` },
+        body: JSON.stringify({
+          type: movForm.type,
+          productId: Number(movForm.productId),
+          toWarehouseId: ["IN", "ADJUSTMENT"].includes(movForm.type) ? Number(movForm.warehouseId) : undefined,
+          fromWarehouseId: movForm.type === "OUT" ? Number(movForm.warehouseId) : undefined,
+          quantity: Number(movForm.quantity),
+          unitCost: movForm.unitCost ? Number(movForm.unitCost) : undefined,
+          reference: movForm.reference || undefined,
+          notes: movForm.notes || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      setShowMovModal(false);
+      setMovForm(emptyMov());
+      loadData();
+    } catch {
+      alert("Error al registrar el movimiento");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const stats = useMemo(() => {
     const totalItems = levels.length;
@@ -76,11 +138,18 @@ export default function StockPage() {
     <RoleGuard anyPermissions={[PERMISSIONS.STOCK_VIEW, PERMISSIONS.STOCK_MANAGE]}>
       <div style={{ display: "grid", gap: 24 }}>
         <HelpTab module="stock" user={user} />
-        <div className="card" style={{ padding: 16 }}>
-          <h1 style={{ color: "var(--primary)", marginBottom: 8 }}>📦 Inventario / Stock</h1>
-          <p style={{ color: "var(--text-secondary)" }}>
-            Niveles de inventario, movimientos de stock y alertas de reabastecimiento.
-          </p>
+        <div className="card" style={{ padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <h1 style={{ color: "var(--primary)", marginBottom: 4 }}>📦 Inventario / Stock</h1>
+            <p style={{ color: "var(--text-secondary)", margin: 0 }}>
+              Niveles de inventario, movimientos de stock y alertas de reabastecimiento.
+            </p>
+          </div>
+          {canManage && (
+            <button onClick={() => setShowMovModal(true)} style={{ padding: "8px 16px", background: "var(--primary)", color: "#fff", border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer" }}>
+              + Registrar Movimiento
+            </button>
+          )}
         </div>
         {/* KPI Cards */}
         {!loading && levels.length > 0 && (
@@ -210,6 +279,75 @@ export default function StockPage() {
             </div>
           )
         )}
+
+        {/* ── Modal: Registrar Movimiento de Stock ─────────────────────── */}
+        {showMovModal && (() => {
+          const inputStyle: React.CSSProperties = { width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid var(--border-color)", background: "var(--bg-primary)", color: "var(--text-primary)", fontSize: 14, boxSizing: "border-box" };
+          const labelStyle: React.CSSProperties = { fontSize: 12, color: "var(--text-secondary)", marginBottom: 4, display: "block" };
+          return (
+            <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+              <div className="card" style={{ width: "100%", maxWidth: 500, padding: 24 }}>
+                <h2 style={{ color: "var(--primary)", marginBottom: 20 }}>📊 Registrar Movimiento de Stock</h2>
+                <div style={{ display: "grid", gap: 14 }}>
+                  <div>
+                    <label style={labelStyle}>Tipo de movimiento *</label>
+                    <select style={inputStyle} value={movForm.type} onChange={(e) => setMovForm((f) => ({ ...f, type: e.target.value }))}>
+                      <option value="IN">📥 Entrada</option>
+                      <option value="OUT">📤 Salida</option>
+                      <option value="ADJUSTMENT">🔧 Ajuste</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Producto *</label>
+                    {uniqueProducts.length > 0 ? (
+                      <select style={inputStyle} value={movForm.productId} onChange={(e) => setMovForm((f) => ({ ...f, productId: e.target.value }))}>
+                        <option value="">— Seleccionar —</option>
+                        {uniqueProducts.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>)}
+                      </select>
+                    ) : (
+                      <input type="number" style={inputStyle} placeholder="ID del producto" value={movForm.productId} onChange={(e) => setMovForm((f) => ({ ...f, productId: e.target.value }))} />
+                    )}
+                  </div>
+                  <div>
+                    <label style={labelStyle}>{movForm.type === "OUT" ? "Almacén origen *" : "Almacén destino *"}</label>
+                    {uniqueWarehouses.length > 0 ? (
+                      <select style={inputStyle} value={movForm.warehouseId} onChange={(e) => setMovForm((f) => ({ ...f, warehouseId: e.target.value }))}>
+                        <option value="">— Seleccionar —</option>
+                        {uniqueWarehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                      </select>
+                    ) : (
+                      <input type="number" style={inputStyle} placeholder="ID del almacén" value={movForm.warehouseId} onChange={(e) => setMovForm((f) => ({ ...f, warehouseId: e.target.value }))} />
+                    )}
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div>
+                      <label style={labelStyle}>Cantidad *</label>
+                      <input type="number" min={1} style={inputStyle} value={movForm.quantity} onChange={(e) => setMovForm((f) => ({ ...f, quantity: Number(e.target.value) }))} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Costo unitario</label>
+                      <input type="number" min={0} step="0.01" style={inputStyle} placeholder="0.00" value={movForm.unitCost} onChange={(e) => setMovForm((f) => ({ ...f, unitCost: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Referencia</label>
+                    <input style={inputStyle} placeholder="Ej. OC-001, Factura #123" value={movForm.reference} onChange={(e) => setMovForm((f) => ({ ...f, reference: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Notas</label>
+                    <textarea style={{ ...inputStyle, minHeight: 56, resize: "vertical" }} placeholder="Observaciones..." value={movForm.notes} onChange={(e) => setMovForm((f) => ({ ...f, notes: e.target.value }))} />
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
+                  <button onClick={() => { setShowMovModal(false); setMovForm(emptyMov()); }} style={{ padding: "8px 20px", background: "var(--bg-secondary)", color: "var(--text-primary)", border: "none", borderRadius: 8, cursor: "pointer" }}>Cancelar</button>
+                  <button onClick={submitMovement} disabled={saving} style={{ padding: "8px 20px", background: "var(--primary)", color: "#fff", border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer" }}>
+                    {saving ? "Guardando..." : "Registrar"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </RoleGuard>
   );

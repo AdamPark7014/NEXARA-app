@@ -89,8 +89,17 @@ export class ProcurementService {
     return `PO-${String(count + 1).padStart(6, '0')}`;
   }
 
+  async listSuppliers() {
+    return this.prisma.supplier.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
   async createPurchaseOrder(dto: {
-    supplierId: number;
+    supplierId?: number;
+    supplierName?: string;
     requisitionId?: number;
     orderDate: string;
     expectedDate?: string;
@@ -100,6 +109,18 @@ export class ProcurementService {
     notes?: string;
     items: Array<{ productId?: number; description: string; quantity: number; unitPrice: number; taxRate?: number }>;
   }, userId: number) {
+    if (!dto.supplierId && !dto.supplierName) {
+      throw new BadRequestException('Se requiere supplierId o supplierName');
+    }
+    let supplierId = dto.supplierId;
+    if (!supplierId && dto.supplierName) {
+      const supplier = await this.prisma.supplier.upsert({
+        where: { name: dto.supplierName.trim() },
+        update: {},
+        create: { name: dto.supplierName.trim() },
+      });
+      supplierId = supplier.id;
+    }
     const poNumber = await this.generatePONumber();
     const items = dto.items.map((i) => ({
       ...i,
@@ -111,7 +132,7 @@ export class ProcurementService {
     return this.prisma.purchaseOrder.create({
       data: {
         poNumber,
-        supplierId: dto.supplierId,
+        supplierId: supplierId!,
         requisitionId: dto.requisitionId ?? null,
         orderDate: new Date(dto.orderDate),
         expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : null,

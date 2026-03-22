@@ -10,6 +10,12 @@ import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 export class PurchaseOrdersController {
   constructor(private readonly svc: ProcurementService) {}
 
+  @Get('suppliers')
+  @RBAC({ permissions: [PERMISSIONS.PROCUREMENT_VIEW] })
+  listSuppliers() {
+    return this.svc.listSuppliers();
+  }
+
   @Post()
   @RBAC({ permissions: [PERMISSIONS.PROCUREMENT_MANAGE] })
   create(@Body() dto: any, @CurrentUser() user: any) {
