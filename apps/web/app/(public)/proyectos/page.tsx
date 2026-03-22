@@ -1,11 +1,30 @@
 import Image from "next/image";
+import type { Metadata } from "next";
 import styles from "./page.module.css";
 import { buildApiUrl, getApiBase } from "@/lib/api-base";
 
-export const metadata = {
-  title: "Catálogo | Nexara",
+const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
+
+export const metadata: Metadata = {
+  title: "Catalogo de Proyectos | Nexara",
   description:
-    "Catálogo de sectores y proyectos tecnológicos de Nexara con descarga PDF dinámica.",
+    "Casos y catalogo de proyectos tecnologicos implementados por Nexara para sectores empresariales y operativos.",
+  alternates: {
+    canonical: "/proyectos",
+  },
+  openGraph: {
+    type: "website",
+    url: `${siteUrl}/proyectos`,
+    title: "Catalogo de Proyectos | Nexara",
+    description: "Explora sectores y proyectos recientes con impacto operativo medible.",
+    images: [{ url: "/logo-nexara.png", width: 1200, height: 630, alt: "Proyectos Nexara" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Catalogo de Proyectos | Nexara",
+    description: "Portafolio de implementaciones tecnologicas por sector.",
+    images: ["/logo-nexara.png"],
+  },
 };
 
 export const dynamic = "force-dynamic";

@@ -1,10 +1,29 @@
 import Link from "next/link";
 import Image from "next/image";
+import type { Metadata } from "next";
 import styles from "./page.module.css";
 
-export const metadata = {
-  title: "Nexara | Sobre nosotros",
-  description: "Conoce Nexara: quiénes somos, misión, visión, valores y cobertura en México",
+const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
+
+export const metadata: Metadata = {
+  title: "Nexara | Sobre Nosotros",
+  description: "Conoce Nexara: mision, vision, principios de trabajo y cobertura para proyectos tecnologicos empresariales en Mexico.",
+  alternates: {
+    canonical: "/nexara",
+  },
+  openGraph: {
+    type: "website",
+    url: `${siteUrl}/nexara`,
+    title: "Nexara | Sobre Nosotros",
+    description: "Equipo de integracion tecnologica orientado a continuidad operativa y resultados medibles.",
+    images: [{ url: "/logo-nexara.png", width: 1200, height: 630, alt: "Nexara" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Nexara | Sobre Nosotros",
+    description: "Experiencia de campo, ejecucion y acompanamiento para operaciones empresariales.",
+    images: ["/logo-nexara.png"],
+  },
 };
 
 export default function NexaraPage() {
