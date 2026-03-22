@@ -45,8 +45,8 @@ export class PurchaseOrdersController {
   @Get('dashboard/pdf')
   @RBAC({ permissions: [PERMISSIONS.PROCUREMENT_VIEW] })
   async dashboardPdf(
-    @Query('fromDate') fromDate?: string,
-    @Query('toDate') toDate?: string,
+    @Query('fromDate') fromDate: string | undefined,
+    @Query('toDate') toDate: string | undefined,
     @Res() res: Response
   ) {
     try {
