@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
+import HelpTab from "@/components/HelpTab";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
@@ -12,14 +13,21 @@ export default function ProductionSchedulePage() {
   const [dashboard, setDashboard] = useState<any>(null);
   const [utilization, setUtilization] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
-  useEffect(() => {
+  const loadData = () => {
     if (!user?.token) return;
     const headers = { Authorization: `Bearer ${user.token}` };
+    const params = new URLSearchParams();
+    if (fromDate) params.set("from", fromDate);
+    if (toDate) params.set("to", toDate);
+    const q = params.toString();
+    setLoading(true);
     Promise.all([
-      fetch(`${API_URL}/manufacturing/production/schedule`, { headers }).then((r) => r.json()),
+      fetch(`${API_URL}/manufacturing/production/schedule${q ? `?${q}` : ""}`, { headers }).then((r) => r.json()),
       fetch(`${API_URL}/manufacturing/production/dashboard`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/manufacturing/production/work-center-utilization`, { headers }).then((r) => r.json()),
+      fetch(`${API_URL}/manufacturing/production/work-center-utilization${q ? `?${q}` : ""}`, { headers }).then((r) => r.json()),
     ])
       .then(([sched, dash, util]) => {
         setOrders(Array.isArray(sched) ? sched : sched.data || []);
@@ -28,6 +36,11 @@ export default function ProductionSchedulePage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    if (!user?.token) return;
+    loadData();
   }, [user?.token]);
 
   const StatCard = ({ label, value, color }: { label: string; value: string | number; color: string }) => (
@@ -49,9 +62,24 @@ export default function ProductionSchedulePage() {
   return (
     <RoleGuard anyPermissions={[PERMISSIONS.MANUFACTURING_VIEW, PERMISSIONS.PRODUCTION_MANAGE]}>
       <div style={{ display: "grid", gap: 24 }}>
+        <HelpTab module="production" user={user} />
         <div className="card" style={{ padding: 16 }}>
           <h1 style={{ color: "var(--primary)", marginBottom: 8 }}>📅 Planificación de Producción</h1>
           <p style={{ color: "var(--text-secondary)" }}>Órdenes de producción, programación y utilización de centros de trabajo.</p>
+        </div>
+
+        <div className="card" style={{ padding: 16, display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10, alignItems: "end" }}>
+          <div>
+            <label style={{ fontSize: 12, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Desde</label>
+            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)" }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Hasta</label>
+            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--border)" }} />
+          </div>
+          <button onClick={loadData} style={{ padding: "8px 16px", border: "none", borderRadius: 8, background: "var(--primary)", color: "#fff", fontWeight: 600, cursor: "pointer" }}>
+            Filtrar
+          </button>
         </div>
 
         {loading && <div className="card" style={{ padding: 32, textAlign: "center" }}>Cargando...</div>}
