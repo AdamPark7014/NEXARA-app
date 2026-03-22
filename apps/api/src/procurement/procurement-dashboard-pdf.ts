@@ -103,20 +103,24 @@ export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPay
       doc.restore();
 
       if (logo) {
-        doc.image(logo, margin, 26, { width: 120 });
+        doc.image(logo, margin, 24, { width: 84 });
       }
 
+      const titleX = margin + 104;
+      const metaX = pageWidth - margin - 150;
       doc.fillColor(colors.navy).fontSize(20).font('Helvetica-Bold')
-        .text('Reporte de Compras', margin + 140, 28, { width: 240 });
+        .text('Reporte de Compras', titleX, 30, { width: 220 });
       doc.fontSize(10).font('Helvetica').fillColor(colors.muted)
-        .text('Requisiciones, ordenes de compra y proveedores', margin + 140, 54, { width: 260 });
+        .text('Requisiciones, ordenes de compra y proveedores', titleX, 56, { width: 230 });
 
-      const rightX = margin + contentWidth - 190;
       const from = payload.fromDate ? formatDate(payload.fromDate) : '-';
       const to = payload.toDate ? formatDate(payload.toDate) : formatDate(new Date());
+      doc.save();
+      doc.roundedRect(metaX - 10, 24, 160, 44, 6).fill('#FFFFFF');
+      doc.restore();
       doc.fillColor(colors.text).fontSize(10)
-        .text(`Periodo: ${from} - ${to}`, rightX, 34, { width: 190 })
-        .text(`Generado: ${formatDate(new Date())}`, rightX, 50, { width: 190 });
+        .text(`Periodo: ${from} - ${to}`, metaX, 34, { width: 140, align: 'left' })
+        .text(`Generado: ${formatDate(new Date())}`, metaX, 49, { width: 140, align: 'left' });
     };
 
     // ── Section title ──────────────────────────────────────────────────────
@@ -137,6 +141,16 @@ export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPay
         doc.text(col.label, x, y + 6, { width: col.width - 8 });
         x += col.width;
       });
+    };
+
+    const drawEmptyRow = (message: string) => {
+      const y = doc.y;
+      doc.save();
+      doc.rect(margin, y - 4, contentWidth, 24).fill(colors.softGray);
+      doc.restore();
+      doc.fillColor(colors.muted).fontSize(9).font('Helvetica-Oblique')
+        .text(message, margin + 10, y + 2, { width: contentWidth - 20, align: 'center' });
+      doc.y = y + 24;
     };
 
     // ── Ensure space before a row, add page if needed ──────────────────────
@@ -191,7 +205,55 @@ export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPay
     drawSectionTitle('Resumen ejecutivo');
     const kpiGridY = doc.y;
     const kpiGridH = drawKpiGrid(kpiGridY);
-    doc.y = kpiGridY + kpiGridH + 20;
+    doc.y = kpiGridY + kpiGridH + 18;
+
+    // ── Ordenes de compra (siempre visible como seccion principal del reporte)
+    drawSectionTitle('Ordenes de compra');
+
+    const ocCols = [
+      { label: '#', width: 36 },
+      { label: 'Proveedor', width: 160 },
+      { label: 'Fecha OC', width: 80 },
+      { label: 'F. Entrega', width: 80 },
+      { label: 'Monto', width: 95 },
+      { label: 'Estatus', width: 64 },
+    ];
+
+    drawTableHeader(doc.y, ocCols);
+    doc.y += 28;
+
+    if (payload.orders?.length > 0) {
+      payload.orders.forEach((order, i) => {
+        const rowH = 20;
+        ensureSpace(rowH + 4, ocCols);
+        const y = doc.y;
+
+        doc.save();
+        if (i % 2 === 0) doc.rect(margin, y - 4, contentWidth, rowH).fill(colors.softGray);
+        else doc.rect(margin, y - 4, contentWidth, rowH).fill('#ffffff');
+        doc.restore();
+
+        doc.fillColor(colors.text).fontSize(9).font('Helvetica');
+        let x = margin + 6;
+        doc.text(`#${order.id}`, x, y, { width: ocCols[0].width - 8 });
+        x += ocCols[0].width;
+        doc.text(truncate(order.supplierName, 28), x, y, { width: ocCols[1].width - 8 });
+        x += ocCols[1].width;
+        doc.text(formatDate(order.orderDate), x, y, { width: ocCols[2].width - 8 });
+        x += ocCols[2].width;
+        doc.text(formatDate(order.expectedDate), x, y, { width: ocCols[3].width - 8 });
+        x += ocCols[3].width;
+        doc.fillColor(colors.navy).font('Helvetica-Bold')
+          .text(formatMoney(order.totalAmount), x, y, { width: ocCols[4].width - 8 });
+        x += ocCols[4].width;
+        doc.fillColor(colors.blue).font('Helvetica-Bold')
+          .text(capitalize(order.status), x, y, { width: ocCols[5].width - 8 });
+
+        doc.y = y + rowH;
+      });
+    } else {
+      drawEmptyRow('No hay ordenes de compra registradas en el periodo seleccionado.');
+    }
 
     // ── Top Suppliers ──────────────────────────────────────────────────────
     if (payload.topSuppliers?.length > 0) {
@@ -228,34 +290,29 @@ export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPay
 
         doc.y = y + rowH;
       });
-    } else {
-      doc.fillColor(colors.muted).fontSize(10).font('Helvetica')
-        .text('Sin datos de proveedores para el periodo seleccionado.', margin, doc.y);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
     // REQUISICIONES
     // ═══════════════════════════════════════════════════════════════════════
+    doc.addPage();
+    drawHeader();
+    doc.y = 140;
+
+    drawSectionTitle('Requisiciones de compra');
+
+    const reqCols = [
+      { label: '#', width: 36 },
+      { label: 'Titulo', width: 200 },
+      { label: 'Prioridad', width: 80 },
+      { label: 'Estatus', width: 100 },
+      { label: 'Fecha', width: 99 },
+    ];
+
+    drawTableHeader(doc.y, reqCols);
+    doc.y += 28;
+
     if (payload.requisitions?.length > 0) {
-      if (doc.y + 100 > pageHeight - 50) {
-        doc.addPage();
-        drawHeader();
-        doc.y = 140;
-      }
-
-      drawSectionTitle('Requisiciones de compra');
-
-      const reqCols = [
-        { label: '#', width: 36 },
-        { label: 'Titulo', width: 200 },
-        { label: 'Prioridad', width: 80 },
-        { label: 'Estatus', width: 100 },
-        { label: 'Fecha', width: 99 },
-      ];
-
-      drawTableHeader(doc.y, reqCols);
-      doc.y += 28;
-
       payload.requisitions.forEach((req, i) => {
         const rowH = 20;
         ensureSpace(rowH + 4, reqCols);
@@ -289,60 +346,8 @@ export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPay
 
         doc.y = y + rowH;
       });
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // ORDENES DE COMPRA
-    // ═══════════════════════════════════════════════════════════════════════
-    if (payload.orders?.length > 0) {
-      if (doc.y + 100 > pageHeight - 50) {
-        doc.addPage();
-        drawHeader();
-        doc.y = 140;
-      }
-
-      drawSectionTitle('Ordenes de compra');
-
-      const ocCols = [
-        { label: '#', width: 36 },
-        { label: 'Proveedor', width: 160 },
-        { label: 'Fecha OC', width: 80 },
-        { label: 'F. Entrega', width: 80 },
-        { label: 'Monto', width: 95 },
-        { label: 'Estatus', width: 64 },
-      ];
-
-      drawTableHeader(doc.y, ocCols);
-      doc.y += 28;
-
-      payload.orders.forEach((order, i) => {
-        const rowH = 20;
-        ensureSpace(rowH + 4, ocCols);
-        const y = doc.y;
-
-        doc.save();
-        if (i % 2 === 0) doc.rect(margin, y - 4, contentWidth, rowH).fill(colors.softGray);
-        else doc.rect(margin, y - 4, contentWidth, rowH).fill('#ffffff');
-        doc.restore();
-
-        doc.fillColor(colors.text).fontSize(9).font('Helvetica');
-        let x = margin + 6;
-        doc.text(`#${order.id}`, x, y, { width: ocCols[0].width - 8 });
-        x += ocCols[0].width;
-        doc.text(truncate(order.supplierName, 28), x, y, { width: ocCols[1].width - 8 });
-        x += ocCols[1].width;
-        doc.text(formatDate(order.orderDate), x, y, { width: ocCols[2].width - 8 });
-        x += ocCols[2].width;
-        doc.text(formatDate(order.expectedDate), x, y, { width: ocCols[3].width - 8 });
-        x += ocCols[3].width;
-        doc.fillColor(colors.navy).font('Helvetica-Bold')
-          .text(formatMoney(order.totalAmount), x, y, { width: ocCols[4].width - 8 });
-        x += ocCols[4].width;
-        doc.fillColor(colors.blue).font('Helvetica-Bold')
-          .text(capitalize(order.status), x, y, { width: ocCols[5].width - 8 });
-
-        doc.y = y + rowH;
-      });
+    } else {
+      drawEmptyRow('No hay requisiciones de compra registradas en el periodo seleccionado.');
     }
 
     // ═══════════════════════════════════════════════════════════════════════
