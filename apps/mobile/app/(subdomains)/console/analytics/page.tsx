@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
+import HelpTab from "@/components/HelpTab";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
@@ -13,12 +14,62 @@ interface KpiCard {
   unit?: string;
 }
 
+const getPeriodStart = (period: string) => {
+  const now = new Date();
+  const start = new Date(now);
+  if (period === "DAILY") {
+    start.setHours(0, 0, 0, 0);
+  } else if (period === "WEEKLY") {
+    const day = start.getDay();
+    const diff = day === 0 ? 6 : day - 1;
+    start.setDate(start.getDate() - diff);
+    start.setHours(0, 0, 0, 0);
+  } else if (period === "MONTHLY") {
+    start.setDate(1);
+    start.setHours(0, 0, 0, 0);
+  } else if (period === "QUARTERLY") {
+    const quarterStartMonth = Math.floor(start.getMonth() / 3) * 3;
+    start.setMonth(quarterStartMonth, 1);
+    start.setHours(0, 0, 0, 0);
+  } else if (period === "YEARLY") {
+    start.setMonth(0, 1);
+    start.setHours(0, 0, 0, 0);
+  }
+  return start;
+};
+
+const getPeriodLabel = (row: any) => {
+  const metaPeriod = row?.metadata?.period;
+  if (metaPeriod) return metaPeriod;
+  if (row?.period) return row.period;
+  if (!row?.periodStart) return "—";
+  const start = new Date(row.periodStart);
+  return start.toLocaleDateString("es-MX", { year: "numeric", month: "short" });
+};
+
+const normalizeKpiRows = (rows: any[]) => {
+  return rows
+    .map((row: any) => ({
+      ...row,
+      displayName: String(row?.kpiName || row?.name || "").trim(),
+      displayTarget: row?.metadata?.target ?? row?.target ?? null,
+      displayPeriod: getPeriodLabel(row),
+      displayDate: row?.periodEnd || row?.periodStart || row?.snapshotDate || row?.createdAt,
+    }))
+    .filter((row: any) => row.displayName.length > 0)
+    .filter((row: any) => row.kpiCategory !== "PUBLIC_TRAFFIC")
+    .filter((row: any) => !row.displayName.toLowerCase().startsWith("landing:"));
+};
+
 export default function AnalyticsPage() {
   const { user } = useUser();
   const [dashboard, setDashboard] = useState<any>(null);
   const [kpis, setKpis] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"dashboard" | "kpis">("dashboard");
+  const [showKpiForm, setShowKpiForm] = useState(false);
+  const [kpiForm, setKpiForm] = useState({ name: "", value: 0, target: 0, unit: "", period: "MONTHLY" });
+  const [savingKpi, setSavingKpi] = useState(false);
 
   useEffect(() => {
     if (!user?.token) return;
@@ -29,11 +80,41 @@ export default function AnalyticsPage() {
     ])
       .then(([dash, kpi]) => {
         setDashboard(dash);
-        setKpis(Array.isArray(kpi) ? kpi : kpi.data || []);
+        const rawRows = Array.isArray(kpi) ? kpi : kpi.data || [];
+        setKpis(normalizeKpiRows(rawRows));
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [user?.token]);
+
+  const handleCreateKpi = async () => {
+    if (!user?.token || !kpiForm.name) return;
+    setSavingKpi(true);
+    try {
+      const periodStart = getPeriodStart(kpiForm.period);
+      const periodEnd = new Date();
+      const res = await fetch(`${API_URL}/analytics/kpi`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${user.token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kpiName: kpiForm.name.trim(),
+          value: Number(kpiForm.value) || 0,
+          unit: kpiForm.unit?.trim() || undefined,
+          kpiCategory: "GENERAL",
+          periodStart: periodStart.toISOString(),
+          periodEnd: periodEnd.toISOString(),
+          metadata: { target: Number(kpiForm.target) || 0, period: kpiForm.period },
+        }),
+      });
+      if (res.ok) {
+        const newKpi = await res.json();
+        setKpis([...normalizeKpiRows([newKpi]), ...kpis]);
+        setKpiForm({ name: "", value: 0, target: 0, unit: "", period: "MONTHLY" });
+        setShowKpiForm(false);
+      }
+    } catch (e) { console.error(e); }
+    finally { setSavingKpi(false); }
+  };
 
   const tabStyle = (t: string) => ({
     padding: "10px 16px",
@@ -61,6 +142,8 @@ export default function AnalyticsPage() {
   return (
     <RoleGuard anyPermissions={[PERMISSIONS.BI_VIEW, PERMISSIONS.BI_MANAGE]}>
       <div style={{ display: "grid", gap: 24 }}>
+        <HelpTab module="analytics" user={user} />
+        
         <div className="card" style={{ padding: 16 }}>
           <h1 style={{ color: "var(--primary)", marginBottom: 8 }}>📊 BI y Analytics</h1>
           <p style={{ color: "var(--text-secondary)" }}>
@@ -114,12 +197,12 @@ export default function AnalyticsPage() {
                 <tbody>
                   {kpis.map((k: any) => (
                     <tr key={k.id}>
-                      <td><strong>{k.name}</strong></td>
+                      <td><strong>{k.displayName}</strong></td>
                       <td style={{ fontWeight: 600 }}>{k.value}</td>
-                      <td>{k.target ?? "—"}</td>
+                      <td>{k.displayTarget ?? "—"}</td>
                       <td>{k.unit || "—"}</td>
-                      <td><span className="badge">{k.period}</span></td>
-                      <td>{new Date(k.snapshotDate || k.createdAt).toLocaleDateString("es-MX")}</td>
+                      <td><span className="badge">{k.displayPeriod}</span></td>
+                      <td>{k.displayDate ? new Date(k.displayDate).toLocaleDateString("es-MX") : "—"}</td>
                     </tr>
                   ))}
                 </tbody>

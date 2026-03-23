@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
+import HelpTab from "@/components/HelpTab";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
@@ -13,6 +14,12 @@ export default function SafetyPage() {
   const [training, setTraining] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"incidents" | "permits" | "training">("incidents");
+  const [showIncidentForm, setShowIncidentForm] = useState(false);
+  const [showPermitForm, setShowPermitForm] = useState(false);
+  const [incidentForm, setIncidentForm] = useState({ type: "", severity: "MEDIUM", location: "", description: "" });
+  const [permitForm, setPermitForm] = useState({ type: "APT", location: "", validDays: 30, description: "" });
+  const [savingIncident, setSavingIncident] = useState(false);
+  const [savingPermit, setSavingPermit] = useState(false);
 
   useEffect(() => {
     if (!user?.token) return;
@@ -31,6 +38,46 @@ export default function SafetyPage() {
       .finally(() => setLoading(false));
   }, [user?.token]);
 
+  const handleCreateIncident = async () => {
+    if (!user?.token || !incidentForm.type) return;
+    setSavingIncident(true);
+    try {
+      const res = await fetch(`${API_URL}/safety/incidents`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${user.token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ ...incidentForm, occurredAt: new Date() }),
+      });
+      if (res.ok) {
+        const newIncident = await res.json();
+        setIncidents([newIncident, ...incidents]);
+        setIncidentForm({ type: "", severity: "MEDIUM", location: "", description: "" });
+        setShowIncidentForm(false);
+      }
+    } catch (e) { console.error(e); }
+    finally { setSavingIncident(false); }
+  };
+
+  const handleCreatePermit = async () => {
+    if (!user?.token || !permitForm.type) return;
+    setSavingPermit(true);
+    try {
+      const validUntil = new Date();
+      validUntil.setDate(validUntil.getDate() + permitForm.validDays);
+      const res = await fetch(`${API_URL}/safety/permits`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${user.token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ ...permitForm, validUntil }),
+      });
+      if (res.ok) {
+        const newPermit = await res.json();
+        setPermits([newPermit, ...permits]);
+        setPermitForm({ type: "APT", location: "", validDays: 30, description: "" });
+        setShowPermitForm(false);
+      }
+    } catch (e) { console.error(e); }
+    finally { setSavingPermit(false); }
+  };
+
   const openIncidents = incidents.filter((i: any) => i.status === "OPEN").length;
   const activePermits = permits.filter((p: any) => p.status === "APPROVED").length;
   const expiredTraining = training.filter((t: any) => t.expiresAt && new Date(t.expiresAt) < new Date()).length;
@@ -48,6 +95,8 @@ export default function SafetyPage() {
   return (
     <RoleGuard anyPermissions={[PERMISSIONS.SAFETY_VIEW, PERMISSIONS.SAFETY_MANAGE]}>
       <div style={{ display: "grid", gap: 24 }}>
+        <HelpTab module="safety" user={user} />
+        
         <div className="card" style={{ padding: 16 }}>
           <h1 style={{ color: "var(--primary)", marginBottom: 8 }}>🦺 Seguridad Industrial</h1>
           <p style={{ color: "var(--text-secondary)" }}>

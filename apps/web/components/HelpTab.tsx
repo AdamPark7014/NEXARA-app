@@ -4,6 +4,36 @@ import React from "react";
 import { useTheme } from "./ThemeContext";
 
 const helpContent: Record<string, Record<string, string>> = {
+  safety: {
+    superadmin: `Aquí supervisa toda la seguridad e higiene de la organización. Gestiona incidentes (reporte, investigación, seguimiento de acciones), permisos de trabajo (APT, TATM, espacios confinados), capacitación obligatoria y planes de seguridad. Todos los registros quedan auditados y generan reportes de cumplimiento normativo.`,
+    admin: `Aquí registra y da seguimiento a incidentes del equipo, autoriza o rechaza permisos de trabajo, verifica que la capacitación esté al día y mantiene trazabilidad de everything para auditorías. Es tu responsabilidad que nada se quede sin reportar ni validar.`,
+    ingeniero: `Aquí reportas incidentes de seguridad cuando ocurren, solicitas permisos de trabajo antes de ejecutar tareas de riesgo (trabajos en altura, espacios confinados, energía, calor), y consultas tu historial de capacitación. Si un permiso es rechazado, no inicies el trabajo hasta que sea aprobado.`,
+    vendedor: `Si tu perfil tiene acceso, aquí consultas información de seguridad relevante a tu conducta y actividades. Si tienes incidentes o necesitas permisos, coordina directamente con tu administrador.`
+  },
+  documents: {
+    superadmin: `Aquí gestiona todos los documentos corporativos: políticas, procedimientos, plantillas contractuales, certificaciones. Puedes crear categorías, registrar documentos nuevos, gestionar versionamiento y establecer flujos de aprobación. Todo queda centralizado, versionado y con trazabilidad de cambios.`,
+    admin: `Aquí administra los documentos de tu área: crea documentos nuevos, organízalos en categorías, gestiona versiones y lidera o participa en flujos de aprobación. Asegúrate de que los documentos vigentes sean accesibles y los documentos obsoletos queden marcados como archivados.`,
+    ingeniero: `Aquí consultas los documentos corporativos que regulan tu trabajo: procedimientos de seguridad, plantillas de reporte, normas de calidad, políticas internas. Si necesitas una nueva versión o un documento está outdated, avísale a tu administrador.`,
+    vendedor: `Aquí consultas documentos corporativos como contratos plantilla, políticas de atención al cliente, procedimientos de facturación. Si necesitas agregar un documento nuevo o revisar una versión anterior, coordina con tu administrador.`
+  },
+  workflow: {
+    superadmin: `Aquí diseña flujos de aprobación para cualquier entidad corporativa: órdenes de compra, gastos, licencias, cambios, etc. Define pasos secuenciales de aprobación, asigna aprobadores, y monitorea instancias en progreso. Todo es rastreable y evita decisiones ad-hoc sin autorización.`,
+    admin: `Aquí participas en flujos de trabajo: apruebas o rechazas solicitudes asignadas a ti en tu bandeja de entrada, inicias flujos nuevos cuando tu equipo lo solicita, y revisa el historial de aprobaciones completadas. Mantén tus aprobaciones pendientes al día.`,
+    ingeniero: `Aquí inicias flujos de aprobación cuando necesitas autorización (gastos, permisos, cambios, compras). Completa la solicitud con detalle, envía para aprobación y monitorea su avance. Si es rechazada, el administrador te indicará por qué y cómo corregir.`,
+    vendedor: `Si tu perfil participa, aquí inicias y consultabas flujos de aprobación para solicitudes comerciales o cambios de alcance. Sigue el estado de tu solicitud y responde si se requieren ajustes.`
+  },
+  audit: {
+    superadmin: `Aquí audita toda la actividad del sistema en tiempo real: quién hizo qué, cuándo y en qué registro. Filtra por acción, entidad, usuario o fecha para investigar cambios, validar cumplimiento normativo y detectar irregularidades. Es tu pista de auditoría completa.`,
+    admin: `Aquí revisas la actividad auditada del área: quién modificó qué datos, cuándo se crearon/eliminaron registros, quién aprobó qué. Úsalo para investigar cambios sospechosos o errados, y como fuente de verdad en discrepancias.`,
+    ingeniero: `Si tu perfil tiene acceso, aquí puedes revisar un historial de cambios de registros específicos (quién editó su actividad, quién cambió su estatus, etc). Sirve para entender la traza de cada registro importante.`,
+    vendedor: `Si tu perfil tiene acceso, aquí consultas la pista de auditoría de registros relacionados con tu trabajo para entender quién hizo qué cambios. Si sospechas de un cambio no autorizado, repórtalo a tu administrador con la fecha y hora exactas que ves en la auditoría.`
+  },
+  analytics: {
+    superadmin: `Aquí visualizas el estado operativo y financiero de la empresa a través de KPIs consolidados. Una KPI (Key Performance Indicator o Indicador Clave de Desempeño) es una métrica que mide si un objetivo se está cumpliendo en un período definido. Ejemplos: usuarios activos, producción, órdenes pendientes, incidentes, inspecciones, facturas y flujos de trabajo. Úsalo para decisiones estratégicas y para detectar focos rojos operativos.`,
+    admin: `Aquí monitoreas el desempeño del área mediante KPIs. Una KPI es un indicador numérico que compara resultado actual vs meta (target) en un periodo (diario, semanal, mensual, etc.). Ejemplos: producción, calidad, cumplimiento, carga de trabajo, incidentes y capacitación. Úsalo para identificar oportunidades de mejora y reportar avances del equipo.`,
+    ingeniero: `Si tu perfil tiene acceso, aquí consultas KPIs operativos del área y la empresa. Una KPI te ayuda a entender tendencia y cumplimiento contra objetivo, para saber si el proceso mejora o se desvía.`,
+    vendedor: `Si tu perfil tiene acceso, aquí revisas KPIs comerciales y operativos (ventas, pipeline, ingresos, facturas, clientes activos). Recuerda: una KPI mide desempeño contra una meta en un periodo, y te sirve para planear mejor tus objetivos comerciales.`
+  },
   attendance: {
     superadmin: `Aquí puedes supervisar la asistencia global de toda la organización, revisar entradas y salidas, detectar incidencias y validar cumplimiento de horarios por área.`,
     admin: `Aquí puedes dar seguimiento a la asistencia de tu equipo, revisar marcajes diarios y detectar retrasos o faltas para tomar acciones de control.`,
