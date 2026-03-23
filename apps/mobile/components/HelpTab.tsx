@@ -107,28 +107,28 @@ const helpContent: Record<string, Record<string, string>> = {
     vendedor: `Si tienes acceso, aquí puedes consultar el estado de candidatos y sus documentos CV en el flujo de selección. Si no ves acciones esperadas, revisa permisos con administración.`
   },
   manufacturing: {
-    superadmin: `Usa este módulo para dejar lista la base de producción antes de operar. Paso a paso: 1) crea los Centros de trabajo (máquinas o áreas), 2) crea el BOM del producto (materiales y cantidades), 3) verifica que todo quede Activo. Si esto está incompleto, las órdenes de producción no se podrán planear bien.`,
-    admin: `Aquí preparas lo necesario para fabricar. Primero registra Centros de trabajo, después crea el BOM de cada producto. Recomendación: usa nombres y códigos claros para que el equipo identifique rápido qué centro y qué BOM usar.`,
-    ingeniero: `Aquí consultas cómo se fabrica cada producto: qué materiales lleva (BOM) y en qué centro se trabaja. Revísalo antes de iniciar una orden para evitar errores de materiales o tiempos.`,
-    vendedor: `Este módulo es principalmente de configuración interna. Si tienes acceso, úsalo para consultar cómo se fabrica un producto y estimar mejor tiempos de entrega.`
+    superadmin: `En una empresa de servicios, este módulo se usa para estandarizar la ejecución técnica por tipo de servicio/proyecto. Flujo recomendado: 1) define centros de trabajo (cuadrillas, taller, laboratorio o áreas operativas), 2) arma la plantilla técnica (BOM) con insumos y cantidades base, 3) valida que quede activo para que el equipo pueda planear y ejecutar sin improvisación.`,
+    admin: `Aquí preparas el estándar operativo del servicio. Registra centros de trabajo y después la plantilla BOM de cada línea de servicio. Esto evita variaciones entre equipos y mejora tiempos de ejecución.`,
+    ingeniero: `Aquí consultas la plantilla técnica del servicio antes de salir a ejecutar: insumos requeridos, cantidades base y centro responsable. Úsalo como checklist previo para reducir retrabajos.`,
+    vendedor: `Si tienes acceso, aquí puedes consultar la estructura técnica base del servicio para alinear expectativas de alcance y tiempos con operación.`
   },
   production: {
-    superadmin: `Aquí controlas todo el ciclo de una orden. Flujo simple: Crear orden -> Iniciar orden -> Completar orden. Al completar, captura la cantidad realmente producida para que los indicadores queden correctos.`,
-    admin: `Aquí operas las órdenes del día a día. Para crear una orden: selecciona BOM, define cantidad, fechas y prioridad. Luego usa los botones Iniciar y Completar según avance real en planta.`,
-    ingeniero: `Aquí das seguimiento a la ejecución: revisa estado, avance y fechas de cada orden. Si ves retraso o bajo avance, repórtalo para reprogramar a tiempo.`,
-    vendedor: `Aquí puedes consultar en qué estado va cada orden para estimar entregas con el cliente: Planificada, En progreso o Completada.`
+    superadmin: `Este módulo controla la ejecución operativa por orden de trabajo interna. Flujo: Crear orden -> Iniciar -> Completar. Cada orden representa una ejecución planificada de servicio, instalación o preparación técnica; al cierre se registra el resultado real para medir cumplimiento.`,
+    admin: `Aquí gestionas órdenes de ejecución del equipo. Crea la orden con plantilla BOM, prioridad y fechas; luego inicia cuando entra a operación y completa al terminar. Esto te da trazabilidad real de tiempos y avance.`,
+    ingeniero: `Aquí ves tus órdenes activas, su avance y fechas compromiso. Úsalo para priorizar trabajo diario y reportar desviaciones cuando el avance real no coincide con lo planeado.`,
+    vendedor: `Aquí puedes consultar el estado operativo de las órdenes para dar seguimiento comercial: planificada, en progreso o completada.`
   },
   "production-schedule": {
-    superadmin: `Aquí ves la carga global de producción por fechas. Usa Desde/Hasta para detectar semanas saturadas y tomar decisiones de capacidad antes de que haya atraso.`,
-    admin: `Aquí organizas la producción por calendario. Filtra por rango de fechas para ver qué órdenes entran y cómo está la utilización de cada centro de trabajo.`,
-    ingeniero: `Aquí revisas la secuencia de trabajo y la ocupación de centros. Te sirve para priorizar qué orden ejecutar primero y evitar tiempos muertos.`,
-    vendedor: `Aquí puedes consultar fechas planeadas de producción para confirmar promesas de entrega al cliente con información real.`
+    superadmin: `Aquí balanceas capacidad operativa por periodo. Filtra por fechas para detectar sobrecarga de centros/cuadrillas y ajustar la agenda antes de afectar compromisos de servicio.`,
+    admin: `Aquí haces planeación semanal/diaria de órdenes. Usa Desde/Hasta para ver carga por centro de trabajo y redistribuir cuando una línea está saturada.`,
+    ingeniero: `Aquí consultas la secuencia programada de trabajo para organizar ruta y prioridades operativas del día.`,
+    vendedor: `Aquí validas ventanas reales de ejecución para coordinar fechas con clientes sin comprometer capacidad operativa.`
   },
   quality: {
-    superadmin: `Aquí gestionas el flujo completo de calidad. Paso a paso: 1) crea inspección, 2) registra checklist, 3) si hay fallo crea NCR, 4) da seguimiento hasta cerrar. Así mantienes trazabilidad de cada incidencia.`,
-    admin: `Aquí registras inspecciones y no conformidades. Si un producto no cumple, levanta NCR con descripción clara, severidad y acciones correctivas para que el equipo sepa exactamente qué corregir.`,
-    ingeniero: `Aquí capturas resultados de revisión de calidad. Usa checklist claro (qué se revisó y contra qué especificación) y crea NCR cuando haya desviaciones.`,
-    vendedor: `Aquí puedes consultar incidencias de calidad que puedan afectar fechas de entrega o satisfacción del cliente.`
+    superadmin: `Aquí controlas la calidad del servicio ejecutado. Flujo: 1) registra inspección, 2) evalúa checklist, 3) si hay desviación levanta NCR, 4) da seguimiento a acción correctiva/preventiva hasta cierre.`,
+    admin: `Aquí documentas hallazgos de calidad y su resolución. Cuando algo no cumple, crea NCR con causa raíz y acción correctiva para evitar repetición en futuros servicios.`,
+    ingeniero: `Aquí registras evidencia de calidad de la ejecución. Si detectas desviación, repórtala con detalle para que se atienda y cierre formalmente.`,
+    vendedor: `Aquí puedes consultar incidencias de calidad abiertas que puedan impactar tiempos de entrega, garantías o satisfacción del cliente.`
   },
   "quality-dashboard": {
     superadmin: `Aquí visualizas KPIs de calidad: inspecciones totales, tasa de aprobación, NCR abiertas y críticas. Úsalo para decisiones ejecutivas y priorización de acciones correctivas.`,
