@@ -13,6 +13,12 @@ export default function DocumentsPage() {
   const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"docs" | "categories">("docs");
+  const [showDocForm, setShowDocForm] = useState(false);
+  const [showCatForm, setShowCatForm] = useState(false);
+  const [docForm, setDocForm] = useState({ code: "", title: "", categoryId: "", description: "" });
+  const [catForm, setCatForm] = useState({ code: "", name: "" });
+  const [savingDoc, setSavingDoc] = useState(false);
+  const [savingCat, setSavingCat] = useState(false);
 
   useEffect(() => {
     if (!user?.token) return;
@@ -28,6 +34,44 @@ export default function DocumentsPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [user?.token]);
+
+  const handleCreateDocument = async () => {
+    if (!user?.token || !docForm.title) return;
+    setSavingDoc(true);
+    try {
+      const res = await fetch(`${API_URL}/documents`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${user.token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ ...docForm, status: "DRAFT" }),
+      });
+      if (res.ok) {
+        const newDoc = await res.json();
+        setDocuments([newDoc, ...documents]);
+        setDocForm({ code: "", title: "", categoryId: "", description: "" });
+        setShowDocForm(false);
+      }
+    } catch (e) { console.error(e); }
+    finally { setSavingDoc(false); }
+  };
+
+  const handleCreateCategory = async () => {
+    if (!user?.token || !catForm.name) return;
+    setSavingCat(true);
+    try {
+      const res = await fetch(`${API_URL}/documents/categories`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${user.token}`, "Content-Type": "application/json" },
+        body: JSON.stringify(catForm),
+      });
+      if (res.ok) {
+        const newCat = await res.json();
+        setCategories([newCat, ...categories]);
+        setCatForm({ code: "", name: "" });
+        setShowCatForm(false);
+      }
+    } catch (e) { console.error(e); }
+    finally { setSavingCat(false); }
+  };
 
   const approved = documents.filter((d: any) => d.status === "APPROVED").length;
   const pending = documents.filter((d: any) => d.status === "DRAFT" || d.status === "PENDING").length;

@@ -20,6 +20,21 @@ export const isSalesManagerUser = (user: PanelUser | null | undefined) => {
 export const getRoleLabel = (user: PanelUser | null | undefined) => {
   if (!user) return "Vendedor";
   if (user.isSuperAdmin) return "Superadmin";
+
+  const roleRaw = String(user.role || "").trim();
+  const role = roleRaw.toLowerCase();
+
+  // Vendedor se mantiene fijo por regla de negocio.
+  if (role.includes("vended")) return "Vendedor";
+
+  if (roleRaw) {
+    return roleRaw
+      .split(/[_\s-]+/)
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+  }
+
   if (isPlatformAdmin(user)) return "Admin";
   return "Vendedor";
 };

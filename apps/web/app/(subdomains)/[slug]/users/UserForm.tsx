@@ -60,6 +60,16 @@ export default function UserForm({
   const prefillName = searchParams.get('prefillName') || '';
   const prefillEmail = searchParams.get('prefillEmail') || '';
   const prefillRole = searchParams.get('prefillRoleName') || '';
+  const initialRoleName = String(initialUser?.role?.nombre || (!isEdit ? prefillRole : "")).trim() || "Vendedor";
+  const initialRoleLower = initialRoleName.toLowerCase();
+  const initialRoleTipo: "vendedor" | "ingeniero" | "administrador" = initialRoleLower.includes("admin")
+    ? "administrador"
+    : initialRoleLower.includes("ingenier")
+      ? "ingeniero"
+      : "vendedor";
+  const initialCargo = initialRoleTipo === "vendedor" || initialRoleName.toLowerCase() === initialRoleTipo
+    ? ""
+    : initialRoleName;
 
   const [form, setForm] = useState({
     nombre: initialUser?.nombre || (!isEdit ? prefillName : ""),
@@ -68,8 +78,10 @@ export default function UserForm({
     departmentId: initialUser?.department?.id ? String(initialUser.department.id) : "",
     department: initialUser?.department?.nombre || "",
     avatarUrl: initialUser?.avatarUrl || "",
+    roleTipo: initialRoleTipo,
+    cargo: initialCargo,
     // Rol personalizado
-    roleNombre: initialUser?.role?.nombre || (!isEdit ? prefillRole : ""),
+    roleNombre: initialRoleName,
     accesoConsole: initialUser?.role?.accesoConsole || false,
     accesoConsoleAdmin: initialUser?.role?.accesoConsoleAdmin || false,
     accesoGestionWeb: initialUser?.role?.accesoGestionWeb || false,
@@ -103,6 +115,22 @@ export default function UserForm({
       const nextForm = { ...prev, [name]: nextValue };
       if (name === "department") {
         nextForm.departmentId = "";
+      }
+      if (name === "roleTipo") {
+        if (value === "vendedor") {
+          nextForm.cargo = "";
+          nextForm.roleNombre = "Vendedor";
+        } else if (nextForm.cargo.trim()) {
+          nextForm.roleNombre = nextForm.cargo.trim();
+        } else {
+          nextForm.roleNombre = value === "administrador" ? "Administrador" : "Ingeniero";
+        }
+      }
+      if (name === "cargo") {
+        const trimmedCargo = String(value || "").trim();
+        if (nextForm.roleTipo !== "vendedor") {
+          nextForm.roleNombre = trimmedCargo || (nextForm.roleTipo === "administrador" ? "Administrador" : "Ingeniero");
+        }
       }
       if (name === "accesoConsoleAdmin" && target.checked) {
         nextForm.accesoConsole = true;
@@ -173,11 +201,21 @@ export default function UserForm({
     e.preventDefault();
     setLoading(true);
     try {
+      const effectiveRoleName = form.roleTipo === "vendedor"
+        ? "Vendedor"
+        : (form.cargo || "").trim() || (form.roleTipo === "administrador" ? "Administrador" : "Ingeniero");
+
+      if (form.roleTipo !== "vendedor" && !(form.cargo || "").trim()) {
+        alert("Por favor especifique su cargo para el rol seleccionado");
+        setLoading(false);
+        return;
+      }
+
       const isConsoleUser = form.accesoConsole || form.accesoConsoleAdmin || form.accesoGestionCvs;
       const isConsoleAdmin = form.accesoConsoleAdmin;
       const enableConsoleModules = isConsoleUser || isConsoleAdmin;
       const rolePayload = {
-        nombre: form.roleNombre,
+        nombre: effectiveRoleName,
         accesoConsole: isConsoleUser,
         accesoConsoleAdmin: isConsoleAdmin,
         accesoActividades: enableConsoleModules,
@@ -215,38 +253,17 @@ export default function UserForm({
         }
         const roles = await listRes.json();
         return Array.isArray(roles)
-          ? roles.find((r) => r?.nombre === form.roleNombre)
+          ? roles.find((r) => r?.nombre === effectiveRoleName)
           : null;
       };
 
-      // 1. Crear/actualizar rol
+      // 1. Resolver rol para asignar al usuario en edición/creación.
+      // En edición NO se muta el rol actual del usuario para evitar impactos en otros usuarios que compartan ese rol.
       let roleId: number | null = null;
-      if (form.roleNombre) {
-        if (isEdit && initialUser?.role?.id) {
-          const existing = await fetchRoleByName();
-          if (existing && existing.id !== initialUser.role.id) {
-            const patchRes = await fetch(buildApiUrl(`roles/${existing.id}`), {
-              method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-                ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
-              },
-              body: JSON.stringify(rolePayload),
-            });
-            if (!patchRes.ok) throw new Error(await getErrorMessage(patchRes, 'Error al actualizar el rol'));
-            roleId = existing.id;
-          } else {
-            const patchRes = await fetch(buildApiUrl(`roles/${initialUser.role.id}`), {
-              method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-                ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
-              },
-              body: JSON.stringify(rolePayload),
-            });
-            if (!patchRes.ok) throw new Error(await getErrorMessage(patchRes, 'Error al actualizar el rol'));
-            roleId = initialUser.role.id;
-          }
+      if (effectiveRoleName) {
+        const existing = await fetchRoleByName();
+        if (existing?.id) {
+          roleId = existing.id;
         } else {
           const roleRes = await fetch(buildApiUrl('roles'), {
             method: 'POST',
@@ -256,23 +273,9 @@ export default function UserForm({
             },
             body: JSON.stringify(rolePayload),
           });
-          if (roleRes.ok) {
-            const roleData = await roleRes.json();
-            roleId = roleData.id;
-          } else {
-            const match = await fetchRoleByName();
-            if (!match?.id) throw new Error('Error al crear el rol');
-            const patchRes = await fetch(buildApiUrl(`roles/${match.id}`), {
-              method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-                ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
-              },
-              body: JSON.stringify(rolePayload),
-            });
-            if (!patchRes.ok) throw new Error(await getErrorMessage(patchRes, 'Error al actualizar el rol'));
-            roleId = match.id;
-          }
+          if (!roleRes.ok) throw new Error(await getErrorMessage(roleRes, 'Error al crear el rol'));
+          const roleData = await roleRes.json();
+          roleId = roleData.id;
         }
       }
       // 2. Crear el usuario con el roleId
@@ -299,7 +302,9 @@ export default function UserForm({
           departmentId: "",
           department: "",
           avatarUrl: "",
-          roleNombre: "",
+          roleTipo: "vendedor",
+          cargo: "",
+          roleNombre: "Vendedor",
           accesoConsole: false,
           accesoConsoleAdmin: false,
           accesoGestionWeb: false,
@@ -368,8 +373,29 @@ export default function UserForm({
           )}
         </div>
         <div className="field">
-          <label className="label">Nombre del Rol</label>
-          <input name="roleNombre" value={form.roleNombre} onChange={handleChange} required className="input" placeholder="Ej: Supervisor, PanelWeb, etc." />
+          <label className="label">Tipo de rol</label>
+          <select name="roleTipo" value={form.roleTipo} onChange={handleChange} className="input">
+            <option value="vendedor">Vendedor</option>
+            <option value="ingeniero">Ingeniero</option>
+            <option value="administrador">Administrador</option>
+          </select>
+        </div>
+        {form.roleTipo !== "vendedor" && (
+          <div className="field">
+            <label className="label">Por favor especifique su cargo</label>
+            <input
+              name="cargo"
+              value={form.cargo}
+              onChange={handleChange}
+              required
+              className="input"
+              placeholder="Ej: Jefe de Ingeniería, Coordinador de Operaciones"
+            />
+          </div>
+        )}
+        <div className="field">
+          <label className="label">Nombre visible del rol</label>
+          <input name="roleNombre" value={form.roleNombre} readOnly className="input" />
         </div>
         <div className="field">
           <label className="label">Departamento</label>
