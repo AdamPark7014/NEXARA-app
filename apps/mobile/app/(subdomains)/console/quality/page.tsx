@@ -26,7 +26,7 @@ export default function QualityPage() {
     inspectedQty: "",
     inspectionDate: new Date().toISOString().slice(0, 10),
     notes: "",
-    checklistText: "Dimensión|Dentro de tolerancia\nAcabado|Sin defectos visibles",
+    checklistText: "Dimension | Dentro de tolerancia\nAcabado | Sin defectos visibles",
   });
 
   const [ncrForm, setNcrForm] = useState({
@@ -176,24 +176,27 @@ export default function QualityPage() {
             {canInspect && (
               <div style={{ display: "grid", gap: 8 }}>
                 <h3 style={{ margin: 0 }}>Nueva Inspección</h3>
+                <p style={{ margin: 0, fontSize: 12, color: "var(--text-secondary)" }}>
+                  Registra la revisión de calidad. Usa IDs solo cuando ya tengas el folio interno (producto, orden o lote).
+                </p>
                 <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}>
                   <select value={inspectionForm.type} onChange={(e) => setInspectionForm((p) => ({ ...p, type: e.target.value }))}>
-                    <option value="INCOMING">Incoming</option>
-                    <option value="IN_PROCESS">In Process</option>
+                    <option value="INCOMING">Entrada (recepción)</option>
+                    <option value="IN_PROCESS">En proceso</option>
                     <option value="FINAL">Final</option>
-                    <option value="RANDOM">Random</option>
+                    <option value="RANDOM">Aleatoria</option>
                   </select>
                   <input placeholder="Cantidad inspeccionada" value={inspectionForm.inspectedQty} onChange={(e) => setInspectionForm((p) => ({ ...p, inspectedQty: e.target.value }))} />
                   <input type="date" value={inspectionForm.inspectionDate} onChange={(e) => setInspectionForm((p) => ({ ...p, inspectionDate: e.target.value }))} />
-                  <input placeholder="Product ID (opcional)" value={inspectionForm.productId} onChange={(e) => setInspectionForm((p) => ({ ...p, productId: e.target.value }))} />
-                  <input placeholder="Lot ID (opcional)" value={inspectionForm.lotId} onChange={(e) => setInspectionForm((p) => ({ ...p, lotId: e.target.value }))} />
-                  <input placeholder="Production Order ID" value={inspectionForm.productionOrderId} onChange={(e) => setInspectionForm((p) => ({ ...p, productionOrderId: e.target.value }))} />
-                  <input placeholder="Purchase Order ID" value={inspectionForm.purchaseOrderId} onChange={(e) => setInspectionForm((p) => ({ ...p, purchaseOrderId: e.target.value }))} />
+                  <input placeholder="ID interno de producto (opcional)" value={inspectionForm.productId} onChange={(e) => setInspectionForm((p) => ({ ...p, productId: e.target.value }))} />
+                  <input placeholder="ID interno de lote (opcional)" value={inspectionForm.lotId} onChange={(e) => setInspectionForm((p) => ({ ...p, lotId: e.target.value }))} />
+                  <input placeholder="ID de orden de producción (opcional)" value={inspectionForm.productionOrderId} onChange={(e) => setInspectionForm((p) => ({ ...p, productionOrderId: e.target.value }))} />
+                  <input placeholder="ID de orden de compra (opcional)" value={inspectionForm.purchaseOrderId} onChange={(e) => setInspectionForm((p) => ({ ...p, purchaseOrderId: e.target.value }))} />
                   <input placeholder="Notas" value={inspectionForm.notes} onChange={(e) => setInspectionForm((p) => ({ ...p, notes: e.target.value }))} />
                 </div>
                 <textarea
                   rows={3}
-                  placeholder="Checklist (una línea por criterio): Parámetro|Especificación"
+                  placeholder="Checklist: una línea por criterio. Ejemplo: Parámetro | Especificación"
                   value={inspectionForm.checklistText}
                   onChange={(e) => setInspectionForm((p) => ({ ...p, checklistText: e.target.value }))}
                   style={{ padding: 10, borderRadius: 8, border: "1px solid var(--border)" }}
@@ -207,14 +210,17 @@ export default function QualityPage() {
             {canManage && (
               <div style={{ display: "grid", gap: 8 }}>
                 <h3 style={{ margin: 0 }}>Nueva No Conformidad (NCR)</h3>
+                <p style={{ margin: 0, fontSize: 12, color: "var(--text-secondary)" }}>
+                  Levanta una NCR cuando exista desviación. Describe claramente el problema y la acción correctiva.
+                </p>
                 <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}>
-                  <input placeholder="Inspection ID (opcional)" value={ncrForm.inspectionId} onChange={(e) => setNcrForm((p) => ({ ...p, inspectionId: e.target.value }))} />
-                  <input placeholder="Product ID (opcional)" value={ncrForm.productId} onChange={(e) => setNcrForm((p) => ({ ...p, productId: e.target.value }))} />
+                  <input placeholder="ID de inspección (opcional)" value={ncrForm.inspectionId} onChange={(e) => setNcrForm((p) => ({ ...p, inspectionId: e.target.value }))} />
+                  <input placeholder="ID de producto (opcional)" value={ncrForm.productId} onChange={(e) => setNcrForm((p) => ({ ...p, productId: e.target.value }))} />
                   <input placeholder="Título" value={ncrForm.title} onChange={(e) => setNcrForm((p) => ({ ...p, title: e.target.value }))} />
                   <select value={ncrForm.severity} onChange={(e) => setNcrForm((p) => ({ ...p, severity: e.target.value }))}>
-                    <option value="MINOR">Minor</option>
-                    <option value="MAJOR">Major</option>
-                    <option value="CRITICAL">Critical</option>
+                    <option value="MINOR">Menor</option>
+                    <option value="MAJOR">Mayor</option>
+                    <option value="CRITICAL">Crítica</option>
                   </select>
                   <input placeholder="Causa raíz" value={ncrForm.rootCause} onChange={(e) => setNcrForm((p) => ({ ...p, rootCause: e.target.value }))} />
                   <input placeholder="Acción correctiva" value={ncrForm.correctiveAction} onChange={(e) => setNcrForm((p) => ({ ...p, correctiveAction: e.target.value }))} />

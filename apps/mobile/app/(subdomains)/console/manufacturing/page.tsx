@@ -178,10 +178,13 @@ export default function ManufacturingPage() {
 
             {showBomForm && canManageBom && (
               <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
-                <input placeholder="Product ID" value={bomForm.productId} onChange={(e) => setBomForm((p) => ({ ...p, productId: e.target.value }))} />
+                <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--text-secondary)" }}>
+                  Captura la estructura base del producto. Los campos con "ID" son identificadores internos del sistema.
+                </div>
+                <input placeholder="ID interno del producto" value={bomForm.productId} onChange={(e) => setBomForm((p) => ({ ...p, productId: e.target.value }))} />
                 <input placeholder="Nombre BOM" value={bomForm.name} onChange={(e) => setBomForm((p) => ({ ...p, name: e.target.value }))} />
                 <input placeholder="Versión (1.0)" value={bomForm.version} onChange={(e) => setBomForm((p) => ({ ...p, version: e.target.value }))} />
-                <input placeholder="Componente Product ID" value={bomForm.componentProductId} onChange={(e) => setBomForm((p) => ({ ...p, componentProductId: e.target.value }))} />
+                <input placeholder="ID interno del componente" value={bomForm.componentProductId} onChange={(e) => setBomForm((p) => ({ ...p, componentProductId: e.target.value }))} />
                 <input placeholder="Cantidad componente" value={bomForm.componentQuantity} onChange={(e) => setBomForm((p) => ({ ...p, componentQuantity: e.target.value }))} />
                 <input placeholder="Unidad (PZ)" value={bomForm.componentUnit} onChange={(e) => setBomForm((p) => ({ ...p, componentUnit: e.target.value }))} />
                 <input placeholder="Merma %" value={bomForm.wastePercent} onChange={(e) => setBomForm((p) => ({ ...p, wastePercent: e.target.value }))} />
@@ -192,6 +195,9 @@ export default function ManufacturingPage() {
 
             {showCenterForm && canManageCenters && (
               <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
+                <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--text-secondary)" }}>
+                  Registra el centro donde se ejecutan operaciones productivas y su capacidad por hora.
+                </div>
                 <input placeholder="Código" value={centerForm.code} onChange={(e) => setCenterForm((p) => ({ ...p, code: e.target.value }))} />
                 <input placeholder="Nombre" value={centerForm.name} onChange={(e) => setCenterForm((p) => ({ ...p, name: e.target.value }))} />
                 <input placeholder="Capacidad por hora" value={centerForm.capacityPerHour} onChange={(e) => setCenterForm((p) => ({ ...p, capacityPerHour: e.target.value }))} />
