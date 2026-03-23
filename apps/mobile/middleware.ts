@@ -29,6 +29,7 @@ const SUSPICIOUS_QUERY_PATTERN = /<script|javascript:|union\s+select|or\s+1\s*=\
 const MALICIOUS_USER_AGENT_PATTERN = /sqlmap|nikto|acunetix|dirbuster|wpscan|masscan|nmap|burpsuite|gobuster/i;
 const SENSITIVE_PATH_PATTERN = /\/(auth|login|signin|reset-password|api\/auth)\b/i;
 const HONEYPOT_PATH_PATTERN = /\/(wp-admin|wp-login|phpmyadmin|\.git|\.env|\.aws|server-status|\.well-known\/acme-challenge(?!\/))/i;
+const STATIC_FILE_EXTENSIONS = /\.(png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot|css|js|json)$/i;
 
 const getAllowedSubdomains = (): string[] => {
   const envSubdomains = process.env.ALLOWED_SUBDOMAINS;
@@ -255,8 +256,7 @@ export function middleware(request: NextRequest) {
     
     // NO reescribir archivos estáticos (imágenes, fuentes, etc.)
     // Permitir que Next.js los sirva directamente desde /public
-    const staticFileExtensions = /\.(png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot|css|js|json)$/i;
-    if (staticFileExtensions.test(pathname)) {
+    if (STATIC_FILE_EXTENSIONS.test(pathname)) {
       const response = applySecurityHeaders(NextResponse.next());
       return applyNoStoreForHtml(request, response);
     }
@@ -278,8 +278,9 @@ export function middleware(request: NextRequest) {
   const hasKnownActivePanel = Boolean(activePanelCookie && KNOWN_PANEL_SLUGS.has(activePanelCookie));
   const isAlreadyPanelPath = /^\/(console|ventas|contabilidad|tickets|web)(\/|$)/i.test(pathname);
   const isMobileHubPath = pathname === '/login' || pathname === '/paneles';
+  const isStaticAssetPath = STATIC_FILE_EXTENSIONS.test(pathname) || pathname.startsWith('/uploads/');
 
-  if (hasKnownActivePanel && !isAlreadyPanelPath && !isMobileHubPath) {
+  if (hasKnownActivePanel && !isAlreadyPanelPath && !isMobileHubPath && !isStaticAssetPath) {
     const panelSlug = activePanelCookie as string;
     const targetPath =
       panelSlug === 'tickets' && (pathname === '/' || pathname === '/dashboard')

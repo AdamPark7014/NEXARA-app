@@ -397,7 +397,7 @@ async function bootstrap() {
       maxAge: '1d',
       setHeaders: (res) => {
         res.setHeader('X-Content-Type-Options', 'nosniff');
-        res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
       },
     }),
   );

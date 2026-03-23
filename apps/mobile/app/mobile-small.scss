@@ -5,7 +5,7 @@
   --panel-padding-x: clamp(10px, 3.2vw, 18px);
   --panel-padding-y: clamp(10px, 3.2vw, 18px);
   --panel-gap: clamp(10px, 3vw, 16px);
-  --panel-sidebar-width: 100%;
+  --panel-sidebar-width: 280px;
   --mobile-hit-target: 44px;
   --mobile-stack-gap: 10px;
 }
@@ -43,12 +43,12 @@
     min-height: var(--mobile-hit-target);
   }
 
-  [class*="sidebar"],
-  [class*="Sidebar"] {
-    width: 100% !important;
+  [class*="sidebar"]:not([class*="VentasSidebar_"]),
+  [class*="Sidebar"]:not([class*="VentasSidebar_"]) {
+    width: var(--panel-sidebar-width) !important;
     min-width: 0 !important;
-    max-width: 100% !important;
-    position: static !important;
+    max-width: min(100%, var(--panel-sidebar-width)) !important;
+    position: relative !important;
   }
 
   [class*="grid"],
@@ -98,7 +98,6 @@
 
 @media (max-width: 960px) {
   [class*="workspaceHeader"],
-  [class*="salesWorkspaceHeader"],
   [class*="consoleTopbar"],
   [class*="panelHero"] {
     border-radius: 12px;
@@ -107,14 +106,12 @@
   }
 
   [class*="workspaceMeta"],
-  [class*="salesWorkspaceMeta"],
   [class*="consoleTopbarActions"] {
     width: 100%;
     justify-content: flex-start;
   }
 
   [class*="quickLinksRow"],
-  [class*="salesQuickLinks"],
   [class*="panelTabs"],
   [class*="webPanelNav"] {
     display: flex;
@@ -123,9 +120,8 @@
   }
 
   [class*="quickLink"],
-  [class*="salesQuickLink"],
   [class*="panelTab"],
-  [class*="navLink"],
+  [class*="navLink"]:not([class*="VentasSidebar_"]),
   [class*="menuLink"] {
     min-height: var(--mobile-hit-target);
     display: inline-flex;
@@ -134,6 +130,10 @@
 }
 
 @media (max-width: 640px) {
+  :root {
+    --panel-sidebar-width: 100%;
+  }
+
   html,
   body {
     font-size: 14px;
@@ -148,8 +148,8 @@
     font-size: clamp(1.1rem, 4.8vw, 1.35rem) !important;
   }
 
-  [class*="header"],
-  [class*="Header"] {
+  [class*="header"]:not([class*="VentasSidebar_"]),
+  [class*="Header"]:not([class*="VentasSidebar_"]) {
     position: sticky;
     top: 0;
     z-index: 30;
@@ -157,8 +157,8 @@
     border-bottom: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
   }
 
-  [class*="content"],
-  [class*="Content"],
+  [class*="content"]:not([class*="VentasSidebar_"]),
+  [class*="Content"]:not([class*="VentasSidebar_"]),
   main {
     padding-left: max(10px, env(safe-area-inset-left)) !important;
     padding-right: max(10px, env(safe-area-inset-right)) !important;
@@ -172,22 +172,20 @@
   }
 
   [class*="consoleMain"],
-  [class*="salesMain"],
   [class*="webPanelMain"] {
     padding-left: 8px !important;
     padding-right: 8px !important;
   }
 
   [class*="consoleLayout"],
-  [class*="salesRoot"],
   [class*="webPanelRoot"],
   [class*="contaRoot"],
   [class*="ticketsConsole"] {
     gap: 8px;
   }
 
-  [class*="sidebar"],
-  [class*="Sidebar"] {
+  [class*="sidebar"]:not([class*="VentasSidebar_"]),
+  [class*="Sidebar"]:not([class*="VentasSidebar_"]) {
     border-radius: 14px !important;
   }
 

@@ -214,22 +214,31 @@ export default function UserForm({
       const isConsoleUser = form.accesoConsole || form.accesoConsoleAdmin || form.accesoGestionCvs;
       const isConsoleAdmin = form.accesoConsoleAdmin;
       const enableConsoleModules = isConsoleUser || isConsoleAdmin;
+      const isAdminRole = form.roleTipo === "administrador";
       const rolePayload = {
         nombre: effectiveRoleName,
-        accesoConsole: isConsoleUser,
-        accesoConsoleAdmin: isConsoleAdmin,
+        accesoConsole: isConsoleUser || isAdminRole,
+        accesoConsoleAdmin: isConsoleAdmin || isAdminRole,
         accesoActividades: enableConsoleModules,
         accesoEvidencias: enableConsoleModules,
-        accesoViáticos: enableConsoleModules,
-        accesoVehículos: enableConsoleModules,
+        accesoViaticos: enableConsoleModules,
+        accesoVehiculos: enableConsoleModules,
         accesoAsistencia: enableConsoleModules,
         accesoGps: enableConsoleModules,
-        accesoGestionUsuarios: isConsoleAdmin,
-        accesoGestionWeb: form.accesoGestionWeb,
+        accesoGestionUsuarios: isConsoleAdmin || isAdminRole,
+        accesoGestionWeb: form.accesoGestionWeb || isAdminRole,
         accesoGestionCvs: form.accesoGestionCvs,
         accesoPanelVentas: form.accesoPanelVentas,
-        accesoContabilidad: form.accesoContabilidad,
+        accesoContabilidad: form.accesoContabilidad || isAdminRole,
         accesoCotizaciones: form.accesoCotizaciones,
+        accesoInventario: isAdminRole,
+        accesoCompras: isAdminRole,
+        accesoSeguridad: isAdminRole,
+        accesoDocumentos: isAdminRole,
+        accesoWorkflow: isAdminRole,
+        accesoAuditoria: isAdminRole,
+        accesoBI: isAdminRole,
+        accesoBanca: isAdminRole,
       };
 
       const getErrorMessage = async (res: Response, fallback: string) => {
@@ -263,6 +272,15 @@ export default function UserForm({
       if (effectiveRoleName) {
         const existing = await fetchRoleByName();
         if (existing?.id) {
+          const patchRes = await fetch(buildApiUrl(`roles/${existing.id}`), {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
+            },
+            body: JSON.stringify(rolePayload),
+          });
+          if (!patchRes.ok) throw new Error(await getErrorMessage(patchRes, 'Error al actualizar el rol'));
           roleId = existing.id;
         } else {
           const roleRes = await fetch(buildApiUrl('roles'), {

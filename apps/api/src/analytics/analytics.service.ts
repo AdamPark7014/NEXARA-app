@@ -170,6 +170,83 @@ export class AnalyticsService {
     return result;
   }
 
+  // ── Computed Real-time KPIs ────────────────────────────────────────
+  async getComputedKpis() {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfDay = new Date(now); startOfDay.setHours(0, 0, 0, 0);
+
+    const [
+      attendanceToday,
+      activitiesMonth,
+      pendingActivities,
+      openIncidents,
+      activePermits,
+      expiredTrainings,
+      pendingLeaves,
+      pendingReviews,
+      openPurchaseOrders,
+      lowStock,
+      activeWorkflows,
+      pendingDocApprovals,
+      openNCRs,
+      pendingMaintenance,
+      overdueMaintenance,
+      cotizacionesMonth,
+      approvedSalesMonth,
+      totalUsers,
+    ] = await Promise.all([
+      this.prisma.attendance.count({ where: { type: 'entrada', timestamp: { gte: startOfDay } } }).catch(() => 0),
+      this.prisma.activity.count({ where: { fechaAsignacion: { gte: startOfMonth } } }).catch(() => 0),
+      this.prisma.activity.count({ where: { estatus: { in: ['Pendiente', 'En Proceso'] } } }).catch(() => 0),
+      this.prisma.safetyIncident.count({ where: { status: { in: ['REPORTED', 'INVESTIGATING', 'CORRECTIVE_ACTION'] } } }).catch(() => 0),
+      this.prisma.workPermit.count({ where: { status: 'ACTIVE', validTo: { gte: now } } }).catch(() => 0),
+      this.prisma.trainingRecord.count({ where: { expirationDate: { lt: now } } }).catch(() => 0),
+      this.prisma.leaveRequest.count({ where: { status: 'PENDING' } }).catch(() => 0),
+      this.prisma.performanceReview.count({ where: { status: 'DRAFT' } }).catch(() => 0),
+      this.prisma.purchaseOrder.count({ where: { status: { in: ['DRAFT', 'CONFIRMED', 'PARTIALLY_RECEIVED'] } } }).catch(() => 0),
+      this.prisma.stockLevel.count({ where: { quantity: { lte: 5 } } }).catch(() => 0),
+      this.prisma.workflowInstance.count({ where: { isComplete: false, isCancelled: false } }).catch(() => 0),
+      this.prisma.managedDocument.count({ where: { status: 'PENDING_APPROVAL' } }).catch(() => 0),
+      this.prisma.nonConformanceReport.count({ where: { status: { in: ['OPEN', 'INVESTIGATING'] } } }).catch(() => 0),
+      this.prisma.maintenanceOrder.count({ where: { status: { in: ['PLANNED', 'IN_PROGRESS'] } } }).catch(() => 0),
+      this.prisma.maintenanceOrder.count({ where: { status: 'PLANNED', plannedDate: { lt: now } } }).catch(() => 0),
+      this.prisma.cotizacion.count({ where: { createdAt: { gte: startOfMonth } } }).catch(() => 0),
+      this.prisma.cotizacion.aggregate({ _sum: { total: true }, where: { status: 'APPROVED', createdAt: { gte: startOfMonth } } }).catch(() => ({ _sum: { total: null } })),
+      this.prisma.user.count().catch(() => 0),
+    ]);
+
+    const approvedSales = Number((approvedSalesMonth as any)?._sum?.total ?? 0);
+
+    return [
+      // Operaciones
+      { category: 'Operaciones', name: 'Registros de asistencia hoy', value: attendanceToday, unit: 'entradas', status: 'info' },
+      { category: 'Operaciones', name: 'Actividades este mes', value: activitiesMonth, unit: 'actividades', status: 'info' },
+      { category: 'Operaciones', name: 'Actividades en curso', value: pendingActivities, unit: 'actividades', status: pendingActivities > 20 ? 'warning' : 'ok' },
+      { category: 'Operaciones', name: 'Usuarios registrados', value: totalUsers, unit: 'usuarios', status: 'info' },
+      // Ventas
+      { category: 'Ventas', name: 'Cotizaciones este mes', value: cotizacionesMonth, unit: 'cotizaciones', status: 'info' },
+      { category: 'Ventas', name: 'Ventas aprobadas (mes)', value: approvedSales, unit: 'MXN', status: approvedSales > 0 ? 'ok' : 'warning' },
+      // Seguridad
+      { category: 'Seguridad', name: 'Incidentes abiertos', value: openIncidents, unit: 'incidentes', status: openIncidents > 0 ? 'danger' : 'ok' },
+      { category: 'Seguridad', name: 'Permisos de trabajo vigentes', value: activePermits, unit: 'permisos', status: 'info' },
+      { category: 'Seguridad', name: 'Capacitaciones vencidas', value: expiredTrainings, unit: 'registros', status: expiredTrainings > 0 ? 'warning' : 'ok' },
+      // RH
+      { category: 'Recursos Humanos', name: 'Permisos pendientes de aprobar', value: pendingLeaves, unit: 'solicitudes', status: pendingLeaves > 0 ? 'warning' : 'ok' },
+      { category: 'Recursos Humanos', name: 'Revisiones de desempeño pendientes', value: pendingReviews, unit: 'revisiones', status: pendingReviews > 0 ? 'warning' : 'ok' },
+      // Compras / Inventario
+      { category: 'Compras & Stock', name: 'Órdenes de compra abiertas', value: openPurchaseOrders, unit: 'OC', status: 'info' },
+      { category: 'Compras & Stock', name: 'Artículos con bajo stock', value: lowStock, unit: 'artículos', status: lowStock > 0 ? 'danger' : 'ok' },
+      // Documentos & Workflows
+      { category: 'Documentos & Flujos', name: 'Documentos por aprobar', value: pendingDocApprovals, unit: 'documentos', status: pendingDocApprovals > 0 ? 'warning' : 'ok' },
+      { category: 'Documentos & Flujos', name: 'Flujos de aprobación activos', value: activeWorkflows, unit: 'flujos', status: 'info' },
+      // Calidad & Mantenimiento
+      { category: 'Calidad & Mantenimiento', name: 'No conformidades abiertas', value: openNCRs, unit: 'NCR', status: openNCRs > 0 ? 'danger' : 'ok' },
+      { category: 'Calidad & Mantenimiento', name: 'Mantenimientos activos', value: pendingMaintenance, unit: 'órdenes', status: 'info' },
+      { category: 'Calidad & Mantenimiento', name: 'Mantenimientos vencidos', value: overdueMaintenance, unit: 'órdenes', status: overdueMaintenance > 0 ? 'danger' : 'ok' },
+    ];
+  }
+
   async getProductionEfficiency() {
     const completed = await this.prisma.productionOrder.findMany({
       where: { status: 'COMPLETED', actualEndDate: { not: null }, actualStartDate: { not: null } },
