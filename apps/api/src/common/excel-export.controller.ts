@@ -37,6 +37,6 @@ export class ExcelExportController {
     const buffer = await this.excelExport.exportToExcel(data, model);
     res.setHeader('Content-Disposition', `attachment; filename=${model}s.xlsx`);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.send(buffer);
+    res.send(Buffer.from(buffer));
   }
 }

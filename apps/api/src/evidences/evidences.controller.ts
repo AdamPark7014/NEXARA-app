@@ -86,7 +86,7 @@ export class EvidencesController {
       const buffer = await this.excelExport.exportToExcel(data, 'evidences');
       res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.attachment('evidencias.xlsx');
-      return res.send(buffer);
+      return res.send(Buffer.from(buffer));
     }
     if (format === 'csv') {
       const csv = this.evidencesService.toCSV(data);

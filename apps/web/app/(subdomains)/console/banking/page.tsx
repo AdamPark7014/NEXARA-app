@@ -13,35 +13,110 @@ export default function BankingPage() {
   const [selectedAccount, setSelectedAccount] = useState<number | null>(null);
   const [summary, setSummary] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [loadError, setLoadError] = useState<string>("");
   const [speiSearch, setSpeiSearch] = useState("");
   const [speiResult, setSpeiResult] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [loadingTx, setLoadingTx] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [accountForm, setAccountForm] = useState({
+    name: '',
+    bankName: '',
+    accountNumber: '',
+    clabe: '',
+    currency: 'MXN',
+    bankCode: '',
+    rfc: '',
+    accountType: '',
+    branch: '',
+    speiEnabled: true,
+  });
+  const [txForm, setTxForm] = useState({
+    transactionDate: new Date().toISOString().slice(0, 10),
+    description: '',
+    amount: '',
+    isDebit: false,
+    speiTrackingKey: '',
+    counterpartyName: '',
+    counterpartyRfc: '',
+    concept: '',
+  });
 
   const headers = { Authorization: `Bearer ${user?.token}` };
-
-  useEffect(() => {
-    if (!user?.token) return;
-    fetch(`${API_URL}/accounting/banking/accounts`, { headers })
-      .then((r) => r.json())
-      .then((d) => setBankAccounts(Array.isArray(d) ? d : d.data || []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [user?.token]);
 
   const loadAccount = (accountId: number) => {
     setSelectedAccount(accountId);
     setLoadingTx(true);
+    setLoadError("");
     Promise.all([
-      fetch(`${API_URL}/accounting/banking/accounts/${accountId}/summary`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/accounting/banking/accounts/${accountId}/transactions`, { headers }).then((r) => r.json()),
+      fetch(`${API_URL}/accounting/banking/accounts/${accountId}/summary`, { headers }).then((r) => {
+        if (!r.ok) throw new Error('No se pudo cargar el resumen bancario.');
+        return r.json();
+      }),
+      fetch(`${API_URL}/accounting/banking/accounts/${accountId}/transactions`, { headers }).then((r) => {
+        if (!r.ok) throw new Error('No se pudieron cargar los movimientos de la cuenta.');
+        return r.json();
+      }),
     ])
       .then(([sum, txs]) => {
         setSummary(sum);
         setTransactions(Array.isArray(txs) ? txs : txs.data || []);
       })
-      .catch(() => {})
+      .catch((err: any) => {
+        setSummary(null);
+        setTransactions([]);
+        setLoadError(err?.message || 'Error al jalar datos de la cuenta bancaria.');
+      })
       .finally(() => setLoadingTx(false));
+  };
+
+  const fetchAccounts = async (autoLoad = true, preferredAccountId?: number) => {
+    if (!user?.token) return;
+    setLoadError("");
+    const res = await fetch(`${API_URL}/accounting/banking/accounts`, { headers });
+    if (!res.ok) {
+      throw new Error(`No se pudo cargar cuentas bancarias (HTTP ${res.status}).`);
+    }
+    const d = await res.json();
+    const accounts = Array.isArray(d) ? d : d.data || [];
+    setBankAccounts(accounts);
+
+    if (!autoLoad) return;
+    if (!accounts.length) {
+      setSelectedAccount(null);
+      setSummary(null);
+      setTransactions([]);
+      return;
+    }
+
+    const accountToLoad =
+      (preferredAccountId && accounts.find((a: any) => a.id === preferredAccountId)?.id) ||
+      (selectedAccount && accounts.find((a: any) => a.id === selectedAccount)?.id) ||
+      accounts[0].id;
+
+    loadAccount(accountToLoad);
+  };
+
+  useEffect(() => {
+    if (!user?.token) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    fetchAccounts(true)
+      .catch((err: any) => {
+        setBankAccounts([]);
+        setSelectedAccount(null);
+        setSummary(null);
+        setTransactions([]);
+        setLoadError(err?.message || 'Error al cargar banca.');
+      })
+      .finally(() => setLoading(false));
+  }, [user?.token]);
+
+  const reloadAccounts = async () => {
+    await fetchAccounts(true);
   };
 
   const searchSpei = () => {
@@ -54,6 +129,88 @@ export default function BankingPage() {
 
   const fmt = (n: number) => Number(n || 0).toLocaleString("es-MX", { minimumFractionDigits: 2 });
 
+  const createAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.token) return;
+    if (!accountForm.name || !accountForm.bankName || !accountForm.accountNumber) {
+      alert('Completa nombre, banco y numero de cuenta.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_URL}/accounting/banking/accounts`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(accountForm),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const created = await res.json().catch(() => null);
+      setAccountForm({
+        name: '', bankName: '', accountNumber: '', clabe: '', currency: 'MXN', bankCode: '', rfc: '', accountType: '', branch: '', speiEnabled: true,
+      });
+      await fetchAccounts(true, created?.id);
+    } catch (error: any) {
+      alert(error?.message || 'No se pudo crear la cuenta bancaria.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const importOneTransaction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.token || !selectedAccount) return;
+    const amount = Number(txForm.amount || 0);
+    if (!txForm.description || amount <= 0) {
+      alert('Captura descripcion y monto valido.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_URL}/accounting/banking/accounts/${selectedAccount}/transactions/import`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          transactions: [
+            {
+              transactionDate: txForm.transactionDate,
+              description: txForm.description,
+              amount,
+              isDebit: txForm.isDebit,
+              speiTrackingKey: txForm.speiTrackingKey || undefined,
+              counterpartyName: txForm.counterpartyName || undefined,
+              counterpartyRfc: txForm.counterpartyRfc || undefined,
+              concept: txForm.concept || undefined,
+            },
+          ],
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setTxForm({
+        transactionDate: new Date().toISOString().slice(0, 10),
+        description: '',
+        amount: '',
+        isDebit: false,
+        speiTrackingKey: '',
+        counterpartyName: '',
+        counterpartyRfc: '',
+        concept: '',
+      });
+      loadAccount(selectedAccount);
+    } catch (error: any) {
+      alert(error?.message || 'No se pudo registrar el movimiento.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <RoleGuard anyPermissions={[PERMISSIONS.BANKING_VIEW, PERMISSIONS.BANKING_MANAGE]}>
       <div style={{ display: "grid", gap: 24 }}>
@@ -63,6 +220,21 @@ export default function BankingPage() {
           <p style={{ color: "var(--text-secondary)" }}>
             Cuentas Banorte, movimientos SPEI, clave de rastreo, conciliación bancaria y CEP.
           </p>
+        </div>
+
+        <div className="card" style={{ padding: 16 }}>
+          <h4 style={{ color: 'var(--primary)', marginBottom: 8 }}>Alta de cuenta bancaria</h4>
+          <form onSubmit={createAccount} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 8 }}>
+            <input type="text" placeholder="Nombre interno" value={accountForm.name} onChange={(e) => setAccountForm((p) => ({ ...p, name: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+            <input type="text" placeholder="Banco" value={accountForm.bankName} onChange={(e) => setAccountForm((p) => ({ ...p, bankName: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+            <input type="text" placeholder="Numero de cuenta" value={accountForm.accountNumber} onChange={(e) => setAccountForm((p) => ({ ...p, accountNumber: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+            <input type="text" placeholder="CLABE" value={accountForm.clabe} onChange={(e) => setAccountForm((p) => ({ ...p, clabe: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+            <input type="text" placeholder="RFC" value={accountForm.rfc} onChange={(e) => setAccountForm((p) => ({ ...p, rfc: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+            <input type="text" placeholder="Tipo de cuenta" value={accountForm.accountType} onChange={(e) => setAccountForm((p) => ({ ...p, accountType: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+            <button type="submit" disabled={saving} style={{ padding: '8px 12px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: '#fff', cursor: saving ? 'not-allowed' : 'pointer' }}>
+              {saving ? 'Guardando...' : 'Crear cuenta'}
+            </button>
+          </form>
         </div>
 
         {/* SPEI Search */}
@@ -97,6 +269,17 @@ export default function BankingPage() {
 
         {loading ? (
           <p style={{ textAlign: "center", color: "var(--text-secondary)" }}>Cargando...</p>
+        ) : loadError ? (
+          <div className="card" style={{ padding: 24, textAlign: "center" }}>
+            <p style={{ color: "var(--danger, #ef4444)", marginBottom: 8 }}>{loadError}</p>
+            <button
+              type="button"
+              onClick={reloadAccounts}
+              style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: '#fff', cursor: 'pointer' }}
+            >
+              Reintentar carga de cuentas
+            </button>
+          </div>
         ) : bankAccounts.length === 0 ? (
           <div className="card" style={{ padding: 24, textAlign: "center" }}>
             <p style={{ color: "var(--text-secondary)" }}>No hay cuentas bancarias registradas.</p>
@@ -135,6 +318,26 @@ export default function BankingPage() {
             {/* Account Summary + Transactions */}
             {selectedAccount && (
               <div style={{ display: "grid", gap: 16 }}>
+                <div className="card" style={{ padding: 16 }}>
+                  <h4 style={{ color: 'var(--primary)', marginBottom: 8 }}>Registrar movimiento (custom)</h4>
+                  <form onSubmit={importOneTransaction} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+                    <input type="date" value={txForm.transactionDate} onChange={(e) => setTxForm((p) => ({ ...p, transactionDate: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+                    <input type="text" placeholder="Descripcion" value={txForm.description} onChange={(e) => setTxForm((p) => ({ ...p, description: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+                    <input type="number" min={0} step="0.01" placeholder="Monto" value={txForm.amount} onChange={(e) => setTxForm((p) => ({ ...p, amount: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+                    <input type="text" placeholder="Clave SPEI" value={txForm.speiTrackingKey} onChange={(e) => setTxForm((p) => ({ ...p, speiTrackingKey: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+                    <input type="text" placeholder="Contraparte" value={txForm.counterpartyName} onChange={(e) => setTxForm((p) => ({ ...p, counterpartyName: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+                    <input type="text" placeholder="RFC contraparte" value={txForm.counterpartyRfc} onChange={(e) => setTxForm((p) => ({ ...p, counterpartyRfc: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+                    <input type="text" placeholder="Concepto" value={txForm.concept} onChange={(e) => setTxForm((p) => ({ ...p, concept: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                      <input type="checkbox" checked={txForm.isDebit} onChange={(e) => setTxForm((p) => ({ ...p, isDebit: e.target.checked }))} />
+                      Es cargo
+                    </label>
+                    <button type="submit" disabled={saving} style={{ padding: '8px 12px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: '#fff', cursor: saving ? 'not-allowed' : 'pointer' }}>
+                      {saving ? 'Guardando...' : 'Registrar movimiento'}
+                    </button>
+                  </form>
+                </div>
+
                 {/* Month summary */}
                 {summary && (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 16 }}>

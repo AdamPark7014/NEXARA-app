@@ -273,7 +273,7 @@ export class VehiclesController {
       const buffer = await this.excelExport.exportToExcel(data, 'vehicles');
       res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.attachment('vehiculos.xlsx');
-      return res.send(buffer);
+      return res.send(Buffer.from(buffer));
     }
     if (format === 'csv') {
       const csv = this.vehiclesService.toCSV(data);
