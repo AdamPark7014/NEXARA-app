@@ -217,6 +217,7 @@ export default function Sidebar() {
     { icon: "🧾", label: "Facturacion", href: "/invoicing", anyPermissions: [PERMISSIONS.INVOICING_VIEW, PERMISSIONS.INVOICING_MANAGE] },
     { icon: "🏦", label: "Banca y conciliaciones", href: "/banking", anyPermissions: [PERMISSIONS.BANKING_VIEW, PERMISSIONS.BANKING_MANAGE] },
     { icon: "📈", label: "Reportes financieros", href: "/accounting/reports", anyPermissions: [PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE] },
+    { icon: "🔁", label: "Panel contabilidad", href: "/contabilidad/dashboard", anyPermissions: [PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
   ];
 
   const complianceItems: MenuItem[] = [

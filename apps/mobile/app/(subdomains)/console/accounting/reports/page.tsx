@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
+import HelpTab from "@/components/HelpTab";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
@@ -46,6 +47,7 @@ export default function FinancialReportsPage() {
   return (
     <RoleGuard anyPermissions={[PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE]}>
       <div style={{ display: "grid", gap: 24 }}>
+        <HelpTab module="accounting-reports" user={user} />
         <div className="card" style={{ padding: 16 }}>
           <h1 style={{ color: "var(--primary)", marginBottom: 8 }}>📊 Reportes Financieros</h1>
           <p style={{ color: "var(--text-secondary)" }}>Balanza de comprobación, estado de resultados y balance general.</p>
