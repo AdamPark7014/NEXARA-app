@@ -33,35 +33,28 @@ export default function ContabilidadLayout({ children }: { children: React.React
     {
       title: "Panorama financiero",
       items: [
-        { label: "Resumen ejecutivo", href: "/dashboard" },
-        { label: "Capital y liquidez", href: "/capital" },
+        { icon: "📊", label: "Resumen ejecutivo", href: "/dashboard" },
+        { icon: "💼", label: "Capital y liquidez", href: "/capital" },
+        { icon: "📒", label: "Contabilidad (GL)", href: "/accounting" },
+        { icon: "📈", label: "Reportes financieros", href: "/accounting/reports" },
       ],
     },
     {
       title: "RRHH y control de personal",
       items: [
-        { label: "Control de horas", href: "/horas" },
-        { label: "Viáticos", href: "/viaticos" },
-        { label: "Multas y sanciones", href: "/multas" },
+        { icon: "⏱️", label: "Control de horas", href: "/horas" },
+        { icon: "🧳", label: "Viáticos", href: "/viaticos" },
+        { icon: "⚖️", label: "Multas y sanciones", href: "/multas" },
+        { icon: "💰", label: "Nómina y pagos", href: "/employee-payments" },
       ],
     },
     {
-      title: "Operación contable",
+      title: "Operación financiera",
       items: [
-        { label: "Pagos y dispersión", href: "/pagos" },
-        { label: "Proyectos y costos", href: "/proyectos" },
-      ],
-    },
-    {
-      title: "Finanzas integradas (Consola)",
-      items: [
-        { label: "Contabilidad (GL)", href: "/accounting" },
-        { label: "Nómina y pagos", href: "/employee-payments" },
-        { label: "Gastos operativos", href: "/expenses" },
-        { label: "Proyectos de obra", href: "/work-projects" },
-        { label: "Facturación", href: "/invoicing" },
-        { label: "Banca y conciliaciones", href: "/banking" },
-        { label: "Reportes financieros", href: "/accounting/reports" },
+        { icon: "📊", label: "Gastos operativos", href: "/expenses" },
+        { icon: "🏗️", label: "Proyectos de obra", href: "/work-projects" },
+        { icon: "🧾", label: "Facturación", href: "/invoicing" },
+        { icon: "🏦", label: "Banca y conciliaciones", href: "/banking" },
       ],
     },
   ];
@@ -206,7 +199,8 @@ export default function ContabilidadLayout({ children }: { children: React.React
                       className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${isActive ? consoleStyles.active : ""}`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
-                      {item.label}
+                      <span className={consoleStyles.menuLinkIcon} aria-hidden="true">{item.icon}</span>
+                      <span className={consoleStyles.menuLinkText}>{item.label}</span>
                     </Link>
                   </li>
                 );
