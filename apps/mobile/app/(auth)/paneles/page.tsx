@@ -15,15 +15,16 @@ const getGreeting = () => {
 
 export default function PanelHubPage() {
   const router = useRouter();
-  const { user, logout } = useUser();
+  const { user, logout, isContextReady } = useUser();
   const [now, setNow] = useState<Date>(() => new Date());
   const [query, setQuery] = useState("");
 
   useEffect(() => {
+    if (!isContextReady) return;
     if (!user) {
       router.replace("/login");
     }
-  }, [router, user]);
+  }, [router, user, isContextReady]);
 
   const panels = useMemo(() => getAccessiblePanels(user), [user]);
 

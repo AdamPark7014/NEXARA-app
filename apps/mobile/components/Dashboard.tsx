@@ -156,7 +156,8 @@ export default function Dashboard() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRange | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isConsoleAdmin = hasPermission(user, PERMISSIONS.CONSOLE_ADMIN);
   const isSuperAdmin = Boolean(user?.isSuperAdmin);
@@ -206,26 +207,39 @@ export default function Dashboard() {
     }
   }, [availableUsers, isSuperAdmin, normalizedUserId, selectedUserId]);
 
-  const fetchAll = useCallback(async (signal?: AbortSignal) => {
+  const fetchAll = useCallback(async (signal?: AbortSignal, options?: { silent?: boolean }) => {
     if (!user?.token) return;
-    setLoading(true);
+    const silent = Boolean(options?.silent);
+    if (silent) {
+      setRefreshing(true);
+    } else {
+      setInitialLoading(true);
+    }
     setError(null);
 
     try {
+      const abortController = signal ? null : new AbortController();
+      const activeSignal = signal || abortController?.signal;
+      const timeout = setTimeout(() => {
+        abortController?.abort();
+      }, 15000);
+
       const headers = { Authorization: `Bearer ${user.token}` };
       const params = new URLSearchParams({ from: weekRange.from, to: weekRange.to });
       const canManageAttendance = hasPermission(user, PERMISSIONS.ATTENDANCE_MANAGE);
       const canViewAttendance = hasPermission(user, PERMISSIONS.ATTENDANCE_VIEW);
 
       const [viaticsRes, activitiesRes, attendanceRes] = await Promise.all([
-        fetch(buildApiUrl('viatics'), { headers, signal }),
-        fetch(buildApiUrl('activities'), { headers, signal }),
+        fetch(buildApiUrl('viatics'), { headers, signal: activeSignal }),
+        fetch(buildApiUrl('activities'), { headers, signal: activeSignal }),
         canManageAttendance
-          ? fetch(buildApiUrl(`attendance/hierarchy/range?${params.toString()}`), { headers, signal })
+          ? fetch(buildApiUrl(`attendance/hierarchy/range?${params.toString()}`), { headers, signal: activeSignal })
           : canViewAttendance
-            ? fetch(buildApiUrl(`attendance/range?${params.toString()}`), { headers, signal })
+            ? fetch(buildApiUrl(`attendance/range?${params.toString()}`), { headers, signal: activeSignal })
             : Promise.resolve(null),
       ]);
+
+      clearTimeout(timeout);
 
       const viaticsData = viaticsRes.ok ? ((await viaticsRes.json()) as Viatic[]) : [];
       const activitiesData = activitiesRes.ok ? ((await activitiesRes.json()) as Activity[]) : [];
@@ -272,16 +286,24 @@ export default function Dashboard() {
         setAttendance(null);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError('Tiempo de espera agotado al cargar dashboard. Verifica tu conexion e intenta de nuevo.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Error desconocido');
+      }
     } finally {
-      setLoading(false);
+      if (silent) {
+        setRefreshing(false);
+      } else {
+        setInitialLoading(false);
+      }
     }
   }, [user, weekRange.from, weekRange.to]);
 
   useEffect(() => {
     if (!user?.token) return;
     const controller = new AbortController();
-    fetchAll(controller.signal);
+    fetchAll(controller.signal, { silent: false });
     return () => controller.abort();
   }, [user?.token, fetchAll]);
 
@@ -297,7 +319,7 @@ export default function Dashboard() {
     const scheduleRefresh = () => {
       if (refreshTimer) clearTimeout(refreshTimer);
       refreshTimer = setTimeout(() => {
-        fetchAll();
+        fetchAll(undefined, { silent: true });
       }, 250);
     };
 
@@ -315,7 +337,7 @@ export default function Dashboard() {
   }, [user?.token, fetchAll]);
 
   if (!isMounted) return <div className="loadingCard">Cargando dashboard...</div>;
-  if (loading) return <div className="loadingCard">Cargando dashboard...</div>;
+  if (initialLoading) return <div className="loadingCard">Cargando dashboard...</div>;
   if (error) return <div className="errorCard">{error}</div>;
   if (!user) return null;
 
@@ -484,6 +506,7 @@ export default function Dashboard() {
         <div className="heroBadges">
           <span className="chip">Semana: {formatDate(weekRange.from)} - {formatDate(weekRange.to)}</span>
           <span className="chip chipLive">Usuario: {userName}</span>
+          {refreshing && <span className="chip">Actualizando...</span>}
         </div>
         {isConsoleAdmin && availableUsers.length > 0 && (
           <div className="filtersRow">

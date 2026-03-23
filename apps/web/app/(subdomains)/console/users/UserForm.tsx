@@ -216,17 +216,37 @@ export default function UserForm({
     e.preventDefault();
     setLoading(true);
     try {
-      // Construir el payload de rol según la nueva lógica
+      const isAdminRole = Boolean(form.admin);
+      const isIngenieroRole = Boolean(form.ingeniero) && !isAdminRole;
+      const isVendedorRole = Boolean(form.vendedor) && !isAdminRole && !isIngenieroRole;
+      const hasConsoleUser = isAdminRole || isIngenieroRole;
+
+      // Payload compatible con CreateRoleDto/UpdateRoleDto (backend)
       const rolePayload = {
         nombre: form.roleNombre,
-        superadmin: form.superadmin,
-        admin: form.admin,
-        ingeniero: form.ingeniero,
-        vendedor: form.vendedor,
-        accesoGestionWeb: form.accesoGestionWeb,
+        accesoConsole: hasConsoleUser,
+        accesoConsoleAdmin: isAdminRole,
+        accesoActividades: hasConsoleUser,
+        accesoEvidencias: hasConsoleUser,
+        accesoViaticos: hasConsoleUser,
+        accesoVehiculos: hasConsoleUser,
+        accesoAsistencia: hasConsoleUser,
+        accesoGps: hasConsoleUser,
+        accesoGestionUsuarios: isAdminRole,
+        accesoGestionWeb: form.accesoGestionWeb || isAdminRole,
         accesoGestionCvs: form.accesoGestionCvs,
-        accesoContabilidad: form.accesoContabilidad,
+        accesoPanelVentas: isVendedorRole,
+        accesoContabilidad: form.accesoContabilidad || isAdminRole,
         accesoCotizaciones: form.accesoCotizaciones,
+        // Módulos ERP para Administración
+        accesoInventario: isAdminRole,
+        accesoCompras: isAdminRole,
+        accesoSeguridad: isAdminRole,
+        accesoDocumentos: isAdminRole,
+        accesoWorkflow: isAdminRole,
+        accesoAuditoria: isAdminRole,
+        accesoBI: isAdminRole,
+        accesoBanca: isAdminRole,
       };
 
       const getErrorMessage = async (res: Response, fallback: string) => {

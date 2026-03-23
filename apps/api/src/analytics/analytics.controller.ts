@@ -20,6 +20,12 @@ export class AnalyticsController {
     return this.svc.getKpiTimeSeries(name, from, to);
   }
 
+  @Get('kpi/computed')
+  @RBAC({ anyPermissions: [PERMISSIONS.BI_VIEW, PERMISSIONS.BI_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  getComputedKpis() {
+    return this.svc.getComputedKpis();
+  }
+
   @Get('kpi/names')
   @RBAC({ permissions: [PERMISSIONS.BI_VIEW] })
   listKpiNames() {

@@ -96,9 +96,6 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
           </div>
 
           <div className={styles.salesQuickLinks}>
-            <Link href="/paneles" className={styles.salesQuickLink}>
-              Cambiar panel
-            </Link>
             {quickLinks.map((item) => {
               const itemPath = item.href.replace(/\/+$/, "");
               const isActive = currentPath === itemPath || currentPath.endsWith(itemPath);
