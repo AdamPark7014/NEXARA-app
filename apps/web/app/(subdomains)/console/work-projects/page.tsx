@@ -60,6 +60,7 @@ export default function WorkProjectsPage() {
   return (
     <RoleGuard anyPermissions={[PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE, PERMISSIONS.CONSOLE_ADMIN]}>
       <div style={{ display: 'grid', gap: 24 }}>
+        <HelpTab module="work-projects" user={user} />
         {/* KPI Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
           <div className="card" style={{ padding: 16, textAlign: 'center' }}>

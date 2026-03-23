@@ -130,6 +130,48 @@ const helpContent: Record<string, Record<string, string>> = {
     ingeniero: `Aquí registras evidencia de calidad de la ejecución. Si detectas desviación, repórtala con detalle para que se atienda y cierre formalmente.`,
     vendedor: `Aquí puedes consultar incidencias de calidad abiertas que puedan impactar tiempos de entrega, garantías o satisfacción del cliente.`
   },
+  accounting: {
+    superadmin: `Este módulo es la base financiera. Aquí validas plan de cuentas, pólizas y períodos fiscales; toda captura en gastos, nómina, proyectos, facturación y banca termina reflejándose en este libro contable. Flujo recomendado: 1) define cuentas, 2) valida período abierto, 3) revisa pólizas generadas por operación.`,
+    admin: `Aquí revisas la estructura contable oficial: catálogo de cuentas, pólizas y períodos. Antes de registrar operaciones en otros módulos, confirma que el período esté abierto y que la cuenta correcta exista para evitar reclasificaciones.`,
+    ingeniero: `Si tienes acceso, aquí puedes consultar la contabilidad consolidada para entender cómo impactan en números las operaciones diarias del servicio.`,
+    vendedor: `Si tienes acceso, aquí puedes consultar el resumen contable para alinear compromisos comerciales con la capacidad financiera real.`
+  },
+  "employee-payments": {
+    superadmin: `Aquí se registra y audita la nómina/pagos operativos. Cada pago debe llevar periodo, monto, referencia y evidencia; su impacto se refleja en contabilidad y reportes.`,
+    admin: `Aquí capturas pagos al personal con periodo y soporte. Usa criterios consistentes de concepto y referencia para que contabilidad y conciliación bancaria cuadren sin ajustes manuales.`,
+    ingeniero: `Si tu perfil lo permite, aquí consultas pagos registrados por periodo y su evidencia.`,
+    vendedor: `Si tienes acceso, aquí puedes consultar pagos vinculados a la operación comercial o de servicio.`
+  },
+  expenses: {
+    superadmin: `Aquí controlas egresos operativos. Cada gasto aprobado alimenta contabilidad y reportes; relaciona categoría y concepto de forma estandarizada para trazabilidad completa.`,
+    admin: `Registra gastos con categoría, monto y fecha real de impacto. Esto permite que proyectos, pólizas y estado de resultados se mantengan alineados.`,
+    ingeniero: `Si tienes permisos, aquí puedes consultar gastos y su estatus para seguimiento operativo.`,
+    vendedor: `Si tienes acceso, aquí puedes consultar gastos relacionados a atención de clientes y ejecución comercial.`
+  },
+  "work-projects": {
+    superadmin: `Este módulo concentra presupuesto vs costo real por proyecto. Los movimientos aquí deben corresponder con gastos y pagos para evitar diferencias financieras.`,
+    admin: `Aquí das seguimiento a costo, avance y presupuesto del proyecto. Mantén sincronía entre lo ejecutado, lo pagado y lo registrado como gasto.`,
+    ingeniero: `Aquí puedes consultar estado y costos del proyecto para priorizar ejecución dentro del presupuesto.`,
+    vendedor: `Aquí puedes revisar consumo presupuestal por proyecto para ajustar expectativas y alcance con el cliente.`
+  },
+  invoicing: {
+    superadmin: `Aquí gestionas facturación y cobranza/pago (CxC/CxP). Lo facturado y cobrado impacta contabilidad, banca y reportes; controla estatus y vencimientos diariamente.`,
+    admin: `Registra y monitorea facturas con folio fiscal, receptor, total, pagos y vencimiento. Esto conecta ingresos/egresos con conciliación bancaria y reportes.`,
+    ingeniero: `Si tienes acceso, aquí consultas facturas y estatus para validar compromisos operativos y administrativos.`,
+    vendedor: `Aquí das seguimiento a facturas del cliente, estatus de cobro y vencimientos para mantener salud de cartera.`
+  },
+  banking: {
+    superadmin: `Aquí se concilian movimientos bancarios reales con pagos y facturas. La clave es validar SPEI, contraparte y conciliación para cerrar cifras con contabilidad.`,
+    admin: `Usa este módulo para revisar cuentas, movimientos y conciliación. Todo movimiento sin conciliar es un riesgo de diferencia en reportes financieros.`,
+    ingeniero: `Si tienes acceso, aquí consultas movimientos bancarios relacionados a operación y su conciliación.`,
+    vendedor: `Si tienes acceso, aquí puedes validar pagos recibidos para confirmar continuidad comercial con clientes.`
+  },
+  "accounting-reports": {
+    superadmin: `Aquí cierras el ciclo financiero: balanza, estado de resultados y balance general. Si hay diferencias, revisa primero captura en pagos, gastos, proyectos, facturación y banca.`,
+    admin: `Este módulo consolida la salud financiera. Úsalo para validar que lo capturado en los demás módulos esté correctamente reflejado antes de cierre.`,
+    ingeniero: `Si tienes acceso, aquí puedes consultar reportes financieros consolidados para contexto de operación.`,
+    vendedor: `Si tienes acceso, aquí puedes revisar indicadores financieros para planear metas y compromisos comerciales realistas.`
+  },
   "quality-dashboard": {
     superadmin: `Aquí visualizas KPIs de calidad: inspecciones totales, tasa de aprobación, NCR abiertas y críticas. Úsalo para decisiones ejecutivas y priorización de acciones correctivas.`,
     admin: `Aquí monitoreas el desempeño de calidad del equipo mediante indicadores y NCR recientes. Sirve para detectar focos rojos y dar seguimiento oportuno.`,
@@ -211,9 +253,14 @@ const moduleNames: Record<string, string> = {
   cvs: "CVs / Candidatos",
   workflow: "Flujo de Trabajo",
   "work-projects": "Proyectos de Trabajo",
+  accounting: "Contabilidad General",
+  "employee-payments": "Nómina y Pagos",
+  expenses: "Gastos Operativos",
+  invoicing: "Facturación",
+  banking: "Banca y Conciliaciones",
+  "accounting-reports": "Reportes Financieros",
   maintenance: "Mantenimiento",
   audit: "Auditoría",
-  invoicing: "Facturación",
   newsletter: "Boletín",
   "client-tickets": "Tickets de Clientes",
   manufacturing: "Manufactura / BOM",

@@ -60,6 +60,18 @@ export default function ContabilidadLayout({ children }: { children: React.React
         { label: "Proyectos y costos", href: withContaPrefix("/proyectos") },
       ],
     },
+    {
+      title: "Finanzas integradas (Consola)",
+      items: [
+        { label: "Contabilidad (GL)", href: withContaPrefix("/accounting") },
+        { label: "Nómina y pagos", href: withContaPrefix("/employee-payments") },
+        { label: "Gastos operativos", href: withContaPrefix("/expenses") },
+        { label: "Proyectos de obra", href: withContaPrefix("/work-projects") },
+        { label: "Facturación", href: withContaPrefix("/invoicing") },
+        { label: "Banca y conciliaciones", href: withContaPrefix("/banking") },
+        { label: "Reportes financieros", href: withContaPrefix("/accounting/reports") },
+      ],
+    },
   ];
 
   const flatNavItems = useMemo(() => navGroups.flatMap((group) => group.items), []);
