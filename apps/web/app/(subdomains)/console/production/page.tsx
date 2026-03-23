@@ -152,17 +152,20 @@ export default function ProductionPage() {
 
         {canManage && (
           <div className="card" style={{ padding: 16, display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}>
-            <input placeholder="Product ID" value={form.productId} onChange={(e) => setForm((p) => ({ ...p, productId: e.target.value }))} />
+            <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--text-secondary)" }}>
+              Crea una orden de producción. Selecciona un BOM y confirma cantidad, fechas y prioridad.
+            </div>
+            <input placeholder="ID interno del producto" value={form.productId} onChange={(e) => setForm((p) => ({ ...p, productId: e.target.value }))} />
             <select value={form.bomId} onChange={(e) => {
               const bom = boms.find((x: any) => String(x.id) === e.target.value);
               setForm((p) => ({ ...p, bomId: e.target.value, productId: bom?.productId ? String(bom.productId) : p.productId }));
             }}>
-              <option value="">Selecciona BOM</option>
+              <option value="">Selecciona BOM (lista de materiales)</option>
               {boms.map((bom: any) => (
                 <option key={bom.id} value={bom.id}>#{bom.id} - {bom.name || bom.product?.name || "BOM"}</option>
               ))}
             </select>
-            <input placeholder="Cantidad plan." value={form.plannedQty} onChange={(e) => setForm((p) => ({ ...p, plannedQty: e.target.value }))} />
+            <input placeholder="Cantidad a producir" value={form.plannedQty} onChange={(e) => setForm((p) => ({ ...p, plannedQty: e.target.value }))} />
             <input type="date" value={form.plannedStartDate} onChange={(e) => setForm((p) => ({ ...p, plannedStartDate: e.target.value }))} />
             <input type="date" value={form.plannedEndDate} onChange={(e) => setForm((p) => ({ ...p, plannedEndDate: e.target.value }))} />
             <select value={form.priority} onChange={(e) => setForm((p) => ({ ...p, priority: e.target.value }))}>
@@ -170,7 +173,7 @@ export default function ProductionPage() {
               <option value="NORMAL">Normal</option>
               <option value="HIGH">Alta</option>
             </select>
-            <input placeholder="Notas" value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
+            <input placeholder="Observaciones de la orden" value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
             <button onClick={createOrder} disabled={saving} style={{ padding: "8px 12px", borderRadius: 8, border: "none", background: "var(--primary)", color: "#fff", fontWeight: 600, cursor: "pointer" }}>
               {saving ? "Guardando..." : "Crear Orden"}
             </button>
