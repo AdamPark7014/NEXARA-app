@@ -7,6 +7,94 @@ import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagina
 export class AccountingService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private readonly satPaymentFormValues = new Set([
+    'FP01', 'FP02', 'FP03', 'FP04', 'FP05', 'FP06', 'FP08', 'FP12', 'FP13', 'FP14',
+    'FP15', 'FP17', 'FP23', 'FP24', 'FP25', 'FP26', 'FP27', 'FP28', 'FP29', 'FP30',
+    'FP31', 'FP99',
+  ]);
+
+  private readonly satPaymentMethodValues = new Set(['PUE', 'PPD']);
+
+  private readonly cfdiUsageValues = new Set([
+    'G01', 'G02', 'G03', 'I01', 'I02', 'I03', 'I04', 'I05', 'I06', 'I07', 'I08',
+    'D01', 'D02', 'D03', 'D04', 'D05', 'D06', 'D07', 'D08', 'D10', 'P01', 'S01', 'CP01',
+  ]);
+
+  private readonly fiscalRegimeValues = new Set([
+    'R601', 'R603', 'R605', 'R606', 'R607', 'R608', 'R610', 'R611', 'R612', 'R614',
+    'R615', 'R616', 'R620', 'R621', 'R622', 'R623', 'R624', 'R625', 'R626',
+  ]);
+
+  private normalizeSatPaymentForm(value?: string) {
+    if (!value) return undefined;
+    const raw = String(value).trim().toUpperCase();
+    const normalized = raw.startsWith('FP')
+      ? raw
+      : /^\d{1,2}$/.test(raw)
+        ? `FP${raw.padStart(2, '0')}`
+        : raw;
+
+    if (!this.satPaymentFormValues.has(normalized)) {
+      throw new BadRequestException(`Forma de pago SAT inválida: ${value}`);
+    }
+    return normalized;
+  }
+
+  private normalizeSatPaymentMethod(value?: string) {
+    if (!value) return undefined;
+    const normalized = String(value).trim().toUpperCase();
+    if (!this.satPaymentMethodValues.has(normalized)) {
+      throw new BadRequestException(`Método de pago SAT inválido: ${value}`);
+    }
+    return normalized;
+  }
+
+  private normalizeCfdiUsage(value?: string) {
+    if (!value) return undefined;
+    const normalized = String(value).trim().toUpperCase();
+    if (!this.cfdiUsageValues.has(normalized)) {
+      throw new BadRequestException(`Uso CFDI inválido: ${value}`);
+    }
+    return normalized;
+  }
+
+  private normalizeFiscalRegime(value?: string) {
+    if (!value) return undefined;
+    const raw = String(value).trim().toUpperCase();
+    const normalized = raw.startsWith('R')
+      ? raw
+      : /^\d{3}$/.test(raw)
+        ? `R${raw}`
+        : raw;
+
+    if (!this.fiscalRegimeValues.has(normalized)) {
+      throw new BadRequestException(`Régimen fiscal inválido: ${value}`);
+    }
+    return normalized;
+  }
+
+  private normalizeSettingKey(value?: string) {
+    return (value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '');
+  }
+
+  private pickSettingValue(
+    settings: Array<{ key: string; value: string; label?: string | null }>,
+    candidates: string[],
+  ): string | undefined {
+    const normalizedCandidates = candidates.map((c) => this.normalizeSettingKey(c));
+    const match = settings.find((s) => {
+      const key = this.normalizeSettingKey(s.key);
+      const label = this.normalizeSettingKey(s.label || '');
+      return normalizedCandidates.some((candidate) => key.includes(candidate) || label.includes(candidate));
+    });
+    const value = match?.value?.trim();
+    return value ? value : undefined;
+  }
+
   // ── Chart of Accounts ─────────────────────────────────────────────
   async createAccount(dto: {
     code: string;
@@ -412,15 +500,15 @@ export class AccountingService {
         notes: dto.notes?.trim() || null,
         createdById: userId,
         // CFDI 4.0
-        cfdiUsage: (dto.cfdiUsage as any) || undefined,
-        satPaymentForm: (dto.satPaymentForm as any) || undefined,
-        satPaymentMethod: (dto.satPaymentMethod as any) || undefined,
+        cfdiUsage: this.normalizeCfdiUsage(dto.cfdiUsage) as any,
+        satPaymentForm: this.normalizeSatPaymentForm(dto.satPaymentForm) as any,
+        satPaymentMethod: this.normalizeSatPaymentMethod(dto.satPaymentMethod) as any,
         emisorRfc: dto.emisorRfc?.trim() || null,
         emisorName: dto.emisorName?.trim() || null,
-        emisorRegime: (dto.emisorRegime as any) || undefined,
+        emisorRegime: this.normalizeFiscalRegime(dto.emisorRegime) as any,
         receptorRfc: dto.receptorRfc?.trim() || null,
         receptorName: dto.receptorName?.trim() || null,
-        receptorRegime: (dto.receptorRegime as any) || undefined,
+        receptorRegime: this.normalizeFiscalRegime(dto.receptorRegime) as any,
         receptorZipCode: dto.receptorZipCode?.trim() || null,
         exchangeRate: dto.exchangeRate ? new Prisma.Decimal(dto.exchangeRate) : null,
         cfdiSerie: dto.cfdiSerie?.trim() || null,
@@ -455,7 +543,7 @@ export class AccountingService {
   }
 
   async listInvoices(filters?: { type?: string; status?: string; from?: string; to?: string }, query?: PaginationQueryDto) {
-    const where: any = {};
+    const where: any = { deletedAt: null };
     if (filters?.type) where.type = filters.type;
     if (filters?.status) where.status = filters.status;
     if (filters?.from || filters?.to) {
@@ -475,12 +563,88 @@ export class AccountingService {
   }
 
   async getInvoice(id: number) {
-    const invoice = await this.prisma.invoice.findUnique({
-      where: { id },
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id, deletedAt: null },
       include: { items: { include: { product: true } }, client: true, supplier: true, payments: true },
     });
     if (!invoice) throw new NotFoundException('Factura no encontrada');
     return invoice;
+  }
+
+  async getInvoiceIssuerProfile() {
+    const settings = await this.prisma.systemSetting.findMany({
+      where: { category: { in: ['empresa', 'fiscal'] } },
+      select: { key: true, value: true, label: true },
+    });
+
+    const emisorRfc = this.pickSettingValue(settings, ['rfc', 'fiscalrfc', 'empresarfc']);
+    const emisorName = this.pickSettingValue(settings, ['razonsocial', 'nombreempresa', 'empresa', 'socialname']);
+    const emisorRegime = this.pickSettingValue(settings, ['regimenfiscal', 'regimen']);
+    const emisorZipCode = this.pickSettingValue(settings, ['codigopostal', 'cp', 'zip']);
+
+    if (emisorRfc || emisorName || emisorRegime || emisorZipCode) {
+      return {
+        emisorRfc: emisorRfc || null,
+        emisorName: emisorName || null,
+        emisorRegime: emisorRegime || null,
+        emisorZipCode: emisorZipCode || null,
+        source: 'settings',
+      };
+    }
+
+    const latestInvoiceWithIssuer = await this.prisma.invoice.findFirst({
+      where: {
+        deletedAt: null,
+        OR: [
+          { emisorRfc: { not: null } },
+          { emisorName: { not: null } },
+          { emisorRegime: { not: null } },
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        emisorRfc: true,
+        emisorName: true,
+        emisorRegime: true,
+      },
+    });
+
+    return {
+      emisorRfc: latestInvoiceWithIssuer?.emisorRfc || null,
+      emisorName: latestInvoiceWithIssuer?.emisorName || null,
+      emisorRegime: latestInvoiceWithIssuer?.emisorRegime || null,
+      emisorZipCode: null,
+      source: latestInvoiceWithIssuer ? 'latest_invoice' : 'empty',
+    };
+  }
+
+  async deleteInvoice(id: number, userId: number) {
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id },
+      include: { payments: { select: { id: true } } },
+    });
+
+    if (!invoice || invoice.deletedAt) {
+      throw new NotFoundException('Factura no encontrada');
+    }
+
+    if (invoice.payments.length > 0) {
+      throw new BadRequestException('No se puede eliminar una factura con pagos registrados.');
+    }
+
+    if (!invoice.isCancelled && invoice.status !== 'DRAFT') {
+      throw new BadRequestException('Solo se pueden eliminar facturas en borrador o canceladas.');
+    }
+
+    return this.prisma.invoice.update({
+      where: { id },
+      data: {
+        deletedAt: new Date(),
+        updatedAt: new Date(),
+        createdById: invoice.createdById ?? userId,
+      },
+      select: { id: true, invoiceNumber: true, deletedAt: true },
+    });
   }
 
   async registerPayment(dto: {
@@ -499,11 +663,19 @@ export class AccountingService {
     const invoice = await this.prisma.invoice.findUnique({ where: { id: dto.invoiceId } });
     if (!invoice) throw new NotFoundException('Factura no encontrada');
 
+    if (dto.bankAccountId) {
+      const bankAccount = await this.prisma.bankAccount.findUnique({ where: { id: dto.bankAccountId } });
+      if (!bankAccount) {
+        throw new NotFoundException('Cuenta bancaria no encontrada');
+      }
+    }
+
     const newPaid = Number(invoice.paidAmount) + dto.amount;
     const newStatus = newPaid >= Number(invoice.totalAmount) ? 'PAID' : 'PARTIALLY_PAID';
+    const isDebit = invoice.type === 'ACCOUNTS_PAYABLE';
 
-    const [payment] = await this.prisma.$transaction([
-      this.prisma.payment.create({
+    const [payment] = await this.prisma.$transaction(async (tx) => {
+      const createdPayment = await tx.payment.create({
         data: {
           invoiceId: dto.invoiceId,
           amount: new Prisma.Decimal(dto.amount),
@@ -513,17 +685,47 @@ export class AccountingService {
           bankAccountId: dto.bankAccountId ?? null,
           notes: dto.notes?.trim() || null,
           createdById: userId,
-          satPaymentForm: (dto.satPaymentForm as any) || undefined,
+          satPaymentForm: this.normalizeSatPaymentForm(dto.satPaymentForm) as any,
           speiTrackingKey: dto.speiTrackingKey?.trim() || null,
           exchangeRate: dto.exchangeRate ? new Prisma.Decimal(dto.exchangeRate) : null,
           operationNumber: dto.operationNumber?.trim() || null,
         },
-      }),
-      this.prisma.invoice.update({
+      });
+
+      await tx.invoice.update({
         where: { id: dto.invoiceId },
         data: { paidAmount: new Prisma.Decimal(newPaid), status: newStatus },
-      }),
-    ]);
+      });
+
+      if (dto.bankAccountId) {
+        await tx.bankTransaction.create({
+          data: {
+            bankAccountId: dto.bankAccountId,
+            transactionDate: new Date(dto.paymentDate),
+            description: `Pago factura ${invoice.invoiceNumber}`,
+            amount: new Prisma.Decimal(dto.amount),
+            isDebit,
+            externalRef: dto.reference?.trim() || dto.operationNumber?.trim() || null,
+            speiTrackingKey: dto.speiTrackingKey?.trim() || null,
+            concept: dto.notes?.trim() || `Pago ${invoice.invoiceNumber}`,
+            counterpartyName: invoice.receptorName?.trim() || null,
+            counterpartyRfc: invoice.receptorRfc?.trim() || null,
+          },
+        });
+
+        await tx.bankAccount.update({
+          where: { id: dto.bankAccountId },
+          data: {
+            currentBalance: isDebit
+              ? { decrement: new Prisma.Decimal(dto.amount) }
+              : { increment: new Prisma.Decimal(dto.amount) },
+            lastSyncAt: new Date(),
+          },
+        });
+      }
+
+      return [createdPayment] as const;
+    });
 
     return payment;
   }
@@ -702,6 +904,7 @@ export class AccountingService {
   async getOverdueInvoices() {
     return this.prisma.invoice.findMany({
       where: {
+        deletedAt: null,
         status: { in: ['SENT', 'PARTIALLY_PAID'] },
         dueDate: { lt: new Date() },
         isCancelled: false,
@@ -719,20 +922,20 @@ export class AccountingService {
 
     const [totalAR, totalAP, overdueCount, monthInvoices, recentPayments] = await Promise.all([
       this.prisma.invoice.aggregate({
-        where: { type: 'ACCOUNTS_RECEIVABLE', status: { in: ['SENT', 'PARTIALLY_PAID'] }, isCancelled: false },
+        where: { deletedAt: null, type: 'ACCOUNTS_RECEIVABLE', status: { in: ['SENT', 'PARTIALLY_PAID'] }, isCancelled: false },
         _sum: { totalAmount: true, paidAmount: true },
         _count: true,
       }),
       this.prisma.invoice.aggregate({
-        where: { type: 'ACCOUNTS_PAYABLE', status: { in: ['SENT', 'PARTIALLY_PAID'] }, isCancelled: false },
+        where: { deletedAt: null, type: 'ACCOUNTS_PAYABLE', status: { in: ['SENT', 'PARTIALLY_PAID'] }, isCancelled: false },
         _sum: { totalAmount: true, paidAmount: true },
         _count: true,
       }),
       this.prisma.invoice.count({
-        where: { status: { in: ['SENT', 'PARTIALLY_PAID'] }, dueDate: { lt: now }, isCancelled: false },
+        where: { deletedAt: null, status: { in: ['SENT', 'PARTIALLY_PAID'] }, dueDate: { lt: now }, isCancelled: false },
       }),
       this.prisma.invoice.count({
-        where: { issueDate: { gte: startOfMonth, lte: endOfMonth } },
+        where: { deletedAt: null, issueDate: { gte: startOfMonth, lte: endOfMonth } },
       }),
       this.prisma.payment.findMany({
         take: 10,
@@ -806,5 +1009,37 @@ export class AccountingService {
     });
     if (!tx) throw new NotFoundException('Transacción SPEI no encontrada');
     return tx;
+  }
+
+  // ── Financial Reports PDF ────────────────────────────────────────
+  async getFinancialReportsForPdf(fromDate?: string, toDate?: string, asOfDate?: string) {
+    // Get all three reports
+    const [trialBalance, incomeStatement, balanceSheet] = await Promise.all([
+      this.getTrialBalance(),
+      this.getIncomeStatement(fromDate, toDate),
+      this.getBalanceSheet(asOfDate),
+    ]);
+
+    return {
+      fromDate,
+      toDate,
+      asOfDate,
+      trialBalance: trialBalance.map((t) => ({
+        code: t.code,
+        name: t.name,
+        type: t.type,
+        debit: t.debit,
+        credit: t.credit,
+        balance: t.debit - t.credit,
+      })),
+      incomeStatement: {
+        totalRevenue: incomeStatement.totalRevenue,
+        totalExpenses: incomeStatement.totalExpenses,
+        netIncome: incomeStatement.netIncome,
+        revenue: incomeStatement.revenue,
+        expenses: incomeStatement.expenses,
+      },
+      balanceSheet,
+    };
   }
 }

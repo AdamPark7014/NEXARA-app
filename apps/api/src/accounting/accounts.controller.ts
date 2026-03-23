@@ -1,8 +1,10 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { AccountingService } from './accounting.service.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { generateFinancialReportsPdf } from './accounting-reports-pdf.js';
 
 @Controller('accounting/accounts')
 export class AccountsController {
@@ -93,5 +95,32 @@ export class AccountsController {
   @RBAC({ permissions: [PERMISSIONS.ACCOUNTING_MANAGE] })
   update(@Param('id') id: string, @Body() dto: any) {
     return this.service.updateAccount(+id, dto);
+  }
+
+  @Get('reports/pdf')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.ACCOUNTING_VIEW] })
+  async reportsPdf(
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('asOfDate') asOfDate?: string,
+    @Res() res?: Response
+  ) {
+    try {
+      const data = await this.service.getFinancialReportsForPdf(fromDate, toDate, asOfDate);
+      const pdf = await generateFinancialReportsPdf(data);
+      
+      if (res) {
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=reportes-financieros-${new Date().toISOString().slice(0, 10)}.pdf`);
+        res.send(pdf);
+      }
+      return pdf;
+    } catch (error) {
+      if (res) {
+        res.status(500).json({ error: 'Error al generar PDF' });
+      }
+      throw error;
+    }
   }
 }

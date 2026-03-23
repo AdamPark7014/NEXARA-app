@@ -14,14 +14,29 @@ export default function FinancialReportsPage() {
   const [incomeStatement, setIncomeStatement] = useState<any>(null);
   const [balanceSheet, setBalanceSheet] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [fromDate, setFromDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().slice(0, 10);
+  });
+  const [toDate, setToDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [asOfDate, setAsOfDate] = useState<string>(new Date().toISOString().slice(0, 10));
 
-  useEffect(() => {
+  const loadReports = () => {
     if (!user?.token) return;
     const headers = { Authorization: `Bearer ${user.token}` };
+    const incomeParams = new URLSearchParams();
+    if (fromDate) incomeParams.append('from', fromDate);
+    if (toDate) incomeParams.append('to', toDate);
+    const balanceParams = new URLSearchParams();
+    if (asOfDate) balanceParams.append('asOf', asOfDate);
+
+    setLoading(true);
     Promise.all([
       fetch(`${API_URL}/accounting/accounts/trial-balance`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/accounting/accounts/income-statement`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/accounting/accounts/balance-sheet`, { headers }).then((r) => r.json()),
+      fetch(`${API_URL}/accounting/accounts/income-statement?${incomeParams.toString()}`, { headers }).then((r) => r.json()),
+      fetch(`${API_URL}/accounting/accounts/balance-sheet?${balanceParams.toString()}`, { headers }).then((r) => r.json()),
     ])
       .then(([trial, income, balance]) => {
         setTrialBalance(Array.isArray(trial) ? trial : []);
@@ -30,6 +45,39 @@ export default function FinancialReportsPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!user?.token) return;
+    setDownloadingPdf(true);
+    try {
+      const params = new URLSearchParams();
+      if (fromDate) params.append("fromDate", fromDate);
+      if (toDate) params.append("toDate", toDate);
+      if (asOfDate) params.append("asOfDate", asOfDate);
+
+      const res = await fetch(`${API_URL}/accounting/accounts/reports/pdf?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `reportes-financieros-${new Date().toISOString().slice(0, 10)}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error("Error descargando PDF:", error);
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
+  useEffect(() => {
+    loadReports();
   }, [user?.token]);
 
   const fmt = (n: number) => Number(n || 0).toLocaleString("es-MX", { minimumFractionDigits: 2 });
@@ -51,6 +99,27 @@ export default function FinancialReportsPage() {
         <div className="card" style={{ padding: 16 }}>
           <h1 style={{ color: "var(--primary)", marginBottom: 8 }}>📊 Reportes Financieros</h1>
           <p style={{ color: "var(--text-secondary)" }}>Balanza de comprobación, estado de resultados y balance general.</p>
+        </div>
+
+        <div className="card" style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, alignItems: 'end' }}>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Desde (Resultados)</label>
+            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Hasta (Resultados)</label>
+            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>Corte Balance</label>
+            <input type="date" value={asOfDate} onChange={(e) => setAsOfDate(e.target.value)} style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+          </div>
+          <button onClick={loadReports} disabled={loading} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: '#fff', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1 }}>
+            {loading ? 'Filtrando...' : '🔄 Filtrar'}
+          </button>
+          <button onClick={handleDownloadPdf} disabled={downloadingPdf || loading} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: downloadingPdf || loading ? '#999' : '#10b981', color: '#fff', fontWeight: 600, cursor: downloadingPdf || loading ? 'not-allowed' : 'pointer', opacity: downloadingPdf || loading ? 0.6 : 1 }}>
+            {downloadingPdf ? 'Descargando...' : '📥 Generar PDF'}
+          </button>
         </div>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

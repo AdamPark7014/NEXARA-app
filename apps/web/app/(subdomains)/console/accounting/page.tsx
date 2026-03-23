@@ -13,11 +13,26 @@ export default function AccountingPage() {
   const [journals, setJournals] = useState<any[]>([]);
   const [periods, setPeriods] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState<"chart" | "journals" | "periods">("chart");
+  const [accountForm, setAccountForm] = useState({
+    code: '',
+    name: '',
+    type: 'ASSET',
+    currency: 'MXN',
+    parentId: '',
+    description: '',
+  });
+  const [periodForm, setPeriodForm] = useState({
+    name: '',
+    startDate: '',
+    endDate: '',
+  });
 
-  useEffect(() => {
+  const loadData = () => {
     if (!user?.token) return;
     const headers = { Authorization: `Bearer ${user.token}` };
+    setLoading(true);
     Promise.all([
       fetch(`${API_URL}/accounting/accounts`, { headers }).then((r) => r.json()),
       fetch(`${API_URL}/accounting/journal-entries`, { headers }).then((r) => r.json()),
@@ -30,7 +45,74 @@ export default function AccountingPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadData();
   }, [user?.token]);
+
+  const submitAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.token) return;
+    if (!accountForm.code || !accountForm.name || !accountForm.type) {
+      alert('Completa codigo, nombre y tipo de cuenta.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_URL}/accounting/accounts`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code: accountForm.code,
+          name: accountForm.name,
+          type: accountForm.type,
+          currency: accountForm.currency || 'MXN',
+          parentId: accountForm.parentId ? Number(accountForm.parentId) : undefined,
+          description: accountForm.description || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setAccountForm({ code: '', name: '', type: 'ASSET', currency: 'MXN', parentId: '', description: '' });
+      loadData();
+    } catch (error: any) {
+      alert(error?.message || 'No se pudo crear la cuenta contable.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const submitPeriod = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.token) return;
+    if (!periodForm.name || !periodForm.startDate || !periodForm.endDate) {
+      alert('Completa nombre e intervalo del periodo fiscal.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_URL}/accounting/accounts/fiscal-periods`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(periodForm),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setPeriodForm({ name: '', startDate: '', endDate: '' });
+      loadData();
+    } catch (error: any) {
+      alert(error?.message || 'No se pudo crear el periodo fiscal.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const tabStyle = (t: string) => ({
     padding: "10px 16px",
@@ -51,6 +133,41 @@ export default function AccountingPage() {
           <p style={{ color: "var(--text-secondary)" }}>
             Plan de cuentas, pólizas contables y períodos fiscales.
           </p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+          <div className="card" style={{ padding: 16 }}>
+            <h3 style={{ marginBottom: 10, color: 'var(--primary)' }}>Nueva cuenta contable</h3>
+            <form onSubmit={submitAccount} style={{ display: 'grid', gap: 8 }}>
+              <input type="text" placeholder="Codigo (ej. 1101)" value={accountForm.code} onChange={(e) => setAccountForm((p) => ({ ...p, code: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+              <input type="text" placeholder="Nombre" value={accountForm.name} onChange={(e) => setAccountForm((p) => ({ ...p, name: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+              <select value={accountForm.type} onChange={(e) => setAccountForm((p) => ({ ...p, type: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }}>
+                <option value="ASSET">Activo</option>
+                <option value="LIABILITY">Pasivo</option>
+                <option value="EQUITY">Capital</option>
+                <option value="REVENUE">Ingreso</option>
+                <option value="EXPENSE">Gasto</option>
+              </select>
+              <input type="text" placeholder="Moneda (MXN)" value={accountForm.currency} onChange={(e) => setAccountForm((p) => ({ ...p, currency: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+              <input type="number" placeholder="Parent ID (opcional)" value={accountForm.parentId} onChange={(e) => setAccountForm((p) => ({ ...p, parentId: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+              <input type="text" placeholder="Descripcion" value={accountForm.description} onChange={(e) => setAccountForm((p) => ({ ...p, description: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+              <button type="submit" disabled={saving} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: '#fff', cursor: saving ? 'not-allowed' : 'pointer' }}>
+                {saving ? 'Guardando...' : 'Crear cuenta'}
+              </button>
+            </form>
+          </div>
+
+          <div className="card" style={{ padding: 16 }}>
+            <h3 style={{ marginBottom: 10, color: 'var(--primary)' }}>Nuevo periodo fiscal</h3>
+            <form onSubmit={submitPeriod} style={{ display: 'grid', gap: 8 }}>
+              <input type="text" placeholder="Nombre del periodo" value={periodForm.name} onChange={(e) => setPeriodForm((p) => ({ ...p, name: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+              <input type="date" value={periodForm.startDate} onChange={(e) => setPeriodForm((p) => ({ ...p, startDate: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+              <input type="date" value={periodForm.endDate} onChange={(e) => setPeriodForm((p) => ({ ...p, endDate: e.target.value }))} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }} />
+              <button type="submit" disabled={saving} style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: '#fff', cursor: saving ? 'not-allowed' : 'pointer' }}>
+                {saving ? 'Guardando...' : 'Crear periodo'}
+              </button>
+            </form>
+          </div>
         </div>
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>

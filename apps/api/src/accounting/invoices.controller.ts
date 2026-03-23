@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, Query, UseGuards, Patch } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Query, UseGuards, Patch, Delete } from '@nestjs/common';
 import { AccountingService } from './accounting.service.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
@@ -34,6 +34,13 @@ export class InvoicesController {
     return this.service.getInvoiceDashboard();
   }
 
+  @Get('issuer-profile')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.INVOICING_VIEW] })
+  issuerProfile() {
+    return this.service.getInvoiceIssuerProfile();
+  }
+
   @Get('overdue')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_VIEW] })
@@ -60,5 +67,12 @@ export class InvoicesController {
   @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
   cancel(@Param('id') id: string, @CurrentUser() user: any, @Body() dto: any) {
     return this.service.cancelInvoice(+id, dto, user.id);
+  }
+
+  @Delete(':id')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
+  remove(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.service.deleteInvoice(+id, user.id);
   }
 }

@@ -51,7 +51,7 @@ export class ViaticosController {
       const buffer = await this.excelExport.exportToExcel(data, 'viatics');
       res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.attachment('viaticos.xlsx');
-      return res.send(buffer);
+      return res.send(Buffer.from(buffer));
     }
     if (format === 'csv') {
       res.header('Content-Type', 'text/csv');

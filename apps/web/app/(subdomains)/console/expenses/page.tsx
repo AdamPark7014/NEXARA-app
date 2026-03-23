@@ -32,15 +32,68 @@ export default function ExpensesPage() {
   const { user } = useUser();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    actividadId: '',
+    montoSolicitado: '',
+    razonGasto: '',
+  });
 
-  useEffect(() => {
+  const loadExpenses = () => {
     setLoading(true);
     fetch(buildApiUrl('expenses'), { headers: { Authorization: user?.token ? `Bearer ${user.token}` : '' } })
       .then(res => res.json())
       .then(data => setExpenses(Array.isArray(data) ? data : data.data || []))
       .catch(() => setExpenses([]))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadExpenses();
   }, [user]);
+
+  const submitExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.token || !user?.id) return;
+
+    const actividadId = Number(form.actividadId || 0);
+    const montoSolicitado = Number(form.montoSolicitado || 0);
+    if (!actividadId || montoSolicitado <= 0) {
+      alert('Ingresa actividad y monto valido.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const res = await fetch(buildApiUrl('expenses'), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          actividadId,
+          usuarioId: Number(user.id),
+          montoSolicitado,
+          razonGasto: form.razonGasto || undefined,
+          estatusPago: 'pendiente',
+          fechaSolicitud: new Date().toISOString(),
+        }),
+      });
+
+      if (!res.ok) {
+        const msg = await res.text().catch(() => 'Error al crear gasto.');
+        throw new Error(msg || 'Error al crear gasto.');
+      }
+
+      setForm({ actividadId: '', montoSolicitado: '', razonGasto: '' });
+      loadExpenses();
+    } catch (error: any) {
+      alert(error?.message || 'No se pudo registrar el gasto.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const total = expenses.reduce((acc, e) => acc + (e.monto || 0), 0);
   const pendientes = expenses.filter(e => e.estado === 'pendiente').length;
@@ -50,6 +103,50 @@ export default function ExpensesPage() {
     <RoleGuard anyPermissions={[PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE, PERMISSIONS.CONSOLE_ADMIN]}>
       <div style={{ display: 'grid', gap: 24 }}>
         <HelpTab module="expenses" user={user} />
+        <div className="card" style={{ padding: 16 }}>
+          <h3 style={{ marginBottom: 12, color: 'var(--primary)' }}>Registrar gasto operativo</h3>
+          <form onSubmit={submitExpense} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+            <input
+              type="number"
+              min={1}
+              placeholder="ID actividad"
+              value={form.actividadId}
+              onChange={(e) => setForm((prev) => ({ ...prev, actividadId: e.target.value }))}
+              style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }}
+            />
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              placeholder="Monto solicitado"
+              value={form.montoSolicitado}
+              onChange={(e) => setForm((prev) => ({ ...prev, montoSolicitado: e.target.value }))}
+              style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }}
+            />
+            <input
+              type="text"
+              placeholder="Razon del gasto"
+              value={form.razonGasto}
+              onChange={(e) => setForm((prev) => ({ ...prev, razonGasto: e.target.value }))}
+              style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)' }}
+            />
+            <button
+              type="submit"
+              disabled={saving}
+              style={{
+                padding: '8px 14px',
+                borderRadius: 8,
+                background: 'var(--primary)',
+                color: '#fff',
+                border: 'none',
+                cursor: saving ? 'not-allowed' : 'pointer',
+                opacity: saving ? 0.7 : 1,
+              }}
+            >
+              {saving ? 'Guardando...' : 'Crear gasto'}
+            </button>
+          </form>
+        </div>
         {/* KPI Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
           <div className="card" style={{ padding: 16, textAlign: 'center' }}>
