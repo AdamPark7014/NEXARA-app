@@ -164,20 +164,6 @@ export default function Sidebar() {
     { icon: "📊", label: "Dashboard compras", href: "/procurement/dashboard", anyPermissions: [PERMISSIONS.PROCUREMENT_VIEW, PERMISSIONS.PROCUREMENT_MANAGE] },
   ];
 
-  const productionItems: MenuItem[] = [
-    { icon: "⚙️", label: "Manufactura / BOM", href: "/manufacturing", anyPermissions: [PERMISSIONS.MANUFACTURING_VIEW, PERMISSIONS.BOM_MANAGE] },
-    { icon: "🏭", label: "Ordenes de produccion", href: "/production", anyPermissions: [PERMISSIONS.PRODUCTION_MANAGE, PERMISSIONS.MANUFACTURING_VIEW] },
-    { icon: "📅", label: "Planificacion produccion", href: "/production/schedule", anyPermissions: [PERMISSIONS.MANUFACTURING_VIEW, PERMISSIONS.PRODUCTION_MANAGE] },
-    { icon: "✅", label: "Control de calidad", href: "/quality", anyPermissions: [PERMISSIONS.QUALITY_VIEW, PERMISSIONS.QUALITY_INSPECT] },
-    { icon: "📊", label: "Dashboard calidad", href: "/quality/dashboard", anyPermissions: [PERMISSIONS.QUALITY_VIEW, PERMISSIONS.QUALITY_INSPECT] },
-  ];
-
-  const maintenanceItems: MenuItem[] = [
-    { icon: "🔧", label: "Activos y equipos", href: "/assets", anyPermissions: [PERMISSIONS.ASSETS_VIEW, PERMISSIONS.ASSETS_MANAGE] },
-    { icon: "�", label: "Depreciación de activos", href: "/assets/depreciation", anyPermissions: [PERMISSIONS.ASSETS_VIEW, PERMISSIONS.ASSETS_MANAGE] },
-    { icon: "�📋", label: "Ordenes de mantenimiento", href: "/maintenance", anyPermissions: [PERMISSIONS.MAINTENANCE_VIEW, PERMISSIONS.MAINTENANCE_MANAGE] },
-  ];
-
   const financeItems: MenuItem[] = [
     { icon: "📒", label: "Contabilidad (GL)", href: "/accounting", anyPermissions: [PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE] },
     { icon: "💰", label: "Nómina y pagos", href: "/employee-payments", anyPermissions: [PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
@@ -231,16 +217,6 @@ export default function Sidebar() {
       id: "inventory",
       title: "Inventario y compras",
       items: inventoryItems,
-    },
-    {
-      id: "production",
-      title: "Produccion y calidad",
-      items: productionItems,
-    },
-    {
-      id: "maintenance",
-      title: "Mantenimiento (CMMS)",
-      items: maintenanceItems,
     },
     {
       id: "finance",
