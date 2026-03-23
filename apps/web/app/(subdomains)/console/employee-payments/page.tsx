@@ -29,6 +29,11 @@ export default function EmployeePaymentsPage() {
   const [filterTo, setFilterTo] = useState('');
 
   const loadPayments = async () => {
+    if (!user?.token) {
+      setPayments([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       let url = 'employee-payments';
@@ -36,11 +41,19 @@ export default function EmployeePaymentsPage() {
       if (filterFrom) params.append('from', filterFrom);
       if (filterTo) params.append('to', filterTo);
       const qs = params.toString();
-      const response = await fetch(buildApiUrl(url) + '?' + qs);
+      if (qs) url += `?${qs}`;
+      const response = await fetch(buildApiUrl(url), {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      if (!response.ok) {
+        setPayments([]);
+        return;
+      }
       const data = await response.json();
-      setPayments(data);
+      setPayments(Array.isArray(data) ? data : data?.data || []);
     } catch (error) {
       console.error('Error loading payments:', error);
+      setPayments([]);
     } finally {
       setLoading(false);
     }
@@ -48,7 +61,7 @@ export default function EmployeePaymentsPage() {
 
   useEffect(() => {
     loadPayments();
-  }, []);
+  }, [user?.token, filterFrom, filterTo]);
 
   return (
     <RoleGuard anyPermissions={[PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE, PERMISSIONS.CONSOLE_ADMIN]}>
