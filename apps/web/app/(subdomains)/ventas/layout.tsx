@@ -106,41 +106,23 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
           </div>
 
           {canManageSellers && (
-            <div style={{ display: "grid", gap: 10, marginBottom: 14 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, opacity: 0.9 }}>Division por vendedor (mes actual)</div>
-              <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))" }}>
-                <Link href={pathname || "/dashboard"} style={{ textDecoration: "none" }}>
-                  <div
-                    style={{
-                      border: selectedOwnerId ? "1px solid rgba(120,120,120,0.25)" : "2px solid rgba(20,120,220,0.7)",
-                      borderRadius: 10,
-                      padding: "10px 12px",
-                      background: "rgba(255,255,255,0.04)",
-                    }}
-                  >
-                    <div style={{ fontWeight: 700 }}>Todos los vendedores</div>
-                    <div style={{ fontSize: 12, opacity: 0.85 }}>Vista global del equipo</div>
-                  </div>
+            <div className={styles.vendorSection}>
+              <div className={styles.vendorSectionLabel}>Division por vendedor (mes actual)</div>
+              <div className={styles.vendorGrid}>
+                <Link href={pathname || "/dashboard"} className={`${styles.vendorCard} ${!selectedOwnerId ? styles.vendorCardActive : ""}`}>
+                  <div className={styles.vendorCardName}>Todos los vendedores</div>
+                  <div className={styles.vendorCardMeta}>Vista global del equipo</div>
                 </Link>
                 {vendorStats.map((vendor) => (
-                  <Link key={vendor.userId} href={withOwnerFilter(pathname || "/dashboard", vendor.userId)} style={{ textDecoration: "none" }}>
-                    <div
-                      style={{
-                        border: selectedOwnerId === vendor.userId ? "2px solid rgba(20,120,220,0.7)" : "1px solid rgba(120,120,120,0.25)",
-                        borderRadius: 10,
-                        padding: "10px 12px",
-                        background: "rgba(255,255,255,0.04)",
-                      }}
-                    >
-                      <div style={{ fontWeight: 700 }}>{vendor.userName}</div>
-                      <div style={{ fontSize: 12, opacity: 0.85 }}>Oportunidades: {vendor.opportunities}</div>
-                      <div style={{ fontSize: 12, opacity: 0.85 }}>Proyectos: {vendor.projects}</div>
-                      <div style={{ fontSize: 12, opacity: 0.85 }}>Performance: {vendor.performance}%</div>
-                    </div>
+                  <Link key={vendor.userId} href={withOwnerFilter(pathname || "/dashboard", vendor.userId)} className={`${styles.vendorCard} ${selectedOwnerId === vendor.userId ? styles.vendorCardActive : ""}`}>
+                    <div className={styles.vendorCardName}>{vendor.userName}</div>
+                    <div className={styles.vendorCardMeta}>Oportunidades: {vendor.opportunities}</div>
+                    <div className={styles.vendorCardMeta}>Proyectos: {vendor.projects}</div>
+                    <div className={styles.vendorCardMeta}>Performance: {vendor.performance}%</div>
                   </Link>
                 ))}
                 {vendorStats.length === 0 && (
-                  <div style={{ fontSize: 12, opacity: 0.8 }}>No hay métricas por vendedor disponibles.</div>
+                  <div className={styles.vendorCardEmpty}>No hay métricas por vendedor disponibles.</div>
                 )}
               </div>
             </div>

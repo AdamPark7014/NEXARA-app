@@ -41,6 +41,7 @@ export default function SalesReportsDashboard({
   const [periodLabel, setPeriodLabel] = useState('');
   const [generatePdfLoading, setGeneratePdfLoading] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
   const [showPdfViewer, setShowPdfViewer] = useState(false);
   const pdfModalRef = useRef<HTMLDivElement | null>(null);
   const [quotaForm, setQuotaForm] = useState<SalesQuotaPayload>({
@@ -159,6 +160,12 @@ export default function SalesReportsDashboard({
       if (!res.ok) throw new Error('Error al generar PDF');
 
       const blob = await res.blob();
+      const arrayBuffer = await blob.arrayBuffer();
+      setPdfData(new Uint8Array(arrayBuffer));
+
+      if (pdfUrl) {
+        window.URL.revokeObjectURL(pdfUrl);
+      }
       const url = window.URL.createObjectURL(blob);
       setPdfUrl(url);
       setShowPdfViewer(true);
@@ -253,6 +260,14 @@ export default function SalesReportsDashboard({
     modal.addEventListener('keydown', handleModalKeyDown);
     return () => modal.removeEventListener('keydown', handleModalKeyDown);
   }, [showPdfViewer]);
+
+  useEffect(() => {
+    return () => {
+      if (pdfUrl) {
+        window.URL.revokeObjectURL(pdfUrl);
+      }
+    };
+  }, [pdfUrl]);
 
   if (loading) return <div className={styles.loading}>Cargando reportes...</div>;
 
@@ -763,6 +778,7 @@ export default function SalesReportsDashboard({
             <div className={styles.pdfViewerContainer}>
               <PDFViewer 
                 pdfUrl={pdfUrl} 
+                pdfData={pdfData}
                 fileName={`reporte-ventas-${currentPeriod}.pdf`}
                 height="70vh"
               />

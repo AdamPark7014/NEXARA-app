@@ -1,9 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
 import HelpTab from "@/components/HelpTab";
+
+const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false });
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
@@ -14,7 +17,10 @@ export default function FinancialReportsPage() {
   const [incomeStatement, setIncomeStatement] = useState<any>(null);
   const [balanceSheet, setBalanceSheet] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
+  const [showPdfModal, setShowPdfModal] = useState(false);
   const [fromDate, setFromDate] = useState<string>(() => {
     const d = new Date();
     d.setDate(d.getDate() - 30);
@@ -47,9 +53,9 @@ export default function FinancialReportsPage() {
       .finally(() => setLoading(false));
   };
 
-  const handleDownloadPdf = async () => {
+  const handleViewPdf = async () => {
     if (!user?.token) return;
-    setDownloadingPdf(true);
+    setGeneratingPdf(true);
     try {
       const params = new URLSearchParams();
       if (fromDate) params.append("fromDate", fromDate);
@@ -62,18 +68,25 @@ export default function FinancialReportsPage() {
 
       if (res.ok) {
         const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `reportes-financieros-${new Date().toISOString().slice(0, 10)}.pdf`;
-        a.click();
-        URL.revokeObjectURL(url);
+        const arrayBuffer = await blob.arrayBuffer();
+        setPdfData(new Uint8Array(arrayBuffer));
+        if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+        setPdfUrl(URL.createObjectURL(blob));
+        setShowPdfModal(true);
       }
     } catch (error) {
-      console.error("Error descargando PDF:", error);
+      console.error("Error generando PDF:", error);
     } finally {
-      setDownloadingPdf(false);
+      setGeneratingPdf(false);
     }
+  };
+
+  const handleDownloadPdf = () => {
+    if (!pdfUrl) return;
+    const a = document.createElement("a");
+    a.href = pdfUrl;
+    a.download = `reportes-financieros-${new Date().toISOString().slice(0, 10)}.pdf`;
+    a.click();
   };
 
   useEffect(() => {
@@ -117,8 +130,8 @@ export default function FinancialReportsPage() {
           <button onClick={loadReports} disabled={loading} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: '#fff', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1 }}>
             {loading ? 'Filtrando...' : '🔄 Filtrar'}
           </button>
-          <button onClick={handleDownloadPdf} disabled={downloadingPdf || loading} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: downloadingPdf || loading ? '#999' : '#10b981', color: '#fff', fontWeight: 600, cursor: downloadingPdf || loading ? 'not-allowed' : 'pointer', opacity: downloadingPdf || loading ? 0.6 : 1 }}>
-            {downloadingPdf ? 'Descargando...' : '📥 Generar PDF'}
+          <button onClick={handleViewPdf} disabled={generatingPdf || loading} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: generatingPdf || loading ? '#999' : '#10b981', color: '#fff', fontWeight: 600, cursor: generatingPdf || loading ? 'not-allowed' : 'pointer', opacity: generatingPdf || loading ? 0.6 : 1 }}>
+            {generatingPdf ? 'Generando...' : '📄 Ver PDF'}
           </button>
         </div>
 
@@ -262,6 +275,29 @@ export default function FinancialReportsPage() {
           </div>
         )}
       </div>
+
+      {showPdfModal && pdfUrl && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={() => setShowPdfModal(false)}
+        >
+          <div
+            style={{ background: "var(--surface, #fff)", borderRadius: 12, width: "100%", maxWidth: 900, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>
+              <span style={{ fontWeight: 600 }}>📊 Reportes Financieros</span>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={handleDownloadPdf} style={{ padding: "6px 14px", background: "var(--primary)", color: "#fff", border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer" }}>📥 Descargar</button>
+                <button onClick={() => setShowPdfModal(false)} style={{ padding: "6px 14px", background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: 8, cursor: "pointer" }}>✕ Cerrar</button>
+              </div>
+            </div>
+            <div style={{ flex: 1, overflow: "auto" }}>
+              <PDFViewer pdfUrl={pdfUrl} pdfData={pdfData} fileName={`reportes-financieros-${new Date().toISOString().slice(0, 10)}.pdf`} height="800px" />
+            </div>
+          </div>
+        </div>
+      )}
     </RoleGuard>
   );
 }

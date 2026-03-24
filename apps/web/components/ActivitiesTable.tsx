@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
+import ExcelDownloadModal from './ExcelDownloadModal';
 
 const ActivitiesTable: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -11,6 +12,9 @@ const ActivitiesTable: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isSmallMobile, setIsSmallMobile] = useState(false);
+  const [excelUrl, setExcelUrl] = useState<string | null>(null);
+  const [excelBlob, setExcelBlob] = useState<Blob | null>(null);
+  const [excelPreparing, setExcelPreparing] = useState(false);
 
   // Filtros y paginación
   const [estatus, setEstatus] = useState<string>('');
@@ -83,6 +87,53 @@ const ActivitiesTable: React.FC = () => {
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
   const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, '');
+
+  const closeExcelModal = () => {
+    if (excelUrl) {
+      window.URL.revokeObjectURL(excelUrl);
+    }
+    setExcelUrl(null);
+    setExcelBlob(null);
+  };
+
+  const handlePrepareExcelExport = async () => {
+    if (excelPreparing) return;
+    setExcelPreparing(true);
+    try {
+      const res = await fetch(buildApiUrl('export/activity'));
+      if (!res.ok) throw new Error('Error al exportar');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      if (excelUrl) {
+        window.URL.revokeObjectURL(excelUrl);
+      }
+      setExcelUrl(url);
+      setExcelBlob(blob);
+    } catch {
+      alert('Error al exportar');
+    } finally {
+      setExcelPreparing(false);
+    }
+  };
+
+  const handleDownloadExcel = () => {
+    if (!excelUrl) return;
+    const a = document.createElement('a');
+    a.href = excelUrl;
+    a.download = 'actividades.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    closeExcelModal();
+  };
+
+  useEffect(() => {
+    return () => {
+      if (excelUrl) {
+        window.URL.revokeObjectURL(excelUrl);
+      }
+    };
+  }, [excelUrl]);
 
   const fetchActivities = () => {
     if (!user?.token) return;
@@ -596,26 +647,24 @@ const ActivitiesTable: React.FC = () => {
               <div className="activities-export-actions">
                 <button
                   className="button-secondary"
-                  onClick={async () => {
-                    const res = await fetch(buildApiUrl('export/activity'));
-                    if (!res.ok) return alert('Error al exportar');
-                    const blob = await res.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'actividades.xlsx';
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    window.URL.revokeObjectURL(url);
-                  }}
+                  onClick={handlePrepareExcelExport}
+                  disabled={excelPreparing}
                 >
-                  Exportar Excel
+                  {excelPreparing ? 'Preparando...' : 'Exportar Excel'}
                 </button>
               </div>
             )}
           </div>
         </div>
+
+        <ExcelDownloadModal
+          isOpen={Boolean(excelUrl)}
+          fileName="actividades.xlsx"
+          excelBlob={excelBlob}
+          isPreparing={excelPreparing}
+          onClose={closeExcelModal}
+          onDownload={handleDownloadExcel}
+        />
 
         <div className="activities-table-wrap">
           {!isMobile && (

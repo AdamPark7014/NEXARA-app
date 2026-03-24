@@ -1,8 +1,11 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
+
+const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false });
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
@@ -10,7 +13,10 @@ export default function ProcurementDashboardPage() {
   const { user } = useUser();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
+  const [showPdfModal, setShowPdfModal] = useState(false);
   const [fromDate, setFromDate] = useState<string>(() => {
     const d = new Date();
     d.setDate(d.getDate() - 30);
@@ -38,9 +44,13 @@ export default function ProcurementDashboardPage() {
     loadDashboard();
   }, [loadDashboard]);
 
-  const handleDownloadPdf = async () => {
+  useEffect(() => {
+    return () => { if (pdfUrl) URL.revokeObjectURL(pdfUrl); };
+  }, [pdfUrl]);
+
+  const handleViewPdf = async () => {
     if (!user?.token) return;
-    setDownloadingPdf(true);
+    setGeneratingPdf(true);
     try {
       const params = new URLSearchParams();
       if (fromDate) params.append("fromDate", fromDate);
@@ -52,17 +62,16 @@ export default function ProcurementDashboardPage() {
 
       if (res.ok) {
         const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `reporte-compras-${new Date().toISOString().slice(0, 10)}.pdf`;
-        a.click();
-        URL.revokeObjectURL(url);
+        const arrayBuffer = await blob.arrayBuffer();
+        setPdfData(new Uint8Array(arrayBuffer));
+        if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+        setPdfUrl(URL.createObjectURL(blob));
+        setShowPdfModal(true);
       }
     } catch (error) {
-      console.error("Error descargando PDF:", error);
+      console.error("Error generando PDF:", error);
     } finally {
-      setDownloadingPdf(false);
+      setGeneratingPdf(false);
     }
   };
 
@@ -134,20 +143,20 @@ export default function ProcurementDashboardPage() {
             {loading ? "Cargando..." : "Filtrar"}
           </button>
           <button
-            onClick={handleDownloadPdf}
-            disabled={downloadingPdf || !data}
+            onClick={handleViewPdf}
+            disabled={generatingPdf || !data}
             style={{
               padding: "8px 16px",
-              background: downloadingPdf ? "#999" : "#10b981",
+              background: generatingPdf ? "#999" : "#10b981",
               color: "#fff",
               border: "none",
               borderRadius: 8,
               fontWeight: 600,
-              cursor: downloadingPdf || !data ? "not-allowed" : "pointer",
-              opacity: downloadingPdf || !data ? 0.6 : 1,
+              cursor: generatingPdf || !data ? "not-allowed" : "pointer",
+              opacity: generatingPdf || !data ? 0.6 : 1,
             }}
           >
-            {downloadingPdf ? "Descargando..." : "📄 Descargar PDF"}
+            {generatingPdf ? "Generando..." : "📄 Ver PDF"}
           </button>
         </div>
 
@@ -191,6 +200,28 @@ export default function ProcurementDashboardPage() {
           )
         )}
       </div>
+
+      {showPdfModal && pdfUrl && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={() => setShowPdfModal(false)}
+        >
+          <div
+            style={{ background: "var(--surface, #fff)", borderRadius: 12, width: "100%", maxWidth: 900, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>
+              <span style={{ fontWeight: 600 }}>📦 Reporte de Compras</span>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setShowPdfModal(false)} style={{ padding: "6px 14px", background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: 8, cursor: "pointer" }}>✕ Cerrar</button>
+              </div>
+            </div>
+            <div style={{ flex: 1, overflow: "auto" }}>
+              <PDFViewer pdfUrl={pdfUrl} pdfData={pdfData} fileName={`reporte-compras-${new Date().toISOString().slice(0, 10)}.pdf`} height="800px" />
+            </div>
+          </div>
+        </div>
+      )}
     </RoleGuard>
   );
 }

@@ -57,6 +57,7 @@ export default function QuoteGenerator({ onQuoteGenerated }: QuoteGeneratorProps
   const [error, setError] = useState<string | null>(null);
   const [generatedPdf, setGeneratedPdf] = useState<{
     pdfUrl: string;
+    pdfData: Uint8Array;
     fileName: string;
     size: number;
   } | null>(null);
@@ -151,8 +152,13 @@ export default function QuoteGenerator({ onQuoteGenerated }: QuoteGeneratorProps
         throw new Error('Failed to generate PDF');
       }
 
-      const data = await response.json();
-      setGeneratedPdf(data);
+      const blob = await response.blob();
+      const arrayBuffer = await blob.arrayBuffer();
+      const pdfData = new Uint8Array(arrayBuffer);
+      const fileName = `cotizacion-${opportunityQuoteId}-${Date.now()}.pdf`;
+      if (generatedPdf?.pdfUrl) window.URL.revokeObjectURL(generatedPdf.pdfUrl);
+      const pdfUrl = window.URL.createObjectURL(blob);
+      setGeneratedPdf({ pdfUrl, pdfData, fileName, size: blob.size });
       setStep(3);
       
       // Callback para refrescar lista si el padre lo proporciona
@@ -166,23 +172,14 @@ export default function QuoteGenerator({ onQuoteGenerated }: QuoteGeneratorProps
     }
   };
 
-  const downloadPdf = async () => {
+  const downloadPdf = () => {
     if (!generatedPdf) return;
-
-    try {
-      const response = await fetch(generatedPdf.pdfUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = generatedPdf.fileName;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (err) {
-      setError('Error downloading PDF: ' + (err instanceof Error ? err.message : 'Unknown'));
-    }
+    const a = document.createElement('a');
+    a.href = generatedPdf.pdfUrl;
+    a.download = generatedPdf.fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   return (
@@ -285,6 +282,7 @@ export default function QuoteGenerator({ onQuoteGenerated }: QuoteGeneratorProps
               {generatedPdf ? (
                 <PDFViewer 
                   pdfUrl={generatedPdf.pdfUrl} 
+                  pdfData={generatedPdf.pdfData}
                   fileName={generatedPdf.fileName}
                   height="700px"
                 />
@@ -314,6 +312,7 @@ export default function QuoteGenerator({ onQuoteGenerated }: QuoteGeneratorProps
             <div className={styles.pdfPreview}>
               <PDFViewer 
                 pdfUrl={generatedPdf.pdfUrl} 
+                pdfData={generatedPdf.pdfData}
                 fileName={generatedPdf.fileName}
                 height="500px"
               />

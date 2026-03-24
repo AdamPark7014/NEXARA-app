@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
+import ExcelDownloadModal from './ExcelDownloadModal';
 import styles from './VehicleTable.module.css';
 
 interface Vehicle {
@@ -44,6 +45,9 @@ const VehicleTable = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [isMobile, setIsMobile] = useState(false);
+  const [excelUrl, setExcelUrl] = useState<string | null>(null);
+  const [excelBlob, setExcelBlob] = useState<Blob | null>(null);
+  const [excelPreparing, setExcelPreparing] = useState(false);
   const MOBILE_BREAKPOINT = 1024;
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
@@ -56,6 +60,53 @@ const VehicleTable = () => {
     }
     return [];
   };
+
+  const closeExcelModal = () => {
+    if (excelUrl) {
+      window.URL.revokeObjectURL(excelUrl);
+    }
+    setExcelUrl(null);
+    setExcelBlob(null);
+  };
+
+  const handlePrepareExcelExport = async () => {
+    if (excelPreparing) return;
+    setExcelPreparing(true);
+    try {
+      const res = await fetch(buildApiUrl('export/vehicle'));
+      if (!res.ok) throw new Error('Error al exportar');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      if (excelUrl) {
+        window.URL.revokeObjectURL(excelUrl);
+      }
+      setExcelUrl(url);
+      setExcelBlob(blob);
+    } catch {
+      alert('Error al exportar');
+    } finally {
+      setExcelPreparing(false);
+    }
+  };
+
+  const handleDownloadExcel = () => {
+    if (!excelUrl) return;
+    const a = document.createElement('a');
+    a.href = excelUrl;
+    a.download = 'vehiculos.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    closeExcelModal();
+  };
+
+  useEffect(() => {
+    return () => {
+      if (excelUrl) {
+        window.URL.revokeObjectURL(excelUrl);
+      }
+    };
+  }, [excelUrl]);
 
 
   // Importar vehículos
@@ -399,25 +450,22 @@ const VehicleTable = () => {
           <>
             <button
               className="button-primary"
-              onClick={async () => {
-                const res = await fetch(buildApiUrl('export/vehicle'));
-                if (!res.ok) return alert('Error al exportar');
-                const blob = await res.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'vehiculos.xlsx';
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                window.URL.revokeObjectURL(url);
-              }}
+              onClick={handlePrepareExcelExport}
+              disabled={excelPreparing}
             >
-              Exportar Excel
+              {excelPreparing ? 'Preparando...' : 'Exportar Excel'}
             </button>
           </>
         )}
       </div>
+      <ExcelDownloadModal
+        isOpen={Boolean(excelUrl)}
+        fileName="vehiculos.xlsx"
+        excelBlob={excelBlob}
+        isPreparing={excelPreparing}
+        onClose={closeExcelModal}
+        onDownload={handleDownloadExcel}
+      />
       {importMsg && (
         <div className={importMsg.startsWith('Error') ? styles.importError : styles.importOk}>{importMsg}</div>
       )}

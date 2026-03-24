@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
+import ExcelDownloadModal from './ExcelDownloadModal';
 import styles from './EvidenceTable.module.css';
 
 interface Evidence {
@@ -41,6 +42,9 @@ const EvidenceTable: React.FC<{ mode?: 'admin' | 'user'; title?: string | null }
   const [responsable, setResponsable] = useState<string>('');
   const [page, setPage] = useState<number>(1);
   const [pageSize] = useState<number>(10);
+  const [excelUrl, setExcelUrl] = useState<string | null>(null);
+  const [excelBlob, setExcelBlob] = useState<Blob | null>(null);
+  const [excelPreparing, setExcelPreparing] = useState(false);
   const estatusList = ['Pendiente', 'Aprobada', 'Rechazada'];
   const calificacionOptions = ['Alta', 'Media', 'Baja'];
   const [reviewDrafts, setReviewDrafts] = useState<Record<number, { calificacion: string; observaciones: string }>>({});
@@ -61,6 +65,53 @@ const EvidenceTable: React.FC<{ mode?: 'admin' | 'user'; title?: string | null }
     if (!lat || !lng) return '';
     return `https://www.google.com/maps?q=${lat},${lng}`;
   };
+
+  const closeExcelModal = () => {
+    if (excelUrl) {
+      window.URL.revokeObjectURL(excelUrl);
+    }
+    setExcelUrl(null);
+    setExcelBlob(null);
+  };
+
+  const handlePrepareExcelExport = async () => {
+    if (excelPreparing) return;
+    setExcelPreparing(true);
+    try {
+      const res = await fetch(buildApiUrl('export/evidence'));
+      if (!res.ok) throw new Error('Error al exportar');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      if (excelUrl) {
+        window.URL.revokeObjectURL(excelUrl);
+      }
+      setExcelUrl(url);
+      setExcelBlob(blob);
+    } catch {
+      alert('Error al exportar');
+    } finally {
+      setExcelPreparing(false);
+    }
+  };
+
+  const handleDownloadExcel = () => {
+    if (!excelUrl) return;
+    const a = document.createElement('a');
+    a.href = excelUrl;
+    a.download = 'evidencias.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    closeExcelModal();
+  };
+
+  useEffect(() => {
+    return () => {
+      if (excelUrl) {
+        window.URL.revokeObjectURL(excelUrl);
+      }
+    };
+  }, [excelUrl]);
 
   // Filtrado
   const filtered = evidences.filter(evi =>
@@ -211,25 +262,22 @@ const EvidenceTable: React.FC<{ mode?: 'admin' | 'user'; title?: string | null }
           <>
             <button
               className="button-primary"
-              onClick={async () => {
-                const res = await fetch(buildApiUrl('export/evidence'));
-                if (!res.ok) return alert('Error al exportar');
-                const blob = await res.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'evidencias.xlsx';
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                window.URL.revokeObjectURL(url);
-              }}
+              onClick={handlePrepareExcelExport}
+              disabled={excelPreparing}
             >
-              Exportar Excel
+              {excelPreparing ? 'Preparando...' : 'Exportar Excel'}
             </button>
           </>
         )}
       </div>
+      <ExcelDownloadModal
+        isOpen={Boolean(excelUrl)}
+        fileName="evidencias.xlsx"
+        excelBlob={excelBlob}
+        isPreparing={excelPreparing}
+        onClose={closeExcelModal}
+        onDownload={handleDownloadExcel}
+      />
       {importMsg && <div className={importMsg.startsWith('Error') ? styles.feedbackError : styles.feedbackSuccess}>{importMsg}</div>}
       <div className={styles.tableWrapper}>
       <table className={`table ${styles.evidenceTable}`}>
