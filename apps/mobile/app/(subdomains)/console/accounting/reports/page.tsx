@@ -1,9 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
 import HelpTab from "@/components/HelpTab";
+
+const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false });
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
@@ -14,6 +17,10 @@ export default function FinancialReportsPage() {
   const [incomeStatement, setIncomeStatement] = useState<any>(null);
   const [balanceSheet, setBalanceSheet] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
+  const [showPdfModal, setShowPdfModal] = useState(false);
 
   useEffect(() => {
     if (!user?.token) return;
@@ -31,6 +38,36 @@ export default function FinancialReportsPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [user?.token]);
+
+  const handleViewPdf = async () => {
+    if (!user?.token) return;
+    setGeneratingPdf(true);
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+      const params = new URLSearchParams({ fromDate: monthAgo, toDate: today, asOfDate: today });
+      const res = await fetch(`${API_URL}/accounting/accounts/reports/pdf?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const arrayBuffer = await blob.arrayBuffer();
+        setPdfData(new Uint8Array(arrayBuffer));
+        if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+        setPdfUrl(URL.createObjectURL(blob));
+        setShowPdfModal(true);
+      }
+    } catch {}
+    finally { setGeneratingPdf(false); }
+  };
+
+  const handleDownloadPdf = () => {
+    if (!pdfUrl) return;
+    const a = document.createElement("a");
+    a.href = pdfUrl;
+    a.download = `reportes-financieros-${new Date().toISOString().slice(0, 10)}.pdf`;
+    a.click();
+  };
 
   const fmt = (n: number) => Number(n || 0).toLocaleString("es-MX", { minimumFractionDigits: 2 });
 
@@ -51,6 +88,9 @@ export default function FinancialReportsPage() {
         <div className="card" style={{ padding: 16 }}>
           <h1 style={{ color: "var(--primary)", marginBottom: 8 }}>📊 Reportes Financieros</h1>
           <p style={{ color: "var(--text-secondary)" }}>Balanza de comprobación, estado de resultados y balance general.</p>
+          <button onClick={handleViewPdf} disabled={generatingPdf || loading} style={{ marginTop: 12, padding: '8px 16px', borderRadius: 8, border: 'none', background: generatingPdf || loading ? '#999' : '#10b981', color: '#fff', fontWeight: 600, cursor: generatingPdf || loading ? 'not-allowed' : 'pointer' }}>
+            {generatingPdf ? 'Generando...' : '📄 Ver PDF'}
+          </button>
         </div>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -193,6 +233,29 @@ export default function FinancialReportsPage() {
           </div>
         )}
       </div>
+
+      {showPdfModal && pdfUrl && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={() => setShowPdfModal(false)}
+        >
+          <div
+            style={{ background: "var(--surface, #fff)", borderRadius: 12, width: "100%", maxWidth: 900, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>
+              <span style={{ fontWeight: 600 }}>📊 Reportes Financieros</span>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={handleDownloadPdf} style={{ padding: "6px 14px", background: "var(--primary)", color: "#fff", border: "none", borderRadius: 8, fontWeight: 600, cursor: "pointer" }}>📥 Descargar</button>
+                <button onClick={() => setShowPdfModal(false)} style={{ padding: "6px 14px", background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: 8, cursor: "pointer" }}>✕ Cerrar</button>
+              </div>
+            </div>
+            <div style={{ flex: 1, overflow: "auto" }}>
+              <PDFViewer pdfUrl={pdfUrl} pdfData={pdfData} fileName={`reportes-financieros-${new Date().toISOString().slice(0, 10)}.pdf`} height="800px" />
+            </div>
+          </div>
+        </div>
+      )}
     </RoleGuard>
   );
 }

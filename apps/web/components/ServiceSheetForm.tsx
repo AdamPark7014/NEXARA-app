@@ -32,6 +32,7 @@ export default function ServiceSheetForm() {
   });
   const [message, setMessage] = useState<string | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
   const [showPdfViewer, setShowPdfViewer] = useState(false);
   const pdfModalRef = useRef<HTMLDivElement | null>(null);
 
@@ -143,6 +144,9 @@ export default function ServiceSheetForm() {
       return;
     }
     const blob = await res.blob();
+    const arrayBuffer = await blob.arrayBuffer();
+    setPdfData(new Uint8Array(arrayBuffer));
+    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
     const url = URL.createObjectURL(blob);
     setPdfUrl(url);
     setShowPdfViewer(true);
@@ -369,6 +373,7 @@ export default function ServiceSheetForm() {
             <div className={styles.viewerWrap}>
               <PDFViewer 
                 pdfUrl={pdfUrl} 
+                pdfData={pdfData}
                 fileName={`hoja-servicio-${activityId}.pdf`}
                 height="calc(90vh - 80px)"
               />

@@ -1034,6 +1034,7 @@ export class VentasService {
       pdfUrl: quoteUrl,
       fileName: filename,
       size: pdfBuffer.length,
+      pdfBuffer,
     };
   }
 
@@ -2028,30 +2029,40 @@ export class VentasService {
   }
 
   async generateDynamicReportPdf(period: 'week' | 'month' | 'year', user?: any, includeVendorStats = false, logoUrl?: string) {
-    const metrics = await this.getMetricsByPeriod(period, user);
+    const end = new Date();
+    const start = new Date(end);
 
-    // Build summary for PDF payload
-    const periodLabel = period === 'week' ? 'Esta Semana' : period === 'month' ? 'Este Mes' : 'Este Año';
+    if (period === 'week') {
+      start.setDate(end.getDate() - 6);
+      start.setHours(0, 0, 0, 0);
+    } else if (period === 'month') {
+      start.setDate(1);
+      start.setHours(0, 0, 0, 0);
+    } else {
+      start.setMonth(0, 1);
+      start.setHours(0, 0, 0, 0);
+    }
+
+    const summary = await this.buildReportSummary(
+      {
+        start: start.toISOString(),
+        end: end.toISOString(),
+      },
+      user,
+    );
+
+    const topOpportunities = includeVendorStats
+      ? summary.topOpportunities
+      : summary.topOpportunities.slice(0, 4);
 
     const pdfBuffer = await generateSalesReportPdf({
       generatedAt: new Date(),
-      rangeLabel: periodLabel,
-      totals: {
-        leads: 0,
-        opportunities: metrics.opportunityCount,
-        won: metrics.projectCount,
-        lost: 0,
-        pipelineValue: metrics.pipelineValue,
-        expectedValue: metrics.totalRevenue,
-        projects: metrics.projectCount,
-        totalMargin: metrics.averageMargin,
-        quotes: 0,
-        clients: metrics.activeClients,
-      },
-      byStage: [],
-      byLeadSource: [],
-      marginByStatus: [],
-      topOpportunities: [],
+      rangeLabel: summary.rangeLabel,
+      totals: summary.totals,
+      byStage: summary.byStage,
+      byLeadSource: summary.byLeadSource,
+      marginByStatus: summary.marginByStatus,
+      topOpportunities,
       logoUrl,
     });
 

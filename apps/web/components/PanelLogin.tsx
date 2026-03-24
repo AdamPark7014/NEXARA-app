@@ -7,6 +7,7 @@ import { io, Socket } from "socket.io-client";
 import { useUser } from "./UserContext";
 import { hasPermission, PERMISSIONS } from "../lib/permissions";
 import { getDeviceIdentityHeaders } from "@/lib/device-identity";
+import { getAccessiblePanels, setActivePanel } from "@/lib/panel-routing";
 
 type PanelLoginProps = {
   redirectTo: string;
@@ -143,6 +144,18 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
       }
 
       setUser(userData);
+
+      const accessiblePanels = getAccessiblePanels(userData);
+      if (accessiblePanels.length === 1) {
+        setActivePanel(accessiblePanels[0].key);
+        router.replace(accessiblePanels[0].entryPath);
+        return;
+      }
+      if (accessiblePanels.length > 1) {
+        router.replace("/paneles");
+        return;
+      }
+
       router.replace(redirectTo);
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message);

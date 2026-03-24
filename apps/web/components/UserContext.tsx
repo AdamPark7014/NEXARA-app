@@ -20,6 +20,7 @@ interface UserContextType {
 	user: User | null;
 	setUser: (user: User | null) => void;
 	logout: () => void;
+	isContextReady: boolean;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -117,6 +118,7 @@ const safePersistUser = (user: User | null) => {
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
 	const [user, setUser] = useState<User | null>(null);
+	const [isContextReady, setIsContextReady] = useState(false);
 
 	useEffect(() => {
 		const storedUser = safeGetStoredUser();
@@ -127,6 +129,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 				setUser(storedUser);
 			}
 		}
+		setIsContextReady(true);
 	}, []);
 
 	useEffect(() => {
@@ -153,7 +156,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 	const logout = () => setUser(null);
 
 	return (
-		<UserContext.Provider value={{ user, setUser, logout }}>
+		<UserContext.Provider value={{ user, setUser, logout, isContextReady }}>
 			{children}
 		</UserContext.Provider>
 	);

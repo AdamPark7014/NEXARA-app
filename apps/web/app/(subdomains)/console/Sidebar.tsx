@@ -415,13 +415,6 @@ export default function Sidebar() {
         ))}
         <div className={styles.sidebarFooter}>
           <div className={styles.sidebarFooterActions}>
-            <Link
-              href="/paneles"
-              className={styles.menuLink}
-              onClick={closeMenu}
-            >
-              Cambiar panel
-            </Link>
             <button
               onClick={toggleDarkMode}
               className={styles.themeSwitcher}

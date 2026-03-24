@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { useUser } from "@/components/UserContext";
+import ExcelDownloadModal from "@/components/ExcelDownloadModal";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import styles from "./ContabilidadViaticTable.module.css";
 
@@ -44,6 +45,9 @@ const ContabilidadViaticTable = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [excelUrl, setExcelUrl] = useState<string | null>(null);
+  const [excelBlob, setExcelBlob] = useState<Blob | null>(null);
+  const [excelPreparing, setExcelPreparing] = useState(false);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 900);
@@ -99,6 +103,53 @@ const ContabilidadViaticTable = () => {
     const total = filtered.reduce((sum, item) => sum + (item.montoSolicitado || 0), 0);
     return { total, count: filtered.length };
   }, [filtered]);
+
+  const closeExcelModal = () => {
+    if (excelUrl) {
+      window.URL.revokeObjectURL(excelUrl);
+    }
+    setExcelUrl(null);
+    setExcelBlob(null);
+  };
+
+  const handlePrepareExcelExport = async () => {
+    if (excelPreparing) return;
+    setExcelPreparing(true);
+    try {
+      const res = await fetch(buildApiUrl("export/viatic"));
+      if (!res.ok) throw new Error("Error al exportar");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      if (excelUrl) {
+        window.URL.revokeObjectURL(excelUrl);
+      }
+      setExcelUrl(url);
+      setExcelBlob(blob);
+    } catch {
+      alert("Error al exportar");
+    } finally {
+      setExcelPreparing(false);
+    }
+  };
+
+  const handleDownloadExcel = () => {
+    if (!excelUrl) return;
+    const a = document.createElement("a");
+    a.href = excelUrl;
+    a.download = "viáticos.xlsx";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    closeExcelModal();
+  };
+
+  useEffect(() => {
+    return () => {
+      if (excelUrl) {
+        window.URL.revokeObjectURL(excelUrl);
+      }
+    };
+  }, [excelUrl]);
 
   const totalPages = Math.ceil(filtered.length / pageSize);
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -225,21 +276,10 @@ const ContabilidadViaticTable = () => {
           <div className={styles.actionGroup}>
             <button
               className={styles.primaryButton}
-              onClick={async () => {
-                const res = await fetch(buildApiUrl("export/viatic"));
-                if (!res.ok) return alert("Error al exportar");
-                const blob = await res.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = "viáticos.xlsx";
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                window.URL.revokeObjectURL(url);
-              }}
+              onClick={handlePrepareExcelExport}
+              disabled={excelPreparing}
             >
-              Exportar Excel
+              {excelPreparing ? "Preparando..." : "Exportar Excel"}
             </button>
           </div>
         )}
@@ -273,6 +313,14 @@ const ContabilidadViaticTable = () => {
         </select>
       </div>
 
+      <ExcelDownloadModal
+        isOpen={Boolean(excelUrl)}
+        fileName="viáticos.xlsx"
+        excelBlob={excelBlob}
+        isPreparing={excelPreparing}
+        onClose={closeExcelModal}
+        onDownload={handleDownloadExcel}
+      />
       {importMsg && (
         <div className={importMsg.startsWith("Error") ? styles.error : styles.success}>{importMsg}</div>
       )}

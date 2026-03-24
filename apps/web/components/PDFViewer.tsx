@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React from 'react';
 import dynamic from 'next/dynamic';
 import '@react-pdf-viewer/core/lib/styles/index.css';
 import styles from './PDFViewer.module.css';
@@ -17,17 +17,17 @@ const Viewer = dynamic(
 
 interface PDFViewerProps {
   pdfUrl: string;
+  pdfData?: Uint8Array | null;
   fileName?: string;
   height?: string;
 }
 
 export default function PDFViewer({
   pdfUrl,
+  pdfData,
   fileName = 'Documento.pdf',
   height = '600px',
 }: PDFViewerProps) {
-  const [error, setError] = useState<string | null>(null);
-
   const viewerHeightClass = {
     '400px': styles.viewerH400,
     '500px': styles.viewerH500,
@@ -76,11 +76,21 @@ export default function PDFViewer({
         </div>
       </div>
 
-      {error && <div className={styles.error}>{error}</div>}
-
       <div className={`${styles.viewer} ${viewerHeightClass}`}>
-        <Worker workerUrl="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js">
-          <Viewer fileUrl={pdfUrl} />
+        <Worker workerUrl="/pdf.worker.min.js">
+          <Viewer
+            fileUrl={pdfData || pdfUrl}
+            renderError={(error) => (
+              <div className={styles.error}>
+                No se pudo previsualizar el PDF: {error.message || 'error de visor'}
+                <div>
+                  <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
+                    Abrir PDF en una pestaña nueva
+                  </a>
+                </div>
+              </div>
+            )}
+          />
         </Worker>
       </div>
     </div>

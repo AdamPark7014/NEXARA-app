@@ -6,8 +6,10 @@ import {
   ParseIntPipe,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { VentasService } from './ventas.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
@@ -66,6 +68,7 @@ export class VentasCotizacionesController {
   async generateQuotePdf(
     @Body() body: { opportunityQuoteId: number; clientId: number; templateId?: number },
     @CurrentUser() user: any,
+    @Res() res: Response,
   ) {
     const result = await this.ventasService.generateQuotePdfDynamic(body.opportunityQuoteId, body.clientId, body.templateId, user);
     await this.ventasService.createAuditEvent({
@@ -75,6 +78,8 @@ export class VentasCotizacionesController {
       actorId: user?.id,
       metadata: { clientId: body.clientId, templateId: body.templateId || null },
     });
-    return result;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=${result.fileName}`);
+    res.end(result.pdfBuffer);
   }
 }

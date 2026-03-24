@@ -170,6 +170,14 @@ export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPay
       }
     };
 
+    const ensureSectionSpace = (minHeight: number) => {
+      if (doc.y + minHeight > pageHeight - 50) {
+        doc.addPage();
+        drawHeader();
+        doc.y = 140;
+      }
+    };
+
     // ── KPI summary box (2x2 grid) ─────────────────────────────────────────
     const drawKpiGrid = (y: number) => {
       const cardW = (contentWidth - 12) / 2;
@@ -214,6 +222,7 @@ export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPay
     doc.y = kpiGridY + kpiGridH + 18;
 
     // ── Ordenes de compra (siempre visible como seccion principal del reporte)
+    ensureSectionSpace(56);
     drawSectionTitle('Ordenes de compra');
 
     const ocCols = [
@@ -263,6 +272,7 @@ export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPay
 
     // ── Top Suppliers ──────────────────────────────────────────────────────
     if (payload.topSuppliers?.length > 0) {
+      ensureSectionSpace(80);
       drawSectionTitle('Top proveedores (por evaluacion)');
 
       const supplierCols = [
@@ -276,6 +286,7 @@ export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPay
 
       payload.topSuppliers.forEach((s, i) => {
         const rowH = 20;
+        ensureSpace(rowH + 4, supplierCols);
         const y = doc.y;
         doc.save();
         if (i % 2 === 0) doc.rect(margin, y - 4, contentWidth, rowH).fill(colors.softGray);
@@ -299,26 +310,23 @@ export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPay
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // REQUISICIONES
+    // REQUISICIONES (solo si hay datos)
     // ═══════════════════════════════════════════════════════════════════════
-    doc.addPage();
-    drawHeader();
-    doc.y = 140;
-
-    drawSectionTitle('Requisiciones de compra');
-
-    const reqCols = [
-      { label: '#', width: 36 },
-      { label: 'Titulo', width: 200 },
-      { label: 'Prioridad', width: 80 },
-      { label: 'Estatus', width: 100 },
-      { label: 'Fecha', width: 99 },
-    ];
-
-    drawTableHeader(doc.y, reqCols);
-    doc.y += 28;
-
     if (payload.requisitions?.length > 0) {
+      const reqCols = [
+        { label: '#', width: 36 },
+        { label: 'Titulo', width: 200 },
+        { label: 'Prioridad', width: 80 },
+        { label: 'Estatus', width: 100 },
+        { label: 'Fecha', width: 99 },
+      ];
+
+      ensureSectionSpace(80);
+
+      drawSectionTitle('Requisiciones de compra');
+      drawTableHeader(doc.y, reqCols);
+      doc.y += 28;
+
       payload.requisitions.forEach((req, i) => {
         const rowH = 20;
         ensureSpace(rowH + 4, reqCols);
@@ -352,8 +360,6 @@ export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPay
 
         doc.y = y + rowH;
       });
-    } else {
-      drawEmptyRow('No hay requisiciones de compra registradas en el periodo seleccionado.');
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -362,13 +368,20 @@ export const generateProcurementDashboardPdf = (payload: ProcurementDashboardPay
     const pageCount = (doc as any).bufferedPageRange().count;
     for (let i = 0; i < pageCount; i++) {
       doc.switchToPage(i);
+      const currentPageWidth = doc.page.width;
+      const currentPageHeight = doc.page.height;
+      const footerHeight = 28;
+      // Draw footer inside printable area to avoid auto page breaks.
+      const footerTop = currentPageHeight - doc.page.margins.bottom + 8;
       doc.save();
-      doc.rect(0, pageHeight - 28, pageWidth, 28).fill(colors.lightBlue);
+      doc.rect(0, footerTop, currentPageWidth, footerHeight).fill(colors.lightBlue);
       doc.restore();
       doc.fillColor(colors.muted).fontSize(8).font('Helvetica')
         .text(
           `NEXARA  |  Reporte de Compras  |  Pagina ${i + 1} de ${pageCount}  |  Generado: ${new Date().toLocaleString('es-MX')}`,
-          margin, pageHeight - 18, { width: contentWidth, align: 'center' },
+          margin,
+          footerTop + 10,
+          { width: currentPageWidth - margin * 2, align: 'center', lineBreak: false },
         );
     }
 

@@ -1,23 +1,23 @@
 "use client";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { useUser } from "@/components/UserContext";
 
 export default function PanelRootPage() {
   const params = useParams();
   const router = useRouter();
   const slug = params?.slug as string;
+  const { user, isContextReady } = useUser();
 
   useEffect(() => {
-    if (slug) {
-      // Redirigir automáticamente a /dashboard
-      router.replace('/dashboard');
+    if (!isContextReady) return;
+    if (!slug) return;
+    if (!user) {
+      router.replace("/login");
+      return;
     }
-  }, [slug, router]);
+    router.replace(`/${slug}/dashboard`);
+  }, [slug, router, user, isContextReady]);
 
-  return (
-    <div style={{ padding: '2rem', textAlign: 'center' }}>
-      <h1>Cargando panel {slug}...</h1>
-      <p>Redirigiendo al dashboard...</p>
-    </div>
-  );
+  return null;
 }
