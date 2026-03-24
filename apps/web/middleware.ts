@@ -229,6 +229,10 @@ export function middleware(request: NextRequest) {
   if (subdomain && SUBDOMAIN_MAP[subdomain]) {
     const internalSlug = SUBDOMAIN_MAP[subdomain];
     const pathname = request.nextUrl.pathname;
+    const isAlreadyScopedPath = (() => {
+      const firstSegment = pathname.split('/').filter(Boolean)[0]?.toLowerCase();
+      return firstSegment === internalSlug;
+    })();
 
     if (
       pathname.startsWith('/_next/') ||
@@ -237,6 +241,13 @@ export function middleware(request: NextRequest) {
       pathname === '/socket.io' ||
       pathname.startsWith('/socket.io/')
     ) {
+      const response = applySecurityHeaders(NextResponse.next());
+      return applyNoStoreForHtml(request, response);
+    }
+
+    // Si la ruta ya está prefijada con el slug del subdominio actual,
+    // no la reescribimos para evitar /console/console/dashboard.
+    if (isAlreadyScopedPath) {
       const response = applySecurityHeaders(NextResponse.next());
       return applyNoStoreForHtml(request, response);
     }
