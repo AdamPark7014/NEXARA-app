@@ -2,9 +2,8 @@ import ProjectExpensesPage from './ProjectExpensesClient';
 
 export const dynamicParams = false;
 export async function generateStaticParams() {
-  // Return a placeholder so Next.js considers this route statically provided.
-  // Actual [id] values are resolved at runtime via useParams() during in-app navigation.
-  return [{ id: '__placeholder__' }];
+  // Project IDs are resolved at runtime via useParams(); no pre-rendered params are required.
+  return [];
 }
 
 export default function Page() {
