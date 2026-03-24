@@ -6,6 +6,7 @@ import {
   findServiceLanding,
   getProgrammaticLandings,
 } from "@/lib/seo/programmatic-landings";
+import { getPageKeywords, categoryFromSlug } from "@/lib/seo/keywords";
 
 type Params = {
   industry: string;
@@ -35,17 +36,22 @@ export function generateMetadata({ params }: { params: Params }): Metadata {
   }
 
   const path = `/soluciones/${industry.slug}/${service.slug}`;
-  const title = `${service.name} para ${industry.name} en Mexico | Nexara`;
-  const description = `${service.summary} Enfoque para ${industry.name.toLowerCase()} con resultados en continuidad, control y eficiencia operativa.`;
+  const title = `${service.name} en Puebla y Mexico | Nexara`;
+  const description = `${service.summary} Servicio profesional en Puebla, CDMX y toda la Republica Mexicana. Nexara — tecnologia confiable para tu empresa.`;
+
+  const category = categoryFromSlug(service.slug);
+  const pageKeywords = getPageKeywords(category, 'Puebla');
 
   return {
     title,
     description,
     keywords: [
+      ...pageKeywords,
       `${service.name} para ${industry.name}`,
-      `${service.name} en Mexico`,
+      `${service.name} Puebla`,
+      `${service.name} CDMX`,
+      `${service.name} Mexico`,
       `soluciones TI para ${industry.name}`,
-      "transformacion digital empresarial",
       "Nexara",
     ],
     alternates: {

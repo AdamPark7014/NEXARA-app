@@ -24,6 +24,26 @@ export const INDUSTRY_LANDINGS: IndustryLanding[] = [
     ],
   },
   {
+    slug: "seguridad-electronica",
+    name: "Seguridad electronica",
+    painPoint: "Instalaciones vulnerables, sin monitoreo en tiempo real ni registros de acceso confiables.",
+    outcomes: [
+      "Cobertura de videovigilancia completa en sitio",
+      "Acceso a grabaciones 24/7 desde cualquier dispositivo",
+      "Mayor disuasion y respuesta ante incidentes",
+    ],
+  },
+  {
+    slug: "pymes-y-startups",
+    name: "PyMEs y startups",
+    painPoint: "Operaciones limitadas por tecnologia desactualizada y sin soporte especializado.",
+    outcomes: [
+      "Infraestructura robusta desde el primer dia",
+      "Soporte tecnico claro y sin sorpresas",
+      "Escalabilidad tecnologica para crecer sin friccion",
+    ],
+  },
+  {
     slug: "logistica",
     name: "Logistica y distribucion",
     painPoint: "Entregas tardias, visibilidad limitada y costos de operacion variables.",
@@ -84,6 +104,46 @@ export const SERVICE_LANDINGS: ServiceLanding[] = [
       "Mapa de procesos por area",
       "Implementacion por fases con KPI",
       "Tableros de control para direccion",
+    ],
+  },
+  {
+    slug: "camaras-cctv",
+    name: "Camaras CCTV e IP",
+    summary: "Diseno, instalacion y puesta en marcha de sistemas de videovigilancia IP y analogica HD para empresas.",
+    deliverables: [
+      "Estudio de sitio y plano de cobertura",
+      "Instalacion de camaras IP/HD interior y exterior",
+      "Configuracion de NVR/DVR y acceso remoto 24/7",
+    ],
+  },
+  {
+    slug: "equipo-de-computo",
+    name: "Equipo de computo",
+    summary: "Venta, renta, mantenimiento y soporte de equipo de computo para empresas y oficinas.",
+    deliverables: [
+      "Diagnostico de parque tecnologico actual",
+      "Propuesta de renovacion o renta de equipos",
+      "Mantenimiento preventivo y correctivo programado",
+    ],
+  },
+  {
+    slug: "redes-y-conectividad",
+    name: "Redes y WiFi empresarial",
+    summary: "Diseno e instalacion de infraestructura de red: cableado estructurado, WiFi y conectividad WAN.",
+    deliverables: [
+      "Plano de distribucion de red y sitio survey",
+      "Instalacion de cableado Cat6/Cat6A y equipos activos",
+      "Configuracion, pruebas de rendimiento y entrega documentada",
+    ],
+  },
+  {
+    slug: "soporte-ti-pyme",
+    name: "Soporte TI para PyMEs",
+    summary: "Mesa de ayuda, soporte en sitio y gestion de activos tecnologicos para pequenas y medianas empresas.",
+    deliverables: [
+      "Catalogo de servicios y SLA definidos",
+      "Atencion remota y visitas programadas en sitio",
+      "Reportes mensuales de estado tecnologico",
     ],
   },
   {

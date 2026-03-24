@@ -1,8 +1,9 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import PanelLogin from "@/components/PanelLogin";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
+import BranchesForm from "@/components/BranchesForm";
 import TicketsInventoryManager from "@/components/TicketsInventoryManager";
 import { useTheme } from "@/components/ThemeContext";
 import consoleStyles from "../console/console.module.css";
@@ -62,6 +63,8 @@ type Branch = {
   latitud?: number | null;
   longitud?: number | null;
   portalEmail?: string | null;
+  logoUrl?: string | null;
+  isActive?: boolean;
 };
 
 type TicketRequest = {
@@ -235,6 +238,11 @@ export default function ClientTicketsPage() {
       country: data.country || "",
     });
   };
+
+  const handleBranchSaved = useCallback(() => {
+    if (!session?.token) return;
+    fetchProfile(session.token);
+  }, [session?.token]);
 
   const fetchRequests = async (token: string) => {
     const res = await fetch(buildApiUrl("client-portal/requests"), {
@@ -660,13 +668,16 @@ export default function ClientTicketsPage() {
             </button>
           </li>
           <li className={consoleStyles.sidebarMenuItem}>
-            <a
-              href="mis-sucursales"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
-              onClick={() => setMobileMenuOpen(false)}
+            <button
+              type="button"
+              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "perfil" ? consoleStyles.active : ""}`}
+              onClick={() => {
+                setActiveTab("perfil");
+                setMobileMenuOpen(false);
+              }}
             >
               🏬 Gestión de sucursales
-            </a>
+            </button>
           </li>
         </ul>
 
@@ -1169,11 +1180,18 @@ export default function ClientTicketsPage() {
               <div className={`card ${styles.cardSoft}`}>
                 <p className={styles.sectionTitle}>Gestión de sucursales</p>
                 <p className={styles.mutedText} style={{ margin: 0 }}>
-                  Para crear, editar o eliminar sucursales y configurar su logo, dirígete a la sección Mis sucursales en el menú.
+                  Administra aquí mismo tus sucursales, logos y credenciales de acceso.
                 </p>
-                <a href="mis-sucursales" className={`button-primary ${styles.linkCta}`}>
-                  Ir a Mis Sucursales
-                </a>
+                {session?.token && (
+                  <BranchesForm
+                    token={session.token}
+                    branches={branches}
+                    onBranchSaved={handleBranchSaved}
+                    clientLogoUrl={profile?.logoUrl || session.client.logoUrl || null}
+                    companyLogoUrl={profile?.logoUrl || null}
+                    apiUrl={API_URL}
+                  />
+                )}
               </div>
             </div>
           )}

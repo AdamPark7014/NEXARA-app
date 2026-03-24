@@ -61,3 +61,70 @@
   border-color: rgba(80, 170, 255, 0.65);
   color: #ecf7ff;
 }
+
+/* Homologa colores de tickets al tema global (light/dark) */
+.ticketsConsole,
+:global(body.light) .ticketsConsole,
+:global(body.dark) .ticketsConsole {
+  background: var(--background, transparent) !important;
+}
+
+.ticketsConsole :global(.card),
+.panelHero,
+.cardPanel,
+.cardSoft,
+.itemCard,
+.panelTabs,
+.panelKpi,
+.companyBox,
+.dropzone,
+.gradientHeader,
+.mediaTile,
+.panelTab,
+.ticketsConsole :global(.button-secondary),
+.ticketsConsole :global(.input),
+.ticketsConsole :global(input),
+.ticketsConsole :global(select),
+.ticketsConsole :global(textarea) {
+  background: var(--card-bg, transparent) !important;
+  border-color: var(--border-color, currentColor) !important;
+}
+
+.ticketsConsole :global(.input),
+.ticketsConsole :global(input),
+.ticketsConsole :global(select),
+.ticketsConsole :global(textarea),
+.panelTab,
+.ticketsConsole :global(.badge),
+.sectionTitle,
+.panelHeroTitle,
+.panelKpiValue,
+.authTitle {
+  color: var(--foreground, inherit) !important;
+}
+
+.sectionSubtitle,
+.panelHeroMeta,
+.mutedText,
+.metaGrid,
+.panelKpiLabel,
+.authLead,
+.authEyebrow,
+.ticketsConsole :global(input::placeholder),
+.ticketsConsole :global(textarea::placeholder) {
+  color: var(--text-secondary, inherit) !important;
+}
+
+.panelTabActive,
+.ticketsConsole :global(.input:focus),
+.ticketsConsole :global(input:focus),
+.ticketsConsole :global(select:focus),
+.ticketsConsole :global(textarea:focus) {
+  border-color: var(--primary, currentColor) !important;
+  color: var(--primary, inherit) !important;
+}
+
+.linkCta {
+  color: #ffffff !important;
+  font-weight: 700;
+}
