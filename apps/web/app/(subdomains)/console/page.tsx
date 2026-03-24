@@ -16,7 +16,10 @@ export default function ConsolePanel() {
       return;
     }
     setActivePanel("console");
-    router.replace("/console/dashboard");
+
+    const hostname = typeof window !== "undefined" ? window.location.hostname.toLowerCase() : "";
+    const isConsoleSubdomain = hostname.startsWith("consola.") || hostname.startsWith("console.");
+    router.replace(isConsoleSubdomain ? "/dashboard" : "/console/dashboard");
   }, [router, user, isContextReady]);
   return null;
 }
