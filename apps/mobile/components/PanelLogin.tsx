@@ -7,6 +7,7 @@ import { io, Socket } from "socket.io-client";
 import { useUser } from "./UserContext";
 import { hasPermission, PERMISSIONS } from "../lib/permissions";
 import { getDeviceIdentityHeaders } from "@/lib/device-identity";
+import { getApiBase, getSocketBaseUrl } from "@/lib/api-base";
 import { getAccessiblePanels, setActivePanel } from "@/lib/panel-routing";
 
 type PanelLoginProps = {
@@ -26,7 +27,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
   const router = useRouter();
 
   useEffect(() => {
-    const socketUrl = (process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['websocket', 'polling'] });
 
     let clearErrorTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -56,7 +57,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
     setIsLoading(true);
     try {
       const deviceHeaders = await getDeviceIdentityHeaders();
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+      const API_URL = getApiBase();
       const endpoint = `${API_URL}/auth/login`;
       const res = await fetch(endpoint, {
         method: "POST",
