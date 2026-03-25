@@ -66,8 +66,16 @@ const buildDefaultAllowedHostPatterns = (): RegExp[] => {
   ];
 };
 
-const buildCsp = () => {
+const DIRECT_IP_HOST_PATTERN = /^\d{1,3}(?:\.\d{1,3}){3}$/;
+
+const isDirectIpHost = (host: string) => {
+  return DIRECT_IP_HOST_PATTERN.test(host) || DEFAULT_ALLOWED_IP_HOSTS.includes(host);
+};
+
+const buildCsp = (hostname?: string) => {
   const isDev = process.env.NODE_ENV !== 'production';
+  const hostWithoutPort = (hostname || '').split(':')[0].trim().toLowerCase();
+  const shouldAllowHttpHost = hostWithoutPort !== '' && isDirectIpHost(hostWithoutPort);
   
   // Permitir scripts de servicios externos con API keys
   const externalScriptSources = [
@@ -92,23 +100,35 @@ const buildCsp = () => {
     'https://api.stripe.com',
   ].join(' ');
 
-  return [
+  const directHostConnectSources = shouldAllowHttpHost
+    ? `http://${hostWithoutPort}:* ws://${hostWithoutPort}:*`
+    : '';
+
+  const cspDirectives = [
     "default-src 'self'",
     `script-src ${scriptSrc}`,
     "style-src 'self' 'unsafe-inline' https:",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data: https:",
-    `connect-src 'self' https: wss: http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:* http://*.localhost:* ws://*.localhost:* wss://*.localhost:* ${externalConnectSources}`,
+    `connect-src 'self' https: wss: http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:* http://*.localhost:* ws://*.localhost:* wss://*.localhost:* ${directHostConnectSources} ${externalConnectSources}`,
     "media-src 'self' blob: https:",
     "object-src 'none'",
     "base-uri 'self'",
     "frame-ancestors 'none'",
     "form-action 'self'",
-    'upgrade-insecure-requests',
-  ].join('; ');
+  ];
+
+  if (!shouldAllowHttpHost) {
+    cspDirectives.push('upgrade-insecure-requests');
+  }
+
+  return cspDirectives.join('; ');
 };
 
-const applySecurityHeaders = (response: NextResponse) => {
+const applySecurityHeaders = (response: NextResponse, request?: NextRequest) => {
+  const hostname = request?.headers.get('host')?.trim().toLowerCase();
+  const hostWithoutPort = (hostname || '').split(':')[0];
+  const shouldAllowHttpHost = hostWithoutPort !== '' && isDirectIpHost(hostWithoutPort);
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -119,8 +139,10 @@ const applySecurityHeaders = (response: NextResponse) => {
   response.headers.set('Cross-Origin-Resource-Policy', 'same-site');
   response.headers.set('Cross-Origin-Embedder-Policy', 'credentialless');
   response.headers.set('Origin-Agent-Cluster', '?1');
-  response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
-  response.headers.set('Content-Security-Policy', buildCsp());
+  if (!shouldAllowHttpHost) {
+    response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  }
+  response.headers.set('Content-Security-Policy', buildCsp(hostname));
   return response;
 };
 
@@ -139,8 +161,8 @@ const applyNoStoreForHtml = (request: NextRequest, response: NextResponse) => {
   return response;
 };
 
-const rejectWithSecurityHeaders = (message: string, status: number) => {
-  return applySecurityHeaders(new NextResponse(message, { status }));
+const rejectWithSecurityHeaders = (message: string, status: number, request?: NextRequest) => {
+  return applySecurityHeaders(new NextResponse(message, { status }), request);
 };
 
 const getAllowedHostPatterns = (): RegExp[] => {
@@ -167,44 +189,44 @@ const isAllowedHost = (host: string) => {
 
 export function middleware(request: NextRequest) {
   if (!DEFAULT_ALLOWED_METHODS.has(request.method.toUpperCase())) {
-    return rejectWithSecurityHeaders('Método no permitido', 405);
+    return rejectWithSecurityHeaders('Método no permitido', 405, request);
   }
 
   const userAgent = request.headers.get('user-agent') || '';
   if (MALICIOUS_USER_AGENT_PATTERN.test(userAgent)) {
-    return rejectWithSecurityHeaders('Cliente no permitido', 403);
+    return rejectWithSecurityHeaders('Cliente no permitido', 403, request);
   }
 
   const pathnameWithQuery = `${request.nextUrl.pathname}${request.nextUrl.search || ''}`;
   if (HONEYPOT_PATH_PATTERN.test(request.nextUrl.pathname)) {
-    return rejectWithSecurityHeaders('Not found', 404);
+    return rejectWithSecurityHeaders('Not found', 404, request);
   }
 
   if (SUSPICIOUS_PATH_PATTERN.test(pathnameWithQuery)) {
-    return rejectWithSecurityHeaders('Ruta inválida', 400);
+    return rejectWithSecurityHeaders('Ruta inválida', 400, request);
   }
 
   const queryString = request.nextUrl.searchParams.toString();
   if (SUSPICIOUS_QUERY_PATTERN.test(queryString)) {
-    return rejectWithSecurityHeaders('Query inválida', 400);
+    return rejectWithSecurityHeaders('Query inválida', 400, request);
   }
 
   const mutatingMethod = request.method === 'POST' || request.method === 'PUT' || request.method === 'PATCH' || request.method === 'DELETE';
   if (mutatingMethod) {
     const fetchSite = request.headers.get('sec-fetch-site');
     if (fetchSite && !['same-origin', 'same-site', 'none'].includes(fetchSite.toLowerCase())) {
-      return rejectWithSecurityHeaders('Cross-site request bloqueada', 403);
+      return rejectWithSecurityHeaders('Cross-site request bloqueada', 403, request);
     }
   }
 
   const hostname = request.headers.get('host')?.trim().toLowerCase();
   
   if (!hostname) {
-    return applySecurityHeaders(NextResponse.next());
+    return applySecurityHeaders(NextResponse.next(), request);
   }
 
   if (!isAllowedHost(hostname)) {
-    return rejectWithSecurityHeaders('Host no permitido', 400);
+    return rejectWithSecurityHeaders('Host no permitido', 400, request);
   }
 
   const hostWithoutPort = hostname.split(':')[0];
@@ -214,7 +236,7 @@ export function middleware(request: NextRequest) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = '/login';
     loginUrl.search = '';
-    const response = applySecurityHeaders(NextResponse.redirect(loginUrl));
+    const response = applySecurityHeaders(NextResponse.redirect(loginUrl), request);
     return applyNoStoreForHtml(request, response);
   }
 
@@ -256,14 +278,14 @@ export function middleware(request: NextRequest) {
       pathname === '/socket.io' ||
       pathname.startsWith('/socket.io/')
     ) {
-      const response = applySecurityHeaders(NextResponse.next());
+      const response = applySecurityHeaders(NextResponse.next(), request);
       return applyNoStoreForHtml(request, response);
     }
     
     // NO reescribir archivos estáticos (imágenes, fuentes, etc.)
     // Permitir que Next.js los sirva directamente desde /public
     if (STATIC_FILE_EXTENSIONS.test(pathname)) {
-      const response = applySecurityHeaders(NextResponse.next());
+      const response = applySecurityHeaders(NextResponse.next(), request);
       return applyNoStoreForHtml(request, response);
     }
     
@@ -275,7 +297,7 @@ export function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = rewritePath;
     
-    const response = applySecurityHeaders(NextResponse.rewrite(url));
+    const response = applySecurityHeaders(NextResponse.rewrite(url), request);
     return applyNoStoreForHtml(request, response);
   }
 
@@ -295,12 +317,12 @@ export function middleware(request: NextRequest) {
 
     const rewritten = request.nextUrl.clone();
     rewritten.pathname = targetPath;
-    const response = applySecurityHeaders(NextResponse.rewrite(rewritten));
+    const response = applySecurityHeaders(NextResponse.rewrite(rewritten), request);
     return applyNoStoreForHtml(request, response);
   }
 
   // Dominio principal o www: mantener como está, Next.js maneja normalmente
-  const response = applyNoStoreForHtml(request, applySecurityHeaders(NextResponse.next()));
+  const response = applyNoStoreForHtml(request, applySecurityHeaders(NextResponse.next(), request));
   if (SENSITIVE_PATH_PATTERN.test(request.nextUrl.pathname)) {
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
     response.headers.set('Pragma', 'no-cache');
