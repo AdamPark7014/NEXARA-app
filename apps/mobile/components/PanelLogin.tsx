@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { io, Socket } from "socket.io-client";
 import { useUser } from "./UserContext";
 import { hasPermission, PERMISSIONS } from "../lib/permissions";
@@ -23,6 +22,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [brandLogoSrc, setBrandLogoSrc] = useState('/logo-nexara.png');
   const { setUser } = useUser();
   const router = useRouter();
 
@@ -444,7 +444,14 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
         <div className="login-card">
           <div className="logo-container">
             <div className="logo">
-              <Image src="/logo-nexara.png" alt="Nexara" width={64} height={64} className="logoImage" priority />
+              <img
+                src={brandLogoSrc}
+                alt="Nexara"
+                width={64}
+                height={64}
+                className="logoImage"
+                onError={() => setBrandLogoSrc('/icon.png')}
+              />
             </div>
             <p className="brandName">Nexara</p>
             <h1 className="title">{title || "Iniciar sesión"}</h1>
