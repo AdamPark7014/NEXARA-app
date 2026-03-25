@@ -13,11 +13,13 @@ type ConnectionEntry = {
 };
 
 const DEFAULT_ALLOWED_SUBDOMAINS = ['consola', 'console', 'ventas', 'web', 'contabilidad', 'tickets', 'mobile'];
+const DEFAULT_ALLOWED_IP_HOSTS = ['138.197.42.104', '10.17.0.5'];
 const DEFAULT_ALLOWED_HOST_PATTERNS: RegExp[] = [
   /^localhost(?::\d+)?$/i,
   /^127\.0\.0\.1(?::\d+)?$/i,
   /^nexara\.com\.mx(?::\d+)?$/i,
   /^www\.nexara\.com\.mx(?::\d+)?$/i,
+  ...DEFAULT_ALLOWED_IP_HOSTS.map((host) => new RegExp(`^${escapeRegex(host)}(?::\\d+)?$`, 'i')),
   /^[a-z0-9-]+\.localhost(?::\d+)?$/i,
   /^[a-z0-9-]+\.nexara\.local(?::\d+)?$/i,
   /^[a-z0-9-]+\.nexara\.com\.mx(?::\d+)?$/i,
@@ -47,7 +49,12 @@ const PARSED_ALLOWED_SUBDOMAINS = (() => {
 const PARSED_CORS_ORIGINS = (() => {
   const corsEnv = process.env['CORS_ORIGIN'];
   if (!corsEnv) {
-    return ['http://localhost:3000', 'http://127.0.0.1:3000'];
+    return [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://138.197.42.104:3002',
+      'http://10.17.0.5:3002',
+    ];
   }
 
   return corsEnv
@@ -97,6 +104,15 @@ export const isOriginAllowed = (origin?: string | null): boolean => {
 
   const corsOrigins = getConfiguredCorsOrigins();
   if (corsOrigins.includes(origin)) {
+    return true;
+  }
+
+  const directIpOriginAllowed = DEFAULT_ALLOWED_IP_HOSTS.some((ipHost) => {
+    const pattern = new RegExp(`^https?:\\/\\/${escapeRegex(ipHost)}(?::\\d+)?$`, 'i');
+    return pattern.test(origin);
+  });
+
+  if (directIpOriginAllowed) {
     return true;
   }
 
