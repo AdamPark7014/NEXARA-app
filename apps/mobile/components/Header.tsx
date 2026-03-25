@@ -136,11 +136,9 @@ export default function Header() {
 
   useEffect(() => {
     if (!mobileMenuOpen) {
-      document.body.style.overflow = '';
       return;
     }
 
-    document.body.style.overflow = 'hidden';
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setMobileMenuOpen(false);
@@ -149,7 +147,6 @@ export default function Header() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.body.style.overflow = '';
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [mobileMenuOpen]);

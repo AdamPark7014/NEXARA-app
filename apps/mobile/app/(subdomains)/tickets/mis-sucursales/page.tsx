@@ -100,10 +100,6 @@ export default function MyBranchesPage() {
       setMobileMenuOpen(false);
       return;
     }
-    document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
   }, [isMobile, mobileMenuOpen]);
 
   const fetchProfile = async (token: string) => {

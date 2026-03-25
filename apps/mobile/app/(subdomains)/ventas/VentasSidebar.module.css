@@ -435,6 +435,9 @@
     right: 8px;
     max-height: calc(100dvh - 72px);
     overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    touch-action: auto;
     z-index: 12002;
     border-radius: var(--radius-md);
     border: 1px solid var(--border);

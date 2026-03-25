@@ -293,6 +293,8 @@
 		max-height: calc(100dvh - var(--public-header-height) - 16px);
 		overflow-y: auto;
 		-webkit-overflow-scrolling: touch;
+		overscroll-behavior-y: contain;
+		touch-action: auto;
 	}
 }
 

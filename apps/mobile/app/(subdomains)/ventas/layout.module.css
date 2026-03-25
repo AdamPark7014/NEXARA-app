@@ -10,7 +10,9 @@
 .salesMain {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
   padding: var(--panel-padding-y) var(--panel-padding-x);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
@@ -149,6 +151,7 @@
     border-radius: 0;
     border-left: 0;
     border-right: 0;
+    overflow-y: visible;
     padding: 14px 12px 16px;
   }
 

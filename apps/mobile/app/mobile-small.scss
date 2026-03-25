@@ -18,7 +18,10 @@
 
   body {
     overflow-x: hidden;
-    overscroll-behavior-y: contain;
+    overflow-y: auto;
+    overscroll-behavior-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: auto;
   }
 
   table {

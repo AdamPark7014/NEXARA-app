@@ -53,6 +53,7 @@ body {
   min-height: 100%;
   max-width: 100%;
   overflow-x: hidden;
+  overflow-y: auto;
 }
 
 html {
@@ -237,6 +238,8 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-overflow-scrolling: touch;
+  touch-action: auto;
   background:
     radial-gradient(circle at 8% -10%, rgba(121, 216, 206, 0.1), transparent 42%),
     radial-gradient(circle at 94% -10%, rgba(67, 184, 171, 0.08), transparent 40%),
@@ -524,6 +527,7 @@ textarea:disabled {
 
   body {
     line-height: 1.5;
+    overscroll-behavior-y: auto;
   }
 
   :where(main, section, article) {
@@ -563,6 +567,11 @@ textarea:disabled {
     min-height: 0;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
+    touch-action: auto;
+  }
+
+  :where(.mobileMenu, [class*="mobileMenu"], .sidebarContent, [class*="sidebarContent"], [class*="menuContent"], [class*="drawerContent"], [class*="panelContent"]) {
+    touch-action: auto;
   }
 
   :where(.card, [class*="card"], [class*="Card"]) {
