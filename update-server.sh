@@ -95,15 +95,13 @@ cp /tmp/nexara-backup/.env.api apps/api/.env 2>/dev/null || echo "⚠️  No se 
 cp /tmp/nexara-backup/.env.web apps/web/.env.local 2>/dev/null || echo "⚠️  No se pudo restaurar apps/web/.env.local"
 cp /tmp/nexara-backup/.env.mobile apps/mobile/.env.local 2>/dev/null || echo "⚠️  No se pudo restaurar apps/mobile/.env.local"
 
-if [ ! -f apps/mobile/.env.local ]; then
-  echo "📝 Creando apps/mobile/.env.local por defecto para entorno productivo..."
-  cat > apps/mobile/.env.local <<EOF
-NEXT_PUBLIC_API_URL=http://${PUBLIC_HOST}:${API_PORT}/api
-NEXT_PUBLIC_SOCKET_URL=http://${PUBLIC_HOST}:${API_PORT}
+echo "📝 Asegurando apps/mobile/.env.local para entorno productivo (same-origin API)..."
+cat > apps/mobile/.env.local <<EOF
+NEXT_PUBLIC_API_URL=http://${PUBLIC_HOST}:${MOBILE_PORT}/api
+NEXT_PUBLIC_SOCKET_URL=http://${PUBLIC_HOST}:${MOBILE_PORT}
 NEXT_PUBLIC_BASE_URL=http://${PUBLIC_HOST}:${MOBILE_PORT}
-NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API=true
+NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API=false
 EOF
-fi
 
 # Verificar que DATABASE_URL existe
 if ! grep -q "DATABASE_URL" apps/api/.env 2>/dev/null; then
