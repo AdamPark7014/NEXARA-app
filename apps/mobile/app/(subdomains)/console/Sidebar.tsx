@@ -50,10 +50,7 @@ export default function Sidebar() {
 
   useEffect(() => {
     if (!isMobile) return;
-    document.body.style.overflow = isMenuOpen ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
+    if (!isMenuOpen) return;
   }, [isMenuOpen, isMobile]);
 
   const toggleMenu = () => {

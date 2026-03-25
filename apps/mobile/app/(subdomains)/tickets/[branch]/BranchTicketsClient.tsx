@@ -165,10 +165,6 @@ export default function BranchTicketsPage() {
       setMobileMenuOpen(false);
       return;
     }
-    document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
   }, [isMobile, mobileMenuOpen]);
 
   useEffect(() => {

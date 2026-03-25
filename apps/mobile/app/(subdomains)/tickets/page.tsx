@@ -233,10 +233,6 @@ export default function ClientTicketsPage() {
       setMobileMenuOpen(false);
       return;
     }
-    document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
   }, [isMobile, mobileMenuOpen]);
 
   useEffect(() => {

@@ -640,6 +640,8 @@
 		overflow-x: hidden;
 		overflow: auto;
 		overscroll-behavior: contain;
+		-webkit-overflow-scrolling: touch;
+		touch-action: auto;
 		opacity: 0;
 		visibility: hidden;
 		transform: translateY(-8px) scale(0.99);

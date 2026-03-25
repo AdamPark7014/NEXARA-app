@@ -61,10 +61,7 @@ export default function VentasSidebar() {
 
   useEffect(() => {
     if (!isMobile) return;
-    document.body.style.overflow = isMenuOpen ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
+    if (!isMenuOpen) return;
   }, [isMenuOpen, isMobile]);
 
   useEffect(() => {

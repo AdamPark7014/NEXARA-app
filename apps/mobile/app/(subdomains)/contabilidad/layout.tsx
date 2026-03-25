@@ -106,12 +106,9 @@ export default function ContabilidadLayout({ children }: { children: React.React
 
   useEffect(() => {
     if (!isMobile) {
+      setMobileMenuOpen(false);
       return;
     }
-    document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
   }, [mobileMenuOpen, isMobile]);
 
   useEffect(() => {
