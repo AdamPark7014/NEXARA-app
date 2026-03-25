@@ -30,6 +30,10 @@ const MALICIOUS_USER_AGENT_PATTERN = /sqlmap|nikto|acunetix|dirbuster|wpscan|mas
 const SENSITIVE_PATH_PATTERN = /\/(auth|login|signin|reset-password|api\/auth)\b/i;
 const HONEYPOT_PATH_PATTERN = /\/(wp-admin|wp-login|phpmyadmin|\.git|\.env|\.aws|server-status|\.well-known\/acme-challenge(?!\/))/i;
 const STATIC_FILE_EXTENSIONS = /\.(png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot|css|js|json)$/i;
+const DEFAULT_ALLOWED_IP_HOSTS = [
+  '138.197.42.104',
+  '10.17.0.5',
+];
 
 const getAllowedSubdomains = (): string[] => {
   const envSubdomains = process.env.ALLOWED_SUBDOMAINS;
@@ -48,12 +52,14 @@ const getAllowedSubdomains = (): string[] => {
 const buildDefaultAllowedHostPatterns = (): RegExp[] => {
   const allowedSubdomains = getAllowedSubdomains().map((subdomain) => subdomain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   const subdomainAlternation = allowedSubdomains.join('|');
+  const allowedIpHosts = DEFAULT_ALLOWED_IP_HOSTS.map((host) => host.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
 
   return [
     /^localhost(?::\d+)?$/i,
     /^127\.0\.0\.1(?::\d+)?$/i,
     /^nexara\.com\.mx(?::\d+)?$/i,
     /^www\.nexara\.com\.mx(?::\d+)?$/i,
+    ...allowedIpHosts.map((host) => new RegExp(`^${host}(?::\\d+)?$`, 'i')),
     new RegExp(`^(${subdomainAlternation})\\.localhost(?::\\d+)?$`, 'i'),
     new RegExp(`^(${subdomainAlternation})\\.nexara\\.com\\.mx(?::\\d+)?$`, 'i'),
     new RegExp(`^(${subdomainAlternation})\\.nexara\\.local(?::\\d+)?$`, 'i'),
