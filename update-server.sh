@@ -9,6 +9,7 @@ PROJECT_DIR="/var/www/nexara-app"
 API_PORT="${API_PORT:-3001}"
 WEB_PORT="${WEB_PORT:-3000}"
 MOBILE_PORT="${MOBILE_PORT:-3002}"
+PUBLIC_HOST="${PUBLIC_HOST:-138.197.42.104}"
 MOBILE_APP_URL="${MOBILE_APP_URL:-http://138.197.42.104:3002}"
 SKIP_CAP_SYNC="${SKIP_CAP_SYNC:-0}"
 HEALTHCHECK_RETRIES="${HEALTHCHECK_RETRIES:-30}"
@@ -93,6 +94,16 @@ echo "📂 Restaurando archivos .env..."
 cp /tmp/nexara-backup/.env.api apps/api/.env 2>/dev/null || echo "⚠️  No se pudo restaurar apps/api/.env"
 cp /tmp/nexara-backup/.env.web apps/web/.env.local 2>/dev/null || echo "⚠️  No se pudo restaurar apps/web/.env.local"
 cp /tmp/nexara-backup/.env.mobile apps/mobile/.env.local 2>/dev/null || echo "⚠️  No se pudo restaurar apps/mobile/.env.local"
+
+if [ ! -f apps/mobile/.env.local ]; then
+  echo "📝 Creando apps/mobile/.env.local por defecto para entorno productivo..."
+  cat > apps/mobile/.env.local <<EOF
+NEXT_PUBLIC_API_URL=http://${PUBLIC_HOST}:${API_PORT}/api
+NEXT_PUBLIC_SOCKET_URL=http://${PUBLIC_HOST}:${API_PORT}
+NEXT_PUBLIC_BASE_URL=http://${PUBLIC_HOST}:${MOBILE_PORT}
+NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API=true
+EOF
+fi
 
 # Verificar que DATABASE_URL existe
 if ! grep -q "DATABASE_URL" apps/api/.env 2>/dev/null; then
