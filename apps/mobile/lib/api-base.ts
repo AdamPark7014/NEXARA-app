@@ -4,11 +4,15 @@ const ensureApiBase = (value: string) => {
   return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
 };
 
+const MOBILE_IP_API_HOST = '138.197.42.104';
+const MOBILE_APP_PORT = '3002';
+const MOBILE_API_PORT = '3001';
+
 const normalizeSocketOrigin = (baseUrl: string) => {
   try {
     const parsed = new URL(baseUrl);
     const host = parsed.hostname.toLowerCase();
-    if (host === 'nexara.com.mx' || host === 'www.nexara.com.mx') {
+    if (host === 'nexara.com.mx' || host === 'www.nexara.com.mx' || host === 'app.nexara.com.mx') {
       return `${parsed.protocol}//api.nexara.com.mx`;
     }
     return parsed.origin;
@@ -23,6 +27,8 @@ export const getApiBase = () => {
   if (typeof window !== "undefined" && window.location?.origin) {
     const originHost = window.location.hostname.toLowerCase();
     const currentOrigin = window.location.origin;
+    const currentPort = window.location.port;
+    const currentProtocol = window.location.protocol;
     const isLocalOrigin =
       originHost === "localhost" ||
       originHost === "127.0.0.1" ||
@@ -52,6 +58,14 @@ export const getApiBase = () => {
       }
     }
 
+    if (originHost === 'app.nexara.com.mx') {
+      return 'https://api.nexara.com.mx/api';
+    }
+
+    if (originHost === MOBILE_IP_API_HOST && currentPort === MOBILE_APP_PORT) {
+      return `${currentProtocol}//${originHost}:${MOBILE_API_PORT}/api`;
+    }
+
     return `${currentOrigin}/api`;
   }
 
@@ -59,7 +73,7 @@ export const getApiBase = () => {
     return ensureApiBase(envBase);
   }
 
-  return "http://localhost:3001/api";
+  return `http://${MOBILE_IP_API_HOST}:${MOBILE_API_PORT}/api`;
 };
 
 export const buildApiUrl = (path: string) => {
