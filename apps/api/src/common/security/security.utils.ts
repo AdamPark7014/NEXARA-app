@@ -12,6 +12,10 @@ type ConnectionEntry = {
   active: number;
 };
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 const DEFAULT_ALLOWED_SUBDOMAINS = ['consola', 'console', 'ventas', 'web', 'contabilidad', 'tickets', 'mobile'];
 const DEFAULT_ALLOWED_IP_HOSTS = ['138.197.42.104', '10.17.0.5'];
 const DEFAULT_ALLOWED_HOST_PATTERNS: RegExp[] = [
@@ -29,8 +33,6 @@ const SUSPICIOUS_PATH_PATTERN = /\.\.|%2e%2e|%00|<|>|\\/i;
 const DANGEROUS_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 const SUSPICIOUS_INPUT_PATTERN = /<script|javascript:|onerror\s*=|onload\s*=|union\s+select|or\s+1\s*=\s*1|drop\s+table|information_schema|\.\.|%2e%2e|\$\{jndi:|\/etc\/passwd|\\x00|%00/i;
 const HONEYPOT_PATH_PATTERN = /\/(wp-admin|wp-login|phpmyadmin|\.git|\.env|\.aws|server-status|\.well-known\/acme-challenge(?!\/))/i;
-
-const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const PARSED_ALLOWED_SUBDOMAINS = (() => {
   const envValue = process.env['ALLOWED_SUBDOMAINS'];
