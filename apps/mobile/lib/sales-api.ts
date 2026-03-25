@@ -318,6 +318,14 @@ const apiRequest = async <T>(path: string, init: FetchInit, fallbackError = "Err
   return payload as T;
 };
 
+const safeDashboardFetch = async <T>(request: Promise<T>, fallback: T): Promise<T> => {
+  try {
+    return await request;
+  } catch {
+    return fallback;
+  }
+};
+
 export const listSalesLeads = async (token: string, filters?: { ownerId?: number }) => {
   const search = new URLSearchParams();
   if (filters?.ownerId) search.set("ownerId", String(filters.ownerId));
@@ -440,12 +448,15 @@ export const addSalesOpportunityNote = async (token: string, opportunityId: numb
 
 export const getSalesDashboardData = async (token: string, filters?: { ownerId?: number }): Promise<SalesDashboardData> => {
   const [leads, opportunities, projects] = await Promise.all([
-    listSalesLeads(token, filters),
-    listSalesOpportunities(token, filters),
-    apiRequest<unknown>(
-      `ventas/proyectos${filters?.ownerId ? `?ownerId=${filters.ownerId}` : ""}`,
-      { token, method: "GET" },
-      "No se pudieron cargar los proyectos",
+    safeDashboardFetch(listSalesLeads(token, filters), [] as SalesLead[]),
+    safeDashboardFetch(listSalesOpportunities(token, filters), [] as SalesOpportunity[]),
+    safeDashboardFetch(
+      apiRequest<unknown>(
+        `ventas/proyectos${filters?.ownerId ? `?ownerId=${filters.ownerId}` : ""}`,
+        { token, method: "GET" },
+        "No se pudieron cargar los proyectos",
+      ),
+      [] as unknown,
     ),
   ]);
 
