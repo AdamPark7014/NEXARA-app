@@ -41,7 +41,27 @@ export class BranchPortalController {
     @Query('start') start?: string,
     @Query('end') end?: string,
   ) {
-    const where: any = { clientId: user.clientId, branchId: user.branchId };
+    const branch = await this.prisma['serviceClientBranch'].findFirst({
+      where: { id: user.branchId, clientId: user.clientId },
+      select: { name: true, branchNumber: true },
+    });
+
+    const branchScope: any[] = [
+      { clientTicketRequest: { is: { branchId: user.branchId } } },
+    ];
+
+    if (branch?.branchNumber) {
+      branchScope.push({ branchNumber: branch.branchNumber });
+    }
+
+    if (branch?.name) {
+      branchScope.push({ branchName: branch.name });
+    }
+
+    const where: any = {
+      clientId: user.clientId,
+      OR: branchScope,
+    };
 
     if (start || end) {
       const dateFilter: any = {};
@@ -75,8 +95,29 @@ export class BranchPortalController {
     @Param('id', ParseIntPipe) id: number,
     @Res() res: Response,
   ) {
+    const branch = await this.prisma['serviceClientBranch'].findFirst({
+      where: { id: user.branchId, clientId: user.clientId },
+      select: { name: true, branchNumber: true },
+    });
+
+    const branchScope: any[] = [
+      { clientTicketRequest: { is: { branchId: user.branchId } } },
+    ];
+
+    if (branch?.branchNumber) {
+      branchScope.push({ branchNumber: branch.branchNumber });
+    }
+
+    if (branch?.name) {
+      branchScope.push({ branchName: branch.name });
+    }
+
     const activity = await this.prisma['activity'].findFirst({
-      where: { id, clientId: user.clientId, branchId: user.branchId },
+      where: {
+        id,
+        clientId: user.clientId,
+        OR: branchScope,
+      },
       select: { id: true },
     });
     if (!activity) {
