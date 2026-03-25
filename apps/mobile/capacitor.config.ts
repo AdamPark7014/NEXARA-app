@@ -1,6 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
-const appUrl = process.env.CAPACITOR_APP_URL || 'https://nexara.com.mx/login';
+const appUrl = process.env.CAPACITOR_APP_URL || 'http://138.197.42.104:3002';
+const isHttpUrl = appUrl.startsWith('http://');
 
 const config: CapacitorConfig = {
   // Bundle ID — must match the ID you register in Play Store / App Store
@@ -12,8 +13,8 @@ const config: CapacitorConfig = {
     // Production mobile shell points to your deployed mobile app URL.
     // This avoids Next.js static-export limitations for dynamic routes.
     url: appUrl,
-    androidScheme: 'https',
-    cleartext: false,
+    androidScheme: isHttpUrl ? 'http' : 'https',
+    cleartext: isHttpUrl,
   },
   plugins: {
     // Push notifications (add @capacitor/push-notifications if needed)
