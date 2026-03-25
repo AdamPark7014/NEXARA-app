@@ -373,6 +373,85 @@ export class ServiceClientsService {
     return { pdf, reportUrl };
   }
 
+  async generateBranchReport(clientId: number, branchId: number, range?: { start: Date; end: Date }) {
+    const client = await this.db.serviceClient.findUnique({ where: { id: clientId } });
+    if (!client) throw new NotFoundException('Cliente no encontrado');
+
+    const branch = await this.db.serviceClientBranch.findFirst({
+      where: { id: branchId, clientId },
+      select: { id: true, name: true, branchNumber: true },
+    });
+    if (!branch) throw new NotFoundException('Sucursal no encontrada');
+
+    const rangeFilter = range && !Number.isNaN(range.start.getTime()) && !Number.isNaN(range.end.getTime())
+      ? { fechaAsignacion: { gte: range.start, lte: range.end } }
+      : undefined;
+
+    const activities: any[] = await this.db.activity.findMany({
+      where: { clientId, branchId, ...(rangeFilter ? rangeFilter : {}) },
+      include: { responsable: true, evidencias: true },
+      orderBy: { fechaAsignacion: 'desc' },
+    });
+
+    const totalTickets = activities.length;
+    const closed = activities.filter((activity: any) => activity.estatus === 'Finalizada');
+    const durations = closed
+      .map((activity: any) => {
+        if (!activity.fechaFinalizacion) return null;
+        const start = activity.fechaInicio || activity.fechaAsignacion;
+        if (!start) return null;
+        return Math.round((activity.fechaFinalizacion.getTime() - start.getTime()) / 60000);
+      })
+      .filter((value: number | null): value is number => value !== null && !Number.isNaN(value));
+
+    const avgDurationMin = durations.length
+      ? Math.round(durations.reduce((acc: number, value: number) => acc + value, 0) / durations.length)
+      : null;
+
+    const pickEfficiency = (activity: any) => {
+      const evidences = Array.isArray(activity?.evidencias) ? activity.evidencias : [];
+      const scored = evidences
+        .map((evidence: any) => evidence.calificacionEficiencia)
+        .filter((value: string | null | undefined) => Boolean(value));
+      return scored.length ? scored[scored.length - 1] : null;
+    };
+
+    const pdf = await generateClientReportPdf({
+      clientName: `${client.name} - ${branch.name}`,
+      clientLogoUrl: client.logoUrl,
+      generatedAt: new Date(),
+      totalTickets,
+      closedTickets: closed.length,
+      avgDurationMin,
+      activities: activities.map((activity: any) => ({
+        anNumber: activity.anNumber,
+        titulo: activity.titulo,
+        estatus: activity.estatus,
+        prioridad: activity.prioridad,
+        eficiencia: pickEfficiency(activity),
+        ticketType: activity.ticketType,
+        branchName: activity.branchName,
+        branchCity: activity.branchCity,
+        branchState: activity.branchState,
+        assignedAt: activity.fechaAsignacion,
+        startedAt: activity.fechaInicio,
+        finishedAt: activity.fechaFinalizacion,
+        durationMin: activity.fechaFinalizacion
+          ? Math.round(((activity.fechaFinalizacion.getTime() - (activity.fechaInicio || activity.fechaAsignacion).getTime()) / 60000))
+          : null,
+        responsableName: activity.responsable?.nombre || null,
+        evidences: (activity.evidencias || []).map((evidence: any) => ({
+          archivoUrl: evidence.archivoUrl,
+          tipoEvidencia: evidence.tipoEvidencia,
+          latitud: evidence.latitud ?? null,
+          longitud: evidence.longitud ?? null,
+        })),
+      })),
+    });
+
+    return { pdf };
+  }
+
   async requestClientSurvey(activityId: number) {
     const activity = await this.db.activity.findUnique({
       where: { id: activityId },
