@@ -98,14 +98,56 @@ export class ActivitiesService {
 
   async findAllDetailed() {
     return this.prisma['activity'].findMany({
-      include: {
-        creador: true,
-        responsable: true,
-        client: true,
-        serviceSheet: true,
-        evidencias: true,
-        clientFeedback: true,
-        activityEvidence: true,
+      select: {
+        id: true,
+        anNumber: true,
+        titulo: true,
+        estatus: true,
+        prioridad: true,
+        ticketType: true,
+        fechaAsignacion: true,
+        fechaInicio: true,
+        fechaFinalizacion: true,
+        branchName: true,
+        branchCity: true,
+        branchState: true,
+        client: {
+          select: {
+            id: true,
+            name: true,
+            logoUrl: true,
+          },
+        },
+        responsable: {
+          select: {
+            nombre: true,
+          },
+        },
+        evidencias: {
+          select: {
+            id: true,
+            archivoUrl: true,
+            tipoEvidencia: true,
+            calificacionEficiencia: true,
+            latitud: true,
+            longitud: true,
+          },
+        },
+        serviceSheet: {
+          select: {
+            pdfUrl: true,
+          },
+        },
+        clientFeedback: {
+          select: {
+            rating: true,
+            wasOnTime: true,
+            wasFriendly: true,
+            wasSolved: true,
+            comments: true,
+            createdAt: true,
+          },
+        },
       },
       orderBy: { fechaAsignacion: 'desc' },
     });
