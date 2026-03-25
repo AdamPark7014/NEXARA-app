@@ -1,5 +1,6 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { io, Socket } from "socket.io-client";
 import PanelLogin from "@/components/PanelLogin";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
@@ -8,6 +9,8 @@ import TicketsInventoryManager from "@/components/TicketsInventoryManager";
 import { useTheme } from "@/components/ThemeContext";
 import consoleStyles from "../console/console.module.css";
 import styles from "./tickets.module.css";
+
+const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false });
 
 type ClientSession = {
   token: string;
@@ -117,10 +120,14 @@ export default function ClientTicketsPage() {
   const [error, setError] = useState<string | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"tickets" | "nuevo" | "inventarios" | "perfil">("tickets");
+  const [activeTab, setActiveTab] = useState<"tickets" | "nuevo" | "inventarios" | "perfil" | "sucursales">("tickets");
   const [reportRange, setReportRange] = useState<"today" | "7d" | "30d" | "custom">("7d");
   const [reportStart, setReportStart] = useState("");
   const [reportEnd, setReportEnd] = useState("");
+  const [reportGenerating, setReportGenerating] = useState(false);
+  const [reportPdfUrl, setReportPdfUrl] = useState<string | null>(null);
+  const [reportPdfData, setReportPdfData] = useState<Uint8Array | null>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [profile, setProfile] = useState<ClientProfile | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [requests, setRequests] = useState<TicketRequest[]>([]);
@@ -188,6 +195,8 @@ export default function ClientTicketsPage() {
         setActiveTab("inventarios");
       } else if (tabParam === "profile") {
         setActiveTab("perfil");
+      } else if (tabParam === "branches" || tabParam === "sucursales") {
+        setActiveTab("sucursales");
       }
     }
   }, []);
@@ -210,9 +219,33 @@ export default function ClientTicketsPage() {
     };
   }, [isMobile, mobileMenuOpen]);
 
+  useEffect(() => {
+    return () => {
+      if (reportPdfUrl) URL.revokeObjectURL(reportPdfUrl);
+    };
+  }, [reportPdfUrl]);
+
   const fetchTickets = async (token: string) => {
     setLoading(true);
-    const res = await fetch(buildApiUrl("client-portal/tickets"), {
+    const now = new Date();
+    let startDate: Date | null = null;
+    let endDate: Date | null = now;
+    if (reportRange === "today") {
+      startDate = new Date(now);
+      startDate.setHours(0, 0, 0, 0);
+    } else if (reportRange === "7d" || reportRange === "30d") {
+      const days = reportRange === "7d" ? 7 : 30;
+      startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    } else if (reportStart && reportEnd) {
+      startDate = new Date(reportStart);
+      endDate = new Date(reportEnd);
+    }
+
+    const query = startDate && endDate
+      ? `?start=${encodeURIComponent(startDate.toISOString())}&end=${encodeURIComponent(endDate.toISOString())}`
+      : "";
+
+    const res = await fetch(buildApiUrl(`client-portal/tickets${query}`), {
       headers: { Authorization: `Bearer ${token}` },
     });
     const data = await res.json().catch(() => []);
@@ -220,14 +253,43 @@ export default function ClientTicketsPage() {
     setLoading(false);
   };
 
+  const fetchBranches = async (token: string) => {
+    const res = await fetch(buildApiUrl("client-portal/branches"), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        window.sessionStorage.removeItem("clientSession");
+        setSession(null);
+        setBranches([]);
+      }
+      return;
+    }
+    const data = await res.json().catch(() => []);
+    setBranches(Array.isArray(data) ? data : []);
+  };
+
   const fetchProfile = async (token: string) => {
     const res = await fetch(buildApiUrl("client-portal/profile"), {
       headers: { Authorization: `Bearer ${token}` },
     });
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        window.sessionStorage.removeItem("clientSession");
+        setSession(null);
+        setBranches([]);
+        return;
+      }
+      setError("No se pudo cargar el perfil corporativo. Verifica la sesión.");
+      return;
+    }
     const data = await res.json().catch(() => null);
     if (!data) return;
     setProfile(data);
-    setBranches(Array.isArray(data.branches) ? data.branches : []);
+
+    const profileBranches = Array.isArray(data.branches) ? data.branches : [];
+    setBranches(profileBranches);
+
     setProfileDraft({
       contactName: data.contactName || "",
       contactEmail: data.contactEmail || "",
@@ -242,6 +304,7 @@ export default function ClientTicketsPage() {
   const handleBranchSaved = useCallback(() => {
     if (!session?.token) return;
     fetchProfile(session.token);
+    fetchBranches(session.token);
   }, [session?.token]);
 
   const fetchRequests = async (token: string) => {
@@ -264,10 +327,11 @@ export default function ClientTicketsPage() {
     if (session?.token) {
       fetchTickets(session.token);
       fetchProfile(session.token);
+      fetchBranches(session.token);
       fetchRequests(session.token);
       fetchPendingFeedback(session.token);
     }
-  }, [session?.token]);
+  }, [session?.token, reportRange, reportStart, reportEnd]);
 
   useEffect(() => {
     if (!session?.token) return undefined;
@@ -314,6 +378,17 @@ export default function ClientTicketsPage() {
     });
   }, [tickets]);
 
+  const ticketsByBranch = useMemo(() => {
+    const grouped = new Map<string, Ticket[]>();
+    for (const ticket of sortedTickets) {
+      const key = ticket.branchName || "Sucursal sin nombre";
+      const items = grouped.get(key) || [];
+      items.push(ticket);
+      grouped.set(key, items);
+    }
+    return Array.from(grouped.entries());
+  }, [sortedTickets]);
+
   const ticketStats = useMemo(() => {
     const normalized = sortedTickets.map((ticket) => String(ticket.estatus || "").toUpperCase());
     return {
@@ -349,24 +424,23 @@ export default function ClientTicketsPage() {
       setError("Selecciona un rango valido para el reporte");
       return;
     }
-    setLoading(true);
+    setReportGenerating(true);
     const query = `?start=${encodeURIComponent(range.start.toISOString())}&end=${encodeURIComponent(range.end.toISOString())}`;
     const res = await fetch(buildApiUrl(`client-portal/report${query}`), {
       headers: { Authorization: `Bearer ${session.token}` },
     });
     if (!res.ok) {
       setError("No se pudo descargar el reporte");
-      setLoading(false);
+      setReportGenerating(false);
       return;
     }
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `reporte-tickets-${session.client.id}.pdf`;
-    link.click();
-    URL.revokeObjectURL(url);
-    setLoading(false);
+    const arrayBuffer = await blob.arrayBuffer();
+    setReportPdfData(new Uint8Array(arrayBuffer));
+    if (reportPdfUrl) URL.revokeObjectURL(reportPdfUrl);
+    setReportPdfUrl(URL.createObjectURL(blob));
+    setShowReportModal(true);
+    setReportGenerating(false);
   };
 
   const handleTicketReport = async (ticketId: number) => {
@@ -443,7 +517,11 @@ export default function ClientTicketsPage() {
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
-      setError("No se pudo levantar el ticket");
+      const errorData = await res.json().catch(() => null);
+      const message = Array.isArray(errorData?.message)
+        ? errorData.message.join(". ")
+        : errorData?.message;
+      setError(message || "No se pudo levantar el ticket");
       return;
     }
     setRequestDraft({
@@ -670,9 +748,9 @@ export default function ClientTicketsPage() {
           <li className={consoleStyles.sidebarMenuItem}>
             <button
               type="button"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "perfil" ? consoleStyles.active : ""}`}
+              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "sucursales" ? consoleStyles.active : ""}`}
               onClick={() => {
-                setActiveTab("perfil");
+                setActiveTab("sucursales");
                 setMobileMenuOpen(false);
               }}
             >
@@ -765,6 +843,7 @@ export default function ClientTicketsPage() {
             <button type="button" className={`${styles.panelTab} ${activeTab === "nuevo" ? styles.panelTabActive : ""}`} onClick={() => setActiveTab("nuevo")}>Nueva solicitud</button>
             <button type="button" className={`${styles.panelTab} ${activeTab === "inventarios" ? styles.panelTabActive : ""}`} onClick={() => setActiveTab("inventarios")}>Inventarios</button>
             <button type="button" className={`${styles.panelTab} ${activeTab === "perfil" ? styles.panelTabActive : ""}`} onClick={() => setActiveTab("perfil")}>Perfil</button>
+            <button type="button" className={`${styles.panelTab} ${activeTab === "sucursales" ? styles.panelTabActive : ""}`} onClick={() => setActiveTab("sucursales")}>Sucursales</button>
           </div>
 
           {activeTab === "tickets" && (
@@ -884,8 +963,8 @@ export default function ClientTicketsPage() {
                     />
                   </div>
                   <div className={styles.actionRow}>
-                    <button className="button-primary" onClick={handleReportDownload} disabled={loading}>
-                      Descargar reporte consolidado
+                    <button className="button-primary" onClick={handleReportDownload} disabled={reportGenerating}>
+                      {reportGenerating ? "Generando..." : "Ver reporte consolidado"}
                     </button>
                   </div>
                 </div>
@@ -903,7 +982,13 @@ export default function ClientTicketsPage() {
                   ))}
                 </div>
               )}
-              {sortedTickets.map((ticket) => (
+              {ticketsByBranch.map(([branchLabel, branchTickets]) => (
+                <div key={branchLabel} className={styles.sectionStack}>
+                  <div className={`card ${styles.cardSoft}`}>
+                    <p className={styles.sectionTitle} style={{ marginBottom: 0 }}>{branchLabel}</p>
+                    <p className={styles.mutedText} style={{ margin: 0 }}>{branchTickets.length} ticket(s) en este rango</p>
+                  </div>
+                  {branchTickets.map((ticket) => (
                 <div key={ticket.id} className={`card ${styles.itemCard}`}>
                   <div className={styles.itemHeader}>
                     <div>
@@ -958,6 +1043,8 @@ export default function ClientTicketsPage() {
                       loading="lazy"
                     />
                   )}
+                </div>
+                  ))}
                 </div>
               ))}
             </div>
@@ -1177,6 +1264,10 @@ export default function ClientTicketsPage() {
                   <button className="button-primary" type="button" onClick={handleProfileSave}>Guardar cambios</button>
                 </div>
               </div>
+            </div>
+          )}
+          {activeTab === "sucursales" && (
+            <div className={styles.sectionStack}>
               <div className={`card ${styles.cardSoft}`}>
                 <p className={styles.sectionTitle}>Gestión de sucursales</p>
                 <p className={styles.mutedText} style={{ margin: 0 }}>
@@ -1197,6 +1288,30 @@ export default function ClientTicketsPage() {
           )}
         </div>
       </main>
+      {showReportModal && reportPdfUrl && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={() => setShowReportModal(false)}
+        >
+          <div
+            style={{ background: "var(--surface, #fff)", borderRadius: 12, width: "100%", maxWidth: 980, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>
+              <span style={{ fontWeight: 600 }}>Reporte consolidado de tickets</span>
+              <button onClick={() => setShowReportModal(false)} style={{ padding: "6px 14px", background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: 8, cursor: "pointer" }}>✕ Cerrar</button>
+            </div>
+            <div style={{ flex: 1, overflow: "auto" }}>
+              <PDFViewer
+                pdfUrl={reportPdfUrl}
+                pdfData={reportPdfData}
+                fileName={`reporte-tickets-${new Date().toISOString().slice(0, 10)}.pdf`}
+                height="800px"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

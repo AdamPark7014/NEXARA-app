@@ -262,7 +262,6 @@ export class ClientPortalController {
       branchData = await this.prisma['serviceClientBranch'].findFirst({
         where: { id: branchId, clientId: user.clientId },
       });
-      if (!branchData) throw new BadRequestException('Sucursal no encontrada');
     }
 
     const latitud = body.latitud ? Number(body.latitud) : undefined;
@@ -301,9 +300,42 @@ export class ClientPortalController {
   }
 
   @Get('tickets')
-  async tickets(@CurrentUser() user: any) {
+  async tickets(
+    @CurrentUser() user: any,
+    @Query('start') start?: string,
+    @Query('end') end?: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    const where: any = { clientId: user.clientId };
+
+    if (branchId) {
+      const parsedBranchId = Number(branchId);
+      if (!Number.isNaN(parsedBranchId)) {
+        where.branchId = parsedBranchId;
+      }
+    }
+
+    if (start || end) {
+      const dateFilter: any = {};
+      if (start) {
+        const startDate = new Date(start);
+        if (!Number.isNaN(startDate.getTime())) {
+          dateFilter.gte = startDate;
+        }
+      }
+      if (end) {
+        const endDate = new Date(end);
+        if (!Number.isNaN(endDate.getTime())) {
+          dateFilter.lte = endDate;
+        }
+      }
+      if (Object.keys(dateFilter).length > 0) {
+        where.fechaAsignacion = dateFilter;
+      }
+    }
+
     return this.prisma['activity'].findMany({
-      where: { clientId: user.clientId },
+      where,
       include: { responsable: true, evidencias: true, serviceSheet: true },
       orderBy: { fechaAsignacion: 'desc' },
     });

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Put, UseGuards, UploadedFiles, UseInterceptors, BadRequestException } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, UseGuards, UploadedFiles, UseInterceptors, BadRequestException, Query } from '@nestjs/common';
 import { Param, ParseIntPipe, Res } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
@@ -6,6 +6,8 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { BranchPortalGuard } from './branch-portal.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { InventoriesService } from '../inventories/inventories.service.js';
+import { ActivitiesService } from '../activities/activities.service.js';
+import { ServiceClientsService } from '../service-clients/service-clients.service.js';
 
 @Controller('branch-portal')
 @UseGuards(BranchPortalGuard)
@@ -13,6 +15,8 @@ export class BranchPortalController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventoriesService: InventoriesService,
+    private readonly activitiesService: ActivitiesService,
+    private readonly serviceClientsService: ServiceClientsService,
   ) {}
 
   @Get('profile')
@@ -29,6 +33,78 @@ export class BranchPortalController {
       where: { branchId: user.branchId, clientId: user.clientId },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  @Get('tickets')
+  async tickets(
+    @CurrentUser() user: any,
+    @Query('start') start?: string,
+    @Query('end') end?: string,
+  ) {
+    const where: any = { clientId: user.clientId, branchId: user.branchId };
+
+    if (start || end) {
+      const dateFilter: any = {};
+      if (start) {
+        const startDate = new Date(start);
+        if (!Number.isNaN(startDate.getTime())) {
+          dateFilter.gte = startDate;
+        }
+      }
+      if (end) {
+        const endDate = new Date(end);
+        if (!Number.isNaN(endDate.getTime())) {
+          dateFilter.lte = endDate;
+        }
+      }
+      if (Object.keys(dateFilter).length > 0) {
+        where.fechaAsignacion = dateFilter;
+      }
+    }
+
+    return this.prisma['activity'].findMany({
+      where,
+      include: { responsable: true, evidencias: true, serviceSheet: true },
+      orderBy: { fechaAsignacion: 'desc' },
+    });
+  }
+
+  @Get('tickets/:id/report')
+  async ticketReport(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+  ) {
+    const activity = await this.prisma['activity'].findFirst({
+      where: { id, clientId: user.clientId, branchId: user.branchId },
+      select: { id: true },
+    });
+    if (!activity) {
+      return res.status(404).send('Ticket no encontrado');
+    }
+
+    const result = await this.activitiesService.generateTicketReport(activity.id);
+    if (!result) {
+      return res.status(404).send('Ticket no encontrado');
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=reporte-ticket-${id}.pdf`);
+    return res.send(result.pdf);
+  }
+
+  @Get('report')
+  async report(
+    @CurrentUser() user: any,
+    @Res() res: Response,
+    @Query('start') start?: string,
+    @Query('end') end?: string,
+  ) {
+    const range = start && end ? { start: new Date(start), end: new Date(end) } : undefined;
+    const { pdf } = await this.serviceClientsService.generateBranchReport(user.clientId, user.branchId, range);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename=reporte-tickets-sucursal.pdf');
+    return res.send(pdf);
   }
 
   @Get('inventories')

@@ -1,5 +1,6 @@
 ﻿"use client";
 import React, { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import PanelLogin from "@/components/PanelLogin";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
@@ -7,6 +8,8 @@ import TicketsInventoryManager from "@/components/TicketsInventoryManager";
 import { useTheme } from "@/components/ThemeContext";
 import consoleStyles from "../../console/console.module.css";
 import styles from "../tickets.module.css";
+
+const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false });
 
 type BranchSession = {
   token: string;
@@ -38,6 +41,20 @@ type BranchRequest = {
   evidenceUrls?: string[];
 };
 
+type Ticket = {
+  id: number;
+  anNumber: string;
+  titulo: string;
+  estatus: string;
+  prioridad: string;
+  ticketType?: string | null;
+  fechaAsignacion?: string | null;
+  fechaInicio?: string | null;
+  fechaFinalizacion?: string | null;
+  responsable?: { nombre: string } | null;
+  serviceSheet?: { pdfUrl?: string | null } | null;
+};
+
 export default function BranchTicketsPage() {
   const { darkMode, toggleDarkMode } = useTheme();
   const [session, setSession] = useState<BranchSession | null>(null);
@@ -47,9 +64,21 @@ export default function BranchTicketsPage() {
   const [requests, setRequests] = useState<BranchRequest[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"request" | "inventories">("request");
+  const [activeTab, setActiveTab] = useState<"profile" | "tickets" | "request" | "inventories">("tickets");
   const [files, setFiles] = useState<{ file: File; url: string; kind: "image" | "pdf" }[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [fromDate, setFromDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().slice(0, 10);
+  });
+  const [toDate, setToDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
+  const [showPdfModal, setShowPdfModal] = useState(false);
+  const [avatarLoadError, setAvatarLoadError] = useState(false);
   const [draft, setDraft] = useState({
     requestType: "ISSUE" as "ISSUE" | "PREVENTIVE_INVENTORY",
     description: "",
@@ -86,6 +115,11 @@ export default function BranchTicketsPage() {
     const base = API_URL.replace(/\/+api\/?$/, "");
     return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
   };
+  const branchAvatarUrl = profile?.logoUrl || session?.branch?.logoUrl || "";
+
+  useEffect(() => {
+    setAvatarLoadError(false);
+  }, [branchAvatarUrl]);
 
   useEffect(() => {
     const saved = typeof window !== "undefined" ? window.sessionStorage.getItem("branchSession") : null;
@@ -121,6 +155,12 @@ export default function BranchTicketsPage() {
     };
   }, [files]);
 
+  useEffect(() => {
+    return () => {
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+    };
+  }, [pdfUrl]);
+
   const fetchProfile = async (token: string) => {
     const res = await fetch(buildApiUrl("branch-portal/profile"), {
       headers: { Authorization: `Bearer ${token}` },
@@ -146,11 +186,67 @@ export default function BranchTicketsPage() {
     setRequests(Array.isArray(data) ? data : []);
   };
 
+  const fetchTickets = async (token: string) => {
+    const params = new URLSearchParams();
+    if (fromDate) params.append("start", `${fromDate}T00:00:00.000Z`);
+    if (toDate) params.append("end", `${toDate}T23:59:59.999Z`);
+    const query = params.toString() ? `?${params.toString()}` : "";
+    const res = await fetch(buildApiUrl(`branch-portal/tickets${query}`), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json().catch(() => []);
+    setTickets(Array.isArray(data) ? data : []);
+  };
+
   useEffect(() => {
     if (!session?.token) return;
     fetchProfile(session.token);
     fetchRequests(session.token);
-  }, [session?.token]);
+    fetchTickets(session.token);
+  }, [session?.token, fromDate, toDate]);
+
+  const handleViewPdf = async () => {
+    if (!session?.token) return;
+    setGeneratingPdf(true);
+    try {
+      const params = new URLSearchParams();
+      if (fromDate) params.append("start", `${fromDate}T00:00:00.000Z`);
+      if (toDate) params.append("end", `${toDate}T23:59:59.999Z`);
+      const res = await fetch(buildApiUrl(`branch-portal/report?${params.toString()}`), {
+        headers: { Authorization: `Bearer ${session.token}` },
+      });
+      if (!res.ok) {
+        setError("No se pudo generar el reporte PDF");
+        return;
+      }
+      const blob = await res.blob();
+      const arrayBuffer = await blob.arrayBuffer();
+      setPdfData(new Uint8Array(arrayBuffer));
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+      setPdfUrl(URL.createObjectURL(blob));
+      setShowPdfModal(true);
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  const handleTicketReport = async (ticketId: number) => {
+    if (!session?.token) return;
+    const res = await fetch(buildApiUrl(`branch-portal/tickets/${ticketId}/report`), {
+      headers: { Authorization: `Bearer ${session.token}` },
+    });
+    if (!res.ok) {
+      setError("No se pudo generar el reporte del ticket");
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `reporte-ticket-${ticketId}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   useEffect(() => {
     if (!session?.branch) return;
@@ -288,13 +384,14 @@ export default function BranchTicketsPage() {
         >
         <div className={consoleStyles.sidebarUser}>
           <div className={consoleStyles.sidebarAvatar}>
-            {profile?.logoUrl || session.branch.logoUrl ? (
+            {branchAvatarUrl && !avatarLoadError ? (
               <img
                 className={consoleStyles.avatarImage}
-                src={getAssetUrl(profile?.logoUrl || session.branch.logoUrl || "")}
+                src={getAssetUrl(branchAvatarUrl)}
                 alt={profile?.name || session.branch.name}
                 width={64}
                 height={64}
+                onError={() => setAvatarLoadError(true)}
               />
             ) : (
               <span className={consoleStyles.sidebarName}>{(profile?.name || session.branch.name).slice(0, 2).toUpperCase()}</span>
@@ -306,8 +403,32 @@ export default function BranchTicketsPage() {
             <span className={consoleStyles.rolePill}>Sucursal</span>
           </div>
         </div>
-        <div className={consoleStyles.menuTitle}>Servicio y solicitudes</div>
+        <div className={consoleStyles.menuTitle}>Sucursal</div>
         <ul className={consoleStyles.sidebarMenu}>
+          <li className={consoleStyles.sidebarMenuItem}>
+            <button
+              type="button"
+              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "profile" ? consoleStyles.active : ""}`}
+              onClick={() => {
+                setActiveTab("profile");
+                setMobileMenuOpen(false);
+              }}
+            >
+              🪪 Mi perfil
+            </button>
+          </li>
+          <li className={consoleStyles.sidebarMenuItem}>
+            <button
+              type="button"
+              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "tickets" ? consoleStyles.active : ""}`}
+              onClick={() => {
+                setActiveTab("tickets");
+                setMobileMenuOpen(false);
+              }}
+            >
+              🎫 Mis tickets
+            </button>
+          </li>
           <li className={consoleStyles.sidebarMenuItem}>
             <button
               type="button"
@@ -370,9 +491,79 @@ export default function BranchTicketsPage() {
           </div>
 
           <div className={styles.panelTabs}>
+            <button type="button" className={`${styles.panelTab} ${activeTab === "profile" ? styles.panelTabActive : ""}`} onClick={() => setActiveTab("profile")}>Mi perfil</button>
+            <button type="button" className={`${styles.panelTab} ${activeTab === "tickets" ? styles.panelTabActive : ""}`} onClick={() => setActiveTab("tickets")}>Mis tickets</button>
             <button type="button" className={`${styles.panelTab} ${activeTab === "request" ? styles.panelTabActive : ""}`} onClick={() => setActiveTab("request")}>Nueva solicitud</button>
             <button type="button" className={`${styles.panelTab} ${activeTab === "inventories" ? styles.panelTabActive : ""}`} onClick={() => setActiveTab("inventories")}>Inventarios</button>
           </div>
+
+          {activeTab === "profile" && (
+            <div className={`card ${styles.cardSoft}`}>
+              <p className={styles.sectionTitle}>Mi perfil de sucursal</p>
+              <div className={styles.grid200}>
+                <input className="input" value={profile?.name || session.branch.name} readOnly />
+                <input className="input" value={profile?.branchNumber || session.branch.branchNumber || ""} readOnly />
+                <input className="input" value={profile?.address || ""} readOnly placeholder="Dirección" />
+                <input className="input" value={profile?.city || ""} readOnly placeholder="Ciudad" />
+                <input className="input" value={profile?.state || ""} readOnly placeholder="Estado" />
+                <input className="input" value={profile?.country || ""} readOnly placeholder="País" />
+              </div>
+            </div>
+          )}
+
+          {activeTab === "tickets" && (
+            <div className={styles.sectionStack}>
+              <div className={`card ${styles.cardSoft}`}>
+                <div className={styles.grid200}>
+                  <div>
+                    <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Desde</label>
+                    <input className="input" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Hasta</label>
+                    <input className="input" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+                  </div>
+                  <div className={styles.actionRow}>
+                    <button className="button-primary" type="button" onClick={() => session?.token && fetchTickets(session.token)}>
+                      Filtrar tickets
+                    </button>
+                    <button className="button-secondary" type="button" onClick={handleViewPdf} disabled={generatingPdf}>
+                      {generatingPdf ? "Generando..." : "Ver PDF"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              {tickets.length === 0 && <div className={styles.mutedText}>No hay tickets para el rango seleccionado.</div>}
+              {tickets.map((ticket) => (
+                <div key={ticket.id} className={`card ${styles.itemCard}`}>
+                  <div className={styles.itemHeader}>
+                    <div>
+                      <div style={{ fontWeight: 700 }}>{ticket.anNumber || `Ticket #${ticket.id}`}</div>
+                      <div style={{ color: "var(--text-secondary)", fontSize: 12 }}>{ticket.titulo}</div>
+                    </div>
+                    <span className="badge">{ticket.estatus}</span>
+                  </div>
+                  <div className={styles.metaGrid}>
+                    <span>Prioridad: {ticket.prioridad || "-"}</span>
+                    <span>Tipo: {ticket.ticketType || "-"}</span>
+                    <span>Atendió: {ticket.responsable?.nombre || "-"}</span>
+                    <span>Inicio: {ticket.fechaInicio || "-"}</span>
+                    <span>Cierre: {ticket.fechaFinalizacion || "-"}</span>
+                  </div>
+                  <div className={styles.actionRow}>
+                    {ticket.serviceSheet?.pdfUrl && (
+                      <a className="button-secondary" href={getAssetUrl(ticket.serviceSheet.pdfUrl)} target="_blank" rel="noreferrer">
+                        Hoja de servicio (PDF)
+                      </a>
+                    )}
+                    <button className="button-secondary" type="button" onClick={() => handleTicketReport(ticket.id)}>
+                      Exportar ticket (PDF)
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {activeTab === "inventories" && session?.token && (
             <TicketsInventoryManager
@@ -545,6 +736,30 @@ export default function BranchTicketsPage() {
           )}
         </div>
       </main>
+      {showPdfModal && pdfUrl && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+          onClick={() => setShowPdfModal(false)}
+        >
+          <div
+            style={{ background: "var(--surface, #fff)", borderRadius: 12, width: "100%", maxWidth: 980, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>
+              <span style={{ fontWeight: 600 }}>Reporte de tickets de sucursal</span>
+              <button onClick={() => setShowPdfModal(false)} style={{ padding: "6px 14px", background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: 8, cursor: "pointer" }}>✕ Cerrar</button>
+            </div>
+            <div style={{ flex: 1, overflow: "auto" }}>
+              <PDFViewer
+                pdfUrl={pdfUrl}
+                pdfData={pdfData}
+                fileName={`reporte-sucursal-${new Date().toISOString().slice(0, 10)}.pdf`}
+                height="800px"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
