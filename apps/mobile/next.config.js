@@ -1,14 +1,16 @@
 const path = require('path');
 
-// When CAPACITOR=1, build as static export for Capacitor (APK/IPA)
+// Capacitor app runs in remote URL mode by default (see capacitor.config.ts).
+// Keep static export as an explicit opt-in only.
 const isCapacitor = process.env.CAPACITOR === '1';
+const isCapacitorStaticExport = process.env.CAPACITOR_STATIC_EXPORT === '1';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
 
-  // Static export when building for Capacitor (APK / iOS)
-  ...(isCapacitor && { output: 'export' }),
+  // Static export is optional and disabled by default for dynamic route support.
+  ...(isCapacitorStaticExport && { output: 'export' }),
   
   // Habilitar SWC para compilación más rápida
   swcMinify: true,

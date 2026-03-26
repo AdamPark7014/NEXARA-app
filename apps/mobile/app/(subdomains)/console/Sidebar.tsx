@@ -8,8 +8,14 @@ import Image from "next/image";
 import { hasAnyPermission, hasPermission, PERMISSIONS } from '@/lib/permissions';
 import { getAvatarSrc, getRoleLabel, isPlatformAdmin } from '@/lib/panel-user';
 import { useState, useEffect } from "react";
+import { hapticTap } from "@/lib/haptics";
 
-export default function Sidebar() {
+interface SidebarProps {
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
+}
+
+export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}) {
   const MOBILE_BREAKPOINT = 900;
   const pathname = usePathname();
   const { user, logout } = useUser();
@@ -17,6 +23,13 @@ export default function Sidebar() {
   const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof mobileOpen === 'boolean' && mobileOpen !== isMenuOpen) {
+      setIsMenuOpen(mobileOpen);
+    }
+  }, [mobileOpen]);
+
   const [mobileOpenGroups, setMobileOpenGroups] = useState<string[]>([]);
   const [brandLogoSrc, setBrandLogoSrc] = useState("/icon.png");
 
@@ -54,6 +67,7 @@ export default function Sidebar() {
   }, [isMenuOpen, isMobile]);
 
   const toggleMenu = () => {
+    void hapticTap("light");
     setIsMenuOpen((prev) => {
       const next = !prev;
       if (next) {
@@ -66,9 +80,11 @@ export default function Sidebar() {
   const closeMenu = () => {
     setIsMenuOpen(false);
     setMobileOpenGroups([]);
+    onMobileClose?.();
   };
 
   const handleLogout = () => {
+    void hapticTap("heavy");
     logout();
     closeMenu();
     router.replace('/login');
@@ -245,19 +261,21 @@ export default function Sidebar() {
     },
   ];
 
-  const withConsolePrefix = (href: string) => {
-    if (!href.startsWith('/')) return `/console/${href}`;
+  const inPrefixedConsolePath = Boolean(pathname && pathname.startsWith('/console'));
+
+  const resolveConsoleHref = (href: string) => {
+    if (!href.startsWith('/')) return href;
     if (href === '/paneles' || href === '/login') return href;
     if (href === '/contabilidad' || href.startsWith('/contabilidad/')) return href;
     if (href === '/console' || href.startsWith('/console/')) return href;
-    return `/console${href}`;
+    return inPrefixedConsolePath ? `/console${href}` : href;
   };
 
   const groupsToRender = (visibleGroups.length > 0 ? visibleGroups : fallbackGroups).map((group) => ({
     ...group,
     items: group.items.map((item) => ({
       ...item,
-      href: withConsolePrefix(item.href),
+      href: resolveConsoleHref(item.href),
     })),
   }));
 

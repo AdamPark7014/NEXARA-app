@@ -4,6 +4,8 @@ import Sidebar from "./Sidebar";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import NotificationCenter from "@/components/NotificationCenter";
+import BottomNav from "@/components/BottomNav";
+import PageTransition from "@/components/PageTransition";
 import { setActivePanel } from "@/lib/panel-routing";
 
 const formatConsoleTitle = (pathname: string) => {
@@ -70,7 +72,15 @@ const formatConsoleTitle = (pathname: string) => {
 export default function ConsoleLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [viewSubtitle, setViewSubtitle] = useState("Consola NEXARA");
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const viewTitle = useMemo(() => formatConsoleTitle(pathname || "console"), [pathname]);
+  const inPrefixedConsolePath = Boolean(pathname && pathname.startsWith("/console"));
+
+  const resolveConsoleRoute = (shortHref: string) => {
+    if (!shortHref.startsWith("/")) return shortHref;
+    if (shortHref === "/paneles" || shortHref === "/login") return shortHref;
+    return inPrefixedConsolePath ? `/console${shortHref}` : shortHref;
+  };
 
   useEffect(() => {
     const now = new Date();
@@ -83,7 +93,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   }
   return (
     <div className={styles.consoleLayout}>
-      <Sidebar />
+      <Sidebar mobileOpen={drawerOpen} onMobileClose={() => setDrawerOpen(false)} />
       <main className={styles.consoleMain}>
         <section className={styles.consoleTopbar}>
           <p className={styles.consoleEyebrow}>Panel corporativo</p>
@@ -97,8 +107,17 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
             </div>
           </div>
         </section>
-        <div className={styles.consoleContent}>{children}</div>
+        <div className={styles.consoleContent}><PageTransition>{children}</PageTransition></div>
       </main>
+      <BottomNav
+        items={[
+          { icon: "📊", label: "Inicio", href: resolveConsoleRoute("/dashboard"), hapticIntent: "selection" },
+          { icon: "📋", label: "Actividades", href: resolveConsoleRoute("/my-activities"), hapticIntent: "selection" },
+          { icon: "🕒", label: "Asistencia", href: resolveConsoleRoute("/attendance"), hapticIntent: "selection" },
+          { icon: "👤", label: "Perfil", href: resolveConsoleRoute("/my-profile"), hapticIntent: "selection" },
+          { icon: "☰", label: "Menú", onPress: () => setDrawerOpen(true), hapticIntent: "medium" },
+        ]}
+      />
     </div>
   );
 }

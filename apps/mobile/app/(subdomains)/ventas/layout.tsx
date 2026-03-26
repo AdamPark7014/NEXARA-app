@@ -4,11 +4,14 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import VentasSidebar from "./VentasSidebar";
+import BottomNav from "@/components/BottomNav";
+import PageTransition from "@/components/PageTransition";
 import styles from "./layout.module.css";
 import { useUser } from "@/components/UserContext";
 import { setActivePanel } from "@/lib/panel-routing";
 import { getRoleLabel, isSalesManagerUser } from "@/lib/panel-user";
 import { getSalesVendorStats, type SalesVendorStats } from "@/lib/sales-api";
+import { hapticTap } from "@/lib/haptics";
 
 export default function VentasLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -16,6 +19,7 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
   const canManageSellers = isSalesManagerUser(user);
   const roleLabel = getRoleLabel(user);
   const [workspaceDateLabel, setWorkspaceDateLabel] = useState("");
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [vendorStats, setVendorStats] = useState<SalesVendorStats[]>([]);
   const selectedOwnerId =
     typeof window === "undefined"
@@ -75,7 +79,7 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
 
   return (
     <div className={styles.salesRoot}>
-      <VentasSidebar />
+      <VentasSidebar mobileOpen={drawerOpen} onMobileClose={() => setDrawerOpen(false)} />
       <main className={styles.salesMain}>
         <section className={styles.salesWorkspace}>
           <div className={styles.salesWorkspaceHeader}>
@@ -100,7 +104,14 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
               const itemPath = item.href.replace(/\/+$/, "");
               const isActive = currentPath === itemPath || currentPath.endsWith(itemPath);
               return (
-                <Link key={`quick-${item.href}`} href={withOwnerFilter(item.href)} className={`${styles.salesQuickLink} ${isActive ? styles.salesQuickLinkActive : ""}`}>
+                <Link
+                  key={`quick-${item.href}`}
+                  href={withOwnerFilter(item.href)}
+                  className={`${styles.salesQuickLink} ${isActive ? styles.salesQuickLinkActive : ""}`}
+                  onClick={() => {
+                    void hapticTap("selection");
+                  }}
+                >
                   {item.label}
                 </Link>
               );
@@ -148,9 +159,18 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
             </div>
           )}
 
-          <div className={styles.salesWorkspaceContent}>{children}</div>
+          <div className={styles.salesWorkspaceContent}><PageTransition>{children}</PageTransition></div>
         </section>
       </main>
+      <BottomNav
+        items={[
+          { icon: "📊", label: "Dashboard", href: "/dashboard", hapticIntent: "selection" },
+          { icon: "💼", label: "Oportunidades", href: "/oportunidades", hapticIntent: "selection" },
+          { icon: "👥", label: "Clientes", href: "/clientes", hapticIntent: "selection" },
+          { icon: "📄", label: "Cotizaciones", href: "/cotizaciones", hapticIntent: "selection" },
+          { icon: "☰", label: "Menú", onPress: () => setDrawerOpen(true), hapticIntent: "medium" },
+        ]}
+      />
     </div>
   );
 }

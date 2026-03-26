@@ -589,3 +589,59 @@ textarea:disabled {
   }
 }
 
+/* Native mobile UX additions */
+:root {
+  --bottom-nav-height: 56px;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:where(a, button, [role="button"], [type="button"], [type="submit"], label) {
+  touch-action: manipulation;
+}
+
+.native-scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.native-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  body::before {
+    display: none;
+  }
+}
+
+/* Hybrid native pass: balanced iOS + Android density */
+@media (max-width: 900px) {
+  :root {
+    --control-height: 46px;
+  }
+
+  body {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  :where(button, a, [role="button"], [type="button"], [type="submit"]) {
+    min-height: 46px;
+    border-radius: 12px;
+  }
+}
+
+@supports (-webkit-touch-callout: none) {
+  @media (max-width: 900px) {
+    :where(.card, [class*="card"], [class*="Card"]) {
+      box-shadow:
+        0 10px 22px color-mix(in srgb, var(--shadow) 42%, transparent),
+        0 1px 0 color-mix(in srgb, #fff 38%, transparent) inset;
+    }
+  }
+}
+

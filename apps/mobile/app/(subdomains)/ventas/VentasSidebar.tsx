@@ -7,6 +7,7 @@ import { useUser } from "@/components/UserContext";
 import { useTheme } from "@/components/ThemeContext";
 import { useState, useMemo, useEffect } from "react";
 import { getAvatarSrc, getRoleLabel, isSalesManagerUser } from "@/lib/panel-user";
+import { hapticTap } from "@/lib/haptics";
 
 interface MenuItem {
   label: string;
@@ -41,7 +42,12 @@ const sectionOrder = [
   "Análisis y estrategia",
 ];
 
-export default function VentasSidebar() {
+interface VentasSidebarProps {
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
+}
+
+export default function VentasSidebar({ mobileOpen, onMobileClose }: VentasSidebarProps = {}) {
   const MOBILE_BREAKPOINT = 768;
   const pathname = usePathname();
   const router = useRouter();
@@ -50,6 +56,13 @@ export default function VentasSidebar() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof mobileOpen === 'boolean' && mobileOpen !== isMenuOpen) {
+      setIsMenuOpen(mobileOpen);
+    }
+  }, [mobileOpen]);
+
   const [navQuery, setNavQuery] = useState("");
 
   useEffect(() => {
@@ -77,9 +90,13 @@ export default function VentasSidebar() {
     return () => window.removeEventListener("keydown", handleEscape);
   }, [isMenuOpen]);
 
-  const closeMenu = () => setIsMenuOpen(false);
+  const closeMenu = () => {
+    setIsMenuOpen(false);
+    onMobileClose?.();
+  };
 
   const handleLogout = () => {
+    void hapticTap("heavy");
     logout();
     closeMenu();
     router.replace("/login");
@@ -160,7 +177,10 @@ export default function VentasSidebar() {
           <button
             type="button"
             className={styles.hamburgerButton}
-            onClick={() => setIsMenuOpen((prev) => !prev)}
+            onClick={() => {
+              void hapticTap("light");
+              setIsMenuOpen((prev) => !prev);
+            }}
             aria-label={isMenuOpen ? "Cerrar menú" : "Abrir menú"}
             aria-expanded={isMenuOpen}
             aria-controls="ventas-sidebar-menu"

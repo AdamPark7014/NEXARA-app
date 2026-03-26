@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
+import { buildApiUrl, getSocketBaseUrl } from '@/lib/api-base';
 function BackupRestorePanel() {
   const { user } = useUser();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -11,7 +12,7 @@ function BackupRestorePanel() {
   useEffect(() => {
     if (!user) return;
 
-    const socketUrl = (process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, {
       auth: { token: user.token },
       transports: ['websocket', 'polling'],
@@ -43,7 +44,7 @@ function BackupRestorePanel() {
 
   // Exportar backup general
   const handleExport = async () => {
-    const res = await fetch('/api/export/all', {
+    const res = await fetch(buildApiUrl('export/all'), {
       headers: { Authorization: `Bearer ${user.token}` },
     });
     if (!res.ok) return alert('Error al exportar backup');
@@ -65,7 +66,7 @@ function BackupRestorePanel() {
     if (!file || !user) return;
     const formData = new FormData();
     formData.append('file', file);
-    const res = await fetch('/api/import/all', {
+    const res = await fetch(buildApiUrl('import/all'), {
       method: 'POST',
       headers: { Authorization: `Bearer ${user.token}` },
       body: formData,

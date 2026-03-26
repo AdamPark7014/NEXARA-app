@@ -184,3 +184,43 @@
     border-radius: var(--radius-md);
   }
 }
+
+@media (max-width: 768px) {
+  .salesMain {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 8px) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .salesWorkspaceHeader {
+    position: sticky;
+    top: 0;
+    z-index: 32;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    background: color-mix(in srgb, var(--surface) 90%, transparent);
+  }
+
+  .salesQuickLinks {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+
+  .salesQuickLinks::-webkit-scrollbar {
+    display: none;
+  }
+
+  .salesQuickLink {
+    flex: 0 0 auto;
+    min-height: 38px;
+  }
+
+  .salesWorkspaceContent :global(.card),
+  .salesWorkspaceContent :global([class*='card']),
+  .salesWorkspaceContent :global([class*='panel']) {
+    box-shadow: 0 10px 20px color-mix(in srgb, var(--shadow) 30%, transparent);
+  }
+}

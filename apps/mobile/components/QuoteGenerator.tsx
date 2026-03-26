@@ -5,6 +5,7 @@ import { useUser } from './UserContext';
 import PDFViewer from './PDFViewer';
 import styles from './QuoteGenerator.module.css';
 import { io, Socket } from 'socket.io-client';
+import { buildApiUrl, getSocketBaseUrl } from '@/lib/api-base';
 
 interface Quote {
   id: number;
@@ -66,13 +67,13 @@ export default function QuoteGenerator({ onQuoteGenerated }: QuoteGeneratorProps
     try {
       setLoading(true);
       const [quotesRes, clientsRes, templatesRes] = await Promise.all([
-        fetch('/api/ventas/cotizaciones', {
+        fetch(buildApiUrl('ventas/cotizaciones'), {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        fetch('/api/ventas/clientes', {
+        fetch(buildApiUrl('ventas/clientes'), {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        fetch('/api/ventas/order-templates', {
+        fetch(buildApiUrl('ventas/order-templates'), {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -99,9 +100,7 @@ export default function QuoteGenerator({ onQuoteGenerated }: QuoteGeneratorProps
   useEffect(() => {
     if (!token) return;
 
-    const socketUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api')
-      .replace(/[\/.]+$/, '')
-      .replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -135,7 +134,7 @@ export default function QuoteGenerator({ onQuoteGenerated }: QuoteGeneratorProps
       setLoading(true);
       setError(null);
 
-      const response = await fetch('/api/ventas/cotizaciones/generar-pdf', {
+      const response = await fetch(buildApiUrl('ventas/cotizaciones/generar-pdf'), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
