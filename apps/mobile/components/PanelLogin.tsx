@@ -6,7 +6,7 @@ import { io, Socket } from "socket.io-client";
 import { useUser } from "./UserContext";
 import { hasPermission, PERMISSIONS } from "../lib/permissions";
 import { getDeviceIdentityHeaders } from "@/lib/device-identity";
-import { getApiBase, getSocketBaseUrl } from "@/lib/api-base";
+import { getApiBaseCandidates, getSocketBaseUrl } from "@/lib/api-base";
 import { getAccessiblePanels, setActivePanel } from "@/lib/panel-routing";
 
 type PanelLoginProps = {
@@ -57,19 +57,65 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
     setIsLoading(true);
     try {
       const deviceHeaders = await getDeviceIdentityHeaders();
-      const API_URL = getApiBase();
-      const endpoint = `${API_URL}/auth/login`;
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...deviceHeaders },
-        body: JSON.stringify({
-          email,
-          password,
-          ...(requiredPermission === PERMISSIONS.PANEL_VENTAS ? { panel: "ventas" } : {}),
-        }),
+      const payload = JSON.stringify({
+        email,
+        password,
+        ...(requiredPermission === PERMISSIONS.PANEL_VENTAS ? { panel: "ventas" } : {}),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || data.error || "Credenciales incorrectas");
+
+      let data: any = null;
+      let responseError = "No se pudo conectar con el servidor de autenticacion";
+
+      for (const API_URL of getApiBaseCandidates()) {
+        try {
+          const endpoint = `${API_URL}/auth/login`;
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...deviceHeaders },
+            body: payload,
+          });
+
+          const responseText = await res.text();
+          const contentType = res.headers.get("content-type") || "";
+          const isHtmlResponse = /<html|<!doctype/i.test(responseText) || contentType.includes("text/html");
+
+          let parsedBody: any = null;
+          if (responseText) {
+            try {
+              parsedBody = JSON.parse(responseText);
+            } catch {
+              parsedBody = null;
+            }
+          }
+
+          if (res.ok && parsedBody && typeof parsedBody === "object") {
+            data = parsedBody;
+            break;
+          }
+
+          if (isHtmlResponse) {
+            responseError = "El servidor respondio HTML en lugar de JSON. Verifica la configuracion de /api en el host movil.";
+            continue;
+          }
+
+          if (!res.ok) {
+            const messageFromArray = Array.isArray(parsedBody?.message) ? parsedBody.message[0] : null;
+            const apiMessage = messageFromArray || parsedBody?.message || parsedBody?.error;
+            const finalMessage = typeof apiMessage === "string" && apiMessage.trim() ? apiMessage : "Credenciales incorrectas";
+            throw new Error(`AUTH_ERROR:${finalMessage}`);
+          }
+
+          responseError = "Respuesta invalida del servidor de autenticacion";
+        } catch (requestError) {
+          if (requestError instanceof Error && requestError.message.startsWith("AUTH_ERROR:")) {
+            throw new Error(requestError.message.replace("AUTH_ERROR:", ""));
+          }
+          responseError = "No se pudo conectar con el servidor de autenticacion";
+          continue;
+        }
+      }
+
+      if (!data) throw new Error(responseError);
 
       const userData = {
         id: data.user.id,
