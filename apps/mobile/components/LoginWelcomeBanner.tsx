@@ -38,8 +38,13 @@ export default function LoginWelcomeBanner() {
 
   return (
     <div className={`${styles.banner} ${isClosing ? styles.closing : ""}`} role="status" aria-live="polite">
-      <strong className={styles.title}>Bienvenido</strong>
-      <span>{message}</span>
+      <div className={styles.row}>
+        <span className={styles.icon} aria-hidden="true">N</span>
+        <div className={styles.copy}>
+          <strong className={styles.title}>Bienvenido</strong>
+          <span>{message}</span>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,19 +1,36 @@
 "use client";
+
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import styles from "./console.module.css";
-import { useUser } from '@/components/UserContext';
-import { useTheme } from '@/components/ThemeContext';
+import { useUser } from "@/components/UserContext";
+import { useTheme } from "@/components/ThemeContext";
 import Image from "next/image";
-import { hasAnyPermission, hasPermission, PERMISSIONS } from '@/lib/permissions';
-import { getAvatarSrc, getRoleLabel, isPlatformAdmin } from '@/lib/panel-user';
-import { useState, useEffect } from "react";
+import { hasAnyPermission, hasPermission, PERMISSIONS } from "@/lib/permissions";
+import { getAvatarSrc, getRoleLabel, isPlatformAdmin } from "@/lib/panel-user";
+import { useEffect, useMemo, useState } from "react";
 import { hapticTap } from "@/lib/haptics";
 
 interface SidebarProps {
   mobileOpen?: boolean;
   onMobileClose?: () => void;
 }
+
+type MenuItem = {
+  icon: string;
+  label: string;
+  href: string;
+  permissions?: string[];
+  anyPermissions?: string[];
+};
+
+type MenuGroup = {
+  id: string;
+  title: string;
+  items: MenuItem[];
+};
+
+const DEFAULT_OPEN_GROUP_IDS = ["profile", "employee", "operations", "people", "commercial", "system", "inventory", "finance", "compliance", "fallback"];
 
 export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}) {
   const MOBILE_BREAKPOINT = 900;
@@ -23,17 +40,17 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
   const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    if (typeof mobileOpen === 'boolean' && mobileOpen !== isMenuOpen) {
-      setIsMenuOpen(mobileOpen);
-    }
-  }, [mobileOpen]);
-
   const [mobileOpenGroups, setMobileOpenGroups] = useState<string[]>([]);
   const [brandLogoSrc, setBrandLogoSrc] = useState("/icon.png");
 
-  // Detectar si es móvil
+  useEffect(() => {
+    if (typeof mobileOpen !== "boolean") return;
+    setIsMenuOpen(mobileOpen);
+    if (mobileOpen) {
+      setMobileOpenGroups(DEFAULT_OPEN_GROUP_IDS);
+    }
+  }, [mobileOpen]);
+
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT);
@@ -50,7 +67,6 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
     }
   }, [pathname, isMobile]);
 
-  // Cerrar menú al hacer Escape
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isMenuOpen) {
@@ -63,7 +79,10 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
 
   useEffect(() => {
     if (!isMobile) return;
-    if (!isMenuOpen) return;
+    document.body.style.overflow = isMenuOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [isMenuOpen, isMobile]);
 
   const toggleMenu = () => {
@@ -71,6 +90,8 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
     setIsMenuOpen((prev) => {
       const next = !prev;
       if (next) {
+        setMobileOpenGroups(DEFAULT_OPEN_GROUP_IDS);
+      } else {
         setMobileOpenGroups([]);
       }
       return next;
@@ -87,30 +108,51 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
     void hapticTap("heavy");
     logout();
     closeMenu();
-    router.replace('/login');
+    router.replace("/login");
   };
 
   if (!user) return null;
 
-  const isSuperAdmin = user.isSuperAdmin;
-  const isAdmin = isPlatformAdmin(user);
+  const role = String(user.role || "").toLowerCase();
+  const extraAccess = user as typeof user & { accesoCotizaciones?: boolean; accesoGestionCvs?: boolean };
+  const isSuperAdmin = Boolean(user.isSuperAdmin);
+  const isAdmin = !isSuperAdmin && isPlatformAdmin(user);
+  const isIngeniero = !isSuperAdmin && !isAdmin && role.includes("ingenier");
+  const isVendedor = !isSuperAdmin && !isAdmin && !isIngeniero;
   const userRoleLabel = getRoleLabel(user);
 
-  type MenuItem = {
-    icon: string;
-    label: string;
-    href: string;
-    permissions?: string[];
-    anyPermissions?: string[];
-  };
-
-  type MenuGroup = {
-    id: string;
-    title: string;
-    items: MenuItem[];
-  };
-
   const canAccessItem = (item: MenuItem) => {
+    if (isSuperAdmin) {
+      if (item.href.startsWith("/my-")) return false;
+      return true;
+    }
+
+    if (isAdmin) {
+      if (item.href.startsWith("/my-")) return false;
+      if (["/ventas", "/accounting", "/newsletter", "/news", "/gestion-pagina-web"].some((prefix) => item.href.startsWith(prefix))) {
+        return false;
+      }
+      if (item.href === "/cotizaciones" && !extraAccess.accesoCotizaciones) return false;
+      if (item.href === "/cvs" && !extraAccess.accesoGestionCvs) return false;
+    }
+
+    if (isIngeniero) {
+      if (!item.href.startsWith("/my-") && !["/dashboard", "/attendance", "/cotizaciones", "/cvs", "/ventas"].includes(item.href)) {
+        return false;
+      }
+      if (item.href === "/cotizaciones" && !extraAccess.accesoCotizaciones) return false;
+      if (item.href === "/cvs" && !extraAccess.accesoGestionCvs) return false;
+      if (item.href === "/ventas" && !role.includes("vended")) return false;
+    }
+
+    if (isVendedor) {
+      if (item.href !== "/ventas" && !["/cotizaciones", "/cvs", "/my-profile", "/my-preferences"].includes(item.href)) {
+        return false;
+      }
+      if (item.href === "/cotizaciones" && !extraAccess.accesoCotizaciones) return false;
+      if (item.href === "/cvs" && !extraAccess.accesoGestionCvs) return false;
+    }
+
     if (item.permissions && !item.permissions.every((permission) => hasPermission(user, permission))) {
       return false;
     }
@@ -120,22 +162,27 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
     return true;
   };
 
-  const profileItems: MenuItem[] = [
-    { icon: "👤", label: "Mi perfil", href: "/my-profile", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "⚙️", label: "Mis preferencias", href: "/my-preferences", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-  ];
+  const profileItems: MenuItem[] = [];
+  if (!isSuperAdmin && !isAdmin) {
+    profileItems.push(
+      { icon: "👤", label: "Mi perfil", href: "/my-profile", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+      { icon: "⚙️", label: "Mis preferencias", href: "/my-preferences", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    );
+  }
 
-  // ── Empleado (auto-servicio) ──────────────────────────
   const employeeItems: MenuItem[] = [
     { icon: "📊", label: "Resumen ejecutivo", href: "/dashboard", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "📋", label: "Mis actividades", href: "/my-activities", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "📸", label: "Mis evidencias", href: "/my-evidences", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "💼", label: "Mis viáticos", href: "/my-viatics", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "🚗", label: "Mis vehículos", href: "/my-vehicles", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "🍽️", label: "Breaks y comidas", href: "/my-lunch-breaks", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
   ];
+  if (isIngeniero) {
+    employeeItems.push(
+      { icon: "📋", label: "Mis actividades", href: "/my-activities", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+      { icon: "📸", label: "Mis evidencias", href: "/my-evidences", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+      { icon: "💼", label: "Mis viáticos", href: "/my-viatics", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+      { icon: "🚗", label: "Mis vehículos", href: "/my-vehicles", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+      { icon: "🍽️", label: "Breaks y comidas", href: "/my-lunch-breaks", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    );
+  }
 
-  // ── Operación (supervisión) ────────────────────────────
   const operationItems: MenuItem[] = [
     { icon: "🗂️", label: "Operación: actividades", href: "/activities", anyPermissions: [PERMISSIONS.ACTIVITIES_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
     { icon: "📸", label: "Evidencias de servicio", href: "/evidences", anyPermissions: [PERMISSIONS.EVIDENCES_REVIEW, PERMISSIONS.CONSOLE_ADMIN] },
@@ -169,7 +216,6 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
     { icon: "🔧", label: "Configuración del sistema", href: "/settings", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
   ];
 
-  // ── ERP Industrial ──────────────────────────────────────
   const inventoryItems: MenuItem[] = [
     { icon: "🏭", label: "Almacenes", href: "/warehouse", anyPermissions: [PERMISSIONS.WAREHOUSE_VIEW, PERMISSIONS.WAREHOUSE_MANAGE] },
     { icon: "📦", label: "Inventario / Stock", href: "/stock", anyPermissions: [PERMISSIONS.STOCK_VIEW, PERMISSIONS.STOCK_MANAGE] },
@@ -196,59 +242,24 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
   ];
 
   const groups: MenuGroup[] = [
-    {
-      id: "profile",
-      title: "Cuenta personal",
-      items: profileItems,
-    },
-    {
-      id: "employee",
-      title: "Mi espacio de trabajo",
-      items: employeeItems,
-    },
-    {
-      id: "operations",
-      title: "Supervisión operativa",
-      items: operationItems,
-    },
-    {
-      id: "people",
-      title: "RRHH y control de personal",
-      items: peopleItems,
-    },
-    {
-      id: "commercial",
-      title: "Clientes y comercial",
-      items: commercialItems,
-    },
-    {
-      id: "system",
-      title: "Administracion interna",
-      items: systemItems,
-    },
-    {
-      id: "inventory",
-      title: "Inventario y compras",
-      items: inventoryItems,
-    },
-    {
-      id: "finance",
-      title: "Finanzas y banca",
-      items: financeItems,
-    },
-    {
-      id: "compliance",
-      title: "Cumplimiento y BI",
-      items: complianceItems,
-    },
+    { id: "profile", title: "Cuenta personal", items: profileItems },
+    { id: "employee", title: "Mi espacio de trabajo", items: employeeItems },
+    { id: "operations", title: "Supervisión operativa", items: operationItems },
+    { id: "people", title: "RRHH y control de personal", items: peopleItems },
+    { id: "commercial", title: "Clientes y comercial", items: commercialItems },
+    { id: "system", title: "Administracion interna", items: systemItems },
+    { id: "inventory", title: "Inventario y compras", items: inventoryItems },
+    { id: "finance", title: "Finanzas y banca", items: financeItems },
+    { id: "compliance", title: "Cumplimiento y BI", items: complianceItems },
   ];
 
-  const visibleGroups = groups
-    .map((group) => ({
-      ...group,
-      items: group.items.filter(canAccessItem),
-    }))
-    .filter((group) => group.items.length > 0);
+  const visibleGroups = useMemo(
+    () =>
+      groups
+        .map((group) => ({ ...group, items: group.items.filter(canAccessItem) }))
+        .filter((group) => group.items.length > 0),
+    [groups],
+  );
 
   const fallbackGroups: MenuGroup[] = [
     {
@@ -261,13 +272,13 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
     },
   ];
 
-  const inPrefixedConsolePath = Boolean(pathname && pathname.startsWith('/console'));
+  const inPrefixedConsolePath = Boolean(pathname && pathname.startsWith("/console"));
 
   const resolveConsoleHref = (href: string) => {
-    if (!href.startsWith('/')) return href;
-    if (href === '/paneles' || href === '/login') return href;
-    if (href === '/contabilidad' || href.startsWith('/contabilidad/')) return href;
-    if (href === '/console' || href.startsWith('/console/')) return href;
+    if (!href.startsWith("/")) return href;
+    if (href === "/paneles" || href === "/login") return href;
+    if (href === "/contabilidad" || href.startsWith("/contabilidad/")) return href;
+    if (href === "/console" || href.startsWith("/console/")) return href;
     return inPrefixedConsolePath ? `/console${href}` : href;
   };
 
@@ -282,24 +293,16 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
   const isPathActive = (href: string) => pathname === href || (pathname?.startsWith(`${href}/`) ?? false);
 
   const toggleMobileGroup = (groupId: string) => {
-    setMobileOpenGroups((prev) =>
-      prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId],
-    );
+    setMobileOpenGroups((prev) => (prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId]));
   };
 
   const avatarUrl = getAvatarSrc(user);
 
   return (
-    <aside className={styles.sidebar} data-mobile={isMobile ? 'true' : 'false'} data-open={isMenuOpen ? 'true' : 'false'}>
-      {/* Header del Sidebar con Logo y Hamburguesa */}
+    <aside className={styles.sidebar} data-mobile={isMobile ? "true" : "false"} data-open={isMenuOpen ? "true" : "false"}>
       <div className={styles.sidebarHeader}>
         <div className={styles.sidebarLogo}>
-          <img
-            src={brandLogoSrc}
-            alt="NEXARA"
-            className={styles.brandLogo}
-            onError={() => setBrandLogoSrc("/icon.png")}
-          />
+          <img src={brandLogoSrc} alt="NEXARA" className={styles.brandLogo} onError={() => setBrandLogoSrc("/icon.png")} />
           <span className={styles.brandMark}>NEXARA</span>
           {isMobile && <span className={styles.brandSub}>Consola</span>}
         </div>
@@ -311,7 +314,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
             aria-label={isMenuOpen ? "Cerrar menú" : "Abrir menú"}
             aria-expanded={isMenuOpen}
             aria-controls="sidebar-menu"
-            data-open={isMenuOpen ? 'true' : 'false'}
+            data-open={isMenuOpen ? "true" : "false"}
           >
             <span className={styles.hamburgerLine}></span>
             <span className={styles.hamburgerLine}></span>
@@ -320,112 +323,87 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
         )}
       </div>
 
-      {/* Overlay para móvil */}
-      {isMobile && isMenuOpen && (
-        <div
-          className={styles.sidebarOverlay}
-          onClick={closeMenu}
-          role="presentation"
-        ></div>
-      )}
+      {isMobile && isMenuOpen && <div className={styles.sidebarOverlay} onClick={closeMenu} role="presentation"></div>}
 
-      {/* Contenedor del menú que se desplaza en móvil */}
       {(!isMobile || isMenuOpen) && (
-      <div
-        className={styles.sidebarContent}
-        id="sidebar-menu"
-        data-open={isMobile && isMenuOpen ? 'true' : undefined}
-      >
-        <div className={styles.sidebarUser}>
-          <div className={styles.sidebarAvatar}>
-            <Image 
-              className={`${styles.avatarImage} ${user.isSuperAdmin ? styles.avatarImageLogo : ''}`} 
-              src={avatarUrl} 
-              alt={user.isSuperAdmin ? 'NEXARA' : user.nombre}
-              width={64} 
-              height={64}
-              priority={false}
-              loading="lazy"
-              unoptimized
-            />
+        <div className={styles.sidebarContent} id="sidebar-menu" data-open={isMobile && isMenuOpen ? "true" : undefined}>
+          <div className={styles.sidebarUser}>
+            <div className={styles.sidebarAvatar}>
+              <Image
+                className={`${styles.avatarImage} ${user.isSuperAdmin ? styles.avatarImageLogo : ""}`}
+                src={avatarUrl}
+                alt={user.isSuperAdmin ? "NEXARA" : user.nombre}
+                width={64}
+                height={64}
+                priority={false}
+                loading="lazy"
+                unoptimized
+              />
+            </div>
+            <div className={styles.sidebarName}>{user.nombre}</div>
+            <div className={styles.sidebarEmail}>{user.email}</div>
+            <div className={styles.sidebarMeta}>
+              <span className={styles.rolePill}>{userRoleLabel}</span>
+              {user.isSuperAdmin && <span className={styles.levelPill}>Superadmin</span>}
+              {!user.isSuperAdmin && isAdmin && <span className={styles.levelPill}>Admin</span>}
+            </div>
           </div>
-          <div className={styles.sidebarName}>{user.nombre}</div>
-          <div className={styles.sidebarEmail}>{user.email}</div>
-          <div className={styles.sidebarMeta}>
-            <span className={styles.rolePill}>{userRoleLabel}</span>
-            {user.isSuperAdmin && <span className={styles.levelPill}>Superadmin</span>}
-            {!user.isSuperAdmin && isAdmin && <span className={styles.levelPill}>Admin</span>}
-          </div>
-        </div>
-        {groupsToRender.map((group) => (
-          <div key={group.id} className={styles.menuGroup}>
-            {isMobile ? (
-              <button
-                type="button"
-                className={styles.menuGroupToggle}
-                onClick={() => toggleMobileGroup(group.id)}
-                aria-expanded={mobileOpenGroups.includes(group.id)}
-                aria-controls={`menu-group-${group.id}`}
-              >
-                <span>{group.title}</span>
-                <span className={`${styles.menuGroupChevron} ${mobileOpenGroups.includes(group.id) ? styles.menuGroupChevronOpen : ""}`}>
-                  ▾
-                </span>
-              </button>
-            ) : (
-              <div className={styles.menuTitle}>{group.title}</div>
-            )}
 
-            {(!isMobile || mobileOpenGroups.includes(group.id)) && (
-              <ul className={styles.sidebarMenu} id={`menu-group-${group.id}`}>
-                {group.items.map((item) => {
-                  const isItemActive = isPathActive(item.href);
-                  return (
-                    <li key={`${group.id}-${item.href}`} className={styles.sidebarMenuItem}>
-                      <Link
-                        href={item.href}
-                        className={isItemActive ? `${styles.menuLink} ${styles.active}` : styles.menuLink}
-                        onClick={closeMenu}
-                      >
-                        <span className={styles.menuLinkIcon} aria-hidden="true">{item.icon}</span>
-                        <span className={styles.menuLinkText}>{item.label}</span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-        ))}
-        <div className={styles.sidebarFooter}>
-          <div className={styles.sidebarFooterActions}>
-            <Link
-              href="/paneles"
-              className={styles.menuLink}
-              onClick={closeMenu}
-            >
-              Cambiar panel
-            </Link>
-            <button
-              onClick={toggleDarkMode}
-              className={styles.themeSwitcher}
-              aria-label={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-              title={darkMode ? 'Modo claro' : 'Modo oscuro'}
-            >
-              <span className={styles.themeIcon} aria-hidden="true">●</span>
-              <span className={styles.themeLabel}>{darkMode ? 'Vista oscura' : 'Vista clara'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className={styles.logoutButton}
-              aria-label="Cerrar sesión"
-            >
-              Cerrar sesión
-            </button>
+          {groupsToRender.map((group) => (
+            <div key={group.id} className={styles.menuGroup}>
+              {isMobile ? (
+                <button
+                  type="button"
+                  className={styles.menuGroupToggle}
+                  onClick={() => toggleMobileGroup(group.id)}
+                  aria-expanded={mobileOpenGroups.includes(group.id)}
+                  aria-controls={`menu-group-${group.id}`}
+                >
+                  <span>{group.title}</span>
+                  <span className={`${styles.menuGroupChevron} ${mobileOpenGroups.includes(group.id) ? styles.menuGroupChevronOpen : ""}`}>▾</span>
+                </button>
+              ) : (
+                <div className={styles.menuTitle}>{group.title}</div>
+              )}
+
+              {(!isMobile || mobileOpenGroups.includes(group.id)) && (
+                <ul className={styles.sidebarMenu} id={`menu-group-${group.id}`}>
+                  {group.items.map((item) => {
+                    const isItemActive = isPathActive(item.href);
+                    return (
+                      <li key={`${group.id}-${item.href}`} className={styles.sidebarMenuItem}>
+                        <Link href={item.href} className={isItemActive ? `${styles.menuLink} ${styles.active}` : styles.menuLink} onClick={closeMenu}>
+                          <span className={styles.menuLinkIcon} aria-hidden="true">{item.icon}</span>
+                          <span className={styles.menuLinkText}>{item.label}</span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          ))}
+
+          <div className={styles.sidebarFooter}>
+            <div className={styles.sidebarFooterActions}>
+              <Link href="/paneles" className={styles.menuLink} onClick={closeMenu}>
+                Cambiar panel
+              </Link>
+              <button
+                onClick={toggleDarkMode}
+                className={styles.themeSwitcher}
+                aria-label={darkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+                title={darkMode ? "Modo claro" : "Modo oscuro"}
+              >
+                <span className={styles.themeIcon} aria-hidden="true">●</span>
+                <span className={styles.themeLabel}>{darkMode ? "Vista oscura" : "Vista clara"}</span>
+              </button>
+              <button type="button" onClick={handleLogout} className={styles.logoutButton} aria-label="Cerrar sesión">
+                Cerrar sesión
+              </button>
+            </div>
           </div>
         </div>
-      </div>
       )}
     </aside>
   );

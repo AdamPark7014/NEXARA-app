@@ -594,6 +594,13 @@ textarea:disabled {
   --bottom-nav-height: 56px;
 }
 
+/* Floating pill bottom nav is taller: pill height + bottom margin */
+@media (max-width: 900px) {
+  :root {
+    --bottom-nav-height: 76px;
+  }
+}
+
 * {
   -webkit-tap-highlight-color: transparent;
 }
@@ -642,6 +649,523 @@ textarea:disabled {
         0 10px 22px color-mix(in srgb, var(--shadow) 42%, transparent),
         0 1px 0 color-mix(in srgb, #fff 38%, transparent) inset;
     }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NEXARA MOBILE — Global UI Enhancement Pack
+   Mega-friendly mobile-first design system additions
+═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── New keyframes ─────────────────────────────────────────────────────── */
+@keyframes nexara-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+@keyframes nexara-slide-in-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes nexara-pop {
+  0%   { transform: scale(0.92); opacity: 0; }
+  65%  { transform: scale(1.04); }
+  100% { transform: scale(1);    opacity: 1; }
+}
+
+@keyframes nexara-skeleton {
+  0%   { background-position: -320px 0; }
+  100% { background-position:  320px 0; }
+}
+
+@keyframes nexara-glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0   color-mix(in srgb, var(--primary) 38%, transparent); }
+  50%       { box-shadow: 0 0 0 6px color-mix(in srgb, var(--primary) 0%,  transparent); }
+}
+
+/* ── Button: primary ───────────────────────────────────────────────────── */
+.button-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.48rem;
+  height: var(--control-height, 46px);
+  padding: 0 1.35rem;
+  border-radius: var(--radius-md);
+  font-family: var(--font-base);
+  font-size: 0.91rem;
+  font-weight: 700;
+  letter-spacing: 0.012em;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 55%, var(--primary-strong) 100%);
+  background-size: 200% auto;
+  color: #ffffff;
+  box-shadow:
+    0 4px 16px color-mix(in srgb, var(--primary) 44%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  transition: transform 0.14s ease, box-shadow 0.22s ease, background-position 0.4s ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.button-primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.18) 50%, transparent 100%);
+  background-size: 200% auto;
+  opacity: 0;
+  transition: opacity 0.28s ease;
+}
+
+.button-primary:hover:not(:disabled) {
+  background-position: right center;
+  transform: translateY(-2px);
+  box-shadow:
+    0 10px 28px color-mix(in srgb, var(--primary) 54%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.button-primary:hover:not(:disabled)::after {
+  opacity: 1;
+  animation: nexara-shimmer 1.2s linear infinite;
+}
+
+.button-primary:active:not(:disabled) {
+  transform: translateY(0) scale(0.972);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 38%, transparent);
+}
+
+.button-primary:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ── Button: secondary ─────────────────────────────────────────────────── */
+.button-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.48rem;
+  height: var(--control-height, 46px);
+  padding: 0 1.25rem;
+  border-radius: var(--radius-md);
+  font-family: var(--font-base);
+  font-size: 0.91rem;
+  font-weight: 700;
+  letter-spacing: 0.012em;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--surface) 93%, var(--primary) 7%);
+  border: 1.5px solid color-mix(in srgb, var(--primary) 38%, var(--border));
+  color: var(--primary);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--shadow) 26%, transparent);
+  transition: transform 0.14s ease, box-shadow 0.22s ease, background 0.22s ease, border-color 0.22s ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.button-secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+  border-color: color-mix(in srgb, var(--primary) 58%, transparent);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--primary) 24%, transparent);
+}
+
+.button-secondary:active:not(:disabled) {
+  transform: scale(0.972);
+  box-shadow: none;
+}
+
+.button-secondary:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+}
+
+/* ── Button: ghost ─────────────────────────────────────────────────────── */
+.button-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.44rem;
+  height: var(--control-height, 44px);
+  padding: 0 1rem;
+  border-radius: var(--radius-md);
+  font-family: var(--font-base);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  color: var(--text-secondary);
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.button-ghost:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--surface-2) 88%, transparent);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.button-ghost:active:not(:disabled) {
+  transform: scale(0.972);
+}
+
+/* ── Button: danger ────────────────────────────────────────────────────── */
+.button-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.48rem;
+  height: var(--control-height, 46px);
+  padding: 0 1.25rem;
+  border-radius: var(--radius-md);
+  font-family: var(--font-base);
+  font-size: 0.91rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  background: linear-gradient(135deg, var(--danger) 0%, color-mix(in srgb, var(--danger) 78%, #7a0000) 100%);
+  border: none;
+  color: #fff;
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--danger) 40%, transparent);
+  transition: transform 0.14s ease, box-shadow 0.22s ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.button-danger:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--danger) 52%, transparent);
+}
+
+.button-danger:active:not(:disabled) {
+  transform: scale(0.972);
+}
+
+.button-danger:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+}
+
+/* ── Icon button ───────────────────────────────────────────────────────── */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 84%, transparent);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 1.02rem;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.btn-icon:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary) 14%, var(--surface));
+  color: var(--primary);
+  border-color: color-mix(in srgb, var(--primary) 36%, transparent);
+  transform: scale(1.06);
+}
+
+.btn-icon:active:not(:disabled) {
+  transform: scale(0.90);
+}
+
+/* ── Card (glass morphism) ─────────────────────────────────────────────── */
+.card {
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--primary) 16%, var(--border));
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  padding: var(--panel-padding-y) var(--panel-padding-x);
+  box-shadow:
+    0 2px 14px color-mix(in srgb, var(--shadow) 28%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 26%, transparent);
+  position: relative;
+  overflow: hidden;
+  animation: nexara-slide-in-up var(--motion-base) ease both;
+  transition: box-shadow 0.22s ease, transform 0.18s ease;
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--primary) 36%, transparent) 40%,
+    color-mix(in srgb, var(--primary) 36%, transparent) 60%,
+    transparent 100%
+  );
+}
+
+.card:hover {
+  box-shadow:
+    0 10px 28px color-mix(in srgb, var(--shadow) 44%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 26%, transparent);
+  transform: translateY(-1px);
+}
+
+/* ── Stat card (dashboard metric tile) ────────────────────────────────── */
+.stat-card {
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--border));
+  padding: 1.05rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  background: linear-gradient(
+    148deg,
+    color-mix(in srgb, var(--surface) 97%, var(--primary) 3%),
+    color-mix(in srgb, var(--surface) 92%, var(--background) 8%)
+  );
+  box-shadow:
+    0 2px 14px color-mix(in srgb, var(--shadow) 24%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent);
+  animation: nexara-slide-in-up var(--motion-base) ease both;
+}
+
+.stat-card-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.stat-card-value {
+  font-size: 1.65rem;
+  font-weight: 800;
+  font-family: var(--font-heading);
+  color: var(--text-primary);
+  line-height: 1.08;
+  letter-spacing: -0.022em;
+}
+
+.stat-card-sub    { font-size: 0.8rem;  color: var(--text-secondary); }
+.stat-card-accent { color: var(--primary); }
+.stat-card-up     { color: var(--success); font-weight: 700; }
+.stat-card-down   { color: var(--danger);  font-weight: 700; }
+
+/* ── Status badges / chips ─────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.26rem;
+  padding: 0.2rem 0.62rem;
+  border-radius: 999px;
+  font-size: 0.73rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.badge-success { background: var(--state-success-bg); color: var(--state-success-text); border: 1px solid var(--state-success-border); }
+.badge-warning { background: var(--state-warning-bg); color: var(--state-warning-text); border: 1px solid var(--state-warning-border); }
+.badge-danger  { background: var(--state-danger-bg);  color: var(--state-danger-text);  border: 1px solid var(--state-danger-border); }
+.badge-info    { background: var(--state-info-bg);    color: var(--state-info-text);    border: 1px solid var(--state-info-border); }
+.badge-neutral { background: color-mix(in srgb, var(--surface-2) 84%, transparent); color: var(--text-secondary); border: 1px solid var(--border); }
+.badge-primary { background: color-mix(in srgb, var(--primary) 16%, transparent); color: var(--primary); border: 1px solid color-mix(in srgb, var(--primary) 38%, transparent); }
+
+/* ── Skeleton loading ──────────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--surface-2) 82%, transparent) 0%,
+    color-mix(in srgb, var(--surface-3) 82%, transparent) 42%,
+    color-mix(in srgb, var(--surface-2) 82%, transparent) 84%
+  );
+  background-size: 320px 100%;
+  border-radius: var(--radius-sm);
+  animation: nexara-skeleton 1.4s ease-in-out infinite;
+}
+
+.skeleton-text   { height: 0.88rem; margin-bottom: 0.55rem; }
+.skeleton-title  { height: 1.35rem; width: 62%; margin-bottom: 0.75rem; }
+.skeleton-avatar { width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0; }
+.skeleton-card   { height: 118px; }
+.skeleton-row    { height: 46px; margin-bottom: 0.44rem; }
+
+/* ── Empty state ───────────────────────────────────────────────────────── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  padding: 3.2rem 1.5rem;
+  text-align: center;
+}
+
+.empty-state-icon    { font-size: 2.8rem; opacity: 0.52; }
+.empty-state-title   { font-size: 1.04rem; font-weight: 700; color: var(--text-secondary); margin: 0; }
+.empty-state-message { font-size: 0.86rem; line-height: 1.52; color: var(--text-tertiary); margin: 0; max-width: 280px; }
+
+/* ── Table wrapper (mobile-scrollable) ────────────────────────────────── */
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--border) 78%, transparent) transparent;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--shadow) 22%, transparent);
+}
+
+.table-wrapper table {
+  width: 100%;
+  min-width: 480px;
+  border-collapse: collapse;
+}
+
+.table-wrapper th {
+  padding: 0.6rem 0.85rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  background: color-mix(in srgb, var(--surface-2) 86%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  white-space: nowrap;
+  text-align: left;
+}
+
+.table-wrapper td {
+  padding: var(--table-cell-y) var(--table-cell-x);
+  font-size: 0.88rem;
+  color: var(--text-primary);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 36%, transparent);
+  vertical-align: middle;
+}
+
+.table-wrapper tr:last-child td { border-bottom: none; }
+
+.table-wrapper tr:hover td {
+  background: color-mix(in srgb, var(--primary) 5%, transparent);
+}
+
+/* ── Divider with optional label ───────────────────────────────────────── */
+.divider {
+  width: 100%;
+  height: 1px;
+  background: color-mix(in srgb, var(--border) 70%, transparent);
+  margin: var(--panel-gap, 14px) 0;
+}
+
+.divider-label {
+  display: flex;
+  align-items: center;
+  gap: 0.72rem;
+  color: var(--text-tertiary);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: var(--space-4) 0;
+}
+
+.divider-label::before,
+.divider-label::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+/* ── Section heading ───────────────────────────────────────────────────── */
+.section-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.58rem;
+  margin: 0 0 var(--panel-gap, 14px);
+}
+
+.section-heading h2,
+.section-heading h3 {
+  margin: 0;
+  line-height: 1.2;
+}
+
+.section-heading-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--primary);
+  flex-shrink: 0;
+  box-shadow: 0 0 7px var(--primary);
+}
+
+/* ── Page container safe-area (accounts for floating BottomNav) ────────── */
+.page-content {
+  padding-bottom: calc(var(--bottom-nav-height, 56px) + 24px + env(safe-area-inset-bottom, 0px));
+}
+
+/* ── Smooth list-item entrance ─────────────────────────────────────────── */
+.list-item-enter {
+  animation: nexara-slide-in-up var(--motion-base) ease both;
+}
+
+.list-item-enter:nth-child(1)  { animation-delay: 0ms;  }
+.list-item-enter:nth-child(2)  { animation-delay: 40ms; }
+.list-item-enter:nth-child(3)  { animation-delay: 80ms; }
+.list-item-enter:nth-child(4)  { animation-delay: 120ms; }
+.list-item-enter:nth-child(5)  { animation-delay: 160ms; }
+.list-item-enter:nth-child(n+6){ animation-delay: 200ms; }
+
+/* ── Panel glass tile (stats blocks, metric panels) ────────────────────── */
+.panel-glass {
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
+  background:
+    linear-gradient(145deg,
+      color-mix(in srgb, var(--surface) 96%, var(--primary) 4%),
+      color-mix(in srgb, var(--background) 14%, var(--surface) 86%)
+    );
+  box-shadow:
+    0 4px 18px color-mix(in srgb, var(--shadow) 28%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 20%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ── Mobile-only: collapsible card header ──────────────────────────────── */
+@media (max-width: 640px) {
+  .stat-card-value { font-size: 1.42rem; }
+  .badge           { font-size: 0.68rem;  padding: 0.18rem 0.52rem; }
+  .btn-icon        { width: 38px; height: 38px; }
+
+  .button-primary,
+  .button-secondary,
+  .button-danger {
+    height: max(var(--control-height, 46px), 46px);
+    font-size: 0.88rem;
   }
 }
 

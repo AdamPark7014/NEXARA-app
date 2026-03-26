@@ -127,8 +127,9 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
           overflow: hidden;
           padding: clamp(14px, 2.2vw, 30px);
           background:
-            radial-gradient(circle at 12% -10%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 42%),
-            radial-gradient(circle at 88% -4%, color-mix(in srgb, var(--secondary) 12%, transparent), transparent 44%),
+            radial-gradient(circle at 12% -10%, color-mix(in srgb, var(--primary) 18%, transparent), transparent 42%),
+            radial-gradient(circle at 88% -4%, color-mix(in srgb, var(--secondary) 16%, transparent), transparent 44%),
+            radial-gradient(circle at 50% 110%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 38%),
             linear-gradient(180deg, var(--background) 0%, color-mix(in srgb, var(--surface-2) 88%, var(--background)) 100%);
         }
 
@@ -145,17 +146,49 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
           z-index: -1;
         }
 
+        .login-container::after {
+          content: "";
+          position: absolute;
+          inset: auto auto 8% 50%;
+          width: min(66vw, 520px);
+          height: min(66vw, 520px);
+          transform: translateX(-50%);
+          border-radius: 50%;
+          background: radial-gradient(circle, color-mix(in srgb, var(--primary) 10%, transparent), transparent 62%);
+          filter: blur(18px);
+          opacity: 0.85;
+          z-index: -1;
+        }
+
         .login-card {
           position: relative;
           width: 100%;
-          max-width: 540px;
+          max-width: 560px;
           border-radius: 24px;
           padding: clamp(26px, 4vw, 44px) clamp(18px, 3vw, 36px);
           background:
+            radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--primary) 12%, transparent), transparent 42%),
             linear-gradient(165deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface-2) 88%, transparent));
-          border: 1px solid var(--border);
-          box-shadow: var(--elev-2);
+          border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
+          box-shadow:
+            0 22px 54px color-mix(in srgb, var(--shadow) 42%, transparent),
+            inset 0 1px 0 color-mix(in srgb, #fff 24%, transparent);
+          backdrop-filter: blur(14px) saturate(1.15);
+          -webkit-backdrop-filter: blur(14px) saturate(1.15);
           animation: login-card-enter 0.34s ease-out;
+          overflow: hidden;
+        }
+
+        .login-card::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: 24px;
+          right: 24px;
+          height: 2px;
+          border-radius: 0 0 4px 4px;
+          background: linear-gradient(90deg, transparent, var(--primary), transparent);
+          opacity: 0.82;
         }
 
         @keyframes login-card-enter {
@@ -174,23 +207,58 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
           margin-bottom: clamp(22px, 2.8vw, 34px);
         }
 
-        .logo {
-          width: 88px;
-          height: 88px;
+        .login-shell {
+          display: grid;
+          gap: 18px;
+        }
+
+        .hero-kicker {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.45rem;
           margin: 0 auto 12px;
-          border-radius: 20px;
+          padding: 0.38rem 0.72rem;
+          border-radius: 999px;
+          border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--border));
+          background: color-mix(in srgb, var(--surface) 88%, var(--primary) 12%);
+          color: var(--primary-strong);
+          font-size: 0.76rem;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          box-shadow: 0 8px 18px color-mix(in srgb, var(--primary) 14%, transparent);
+        }
+
+        .hero-kicker-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: var(--primary);
+          box-shadow: 0 0 10px color-mix(in srgb, var(--primary) 66%, transparent);
+        }
+
+        .logo {
+          width: 96px;
+          height: 96px;
+          margin: 0 auto 12px;
+          border-radius: 24px;
           display: flex;
           align-items: center;
           justify-content: center;
-          background: linear-gradient(145deg, color-mix(in srgb, var(--surface) 88%, var(--primary) 12%), color-mix(in srgb, var(--surface-2) 84%, var(--secondary) 16%));
-          border: 1px solid color-mix(in srgb, var(--primary) 26%, var(--border));
-          box-shadow: var(--elev-1);
+          background:
+            radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.08), transparent 38%),
+            linear-gradient(145deg, color-mix(in srgb, var(--surface) 84%, var(--primary) 16%), color-mix(in srgb, var(--surface-2) 80%, var(--secondary) 20%));
+          border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
+          box-shadow:
+            0 16px 30px color-mix(in srgb, var(--shadow) 34%, transparent),
+            inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent);
         }
 
         .logoImage {
-          width: 60px;
-          height: 60px;
+          width: 70px;
+          height: 70px;
           object-fit: contain;
+          filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.18));
         }
 
         .brandName {
@@ -217,10 +285,51 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
           line-height: 1.54;
           color: var(--text-secondary);
           text-wrap: pretty;
+          max-width: 32rem;
+          margin-inline: auto;
+        }
+
+        .hero-metrics {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 0.75rem;
+          margin-top: 18px;
+        }
+
+        .metric {
+          padding: 0.8rem 0.85rem;
+          border-radius: 16px;
+          border: 1px solid color-mix(in srgb, var(--primary) 16%, var(--border));
+          background: color-mix(in srgb, var(--surface) 94%, transparent);
+          box-shadow: 0 10px 22px color-mix(in srgb, var(--shadow) 16%, transparent);
+        }
+
+        .metric-value {
+          display: block;
+          font-family: var(--font-heading);
+          font-size: 1.02rem;
+          font-weight: 800;
+          color: var(--text-primary);
+          line-height: 1.05;
+        }
+
+        .metric-label {
+          display: block;
+          margin-top: 4px;
+          font-size: 0.72rem;
+          line-height: 1.35;
+          color: var(--text-tertiary);
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
         }
 
         .form {
           margin-top: clamp(20px, 2vw, 30px);
+          padding: 1rem;
+          border-radius: 20px;
+          border: 1px solid color-mix(in srgb, var(--primary) 14%, var(--border));
+          background: color-mix(in srgb, var(--surface) 88%, transparent);
+          box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent);
         }
 
         .input-group {
@@ -313,17 +422,19 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
 
         .submit-button {
           width: 100%;
-          margin-top: 6px;
-          min-height: 50px;
+          margin-top: 10px;
+          min-height: 54px;
           border: none;
-          border-radius: var(--radius-sm);
-          background: linear-gradient(140deg, var(--primary) 0%, var(--secondary) 100%);
+          border-radius: 16px;
+          background: linear-gradient(140deg, var(--secondary) 0%, var(--primary) 52%, var(--primary-strong) 100%);
           color: #fff;
-          font-size: 0.98rem;
+          font-size: 1rem;
           font-weight: 700;
-          letter-spacing: 0.01em;
+          letter-spacing: 0.015em;
           cursor: pointer;
-          box-shadow: 0 10px 24px color-mix(in srgb, var(--primary) 28%, transparent);
+          box-shadow:
+            0 14px 30px color-mix(in srgb, var(--primary) 32%, transparent),
+            inset 0 1px 0 rgba(255, 255, 255, 0.22);
           transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
         }
 
@@ -367,6 +478,27 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
           border-top: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
         }
 
+        .trust-row {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 0.5rem;
+          margin-top: 0.9rem;
+        }
+
+        .trust-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+          padding: 0.38rem 0.7rem;
+          border-radius: 999px;
+          background: color-mix(in srgb, var(--surface-2) 90%, transparent);
+          border: 1px solid color-mix(in srgb, var(--primary) 14%, var(--border));
+          color: var(--text-secondary);
+          font-size: 0.74rem;
+          font-weight: 700;
+        }
+
         .footer-text {
           margin: 0;
           font-size: 0.8rem;
@@ -401,15 +533,20 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
             padding: 24px 14px;
           }
 
+          .hero-metrics {
+            grid-template-columns: 1fr;
+            gap: 0.55rem;
+          }
+
           .logo {
-            width: 74px;
-            height: 74px;
+            width: 82px;
+            height: 82px;
             border-radius: 16px;
           }
 
           .logoImage {
-            width: 48px;
-            height: 48px;
+            width: 58px;
+            height: 58px;
           }
 
           .title {
@@ -442,7 +579,12 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
 
       <div className="login-container">
         <div className="login-card">
+          <div className="login-shell">
           <div className="logo-container">
+            <div className="hero-kicker">
+              <span className="hero-kicker-dot" aria-hidden="true"></span>
+              Acceso seguro
+            </div>
             <div className="logo">
               <img
                 src={brandLogoSrc}
@@ -456,6 +598,20 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
             <p className="brandName">Nexara</p>
             <h1 className="title">{title || "Iniciar sesión"}</h1>
             <p className="subtitle">{subtitle || "Ingresa a tu cuenta de Nexara"}</p>
+            <div className="hero-metrics" aria-hidden="true">
+              <div className="metric">
+                <span className="metric-value">Roles</span>
+                <span className="metric-label">Acceso por permisos</span>
+              </div>
+              <div className="metric">
+                <span className="metric-value">Seguro</span>
+                <span className="metric-label">Validación por dispositivo</span>
+              </div>
+              <div className="metric">
+                <span className="metric-value">Tiempo real</span>
+                <span className="metric-label">Operación conectada</span>
+              </div>
+            </div>
           </div>
 
           <form className="form" onSubmit={handleLogin}>
@@ -532,6 +688,12 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
 
           <div className="footer">
             <p className="footer-text">Tecnología que impulsa tu negocio</p>
+            <div className="trust-row" aria-hidden="true">
+              <span className="trust-pill">Control operacional</span>
+              <span className="trust-pill">Permisos por usuario</span>
+              <span className="trust-pill">Acceso corporativo</span>
+            </div>
+          </div>
           </div>
         </div>
       </div>

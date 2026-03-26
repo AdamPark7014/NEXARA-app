@@ -4,6 +4,10 @@
 	gap: clamp(14px, 1.8vw, 22px);
 	padding: var(--panel-padding-y) var(--panel-padding-x);
 	min-height: 100vh;
+	position: relative;
+	background:
+		radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--primary) 10%, transparent), transparent 32%),
+		radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--secondary) 9%, transparent), transparent 34%);
 }
 
 .consoleMain {
@@ -12,6 +16,7 @@
 	display: flex;
 	flex-direction: column;
 	gap: 14px;
+	padding-bottom: calc(var(--bottom-nav-height, 56px) + 26px + env(safe-area-inset-bottom, 0px));
 }
 
 .consoleTopbar {
@@ -20,7 +25,14 @@
 	padding: 14px 16px;
 	border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
 	border-radius: 16px;
-	background: color-mix(in srgb, var(--surface) 94%, transparent);
+	background:
+		radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 48%),
+		linear-gradient(145deg, color-mix(in srgb, var(--surface) 94%, transparent), color-mix(in srgb, var(--surface-2) 84%, transparent));
+	backdrop-filter: blur(14px) saturate(1.25);
+	-webkit-backdrop-filter: blur(14px) saturate(1.25);
+	box-shadow:
+		0 14px 28px color-mix(in srgb, var(--shadow) 26%, transparent),
+		inset 0 1px 0 color-mix(in srgb, #fff 28%, transparent);
 }
 
 .consoleEyebrow {
@@ -68,6 +80,10 @@
 .consoleContent {
 	display: grid;
 	gap: 14px;
+	min-width: 0;
+}
+
+.consoleContent > * {
 	min-width: 0;
 }
 
@@ -168,6 +184,9 @@
 .avatarImage {
 	width: 100%;
 	height: 100%;
+	display: block;
+	aspect-ratio: 1 / 1;
+	border-radius: 50%;
 	object-fit: cover;
 }
 
@@ -714,109 +733,6 @@
 	background: color-mix(in srgb, var(--foreground) 24%, transparent);
 }
 
-/* Mobile sidebar refresh: better contrast, clearer grouping, cleaner footer */
-@media (max-width: 900px) {
-	.sidebar[data-mobile="true"] .sidebarContent {
-		display: none;
-		position: fixed;
-		top: 64px;
-		left: 8px;
-		right: 8px;
-		z-index: 12002;
-		max-height: calc(100dvh - 74px);
-		overflow-y: auto;
-		overflow-x: hidden;
-		overflow: auto;
-		overscroll-behavior: contain;
-		-webkit-overflow-scrolling: touch;
-		touch-action: auto;
-		opacity: 0;
-		visibility: hidden;
-		transform: translateY(-8px) scale(0.99);
-		pointer-events: none;
-		padding: 0.9rem;
-		gap: 0.82rem;
-		border-radius: 16px;
-	}
-
-	.sidebar[data-mobile="true"] .sidebarContent[data-open="true"] {
-		display: flex;
-		background: color-mix(in srgb, var(--surface) 96%, var(--background));
-		border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
-		box-shadow: 0 20px 36px color-mix(in srgb, var(--shadow) 52%, transparent);
-		opacity: 1;
-		visibility: visible;
-		transform: translateY(0) scale(1);
-		pointer-events: auto;
-	}
-
-	.menuGroup {
-		gap: 0.38rem;
-		padding: 0.42rem 0.24rem 0.3rem;
-		border-top: 1px dashed color-mix(in srgb, var(--border) 76%, transparent);
-	}
-
-	.menuGroup:first-of-type {
-		border-top: 0;
-		padding-top: 0.12rem;
-	}
-
-	.menuGroupToggle,
-	.menuTitle {
-		color: color-mix(in srgb, var(--text-primary) 86%, var(--text-secondary));
-		font-weight: 760;
-		letter-spacing: 0.045em;
-		font-size: 0.73rem;
-	}
-
-	.menuGroupChevron {
-		color: var(--text-secondary);
-	}
-
-	.sidebarMenu {
-		gap: 0.3rem;
-	}
-
-	.menuLink {
-		min-height: 42px;
-		padding: 0.52rem 0.7rem;
-		font-size: 0.86rem;
-		border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
-	}
-
-	.active {
-		background: color-mix(in srgb, var(--primary) 14%, var(--surface));
-		border-color: color-mix(in srgb, var(--primary) 46%, var(--border));
-	}
-
-	.sidebarFooter {
-		margin-top: auto;
-		padding-top: 0.42rem;
-		border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-	}
-
-	.sidebarFooterActions {
-		gap: 0.5rem;
-	}
-
-	.themeSwitcher,
-	.logoutButton,
-	.sidebarFooter .menuLink {
-		min-height: 42px;
-		font-weight: 700;
-	}
-}
-
-@media (max-width: 640px) {
-	.sidebar[data-mobile="true"] .sidebarContent {
-		top: 56px;
-		left: 6px;
-		right: 6px;
-		max-height: calc(100dvh - 62px);
-		border-radius: 14px;
-	}
-}
-
 /* Final mobile menu polish: consistent interaction, spacing and accessibility */
 .hamburgerButton:focus-visible,
 .menuLink:focus-visible,
@@ -829,16 +745,17 @@
 
 @media (max-width: 900px) {
 	.sidebar[data-mobile="true"] .sidebarContent {
-		left: max(8px, env(safe-area-inset-left));
-		right: max(8px, env(safe-area-inset-right));
-		top: max(64px, env(safe-area-inset-top));
-		border-radius: 16px;
-		border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
-		box-shadow: 0 24px 44px color-mix(in srgb, var(--shadow) 54%, transparent);
+		display: flex;
+		flex-direction: column;
+		min-height: calc(100dvh - env(safe-area-inset-top, 0px));
+		max-height: calc(100dvh - env(safe-area-inset-top, 0px));
+		overflow-y: auto;
+		overflow-x: hidden;
+		padding: 0.85rem 0.8rem calc(0.9rem + env(safe-area-inset-bottom, 0px));
 	}
 
 	.sidebar[data-mobile="true"] .sidebarContent[data-open="true"] {
-		animation: menu-pop 0.22s ease;
+		animation: menu-pop 0.2s ease;
 	}
 
 	.menuGroup {
@@ -885,15 +802,16 @@
 		margin-top: auto;
 		padding-top: 0.42rem;
 		border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+		background: var(--surface);
+		position: sticky;
+		bottom: 0;
+		padding-bottom: max(0.3rem, env(safe-area-inset-bottom, 0px));
 	}
 }
 
 @media (max-width: 640px) {
 	.sidebar[data-mobile="true"] .sidebarContent {
-		top: max(56px, env(safe-area-inset-top));
-		left: max(6px, env(safe-area-inset-left));
-		right: max(6px, env(safe-area-inset-right));
-		max-height: calc(100dvh - 62px - env(safe-area-inset-top));
+		padding-inline: 0.72rem;
 	}
 }
 
