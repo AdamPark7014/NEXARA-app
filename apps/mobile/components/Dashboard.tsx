@@ -229,34 +229,41 @@ export default function Dashboard() {
       const canManageAttendance = hasPermission(user, PERMISSIONS.ATTENDANCE_MANAGE);
       const canViewAttendance = hasPermission(user, PERMISSIONS.ATTENDANCE_VIEW);
 
-      const [viaticsRes, activitiesRes, attendanceRes] = await Promise.all([
+      const [viaticsRes, activitiesRes] = await Promise.all([
         fetch(buildApiUrl('viatics'), { headers, signal: activeSignal }),
         fetch(buildApiUrl('activities'), { headers, signal: activeSignal }),
-        canManageAttendance
-          ? fetch(buildApiUrl(`attendance/hierarchy/range?${params.toString()}`), { headers, signal: activeSignal })
-          : canViewAttendance
-            ? fetch(buildApiUrl(`attendance/range?${params.toString()}`), { headers, signal: activeSignal })
-            : Promise.resolve(null),
       ]);
+
+      let attendanceRes: Response | null = null;
+      if (canManageAttendance) {
+        const hierarchyRes = await fetch(buildApiUrl(`attendance/hierarchy/range?${params.toString()}`), {
+          headers,
+          signal: activeSignal,
+        });
+        if (hierarchyRes.ok) {
+          attendanceRes = hierarchyRes;
+        } else if ([404, 403].includes(hierarchyRes.status) && canViewAttendance) {
+          const fallbackRes = await fetch(buildApiUrl(`attendance/range?${params.toString()}`), {
+            headers,
+            signal: activeSignal,
+          });
+          attendanceRes = fallbackRes.ok ? fallbackRes : null;
+        }
+      } else if (canViewAttendance) {
+        const ownAttendanceRes = await fetch(buildApiUrl(`attendance/range?${params.toString()}`), {
+          headers,
+          signal: activeSignal,
+        });
+        attendanceRes = ownAttendanceRes.ok ? ownAttendanceRes : null;
+      }
 
       clearTimeout(timeout);
 
       const viaticsData = viaticsRes.ok ? ((await viaticsRes.json()) as Viatic[]) : [];
       const activitiesData = activitiesRes.ok ? ((await activitiesRes.json()) as Activity[]) : [];
       let attendancePayload: AttendanceRange | { totalMinutes?: number; days?: any[]; attendances?: any[] } | null = null;
-      if (attendanceRes) {
-        if (attendanceRes.ok) {
-          attendancePayload = await attendanceRes.json();
-        } else {
-          let attendanceMessage = `Error al consultar asistencia (${attendanceRes.status})`;
-          try {
-            const errorPayload = await attendanceRes.json();
-            if (errorPayload?.message) attendanceMessage = errorPayload.message;
-          } catch {
-            // Ignore JSON parse errors for non-JSON responses.
-          }
-          throw new Error(attendanceMessage);
-        }
+      if (attendanceRes?.ok) {
+        attendancePayload = await attendanceRes.json();
       }
 
       setViatics(Array.isArray(viaticsData) ? viaticsData : []);
