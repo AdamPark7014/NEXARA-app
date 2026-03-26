@@ -129,7 +129,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
     }
 
     if (isIngeniero) {
-      if (!item.href.startsWith("/my-") && !["/dashboard", "/attendance", "/cotizaciones", "/cvs", "/ventas"].includes(item.href)) {
+      if (!item.href.startsWith("/my-") && !["/cotizaciones", "/cvs", "/ventas"].includes(item.href)) {
         return false;
       }
       if (item.href === "/cotizaciones" && !extraAccess.accesoCotizaciones) return false;
@@ -138,7 +138,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
     }
 
     if (isVendedor) {
-      if (item.href !== "/ventas" && !["/cotizaciones", "/cvs", "/my-profile", "/my-preferences"].includes(item.href)) {
+      if (item.href !== "/ventas" && !["/cotizaciones", "/cvs"].includes(item.href)) {
         return false;
       }
       if (item.href === "/cotizaciones" && !extraAccess.accesoCotizaciones) return false;
@@ -257,10 +257,15 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
     {
       id: "fallback",
       title: "Menú principal",
-      items: [
-        { icon: "👤", label: "Mi perfil", href: "/my-profile" },
-        { icon: "📊", label: "Resumen ejecutivo", href: "/dashboard" },
-      ],
+      items: isSuperAdmin || isAdmin
+        ? [
+            { icon: "📊", label: "Resumen ejecutivo", href: "/dashboard" },
+            { icon: "🗂️", label: "Operación: actividades", href: "/activities" },
+          ]
+        : [
+            { icon: "👤", label: "Mi perfil", href: "/my-profile" },
+            { icon: "📊", label: "Resumen ejecutivo", href: "/dashboard" },
+          ],
     },
   ];
 
@@ -291,34 +296,34 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
   const avatarUrl = getAvatarSrc(user);
 
   return (
-    <aside className={styles.sidebar} data-mobile={isMobile ? "true" : "false"} data-open={isMenuOpen ? "true" : "false"}>
-      <div className={styles.sidebarHeader}>
-        <div className={styles.sidebarLogo}>
-          <img src={brandLogoSrc} alt="NEXARA" className={styles.brandLogo} onError={() => setBrandLogoSrc("/icon.png")} />
-          <span className={styles.brandMark}>NEXARA</span>
-          {isMobile && <span className={styles.brandSub}>Consola</span>}
+    <>
+      {isMobile && isMenuOpen && <div className={styles.sidebarOverlay} onClick={closeMenu} role="presentation" aria-hidden="true"></div>}
+      <aside className={styles.sidebar} data-mobile={isMobile ? "true" : "false"} data-open={isMenuOpen ? "true" : "false"}>
+        <div className={styles.sidebarHeader}>
+          <div className={styles.sidebarLogo}>
+            <img src={brandLogoSrc} alt="NEXARA" className={styles.brandLogo} onError={() => setBrandLogoSrc("/icon.png")} />
+            <span className={styles.brandMark}>NEXARA</span>
+            {isMobile && <span className={styles.brandSub}>Consola</span>}
+          </div>
+          {isMobile && (
+            <button
+              type="button"
+              className={styles.hamburgerButton}
+              onClick={toggleMenu}
+              aria-label={isMenuOpen ? "Cerrar menú" : "Abrir menú"}
+              aria-expanded={isMenuOpen}
+              aria-controls="sidebar-menu"
+              data-open={isMenuOpen ? "true" : "false"}
+            >
+              <span className={styles.hamburgerLine}></span>
+              <span className={styles.hamburgerLine}></span>
+              <span className={styles.hamburgerLine}></span>
+            </button>
+          )}
         </div>
-        {isMobile && (
-          <button
-            type="button"
-            className={styles.hamburgerButton}
-            onClick={toggleMenu}
-            aria-label={isMenuOpen ? "Cerrar menú" : "Abrir menú"}
-            aria-expanded={isMenuOpen}
-            aria-controls="sidebar-menu"
-            data-open={isMenuOpen ? "true" : "false"}
-          >
-            <span className={styles.hamburgerLine}></span>
-            <span className={styles.hamburgerLine}></span>
-            <span className={styles.hamburgerLine}></span>
-          </button>
-        )}
-      </div>
 
-      {isMobile && isMenuOpen && <div className={styles.sidebarOverlay} onClick={closeMenu} role="presentation"></div>}
-
-      {(!isMobile || isMenuOpen) && (
-        <div className={styles.sidebarContent} id="sidebar-menu" data-open={isMobile && isMenuOpen ? "true" : undefined}>
+        {(!isMobile || isMenuOpen) && (
+          <div className={styles.sidebarContent} id="sidebar-menu" data-open={isMobile && isMenuOpen ? "true" : undefined}>
           <div className={styles.sidebarUser}>
             <div className={styles.sidebarAvatar}>
               <Image
@@ -395,8 +400,9 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
               </button>
             </div>
           </div>
-        </div>
-      )}
-    </aside>
+          </div>
+        )}
+      </aside>
+    </>
   );
 }
