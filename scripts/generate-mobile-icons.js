@@ -5,7 +5,7 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 
 const repoRoot = path.resolve(__dirname, "..");
-const logoPath = path.join(repoRoot, "apps", "mobile", "public", "logo-nexara.png");
+const logoPath = path.join(repoRoot, "apps", "mobile", "app", "icon.png");
 const resBase = path.join(repoRoot, "apps", "mobile", "android", "app", "src", "main", "res");
 
 const densities = [
@@ -50,16 +50,6 @@ function escapePowerShell(value) {
 }
 
 async function generateWithSharp(sharp) {
-  const logoMeta = await sharp(logoPath).metadata();
-  const width = logoMeta.width || 3544;
-  const height = logoMeta.height || 3544;
-  const extract = {
-    left: Math.round(width * 0.02),
-    top: Math.round(height * 0.01),
-    width: Math.round(width * 0.96),
-    height: Math.round(height * 0.74),
-  };
-
   const baseOverlay = (size) => Buffer.from(`
     <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
       <defs>
@@ -89,10 +79,9 @@ async function generateWithSharp(sharp) {
   const circleMask = (size) => Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2}" fill="white"/></svg>`);
 
   async function renderCanvas(size) {
-    const inset = Math.round(size * 0.13);
+    const inset = Math.round(size * 0.11);
     const logoSize = size - inset * 2;
     const logoBuffer = await sharp(logoPath)
-      .extract(extract)
       .resize(logoSize, logoSize, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
       .png()
       .toBuffer();
@@ -107,7 +96,7 @@ async function generateWithSharp(sharp) {
     })
       .composite([
         { input: baseOverlay(size) },
-        { input: logoBuffer, left: inset, top: Math.max(0, inset - Math.round(size * 0.03)) },
+        { input: logoBuffer, left: inset, top: inset },
       ])
       .png()
       .toBuffer();
@@ -216,9 +205,8 @@ function Add-Logo {
   $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
   $g.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
 
-  $src = New-Object System.Drawing.RectangleF -ArgumentList ($Logo.Width * 0.02), ($Logo.Height * 0.01), ($Logo.Width * 0.96), ($Logo.Height * 0.74)
-  $destSize = [float]($size * 0.72)
-  $dest = New-Object System.Drawing.RectangleF -ArgumentList (($size - $destSize) / 2), ($size * 0.09), $destSize, $destSize
+  $destSize = [float]($size * 0.78)
+  $dest = New-Object System.Drawing.RectangleF -ArgumentList (($size - $destSize) / 2), (($size - $destSize) / 2), $destSize, $destSize
 
   $shadowRect = New-Object System.Drawing.RectangleF -ArgumentList $dest.X, ($size * 0.78), $dest.Width, ($size * 0.055)
   $shadowPath = New-Object System.Drawing.Drawing2D.GraphicsPath
@@ -228,7 +216,7 @@ function Add-Logo {
   $shadowBrush.SurroundColors = @([System.Drawing.Color]::FromArgb(0, 0, 0, 0))
   $g.FillEllipse($shadowBrush, $shadowRect)
 
-  $g.DrawImage($Logo, $dest, $src, [System.Drawing.GraphicsUnit]::Pixel)
+  $g.DrawImage($Logo, $dest)
 
   $shadowBrush.Dispose(); $shadowPath.Dispose(); $g.Dispose()
 }
