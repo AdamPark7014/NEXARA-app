@@ -74,6 +74,45 @@ export const getApiBase = () => {
   return `http://${MOBILE_IP_API_HOST}:${MOBILE_APP_PORT}/api`;
 };
 
+export const getApiBaseCandidates = () => {
+  const candidates: string[] = [];
+  const seen = new Set<string>();
+
+  const addCandidate = (value: string | null | undefined) => {
+    if (!value) return;
+    const normalized = ensureApiBase(value);
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    candidates.push(normalized);
+  };
+
+  addCandidate(getApiBase());
+
+  const envBase = process.env.NEXT_PUBLIC_API_URL;
+  if (envBase && envBase.trim()) {
+    addCandidate(envBase);
+  }
+
+  if (typeof window !== "undefined" && window.location) {
+    const { protocol, hostname, port } = window.location;
+    const lowerHost = hostname.toLowerCase();
+
+    if (port === MOBILE_APP_PORT) {
+      addCandidate(`${protocol}//${hostname}:3001`);
+    }
+
+    if (
+      lowerHost === "app.nexara.com.mx" ||
+      lowerHost === "nexara.com.mx" ||
+      lowerHost === "www.nexara.com.mx"
+    ) {
+      addCandidate(`${protocol}//api.nexara.com.mx`);
+    }
+  }
+
+  return candidates;
+};
+
 export const buildApiUrl = (path: string) => {
   const base = getApiBase().replace(/\/+$/, "");
   return `${base}/${path.replace(/^\/+/, "")}`;
