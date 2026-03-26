@@ -5,6 +5,7 @@ import styles from "../../console.module.css";
 import { useUser } from "@/components/UserContext";
 import { hasAnyPermission, PERMISSIONS } from "@/lib/permissions";
 import HelpTab from '@/components/HelpTab';
+import { buildApiUrl } from "@/lib/api-base";
 
 type BorrowTool = {
   id: number;
@@ -119,7 +120,7 @@ export default function MyToolsPage() {
 
     setLoading(true);
     try {
-      const response = await fetch("/api/tool-requests", {
+      const response = await fetch(buildApiUrl("tool-requests"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -163,7 +164,7 @@ export default function MyToolsPage() {
 
   const loadBorrowTools = async () => {
     try {
-      const response = await fetch("/api/tool-requests/my-active");
+      const response = await fetch(buildApiUrl("tool-requests/my-active"));
       if (response.ok) {
         const data = await response.json();
         setBorrowTools(data);
@@ -180,7 +181,7 @@ export default function MyToolsPage() {
     if (!reason) return;
 
     try {
-      const response = await fetch(`/api/tool-requests/${toolId}/renewal-request`, {
+      const response = await fetch(buildApiUrl(`tool-requests/${toolId}/renewal-request`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

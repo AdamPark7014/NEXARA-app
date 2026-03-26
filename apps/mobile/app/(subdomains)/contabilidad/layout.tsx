@@ -10,6 +10,9 @@ import { getAvatarSrc, getRoleLabel, isPlatformAdmin } from "@/lib/panel-user";
 import consoleStyles from "../console/console.module.css";
 import styles from "./layout.module.css";
 import { setActivePanel } from "@/lib/panel-routing";
+import BottomNav from "@/components/BottomNav";
+import PageTransition from "@/components/PageTransition";
+import { hapticTap } from "@/lib/haptics";
 
 export default function ContabilidadLayout({ children }: { children: React.ReactNode }) {
   const MOBILE_BREAKPOINT = 980;
@@ -29,40 +32,41 @@ export default function ContabilidadLayout({ children }: { children: React.React
 
   const isSuperAdmin = Boolean(user?.isSuperAdmin);
   const isAdmin = isPlatformAdmin(user);
+  const inPrefixedContaPath = Boolean(pathname && pathname.startsWith('/contabilidad'));
 
-  const withContaPrefix = (href: string) => {
-    if (!href.startsWith('/')) return `/contabilidad/${href}`;
+  const resolveContaHref = (href: string) => {
+    if (!href.startsWith('/')) return href;
     if (href === '/paneles' || href === '/login') return href;
     if (href === '/contabilidad' || href.startsWith('/contabilidad/')) return href;
-    return `/contabilidad${href}`;
+    return inPrefixedContaPath ? `/contabilidad${href}` : href;
   };
 
   const navGroups = [
     {
       title: "Panorama financiero",
       items: [
-        { icon: "📊", label: "Resumen ejecutivo", href: withContaPrefix("/dashboard") },
-        { icon: "💼", label: "Capital y liquidez", href: withContaPrefix("/capital") },
-        { icon: "📒", label: "Contabilidad (GL)", href: withContaPrefix("/accounting") },
-        { icon: "📈", label: "Reportes financieros", href: withContaPrefix("/accounting/reports") },
+        { icon: "📊", label: "Resumen ejecutivo", href: resolveContaHref("/dashboard") },
+        { icon: "💼", label: "Capital y liquidez", href: resolveContaHref("/capital") },
+        { icon: "📒", label: "Contabilidad (GL)", href: resolveContaHref("/accounting") },
+        { icon: "📈", label: "Reportes financieros", href: resolveContaHref("/accounting/reports") },
       ],
     },
     {
       title: "RRHH y control de personal",
       items: [
-        { icon: "⏱️", label: "Control de horas", href: withContaPrefix("/horas") },
-        { icon: "🧳", label: "Viáticos", href: withContaPrefix("/viaticos") },
-        { icon: "⚖️", label: "Multas y sanciones", href: withContaPrefix("/multas") },
-        { icon: "💰", label: "Nómina y pagos", href: withContaPrefix("/employee-payments") },
+        { icon: "⏱️", label: "Control de horas", href: resolveContaHref("/horas") },
+        { icon: "🧳", label: "Viáticos", href: resolveContaHref("/viaticos") },
+        { icon: "⚖️", label: "Multas y sanciones", href: resolveContaHref("/multas") },
+        { icon: "💰", label: "Nómina y pagos", href: resolveContaHref("/employee-payments") },
       ],
     },
     {
       title: "Operación financiera",
       items: [
-        { icon: "📊", label: "Gastos operativos", href: withContaPrefix("/expenses") },
-        { icon: "🏗️", label: "Proyectos de obra", href: withContaPrefix("/work-projects") },
-        { icon: "🧾", label: "Facturación", href: withContaPrefix("/invoicing") },
-        { icon: "🏦", label: "Banca y conciliaciones", href: withContaPrefix("/banking") },
+        { icon: "📊", label: "Gastos operativos", href: resolveContaHref("/expenses") },
+        { icon: "🏗️", label: "Proyectos de obra", href: resolveContaHref("/work-projects") },
+        { icon: "🧾", label: "Facturación", href: resolveContaHref("/invoicing") },
+        { icon: "🏦", label: "Banca y conciliaciones", href: resolveContaHref("/banking") },
       ],
     },
   ];
@@ -117,6 +121,7 @@ export default function ContabilidadLayout({ children }: { children: React.React
   }, []);
 
   const handleLogout = () => {
+    void hapticTap("heavy");
     logout();
     setMobileMenuOpen(false);
     router.replace("/login");
@@ -140,7 +145,10 @@ export default function ContabilidadLayout({ children }: { children: React.React
         <button
           type="button"
           className={consoleStyles.hamburgerButton}
-          onClick={() => setMobileMenuOpen((prev) => !prev)}
+          onClick={() => {
+            void hapticTap("light");
+            setMobileMenuOpen((prev) => !prev);
+          }}
           aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
           aria-expanded={mobileMenuOpen}
           aria-controls="conta-mobile-menu"
@@ -161,10 +169,9 @@ export default function ContabilidadLayout({ children }: { children: React.React
         />
       )}
 
-      {(!isMobile || mobileMenuOpen) && (
       <aside
         id="conta-mobile-menu"
-        className={`${consoleStyles.sidebar} ${styles.contaSidebar} ${mobileMenuOpen ? styles.contaSidebarOpen : ""}`}
+        className={`${consoleStyles.sidebar} ${styles.contaSidebar} ${isMobile && mobileMenuOpen ? styles.contaSidebarOpen : ""}`}
       >
         <div className={consoleStyles.sidebarLogo}>
           <span className={consoleStyles.brandMark}>NEXARA</span>
@@ -203,7 +210,10 @@ export default function ContabilidadLayout({ children }: { children: React.React
                     <Link
                       href={item.href}
                       className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${isActive ? consoleStyles.active : ""}`}
-                      onClick={() => setMobileMenuOpen(false)}
+                      onClick={() => {
+                        void hapticTap("selection");
+                        setMobileMenuOpen(false);
+                      }}
                     >
                       <span className={consoleStyles.menuLinkIcon} aria-hidden="true">{item.icon}</span>
                       <span className={consoleStyles.menuLinkText}>{item.label}</span>
@@ -221,7 +231,10 @@ export default function ContabilidadLayout({ children }: { children: React.React
             <Link
               href="/paneles"
               className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={() => {
+                void hapticTap("selection");
+                setMobileMenuOpen(false);
+              }}
             >
               Cambiar panel
             </Link>
@@ -231,7 +244,10 @@ export default function ContabilidadLayout({ children }: { children: React.React
             <button
               type="button"
               className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
-              onClick={toggleDarkMode}
+              onClick={() => {
+                void hapticTap("medium");
+                toggleDarkMode();
+              }}
               aria-label={darkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
             >
               {darkMode ? "Cambiar a vista clara" : "Cambiar a vista oscura"}
@@ -250,7 +266,6 @@ export default function ContabilidadLayout({ children }: { children: React.React
           </li>
         </ul>
       </aside>
-      )}
       <main className={consoleStyles.consoleMain}>
         <section className={styles.workspaceShell}>
           <div className={styles.workspaceHeader}>
@@ -272,16 +287,32 @@ export default function ContabilidadLayout({ children }: { children: React.React
               const itemPath = item.href.replace(/\/+$/, "");
               const isActive = currentPath === itemPath || currentPath.endsWith(itemPath);
               return (
-                <Link key={`quick-${item.href}`} href={item.href} className={`${styles.quickLink} ${isActive ? styles.quickLinkActive : ""}`}>
+                <Link
+                  key={`quick-${item.href}`}
+                  href={item.href}
+                  className={`${styles.quickLink} ${isActive ? styles.quickLinkActive : ""}`}
+                  onClick={() => {
+                    void hapticTap("selection");
+                  }}
+                >
                   {item.label}
                 </Link>
               );
             })}
           </div>
 
-          <div className={styles.workspaceContent}>{children}</div>
+          <div className={styles.workspaceContent}><PageTransition>{children}</PageTransition></div>
         </section>
       </main>
+      <BottomNav
+        items={[
+          { icon: "📊", label: "Resumen", href: resolveContaHref("/dashboard"), hapticIntent: "selection" },
+          { icon: "📒", label: "Contabilidad", href: resolveContaHref("/accounting"), hapticIntent: "selection" },
+          { icon: "💰", label: "Nómina", href: resolveContaHref("/employee-payments"), hapticIntent: "selection" },
+          { icon: "📊", label: "Gastos", href: resolveContaHref("/expenses"), hapticIntent: "selection" },
+          { icon: "☰", label: "Menú", onPress: () => setMobileMenuOpen(true), hapticIntent: "medium" },
+        ]}
+      />
     </div>
   );
 }

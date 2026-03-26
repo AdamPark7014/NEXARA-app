@@ -46,12 +46,11 @@
     min-height: var(--mobile-hit-target);
   }
 
-  [class*="sidebar"]:not([class*="VentasSidebar_"]),
-  [class*="Sidebar"]:not([class*="VentasSidebar_"]) {
+  [class*="sidebar"]:not([class*="VentasSidebar_"]):not([class*="contaSidebar"]):not([class*="sidebarContent"]),
+  [class*="Sidebar"]:not([class*="VentasSidebar_"]):not([class*="contaSidebar"]):not([class*="sidebarContent"]) {
     width: var(--panel-sidebar-width) !important;
     min-width: 0 !important;
     max-width: min(100%, var(--panel-sidebar-width)) !important;
-    position: relative !important;
   }
 
   [class*="grid"],
@@ -292,5 +291,34 @@
     font-weight: 700;
     letter-spacing: 0.01em;
     border-radius: 999px;
+  }
+}
+
+/* Scroll & touch polish */
+@media (max-width: 900px) {
+  :where(
+    [class*="sidebarContent"],
+    [class*="navContainer"],
+    [class*="salesMain"],
+    [class*="modalContent"]
+  ) {
+    scrollbar-width: none;
+  }
+
+  :where(
+    [class*="sidebarContent"],
+    [class*="navContainer"],
+    [class*="salesMain"],
+    [class*="modalContent"]
+  )::-webkit-scrollbar {
+    display: none;
+  }
+
+  :where(
+    [class*="sidebar"][data-mobile="true"],
+    [class*="contaSidebar"],
+    [role="dialog"]
+  ) {
+    overscroll-behavior: contain;
   }
 }
