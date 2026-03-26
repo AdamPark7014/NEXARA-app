@@ -7,6 +7,8 @@ import NotificationCenter from "@/components/NotificationCenter";
 import BottomNav from "@/components/BottomNav";
 import PageTransition from "@/components/PageTransition";
 import { setActivePanel } from "@/lib/panel-routing";
+import { useUser } from "@/components/UserContext";
+import { isPlatformAdmin } from "@/lib/panel-user";
 
 const formatConsoleTitle = (pathname: string) => {
   const normalized = pathname.replace(/^\/+/, "").split("?")[0];
@@ -71,10 +73,37 @@ const formatConsoleTitle = (pathname: string) => {
 
 export default function ConsoleLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { user } = useUser();
   const [viewSubtitle, setViewSubtitle] = useState("Consola NEXARA");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const viewTitle = useMemo(() => formatConsoleTitle(pathname || "console"), [pathname]);
   const inPrefixedConsolePath = Boolean(pathname && pathname.startsWith("/console"));
+  const role = String(user?.role || "").toLowerCase();
+  const isSuperAdmin = Boolean(user?.isSuperAdmin);
+  const isAdmin = Boolean(user) && !isSuperAdmin && isPlatformAdmin(user);
+  const isIngeniero = Boolean(user) && !isSuperAdmin && !isAdmin && role.includes("ingenier");
+
+  const bottomNavItems = useMemo(() => {
+    const items: Array<{ icon: string; label: string; href?: string; onPress?: () => void; hapticIntent?: "selection" | "medium" }> = [
+      { icon: "📊", label: "Inicio", href: resolveConsoleRoute("/dashboard"), hapticIntent: "selection" },
+    ];
+
+    if (isIngeniero) {
+      items.push({ icon: "📋", label: "Actividades", href: resolveConsoleRoute("/my-activities"), hapticIntent: "selection" });
+      items.push({ icon: "👤", label: "Perfil", href: resolveConsoleRoute("/my-profile"), hapticIntent: "selection" });
+    } else if (!isSuperAdmin && !isAdmin) {
+      items.push({ icon: "🧾", label: "Cotizaciones", href: resolveConsoleRoute("/cotizaciones"), hapticIntent: "selection" });
+      items.push({ icon: "📄", label: "CVs", href: resolveConsoleRoute("/cvs"), hapticIntent: "selection" });
+    } else {
+      items.push({ icon: "🗂️", label: "Operación", href: resolveConsoleRoute("/activities"), hapticIntent: "selection" });
+      items.push({ icon: "🧑‍💼", label: "Usuarios", href: resolveConsoleRoute("/users"), hapticIntent: "selection" });
+    }
+
+    items.push({ icon: "🕒", label: "Asistencia", href: resolveConsoleRoute("/attendance"), hapticIntent: "selection" });
+    items.push({ icon: "☰", label: "Menú", onPress: () => setDrawerOpen(true), hapticIntent: "medium" });
+
+    return items;
+  }, [isIngeniero, isSuperAdmin, isAdmin, setDrawerOpen, inPrefixedConsolePath]);
 
   const resolveConsoleRoute = (shortHref: string) => {
     if (!shortHref.startsWith("/")) return shortHref;
@@ -119,13 +148,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         <div className={styles.consoleContent}><PageTransition>{children}</PageTransition></div>
       </main>
       <BottomNav
-        items={[
-          { icon: "📊", label: "Inicio", href: resolveConsoleRoute("/dashboard"), hapticIntent: "selection" },
-          { icon: "📋", label: "Actividades", href: resolveConsoleRoute("/my-activities"), hapticIntent: "selection" },
-          { icon: "🕒", label: "Asistencia", href: resolveConsoleRoute("/attendance"), hapticIntent: "selection" },
-          { icon: "👤", label: "Perfil", href: resolveConsoleRoute("/my-profile"), hapticIntent: "selection" },
-          { icon: "☰", label: "Menú", onPress: () => setDrawerOpen(true), hapticIntent: "medium" },
-        ]}
+        items={bottomNavItems}
       />
     </div>
   );

@@ -399,8 +399,6 @@
 	position: fixed;
 	inset: 0;
 	background: color-mix(in srgb, var(--foreground) 26%, transparent);
-	backdrop-filter: blur(2px);
-	-webkit-backdrop-filter: blur(2px);
 	z-index: 10009;
 }
 
