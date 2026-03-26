@@ -103,6 +103,15 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
               <span className={styles.consoleViewMeta}>{viewSubtitle}</span>
             </div>
             <div className={styles.consoleTopbarActions}>
+              <button
+                type="button"
+                className={styles.topbarMenuButton}
+                onClick={() => setDrawerOpen(true)}
+                aria-label="Abrir menu"
+                title="Menu"
+              >
+                ☰
+              </button>
               <NotificationCenter inlineTrigger position="top-right" maxNotifications={5} autoCloseTime={6000} />
             </div>
           </div>

@@ -1,13 +1,10 @@
 .consoleLayout {
 	display: flex;
 	align-items: flex-start;
-	gap: clamp(14px, 1.8vw, 22px);
-	padding: var(--panel-padding-y) var(--panel-padding-x);
+	gap: clamp(12px, 1.4vw, 18px);
+	padding: clamp(10px, 1.6vw, 20px);
 	min-height: 100vh;
 	position: relative;
-	background:
-		radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--primary) 10%, transparent), transparent 32%),
-		radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--secondary) 9%, transparent), transparent 34%);
 }
 
 .consoleMain {
@@ -15,59 +12,56 @@
 	min-width: 0;
 	display: flex;
 	flex-direction: column;
-	gap: 14px;
-	padding-bottom: calc(var(--bottom-nav-height, 56px) + 26px + env(safe-area-inset-bottom, 0px));
+	gap: 12px;
+	padding-bottom: calc(var(--bottom-nav-height, 56px) + 24px + env(safe-area-inset-bottom, 0px));
 }
 
 .consoleTopbar {
 	display: grid;
-	gap: 10px;
-	padding: 14px 16px;
-	border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
-	border-radius: 16px;
-	background:
-		radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 48%),
-		linear-gradient(145deg, color-mix(in srgb, var(--surface) 94%, transparent), color-mix(in srgb, var(--surface-2) 84%, transparent));
-	backdrop-filter: blur(14px) saturate(1.25);
-	-webkit-backdrop-filter: blur(14px) saturate(1.25);
-	box-shadow:
-		0 14px 28px color-mix(in srgb, var(--shadow) 26%, transparent),
-		inset 0 1px 0 color-mix(in srgb, #fff 28%, transparent);
+	gap: 8px;
+	padding: 12px 14px;
+	border: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
+	border-radius: 14px;
+	background: color-mix(in srgb, var(--surface) 96%, var(--background));
+	box-shadow: 0 8px 20px color-mix(in srgb, var(--shadow) 28%, transparent);
 }
 
 .consoleEyebrow {
 	margin: 0;
-	text-transform: uppercase;
-	letter-spacing: 0.14rem;
 	font-size: 0.68rem;
-	color: var(--text-secondary);
+	text-transform: uppercase;
+	letter-spacing: 0.11em;
 	font-weight: 700;
+	color: var(--text-tertiary);
 }
 
 .consoleTopbarRow {
-	display: flex;
-	justify-content: space-between;
-	align-items: flex-start;
-	gap: 12px;
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 10px;
 }
 
 .consoleTitleGroup {
 	min-width: 0;
 	display: grid;
-	gap: 4px;
+	gap: 2px;
 }
 
 .consoleViewTitle {
 	margin: 0;
-	font-size: clamp(1.14rem, 2.2vw, 1.55rem);
-	line-height: 1.15;
-	color: var(--foreground);
+	font-size: clamp(1.06rem, 2vw, 1.36rem);
+	line-height: 1.18;
+	color: var(--text-primary);
 }
 
 .consoleViewMeta {
-	font-size: 0.82rem;
-	line-height: 1.35;
+	font-size: 0.78rem;
+	line-height: 1.3;
 	color: var(--text-secondary);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .consoleTopbarActions {
@@ -77,135 +71,144 @@
 	flex-shrink: 0;
 }
 
+.topbarMenuButton {
+	display: none;
+	min-width: 38px;
+	height: 38px;
+	border-radius: 10px;
+	border: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--text-primary);
+	font-size: 1.08rem;
+	line-height: 1;
+}
+
 .consoleContent {
 	display: grid;
-	gap: 14px;
+	gap: 12px;
 	min-width: 0;
 }
 
 .consoleContent > * {
 	min-width: 0;
+	border-radius: 14px;
+	border: 1px solid color-mix(in srgb, var(--primary) 14%, transparent);
+	background: color-mix(in srgb, var(--surface) 96%, var(--background));
+	box-shadow: 0 8px 18px color-mix(in srgb, var(--shadow) 24%, transparent);
+	overflow: hidden;
 }
 
 .sidebar {
 	position: sticky;
-	top: calc(var(--header-offset) - 10px);
+	top: 12px;
 	align-self: flex-start;
-	width: min(320px, 100%);
-	max-height: calc(100vh - var(--header-offset));
-	border-radius: 22px;
-	background: var(--menu-bg);
-	color: var(--menu-text);
-	border: 1px solid color-mix(in srgb, var(--menu-text) 22%, transparent);
-	box-shadow: 0 18px 40px rgba(6, 20, 34, 0.36);
-	overflow-y: auto;
-	overflow-x: hidden;
-	z-index: 900;
+	width: min(310px, 100%);
+	max-height: calc(100vh - 24px);
 	display: flex;
 	flex-direction: column;
+	overflow: hidden;
+	overscroll-behavior: contain;
+	-webkit-overflow-scrolling: touch;
+	border-radius: 16px;
+	background: var(--surface);
+	color: var(--text-primary);
+	border: 1px solid var(--border);
+	box-shadow: 0 14px 28px color-mix(in srgb, var(--shadow) 28%, transparent);
+	z-index: 20;
 }
 
 .sidebarHeader {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 0.75rem;
-	padding: 1rem 1rem 0.85rem;
-	border-bottom: 1px solid color-mix(in srgb, var(--menu-text) 20%, transparent);
-	background: color-mix(in srgb, var(--menu-item-bg) 86%, transparent);
+	gap: 0.7rem;
+	padding: 0.86rem;
+	border-bottom: 1px solid var(--border);
+	background: var(--surface-clean-soft);
 }
 
 .sidebarLogo {
 	display: inline-flex;
 	align-items: center;
-	gap: 0.65rem;
+	gap: 0.52rem;
 }
 
 .brandLogo {
-	width: 32px;
-	height: 32px;
+	width: 30px;
+	height: 30px;
 	object-fit: contain;
 }
 
 .brandMark {
+	font-size: 0.9rem;
 	font-weight: 800;
-	font-size: 0.94rem;
 	letter-spacing: 0.04em;
 }
 
 .brandSub {
-	font-size: 0.72rem;
-	padding: 0.15rem 0.42rem;
+	font-size: 0.68rem;
+	padding: 0.12rem 0.42rem;
 	border-radius: 999px;
-	color: var(--menu-text);
-	background: color-mix(in srgb, var(--menu-item-hover-bg) 86%, transparent);
-	border: 1px solid color-mix(in srgb, var(--menu-text) 24%, transparent);
+	border: 1px solid var(--border);
+	background: var(--surface-2);
+	color: var(--text-tertiary);
 }
 
 .sidebarContent {
-	max-height: none;
-	overflow: visible;
-	padding: 0.95rem;
+	flex: 1;
+	min-height: 0;
 	display: flex;
 	flex-direction: column;
-	gap: 0.9rem;
-}
-
-.sidebarContent::-webkit-scrollbar {
-	width: 8px;
-}
-
-.sidebarContent::-webkit-scrollbar-thumb {
-	background: color-mix(in srgb, var(--menu-text) 24%, transparent);
-	border-radius: 999px;
+	gap: 0.82rem;
+	padding: 0.85rem;
+	overflow-y: auto;
+	overflow-x: hidden;
+	-webkit-overflow-scrolling: touch;
+	touch-action: pan-y;
+	overscroll-behavior: contain;
 }
 
 .sidebarUser {
 	display: grid;
 	justify-items: center;
-	gap: 0.3rem;
+	gap: 0.32rem;
 	padding: 0.9rem;
-	border-radius: 16px;
-	background: color-mix(in srgb, var(--menu-item-bg) 92%, transparent);
-	border: 1px solid color-mix(in srgb, var(--menu-text) 20%, transparent);
+	border-radius: 12px;
+	background: var(--surface-clean-soft);
+	border: 1px solid var(--border);
 }
 
 .sidebarAvatar {
-	width: 70px;
-	height: 70px;
+	width: 72px;
+	height: 72px;
 	border-radius: 50%;
-	border: 2px solid color-mix(in srgb, var(--menu-text) 30%, transparent);
+	border: 2px solid var(--border-strong);
 	overflow: hidden;
-	display: grid;
-	place-items: center;
-	background: color-mix(in srgb, var(--menu-item-hover-bg) 78%, transparent);
+	background: var(--surface-2);
 }
 
 .avatarImage {
 	width: 100%;
 	height: 100%;
-	display: block;
-	aspect-ratio: 1 / 1;
-	border-radius: 50%;
 	object-fit: cover;
+	display: block;
 }
 
 .avatarImageLogo {
 	object-fit: contain;
-	padding: 0.5rem;
+	padding: 0.54rem;
 }
 
 .sidebarName {
+	font-size: 0.9rem;
 	font-weight: 700;
-	font-size: 0.93rem;
 	text-align: center;
 }
 
 .sidebarEmail {
-	font-size: 0.78rem;
-	color: var(--menu-muted);
+	font-size: 0.75rem;
+	color: var(--text-tertiary);
 	text-align: center;
-	max-width: 100%;
 	overflow-wrap: anywhere;
 }
 
@@ -213,39 +216,38 @@
 	display: flex;
 	flex-wrap: wrap;
 	justify-content: center;
-	gap: 0.35rem;
+	gap: 0.3rem;
 }
 
 .rolePill,
 .levelPill {
-	font-size: 0.69rem;
+	font-size: 0.67rem;
 	font-weight: 700;
-	letter-spacing: 0.03em;
+	padding: 0.16rem 0.45rem;
 	border-radius: 999px;
-	padding: 0.18rem 0.5rem;
-	border: 1px solid color-mix(in srgb, var(--menu-text) 28%, transparent);
-	background: color-mix(in srgb, var(--menu-item-hover-bg) 88%, transparent);
+	border: 1px solid var(--border);
+	background: var(--surface-2);
 }
 
 .menuGroup {
 	display: grid;
-	gap: 0.5rem;
+	gap: 0.42rem;
 }
 
 .menuTitle,
 .menuGroupToggle {
+	margin: 0;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	width: 100%;
-	margin: 0;
-	font-size: 0.75rem;
-	text-transform: uppercase;
-	letter-spacing: 0.06em;
-	color: var(--menu-muted);
-	background: transparent;
+	padding: 0 0.18rem;
 	border: 0;
-	padding: 0.1rem 0.18rem;
+	background: transparent;
+	font-size: 0.72rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--text-tertiary);
 }
 
 .menuGroupToggle {
@@ -265,7 +267,7 @@
 	margin: 0;
 	padding: 0;
 	display: grid;
-	gap: 0.36rem;
+	gap: 0.32rem;
 }
 
 .sidebarMenuItem {
@@ -275,61 +277,65 @@
 .menuLink {
 	display: flex;
 	align-items: center;
-	gap: 0.52rem;
-	min-height: 40px;
-	border-radius: 11px;
-	padding: 0.52rem 0.7rem;
-	color: var(--menu-text);
-	text-decoration: none;
-	font-size: 0.88rem;
-	font-weight: 580;
-	background: var(--menu-item-bg);
+	gap: 0.5rem;
+	min-height: 38px;
+	padding: 0.46rem 0.66rem;
+	border-radius: 10px;
 	border: 1px solid transparent;
-	transition: background-color 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+	background: var(--surface);
+	color: var(--text-primary);
+	text-decoration: none;
+	font-size: 0.83rem;
+	font-weight: 600;
+	transition: background-color 0.16s ease, border-color 0.16s ease;
+}
+
+.menuLink:hover {
+	background: var(--surface-2);
+	border-color: var(--border);
 }
 
 .menuLinkIcon {
-	width: 1.15rem;
+	width: 1.1rem;
 	text-align: center;
-	font-size: 0.95rem;
 	line-height: 1;
 	flex-shrink: 0;
 }
 
 .menuLinkText {
-	flex: 1;
 	min-width: 0;
-}
-
-.menuLink:hover {
-	background: var(--menu-item-hover-bg);
-	border-color: color-mix(in srgb, var(--menu-text) 24%, transparent);
-	transform: translateX(2px);
+	flex: 1;
 }
 
 .active {
-	background: var(--menu-item-active-bg);
-	border-color: color-mix(in srgb, var(--menu-text) 36%, transparent);
-	box-shadow: 0 8px 16px color-mix(in srgb, var(--shadow) 46%, transparent);
+	background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+	border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+	box-shadow: 0 5px 10px color-mix(in srgb, var(--shadow) 24%, transparent);
 }
 
 .sidebarFooter {
-	margin-top: 0.4rem;
+	margin-top: auto;
+	padding-top: 0.4rem;
+	border-top: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+	background: var(--surface);
+	position: sticky;
+	bottom: 0;
+	padding-bottom: max(0.2rem, env(safe-area-inset-bottom, 0px));
 }
 
 .sidebarFooterActions {
 	display: grid;
-	gap: 0.45rem;
+	gap: 0.4rem;
 }
 
 .themeSwitcher,
-.logoutButton {
-	min-height: 40px;
-	border-radius: 11px;
-	border: 1px solid color-mix(in srgb, var(--menu-text) 22%, transparent);
-	color: var(--menu-text);
-	background: color-mix(in srgb, var(--menu-item-bg) 94%, transparent);
-	cursor: pointer;
+.logoutButton,
+.hamburgerButton {
+	min-height: 38px;
+	border-radius: 10px;
+	border: 1px solid var(--border);
+	background: var(--surface);
+	color: var(--text-primary);
 	font-weight: 700;
 }
 
@@ -337,15 +343,15 @@
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	gap: 0.45rem;
+	gap: 0.44rem;
 }
 
 .themeIcon {
 	width: 10px;
 	height: 10px;
 	border-radius: 999px;
-	background: linear-gradient(130deg, var(--secondary), var(--accent));
-	box-shadow: 0 0 0 3px color-mix(in srgb, var(--menu-item-hover-bg) 80%, transparent);
+	background: linear-gradient(130deg, var(--primary), var(--secondary));
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent);
 }
 
 .themeLabel {
@@ -353,43 +359,27 @@
 }
 
 .logoutButton:hover,
-.themeSwitcher:hover {
-	background: var(--menu-item-hover-bg);
+.themeSwitcher:hover,
+.hamburgerButton:hover,
+.topbarMenuButton:hover {
+	background: var(--surface-2);
 }
 
 .hamburgerButton {
-	width: 40px;
-	height: 40px;
-	border-radius: 12px;
-	border: 1px solid color-mix(in srgb, var(--menu-text) 24%, transparent);
-	background: linear-gradient(
-		140deg,
-		color-mix(in srgb, var(--surface) 92%, var(--primary) 8%),
-		color-mix(in srgb, var(--surface) 92%, var(--secondary) 8%)
-	);
+	width: 38px;
+	height: 38px;
 	display: inline-flex;
 	flex-direction: column;
-	justify-content: center;
 	align-items: center;
-	gap: 0.22rem;
-	box-shadow: 0 8px 16px color-mix(in srgb, var(--shadow) 28%, transparent);
-	transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
-}
-
-.hamburgerButton:hover {
-	border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
-	box-shadow: 0 10px 20px color-mix(in srgb, var(--shadow) 34%, transparent);
-}
-
-.hamburgerButton:active {
-	transform: scale(0.97);
+	justify-content: center;
+	gap: 0.2rem;
 }
 
 .hamburgerLine {
-	width: 16px;
+	width: 14px;
 	height: 2px;
-	border-radius: 999px;
-	background: var(--menu-text);
+	border-radius: 99px;
+	background: var(--text-primary);
 	transition: transform 0.2s ease, opacity 0.2s ease;
 }
 
@@ -408,333 +398,14 @@
 .sidebarOverlay {
 	position: fixed;
 	inset: 0;
-	background: rgba(4, 14, 24, 0.5);
+	background: color-mix(in srgb, var(--foreground) 26%, transparent);
 	backdrop-filter: blur(2px);
-	z-index: 12001;
+	-webkit-backdrop-filter: blur(2px);
+	z-index: 10009;
 }
 
-@media (max-width: 900px) {
-	.consoleLayout {
-		flex-direction: column;
-		gap: 0;
-		padding: 0;
-	}
-
-	.consoleMain {
-		width: 100%;
-		padding: 12px 10px 16px;
-	}
-
-	.consoleTopbar,
-	.consoleContent {
-		max-width: 100%;
-		min-width: 0;
-	}
-
-	.consoleTopbarRow {
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) auto;
-		gap: 10px;
-	}
-
-	.sidebar {
-		position: relative;
-		top: 0;
-		width: 100%;
-		max-height: none;
-		border-radius: 16px;
-	}
-
-	.sidebarContent {
-		max-height: min(76vh, 640px);
-	}
-
-	.sidebar[data-mobile="true"] .sidebarContent[data-open="true"] {
-		border-radius: 16px;
-		border: 1px solid color-mix(in srgb, var(--menu-text) 24%, transparent);
-		background: var(--menu-bg);
-		box-shadow: 0 24px 40px rgba(5, 18, 30, 0.45);
-		animation: menu-pop 0.2s ease;
-	}
-}
-
-@keyframes menu-pop {
-	from {
-		opacity: 0;
-		transform: translateY(-8px) scale(0.98);
-	}
-	to {
-		opacity: 1;
-		transform: translateY(0) scale(1);
-	}
-}
-
-/* 2026-03 design unification pass for subdomains */
-.consoleLayout {
-	gap: clamp(12px, 1.6vw, 18px);
-	padding: clamp(12px, 1.8vw, 22px);
-	background: transparent;
-}
-
-.consoleTopbar {
-	border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
-	background: color-mix(in srgb, var(--surface) 95%, var(--background));
-	border-radius: 14px;
-	box-shadow: 0 8px 20px color-mix(in srgb, var(--shadow) 52%, transparent);
-}
-
-.consoleContent {
-	gap: 12px;
-}
-
-.consoleContent > * {
-	background: color-mix(in srgb, var(--surface) 96%, var(--background));
-	border: 1px solid color-mix(in srgb, var(--primary) 16%, transparent);
-	border-radius: 14px;
-	box-shadow: 0 8px 18px color-mix(in srgb, var(--shadow) 44%, transparent);
-	overflow: hidden;
-}
-
-.sidebar {
-	border-radius: 18px;
-	border: 1px solid color-mix(in srgb, var(--menu-text) 18%, transparent);
-	box-shadow: 0 14px 30px rgba(6, 20, 34, 0.28);
-}
-
-.sidebarHeader {
-	padding: 0.88rem 0.95rem 0.78rem;
-}
-
-.menuLink {
-	border-radius: 10px;
-	min-height: 38px;
-	font-size: 0.85rem;
-}
-
-.menuLink:hover {
-	transform: none;
-}
-
-.active {
-	box-shadow: 0 6px 14px color-mix(in srgb, var(--shadow) 42%, transparent);
-}
-
-/* Off-canvas left drawer - mobile native UX (Phase 3) */
-@media (max-width: 900px) {
-	.sidebar[data-mobile="true"] {
-		position: fixed !important;
-		top: 0 !important;
-		left: 0 !important;
-		height: 100dvh !important;
-		width: min(85vw, 340px) !important;
-		max-height: none !important;
-		border-radius: 0 20px 20px 0 !important;
-		transform: translateX(-100%);
-		transition: transform 220ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
-		z-index: 10010;
-		overflow-y: auto;
-		overscroll-behavior: contain;
-		scrollbar-width: none;
-		pointer-events: none;
-	}
-
-	.sidebar[data-mobile="true"]::-webkit-scrollbar {
-		display: none;
-	}
-
-	.sidebar[data-mobile="true"][data-open="true"] {
-		transform: translateX(0) !important;
-		pointer-events: auto;
-	}
-
-	.sidebarContent {
-		max-height: none !important;
-		overflow-y: auto;
-	}
-
-	.sidebarOverlay {
-		z-index: 10009;
-	}
-
-	.consoleEyebrow {
-		display: none;
-	}
-
-	.consoleTopbar {
-		padding: 10px 12px !important;
-		gap: 6px !important;
-	}
-
-	.consoleViewTitle {
-		font-size: clamp(1rem, 4.5vw, 1.2rem) !important;
-	}
-
-	.consoleViewMeta {
-		display: none;
-	}
-
-	.consoleMain {
-		padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 8px) !important;
-	}
-}
-
-@media (max-width: 900px) {
-	.consoleMain {
-		padding: 10px 8px 14px;
-	}
-
-	.consoleContent > * {
-		border-radius: 12px;
-	}
-}
-
-@media (max-width: 900px) {
-	.consoleTopbar {
-		position: sticky;
-		top: 0;
-		z-index: 35;
-		backdrop-filter: blur(12px);
-		-webkit-backdrop-filter: blur(12px);
-		background: color-mix(in srgb, var(--surface) 88%, transparent);
-		border: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
-	}
-
-	.consoleTopbarRow {
-		align-items: center;
-	}
-
-	.consoleContent {
-		gap: 10px;
-	}
-
-	.consoleContent > * {
-		border-radius: 14px;
-		box-shadow: 0 10px 20px color-mix(in srgb, var(--shadow) 34%, transparent);
-	}
-
-	.sidebar[data-mobile="true"] {
-		box-shadow: 8px 0 34px rgba(5, 18, 30, 0.4);
-	}
-}
-
-/* Corporate clean pass: calmer shell and consistent density */
-.consoleTopbar {
-	padding: 12px 14px;
-	border-radius: 12px;
-	box-shadow: 0 6px 14px color-mix(in srgb, var(--shadow) 42%, transparent);
-}
-
-.consoleContent > * {
-	border-radius: 12px;
-	box-shadow: 0 6px 14px color-mix(in srgb, var(--shadow) 38%, transparent);
-}
-
-.sidebar {
-	border-radius: 16px;
-	box-shadow: 0 12px 24px rgba(8, 24, 44, 0.24);
-}
-
-.menuLink {
-	font-size: 0.84rem;
-	min-height: 36px;
-	padding: 0.46rem 0.66rem;
-}
-
-.menuLink:hover {
-	background: color-mix(in srgb, var(--menu-item-hover-bg) 84%, transparent);
-}
-
-.active {
-	box-shadow: 0 4px 10px color-mix(in srgb, var(--shadow) 34%, transparent);
-}
-
-/* Console palette normalization: inherit global neutral tokens */
-.sidebar {
-	background: var(--surface);
-	color: var(--text-primary);
-	border: 1px solid var(--border);
-	box-shadow: var(--elev-1);
-}
-
-.sidebarHeader {
-	background: var(--surface-clean-soft);
-	border-bottom: 1px solid var(--border);
-}
-
-.brandSub {
-	color: var(--text-tertiary);
-	background: var(--surface-2);
-	border-color: var(--border);
-}
-
-.sidebarUser {
-	background: var(--surface-clean-soft);
-	border-color: var(--border);
-}
-
-.sidebarAvatar {
-	background: var(--surface-2);
-	border-color: var(--border-strong);
-}
-
-.sidebarEmail,
-.menuTitle,
-.menuGroupToggle {
-	color: var(--text-tertiary);
-}
-
-.rolePill,
-.levelPill {
-	background: var(--surface-2);
-	border-color: var(--border);
-}
-
-.menuLink {
-	background: var(--surface);
-	color: var(--text-primary);
-	border-color: transparent;
-}
-
-.menuLink:hover {
-	background: var(--surface-2);
-	border-color: var(--border);
-}
-
-.active {
-	background: color-mix(in srgb, var(--primary) 10%, var(--surface));
-	border-color: color-mix(in srgb, var(--primary) 36%, var(--border));
-	box-shadow: 0 6px 14px color-mix(in srgb, var(--shadow) 28%, transparent);
-}
-
-.themeSwitcher,
-.logoutButton,
-.hamburgerButton {
-	background: var(--surface);
-	color: var(--text-primary);
-	border-color: var(--border);
-}
-
-.themeSwitcher:hover,
-.logoutButton:hover,
-.hamburgerButton:hover {
-	background: var(--surface-2);
-}
-
-.themeIcon {
-	background: linear-gradient(130deg, var(--primary), var(--secondary));
-	box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent);
-}
-
-.hamburgerLine {
-	background: var(--text-primary);
-}
-
-.sidebarOverlay {
-	background: color-mix(in srgb, var(--foreground) 24%, transparent);
-}
-
-/* Final mobile menu polish: consistent interaction, spacing and accessibility */
 .hamburgerButton:focus-visible,
+.topbarMenuButton:focus-visible,
 .menuLink:focus-visible,
 .menuGroupToggle:focus-visible,
 .themeSwitcher:focus-visible,
@@ -744,41 +415,75 @@
 }
 
 @media (max-width: 900px) {
-	.sidebar[data-mobile="true"] .sidebarContent {
-		display: flex;
-		flex-direction: column;
-		min-height: calc(100dvh - env(safe-area-inset-top, 0px));
-		max-height: calc(100dvh - env(safe-area-inset-top, 0px));
-		overflow-y: auto;
-		overflow-x: hidden;
-		padding: 0.85rem 0.8rem calc(0.9rem + env(safe-area-inset-bottom, 0px));
+	.consoleLayout {
+		padding: 0;
+		gap: 0;
 	}
 
-	.sidebar[data-mobile="true"] .sidebarContent[data-open="true"] {
-		animation: menu-pop 0.2s ease;
+	.consoleMain {
+		padding: 10px 8px 14px;
+		gap: 10px;
+		padding-bottom: calc(var(--bottom-nav-height, 56px) + env(safe-area-inset-bottom, 0px) + 10px);
+	}
+
+	.consoleEyebrow,
+	.consoleViewMeta {
+		display: none;
+	}
+
+	.consoleTopbar {
+		position: sticky;
+		top: 0;
+		z-index: 35;
+		padding: 10px 11px;
+	}
+
+	.consoleViewTitle {
+		font-size: clamp(1rem, 4.8vw, 1.2rem);
+	}
+
+	.topbarMenuButton {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.sidebar[data-mobile="true"] {
+		position: fixed;
+		top: 0;
+		left: 0;
+		height: 100dvh;
+		width: min(86vw, 336px);
+		max-height: 100dvh;
+		overflow-y: auto;
+		overflow-x: hidden;
+		-webkit-overflow-scrolling: touch;
+		touch-action: pan-y;
+		border-radius: 0 16px 16px 0;
+		transform: translateX(-100%);
+		transition: transform 220ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+		z-index: 10010;
+		pointer-events: none;
+	}
+
+	.sidebar[data-mobile="true"][data-open="true"] {
+		transform: translateX(0);
+		pointer-events: auto;
+	}
+
+	.sidebar[data-mobile="true"] .sidebarContent {
+		padding: 0.76rem;
+		padding-bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
 	}
 
 	.menuGroup {
-		gap: 0.38rem;
-		padding: 0.42rem 0.22rem 0.3rem;
+		padding-top: 0.36rem;
 		border-top: 1px dashed color-mix(in srgb, var(--border) 76%, transparent);
 	}
 
 	.menuGroup:first-of-type {
 		border-top: 0;
-		padding-top: 0.12rem;
-	}
-
-	.menuTitle,
-	.menuGroupToggle {
-		font-size: 0.73rem;
-		font-weight: 760;
-		letter-spacing: 0.045em;
-		color: color-mix(in srgb, var(--text-primary) 86%, var(--text-secondary));
-	}
-
-	.sidebarMenu {
-		gap: 0.3rem;
+		padding-top: 0;
 	}
 
 	.menuLink,
@@ -786,39 +491,25 @@
 	.logoutButton,
 	.sidebarFooter .menuLink {
 		min-height: 42px;
-		border-radius: 11px;
-	}
-
-	.menuLink {
-		border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
-	}
-
-	.active {
-		background: color-mix(in srgb, var(--primary) 14%, var(--surface));
-		border-color: color-mix(in srgb, var(--primary) 46%, var(--border));
 	}
 
 	.sidebarFooter {
-		margin-top: auto;
-		padding-top: 0.42rem;
-		border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-		background: var(--surface);
-		position: sticky;
-		bottom: 0;
-		padding-bottom: max(0.3rem, env(safe-area-inset-bottom, 0px));
+		margin-top: 0.2rem;
 	}
-}
 
-@media (max-width: 640px) {
-	.sidebar[data-mobile="true"] .sidebarContent {
-		padding-inline: 0.72rem;
+	.consoleContent > * {
+		border-radius: 12px;
+	}
+
+	.hamburgerButton {
+		display: none;
 	}
 }
 
 @media (prefers-reduced-motion: reduce) {
 	.hamburgerButton,
 	.hamburgerLine,
-	.sidebarContent,
+	.sidebar,
 	.menuLink,
 	.menuGroupChevron,
 	.active {

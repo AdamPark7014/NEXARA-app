@@ -30,7 +30,7 @@ type MenuGroup = {
   items: MenuItem[];
 };
 
-const DEFAULT_OPEN_GROUP_IDS = ["profile", "employee", "operations", "people", "commercial", "system", "inventory", "finance", "compliance", "fallback"];
+const DEFAULT_OPEN_GROUP_IDS: string[] = [];
 
 export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}) {
   const MOBILE_BREAKPOINT = 900;
@@ -76,14 +76,6 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
   }, [isMenuOpen]);
-
-  useEffect(() => {
-    if (!isMobile) return;
-    document.body.style.overflow = isMenuOpen ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isMenuOpen, isMobile]);
 
   const toggleMenu = () => {
     void hapticTap("light");
