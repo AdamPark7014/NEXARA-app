@@ -445,6 +445,75 @@
 		gap: 0;
 	}
 
+	/* Global console-only responsive pass for legacy inline layouts */
+	.consoleContent,
+	.consoleContent :global(*) {
+		max-width: 100%;
+		min-width: 0;
+		box-sizing: border-box;
+	}
+
+	.consoleContent :global(.card),
+	.consoleContent :global(.panel),
+	.consoleContent :global(.tile) {
+		border-radius: 14px;
+		overflow: hidden;
+	}
+
+	.consoleContent :global([style*="display: grid"]) {
+		grid-template-columns: 1fr !important;
+	}
+
+	.consoleContent :global([style*="display: flex"]) {
+		flex-wrap: wrap !important;
+	}
+
+	.consoleContent :global(input),
+	.consoleContent :global(select),
+	.consoleContent :global(textarea),
+	.consoleContent :global(button) {
+		max-width: 100%;
+	}
+
+	.consoleContent :global(.card table),
+	.consoleContent :global(.panel table),
+	.consoleContent :global(.tile table),
+	.consoleContent :global(table.table),
+	.consoleContent :global(table) {
+		display: table;
+		width: max(100%, 640px) !important;
+		border-collapse: collapse;
+	}
+
+	.consoleContent :global(.card),
+	.consoleContent :global(.panel),
+	.consoleContent :global(.tile),
+	.consoleContent :global(.tableWrap),
+	.consoleContent :global([style*="overflow: auto"]),
+	.consoleContent :global([style*="overflow:auto"]),
+	.consoleContent :global([style*="overflow-x: auto"]),
+	.consoleContent :global([style*="overflowX: 'auto'"]),
+	.consoleContent :global([style*="overflowX: \"auto\""]) {
+		overflow-x: auto !important;
+		-webkit-overflow-scrolling: touch;
+	}
+
+	.consoleContent :global(th),
+	.consoleContent :global(td) {
+		white-space: nowrap;
+		font-size: 0.82rem;
+		padding: 0.56rem 0.62rem;
+	}
+
+	.consoleContent :global(.badge),
+	.consoleContent :global([class*="badge"]),
+	.consoleContent :global([class*="chip"]) {
+		display: inline-flex;
+		align-items: center;
+		min-height: 28px;
+		line-height: 1;
+	}
+
 	.consoleMain {
 		padding: 10px 8px 14px;
 		gap: 10px;
@@ -538,6 +607,50 @@
 	.active {
 		transition: none !important;
 		animation: none !important;
+	}
+}
+
+@media (max-width: 640px) {
+	.consoleMain {
+		padding: 8px 6px 12px;
+		padding-bottom: calc(var(--bottom-nav-height, 56px) + env(safe-area-inset-bottom, 0px) + 8px);
+	}
+
+	.consoleContent {
+		gap: 9px;
+	}
+
+	.consoleContent > * {
+		border-radius: 11px;
+	}
+
+	.consoleContent :global(.card),
+	.consoleContent :global(.panel),
+	.consoleContent :global(.tile) {
+		padding: 12px !important;
+	}
+
+	.consoleContent :global(table.table),
+	.consoleContent :global(table),
+	.consoleContent :global(.card table),
+	.consoleContent :global(.panel table),
+	.consoleContent :global(.tile table) {
+		width: max(100%, 560px) !important;
+	}
+
+	.consoleContent :global(th),
+	.consoleContent :global(td) {
+		font-size: 0.78rem;
+		padding: 0.48rem 0.54rem;
+	}
+
+	.consoleContent :global(h1) {
+		font-size: clamp(1.05rem, 5.3vw, 1.22rem) !important;
+		line-height: 1.2 !important;
+	}
+
+	.consoleContent :global(h2) {
+		font-size: clamp(0.95rem, 4.7vw, 1.1rem) !important;
 	}
 }
 
