@@ -83,6 +83,12 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   const isAdmin = Boolean(user) && !isSuperAdmin && isPlatformAdmin(user);
   const isIngeniero = Boolean(user) && !isSuperAdmin && !isAdmin && role.includes("ingenier");
 
+  const resolveConsoleRoute = (shortHref: string) => {
+    if (!shortHref.startsWith("/")) return shortHref;
+    if (shortHref === "/paneles" || shortHref === "/login") return shortHref;
+    return inPrefixedConsolePath ? `/console${shortHref}` : shortHref;
+  };
+
   const bottomNavItems = useMemo(() => {
     const items: Array<{ icon: string; label: string; href?: string; onPress?: () => void; hapticIntent?: "selection" | "medium" }> = [
       { icon: "📊", label: "Inicio", href: resolveConsoleRoute("/dashboard"), hapticIntent: "selection" },
@@ -104,12 +110,6 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
 
     return items;
   }, [isIngeniero, isSuperAdmin, isAdmin, setDrawerOpen, inPrefixedConsolePath]);
-
-  const resolveConsoleRoute = (shortHref: string) => {
-    if (!shortHref.startsWith("/")) return shortHref;
-    if (shortHref === "/paneles" || shortHref === "/login") return shortHref;
-    return inPrefixedConsolePath ? `/console${shortHref}` : shortHref;
-  };
 
   useEffect(() => {
     const now = new Date();
