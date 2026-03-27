@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { createPortal } from "react-dom";
 import { useTheme } from "./ThemeContext";
 
 const helpContent: Record<string, Record<string, string>> = {
@@ -310,7 +311,13 @@ export default function HelpTab({ module, user }: { module: string; user?: any }
   const profile = getProfile(user);
   const content = helpContent[module]?.[profile] || "No hay ayuda disponible para este módulo.";
   const [open, setOpen] = React.useState(false);
+  const [mounted, setMounted] = React.useState(false);
   const moduleLabel = moduleNames[module] || module.replace(/-/g, " ");
+
+  React.useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   const buttonStyle: React.CSSProperties = {
     width: 54,
@@ -347,8 +354,12 @@ export default function HelpTab({ module, user }: { module: string; user?: any }
     transition: 'background 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease',
   };
 
-  return (
-    <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1000 }}>
+  if (!mounted || typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
+    <div style={{ position: 'fixed', bottom: 'max(78px, calc(env(safe-area-inset-bottom, 0px) + 72px))', right: 14, zIndex: 10020 }}>
       <button onClick={() => setOpen((v) => !v)} style={buttonStyle}>
         {open ? '×' : '?'}
       </button>
@@ -370,6 +381,7 @@ export default function HelpTab({ module, user }: { module: string; user?: any }
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 }
