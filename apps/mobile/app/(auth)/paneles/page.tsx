@@ -13,11 +13,25 @@ const getGreeting = () => {
   return "Buenas noches";
 };
 
+const getPrimaryName = (fullName?: string) => {
+  if (!fullName) return "Usuario";
+
+  const sanitized = fullName.replace(/\([^)]*\)/g, " ").trim();
+  const [firstName] = sanitized.split(/\s+/);
+  return firstName || "Usuario";
+};
+
 export default function PanelHubPage() {
   const router = useRouter();
   const { user, logout, isContextReady } = useUser();
   const [now, setNow] = useState<Date>(() => new Date());
   const [query, setQuery] = useState("");
+  const primaryName = getPrimaryName(user?.nombre);
+  const isSuperAdmin = !!user?.isSuperAdmin;
+  const headerKicker = isSuperAdmin ? "NEXARA OWNER" : "NEXARA APP";
+  const headerSubtitle = isSuperAdmin
+    ? "Vista de dirección general. Selecciona el panel estratégico que deseas gestionar."
+    : "Tu jornada está lista. Selecciona el panel en el que deseas trabajar.";
 
   useEffect(() => {
     if (!isContextReady) return;
@@ -42,15 +56,6 @@ export default function PanelHubPage() {
     });
   }, [panels, query]);
 
-  useEffect(() => {
-    if (!user) return;
-    if (panels.length !== 1) return;
-
-    const singlePanel = panels[0];
-    setActivePanel(singlePanel.key);
-    router.replace(singlePanel.entryPath);
-  }, [panels, router, user]);
-
   if (!user) {
     return null;
   }
@@ -63,14 +68,14 @@ export default function PanelHubPage() {
   return (
     <section className={styles.page}>
       <header className={styles.header}>
-        <p className={styles.kicker}>NEXARA APP</p>
+        <p className={styles.kicker}>{headerKicker}</p>
         <h1 className={styles.title}>
-          {getGreeting()}, {user.nombre}
+          {getGreeting()}, {primaryName}
         </h1>
-        <p className={styles.subtitle}>Tu jornada está lista. El día de hoy, ¿a qué panel deseas ingresar?</p>
+        <p className={styles.subtitle}>{headerSubtitle}</p>
         <div className={styles.metaRow}>
-          <span>{now.toLocaleDateString("es-MX", { weekday: "long", day: "2-digit", month: "long" })}</span>
-          <span>{now.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+          <span className={styles.metaChip}>{now.toLocaleDateString("es-MX", { weekday: "long", day: "2-digit", month: "long" })}</span>
+          <span className={styles.metaChip}>{now.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
         </div>
       </header>
 
@@ -79,7 +84,15 @@ export default function PanelHubPage() {
           Tu cuenta no tiene paneles habilitados por el momento. Contacta a superadministración para asignar permisos.
         </div>
       ) : (
-        <>
+        <section className={styles.panelsSection}>
+          <div className={styles.sectionHeader}>
+            <div>
+              <p className={styles.sectionKicker}>Paneles</p>
+              <h2 className={styles.sectionTitle}>Accesos disponibles</h2>
+            </div>
+            <span className={styles.counter}>{filteredPanels.length} paneles</span>
+          </div>
+
           <div className={styles.toolbar}>
             <input
               value={query}
@@ -87,7 +100,6 @@ export default function PanelHubPage() {
               className={`input ${styles.search}`}
               placeholder="Buscar panel por nombre"
             />
-            <span className={styles.counter}>{filteredPanels.length} panel(es)</span>
           </div>
           <div className={styles.grid}>
           {filteredPanels.map((panel) => (
@@ -99,10 +111,10 @@ export default function PanelHubPage() {
               <p className={styles.cardDescription}>{panel.description}</p>
               <button
                 type="button"
-                className="button-primary"
+                className={styles.enterButton}
                 onClick={() => handleEnterPanel(panel.key, panel.entryPath)}
               >
-                Entrar a {panel.name}
+                Abrir panel
               </button>
             </article>
           ))}
@@ -112,7 +124,7 @@ export default function PanelHubPage() {
               No hay paneles que coincidan con tu búsqueda.
             </div>
           )}
-        </>
+        </section>
       )}
 
       <div className={styles.actions}>

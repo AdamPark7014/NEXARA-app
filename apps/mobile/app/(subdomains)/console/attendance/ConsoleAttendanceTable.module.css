@@ -1,428 +1,441 @@
 .card {
-	border-radius: 26px;
-	padding: 22px;
-	border: 1px solid var(--border);
-	background: linear-gradient(
-		165deg,
-		color-mix(in srgb, var(--surface) 98%, transparent),
-		color-mix(in srgb, var(--surface-2) 92%, transparent)
-	);
-	box-shadow: var(--elev-2);
-	display: grid;
-	gap: 18px;
-	font-family: var(--font-base);
-}
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --panel-border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  --panel-bg: linear-gradient(
+    168deg,
+    color-mix(in srgb, var(--surface) 99%, transparent),
+    color-mix(in srgb, var(--surface-2) 90%, transparent)
+  );
+  --control-border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  --control-bg: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface) 99%, transparent),
+    color-mix(in srgb, var(--surface-2) 86%, transparent)
+  );
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
 
-:global(body.dark) .card {
-	background: linear-gradient(
-		165deg,
-		color-mix(in srgb, var(--surface) 96%, var(--background)),
-		color-mix(in srgb, var(--surface-2) 90%, var(--background))
-	);
-	border-color: var(--border-strong);
-	box-shadow: var(--shadow);
+  border-radius: 18px;
+  padding: 14px;
+  border: var(--panel-border);
+  background: var(--panel-bg);
+  box-shadow: 0 18px 30px -24px color-mix(in srgb, var(--foreground) 40%, transparent);
+  display: grid;
+  gap: 12px;
+  font-family: var(--font-base);
 }
 
 .hero {
-	display: flex;
-	justify-content: space-between;
-	flex-wrap: wrap;
-	gap: 16px;
-	align-items: center;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  align-items: stretch;
 }
 
 .kicker {
-	text-transform: uppercase;
-	letter-spacing: 0.28rem;
-	font-size: 0.7rem;
-	color: var(--text-tertiary);
-	margin: 0 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  margin: 0 0 4px;
+  font-weight: 700;
 }
 
 .title {
-	margin: 0 0 6px;
-	font-size: 1.8rem;
-	color: var(--foreground);
-	font-family: var(--font-heading);
+  margin: 0 0 4px;
+  font-size: clamp(1.28rem, 2.2vw, 1.64rem);
+  line-height: 1.15;
+  color: var(--foreground);
+  font-family: var(--font-heading);
 }
 
 .subtitle {
-	margin: 0;
-	color: var(--text-secondary);
-	max-width: 420px;
+  margin: 0;
+  color: var(--text-secondary);
+  max-width: 62ch;
+  font-size: 0.95rem;
+  line-height: 1.45;
 }
 
 .heroStats {
-	display: grid;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
-	gap: 12px;
-	text-align: right;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .heroStats div {
-	padding: 10px 14px;
-	border-radius: 16px;
-	border: 1px solid var(--border);
-	background: color-mix(in srgb, var(--surface) 88%, transparent);
-}
-
-:global(body.dark) .heroStats div {
-	background: color-mix(in srgb, var(--surface-2) 76%, transparent);
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  border: var(--panel-border);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--surface) 95%, transparent),
+    color-mix(in srgb, var(--surface-2) 86%, transparent)
+  );
 }
 
 .heroStats span {
-	display: block;
-	font-size: 0.7rem;
-	text-transform: uppercase;
-	letter-spacing: 0.18rem;
-	color: var(--text-tertiary);
+  display: block;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  margin-bottom: 2px;
 }
 
 .heroStats strong {
-	display: block;
-	font-size: 1.2rem;
-	color: var(--foreground);
+  display: block;
+  font-size: 1.16rem;
+  line-height: 1;
+  color: var(--foreground);
 }
 
 .controls {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 12px;
-	align-items: flex-end;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-items: end;
 }
 
 .controlGroup {
-	display: grid;
-	gap: 6px;
-	font-size: 0.85rem;
-	color: var(--text-secondary);
+  display: grid;
+  gap: 5px;
+}
+
+.controlGroup label {
+  font-size: 0.72rem;
 }
 
 .controlGroup input,
 .controls button,
 .detailControls select,
 .detailControls input {
-	border-radius: 999px;
-	padding: 8px 16px;
-	border: 1px solid var(--border);
-	background: color-mix(in srgb, var(--surface) 96%, transparent);
-	color: var(--foreground);
-	font-family: var(--font-base);
+  width: 100%;
+  min-height: 42px;
+  border-radius: var(--radius-md);
+  padding: 9px 12px;
+  border: var(--control-border);
+  background: var(--control-bg);
+  color: var(--foreground);
+  font-family: var(--font-base);
+  box-sizing: border-box;
 }
 
-:global(body.dark) .controlGroup input,
-:global(body.dark) .controls button,
-:global(body.dark) .detailControls select,
-:global(body.dark) .detailControls input {
-	background: color-mix(in srgb, var(--surface-2) 84%, transparent);
+.controlGroup input:focus,
+.controls button:focus,
+.detailControls select:focus,
+.detailControls input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--primary) 48%, var(--border));
+  box-shadow: var(--focus-ring);
 }
 
 .primaryButton {
-	background: linear-gradient(120deg, var(--primary), var(--secondary));
-	color: var(--header-text);
-	border: none;
-	box-shadow: 0 12px 20px color-mix(in srgb, var(--primary) 24%, transparent);
-	cursor: pointer;
+  background: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--secondary) 80%, var(--primary)));
+  color: var(--header-text);
+  border: none;
+  font-weight: 700;
+  box-shadow: 0 14px 24px -18px color-mix(in srgb, var(--primary) 64%, transparent);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.primaryButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 28px -18px color-mix(in srgb, var(--primary) 70%, transparent);
+}
+
+.primaryButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .ghostButton {
-	background: color-mix(in srgb, var(--primary) 12%, transparent);
-	color: var(--foreground);
-	cursor: pointer;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  color: var(--foreground);
+  cursor: pointer;
+  font-weight: 640;
 }
 
 .summaryGrid {
-	display: grid;
-	grid-template-columns: repeat(4, minmax(0, 1fr));
-	gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .summaryGrid div {
-	padding: 12px 14px;
-	border-radius: 16px;
-	border: 1px solid var(--border);
-	background: linear-gradient(
-		145deg,
-		color-mix(in srgb, var(--primary) 10%, var(--surface)),
-		color-mix(in srgb, var(--secondary) 8%, var(--surface-2))
-	);
+  padding: 10px 11px;
+  border-radius: var(--radius-md);
+  border: var(--panel-border);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--primary) 10%, var(--surface)),
+    color-mix(in srgb, var(--secondary) 8%, var(--surface-2))
+  );
 }
 
 .summaryGrid p {
-	margin: 0 0 6px;
-	font-size: 0.75rem;
-	text-transform: uppercase;
-	letter-spacing: 0.18rem;
-	color: var(--text-tertiary);
+  margin: 0 0 4px;
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
 }
 
 .summaryGrid strong {
-	font-size: 1rem;
-	color: var(--foreground);
+  font-size: 0.96rem;
+  color: var(--foreground);
 }
 
 .tableWrap,
 .detailTableWrap {
-	border-radius: 18px;
-	border: 1px solid var(--border);
-	overflow: auto;
-	background: linear-gradient(
-		160deg,
-		color-mix(in srgb, var(--surface) 98%, transparent),
-		color-mix(in srgb, var(--surface-2) 92%, transparent)
-	);
-}
-
-:global(body.dark) .tableWrap,
-:global(body.dark) .detailTableWrap {
-	background: linear-gradient(
-		160deg,
-		color-mix(in srgb, var(--surface) 94%, var(--background)),
-		color-mix(in srgb, var(--surface-2) 88%, var(--background))
-	);
+  border-radius: var(--radius-lg);
+  border: var(--panel-border);
+  overflow: auto;
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--surface) 99%, transparent),
+    color-mix(in srgb, var(--surface-2) 90%, transparent)
+  );
 }
 
 .table {
-	width: 100%;
-	border-collapse: collapse;
-	min-width: 960px;
-	font-size: 0.92rem;
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+  font-size: 0.9rem;
 }
 
 .detailTable {
-	width: 100%;
-	border-collapse: collapse;
-	min-width: 720px;
-	font-size: 0.9rem;
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+  font-size: 0.88rem;
 }
 
 .table th,
 .detailTable th {
-	padding: 12px 14px;
-	text-transform: uppercase;
-	letter-spacing: 0.12rem;
-	font-size: 0.68rem;
-	color: var(--text-secondary);
-	background: linear-gradient(
-		90deg,
-		color-mix(in srgb, var(--primary) 16%, transparent),
-		color-mix(in srgb, var(--secondary) 12%, transparent)
-	);
-	text-align: left;
-}
-
-.detailTable th {
-	padding: 10px 12px;
+  padding: 11px 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--primary) 14%, transparent),
+    color-mix(in srgb, var(--secondary) 10%, transparent)
+  );
+  text-align: left;
 }
 
 .table td,
 .detailTable td {
-	padding: 12px 14px;
-	border-top: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
-	color: var(--foreground);
-}
-
-.detailTable td {
-	padding: 10px 12px;
+  padding: 11px 12px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+  color: var(--foreground);
+  vertical-align: top;
 }
 
 .table td span {
-	display: block;
-	font-size: 0.82rem;
-	color: var(--text-secondary);
-	margin-top: 4px;
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 3px;
+}
+
+.kicker,
+.controlGroup label,
+.summaryGrid p,
+.detailSummary span {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  font-weight: 700;
 }
 
 .badge {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	border-radius: 999px;
-	padding: 4px 10px;
-	font-size: 0.75rem;
-	font-weight: 600;
-	background: var(--state-info-bg);
-	color: var(--state-info-text);
-	border: 1px solid var(--state-info-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 640;
+  background: var(--state-info-bg);
+  color: var(--state-info-text);
+  border: 1px solid var(--state-info-border);
 }
 
 .badge[data-level='Alta'] {
-	background: var(--state-success-bg);
-	color: var(--state-success-text);
-	border-color: var(--state-success-border);
+  background: var(--state-success-bg);
+  color: var(--state-success-text);
+  border-color: var(--state-success-border);
 }
 
 .badge[data-level='Media'] {
-	background: var(--state-warning-bg);
-	color: var(--state-warning-text);
-	border-color: var(--state-warning-border);
+  background: var(--state-warning-bg);
+  color: var(--state-warning-text);
+  border-color: var(--state-warning-border);
 }
 
 .badge[data-level='Baja'] {
-	background: var(--state-danger-bg);
-	color: var(--state-danger-text);
-	border-color: var(--state-danger-border);
+  background: var(--state-danger-bg);
+  color: var(--state-danger-text);
+  border-color: var(--state-danger-border);
 }
 
 .detailsButton {
-	background: linear-gradient(120deg, var(--primary), var(--secondary));
-	color: var(--header-text);
-	border: none;
-	padding: 8px 18px;
-	border-radius: 999px;
-	font-weight: 700;
-	letter-spacing: 0.02rem;
-	box-shadow: 0 12px 22px color-mix(in srgb, var(--primary) 28%, transparent);
-	cursor: pointer;
-	transition: transform 0.2s ease, box-shadow 0.2s ease;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  color: var(--foreground);
+  border: var(--control-border);
+  padding: 7px 11px;
+  border-radius: var(--radius-sm);
+  font-weight: 650;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
 }
 
 .detailsButton:hover {
-	transform: translateY(-1px);
-	box-shadow: 0 16px 26px color-mix(in srgb, var(--primary) 34%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 44%, var(--border));
+  background: color-mix(in srgb, var(--surface-2) 92%, transparent);
 }
 
 .detailCell {
-	padding: 18px 20px;
-	background: linear-gradient(
-		140deg,
-		color-mix(in srgb, var(--primary) 10%, transparent),
-		color-mix(in srgb, var(--secondary) 8%, transparent)
-	);
+  padding: 12px;
+  background: linear-gradient(
+    140deg,
+    color-mix(in srgb, var(--primary) 10%, transparent),
+    color-mix(in srgb, var(--secondary) 8%, transparent)
+  );
 }
 
 .detailHeader {
-	display: flex;
-	justify-content: space-between;
-	flex-wrap: wrap;
-	gap: 12px;
-	align-items: center;
-	margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
 }
 
 .detailHeader h4 {
-	margin: 0 0 4px;
-	font-size: 1.1rem;
-	color: var(--foreground);
+  margin: 0 0 3px;
+  font-size: 1.02rem;
+  color: var(--foreground);
 }
 
 .detailHeader p {
-	margin: 0;
-	color: var(--text-secondary);
-	font-size: 0.9rem;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
 }
 
 .detailControls {
-	display: flex;
-	gap: 10px;
-	flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 
 .detailSummary {
-	display: grid;
-	grid-template-columns: repeat(4, minmax(0, 1fr));
-	gap: 12px;
-	margin-bottom: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
 .detailSummary div {
-	padding: 10px 12px;
-	border-radius: 14px;
-	background: color-mix(in srgb, var(--surface) 86%, var(--primary) 14%);
-	border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--border));
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface) 90%, var(--primary) 10%);
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--border));
 }
 
 .detailSummary span {
-	display: block;
-	font-size: 0.72rem;
-	text-transform: uppercase;
-	letter-spacing: 0.16rem;
-	color: var(--text-tertiary);
+  display: block;
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
 }
 
 .detailSummary strong {
-	color: var(--foreground);
-	font-size: 1rem;
+  color: var(--foreground);
+  font-size: 0.95rem;
 }
 
 .activityList {
-	display: grid;
-	gap: 6px;
-	font-size: 0.85rem;
-	color: var(--text-secondary);
+  display: grid;
+  gap: 6px;
+  font-size: 0.84rem;
+  color: var(--text-secondary);
 }
 
 .emptyRow,
 .emptyState {
-	text-align: center;
-	padding: 16px;
-	color: var(--text-secondary);
-}
-
-.emptyState {
-	padding: 18px;
+  text-align: center;
+  padding: 14px;
+  color: var(--text-secondary);
 }
 
 .locked,
 .error {
-	padding: 12px 14px;
-	border-radius: 12px;
-	background: var(--state-danger-bg);
-	color: var(--state-danger-text);
-	border: 1px solid var(--state-danger-border);
-	font-weight: 600;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--state-danger-bg);
+  color: var(--state-danger-text);
+  border: 1px solid var(--state-danger-border);
+  font-weight: 600;
 }
 
 .locked {
-	padding: 16px;
-	border-radius: 16px;
+  padding: 14px;
+  border-radius: 14px;
 }
 
-@media (max-width: 1100px) {
-	.summaryGrid,
-	.detailSummary {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-	}
+@media (min-width: 760px) {
+  .card {
+    gap: 14px;
+    padding: 16px;
+  }
 
-	.heroStats {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-	}
+  .hero {
+    grid-template-columns: 1fr auto;
+    align-items: end;
+  }
+
+  .controls {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .summaryGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .detailSummary {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
-	.card {
-		padding: 18px;
-	}
+  .table {
+    min-width: 760px;
+    font-size: 0.84rem;
+  }
 
-	.summaryGrid,
-	.detailSummary,
-	.heroStats {
-		grid-template-columns: 1fr;
-	}
+  .detailTable {
+    min-width: 620px;
+  }
 
-	.controls {
-		align-items: stretch;
-	}
+  .table th,
+  .detailTable th {
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    padding: 9px 8px;
+  }
 
-	.detailTableWrap {
-		overflow-x: auto;
-		-webkit-overflow-scrolling: touch;
-	}
-
-	.detailTable {
-		min-width: 0;
-	}
-
-	.detailTable th,
-	.detailTable td {
-		padding: 10px 8px;
-		font-size: 0.82rem;
-		word-break: break-word;
-	}
-
-	.detailTable img {
-		width: 36px !important;
-		height: 36px !important;
-	}
+  .table td,
+  .detailTable td {
+    padding: 9px 8px;
+  }
 }
-

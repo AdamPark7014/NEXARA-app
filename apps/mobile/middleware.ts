@@ -308,7 +308,8 @@ export function middleware(request: NextRequest) {
   const isMobileHubPath = pathname === '/login' || pathname === '/paneles';
   const isStaticAssetPath = STATIC_FILE_EXTENSIONS.test(pathname) || pathname.startsWith('/uploads/');
 
-  if (hasKnownActivePanel && !isAlreadyPanelPath && !isMobileHubPath && !isStaticAssetPath) {
+  const isApiOrSocket = pathname === '/api' || pathname.startsWith('/api/') || pathname === '/socket.io' || pathname.startsWith('/socket.io/');
+  if (hasKnownActivePanel && !isAlreadyPanelPath && !isMobileHubPath && !isStaticAssetPath && !isApiOrSocket) {
     const panelSlug = activePanelCookie as string;
     const targetPath =
       panelSlug === 'tickets' && (pathname === '/' || pathname === '/dashboard')

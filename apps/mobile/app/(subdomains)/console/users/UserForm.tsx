@@ -34,16 +34,69 @@ export type UserFormInitialUser = {
   avatarUrl?: string;
 };
 
+type RoleTipo = "vendedor" | "ingeniero" | "administrador";
+
+type FormState = {
+  nombre: string;
+  email: string;
+  password: string;
+  departmentId: string;
+  department: string;
+  avatarUrl: string;
+  roleTipo: RoleTipo;
+  cargo: string;
+  roleNombre: string;
+  accesoPanelVentas: boolean;
+  accesoGestionWeb: boolean;
+  accesoGestionCvs: boolean;
+  accesoContabilidad: boolean;
+  accesoCotizaciones: boolean;
+};
+
+const DEFAULT_ROLE_LABEL: Record<RoleTipo, string> = {
+  vendedor: "Vendedor",
+  ingeniero: "Usuario consola",
+  administrador: "Admin consola",
+};
+
+const resolveRoleTipo = (initialUser: UserFormInitialUser | undefined, roleName: string): RoleTipo => {
+  const initialRoleLower = roleName.toLowerCase();
+  if (initialUser?.role?.accesoConsoleAdmin) return "administrador";
+  if (initialUser?.role?.accesoConsole) return "ingeniero";
+  if (initialRoleLower.includes("admin")) return "administrador";
+  if (initialRoleLower.includes("ingenier") || initialRoleLower.includes("consola")) return "ingeniero";
+  return "vendedor";
+};
+
+const resolveRoleName = (roleTipo: RoleTipo, cargo: string) => {
+  if (roleTipo === "vendedor") return DEFAULT_ROLE_LABEL.vendedor;
+  const trimmedCargo = cargo.trim();
+  return trimmedCargo || DEFAULT_ROLE_LABEL[roleTipo];
+};
+
+const applyRoleConstraints = (state: FormState): FormState => {
+  const next = { ...state };
+
+  if (next.roleTipo === "vendedor") {
+    next.cargo = "";
+    next.accesoPanelVentas = true;
+  }
+
+  return next;
+};
+
 export default function UserForm({
   onUserCreated,
   onUserUpdated,
   initialUser,
   isEdit = false,
+  showHeader = true,
 }: {
   onUserCreated?: () => void;
   onUserUpdated?: (formData: FormData, id: number) => void;
   initialUser?: UserFormInitialUser;
   isEdit?: boolean;
+  showHeader?: boolean;
 }) {
   const { user } = useUser();
   const searchParams = useSearchParams();
@@ -62,17 +115,13 @@ export default function UserForm({
   const prefillEmail = searchParams.get('prefillEmail') || '';
   const prefillRole = searchParams.get('prefillRoleName') || '';
   const initialRoleName = String(initialUser?.role?.nombre || (!isEdit ? prefillRole : "")).trim() || "Vendedor";
+  const initialRoleTipo = resolveRoleTipo(initialUser, initialRoleName);
   const initialRoleLower = initialRoleName.toLowerCase();
-  const initialRoleTipo: "vendedor" | "ingeniero" | "administrador" = initialRoleLower.includes("admin")
-    ? "administrador"
-    : initialRoleLower.includes("ingenier")
-      ? "ingeniero"
-      : "vendedor";
-  const initialCargo = initialRoleTipo === "vendedor" || initialRoleLower === initialRoleTipo
+  const initialCargo = initialRoleTipo === "vendedor" || initialRoleLower === initialRoleTipo || initialRoleName === DEFAULT_ROLE_LABEL[initialRoleTipo]
     ? ""
     : initialRoleName;
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<FormState>(() => applyRoleConstraints({
     nombre: initialUser?.nombre || (!isEdit ? prefillName : ""),
     email: initialUser?.email || (!isEdit ? prefillEmail : ""),
     password: "",
@@ -81,17 +130,14 @@ export default function UserForm({
     avatarUrl: initialUser?.avatarUrl || "",
     roleTipo: initialRoleTipo,
     cargo: initialCargo,
-    // Rol personalizado
+    // Rol visible editable libremente
     roleNombre: initialRoleName,
-    superadmin: initialUser?.role?.superadmin || false,
-    admin: initialUser?.role?.accesoConsoleAdmin || false,
-    ingeniero: initialUser?.role?.accesoConsole || false,
-    vendedor: initialUser?.role?.accesoPanelVentas || false,
+    accesoPanelVentas: initialUser?.role?.accesoPanelVentas || initialRoleTipo === "vendedor",
     accesoGestionWeb: initialUser?.role?.accesoGestionWeb || false,
     accesoGestionCvs: initialUser?.role?.accesoGestionCvs || false,
     accesoContabilidad: initialUser?.role?.accesoContabilidad || false,
     accesoCotizaciones: initialUser?.role?.accesoCotizaciones || false,
-  });
+  }));
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
 
   // ...existing code...
@@ -106,6 +152,7 @@ export default function UserForm({
   const [dragActive, setDragActive] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const canAssignConsoleRoles = Boolean(user?.isSuperAdmin);
 
   if (!user || !hasPermission(user, PERMISSIONS.USERS_MANAGE)) return null;
 
@@ -114,83 +161,11 @@ export default function UserForm({
     const { name, value, type } = target;
     const nextValue = type === "checkbox" ? target.checked : value;
     setForm((prev) => {
-      let nextForm = { ...prev, [name]: nextValue };
-      if (name === "roleTipo") {
-        if (value === "administrador") {
-          nextForm = { ...nextForm, admin: true, ingeniero: false, vendedor: false, superadmin: false };
-        } else if (value === "ingeniero") {
-          nextForm = { ...nextForm, admin: false, ingeniero: true, vendedor: false, superadmin: false };
-        } else {
-          nextForm = { ...nextForm, admin: false, ingeniero: false, vendedor: true, superadmin: false, cargo: "" };
-        }
-
-        if (value === "vendedor") {
-          nextForm.roleNombre = "Vendedor";
-        } else if (nextForm.cargo.trim()) {
-          nextForm.roleNombre = nextForm.cargo.trim();
-        } else {
-          nextForm.roleNombre = value === "administrador" ? "Administrador" : "Ingeniero";
-        }
-      }
-      if (name === "cargo") {
-        const trimmedCargo = String(value || "").trim();
-        if (nextForm.roleTipo !== "vendedor") {
-          nextForm.roleNombre = trimmedCargo || (nextForm.roleTipo === "administrador" ? "Administrador" : "Ingeniero");
-        }
-      }
-      // Lógica de exclusividad de roles principales
-      if (name === "superadmin" && nextValue) {
-        nextForm = { ...nextForm, admin: false, ingeniero: false, vendedor: false };
-      } else if (name === "admin" && nextValue) {
-        nextForm = { ...nextForm, superadmin: false, ingeniero: false, vendedor: false };
-      } else if (name === "ingeniero" && nextValue) {
-        nextForm = { ...nextForm, superadmin: false, admin: false, vendedor: false };
-      } else if (name === "vendedor" && nextValue) {
-        nextForm = { ...nextForm, superadmin: false, admin: false, ingeniero: false };
-      }
-      // Restricciones de accesos según rol
-      if (nextForm.superadmin) {
-        nextForm = {
-          ...nextForm,
-          accesoGestionWeb: true,
-          accesoGestionCvs: true,
-          accesoContabilidad: true,
-          accesoCotizaciones: true,
-          // superadmin no puede ser admin, ingeniero ni vendedor
-          admin: false,
-          ingeniero: false,
-          vendedor: false,
-        };
-      }
-      if (nextForm.admin) {
-        // admin solo puede tener acceso a cotizaciones o cvs
-        nextForm = {
-          ...nextForm,
-          accesoGestionWeb: false,
-          accesoContabilidad: false,
-          vendedor: false,
-          ingeniero: false,
-          superadmin: false,
-        };
-      }
-      if (nextForm.ingeniero) {
-        // ingeniero puede tener acceso a vendedor, cotizaciones o cvs
-        nextForm = {
-          ...nextForm,
-          admin: false,
-          superadmin: false,
-        };
-      }
-      if (nextForm.vendedor) {
-        // vendedor puede tener acceso a cotizaciones o cvs
-        nextForm = {
-          ...nextForm,
-          admin: false,
-          ingeniero: false,
-          superadmin: false,
-        };
-      }
-      return nextForm;
+      const nextForm = {
+        ...prev,
+        [name]: name === "roleTipo" ? (nextValue as RoleTipo) : nextValue,
+      } as FormState;
+      return applyRoleConstraints(nextForm);
     });
   };
 
@@ -251,41 +226,37 @@ export default function UserForm({
     e.preventDefault();
     setLoading(true);
     try {
-      const effectiveRoleName = form.roleTipo === "vendedor"
-        ? "Vendedor"
-        : (form.cargo || "").trim() || (form.roleTipo === "administrador" ? "Administrador" : "Ingeniero");
-
-      if (form.roleTipo !== "vendedor" && !(form.cargo || "").trim()) {
-        alert("Por favor especifique su cargo para el rol seleccionado");
-        setLoading(false);
-        return;
-      }
+      const normalizedRoleTipo: RoleTipo = canAssignConsoleRoles ? form.roleTipo : "vendedor";
+      const effectiveRoleName = form.roleNombre.trim() || resolveRoleName(normalizedRoleTipo, form.cargo);
+      const accesoPanelVentas = normalizedRoleTipo === "vendedor" ? true : Boolean(form.accesoPanelVentas);
+      const accesoGestionWeb = normalizedRoleTipo === "administrador" ? true : Boolean(form.accesoGestionWeb);
+      const accesoContabilidad = normalizedRoleTipo === "administrador" ? true : Boolean(form.accesoContabilidad);
 
       // Construir el payload de rol según la nueva lógica
       const rolePayload = {
         nombre: effectiveRoleName,
-        accesoConsole: form.roleTipo !== "vendedor",
-        accesoConsoleAdmin: form.roleTipo === "administrador",
-        accesoActividades: form.roleTipo !== "vendedor",
-        accesoEvidencias: form.roleTipo !== "vendedor",
-        accesoViaticos: form.roleTipo !== "vendedor",
-        accesoVehiculos: form.roleTipo !== "vendedor",
-        accesoAsistencia: form.roleTipo !== "vendedor",
-        accesoGps: form.roleTipo !== "vendedor",
-        accesoGestionUsuarios: form.roleTipo === "administrador",
-        accesoGestionWeb: form.accesoGestionWeb || form.roleTipo === "administrador",
+        accesoConsole: normalizedRoleTipo !== "vendedor",
+        accesoConsoleAdmin: normalizedRoleTipo === "administrador",
+        accesoActividades: normalizedRoleTipo !== "vendedor",
+        accesoEvidencias: normalizedRoleTipo !== "vendedor",
+        accesoViaticos: normalizedRoleTipo !== "vendedor",
+        accesoVehiculos: normalizedRoleTipo !== "vendedor",
+        accesoAsistencia: normalizedRoleTipo !== "vendedor",
+        accesoGps: normalizedRoleTipo !== "vendedor",
+        accesoGestionUsuarios: normalizedRoleTipo === "administrador",
+        accesoGestionWeb,
         accesoGestionCvs: form.accesoGestionCvs,
-        accesoPanelVentas: form.vendedor,
-        accesoContabilidad: form.accesoContabilidad || form.roleTipo === "administrador",
+        accesoPanelVentas,
+        accesoContabilidad,
         accesoCotizaciones: form.accesoCotizaciones,
-        accesoInventario: form.roleTipo === "administrador",
-        accesoCompras: form.roleTipo === "administrador",
-        accesoSeguridad: form.roleTipo === "administrador",
-        accesoDocumentos: form.roleTipo === "administrador",
-        accesoWorkflow: form.roleTipo === "administrador",
-        accesoAuditoria: form.roleTipo === "administrador",
-        accesoBI: form.roleTipo === "administrador",
-        accesoBanca: form.roleTipo === "administrador",
+        accesoInventario: normalizedRoleTipo === "administrador",
+        accesoCompras: normalizedRoleTipo === "administrador",
+        accesoSeguridad: normalizedRoleTipo === "administrador",
+        accesoDocumentos: normalizedRoleTipo === "administrador",
+        accesoWorkflow: normalizedRoleTipo === "administrador",
+        accesoAuditoria: normalizedRoleTipo === "administrador",
+        accesoBI: normalizedRoleTipo === "administrador",
+        accesoBanca: normalizedRoleTipo === "administrador",
       };
 
       const getErrorMessage = async (res: Response, fallback: string) => {
@@ -308,26 +279,18 @@ export default function UserForm({
           throw new Error(await getErrorMessage(listRes, 'Error al cargar roles'));
         }
         const roles = await listRes.json();
+        const normalizedName = effectiveRoleName.trim().toLowerCase();
         return Array.isArray(roles)
-          ? roles.find((r) => r?.nombre === effectiveRoleName)
+          ? roles.find((r) => String(r?.nombre || '').trim().toLowerCase() === normalizedName)
           : null;
       };
 
-      // 1. Resolver rol para asignar al usuario en edición/creación.
-      // En edición NO se muta el rol actual del usuario para evitar impactos en otros usuarios que compartan ese rol.
+      // Resolver rol para asignar al usuario en edición/creación.
+      // Se reutiliza el rol existente por nombre y solo se crea uno nuevo cuando no existe.
       let roleId: number | null = null;
       if (effectiveRoleName) {
         const existing = await fetchRoleByName();
         if (existing?.id) {
-          const patchRes = await fetch(buildApiUrl(`roles/${existing.id}`), {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
-            },
-            body: JSON.stringify(rolePayload),
-          });
-          if (!patchRes.ok) throw new Error(await getErrorMessage(patchRes, 'Error al actualizar el rol'));
           roleId = existing.id;
         } else {
           const roleRes = await fetch(buildApiUrl('roles'), {
@@ -343,14 +306,20 @@ export default function UserForm({
           roleId = roleData.id;
         }
       }
-      // 2. Crear el usuario con el roleId
+      if (!roleId) {
+        throw new Error('No se pudo resolver el rol para el usuario');
+      }
+
+      // Crear/actualizar el usuario con el roleId resuelto.
       const data = new FormData();
       data.append("nombre", form.nombre);
       data.append("email", form.email);
       if (form.password) data.append("password", form.password);
       data.append("roleId", String(roleId));
       const resolvedDepartment = (form.departmentId || "").trim() || (form.department || "").trim();
-      data.append("departmentId", resolvedDepartment);
+      if (resolvedDepartment) {
+        data.append("departmentId", resolvedDepartment);
+      }
       if (avatarFile) {
         data.append("avatar", avatarFile);
       }
@@ -360,7 +329,7 @@ export default function UserForm({
         await createUser(data, user?.token);
         if (onUserCreated) onUserCreated();
         alert("Usuario creado correctamente");
-        setForm({
+        setForm(applyRoleConstraints({
           nombre: "",
           email: "",
           password: "",
@@ -369,16 +338,13 @@ export default function UserForm({
           avatarUrl: "",
           roleTipo: "vendedor",
           cargo: "",
-          roleNombre: "Vendedor",
-          superadmin: false,
-          admin: false,
-          ingeniero: false,
-          vendedor: false,
+          roleNombre: DEFAULT_ROLE_LABEL.vendedor,
+          accesoPanelVentas: true,
           accesoGestionWeb: false,
           accesoGestionCvs: false,
           accesoContabilidad: false,
           accesoCotizaciones: false,
-        });
+        }));
         setAvatarFile(null);
         setPreview("");
       }
@@ -393,14 +359,16 @@ export default function UserForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="userForm">
-      <div className="formHeader">
-        <div>
-          <h3 className="formTitle">{isEdit ? "Editar Usuario" : "Crear Usuario"}</h3>
-          <p className="formSubtitle">Gestiona datos, permisos y fotografía del perfil.</p>
+    <form onSubmit={handleSubmit} className={`userForm ${showHeader ? "" : "userFormCompact"}`}>
+      {showHeader && (
+        <div className="formHeader">
+          <div>
+            <h3 className="formTitle">{isEdit ? "Editar Usuario" : "Crear Usuario"}</h3>
+            <p className="formSubtitle">Gestiona datos, permisos y fotografia del perfil.</p>
+          </div>
+          {user?.isSuperAdmin && <span className="formBadge">Superadmin</span>}
         </div>
-        {user?.isSuperAdmin && <span className="formBadge">Superadmin</span>}
-      </div>
+      )}
 
       <div className="formGrid">
         <div className="field">
@@ -411,7 +379,7 @@ export default function UserForm({
           <label className="label">Email</label>
           <input name="email" type="email" value={form.email} onChange={handleChange} required className="input" />
         </div>
-        <div className="field">
+        <div className="field fieldWide">
           <label className="label">Contraseña</label>
           <div className="inputRow">
             <input
@@ -425,9 +393,8 @@ export default function UserForm({
             />
             <button
               type="button"
-              className="ghostButton"
+              className="ghostButton passwordToggleButton"
               onClick={() => setShowPassword((prev) => !prev)}
-              style={{ height: 42 }}
             >
               {showPassword ? "Ocultar" : "Ver"}
             </button>
@@ -442,26 +409,36 @@ export default function UserForm({
           <label className="label">Tipo de rol</label>
           <select name="roleTipo" value={form.roleTipo} onChange={handleChange} className="input">
             <option value="vendedor">Vendedor</option>
-            <option value="ingeniero">Ingeniero</option>
-            <option value="administrador">Administrador</option>
+            {!canAssignConsoleRoles && form.roleTipo === "ingeniero" && <option value="ingeniero">Consola usuario</option>}
+            {!canAssignConsoleRoles && form.roleTipo === "administrador" && <option value="administrador">Consola admin</option>}
+            {canAssignConsoleRoles && <option value="ingeniero">Consola usuario</option>}
+            {canAssignConsoleRoles && <option value="administrador">Consola admin</option>}
           </select>
+          {!canAssignConsoleRoles && (
+            <span className="helperText">Solo superadmin puede asignar roles de consola.</span>
+          )}
         </div>
         {form.roleTipo !== "vendedor" && (
-          <div className="field">
-            <label className="label">Por favor especifique su cargo</label>
+          <div className="field fieldWide">
+            <label className="label">Cargo personalizado (opcional)</label>
             <input
               name="cargo"
               value={form.cargo}
               onChange={handleChange}
-              required
               className="input"
-              placeholder="Ej: Jefe de Ingeniería, Coordinador de Operaciones"
+              placeholder="Ej: Coordinador de Operaciones"
             />
           </div>
         )}
         <div className="field">
           <label className="label">Nombre visible del rol</label>
-          <input name="roleNombre" value={form.roleNombre} readOnly className="input" />
+          <input
+            name="roleNombre"
+            value={form.roleNombre}
+            onChange={handleChange}
+            className="input"
+            placeholder="Ej: Supervisor de Operaciones"
+          />
         </div>
         <div className="field">
           <label className="label">Departamento</label>
@@ -469,18 +446,18 @@ export default function UserForm({
         </div>
       </div>
 
-      <div className="field">
+      <div className="field fieldSection">
         <label className="label">Accesos permitidos</label>
         <div className="checkboxGrid">
-          <label className="checkboxItem"><input type="checkbox" name="accesoGestionWeb" checked={form.accesoGestionWeb} onChange={handleChange} /> Panel Web</label>
-          <label className="checkboxItem"><input type="checkbox" name="accesoGestionCvs" checked={form.accesoGestionCvs} onChange={handleChange} /> Gestión de CVs</label>
-          <label className="checkboxItem"><input type="checkbox" name="vendedor" checked={form.vendedor} onChange={handleChange} /> Panel Ventas</label>
-          {user?.isSuperAdmin && <label className="checkboxItem"><input type="checkbox" name="accesoContabilidad" checked={form.accesoContabilidad} onChange={handleChange} /> Panel Contabilidad</label>}
-          <label className="checkboxItem"><input type="checkbox" name="accesoCotizaciones" checked={form.accesoCotizaciones} onChange={handleChange} /> Pestaña de cotizaciones</label>
+          <label className="checkboxItem"><input type="checkbox" name="accesoGestionWeb" checked={form.accesoGestionWeb} onChange={handleChange} /> <span>Panel Web</span></label>
+          <label className="checkboxItem"><input type="checkbox" name="accesoGestionCvs" checked={form.accesoGestionCvs} onChange={handleChange} /> <span>Gestion de CVs</span></label>
+          <label className="checkboxItem"><input type="checkbox" name="accesoPanelVentas" checked={form.accesoPanelVentas} onChange={handleChange} /> <span>Panel Ventas</span></label>
+          {user?.isSuperAdmin && <label className="checkboxItem"><input type="checkbox" name="accesoContabilidad" checked={form.accesoContabilidad} onChange={handleChange} /> <span>Panel Contabilidad</span></label>}
+          <label className="checkboxItem"><input type="checkbox" name="accesoCotizaciones" checked={form.accesoCotizaciones} onChange={handleChange} /> <span>Pestana de cotizaciones</span></label>
         </div>
       </div>
 
-      <div className="field">
+      <div className="field fieldSection">
         <label className="label">Foto de usuario</label>
         <div
           onDrop={handleDrop}
@@ -500,7 +477,7 @@ export default function UserForm({
           {preview ? (
             <Image src={preview} alt="preview" width={86} height={86} className="previewAvatar" unoptimized />
           ) : (
-            <span>Arrastra una imagen aquí o haz click</span>
+            <span className="dropZoneCopy">Arrastra una imagen aqui o toca para seleccionar</span>
           )}
         </div>
         {preview && (
@@ -548,98 +525,152 @@ export default function UserForm({
       <style jsx>{`
         .userForm {
           display: grid;
-          gap: 18px;
-          padding: 8px 4px 4px;
+          gap: 14px;
+          padding: 2px;
           width: 100%;
+        }
+
+        .userFormCompact {
+          gap: 12px;
+          padding-top: 0;
         }
 
         .formHeader {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          gap: 12px;
+          gap: 14px;
+          padding: 0 0 12px;
+          border-bottom: 1px solid color-mix(in srgb, var(--border) 68%, transparent);
         }
 
         .formTitle {
           margin: 0 0 6px;
-          color: var(--primary);
-          font-weight: 700;
-          font-size: 22px;
+          color: var(--foreground);
+          font-weight: 780;
+          font-size: clamp(1.5rem, 2.2vw, 1.9rem);
+          line-height: 1.08;
+          letter-spacing: var(--panel-title-tracking);
         }
 
         .formSubtitle {
           margin: 0;
           color: var(--text-secondary);
           font-size: 13px;
+          line-height: 1.5;
         }
 
         .formBadge {
-          padding: 6px 12px;
+          padding: 6px 14px;
           border-radius: 999px;
           font-size: 12px;
-          background: rgba(255, 255, 255, 0.08);
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          color: var(--text-secondary);
+          background: linear-gradient(145deg, color-mix(in srgb, var(--primary) 16%, var(--surface)), color-mix(in srgb, var(--surface-2) 86%, transparent));
+          border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--border));
+          color: var(--foreground);
+          font-weight: 750;
         }
 
         .formGrid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-          gap: 14px;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px;
         }
 
         .field {
           display: grid;
           gap: 8px;
+          padding: 10px;
+          border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+          border-radius: 14px;
+          background: linear-gradient(162deg, color-mix(in srgb, var(--surface) 99%, transparent), color-mix(in srgb, var(--surface-2) 86%, transparent));
+          box-shadow: 0 8px 18px -18px color-mix(in srgb, var(--foreground) 44%, transparent);
+        }
+
+        .fieldWide,
+        .fieldSection {
+          grid-column: 1 / -1;
         }
 
         .inputRow {
           display: grid;
           grid-template-columns: 1fr auto;
-          gap: 10px;
+          gap: 8px;
           align-items: center;
         }
 
         .label {
-          color: var(--primary);
-          font-weight: 600;
-          font-size: 14px;
+          color: var(--text-secondary);
+          font-weight: 700;
+          font-size: 12px;
+          text-transform: uppercase;
+          letter-spacing: 0.09em;
         }
 
         .input {
           width: 100%;
-          padding: 10px 14px;
-          border-radius: 10px;
-          border: 1px solid var(--muted);
-          background: var(--background);
+          min-height: 44px;
+          padding: 10px 12px;
+          border-radius: 12px;
+          border: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
+          background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 99%, transparent), color-mix(in srgb, var(--surface-2) 86%, transparent));
           color: var(--foreground);
-          font-size: 15px;
+          font-size: 14px;
           outline: none;
           box-sizing: border-box;
-          transition: border-color 0.2s ease, box-shadow 0.2s ease;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.18s ease;
+          box-shadow: 0 1px 0 color-mix(in srgb, var(--surface) 90%, transparent) inset;
         }
 
         .input:focus {
-          border-color: rgba(15, 106, 214, 0.6);
-          box-shadow: 0 0 0 2px rgba(15, 106, 214, 0.15);
+          border-color: color-mix(in srgb, var(--primary) 54%, var(--border));
+          box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent), 0 8px 14px -12px color-mix(in srgb, var(--primary) 44%, transparent);
+          transform: translateY(-1px);
+        }
+
+        .passwordToggleButton {
+          min-height: 44px;
+          min-width: 76px;
+          padding-inline: 12px;
         }
 
         .checkboxGrid {
           display: grid;
           gap: 8px;
-          padding: 12px;
+          padding: 10px;
           border-radius: 12px;
-          background: rgba(255, 255, 255, 0.04);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          background: linear-gradient(155deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--surface-2) 82%, transparent));
+          border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+          grid-template-columns: repeat(2, minmax(140px, 1fr));
         }
 
         .checkboxItem {
           display: flex;
-          gap: 8px;
+          gap: 10px;
           align-items: center;
           font-size: 13px;
           color: var(--text-secondary);
+          min-height: 40px;
+          padding: 8px 10px;
+          border-radius: 9px;
+          background: color-mix(in srgb, var(--surface) 92%, transparent);
+          border: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+          justify-content: flex-start;
+        }
+
+        .checkboxItem span {
+          line-height: 1.35;
+          color: var(--text-primary);
+          font-weight: 560;
+        }
+
+        .checkboxItem input[type="checkbox"] {
+          width: 16px;
+          height: 16px;
+          min-width: 16px;
+          min-height: 16px;
+          margin: 0;
+          accent-color: var(--primary);
+          transform: none;
         }
 
         .helperText {
@@ -648,17 +679,17 @@ export default function UserForm({
         }
 
         .dropZone {
-          border: 2px dashed var(--muted);
-          border-radius: 12px;
-          padding: 20px;
+          border: 2px dashed color-mix(in srgb, var(--border) 66%, transparent);
+          border-radius: 14px;
+          padding: 16px;
           text-align: center;
           cursor: pointer;
-          min-height: 110px;
+          min-height: 108px;
           display: flex;
           align-items: center;
           justify-content: center;
           color: var(--text-secondary);
-          background: var(--surface-light);
+          background: linear-gradient(165deg, color-mix(in srgb, var(--surface-light) 70%, transparent), color-mix(in srgb, var(--surface-2) 82%, transparent));
           background-size: cover;
           background-position: center;
           transition: border-color 0.2s ease, background 0.2s ease;
@@ -666,8 +697,15 @@ export default function UserForm({
 
         .dropZoneActive {
           border-color: var(--primary);
-          background: rgba(15, 106, 214, 0.12);
+          background: color-mix(in srgb, var(--primary) 14%, var(--surface));
           color: var(--text-primary);
+        }
+
+        .dropZoneCopy {
+          max-width: 28ch;
+          font-size: 13px;
+          line-height: 1.45;
+          color: var(--text-secondary);
         }
 
         .previewAvatar {
@@ -678,15 +716,16 @@ export default function UserForm({
         }
 
         .primaryButton {
-          background: var(--primary);
+          background: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--secondary) 82%, var(--primary)));
           color: #fff;
           border: none;
-          border-radius: 10px;
+          border-radius: 13px;
+          min-height: 46px;
           padding: 12px 18px;
-          font-weight: 700;
+          font-weight: 760;
           font-size: 15px;
           cursor: pointer;
-          box-shadow: 0 10px 18px rgba(15, 106, 214, 0.2);
+          box-shadow: 0 12px 22px -14px color-mix(in srgb, var(--primary) 64%, transparent);
           transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
@@ -697,23 +736,24 @@ export default function UserForm({
 
         .primaryButton:hover:not(:disabled) {
           transform: translateY(-1px);
-          box-shadow: 0 14px 26px rgba(15, 106, 214, 0.25);
+          box-shadow: 0 16px 26px -14px color-mix(in srgb, var(--primary) 72%, transparent);
         }
 
         .ghostButton {
-          background: transparent;
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          color: var(--text-secondary);
-          border-radius: 10px;
+          background: color-mix(in srgb, var(--surface) 92%, transparent);
+          border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+          color: var(--foreground);
+          border-radius: 12px;
           padding: 10px 14px;
-          font-weight: 600;
+          font-weight: 640;
           cursor: pointer;
-          transition: border-color 0.2s ease, color 0.2s ease;
+          transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
         }
 
         .ghostButton:hover {
-          border-color: rgba(15, 106, 214, 0.5);
-          color: var(--text-primary);
+          border-color: color-mix(in srgb, var(--primary) 44%, var(--border));
+          background: color-mix(in srgb, var(--surface-2) 92%, transparent);
+          color: var(--foreground);
         }
 
         .cropModal {
@@ -769,6 +809,25 @@ export default function UserForm({
         }
 
         @media (max-width: 600px) {
+          .formGrid {
+            grid-template-columns: 1fr;
+            gap: 10px;
+          }
+
+          .checkboxGrid {
+            grid-template-columns: 1fr;
+            gap: 7px;
+          }
+
+          .field {
+            padding: 9px;
+            border-radius: 12px;
+          }
+
+          .input {
+            min-height: 42px;
+          }
+
           .cropModal {
             padding: 20px;
             width: calc(100vw - 32px);
@@ -803,6 +862,10 @@ export default function UserForm({
           .formHeader {
             flex-direction: column;
             align-items: flex-start;
+          }
+
+          .formTitle {
+            font-size: 1.62rem;
           }
         }
       `}</style>

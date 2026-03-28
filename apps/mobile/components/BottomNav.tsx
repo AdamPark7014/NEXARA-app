@@ -13,6 +13,7 @@ export interface BottomNavItem {
   onPress?: () => void;
   matchPrefix?: string;
   hapticIntent?: HapticIntent;
+  active?: boolean;
 }
 
 interface BottomNavProps {
@@ -28,6 +29,7 @@ export default function BottomNav({ items }: BottomNavProps) {
   };
 
   const isActive = (item: BottomNavItem) => {
+    if (typeof item.active === "boolean") return item.active;
     if (!item.href || !pathname) return false;
     const match = item.matchPrefix || item.href;
     return pathname === match || pathname.startsWith(`${match}/`);

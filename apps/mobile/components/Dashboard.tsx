@@ -1,8 +1,11 @@
+"use client";
+
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
+import { getApiBaseCandidates, getSocketBaseUrl as resolveSocketBaseUrl } from '@/lib/api-base';
 
 type Viatic = {
   id: number;
@@ -41,9 +44,66 @@ type AttendanceRange = {
   users?: AttendanceRangeUser[];
 };
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
-const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, '');
+type CollectionResponse<T> = T[] | { data?: T[] | null } | null | undefined;
+
+type VisibleUser = {
+  id: number;
+  nombre: string;
+  email?: string | null;
+  role?: {
+    accesoConsoleAdmin?: boolean;
+    nombre?: string | null;
+  } | null;
+};
+
+const buildApiUrlWithBase = (base: string, path: string) => `${base.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
+
+const normalizeCollectionResponse = <T,>(payload: CollectionResponse<T>): T[] => {
+  if (Array.isArray(payload)) return payload;
+  if (payload && Array.isArray(payload.data)) return payload.data;
+  return [];
+};
+
+const fetchFromApiCandidates = async (
+  path: string,
+  init?: RequestInit,
+  timeoutMs = 15000,
+) => {
+  const candidates = getApiBaseCandidates();
+  let lastError: unknown = null;
+
+  for (const base of candidates) {
+    const controller = new AbortController();
+    const externalSignal = init?.signal;
+    const onExternalAbort = () => controller.abort();
+
+    if (externalSignal) {
+      if (externalSignal.aborted) {
+        controller.abort();
+      } else {
+        externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+      }
+    }
+
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(buildApiUrlWithBase(base, path), {
+        ...init,
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (externalSignal) externalSignal.removeEventListener('abort', onExternalAbort);
+      return response;
+    } catch (err) {
+      clearTimeout(timeout);
+      if (externalSignal) externalSignal.removeEventListener('abort', onExternalAbort);
+      lastError = err;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('No se pudo conectar con la API');
+};
 
 const toLocalDateInput = (date: Date) => date.toLocaleDateString('sv-SE');
 
@@ -155,6 +215,7 @@ export default function Dashboard() {
   const [viatics, setViatics] = useState<Viatic[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRange | null>(null);
+  const [visibleUsers, setVisibleUsers] = useState<VisibleUser[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -170,16 +231,58 @@ export default function Dashboard() {
   }, []);
 
   const availableUsers = useMemo(() => {
-    const list = attendance?.users || [];
+    const map = new Map<number, AttendanceRangeUser>();
+
+    const pushUser = (candidate: AttendanceRangeUser | null | undefined) => {
+      if (!candidate || typeof candidate.userId !== 'number' || Number.isNaN(candidate.userId)) return;
+      const existing = map.get(candidate.userId);
+      if (!existing) {
+        map.set(candidate.userId, {
+          userId: candidate.userId,
+          userName: candidate.userName,
+          totalMinutes: candidate.totalMinutes,
+          days: candidate.days || [],
+          attendances: candidate.attendances || [],
+        });
+        return;
+      }
+
+      map.set(candidate.userId, {
+        userId: candidate.userId,
+        userName: existing.userName || candidate.userName,
+        totalMinutes: existing.totalMinutes || candidate.totalMinutes,
+        days: (existing.days && existing.days.length ? existing.days : candidate.days) || [],
+        attendances:
+          (existing.attendances && existing.attendances.length ? existing.attendances : candidate.attendances) || [],
+      });
+    };
+
+    (attendance?.users || []).forEach((item) => pushUser(item));
+
+    visibleUsers.forEach((item) => {
+      pushUser({ userId: Number(item.id), userName: item.nombre });
+    });
+
+    if (normalizedUserId && user?.nombre) {
+      pushUser({ userId: normalizedUserId, userName: user.nombre });
+    }
+
+    let list = Array.from(map.values()).sort((left, right) => {
+      const leftName = String(left.userName || `Usuario ${left.userId}`);
+      const rightName = String(right.userName || `Usuario ${right.userId}`);
+      return leftName.localeCompare(rightName, 'es', { sensitivity: 'base' });
+    });
+
     if (isSuperAdmin) {
       return list.filter((item) => item.userId !== normalizedUserId);
     }
-    if (!isConsoleAdmin) return list;
-    if (!normalizedUserId || !user?.nombre) return list;
-    const exists = list.some((item) => item.userId === normalizedUserId);
-    if (exists) return list;
-    return [...list, { userId: normalizedUserId, userName: user.nombre }];
-  }, [attendance?.users, isConsoleAdmin, isSuperAdmin, normalizedUserId, user?.nombre]);
+
+    if (!isConsoleAdmin) {
+      return normalizedUserId ? list.filter((item) => item.userId === normalizedUserId) : list;
+    }
+
+    return list;
+  }, [attendance?.users, isConsoleAdmin, isSuperAdmin, normalizedUserId, user?.nombre, visibleUsers]);
 
   useEffect(() => {
     if (selectedUserId !== null) return;
@@ -192,7 +295,12 @@ export default function Dashboard() {
   }, [availableUsers, isSuperAdmin, normalizedUserId, selectedUserId]);
 
   useEffect(() => {
-    if (!availableUsers.length) return;
+    if (!availableUsers.length) {
+      if (selectedUserId !== null) {
+        setSelectedUserId(null);
+      }
+      return;
+    }
     const exists = availableUsers.some((item) => item.userId === selectedUserId);
     if (exists) return;
     if (isSuperAdmin) {
@@ -220,54 +328,95 @@ export default function Dashboard() {
     try {
       const abortController = signal ? null : new AbortController();
       const activeSignal = signal || abortController?.signal;
-      const timeout = setTimeout(() => {
-        abortController?.abort();
-      }, 15000);
 
       const headers = { Authorization: `Bearer ${user.token}` };
       const params = new URLSearchParams({ from: weekRange.from, to: weekRange.to });
       const canManageAttendance = hasPermission(user, PERMISSIONS.ATTENDANCE_MANAGE);
       const canViewAttendance = hasPermission(user, PERMISSIONS.ATTENDANCE_VIEW);
 
-      const [viaticsRes, activitiesRes] = await Promise.all([
-        fetch(buildApiUrl('viatics'), { headers, signal: activeSignal }),
-        fetch(buildApiUrl('activities'), { headers, signal: activeSignal }),
+      const [viaticsResult, activitiesResult] = await Promise.allSettled([
+        fetchFromApiCandidates('viatics', { headers, signal: activeSignal }),
+        fetchFromApiCandidates('activities', { headers, signal: activeSignal }),
       ]);
+
+      let visibleUsersRes: Response | null = null;
+      if (isConsoleAdmin || isSuperAdmin) {
+        try {
+          const assignableResponse = await fetchFromApiCandidates('users/assignable', { headers, signal: activeSignal });
+          if (assignableResponse.ok) {
+            visibleUsersRes = assignableResponse;
+          } else {
+            const fallbackResponse = await fetchFromApiCandidates('users', { headers, signal: activeSignal });
+            visibleUsersRes = fallbackResponse.ok ? fallbackResponse : null;
+          }
+        } catch {
+          try {
+            const fallbackResponse = await fetchFromApiCandidates('users', { headers, signal: activeSignal });
+            visibleUsersRes = fallbackResponse.ok ? fallbackResponse : null;
+          } catch {
+            visibleUsersRes = null;
+          }
+        }
+      }
+
+      const viaticsRes = viaticsResult.status === 'fulfilled' ? viaticsResult.value : null;
+      const activitiesRes = activitiesResult.status === 'fulfilled' ? activitiesResult.value : null;
 
       let attendanceRes: Response | null = null;
       if (canManageAttendance) {
-        const hierarchyRes = await fetch(buildApiUrl(`attendance/hierarchy/range?${params.toString()}`), {
-          headers,
-          signal: activeSignal,
-        });
-        if (hierarchyRes.ok) {
-          attendanceRes = hierarchyRes;
-        } else if ([404, 403].includes(hierarchyRes.status) && canViewAttendance) {
-          const fallbackRes = await fetch(buildApiUrl(`attendance/range?${params.toString()}`), {
+        try {
+          const hierarchyRes = await fetchFromApiCandidates(`attendance/hierarchy/range?${params.toString()}`, {
             headers,
             signal: activeSignal,
           });
-          attendanceRes = fallbackRes.ok ? fallbackRes : null;
+          if (hierarchyRes.ok) {
+            attendanceRes = hierarchyRes;
+          } else if ([404, 403].includes(hierarchyRes.status) && canViewAttendance) {
+            const fallbackRes = await fetchFromApiCandidates(`attendance/range?${params.toString()}`, {
+              headers,
+              signal: activeSignal,
+            });
+            attendanceRes = fallbackRes.ok ? fallbackRes : null;
+          }
+        } catch {
+          attendanceRes = null;
         }
       } else if (canViewAttendance) {
-        const ownAttendanceRes = await fetch(buildApiUrl(`attendance/range?${params.toString()}`), {
-          headers,
-          signal: activeSignal,
-        });
-        attendanceRes = ownAttendanceRes.ok ? ownAttendanceRes : null;
+        try {
+          const ownAttendanceRes = await fetchFromApiCandidates(`attendance/range?${params.toString()}`, {
+            headers,
+            signal: activeSignal,
+          });
+          attendanceRes = ownAttendanceRes.ok ? ownAttendanceRes : null;
+        } catch {
+          attendanceRes = null;
+        }
       }
 
-      clearTimeout(timeout);
-
-      const viaticsData = viaticsRes.ok ? ((await viaticsRes.json()) as Viatic[]) : [];
-      const activitiesData = activitiesRes.ok ? ((await activitiesRes.json()) as Activity[]) : [];
+      const viaticsData = viaticsRes?.ok ? ((await viaticsRes.json()) as CollectionResponse<Viatic>) : [];
+      const activitiesData = activitiesRes?.ok ? ((await activitiesRes.json()) as CollectionResponse<Activity>) : [];
+      const visibleUsersData = visibleUsersRes?.ok ? ((await visibleUsersRes.json()) as CollectionResponse<VisibleUser>) : [];
       let attendancePayload: AttendanceRange | { totalMinutes?: number; days?: any[]; attendances?: any[] } | null = null;
       if (attendanceRes?.ok) {
         attendancePayload = await attendanceRes.json();
       }
 
-      setViatics(Array.isArray(viaticsData) ? viaticsData : []);
-      setActivities(Array.isArray(activitiesData) ? activitiesData : []);
+      const normalizedVisibleUsers = normalizeCollectionResponse(visibleUsersData);
+      const allCoreRequestsFailed = !viaticsRes && !activitiesRes && !attendanceRes && !visibleUsersRes;
+      if (allCoreRequestsFailed) {
+        if (silent) {
+          return;
+        }
+        setVisibleUsers([]);
+        setViatics([]);
+        setActivities([]);
+        setAttendance(null);
+        return;
+      }
+
+      setVisibleUsers(normalizedVisibleUsers);
+      setViatics(normalizeCollectionResponse(viaticsData));
+      setActivities(normalizeCollectionResponse(activitiesData));
 
       if (canManageAttendance && attendancePayload) {
         setAttendance(attendancePayload as AttendanceRange);
@@ -305,7 +454,7 @@ export default function Dashboard() {
         setInitialLoading(false);
       }
     }
-  }, [user, weekRange.from, weekRange.to]);
+  }, [isConsoleAdmin, isSuperAdmin, user, weekRange.from, weekRange.to]);
 
   useEffect(() => {
     if (!user?.token) return;
@@ -317,7 +466,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user?.token) return;
 
-    const socket: Socket = io(getSocketBaseUrl(), {
+    const socket: Socket = io(resolveSocketBaseUrl(), {
       transports: ['polling', 'websocket'],
       auth: { token: user.token },
     });
@@ -343,12 +492,39 @@ export default function Dashboard() {
     };
   }, [user?.token, fetchAll]);
 
-  if (!isMounted) return <div className="loadingCard">Cargando dashboard...</div>;
-  if (initialLoading) return <div className="loadingCard">Cargando dashboard...</div>;
-  if (error) return <div className="errorCard">{error}</div>;
-  if (!user) return null;
+  const shouldShowLoading = !isMounted || initialLoading;
+  const shouldShowError = !shouldShowLoading && Boolean(error);
+  const shouldShowEmptySession = !shouldShowLoading && !shouldShowError && !user;
 
-  const activeUserId = selectedUserId ?? (isSuperAdmin ? null : Number(user.id));
+  if (!user && !shouldShowLoading && !shouldShowError) {
+    return (
+      <div className="dashboardRoot">
+        <div className="errorCard">No se encontró una sesión activa.</div>
+        <style jsx>{`
+          .dashboardRoot {
+            display: grid;
+            gap: 18px;
+            padding-bottom: 12px;
+          }
+
+          .errorCard {
+            padding: 28px;
+            border-radius: 18px;
+            border: 1px solid var(--state-danger-border);
+            background: linear-gradient(160deg, color-mix(in srgb, var(--state-danger-bg) 72%, var(--surface)), color-mix(in srgb, var(--surface-2) 94%, transparent));
+            color: var(--state-danger-text);
+            text-align: center;
+            font-size: 16px;
+            box-shadow: var(--elev-1);
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  const currentUser = user;
+
+  const activeUserId = selectedUserId ?? (isSuperAdmin ? null : Number(currentUser?.id ?? 0));
   const isWithinWeek = (value?: string | null) => {
     if (!value) return false;
     const date = new Date(value);
@@ -358,7 +534,7 @@ export default function Dashboard() {
 
   const userName =
     availableUsers.find((item) => item.userId === activeUserId)?.userName ||
-    (isSuperAdmin ? 'Sin usuario seleccionado' : user.nombre);
+    (isSuperAdmin ? 'Sin usuario seleccionado' : currentUser?.nombre || 'Sin usuario seleccionado');
 
   const filteredViatics = viatics.filter((item) => {
     if (!isWithinWeek(item.createdAt)) return false;
@@ -498,105 +674,90 @@ export default function Dashboard() {
 
   return (
     <div className="dashboardRoot">
+      {shouldShowLoading ? (
+        <div className="loadingCard">Cargando dashboard...</div>
+      ) : shouldShowError ? (
+        <div className="errorCard">{error}</div>
+      ) : shouldShowEmptySession ? (
+        <div className="errorCard">No se encontró una sesión activa.</div>
+      ) : (
+        <>
       <div className="heroCard">
-        <div className="heroHeader">
-          <div>
-            <p className="heroKicker">Panel Console</p>
-            <h1 className="heroTitle">Resumen semanal operativo</h1>
-            <div className="heroSubtitle">{userName} · Semana {weekRange.from} a {weekRange.to}</div>
+        <div className="heroTop">
+          <div className="heroLeft">
+            <p className="heroKicker">Contexto operativo</p>
+            <span className="heroWeekRange">{formatDate(weekRange.from)} - {formatDate(weekRange.to)}</span>
+            <span className="heroCurrentUser">{userName}</span>
           </div>
           <div className="heroMeta">
-            <div className="heroRole">{user.role}</div>
-            {user.isSuperAdmin && <div className="heroLevel">Superadmin</div>}
+            {currentUser?.role && <span className="heroRole">{currentUser.role}</span>}
+            {currentUser?.isSuperAdmin && <span className="heroLevel">Superadmin</span>}
+            {refreshing && <span className="heroRefreshing">↻</span>}
           </div>
         </div>
-        <div className="heroBadges">
-          <span className="chip">Semana: {formatDate(weekRange.from)} - {formatDate(weekRange.to)}</span>
-          <span className="chip chipLive">Usuario: {userName}</span>
-          {refreshing && <span className="chip">Actualizando...</span>}
-        </div>
-        {isConsoleAdmin && availableUsers.length > 0 && (
-          <div className="filtersRow">
-            <label className="filterControl">
-              <span className="filterLabel">Usuario</span>
-              <select
-                className="input"
-                value={activeUserId ?? ""}
-                onChange={(event) => setSelectedUserId(Number(event.target.value))}
-              >
-                {availableUsers.map((item) => (
-                  <option key={item.userId} value={item.userId}>
-                    {item.userName || `Usuario ${item.userId}`}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+        {(isConsoleAdmin || isSuperAdmin) && availableUsers.length > 0 && (
+          <select
+            className="userSelect"
+            value={activeUserId ?? ""}
+            onChange={(event) => setSelectedUserId(Number(event.target.value))}
+            aria-label="Seleccionar usuario"
+          >
+            {availableUsers.map((item) => (
+              <option key={item.userId} value={item.userId}>
+                {item.userName || `Usuario ${item.userId}`}
+              </option>
+            ))}
+          </select>
         )}
       </div>
 
       <div className="kpiGrid">
         <div className="kpiCard kpiDelay1">
-          <div className="kpiHeader">
-            <span className="kpiEyebrow">Horas trabajadas</span>
-            <span className="kpiPill">Semana</span>
-          </div>
-          <div className="kpiValue">{formatHours(attendanceMinutes)} h</div>
-          <div className="kpiMeta">Total semanal por usuario</div>
+          <span className="kpiIcon">🕒</span>
+          <span className="kpiValue">{formatHours(attendanceMinutes)}<span className="kpiUnit">h</span></span>
+          <span className="kpiLabel">Horas<br/>semana</span>
         </div>
-
         <div className="kpiCard kpiDelay2">
-          <div className="kpiHeader">
-            <span className="kpiEyebrow">Usuarios activos</span>
-            <span className="kpiPill">Hoy</span>
-          </div>
-          <div className="kpiValue">{activeUsersCount}</div>
-          <div className="kpiMeta">Con entrada abierta</div>
+          <span className="kpiIcon">🟢</span>
+          <span className="kpiValue">{activeUsersCount}</span>
+          <span className="kpiLabel">Usuarios<br/>activos</span>
         </div>
-
         <div className="kpiCard kpiDelay3">
-          <div className="kpiHeader">
-            <span className="kpiEyebrow">Actividades</span>
-            <span className="kpiPill">Semana</span>
-          </div>
-          <div className="kpiValue">{activityTotals.total}</div>
-          <div className="kpiMeta">Asignadas o en proceso</div>
+          <span className="kpiIcon">📋</span>
+          <span className="kpiValue">{activityTotals.total}</span>
+          <span className="kpiLabel">Actividades<br/>semana</span>
         </div>
-
         <div className="kpiCard kpiDelay4">
-          <div className="kpiHeader">
-            <span className="kpiEyebrow">Viáticos</span>
-            <span className="kpiPill">Semana</span>
-          </div>
-          <div className="kpiValue">{formatCurrency(viaticTotals.amount)}</div>
-          <div className="kpiMeta">{viaticTotals.pending} pendientes · {viaticTotals.approved} aprobados</div>
+          <span className="kpiIcon">💰</span>
+          <span className="kpiValue kpiValueMoney">{formatCurrency(viaticTotals.amount)}</span>
+          <span className="kpiLabel">Viáticos<br/>{viaticTotals.pending} pend.</span>
         </div>
-
         <div className="kpiCard kpiDelay5">
-          <div className="kpiHeader">
-            <span className="kpiEyebrow">Ritmo diario</span>
-            <span className="kpiPill pillAccent">Promedio</span>
-          </div>
-          <div className="kpiValue">
-            {formatHours(avgDailyMinutes)} h
-          </div>
-          <div className="kpiMeta">Horas promedio por dia</div>
+          <span className="kpiIcon">📈</span>
+          <span className="kpiValue">{formatHours(avgDailyMinutes)}<span className="kpiUnit">h</span></span>
+          <span className="kpiLabel">Ritmo<br/>diario</span>
+        </div>
+        <div className="kpiCard kpiDelay6">
+          <span className="kpiIcon">✅</span>
+          <span className="kpiValue">{activityTotals.total > 0 ? Math.round(((activityTotals.total - (activityTotals.pending ?? activityTotals.total)) / activityTotals.total) * 100) : 0}<span className="kpiUnit">%</span></span>
+          <span className="kpiLabel">Actividades<br/>completadas</span>
         </div>
       </div>
 
       <div className="analyticsGrid">
         <div className="analysisCard">
           <div className="analysisHeader">
-            <div>
-              <div className="analysisEyebrow">Asistencia</div>
-              <h3 className="analysisTitle">Horas por dia</h3>
+            <span className="analysisIcon">📅</span>
+            <div className="analysisTitleWrap">
+              <span className="analysisEyebrow">Asistencia</span>
+              <h3 className="analysisTitle">Horas / día</h3>
             </div>
-            <span className="analysisPill">Semana actual</span>
+            <span className="analysisPill">Semana</span>
           </div>
           <div className="chartWrap">
             {hasAttendanceData ? (
-              <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={attendanceChart} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={attendanceChart} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="hoursFill" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="var(--primary)" />
@@ -604,11 +765,10 @@ export default function Dashboard() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid stroke="var(--stroke-clean)" vertical={false} />
-                  <XAxis dataKey="date" stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
-                  <YAxis allowDecimals={false} stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
+                  <XAxis dataKey="date" stroke="var(--text-tertiary)" tick={{ fontSize: 10 }} />
+                  <YAxis allowDecimals={false} stroke="var(--text-tertiary)" tick={{ fontSize: 10 }} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Legend />
-                  <Bar dataKey="horas" name="Horas" fill="url(#hoursFill)" radius={[8, 8, 0, 0]} barSize={28} />
+                  <Bar dataKey="horas" name="Horas" fill="url(#hoursFill)" radius={[6, 6, 0, 0]} barSize={20} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -619,16 +779,17 @@ export default function Dashboard() {
 
         <div className="analysisCard">
           <div className="analysisHeader">
-            <div>
-              <div className="analysisEyebrow">Actividades</div>
-              <h3 className="analysisTitle">Distribucion por estatus</h3>
+            <span className="analysisIcon">📋</span>
+            <div className="analysisTitleWrap">
+              <span className="analysisEyebrow">Actividades</span>
+              <h3 className="analysisTitle">Por estatus</h3>
             </div>
-            <span className="analysisPill">{activityTotals.total} total</span>
+            <span className="analysisPill">{activityTotals.total}</span>
           </div>
           <div className="chartWrap">
             {hasActivityData ? (
-              <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={activityStatusData} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={activityStatusData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="activityFill" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="var(--primary)" />
@@ -636,30 +797,31 @@ export default function Dashboard() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid stroke="var(--stroke-clean)" vertical={false} />
-                  <XAxis dataKey="estatus" stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
-                  <YAxis allowDecimals={false} stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
+                  <XAxis dataKey="estatus" stroke="var(--text-tertiary)" tick={{ fontSize: 10 }} />
+                  <YAxis allowDecimals={false} stroke="var(--text-tertiary)" tick={{ fontSize: 10 }} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="cantidad" name="Actividades" fill="url(#activityFill)" radius={[8, 8, 0, 0]} barSize={26} />
+                  <Bar dataKey="cantidad" name="Actividades" fill="url(#activityFill)" radius={[6, 6, 0, 0]} barSize={20} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="chartEmpty">Sin datos en la semana actual.</div>
+              <div className="chartEmpty">Sin datos</div>
             )}
           </div>
         </div>
 
         <div className="analysisCard">
           <div className="analysisHeader">
-            <div>
-              <div className="analysisEyebrow">Viáticos</div>
-              <h3 className="analysisTitle">Pagos por estatus</h3>
+            <span className="analysisIcon">💸</span>
+            <div className="analysisTitleWrap">
+              <span className="analysisEyebrow">Viáticos</span>
+              <h3 className="analysisTitle">Por estatus</h3>
             </div>
-            <span className="analysisPill">{viaticTotals.total} registros</span>
+            <span className="analysisPill">{viaticTotals.total}</span>
           </div>
           <div className="chartWrap">
             {hasViaticData ? (
-              <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={viaticStatusData} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={viaticStatusData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="viaticFill" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="var(--secondary)" />
@@ -667,405 +829,403 @@ export default function Dashboard() {
                     </linearGradient>
                   </defs>
                   <CartesianGrid stroke="var(--stroke-clean)" vertical={false} />
-                  <XAxis dataKey="estatus" stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
-                  <YAxis allowDecimals={false} stroke="var(--text-tertiary)" tick={{ fontSize: 11 }} />
+                  <XAxis dataKey="estatus" stroke="var(--text-tertiary)" tick={{ fontSize: 10 }} />
+                  <YAxis allowDecimals={false} stroke="var(--text-tertiary)" tick={{ fontSize: 10 }} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="cantidad" name="Viáticos" fill="url(#viaticFill)" radius={[8, 8, 0, 0]} barSize={26} />
+                  <Bar dataKey="cantidad" name="Viáticos" fill="url(#viaticFill)" radius={[6, 6, 0, 0]} barSize={20} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="chartEmpty">Sin datos en la semana actual.</div>
+              <div className="chartEmpty">Sin datos</div>
             )}
           </div>
         </div>
         {weeklyUserHours.length > 0 && (
           <div className="analysisCard">
             <div className="analysisHeader">
-              <div>
-                <div className="analysisEyebrow">Usuarios</div>
-                <h3 className="analysisTitle">Horas trabajadas</h3>
+              <span className="analysisIcon">👥</span>
+              <div className="analysisTitleWrap">
+                <span className="analysisEyebrow">Usuarios</span>
+                <h3 className="analysisTitle">Horas semana</h3>
               </div>
-              <span className="analysisPill">Semana actual</span>
+              <span className="analysisPill">Semana</span>
             </div>
             <div className="userHoursList">
               {weeklyUserHours.map((item) => (
                 <div key={item.userId} className="userHoursRow">
+                  <span className="userHoursValue">{formatHours(item.minutes)}<span className="kpiUnit">h</span></span>
                   <span className="userHoursName">{item.name}</span>
-                  <span className="userHoursValue">{formatHours(item.minutes)} h</span>
                 </div>
               ))}
             </div>
           </div>
         )}
       </div>
+        </>
+      )}
 
       <style jsx>{`
+        /* ── Root ── */
         .dashboardRoot {
           display: grid;
-          gap: 18px;
-          padding-bottom: 12px;
+          gap: 10px;
+          padding: 6px 2px 4px;
         }
 
-        .loadingCard,
-        .errorCard,
-        .heroCard,
-        .kpiCard,
-        .analysisCard,
-        .chartWrap,
-        .chartTooltip,
-        .userHoursRow,
-        .input {
-          box-shadow: none;
-          text-shadow: none;
-          filter: none;
-        }
-
+        /* ── States ── */
         .loadingCard,
         .errorCard {
-          padding: 28px;
-          border-radius: 18px;
+          padding: 32px 20px;
+          border-radius: 16px;
           border: 1px solid var(--border);
-          background: linear-gradient(160deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--surface-2) 92%, transparent));
+          background: color-mix(in srgb, var(--surface) 97%, transparent);
           color: var(--foreground);
           text-align: center;
-          font-size: 16px;
-          box-shadow: var(--elev-1);
+          font-size: 15px;
         }
-
         .errorCard {
           color: var(--state-danger-text);
           border-color: var(--state-danger-border);
-          background: linear-gradient(160deg, color-mix(in srgb, var(--state-danger-bg) 72%, var(--surface)), color-mix(in srgb, var(--surface-2) 94%, transparent));
+          background: color-mix(in srgb, var(--state-danger-bg) 60%, var(--surface));
         }
 
+        /* ── Hero ── */
         .heroCard {
           position: relative;
           display: grid;
-          gap: 16px;
-          padding: clamp(18px, 2.5vw, 28px);
+          gap: 8px;
+          padding: 12px 14px;
+          border-radius: 14px;
           border: 1px solid var(--border);
-          border-radius: 24px;
+          background: color-mix(in srgb, var(--surface) 98%, transparent);
           overflow: hidden;
-          background:
-            radial-gradient(circle at top right, color-mix(in srgb, var(--primary) 18%, transparent), transparent 32%),
-            radial-gradient(circle at left bottom, color-mix(in srgb, var(--secondary) 14%, transparent), transparent 28%),
-            linear-gradient(155deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--surface-2) 92%, transparent));
-          box-shadow: var(--elev-2);
         }
-
         .heroCard::after {
           content: "";
           position: absolute;
-          inset: 0;
-          background: linear-gradient(90deg, color-mix(in srgb, var(--primary) 8%, transparent), transparent 40%, color-mix(in srgb, var(--secondary) 7%, transparent));
-          pointer-events: none;
+          top: 0; left: 0; right: 0;
+          height: 1px;
+          background: color-mix(in srgb, var(--primary) 45%, var(--border));
+          opacity: 0.7;
         }
-
-        .heroHeader,
-        .kpiHeader,
-        .analysisHeader,
-        .userHoursRow {
+        .heroTop {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          gap: 12px;
+          gap: 10px;
         }
-
-        .heroHeader,
-        .analysisHeader {
-          flex-wrap: wrap;
-          align-items: flex-start;
+        .heroLeft {
+          display: grid;
+          gap: 2px;
+          min-width: 0;
         }
-
-        .heroKicker,
-        .kpiEyebrow,
-        .analysisEyebrow,
-        .filterLabel {
+        .heroKicker {
           margin: 0;
+          font-size: 10px;
           text-transform: uppercase;
-          letter-spacing: 0.16em;
-          font-size: 11px;
+          letter-spacing: 0.1em;
+          font-weight: 700;
           color: var(--text-tertiary);
         }
-
-        .heroTitle,
-        .analysisTitle,
-        .kpiValue {
-          margin: 0;
+        .heroCurrentUser {
+          font-size: 14px;
+          font-weight: 600;
           color: var(--foreground);
-          line-height: 1.08;
+          line-height: 1.2;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
-
-        .heroTitle {
-          font-size: clamp(26px, 3vw, 38px);
-          font-family: var(--font-heading);
-          letter-spacing: var(--panel-title-tracking);
-        }
-
-        .analysisTitle {
-          margin-top: 6px;
-          font-size: clamp(18px, 1.7vw, 22px);
-          font-family: var(--font-heading);
-        }
-
-        .kpiValue {
-          font-size: clamp(24px, 2.4vw, 34px);
-          font-weight: 700;
-        }
-
-        .heroSubtitle,
-        .heroMeta,
-        .kpiMeta,
-        .userHoursName {
-          color: var(--text-secondary);
-          font-size: 13px;
-        }
-
         .heroMeta {
-          display: grid;
-          gap: 8px;
-          justify-items: end;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 5px;
+          align-items: center;
         }
-
         .heroRole,
-        .heroLevel,
-        .chip,
-        .chipLive,
-        .kpiPill,
-        .analysisPill {
+        .heroLevel {
           display: inline-flex;
           align-items: center;
-          gap: 6px;
-          min-height: 30px;
-          padding: 0 12px;
+          height: 22px;
+          padding: 0 8px;
           border-radius: 999px;
-          border: 1px solid var(--border);
-          background: color-mix(in srgb, var(--surface) 88%, transparent);
-          color: var(--text-secondary);
-          font-size: 12px;
-          font-weight: 650;
-          letter-spacing: 0.01em;
-        }
-
-        .heroRole {
-          background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 12%, var(--surface)), color-mix(in srgb, var(--secondary) 8%, var(--surface-2)));
-          border-color: color-mix(in srgb, var(--primary) 26%, var(--border));
+          font-size: 11px;
+          font-weight: 700;
+          border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+          background: color-mix(in srgb, var(--primary) 10%, var(--surface));
           color: var(--foreground);
         }
-
-        .heroLevel,
-        .chipLive {
+        .heroLevel {
           background: var(--state-info-bg);
           border-color: var(--state-info-border);
           color: var(--state-info-text);
         }
-
-        .kpiPill,
-        .analysisPill,
-        .chip {
-          background: color-mix(in srgb, var(--surface-2) 88%, transparent);
+        .heroRefreshing {
+          font-size: 13px;
+          color: var(--primary);
+          animation: spin 1s linear infinite;
         }
-
-        .pillAccent {
-          background: color-mix(in srgb, var(--secondary) 16%, transparent);
-          border-color: color-mix(in srgb, var(--secondary) 30%, transparent);
-          color: color-mix(in srgb, var(--secondary) 78%, var(--foreground));
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .heroWeekRange {
+          font-size: 12px;
+          font-weight: 600;
+          color: var(--text-secondary);
+          white-space: nowrap;
         }
-
-        .heroBadges,
-        .filtersRow {
-          display: flex;
-          gap: 10px;
-          flex-wrap: wrap;
-        }
-
-        .filtersRow {
-          padding-top: 4px;
-        }
-
-        .filterControl {
-          display: grid;
-          gap: 6px;
-        }
-
-        .input {
-          min-width: 220px;
-          padding: 10px 12px;
-          border-radius: 12px;
+        .userSelect {
+          width: 100%;
+          padding: 8px 12px;
+          border-radius: 10px;
           border: 1px solid var(--border);
           background: color-mix(in srgb, var(--surface) 96%, transparent);
           color: var(--foreground);
-          font-size: 14px;
+          font-size: 13px;
+          font-family: var(--font-base);
         }
-
-        .input:focus {
+        .userSelect:focus {
           outline: none;
           border-color: color-mix(in srgb, var(--primary) 58%, var(--border));
-          box-shadow: var(--ring-soft);
         }
 
+        /* ── KPI row (mobile) ── */
         .kpiGrid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-          gap: 14px;
+          display: flex;
+          gap: 8px;
+          overflow-x: auto;
+          padding-bottom: 2px;
+          scroll-snap-type: x proximity;
+          scrollbar-width: none;
+          -webkit-overflow-scrolling: touch;
         }
-
+        .kpiGrid::-webkit-scrollbar { display: none; }
         .kpiCard {
           position: relative;
-          display: grid;
-          gap: 12px;
-          padding: 18px;
+          flex: 0 0 clamp(132px, 42vw, 152px);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 5px;
+          padding: 14px 10px 12px;
+          border-radius: 14px;
           border: 1px solid var(--border);
-          border-radius: 20px;
+          background: linear-gradient(160deg,
+            color-mix(in srgb, var(--surface) 98%, transparent),
+            color-mix(in srgb, var(--surface-2) 92%, transparent));
+          text-align: center;
           overflow: hidden;
-          background: linear-gradient(160deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--surface-2) 92%, transparent));
-          box-shadow: var(--elev-1);
+          scroll-snap-align: start;
         }
-
-        .kpiCard::before {
+        .kpiCard::after {
           content: "";
           position: absolute;
-          inset: 0 auto 0 0;
-          width: 4px;
-          background: linear-gradient(180deg, var(--primary), var(--secondary));
+          bottom: 0; left: 0; right: 0;
+          height: 2px;
+          background: linear-gradient(90deg, var(--primary), var(--secondary));
+          opacity: 0.6;
+        }
+        .kpiIcon {
+          font-size: 24px;
+          line-height: 1;
+          margin-bottom: 2px;
+        }
+        .kpiValue {
+          font-size: 31px;
+          font-weight: 800;
+          color: var(--foreground);
+          line-height: 1;
+          letter-spacing: -0.02em;
+        }
+        .kpiValueMoney {
+          font-size: 18px;
+          letter-spacing: -0.01em;
+        }
+        .kpiUnit {
+          font-size: 15px;
+          font-weight: 600;
+          opacity: 0.65;
+          margin-left: 1px;
+        }
+        .kpiLabel {
+          font-size: 13px;
+          color: var(--text-tertiary);
+          line-height: 1.25;
+          margin-top: 2px;
         }
 
-        .kpiMeta {
-          font-size: 12px;
-        }
-
+        /* ── Analytics — always 2 columns ── */
         .analyticsGrid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
-          gap: 14px;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 8px;
         }
-
         .analysisCard {
           position: relative;
           display: grid;
-          gap: 14px;
-          padding: 18px;
+          gap: 8px;
+          padding: 10px;
           border: 1px solid var(--border);
-          border-radius: 22px;
+          border-radius: 14px;
           overflow: hidden;
-          background: linear-gradient(162deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--surface-2) 92%, transparent));
-          box-shadow: var(--elev-1);
+          background: linear-gradient(162deg,
+            color-mix(in srgb, var(--surface) 98%, transparent),
+            color-mix(in srgb, var(--surface-2) 92%, transparent));
         }
-
         .analysisCard::before {
           content: "";
           position: absolute;
-          left: 18px;
-          right: 18px;
-          top: 0;
+          top: 0; left: 0; right: 0;
           height: 2px;
           background: linear-gradient(90deg, var(--primary), var(--secondary));
-          opacity: 0.9;
+          opacity: 0.7;
         }
-
+        .analysisHeader {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+        }
+        .analysisIcon {
+          font-size: 18px;
+          line-height: 1;
+          flex-shrink: 0;
+        }
+        .analysisTitleWrap {
+          flex: 1;
+          min-width: 0;
+        }
+        .analysisEyebrow {
+          display: block;
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          font-weight: 700;
+          color: var(--text-tertiary);
+        }
+        .analysisTitle {
+          margin: 0;
+          font-size: 13px;
+          font-weight: 700;
+          color: var(--foreground);
+          line-height: 1.1;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .analysisPill {
+          flex-shrink: 0;
+          display: inline-flex;
+          align-items: center;
+          height: 22px;
+          padding: 0 8px;
+          border-radius: 999px;
+          border: 1px solid var(--border);
+          background: color-mix(in srgb, var(--surface-2) 88%, transparent);
+          color: var(--text-secondary);
+          font-size: 11px;
+          font-weight: 700;
+        }
         .chartWrap {
           width: 100%;
-          height: 240px;
-          padding: 10px;
-          border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
-          border-radius: 16px;
+          height: 170px;
+          border-radius: 8px;
           overflow: hidden;
-          background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 97%, transparent), color-mix(in srgb, var(--surface-clean-soft) 92%, transparent));
         }
-
         .chartEmpty {
           height: 100%;
           display: grid;
           place-items: center;
           text-align: center;
-          border: 1px dashed color-mix(in srgb, var(--border) 90%, transparent);
-          border-radius: 12px;
+          border: 1px dashed color-mix(in srgb, var(--border) 88%, transparent);
+          border-radius: 8px;
           color: var(--text-tertiary);
-          font-size: 13px;
-          padding: 12px;
+          font-size: 11px;
           background: color-mix(in srgb, var(--surface-2) 72%, transparent);
         }
 
+        /* ── Chart tooltip ── */
         .chartTooltip {
-          padding: 10px 12px;
-          border-radius: 12px;
+          padding: 8px 10px;
+          border-radius: 10px;
           border: 1px solid var(--border);
           background: color-mix(in srgb, var(--surface) 98%, transparent);
           color: var(--foreground);
-          font-size: 12px;
+          font-size: 11px;
           display: grid;
-          gap: 6px;
-          box-shadow: var(--elev-1);
+          gap: 4px;
         }
-
         .chartTooltipTitle {
           font-weight: 700;
           color: var(--foreground);
         }
-
         .chartTooltipRow {
           display: flex;
           justify-content: space-between;
           gap: 8px;
           color: var(--text-secondary);
         }
-
-        .userHoursList {
-          display: grid;
-          gap: 10px;
-        }
-
-        .userHoursRow {
-          padding: 12px 14px;
-          border-radius: 14px;
-          border: 1px solid var(--border);
-          background: linear-gradient(145deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface-2) 88%, transparent));
-        }
-
-        .userHoursValue,
         .chartTooltipValue {
           font-weight: 700;
           color: var(--foreground);
         }
 
-        @media (max-width: 900px) {
-          .heroMeta {
-            justify-items: start;
-          }
+        /* ── User hours — horizontal scroll cards ── */
+        .userHoursList {
+          display: flex;
+          gap: 6px;
+          overflow-x: auto;
+          padding-bottom: 2px;
+          scrollbar-width: none;
+        }
+        .userHoursList::-webkit-scrollbar { display: none; }
+        .userHoursRow {
+          flex-shrink: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 4px;
+          padding: 10px 12px;
+          border-radius: 10px;
+          border: 1px solid var(--border);
+          background: color-mix(in srgb, var(--surface) 96%, transparent);
+          min-width: 92px;
+        }
+        .userHoursValue {
+          font-size: 18px;
+          font-weight: 800;
+          color: var(--foreground);
+          line-height: 1;
+        }
+        .userHoursName {
+          font-size: 11px;
+          color: var(--text-secondary);
+          text-align: center;
+          line-height: 1.2;
+          max-width: 84px;
+          overflow: hidden;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
         }
 
-        @media (max-width: 640px) {
-          .dashboardRoot {
-            gap: 14px;
+        /* ── Desktop — wider grids ── */
+        @media (min-width: 900px) {
+          .dashboardRoot { gap: 16px; }
+          .kpiGrid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 12px;
+            overflow: visible;
+            padding-bottom: 0;
           }
-
-          .kpiGrid,
-          .analyticsGrid {
-            grid-template-columns: 1fr;
+          .kpiCard {
+            flex: initial;
           }
-
-          .heroCard,
-          .kpiCard,
-          .analysisCard {
-            padding: 16px;
-            border-radius: 18px;
-          }
-
-          .heroTitle {
-            font-size: 24px;
-          }
-
-          .input {
-            min-width: 0;
-            width: 100%;
-          }
-
-          .chartWrap {
-            height: 220px;
-          }
+          .analyticsGrid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+          .chartWrap { height: 200px; }
+          .kpiCard { padding: 16px 12px; }
+          .analysisCard { padding: 16px; gap: 12px; }
         }
       `}</style>
     </div>
   );
 }
-

@@ -32,6 +32,11 @@ export const getApiBase = () => {
       originHost === "127.0.0.1" ||
       originHost.endsWith(".localhost");
     const allowCrossOriginApi = process.env.NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API === 'true';
+    const sameOriginApi = `${currentOrigin}/api`;
+
+    if (isLocalOrigin && !allowCrossOriginApi) {
+      return sameOriginApi;
+    }
 
     if (envBase && envBase.trim()) {
       const normalizedEnvBase = ensureApiBase(envBase);
@@ -57,14 +62,14 @@ export const getApiBase = () => {
     }
 
     if (originHost === 'app.nexara.com.mx') {
-      return `${currentOrigin}/api`;
+      return sameOriginApi;
     }
 
     if (originHost === MOBILE_IP_API_HOST && currentPort === MOBILE_APP_PORT) {
-      return `${currentOrigin}/api`;
+      return sameOriginApi;
     }
 
-    return `${currentOrigin}/api`;
+    return sameOriginApi;
   }
 
   if (envBase && envBase.trim()) {
@@ -86,16 +91,18 @@ export const getApiBaseCandidates = () => {
     candidates.push(normalized);
   };
 
-  addCandidate(getApiBase());
-
   const envBase = process.env.NEXT_PUBLIC_API_URL;
-  if (envBase && envBase.trim()) {
-    addCandidate(envBase);
-  }
+  const allowCrossOriginApi = process.env.NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API === 'true';
 
-  if (typeof window !== "undefined" && window.location) {
-    const { protocol, hostname, port } = window.location;
+  if (typeof window !== "undefined" && window.location?.origin) {
+    const { origin, protocol, hostname, port } = window.location;
     const lowerHost = hostname.toLowerCase();
+
+    addCandidate(`${origin}/api`);
+
+    if (allowCrossOriginApi && envBase && envBase.trim()) {
+      addCandidate(envBase);
+    }
 
     if (port === MOBILE_APP_PORT) {
       addCandidate(`${protocol}//${hostname}:3001`);
@@ -108,6 +115,15 @@ export const getApiBaseCandidates = () => {
     ) {
       addCandidate(`${protocol}//api.nexara.com.mx`);
     }
+
+    addCandidate(getApiBase());
+    return candidates;
+  }
+
+  addCandidate(getApiBase());
+
+  if (envBase && envBase.trim()) {
+    addCandidate(envBase);
   }
 
   return candidates;

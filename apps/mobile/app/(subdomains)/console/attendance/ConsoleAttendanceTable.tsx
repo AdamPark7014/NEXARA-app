@@ -166,11 +166,6 @@ const groupDailyDetails = (
   rangeStart: Date,
   rangeEnd: Date
 ) => {
-  console.log('🔄 Agrupando detalles diarios:', {
-    attendancesCount: attendances.length,
-    firstAttendance: attendances[0],
-  });
-  
   const dailyMap = new Map<
     string,
     { 
@@ -197,7 +192,6 @@ const groupDailyDetails = (
         latitude: item.entryLatitude,
         longitude: item.entryLongitude,
       };
-      console.log('⬆️ Entrada:', entryData);
       entry.entries.push(entryData);
     }
     if (item.type === "salida") {
@@ -208,7 +202,6 @@ const groupDailyDetails = (
         latitude: item.exitLatitude,
         longitude: item.exitLongitude,
       };
-      console.log('⬇️ Salida:', exitData);
       entry.exits.push(exitData);
     }
     dailyMap.set(dateKey, entry);
@@ -267,15 +260,6 @@ const ConsoleAttendanceTable = () => {
         throw new Error(isHtmlError ? fallbackMessage : raw?.trim() || fallbackMessage);
       }
       const payload = await res.json();
-      console.log('📊 Datos de asistencia recibidos:', {
-        totalUsers: payload.users?.length || 0,
-        users: payload.users?.map((u: any) => ({
-          id: u.userId,
-          name: u.userName,
-          attendancesCount: u.attendances?.length || 0,
-          firstAttendance: u.attendances?.[0],
-        }))
-      });
       setData(payload);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error desconocido");
