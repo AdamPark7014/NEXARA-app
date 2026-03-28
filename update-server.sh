@@ -65,6 +65,21 @@ wait_for_endpoint() {
   return 1
 }
 
+# 0. Asegurar swap para builds pesados (Next.js OOM en servidores con poca RAM)
+echo "💾 Verificando/creando swap..."
+if ! swapon --show | grep -q '/swapfile'; then
+  if [ ! -f /swapfile ]; then
+    echo "  Creando swapfile de 2 GB..."
+    fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
+    chmod 600 /swapfile
+    mkswap /swapfile
+  fi
+  swapon /swapfile
+  echo "  Swap activado: $(swapon --show | tail -1)"
+else
+  echo "  Swap ya activo: $(swapon --show | grep '/swapfile')"
+fi
+
 echo "🔄 Actualizando NEXARA-app desde GitHub..."
 
 # 1. Ir al directorio del proyecto
@@ -127,14 +142,14 @@ echo "🎨 Actualizando Frontend..."
 cd ../web
 rm -rf .next
 node ../../scripts/clear-build-cache.js web
-run_build_serial "Frontend Web" env NODE_OPTIONS="--max_old_space_size=2048" npm run build
+run_build_serial "Frontend Web" npm run build
 
 # 9. Actualizar Frontend (Mobile)
 echo "📱 Actualizando Frontend Mobile..."
 cd ../mobile
 rm -rf .next
 node ../../scripts/clear-build-cache.js mobile
-run_build_serial "Frontend Mobile" env NODE_OPTIONS="--max_old_space_size=2048" npm run build
+run_build_serial "Frontend Mobile" npm run build
 
 # Sincronizar shell nativo Capacitor con URL productiva
 if [ "$SKIP_CAP_SYNC" = "1" ]; then
