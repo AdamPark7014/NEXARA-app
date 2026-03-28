@@ -739,7 +739,7 @@ export default function Dashboard() {
         </div>
         <div className="kpiCard kpiDelay6">
           <span className="kpiIcon">✅</span>
-          <span className="kpiValue">{activityTotals.total > 0 ? Math.round(((activityTotals.total - (activityTotals.pending ?? activityTotals.total)) / activityTotals.total) * 100) : 0}<span className="kpiUnit">%</span></span>
+          <span className="kpiValue">{activityTotals.total > 0 ? Math.round(((activityTotals.total - (activityTotals.statusCounts['Pendiente'] ?? activityTotals.total)) / activityTotals.total) * 100) : 0}<span className="kpiUnit">%</span></span>
           <span className="kpiLabel">Actividades<br/>completadas</span>
         </div>
       </div>
