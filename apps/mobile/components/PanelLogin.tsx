@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { io, Socket } from "socket.io-client";
 import { useUser } from "./UserContext";
@@ -8,6 +8,7 @@ import { hasPermission, PERMISSIONS } from "../lib/permissions";
 import { getDeviceIdentityHeaders } from "@/lib/device-identity";
 import { getApiBaseCandidates, getSocketBaseUrl } from "@/lib/api-base";
 import { getAccessiblePanels, setActivePanel } from "@/lib/panel-routing";
+import { getSavedAccounts, saveAccount, removeSavedAccount, getPassword, type SavedAccount } from "@/lib/saved-accounts";
 
 type PanelLoginProps = {
   redirectTo: string;
@@ -23,8 +24,19 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [brandLogoSrc, setBrandLogoSrc] = useState('/logo-nexara.png');
+  const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const pendingLoginRef = useRef<{ email: string; password: string } | null>(null);
   const { setUser } = useUser();
   const router = useRouter();
+
+  // Load saved accounts on mount (client-only)
+  useEffect(() => {
+    const accounts = getSavedAccounts();
+    setSavedAccounts(accounts);
+    // Show form directly if no saved accounts
+    if (accounts.length === 0) setShowForm(true);
+  }, []);
 
   useEffect(() => {
     const socketUrl = getSocketBaseUrl();
@@ -55,11 +67,17 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
     e.preventDefault();
     setError("");
     setIsLoading(true);
+
+    // Support programmatic login triggered by quick-tap (pendingLoginRef)
+    const loginEmail = pendingLoginRef.current?.email ?? email;
+    const loginPassword = pendingLoginRef.current?.password ?? password;
+    pendingLoginRef.current = null;
+
     try {
       const deviceHeaders = await getDeviceIdentityHeaders();
       const payload = JSON.stringify({
-        email,
-        password,
+        email: loginEmail,
+        password: loginPassword,
         ...(requiredPermission === PERMISSIONS.PANEL_VENTAS ? { panel: "ventas" } : {}),
       });
 
@@ -140,6 +158,13 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
         window.sessionStorage.setItem('nexara_login_greeting', data.loginGreeting);
       }
 
+      // Persist credentials for quick-login next time
+      saveAccount(loginEmail, loginPassword, {
+        name: userData.nombre || userData.email,
+        avatarUrl: userData.avatarUrl || '',
+      });
+      setSavedAccounts(getSavedAccounts());
+
       setUser(userData);
 
       const accessiblePanels = getAccessiblePanels(userData);
@@ -157,6 +182,97 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleQuickLogin = (account: SavedAccount) => {
+    const pw = getPassword(account);
+    setIsLoading(true);
+    setError('');
+    (async () => {
+      try {
+        const deviceHeaders = await getDeviceIdentityHeaders();
+        const payload = JSON.stringify({
+          email: account.email,
+          password: pw,
+          ...(requiredPermission === PERMISSIONS.PANEL_VENTAS ? { panel: 'ventas' } : {}),
+        });
+
+        let data: any = null;
+        let responseError = 'No se pudo conectar con el servidor de autenticacion';
+
+        for (const API_URL of getApiBaseCandidates()) {
+          try {
+            const endpoint = `${API_URL}/auth/login`;
+            const res = await fetch(endpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', ...deviceHeaders },
+              body: payload,
+            });
+            const responseText = await res.text();
+            const contentType = res.headers.get('content-type') || '';
+            const isHtmlResponse = /<html|<!doctype/i.test(responseText) || contentType.includes('text/html');
+            let parsedBody: any = null;
+            if (responseText) { try { parsedBody = JSON.parse(responseText); } catch { parsedBody = null; } }
+
+            if (res.ok && parsedBody && typeof parsedBody === 'object') { data = parsedBody; break; }
+            if (isHtmlResponse) { responseError = 'El servidor respondio HTML.'; continue; }
+            if (!res.ok) {
+              const msg = Array.isArray(parsedBody?.message) ? parsedBody.message[0] : (parsedBody?.message || parsedBody?.error);
+              throw new Error(`AUTH_ERROR:${typeof msg === 'string' && msg.trim() ? msg : 'Credenciales incorrectas'}`);
+            }
+          } catch (reqErr) {
+            if (reqErr instanceof Error && reqErr.message.startsWith('AUTH_ERROR:')) throw new Error(reqErr.message.replace('AUTH_ERROR:', ''));
+            continue;
+          }
+        }
+
+        if (!data) throw new Error(responseError);
+
+        const userData = {
+          id: data.user.id,
+          nombre: data.user.nombre,
+          email: data.user.email,
+          role: data.user.role,
+          roleId: data.user.roleId,
+          department: data.user.department,
+          departmentId: data.user.departmentId,
+          token: data.access_token,
+          avatarUrl: data.user.avatarUrl || '',
+          permissions: data.user.permissions || [],
+          isSuperAdmin: data.user.isSuperAdmin || false,
+          loginDevice: data.loginDevice || data.user.loginDevice,
+        };
+
+        if (requiredPermission && !hasPermission(userData, requiredPermission)) throw new Error('No tienes permisos para acceder');
+        if (typeof window !== 'undefined' && data.loginGreeting) window.sessionStorage.setItem('nexara_login_greeting', data.loginGreeting);
+
+        saveAccount(account.email, pw, { name: userData.nombre || userData.email, avatarUrl: userData.avatarUrl || '' });
+        setSavedAccounts(getSavedAccounts());
+        setUser(userData);
+
+        const accessiblePanels = getAccessiblePanels(userData);
+        if (accessiblePanels.length === 1) {
+          const singlePanel = accessiblePanels[0];
+          setActivePanel(singlePanel.key);
+          router.replace(singlePanel.entryPath);
+          return;
+        }
+        router.replace(redirectTo);
+      } catch (err: unknown) {
+        if (err instanceof Error) setError(err.message);
+        else setError('Error desconocido');
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  };
+
+  const handleRemoveAccount = (e: React.MouseEvent, accountEmail: string) => {
+    e.stopPropagation();
+    removeSavedAccount(accountEmail);
+    const updated = getSavedAccounts();
+    setSavedAccounts(updated);
+    if (updated.length === 0) setShowForm(true);
   };
 
   return (
@@ -542,6 +658,196 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
             transition: none;
           }
         }
+
+        /* ── Saved Accounts ──────────────────────────────────────── */
+        .accounts-section {
+          margin-top: 8px;
+        }
+
+        .accounts-title {
+          font-size: 0.78rem;
+          font-weight: 700;
+          letter-spacing: 0.07em;
+          text-transform: uppercase;
+          color: var(--text-tertiary);
+          margin-bottom: 10px;
+          text-align: center;
+        }
+
+        .accounts-list {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .account-card {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 11px 12px;
+          border-radius: 14px;
+          border: 1px solid color-mix(in srgb, var(--border-strong) 55%, var(--border));
+          background: color-mix(in srgb, var(--surface) 88%, transparent);
+          cursor: pointer;
+          transition: background 0.18s ease, border-color 0.18s ease, transform 0.15s ease;
+          position: relative;
+          text-align: left;
+          width: 100%;
+        }
+
+        .account-card:hover,
+        .account-card:focus-visible {
+          background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+          border-color: color-mix(in srgb, var(--primary) 40%, var(--border-strong));
+        }
+
+        .account-card:active {
+          transform: scale(0.98);
+        }
+
+        .account-avatar {
+          width: 42px;
+          height: 42px;
+          border-radius: 50%;
+          object-fit: cover;
+          border: 2px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+          background: color-mix(in srgb, var(--surface-2) 80%, var(--primary) 20%);
+          flex-shrink: 0;
+        }
+
+        .account-avatar-placeholder {
+          width: 42px;
+          height: 42px;
+          border-radius: 50%;
+          border: 2px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+          background: linear-gradient(135deg, var(--primary), var(--secondary));
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 17px;
+          font-weight: 700;
+          color: #fff;
+          flex-shrink: 0;
+          text-transform: uppercase;
+        }
+
+        .account-info {
+          flex: 1;
+          min-width: 0;
+          overflow: hidden;
+        }
+
+        .account-name {
+          font-size: 0.92rem;
+          font-weight: 700;
+          color: var(--text-primary);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          margin: 0;
+        }
+
+        .account-email {
+          font-size: 0.76rem;
+          color: var(--text-tertiary);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          margin: 0;
+        }
+
+        .account-chevron {
+          color: var(--text-tertiary);
+          flex-shrink: 0;
+        }
+
+        .account-remove {
+          position: absolute;
+          top: 6px;
+          right: 6px;
+          width: 22px;
+          height: 22px;
+          border: none;
+          border-radius: 50%;
+          background: color-mix(in srgb, var(--surface-2) 90%, transparent);
+          color: var(--text-tertiary);
+          cursor: pointer;
+          font-size: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          opacity: 0;
+          transition: opacity 0.18s ease, background 0.18s ease;
+          line-height: 1;
+          padding: 0;
+        }
+
+        .account-card:hover .account-remove,
+        .account-card:focus-within .account-remove {
+          opacity: 1;
+        }
+
+        .account-remove:hover {
+          background: color-mix(in srgb, var(--danger) 16%, var(--surface-2));
+          color: var(--danger);
+        }
+
+        .accounts-divider {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin: 16px 0 4px;
+        }
+
+        .accounts-divider-line {
+          flex: 1;
+          height: 1px;
+          background: var(--border);
+        }
+
+        .accounts-divider-text {
+          font-size: 0.74rem;
+          color: var(--text-tertiary);
+          white-space: nowrap;
+        }
+
+        .use-another-btn {
+          width: 100%;
+          margin-top: 10px;
+          padding: 10px 14px;
+          border-radius: 12px;
+          border: 1px solid color-mix(in srgb, var(--border-strong) 55%, var(--border));
+          background: transparent;
+          color: var(--primary);
+          font-size: 0.88rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.18s ease;
+        }
+
+        .use-another-btn:hover {
+          background: color-mix(in srgb, var(--primary) 8%, transparent);
+        }
+
+        .loading-overlay {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          padding: 32px 16px;
+          color: var(--text-secondary);
+          font-size: 0.92rem;
+        }
+
+        .loading-spinner {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          border: 3px solid color-mix(in srgb, var(--primary) 22%, transparent);
+          border-top-color: var(--primary);
+          animation: spin 0.9s linear infinite;
+        }
       `}</style>
 
       <div className="login-container">
@@ -568,7 +874,82 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
             <p className="subtitle-note">Autenticación por roles y validación de dispositivo.</p>
           </div>
 
+          {/* ── Loading overlay for quick-login ── */}
+          {isLoading && !showForm && (
+            <div className="loading-overlay">
+              <div className="loading-spinner" />
+              <span>Iniciando sesión...</span>
+            </div>
+          )}
+
+          {/* ── Saved Accounts picker ── */}
+          {!isLoading && savedAccounts.length > 0 && !showForm && (
+            <div className="accounts-section">
+              <p className="accounts-title">Acceso rápido</p>
+              <div className="accounts-list">
+                {savedAccounts.map(account => (
+                  <button
+                    key={account.email}
+                    className="account-card"
+                    type="button"
+                    onClick={() => handleQuickLogin(account)}
+                  >
+                    {account.avatarUrl ? (
+                      <img
+                        src={account.avatarUrl}
+                        alt={account.name}
+                        className="account-avatar"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    ) : (
+                      <div className="account-avatar-placeholder" aria-hidden="true">
+                        {account.name.charAt(0)}
+                      </div>
+                    )}
+                    <div className="account-info">
+                      <p className="account-name">{account.name}</p>
+                      <p className="account-email">{account.email}</p>
+                    </div>
+                    <svg className="account-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    <button
+                      type="button"
+                      className="account-remove"
+                      aria-label={`Eliminar cuenta ${account.email}`}
+                      onClick={(e) => handleRemoveAccount(e, account.email)}
+                    >✕</button>
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="use-another-btn"
+                onClick={() => setShowForm(true)}
+              >
+                + Usar otra cuenta
+              </button>
+              {error && (
+                <div className="error-message" role="alert">
+                  <strong>Error:</strong> {error}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Login Form (shown when no saved accounts, or user chose another) ── */}
+          {(showForm || savedAccounts.length === 0) && (
           <form className="form" onSubmit={handleLogin}>
+            {savedAccounts.length > 0 && (
+              <button
+                type="button"
+                className="use-another-btn"
+                style={{ marginBottom: '12px' }}
+                onClick={() => { setShowForm(false); setError(''); }}
+              >
+                ← Volver a mis cuentas
+              </button>
+            )}
             <div className="input-group">
               <label className="input-label" htmlFor="email">
                 Correo electrónico
@@ -639,6 +1020,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
               </div>
             )}
           </form>
+          )}
 
           <div className="footer">
             <p className="footer-text">Plataforma operativa Nexara</p>

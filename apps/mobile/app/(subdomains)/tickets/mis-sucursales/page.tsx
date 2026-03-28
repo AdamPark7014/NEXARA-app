@@ -110,31 +110,16 @@ export default function MyBranchesPage() {
       const data = await res.json().catch(() => null);
       if (data) {
         setProfile(data);
+        setBranches(Array.isArray(data.branches) ? data.branches : []);
       }
     } catch (err) {
       console.error("Error fetching profile:", err);
     }
   };
 
-  const fetchBranches = async (token: string) => {
-    try {
-      const res = await fetch(buildApiUrl("client-portal/branches"), {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        return;
-      }
-      const data = await res.json().catch(() => []);
-      setBranches(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Error fetching branches:", err);
-    }
-  };
-
   useEffect(() => {
     if (session?.token) {
       fetchProfile(session.token);
-      fetchBranches(session.token);
     }
   }, [session?.token]);
 
@@ -145,7 +130,6 @@ export default function MyBranchesPage() {
     socket.on("entity:updated", (payload: { model?: string }) => {
       if (payload?.model === "ServiceClientBranch" || payload?.model === "ServiceClient") {
         fetchProfile(session.token);
-        fetchBranches(session.token);
       }
     });
     return () => {
@@ -331,10 +315,7 @@ export default function MyBranchesPage() {
           <BranchesForm
             token={session.token}
             branches={branches}
-            onBranchSaved={() => {
-              fetchProfile(session.token);
-              fetchBranches(session.token);
-            }}
+            onBranchSaved={() => fetchProfile(session.token)}
             clientLogoUrl={profile?.logoUrl}
             companyLogoUrl={session.client.logoUrl}
             apiUrl={API_URL}
