@@ -50,6 +50,9 @@ const AttendanceForm = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+    const [useFileFallback, setUseFileFallback] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const pendingCameraTypeRef = useRef<'entrada' | 'salida' | null>(null);
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const gpsWatchIdRef = useRef<number | null>(null);
@@ -153,6 +156,12 @@ const AttendanceForm = () => {
   const openCamera = async (tipo: 'entrada' | 'salida', facingMode: 'environment' | 'user' = cameraFacing) => {
     try {
       setCameraType(tipo);
+        if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+          setUseFileFallback(true);
+          pendingCameraTypeRef.current = tipo;
+          setTimeout(() => fileInputRef.current?.click(), 50);
+          return;
+        }
       setCameraFacing(facingMode);
       setCameraPermissionDenied(false);
       stopCameraStream();
@@ -180,8 +189,10 @@ const AttendanceForm = () => {
         setCameraPermissionDenied(true);
         setCameraOpen(true); // open modal to show permission denied UI
       } else {
-        setError('No se pudo acceder a la cámara. Verifica los permisos del dispositivo.');
-        setCameraOpen(false);
+          setUseFileFallback(true);
+          pendingCameraTypeRef.current = tipo;
+          setCameraOpen(false);
+          setTimeout(() => fileInputRef.current?.click(), 50);
       }
     }
   };
@@ -191,6 +202,20 @@ const AttendanceForm = () => {
     const nextFacing = cameraFacing === 'environment' ? 'user' : 'environment';
     await openCamera(cameraType, nextFacing);
   };
+
+    const handleFileCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || !pendingCameraTypeRef.current) return;
+      const tipo = pendingCameraTypeRef.current;
+      pendingCameraTypeRef.current = null;
+      e.target.value = '';
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const base64 = ev.target?.result as string;
+        await handleRegister(tipo, base64);
+      };
+      reader.readAsDataURL(file);
+    };
 
   const closeCamera = () => {
     stopCameraStream();
@@ -559,6 +584,14 @@ const AttendanceForm = () => {
   return (
     <div className={styles.root}>
       {/* Modal de Cámara */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          style={{ display: 'none' }}
+          onChange={handleFileCapture}
+        />
       {cameraOpen && typeof window !== 'undefined' && createPortal(
         <div className={styles.modalOverlay}>
           <div className={styles.modalHeader}>
