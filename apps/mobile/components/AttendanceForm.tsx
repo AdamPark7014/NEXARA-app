@@ -46,6 +46,7 @@ const AttendanceForm = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [cameraType, setCameraType] = useState<'entrada' | 'salida' | null>(null);
   const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
+  const [cameraPermissionDenied, setCameraPermissionDenied] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -153,6 +154,7 @@ const AttendanceForm = () => {
     try {
       setCameraType(tipo);
       setCameraFacing(facingMode);
+      setCameraPermissionDenied(false);
       stopCameraStream();
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { 
@@ -171,10 +173,16 @@ const AttendanceForm = () => {
           console.log('✅ Stream de cámara asignado al video element');
         }
       }, 100);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('❌ Error al acceder a la cámara:', err);
-      setError('No se pudo acceder a la cámara. Verifica los permisos.');
-      setCameraOpen(false);
+      const name = err instanceof Error ? (err as { name?: string }).name : '';
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        setCameraPermissionDenied(true);
+        setCameraOpen(true); // open modal to show permission denied UI
+      } else {
+        setError('No se pudo acceder a la cámara. Verifica los permisos del dispositivo.');
+        setCameraOpen(false);
+      }
     }
   };
 
@@ -561,36 +569,64 @@ const AttendanceForm = () => {
               Ajuste móvil optimizado para captura rápida y táctil
             </p>
           </div>
-          <div className={styles.videoWrap}>
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className={styles.video}
-            />
-          </div>
-          <canvas ref={canvasRef} className={styles.hiddenCanvas} />
-          <div className={styles.cameraActions}>
-            <button
-              className={`button-secondary ${styles.cameraButton}`}
-              onClick={flipCamera}
-            >
-              🔄 Voltear
-            </button>
-            <button
-              className={`button-primary ${styles.cameraButton} ${styles.captureButton}`}
-              onClick={capturePhoto}
-            >
-              📸 Capturar
-            </button>
-            <button
-              className={`button-secondary ${styles.cameraButton}`}
-              onClick={closeCamera}
-            >
-              ✕ Cancelar
-            </button>
-          </div>
+
+          {cameraPermissionDenied ? (
+            <div className={styles.permissionDenied}>
+              <p className={styles.permissionIcon}>📷</p>
+              <p className={styles.permissionTitle}>Permiso de cámara requerido</p>
+              <p className={styles.permissionText}>
+                Para registrar tu {cameraType === 'entrada' ? 'entrada' : 'salida'} necesitas permitir el acceso a la cámara.
+              </p>
+              <button
+                className={`button-primary ${styles.cameraButton}`}
+                onClick={() => cameraType && openCamera(cameraType)}
+              >
+                Permitir cámara
+              </button>
+              <p className={styles.permissionHint}>
+                Si ya denegaste el permiso, ve a Configuración → Aplicaciones → Nexara → Permisos → Cámara → Permitir.
+              </p>
+              <button
+                className={`button-secondary ${styles.cameraButton}`}
+                onClick={closeCamera}
+              >
+                ✕ Cancelar
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className={styles.videoWrap}>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className={styles.video}
+                />
+              </div>
+              <canvas ref={canvasRef} className={styles.hiddenCanvas} />
+              <div className={styles.cameraActions}>
+                <button
+                  className={`button-secondary ${styles.cameraButton}`}
+                  onClick={flipCamera}
+                >
+                  🔄 Voltear
+                </button>
+                <button
+                  className={`button-primary ${styles.cameraButton} ${styles.captureButton}`}
+                  onClick={capturePhoto}
+                >
+                  📸 Capturar
+                </button>
+                <button
+                  className={`button-secondary ${styles.cameraButton}`}
+                  onClick={closeCamera}
+                >
+                  ✕ Cancelar
+                </button>
+              </div>
+            </>
+          )}
         </div>,
         document.body
       )}

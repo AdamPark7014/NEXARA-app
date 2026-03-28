@@ -21,6 +21,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
   const [cameraFacing, setCameraFacing] = useState<'user' | 'environment'>('user');
   const [isMobile, setIsMobile] = useState(false);
   const [isSmallMobile, setIsSmallMobile] = useState(false);
+  const [cameraPermissionDenied, setCameraPermissionDenied] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -40,6 +41,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
 
   const initCamera = async (facingMode: 'user' | 'environment' = cameraFacing) => {
     stopCamera();
+    setCameraPermissionDenied(false);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: {
@@ -56,8 +58,14 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
-    } catch (err) {
-      setError('No se pudo acceder a la cámara. Verifica los permisos del navegador.');
+    } catch (err: unknown) {
+      const name = err instanceof Error ? (err as { name?: string }).name : '';
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        setCameraPermissionDenied(true);
+        setError(null);
+      } else {
+        setError('No se pudo acceder a la cámara. Verifica los permisos del dispositivo.');
+      }
     }
   };
 
@@ -203,33 +211,53 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
                 : 'Tómate una foto mostrando que comenzaste a laborar nuevamente'}
             </p>
 
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className={`${styles.video} ${isMobile ? styles.videoMobile : ''}`}
-            />
+            {cameraPermissionDenied ? (
+              <div className={styles.permissionDenied}>
+                <p className={styles.permissionIcon}>📷</p>
+                <p className={styles.permissionTitle}>Permiso de cámara requerido</p>
+                <p className={styles.permissionText}>
+                  Para registrar tu hora de comida necesitas permitir el acceso a la cámara.
+                </p>
+                <button
+                  className={`button-primary ${styles.captureBtn}`}
+                  type="button"
+                  onClick={() => initCamera()}
+                >
+                  Permitir cámara
+                </button>
+                <p className={styles.permissionHint}>
+                  Si ya denegaste el permiso, ve a Configuración del dispositivo → Aplicaciones → Nexara → Permisos → Cámara → Permitir.
+                </p>
+              </div>
+            ) : (
+              <>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className={`${styles.video} ${isMobile ? styles.videoMobile : ''}`}
+                />
 
-            <canvas
-              ref={canvasRef}
-              width={640}
-              height={480}
-              className={styles.hiddenCanvas}
-            />
+                <canvas
+                  ref={canvasRef}
+                  width={640}
+                  height={480}
+                  className={styles.hiddenCanvas}
+                />
 
-            {error && <div className={styles.errorText}>{error}</div>}
+                {error && <div className={styles.errorText}>{error}</div>}
 
-            <div
-              className={`${styles.captureActions} ${isMobile ? styles.captureActionsMobile : ''} ${isSmallMobile ? styles.captureActionsSmall : ''}`}
-            >
-              <button
-                className={`button-primary ${styles.captureBtn} ${isMobile ? styles.captureBtnMobile : ''} ${isSmallMobile ? styles.captureBtnSmall : ''}`}
-                type="button"
-                onClick={capturePhoto}
-              >
-                📷 Capturar Foto
-              </button>
+                <div
+                  className={`${styles.captureActions} ${isMobile ? styles.captureActionsMobile : ''} ${isSmallMobile ? styles.captureActionsSmall : ''}`}
+                >
+                  <button
+                    className={`button-primary ${styles.captureBtn} ${isMobile ? styles.captureBtnMobile : ''} ${isSmallMobile ? styles.captureBtnSmall : ''}`}
+                    type="button"
+                    onClick={capturePhoto}
+                  >
+                    📷 Capturar Foto
+                  </button>
               <button
                 className={`button-secondary ${styles.captureBtn} ${isMobile ? styles.captureBtnMobile : ''} ${isSmallMobile ? styles.captureBtnSmall : ''}`}
                 type="button"
@@ -238,6 +266,8 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
                 🔄 Voltear
               </button>
             </div>
+              </>
+            )}
           </div>
         </>
       ) : (

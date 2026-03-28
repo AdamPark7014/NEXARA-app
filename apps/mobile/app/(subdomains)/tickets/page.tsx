@@ -285,6 +285,9 @@ export default function ClientTicketsPage() {
     if (!data) return;
     setProfile(data);
 
+    const profileBranches = Array.isArray(data.branches) ? data.branches : [];
+    setBranches(profileBranches);
+
     setProfileDraft({
       contactName: data.contactName || "",
       contactEmail: data.contactEmail || "",

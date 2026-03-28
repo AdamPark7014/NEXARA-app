@@ -13,7 +13,11 @@ const config: CapacitorConfig = {
     // Production mobile shell points to your deployed mobile app URL.
     // This avoids Next.js static-export limitations for dynamic routes.
     url: appUrl,
-    androidScheme: isHttpUrl ? 'http' : 'https',
+    // Always use 'https' as the WebView scheme even when the remote server is HTTP.
+    // Capacitor proxies the HTTP content internally so the WebView sees a secure
+    // origin — this is required for getUserMedia (camera) to work in the WebView.
+    // `cleartext: true` allows the underlying network request to reach the HTTP server.
+    androidScheme: 'https',
     cleartext: isHttpUrl,
   },
   plugins: {
