@@ -25,6 +25,8 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+    const [useFileFallback, setUseFileFallback] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
@@ -42,7 +44,11 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
   const initCamera = async (facingMode: 'user' | 'environment' = cameraFacing) => {
     stopCamera();
     setCameraPermissionDenied(false);
-    try {
+      if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+        setUseFileFallback(true);
+        return;
+      }
+      try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: {
           facingMode,
@@ -64,9 +70,21 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
         setCameraPermissionDenied(true);
         setError(null);
       } else {
-        setError('No se pudo acceder a la cámara. Verifica los permisos del dispositivo.');
+          setUseFileFallback(true);
       }
     }
+  };
+
+  const flipCamera = async () => {
+  const handleFileCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const blob = new Blob([file], { type: file.type });
+    const url = URL.createObjectURL(blob);
+    setPhoto(blob);
+    setPhotoPreview(url);
+    setStep('confirmation');
+    e.target.value = '';
   };
 
   const flipCamera = async () => {
@@ -230,6 +248,30 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
                 </p>
               </div>
             ) : (
+              ) : useFileFallback ? (
+                <div className={styles.permissionDenied}>
+                  <p className={styles.permissionIcon}>📷</p>
+                  <p className={styles.permissionTitle}>Usar cámara del dispositivo</p>
+                  <p className={styles.permissionText}>
+                    Toca el botón para abrir la cámara y tomar la foto.
+                  </p>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    style={{ display: 'none' }}
+                    onChange={handleFileCapture}
+                  />
+                  <button
+                    className={`button-primary ${styles.captureBtn}`}
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    📷 Tomar Foto
+                  </button>
+                </div>
+              ) : (
               <>
                 <video
                   ref={videoRef}
