@@ -22,11 +22,11 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
   const [isMobile, setIsMobile] = useState(false);
   const [isSmallMobile, setIsSmallMobile] = useState(false);
   const [cameraPermissionDenied, setCameraPermissionDenied] = useState(false);
+  const [useFileFallback, setUseFileFallback] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-    const [useFileFallback, setUseFileFallback] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
@@ -44,11 +44,11 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
   const initCamera = async (facingMode: 'user' | 'environment' = cameraFacing) => {
     stopCamera();
     setCameraPermissionDenied(false);
-      if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-        setUseFileFallback(true);
-        return;
-      }
-      try {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      setUseFileFallback(true);
+      return;
+    }
+    try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: {
           facingMode,
@@ -70,12 +70,12 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
         setCameraPermissionDenied(true);
         setError(null);
       } else {
-          setUseFileFallback(true);
+        setUseFileFallback(true);
+        setError(null);
       }
     }
   };
 
-  const flipCamera = async () => {
   const handleFileCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -247,31 +247,30 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
                   Si ya denegaste el permiso, ve a Configuración del dispositivo → Aplicaciones → Nexara → Permisos → Cámara → Permitir.
                 </p>
               </div>
+            ) : useFileFallback ? (
+              <div className={styles.permissionDenied}>
+                <p className={styles.permissionIcon}>📷</p>
+                <p className={styles.permissionTitle}>Usar cámara del dispositivo</p>
+                <p className={styles.permissionText}>
+                  Toca el botón para abrir la cámara y tomar la foto.
+                </p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  style={{ display: 'none' }}
+                  onChange={handleFileCapture}
+                />
+                <button
+                  className={`button-primary ${styles.captureBtn}`}
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  📷 Tomar Foto
+                </button>
+              </div>
             ) : (
-              ) : useFileFallback ? (
-                <div className={styles.permissionDenied}>
-                  <p className={styles.permissionIcon}>📷</p>
-                  <p className={styles.permissionTitle}>Usar cámara del dispositivo</p>
-                  <p className={styles.permissionText}>
-                    Toca el botón para abrir la cámara y tomar la foto.
-                  </p>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    style={{ display: 'none' }}
-                    onChange={handleFileCapture}
-                  />
-                  <button
-                    className={`button-primary ${styles.captureBtn}`}
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    📷 Tomar Foto
-                  </button>
-                </div>
-              ) : (
               <>
                 <video
                   ref={videoRef}
