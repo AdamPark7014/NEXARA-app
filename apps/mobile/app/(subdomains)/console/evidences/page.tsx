@@ -73,10 +73,12 @@ export default function EvidencesPage() {
             padding: 24px;
             border-radius: 24px;
             background:
-              radial-gradient(circle at top right, rgba(24, 144, 255, 0.2), transparent 34%),
-              linear-gradient(145deg, rgba(9, 31, 54, 0.96), rgba(16, 54, 86, 0.9));
-            color: #f5fbff;
-            box-shadow: 0 24px 48px rgba(6, 20, 37, 0.22);
+              radial-gradient(circle at top right, rgba(20, 184, 166, 0.2), transparent 40%),
+              radial-gradient(circle at bottom left, rgba(8, 145, 178, 0.12), transparent 45%),
+              linear-gradient(145deg, rgba(240, 252, 252, 0.98), rgba(232, 248, 249, 0.96));
+            border: 1px solid rgba(8, 145, 178, 0.2);
+            color: var(--text-primary);
+            box-shadow: 0 18px 38px rgba(15, 23, 42, 0.1);
           }
 
           .evidencesHeroEyebrow,
@@ -93,8 +95,8 @@ export default function EvidencesPage() {
           }
 
           .evidencesHeroEyebrow {
-            background: rgba(255, 255, 255, 0.16);
-            color: rgba(255, 255, 255, 0.92);
+            background: rgba(8, 145, 178, 0.14);
+            color: #0f6b85;
           }
 
           .evidencesHeroTitle {
@@ -106,7 +108,7 @@ export default function EvidencesPage() {
           .evidencesHeroText {
             margin: 0;
             max-width: 760px;
-            color: rgba(245, 251, 255, 0.82);
+            color: var(--text-secondary);
             font-size: 0.98rem;
           }
 
