@@ -332,12 +332,29 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
           <>
           <div className={styles.sidebarContent} id="sidebar-menu" data-open={isMobile && isMenuOpen ? "true" : undefined}>
           <div className={styles.sidebarUser}>
-            <div className={styles.sidebarAvatar}>
+            <div
+              className={styles.sidebarAvatar}
+              style={{
+                width: 62,
+                height: 62,
+                minWidth: 62,
+                minHeight: 62,
+                borderRadius: "50%",
+                overflow: "hidden",
+              }}
+            >
               <img
                 className={user.isSuperAdmin ? `${styles.avatarImage} ${styles.avatarImageContain}` : styles.avatarImage}
                 src={user.isSuperAdmin ? "/logo-nexara.png" : avatarUrl}
                 alt={user.isSuperAdmin ? "NEXARA" : user.nombre}
                 loading="lazy"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  borderRadius: "50%",
+                  display: "block",
+                  objectFit: user.isSuperAdmin ? "contain" : "cover",
+                }}
                 onError={(event) => {
                   const img = event.currentTarget;
                   if (user.isSuperAdmin) {
