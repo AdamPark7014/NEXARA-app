@@ -210,35 +210,6 @@
 	aspect-ratio: 1 / 1;
 }
 
-.superadminAvatarWrap {
-	width: 62px;
-	height: 62px;
-	min-width: 62px;
-	min-height: 62px;
-	max-width: 62px;
-	max-height: 62px;
-	border-radius: 999px;
-	border: 2px solid var(--border-strong);
-	overflow: hidden;
-	background: var(--surface);
-	display: grid;
-	place-items: center;
-	justify-self: center;
-	align-self: center;
-	flex: 0 0 62px;
-	aspect-ratio: 1 / 1;
-}
-
-.superadminAvatar {
-	width: 100%;
-	height: 100%;
-	display: block;
-	object-fit: contain;
-	padding: 7px;
-	border-radius: 999px;
-	background: var(--surface);
-}
-
 .sidebarAvatar img,
 .avatarImage {
 	width: 100% !important;
@@ -246,6 +217,12 @@
 	border-radius: 999px !important;
 	object-fit: cover;
 	display: block;
+}
+
+.avatarImageContain {
+	object-fit: contain !important;
+	padding: 7px;
+	background: var(--surface);
 }
 
 .avatarImageLogo {
@@ -707,17 +684,7 @@
 		height: 56px;
 	}
 
-	.superadminAvatarWrap {
-		width: 56px;
-		height: 56px;
-		min-width: 56px;
-		min-height: 56px;
-		max-width: 56px;
-		max-height: 56px;
-		flex-basis: 56px;
-	}
-
-	.superadminAvatar {
+	.avatarImageContain {
 		padding: 6px;
 	}
 

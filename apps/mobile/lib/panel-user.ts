@@ -43,7 +43,24 @@ export const getAvatarSrc = (user: PanelUser | null | undefined) => {
   if (user?.isSuperAdmin) return "/logo-nexara.png";
 
   const assignedAvatar = (user?.avatarUrl || "").trim();
-  if (assignedAvatar) return assignedAvatar;
+  if (assignedAvatar) {
+    const normalized = assignedAvatar.toLowerCase();
+    const isBrandPlaceholder = ["/logo-nexara.png", "/icon.png", "logo-nexara.png", "icon.png"].includes(normalized);
+    if (!isBrandPlaceholder) {
+      if (/^https?:\/\//i.test(assignedAvatar) || assignedAvatar.startsWith("data:")) {
+        return assignedAvatar;
+      }
+
+      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+api\/?$/, "").replace(/\/$/, "");
+      const avatarPath = assignedAvatar.startsWith("/") ? assignedAvatar : `/${assignedAvatar}`;
+
+      if (apiBase && avatarPath.startsWith("/uploads/")) {
+        return `${apiBase}${avatarPath}`;
+      }
+
+      return assignedAvatar;
+    }
+  }
 
   const seed = encodeURIComponent((user?.nombre || "NEXARA").trim());
   return `https://ui-avatars.com/api/?name=${seed}&background=0D8ABC&color=fff&size=96`;
