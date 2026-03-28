@@ -289,6 +289,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
   };
 
   const avatarUrl = getAvatarSrc(user);
+  const avatarFallback = `https://ui-avatars.com/api/?name=${encodeURIComponent((user.nombre || "NEXARA").trim())}&background=0D8ABC&color=fff&size=96`;
 
   return (
     <>
@@ -331,37 +332,26 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
           <>
           <div className={styles.sidebarContent} id="sidebar-menu" data-open={isMobile && isMenuOpen ? "true" : undefined}>
           <div className={styles.sidebarUser}>
-            {user.isSuperAdmin ? (
-              <div className={styles.superadminAvatarWrap}>
-                <img
-                  className={styles.superadminAvatar}
-                  src="/logo-nexara.png"
-                  alt="NEXARA"
-                  loading="lazy"
-                  onError={(event) => {
-                    const img = event.currentTarget;
+            <div className={styles.sidebarAvatar}>
+              <img
+                className={user.isSuperAdmin ? `${styles.avatarImage} ${styles.avatarImageContain}` : styles.avatarImage}
+                src={user.isSuperAdmin ? "/logo-nexara.png" : avatarUrl}
+                alt={user.isSuperAdmin ? "NEXARA" : user.nombre}
+                loading="lazy"
+                onError={(event) => {
+                  const img = event.currentTarget;
+                  if (user.isSuperAdmin) {
                     if (!img.src.endsWith("/icon.png")) {
                       img.src = "/icon.png";
                     }
-                  }}
-                />
-              </div>
-            ) : (
-              <div className={styles.sidebarAvatar}>
-                <img
-                  className={styles.avatarImage}
-                  src={avatarUrl}
-                  alt={user.nombre}
-                  loading="lazy"
-                  onError={(event) => {
-                    const img = event.currentTarget;
-                    if (!img.src.endsWith("/icon.png")) {
-                      img.src = "/icon.png";
-                    }
-                  }}
-                />
-              </div>
-            )}
+                    return;
+                  }
+                  if (img.src !== avatarFallback) {
+                    img.src = avatarFallback;
+                  }
+                }}
+              />
+            </div>
             <div className={styles.sidebarName}>{user.nombre}</div>
             <div className={styles.sidebarEmail}>{user.email}</div>
             <div className={styles.sidebarMeta}>
