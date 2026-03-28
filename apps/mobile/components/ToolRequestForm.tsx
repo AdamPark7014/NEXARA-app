@@ -43,6 +43,8 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
   const streamRef = useRef<MediaStream | null>(null);
   const generalFileInputRef = useRef<HTMLInputElement>(null);
   const specificationsFileInputRef = useRef<HTMLInputElement>(null);
+  const fallbackCameraInputRef = useRef<HTMLInputElement>(null);
+  const pendingFallbackTypeRef = useRef<'general' | 'specifications' | null>(null);
   const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
   const [dragOverPhoto, setDragOverPhoto] = useState<'general' | 'specifications' | null>(null);
 
@@ -200,6 +202,11 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
 
   const startCamera = async (type: 'general' | 'specifications', facingMode: 'environment' | 'user' = 'environment') => {
     setError(null);
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      pendingFallbackTypeRef.current = type;
+      fallbackCameraInputRef.current?.click();
+      return;
+    }
     setPhotoStep(type);
     setCameraFacing(facingMode);
     try {
@@ -213,9 +220,18 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
         await videoRef.current.play();
       }
     } catch {
+      pendingFallbackTypeRef.current = type;
+      fallbackCameraInputRef.current?.click();
       setPhotoStep(null);
-      setError('No se pudo acceder a la cámara. Verifica permisos del navegador.');
     }
+  };
+
+  const handleFallbackCameraFile = (file?: File | null) => {
+    const pendingType = pendingFallbackTypeRef.current;
+    pendingFallbackTypeRef.current = null;
+    if (!file || !pendingType) return;
+    applyPhotoFile(pendingType, file);
+    setError(null);
   };
 
   const stopCameraStream = () => {
@@ -345,6 +361,17 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
 
   return (
     <form className={`card ${styles.form}`} onSubmit={handleSubmit}>
+      <input
+        ref={fallbackCameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className={styles.hiddenInput}
+        onChange={(e) => {
+          handleFallbackCameraFile(e.target.files?.[0]);
+          e.currentTarget.value = '';
+        }}
+      />
       <div>
         <h3 className={styles.headerTitle}>Solicitar Herramienta</h3>
         <div className={styles.headerText}>
