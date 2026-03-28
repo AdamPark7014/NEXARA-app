@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import NotificationCenter from "@/components/NotificationCenter";
 import BottomNav from "@/components/BottomNav";
+import type { BottomNavItem } from "@/components/BottomNav";
 import PageTransition from "@/components/PageTransition";
 import { setActivePanel } from "@/lib/panel-routing";
 import { useUser } from "@/components/UserContext";
@@ -90,7 +91,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   };
 
   const bottomNavItems = useMemo(() => {
-    const items: Array<{ icon: string; label: string; href?: string; onPress?: () => void; hapticIntent?: "selection" | "medium" }> = [
+    const items: BottomNavItem[] = [
       { icon: "📊", label: "Inicio", href: resolveConsoleRoute("/dashboard"), hapticIntent: "selection" },
     ];
 
