@@ -28,10 +28,6 @@ const LunchBreakPage = () => {
   return (
     <div style={{ width: '100%', maxWidth: 1400, margin: '0 auto', padding: isMobile ? 12 : 24 }}>
       <HelpTab module="lunch-breaks" user={user} />
-      <h1 style={{ fontSize: isMobile ? 22 : 28, fontWeight: 600, color: 'var(--primary)', marginBottom: isMobile ? 14 : 24 }}>
-        🍽️ Gestión de Horas de Comida
-      </h1>
-
       {/* Tabs - Se muestran para usuarios normales Y admins (NO para superadmins) */}
       {!isSuperAdmin && (
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0, 1fr))', gap: 10, marginBottom: 16 }}>
@@ -114,7 +110,7 @@ const LunchBreakPage = () => {
 
       {/* Tabla - Se muestra en tab history para usuarios/admins, o siempre para superadmins */}
       {(activeTab === 'history' || isSuperAdmin) && (
-        <LunchBreaksTable key={refreshKey} />
+        <LunchBreaksTable key={refreshKey} showTitle={false} />
       )}
     </div>
   );

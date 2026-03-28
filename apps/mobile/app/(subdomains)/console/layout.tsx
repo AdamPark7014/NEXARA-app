@@ -106,10 +106,16 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
     }
 
     items.push({ icon: "🕒", label: "Asistencia", href: resolveConsoleRoute("/attendance"), hapticIntent: "selection" });
-    items.push({ icon: "☰", label: "Menú", onPress: () => setDrawerOpen(true), hapticIntent: "medium" });
+    items.push({
+      icon: drawerOpen ? "✕" : "☰",
+      label: drawerOpen ? "Cerrar" : "Menú",
+      onPress: () => setDrawerOpen((prev) => !prev),
+      hapticIntent: "medium",
+      active: drawerOpen,
+    });
 
     return items;
-  }, [isIngeniero, isSuperAdmin, isAdmin, setDrawerOpen, inPrefixedConsolePath]);
+  }, [isIngeniero, isSuperAdmin, isAdmin, inPrefixedConsolePath, drawerOpen]);
 
   useEffect(() => {
     const now = new Date();
@@ -137,6 +143,8 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
           </div>
         </section>
         <div className={styles.consoleContent}><PageTransition>{children}</PageTransition></div>
+        {/* Spacer to prevent fixed BottomNav from covering last content row */}
+        <div style={{ height: 96, flexShrink: 0, pointerEvents: 'none' }} aria-hidden="true" />
       </main>
       <BottomNav
         items={bottomNavItems}

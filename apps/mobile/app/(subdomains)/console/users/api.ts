@@ -11,7 +11,16 @@ export async function createUser(formData: FormData, token?: string) {
     body: formData,
   });
   if (!res.ok) {
-    throw new Error("Error al crear usuario");
+    let message = "Error al crear usuario";
+    try {
+      const data = await res.json();
+      if (typeof data?.message === "string" && data.message.trim()) {
+        message = data.message;
+      }
+    } catch {
+      // Keep fallback message when response is not JSON.
+    }
+    throw new Error(message);
   }
   return res.json();
 }

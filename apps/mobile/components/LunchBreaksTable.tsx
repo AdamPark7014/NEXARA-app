@@ -23,7 +23,11 @@ interface LunchBreak {
   notes: string | null;
 }
 
-const LunchBreaksTable: React.FC = () => {
+interface LunchBreaksTableProps {
+  showTitle?: boolean;
+}
+
+const LunchBreaksTable: React.FC<LunchBreaksTableProps> = ({ showTitle = true }) => {
   const { user } = useUser();
   const [lunchBreaks, setLunchBreaks] = useState<LunchBreak[]>([]);
   const [loading, setLoading] = useState(true);
@@ -113,7 +117,7 @@ const LunchBreaksTable: React.FC = () => {
   return (
     <div className={styles.root}>
       <div className={`card ${styles.panel}`}>
-        <h3 className={styles.title}>🍽️ Registro de Horas de Comida</h3>
+        {showTitle && <h3 className={styles.title}>🍽️ Registro de Horas de Comida</h3>}
 
         {error && <div className={styles.error}>{error}</div>}
 

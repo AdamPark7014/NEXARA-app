@@ -15,6 +15,7 @@ const ActivitiesTable: React.FC = () => {
   const [excelUrl, setExcelUrl] = useState<string | null>(null);
   const [excelBlob, setExcelBlob] = useState<Blob | null>(null);
   const [excelPreparing, setExcelPreparing] = useState(false);
+  const [showAdvancedForm, setShowAdvancedForm] = useState(false);
 
   // Filtros y paginación
   const [estatus, setEstatus] = useState<string>('');
@@ -470,7 +471,7 @@ const ActivitiesTable: React.FC = () => {
             <h2 className="activities-title">Actividades</h2>
             <div className="activities-helper">Gestiona actividades, prioridades y asignaciones del equipo.</div>
           </div>
-          <div className="activities-helper">Total visibles: {filtered.length}</div>
+          <div className="activities-total-pill">Total visibles: {filtered.length}</div>
         </div>
       </div>
 
@@ -535,17 +536,29 @@ const ActivitiesTable: React.FC = () => {
             <div className="activities-form-head">
               <div>
                 <h3 className="activities-subtitle">Asignar actividad</h3>
-                <div className="activities-helper">Completa los campos clave para crear la actividad.</div>
+                <div className="activities-helper">Solo llena lo esencial y crea rápido. Puedes abrir opciones avanzadas cuando lo necesites.</div>
               </div>
               <div className="activities-helper">AN sugerido: {nextAn || 'Calculando...'}</div>
             </div>
-            <div className={`activities-form-grid ${isMobile ? 'is-mobile' : ''}`}>
+
+            <div className={`activities-form-primary-grid ${isMobile ? 'is-mobile' : ''}`}>
               <input className="input" placeholder="AN (auto)" value={nextAn || 'Calculando...'} disabled />
-              <input className="input" placeholder="Titulo" value={newActivity.titulo} onChange={(e) => setNewActivity({ ...newActivity, titulo: e.target.value })} />
+              <input className="input" placeholder="Título *" value={newActivity.titulo} onChange={(e) => setNewActivity({ ...newActivity, titulo: e.target.value })} />
               <select className="input" value={newActivity.activityType} onChange={(e) => setNewActivity({ ...newActivity, activityType: e.target.value as 'CLIENT' | 'INTERNAL' })}>
                 <option value="CLIENT">Actividad para Cliente</option>
                 <option value="INTERNAL">Actividad Interna (Proyecto)</option>
               </select>
+              <select className="input" value={newActivity.responsableId} onChange={(e) => setNewActivity({ ...newActivity, responsableId: e.target.value })}>
+                <option value="">Responsable *</option>
+                {assignableUsers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.nombre} {u.role?.nombre ? `(${u.role?.nombre})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className={`activities-form-context-grid ${isMobile ? 'is-mobile' : ''}`}>
               {newActivity.activityType === 'CLIENT' ? (
                 <>
                   <select className="input" value={newActivity.ticketType} onChange={(e) => setNewActivity({ ...newActivity, ticketType: e.target.value })}>
@@ -576,17 +589,21 @@ const ActivitiesTable: React.FC = () => {
                   </select>
                 </>
               )}
-              <select className="input" value={newActivity.responsableId} onChange={(e) => setNewActivity({ ...newActivity, responsableId: e.target.value })}>
-                <option value="">Responsable</option>
-                {assignableUsers.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.nombre} {u.role?.nombre ? `(${u.role?.nombre})` : ''}
-                  </option>
-                ))}
-              </select>
               <select className="input" value={newActivity.prioridad} onChange={(e) => setNewActivity({ ...newActivity, prioridad: e.target.value })}>
                 {prioridadList.map((p) => <option key={p} value={p}>{p}</option>)}
               </select>
+            </div>
+
+            <button
+              type="button"
+              className="activities-form-advanced-toggle"
+              onClick={() => setShowAdvancedForm((prev) => !prev)}
+            >
+              {showAdvancedForm ? 'Ocultar opciones avanzadas' : 'Mostrar opciones avanzadas'}
+            </button>
+
+            {showAdvancedForm && (
+              <div className={`activities-form-grid activities-form-advanced ${isMobile ? 'is-mobile' : ''}`}>
               <select className="input" value={newActivity.estatus} onChange={(e) => setNewActivity({ ...newActivity, estatus: e.target.value })}>
                 {estatusList.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
@@ -613,9 +630,10 @@ const ActivitiesTable: React.FC = () => {
                 <label className="activities-input-label">Entrega esperada</label>
                 <input className="input" type="datetime-local" value={newActivity.fechaEntregaEsperada} onChange={(e) => setNewActivity({ ...newActivity, fechaEntregaEsperada: e.target.value })} />
               </div>
-              <input className="input" placeholder="Descripción" value={newActivity.descripcion} onChange={(e) => setNewActivity({ ...newActivity, descripcion: e.target.value })} />
-              <input className="input" placeholder="Indicaciones" value={newActivity.indicaciones} onChange={(e) => setNewActivity({ ...newActivity, indicaciones: e.target.value })} />
+              <textarea className="input activities-textarea" placeholder="Descripción" value={newActivity.descripcion} onChange={(e) => setNewActivity({ ...newActivity, descripcion: e.target.value })} />
+              <textarea className="input activities-textarea" placeholder="Indicaciones" value={newActivity.indicaciones} onChange={(e) => setNewActivity({ ...newActivity, indicaciones: e.target.value })} />
             </div>
+            )}
             <div className="activities-form-footer">
               <button className="button-primary" onClick={handleAssign}>Asignar</button>
               {formError && <span className="activities-feedback-error">{formError}</span>}
@@ -864,7 +882,7 @@ const ActivitiesTable: React.FC = () => {
         <style jsx>{`
           .activities-shell {
             display: grid;
-            gap: 18px;
+            gap: 16px;
           }
 
           .activities-hero,
@@ -873,13 +891,29 @@ const ActivitiesTable: React.FC = () => {
           .activities-form-card,
           .activities-mobile-card {
             border: 1px solid var(--border);
-            background: linear-gradient(160deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--surface-2) 92%, transparent));
-            box-shadow: var(--elev-1);
+            background: linear-gradient(165deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--surface-2) 90%, transparent));
+            box-shadow: 0 14px 30px -22px color-mix(in srgb, var(--foreground) 34%, transparent), 0 1px 0 color-mix(in srgb, var(--surface) 90%, transparent) inset;
           }
 
           .activities-hero {
-            padding: clamp(18px, 2.3vw, 24px);
-            border-radius: 22px;
+            padding: clamp(16px, 2.2vw, 22px);
+            border-radius: 20px;
+            position: relative;
+            overflow: hidden;
+            border-color: color-mix(in srgb, var(--primary) 22%, var(--border));
+            background:
+              radial-gradient(circle at 94% -10%, color-mix(in srgb, var(--secondary) 14%, transparent), transparent 42%),
+              linear-gradient(165deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--surface-2) 91%, transparent));
+          }
+
+          .activities-hero::before {
+            content: "";
+            position: absolute;
+            inset: 0 auto auto 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            opacity: 0.85;
           }
 
           .activities-hero-head,
@@ -905,20 +939,37 @@ const ActivitiesTable: React.FC = () => {
           }
 
           .activities-title {
-            font-size: clamp(28px, 3vw, 38px);
+            font-size: clamp(24px, 2.3vw, 31px);
+            line-height: 1.15;
+            font-weight: 750;
           }
 
           .activities-subtitle {
-            font-size: clamp(22px, 2vw, 30px);
+            font-size: clamp(17px, 1.15vw, 20px);
+            line-height: 1.2;
           }
 
           .activities-helper,
           .activities-input-label,
           .activities-mobile-meta-item,
           .activities-mobile-notes {
-            color: var(--text-secondary);
+            color: color-mix(in srgb, var(--text-secondary) 96%, var(--foreground));
             font-size: 14px;
-            line-height: 1.55;
+            line-height: 1.5;
+          }
+
+          .activities-total-pill {
+            display: inline-flex;
+            align-items: center;
+            min-height: 32px;
+            padding: 0 13px;
+            border-radius: 999px;
+            border: 1px solid color-mix(in srgb, var(--primary) 38%, var(--border));
+            background: linear-gradient(145deg, color-mix(in srgb, var(--primary) 12%, var(--surface)), color-mix(in srgb, var(--surface-2) 86%, transparent));
+            color: var(--foreground);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.01em;
           }
 
           .activities-input-label {
@@ -933,18 +984,55 @@ const ActivitiesTable: React.FC = () => {
           .activities-main {
             display: grid;
             grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
-            gap: 18px;
-            padding: 18px;
-            border-radius: 24px;
+            gap: 16px;
+            padding: 16px;
+            border-radius: 20px;
+            border-color: color-mix(in srgb, var(--primary) 18%, var(--border));
+            background:
+              radial-gradient(circle at -4% 104%, color-mix(in srgb, var(--primary) 10%, transparent), transparent 36%),
+              linear-gradient(168deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--surface-2) 90%, transparent));
           }
 
           .activities-requests-card,
           .activities-form-card {
             display: grid;
-            gap: 16px;
-            padding: 18px;
-            border-radius: 20px;
+            gap: 12px;
+            padding: 15px;
+            border-radius: 17px;
             min-width: 0;
+            position: relative;
+            overflow: hidden;
+          }
+
+          .activities-requests-card::before,
+          .activities-form-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            opacity: 0.82;
+          }
+
+          .activities-requests-card::before {
+            background: linear-gradient(90deg, color-mix(in srgb, var(--primary) 88%, var(--secondary)), color-mix(in srgb, var(--secondary) 76%, var(--primary)));
+          }
+
+          .activities-form-card {
+            border-color: color-mix(in srgb, var(--primary) 18%, var(--border));
+            background:
+              radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--primary) 8%, transparent), transparent 44%),
+              linear-gradient(165deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--primary) 6%, var(--surface-2)));
+          }
+
+          .activities-form-card::before {
+            background: linear-gradient(90deg, color-mix(in srgb, var(--secondary) 88%, var(--primary)), color-mix(in srgb, var(--primary) 72%, var(--secondary)));
+          }
+
+          .activities-form-head {
+            padding-bottom: 10px;
+            border-bottom: 1px dashed color-mix(in srgb, var(--border) 74%, transparent);
           }
 
           .activities-requests-card {
@@ -972,11 +1060,12 @@ const ActivitiesTable: React.FC = () => {
           .activities-request-item,
           .activities-mobile-card {
             display: grid;
-            gap: 12px;
-            padding: 16px;
-            border-radius: 18px;
-            border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
-            background: linear-gradient(145deg, color-mix(in srgb, var(--surface) 97%, transparent), color-mix(in srgb, var(--surface-light) 74%, transparent));
+            gap: 10px;
+            padding: 13px;
+            border-radius: 14px;
+            border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+            background: linear-gradient(150deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--surface-light) 72%, transparent));
+            box-shadow: 0 10px 24px -20px color-mix(in srgb, var(--foreground) 34%, transparent);
           }
 
           .activities-request-title,
@@ -1014,17 +1103,96 @@ const ActivitiesTable: React.FC = () => {
           }
 
           .activities-form-grid,
+          .activities-form-primary-grid,
+          .activities-form-context-grid,
           .activities-filters-row,
           .activities-mobile-meta-grid {
             display: grid;
             gap: 12px;
           }
 
+          .activities-form-primary-grid,
+          .activities-form-context-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
           .activities-form-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
           }
 
+          .activities-form-grid > * {
+            min-width: 0;
+          }
+
+          .activities-form-grid > div {
+            display: grid;
+            gap: 6px;
+          }
+
+          .activities-form-primary-grid,
+          .activities-form-context-grid {
+            padding: 10px;
+            border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+            border-radius: 12px;
+            background: linear-gradient(160deg, color-mix(in srgb, var(--surface) 99%, transparent), color-mix(in srgb, var(--surface-2) 82%, transparent));
+          }
+
+          .activities-form-advanced-toggle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 40px;
+            padding: 0 14px;
+            border-radius: 12px;
+            border: 1px dashed color-mix(in srgb, var(--border) 82%, transparent);
+            background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 700;
+          }
+
+          .activities-form-advanced {
+            padding: 10px;
+            border: 1px dashed color-mix(in srgb, var(--border) 64%, transparent);
+            border-radius: 12px;
+            background: linear-gradient(160deg, color-mix(in srgb, var(--surface-2) 70%, transparent), color-mix(in srgb, var(--surface) 94%, transparent));
+          }
+
+          .activities-textarea {
+            min-height: 76px;
+            resize: vertical;
+            grid-column: span 2;
+          }
+
+          .activities-form-grid .input,
+          .activities-filters-row .input {
+            min-height: 42px;
+            border-radius: 12px;
+            border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+            background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 99%, transparent), color-mix(in srgb, var(--surface-2) 86%, transparent));
+            padding: 10px 12px;
+            font-size: 14px;
+            color: var(--foreground);
+            transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease, transform 0.16s ease;
+            box-shadow: 0 1px 0 color-mix(in srgb, var(--surface) 92%, transparent) inset;
+          }
+
+          .activities-form-grid .input:focus,
+          .activities-filters-row .input:focus {
+            outline: none;
+            border-color: color-mix(in srgb, var(--primary) 58%, var(--border));
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent), 0 8px 14px -12px color-mix(in srgb, var(--primary) 45%, transparent);
+            background: color-mix(in srgb, var(--surface) 99%, transparent);
+            transform: translateY(-1px);
+          }
+
+          .activities-form-grid .input::placeholder {
+            color: color-mix(in srgb, var(--text-tertiary) 88%, transparent);
+          }
+
           .activities-form-grid.is-mobile,
+          .activities-form-primary-grid.is-mobile,
+          .activities-form-context-grid.is-mobile,
           .activities-filters-row.is-mobile,
           .activities-mobile-meta-grid.is-small {
             grid-template-columns: 1fr;
@@ -1044,6 +1212,16 @@ const ActivitiesTable: React.FC = () => {
             flex-wrap: wrap;
             align-items: center;
             gap: 10px;
+            justify-content: space-between;
+            padding-top: 10px;
+            border-top: 1px dashed color-mix(in srgb, var(--border) 70%, transparent);
+          }
+
+          .activities-form-footer .button-primary {
+            min-height: 42px;
+            padding: 0 18px;
+            border-radius: 12px;
+            font-weight: 700;
           }
 
           .activities-feedback-error,
@@ -1080,10 +1258,12 @@ const ActivitiesTable: React.FC = () => {
 
           .activities-table-wrap {
             min-width: 0;
-            overflow: hidden;
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            background: color-mix(in srgb, var(--surface) 96%, transparent);
+            overflow-x: auto;
+            border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+            border-radius: 16px;
+            background: linear-gradient(160deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--surface-2) 88%, transparent));
+            box-shadow: 0 16px 26px -24px color-mix(in srgb, var(--foreground) 44%, transparent);
+            -webkit-overflow-scrolling: touch;
           }
 
           .activities-table-wrap :global(.table) {
@@ -1168,15 +1348,21 @@ const ActivitiesTable: React.FC = () => {
           }
 
           @media (max-width: 900px) {
+            .activities-title {
+              font-size: 1.55rem;
+            }
+
             .activities-filters-row,
             .activities-form-grid,
+            .activities-form-primary-grid,
+            .activities-form-context-grid,
             .activities-mobile-meta-grid {
               grid-template-columns: 1fr;
             }
 
             .activities-main {
               padding: 14px;
-              border-radius: 20px;
+              border-radius: 18px;
             }
 
             .activities-requests-card,
@@ -1184,6 +1370,37 @@ const ActivitiesTable: React.FC = () => {
             .activities-mobile-card {
               padding: 14px;
               border-radius: 16px;
+            }
+
+            .activities-form-head {
+              padding-bottom: 8px;
+            }
+
+            .activities-form-grid .input,
+            .activities-filters-row .input {
+              min-height: 44px;
+              font-size: 15px;
+            }
+
+            .activities-textarea {
+              grid-column: span 1;
+              min-height: 86px;
+            }
+          }
+
+          @media (max-width: 560px) {
+            .activities-title {
+              font-size: 1.4rem;
+            }
+
+            .activities-subtitle {
+              font-size: 0.98rem;
+            }
+
+            .activities-helper,
+            .activities-mobile-meta-item,
+            .activities-mobile-notes {
+              font-size: 13px;
             }
           }
         `}</style>

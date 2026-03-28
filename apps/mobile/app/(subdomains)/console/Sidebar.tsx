@@ -5,10 +5,9 @@ import { usePathname, useRouter } from "next/navigation";
 import styles from "./console.module.css";
 import { useUser } from "@/components/UserContext";
 import { useTheme } from "@/components/ThemeContext";
-import Image from "next/image";
 import { hasAnyPermission, hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { getAvatarSrc, getRoleLabel, isPlatformAdmin } from "@/lib/panel-user";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { hapticTap } from "@/lib/haptics";
 
 interface SidebarProps {
@@ -30,7 +29,7 @@ type MenuGroup = {
   items: MenuItem[];
 };
 
-const DEFAULT_OPEN_GROUP_IDS: string[] = [];
+const DEFAULT_OPEN_GROUP_IDS: string[] = ["employee", "operations", "people"];
 
 export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}) {
   const MOBILE_BREAKPOINT = 900;
@@ -245,13 +244,9 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
     { id: "compliance", title: "Cumplimiento y BI", items: complianceItems },
   ];
 
-  const visibleGroups = useMemo(
-    () =>
-      groups
-        .map((group) => ({ ...group, items: group.items.filter(canAccessItem) }))
-        .filter((group) => group.items.length > 0),
-    [groups],
-  );
+  const visibleGroups = groups
+    .map((group) => ({ ...group, items: group.items.filter(canAccessItem) }))
+    .filter((group) => group.items.length > 0);
 
   const fallbackGroups: MenuGroup[] = [
     {
@@ -297,7 +292,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
 
   return (
     <>
-      {isMobile && isMenuOpen && <div className={styles.sidebarOverlay} onClick={closeMenu} role="presentation" aria-hidden="true"></div>}
+      {isMobile && isMenuOpen && <div className={styles.sidebarOverlay} onClick={closeMenu} role="presentation" aria-label="Cerrar menú"></div>}
       <aside className={styles.sidebar} data-mobile={isMobile ? "true" : "false"} data-open={isMenuOpen ? "true" : "false"}>
         <div className={styles.sidebarHeader}>
           <div className={styles.sidebarLogo}>
@@ -305,7 +300,17 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
             <span className={styles.brandMark}>NEXARA</span>
             {isMobile && <span className={styles.brandSub}>Consola</span>}
           </div>
-          {isMobile && (
+          {isMobile && isMenuOpen && (
+            <button
+              type="button"
+              className={styles.mobileCloseButton}
+              onClick={closeMenu}
+              aria-label="Cerrar menú"
+            >
+              <span aria-hidden="true">✕</span>
+            </button>
+          )}
+          {isMobile && !isMenuOpen && (
             <button
               type="button"
               className={styles.hamburgerButton}
@@ -323,24 +328,44 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
         </div>
 
         {(!isMobile || isMenuOpen) && (
+          <>
           <div className={styles.sidebarContent} id="sidebar-menu" data-open={isMobile && isMenuOpen ? "true" : undefined}>
           <div className={styles.sidebarUser}>
-            <div className={styles.sidebarAvatar}>
-              <Image
-                className={`${styles.avatarImage} ${user.isSuperAdmin ? styles.avatarImageLogo : ""}`}
-                src={avatarUrl}
-                alt={user.isSuperAdmin ? "NEXARA" : user.nombre}
-                width={64}
-                height={64}
-                priority={false}
-                loading="lazy"
-                unoptimized
-              />
-            </div>
+            {user.isSuperAdmin ? (
+              <div className={styles.superadminAvatarWrap}>
+                <img
+                  className={styles.superadminAvatar}
+                  src="/logo-nexara.png"
+                  alt="NEXARA"
+                  loading="lazy"
+                  onError={(event) => {
+                    const img = event.currentTarget;
+                    if (!img.src.endsWith("/icon.png")) {
+                      img.src = "/icon.png";
+                    }
+                  }}
+                />
+              </div>
+            ) : (
+              <div className={styles.sidebarAvatar}>
+                <img
+                  className={styles.avatarImage}
+                  src={avatarUrl}
+                  alt={user.nombre}
+                  loading="lazy"
+                  onError={(event) => {
+                    const img = event.currentTarget;
+                    if (!img.src.endsWith("/icon.png")) {
+                      img.src = "/icon.png";
+                    }
+                  }}
+                />
+              </div>
+            )}
             <div className={styles.sidebarName}>{user.nombre}</div>
             <div className={styles.sidebarEmail}>{user.email}</div>
             <div className={styles.sidebarMeta}>
-              <span className={styles.rolePill}>{userRoleLabel}</span>
+              {!user.isSuperAdmin && <span className={styles.rolePill}>{userRoleLabel}</span>}
               {user.isSuperAdmin && <span className={styles.levelPill}>Superadmin</span>}
               {!user.isSuperAdmin && isAdmin && <span className={styles.levelPill}>Admin</span>}
             </div>
@@ -400,7 +425,9 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
               </button>
             </div>
           </div>
+
           </div>
+          </>
         )}
       </aside>
     </>

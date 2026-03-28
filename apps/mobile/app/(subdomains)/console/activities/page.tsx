@@ -13,27 +13,41 @@ export default function ActivitiesPage() {
   const isSuperAdmin = user?.isSuperAdmin;
   return (
     <RoleGuard permissions={[PERMISSIONS.CONSOLE_ACCESS]}>
-      <div style={{ display: 'grid', gap: 24 }}>
+      <div className="activities-page-shell">
         {/* Admin y superadmin ven tabla de gestion */}
         {isAdmin && (
-          <div>
-            <h2 style={{ marginBottom: 16 }}>{isSuperAdmin ? 'Actividades de Todos' : 'Gestion de Actividades'}</h2>
+          <section className="activities-page-section">
             <ActivitiesTable />
-          </div>
+          </section>
         )}
 
         {/* Usuario normal y admin (no superadmin) ven su tabla personal */}
         {!isSuperAdmin && (
-          <div>
-            <h2 style={{ marginBottom: 16 }}>Mis Actividades</h2>
+          <section className="activities-page-section">
             <MyActivitiesTable />
             
-            <div style={{ marginTop: 24 }}>
+            <div className="activities-fines-wrap">
               <FinesTable tipo="actividad" usuarioId={user?.id} showUser={false} />
             </div>
-          </div>
+          </section>
         )}
         <HelpTab module="activities" user={user} />
+
+        <style jsx>{`
+          .activities-page-shell {
+            display: grid;
+            gap: 12px;
+          }
+
+          .activities-page-section {
+            display: grid;
+            gap: 8px;
+          }
+
+          .activities-fines-wrap {
+            margin-top: 8px;
+          }
+        `}</style>
       </div>
     </RoleGuard>
   );
