@@ -62,6 +62,7 @@ export default function BranchTicketsPage() {
   const { darkMode, toggleDarkMode } = useTheme();
   const canAccessTicketsPanel = Boolean(user && getAccessiblePanels(user).some((panel) => panel.key === "tickets"));
   const [session, setSession] = useState<BranchSession | null>(null);
+  const [hasCheckedStoredSession, setHasCheckedStoredSession] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profile, setProfile] = useState<BranchProfile | null>(null);
@@ -141,10 +142,18 @@ export default function BranchTicketsPage() {
 
   useEffect(() => {
     const saved = typeof window !== "undefined" ? window.sessionStorage.getItem("branchSession") : null;
-    if (saved) setSession(JSON.parse(saved));
+    if (saved) {
+      try {
+        setSession(JSON.parse(saved));
+      } catch {
+        window.sessionStorage.removeItem("branchSession");
+      }
+    }
+    setHasCheckedStoredSession(true);
   }, []);
 
   useEffect(() => {
+    if (!hasCheckedStoredSession) return;
     if (session) return;
 
     if (!user) {
@@ -168,7 +177,7 @@ export default function BranchTicketsPage() {
     };
     setSession(unifiedSession);
     window.sessionStorage.setItem("branchSession", JSON.stringify(unifiedSession));
-  }, [branchSlug, canAccessTicketsPanel, router, session, user]);
+  }, [branchSlug, canAccessTicketsPanel, hasCheckedStoredSession, router, session, user]);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth <= 900);
