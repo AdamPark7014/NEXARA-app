@@ -66,10 +66,19 @@ export class ClientPortalController {
 
   @Get('profile')
   async profile(@CurrentUser() user: any) {
-    return this.prisma['serviceClient'].findUnique({
+    const client = await this.prisma['serviceClient'].findUnique({
       where: { id: user.clientId },
       include: { branches: true },
     });
+
+    if (!client) return null;
+    if (client.logoUrl) return client;
+
+    const fallbackBranch = (client.branches || []).find((branch: any) => Boolean(branch?.logoUrl));
+    return {
+      ...client,
+      logoUrl: fallbackBranch?.logoUrl || null,
+    };
   }
 
   @Put('profile')

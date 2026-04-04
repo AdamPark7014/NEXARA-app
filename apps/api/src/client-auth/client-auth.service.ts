@@ -26,12 +26,26 @@ export class ClientAuthService {
       isClient: true,
     };
 
+    let resolvedLogoUrl = client.logoUrl || null;
+    if (!resolvedLogoUrl) {
+      const branchWithLogo = await this.prisma['serviceClientBranch'].findFirst({
+        where: {
+          clientId: client.id,
+          logoUrl: { not: null },
+          isActive: true,
+        },
+        orderBy: { updatedAt: 'desc' },
+        select: { logoUrl: true },
+      });
+      resolvedLogoUrl = branchWithLogo?.logoUrl || null;
+    }
+
     return {
       access_token: this.jwtService.sign(payload),
       client: {
         id: client.id,
         name: client.name,
-        logoUrl: client.logoUrl,
+        logoUrl: resolvedLogoUrl,
       },
     };
   }

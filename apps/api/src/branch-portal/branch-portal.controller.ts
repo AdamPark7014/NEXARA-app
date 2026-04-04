@@ -21,10 +21,20 @@ export class BranchPortalController {
 
   @Get('profile')
   async profile(@CurrentUser() user: any) {
-    return this.prisma['serviceClientBranch'].findFirst({
+    const branch = await this.prisma['serviceClientBranch'].findFirst({
       where: { id: user.branchId, clientId: user.clientId },
       include: { client: true },
     });
+
+    if (!branch) return null;
+    if (branch.logoUrl || branch.client?.logoUrl) {
+      return {
+        ...branch,
+        logoUrl: branch.logoUrl || branch.client?.logoUrl || null,
+      };
+    }
+
+    return branch;
   }
 
   @Get('requests')
