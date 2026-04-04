@@ -289,6 +289,9 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
   };
 
   const avatarUrl = getAvatarSrc(user);
+  const avatarFallbackUrl = user.isSuperAdmin
+    ? "/logo-nexara.png"
+    : getAvatarSrc({ ...user, avatarUrl: "" });
 
   return (
     <>
@@ -339,8 +342,8 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
                 loading="lazy"
                 onError={(event) => {
                   const img = event.currentTarget;
-                  if (!img.src.endsWith("/icon.png")) {
-                    img.src = "/icon.png";
+                  if (img.src !== avatarFallbackUrl) {
+                    img.src = avatarFallbackUrl;
                   }
                 }}
               />

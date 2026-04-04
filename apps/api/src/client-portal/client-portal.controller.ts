@@ -1,14 +1,33 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, Res, UseGuards, BadRequestException, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, Res, UseGuards, BadRequestException, UploadedFile, UploadedFiles, UseInterceptors, Req } from '@nestjs/common';
 import { ClientTicketStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { Response } from 'express';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import * as path from 'path';
+import * as fs from 'fs';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { ClientPortalGuard } from './client-portal.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { ServiceClientsService } from '../service-clients/service-clients.service.js';
 import { ActivitiesService } from '../activities/activities.service.js';
 import { InventoriesService } from '../inventories/inventories.service.js';
+import { Request } from 'express';
+
+const ensureBranchUploadsDir = () => {
+  const segments = __dirname.split(path.sep);
+  const appsIndex = segments.lastIndexOf('apps');
+  const projectRoot = appsIndex > 0
+    ? (segments.slice(0, appsIndex).join(path.sep) || path.sep)
+    : path.resolve(__dirname, '../../..');
+
+  const baseUploads = path.join(projectRoot, 'uploads');
+  const dir = path.join(baseUploads, 'branches');
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return dir;
+};
 
 @Controller('client-portal')
 @UseGuards(ClientPortalGuard)
@@ -19,6 +38,16 @@ export class ClientPortalController {
     private readonly activitiesService: ActivitiesService,
     private readonly inventoriesService: InventoriesService,
   ) {}
+
+  private normalizeBoolean(value: unknown) {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'true' || normalized === '1') return true;
+      if (normalized === 'false' || normalized === '0') return false;
+    }
+    return undefined;
+  }
 
   @Get('profile')
   async profile(@CurrentUser() user: any) {
@@ -53,7 +82,23 @@ export class ClientPortalController {
   }
 
   @Post('branches')
-  async createBranch(@CurrentUser() user: any, @Body() body: any) {
+  @UseInterceptors(FileInterceptor('logo', {
+    storage: diskStorage({
+      destination: (req, file, cb) => {
+        cb(null, ensureBranchUploadsDir());
+      },
+      filename: (req, file, cb) => {
+        const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${file.originalname}`;
+        cb(null, uniqueName);
+      },
+    }),
+  }))
+  async createBranch(
+    @CurrentUser() user: any,
+    @UploadedFile() file: any,
+    @Body() body: any,
+    @Req() req: Request,
+  ) {
     const name = body.name?.trim();
     if (!name) throw new BadRequestException('Nombre de sucursal requerido');
     const branchNumber = body.branchNumber?.trim();
@@ -76,6 +121,8 @@ export class ClientPortalController {
     if (existingBranch) throw new BadRequestException('El usuario de sucursal ya existe');
 
     const portalPasswordHash = await bcrypt.hash(portalPassword, 10);
+    const isActive = this.normalizeBoolean(body.isActive);
+    const logoUrl = file ? `/uploads/branches/${file.filename}` : (body.logoUrl?.trim() || null);
     return this.prisma['serviceClientBranch'].create({
       data: {
         clientId: user.clientId,
@@ -90,17 +137,30 @@ export class ClientPortalController {
         longitud: Number.isFinite(longitud) ? longitud : undefined,
         portalEmail: portalEmail || null,
         portalPasswordHash,
-        logoUrl: body.logoUrl?.trim() || null,
-        isActive: body.isActive !== false,
+        logoUrl,
+        isActive: isActive ?? true,
       },
     });
   }
 
   @Put('branches/:id')
+  @UseInterceptors(FileInterceptor('logo', {
+    storage: diskStorage({
+      destination: (req, file, cb) => {
+        cb(null, ensureBranchUploadsDir());
+      },
+      filename: (req, file, cb) => {
+        const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${file.originalname}`;
+        cb(null, uniqueName);
+      },
+    }),
+  }))
   async updateBranch(
     @CurrentUser() user: any,
     @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: any,
     @Body() body: any,
+    @Req() req: Request,
   ) {
     const branch = await this.prisma['serviceClientBranch'].findFirst({
       where: { id, clientId: user.clientId },
@@ -134,6 +194,12 @@ export class ClientPortalController {
     const portalPasswordHash = portalPassword
       ? await bcrypt.hash(portalPassword, 10)
       : undefined;
+    const isActive = this.normalizeBoolean(body.isActive);
+    const nextLogoUrl = file
+      ? `/uploads/branches/${file.filename}`
+      : body.logoUrl !== undefined
+        ? (body.logoUrl?.trim() || null)
+        : undefined;
 
     const data: Record<string, any> = {
       name: body.name?.trim() || branch.name,
@@ -146,8 +212,8 @@ export class ClientPortalController {
       latitud: Number.isFinite(latitud) ? latitud : undefined,
       longitud: Number.isFinite(longitud) ? longitud : undefined,
       portalEmail,
-      logoUrl: body.logoUrl !== undefined ? (body.logoUrl?.trim() || null) : undefined,
-      isActive: body.isActive !== undefined ? body.isActive : undefined,
+      logoUrl: nextLogoUrl,
+      isActive,
     };
     if (portalPasswordHash) data.portalPasswordHash = portalPasswordHash;
     return this.prisma['serviceClientBranch'].update({
