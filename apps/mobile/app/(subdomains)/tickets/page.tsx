@@ -185,6 +185,7 @@ export default function ClientTicketsPage() {
 
     return `${base}${raw.startsWith("/") ? "" : "/"}${raw}`;
   };
+  const clientAvatarUrl = profile?.logoUrl || session?.client?.logoUrl || "";
   const getMapsUrl = (lat?: number | null, lng?: number | null) => {
     if (!lat || !lng) return "";
     return `https://www.google.com/maps?q=${lat},${lng}`;
@@ -299,6 +300,21 @@ export default function ClientTicketsPage() {
     const data = await res.json().catch(() => null);
     if (!data) return;
     setProfile(data);
+
+    if (data.logoUrl !== undefined && session?.client) {
+      const normalizedLogoUrl = data.logoUrl || null;
+      if ((session.client.logoUrl || null) !== normalizedLogoUrl) {
+        const nextSession = {
+          ...session,
+          client: {
+            ...session.client,
+            logoUrl: normalizedLogoUrl,
+          },
+        };
+        window.sessionStorage.setItem("clientSession", JSON.stringify(nextSession));
+        setSession(nextSession);
+      }
+    }
 
     const profileBranches = Array.isArray(data.branches) ? data.branches : [];
     setBranches(profileBranches);
@@ -708,8 +724,8 @@ export default function ClientTicketsPage() {
         >
         <div className={consoleStyles.sidebarUser}>
           <div className={consoleStyles.sidebarAvatar}>
-            {session.client.logoUrl ? (
-              <img className={consoleStyles.avatarImage} src={getAssetUrl(session.client.logoUrl)} alt={session.client.name} width={64} height={64} />
+            {clientAvatarUrl ? (
+              <img className={consoleStyles.avatarImage} src={getAssetUrl(clientAvatarUrl)} alt={session.client.name} width={64} height={64} />
             ) : (
               <span className={consoleStyles.sidebarName}>{session.client.name.slice(0, 2).toUpperCase()}</span>
             )}
@@ -1241,8 +1257,8 @@ export default function ClientTicketsPage() {
           {activeTab === "perfil" && (
             <div className={styles.sectionStack}>
               <div className={`card ${styles.heroRow}`}>
-                {session.client.logoUrl && (
-                  <img src={getAssetUrl(session.client.logoUrl)} alt={session.client.name} className={styles.heroLogo} />
+                {clientAvatarUrl && (
+                  <img src={getAssetUrl(clientAvatarUrl)} alt={session.client.name} className={styles.heroLogo} />
                 )}
                 <div>
                   <h3 style={{ margin: 0 }}>{session.client.name}</h3>
@@ -1278,8 +1294,8 @@ export default function ClientTicketsPage() {
                     token={session.token}
                     branches={branches}
                     onBranchSaved={handleBranchSaved}
-                    clientLogoUrl={profile?.logoUrl || session.client.logoUrl || null}
-                    companyLogoUrl={profile?.logoUrl || null}
+                    clientLogoUrl={clientAvatarUrl || null}
+                    companyLogoUrl={clientAvatarUrl || null}
                     apiUrl={API_URL}
                   />
                 )}
