@@ -5,6 +5,7 @@ import { io, Socket } from "socket.io-client";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { useTheme } from "@/components/ThemeContext";
+import { getApiAssetOrigin } from "@/lib/api-base";
 import { getAccessiblePanels } from "@/lib/panel-routing";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
 import BranchesForm from "@/components/BranchesForm";
@@ -166,7 +167,7 @@ export default function ClientTicketsPage() {
   const getAssetUrl = (url?: string | null) => {
     if (!url) return "";
     if (url.startsWith("http")) return url;
-    const base = API_URL.replace(/\/+api\/?$/, "");
+    const base = getApiAssetOrigin();
     return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
   };
   const getMapsUrl = (lat?: number | null, lng?: number | null) => {
@@ -199,6 +200,8 @@ export default function ClientTicketsPage() {
 
   useEffect(() => {
     if (!mounted) return;
+    if (session) return;
+
     if (!user) {
       router.replace("/login");
       return;
@@ -207,7 +210,6 @@ export default function ClientTicketsPage() {
       router.replace("/paneles");
       return;
     }
-    if (session) return;
 
     const unifiedSession: ClientSession = {
       token: user.token,

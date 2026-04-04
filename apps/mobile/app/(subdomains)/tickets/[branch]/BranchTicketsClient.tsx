@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { useTheme } from "@/components/ThemeContext";
+import { getApiAssetOrigin } from "@/lib/api-base";
 import { getAccessiblePanels } from "@/lib/panel-routing";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
 import TicketsInventoryManager from "@/components/TicketsInventoryManager";
@@ -114,7 +115,7 @@ export default function BranchTicketsPage() {
   const getAssetUrl = (url?: string | null) => {
     if (!url) return "";
     if (url.startsWith("http")) return url;
-    const base = API_URL.replace(/\/+api\/?$/, "");
+    const base = getApiAssetOrigin();
     return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
   };
   const branchAvatarUrl = profile?.logoUrl || session?.branch?.logoUrl || "";
@@ -129,6 +130,8 @@ export default function BranchTicketsPage() {
   }, []);
 
   useEffect(() => {
+    if (session) return;
+
     if (!user) {
       router.replace("/login");
       return;
@@ -137,7 +140,6 @@ export default function BranchTicketsPage() {
       router.replace("/paneles");
       return;
     }
-    if (session) return;
 
     const unifiedSession: BranchSession = {
       token: user.token,

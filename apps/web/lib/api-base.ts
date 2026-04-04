@@ -67,6 +67,34 @@ export const buildApiUrl = (path: string) => {
   return `${base}/${path.replace(/^\/+/, "")}`;
 };
 
+export const getApiAssetOrigin = () => {
+  const envBase = process.env.NEXT_PUBLIC_API_URL;
+
+  if (typeof window !== "undefined" && window.location?.origin) {
+    const protocol = window.location.protocol;
+    const host = window.location.hostname.toLowerCase();
+
+    if (
+      host === "nexara.com.mx" ||
+      host === "www.nexara.com.mx" ||
+      host === "app.nexara.com.mx" ||
+      host.endsWith(".nexara.com.mx")
+    ) {
+      return `${protocol}//api.nexara.com.mx`;
+    }
+  }
+
+  if (envBase && envBase.trim()) {
+    try {
+      return new URL(ensureApiBase(envBase)).origin;
+    } catch {
+      // Fall through to getApiBase-based origin.
+    }
+  }
+
+  return getApiBase().replace(/\/+api\/?$/, "").replace(/\/+$/, "");
+};
+
 export const getSocketBaseUrl = () => {
   const envSocket = process.env.NEXT_PUBLIC_SOCKET_URL;
   if (envSocket && envSocket.trim()) {
