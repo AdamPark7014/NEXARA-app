@@ -136,7 +136,12 @@ export const buildApiUrl = (path: string) => {
 };
 
 export const getApiAssetOrigin = () => {
+  const envAssetOrigin = process.env.NEXT_PUBLIC_API_ASSET_ORIGIN;
   const envBase = process.env.NEXT_PUBLIC_API_URL;
+
+  if (envAssetOrigin && envAssetOrigin.trim()) {
+    return envAssetOrigin.trim().replace(/\/+$/, '');
+  }
 
   if (typeof window !== "undefined" && window.location?.origin) {
     const protocol = window.location.protocol;
