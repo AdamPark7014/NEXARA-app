@@ -102,8 +102,8 @@ fi
 
 # Ejecutar migraciones de Prisma
 echo -e "${YELLOW}🗄️ Ejecutando migraciones de Prisma...${NC}"
-npx prisma generate
-npx prisma migrate deploy
+npm run prisma:generate
+npm run prisma:deploy
 
 # Preguntar si ejecutar seed
 echo -e "${YELLOW}¿Deseas ejecutar el seed de la base de datos? (s/n)${NC}"
