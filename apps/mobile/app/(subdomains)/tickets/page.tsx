@@ -166,9 +166,24 @@ export default function ClientTicketsPage() {
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
   const getAssetUrl = (url?: string | null) => {
     if (!url) return "";
-    if (url.startsWith("http")) return url;
+    const raw = url.trim();
+    if (!raw) return "";
+    if (/^(data:|blob:|\/\/)/i.test(raw)) return raw;
+
     const base = getApiAssetOrigin();
-    return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
+    if (/^https?:\/\//i.test(raw)) {
+      try {
+        const parsed = new URL(raw);
+        if (parsed.pathname.startsWith("/uploads/")) {
+          return `${base}${parsed.pathname}${parsed.search}`;
+        }
+      } catch {
+        // Keep original URL if parsing fails.
+      }
+      return raw;
+    }
+
+    return `${base}${raw.startsWith("/") ? "" : "/"}${raw}`;
   };
   const getMapsUrl = (lat?: number | null, lng?: number | null) => {
     if (!lat || !lng) return "";
@@ -274,13 +289,11 @@ export default function ClientTicketsPage() {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) {
-      if (res.status === 401 || res.status === 403) {
-        window.sessionStorage.removeItem("clientSession");
-        setSession(null);
-        setBranches([]);
-        return;
-      }
-      setError("No se pudo cargar el perfil corporativo. Verifica la sesión.");
+      window.sessionStorage.removeItem("clientSession");
+      setSession(null);
+      setProfile(null);
+      setBranches([]);
+      setError(`No se pudo validar la sesión del portal (${res.status}). Inicia sesión nuevamente.`);
       return;
     }
     const data = await res.json().catch(() => null);
