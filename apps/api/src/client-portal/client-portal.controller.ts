@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, Res, UseGuards, BadRequestException, UploadedFile, UploadedFiles, UseInterceptors, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put, Query, Res, UseGuards, BadRequestException, UploadedFile, UploadedFiles, UseInterceptors, Req } from '@nestjs/common';
 import { ClientTicketStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { Response } from 'express';
@@ -23,6 +23,21 @@ const ensureBranchUploadsDir = () => {
 
   const baseUploads = path.join(projectRoot, 'uploads');
   const dir = path.join(baseUploads, 'branches');
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return dir;
+};
+
+const ensureClientUploadsDir = () => {
+  const segments = __dirname.split(path.sep);
+  const appsIndex = segments.lastIndexOf('apps');
+  const projectRoot = appsIndex > 0
+    ? (segments.slice(0, appsIndex).join(path.sep) || path.sep)
+    : path.resolve(__dirname, '../../..');
+
+  const baseUploads = path.join(projectRoot, 'uploads');
+  const dir = path.join(baseUploads, 'clients');
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
@@ -70,6 +85,36 @@ export class ClientPortalController {
         state: body.state?.trim() || null,
         country: body.country?.trim() || null,
       },
+    });
+  }
+
+  @Patch('profile/logo')
+  @UseInterceptors(FileInterceptor('logo', {
+    storage: diskStorage({
+      destination: (req, file, cb) => {
+        cb(null, ensureClientUploadsDir());
+      },
+      filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase() || '.png';
+        const uniqueName = `client-${Date.now()}-${Math.random().toString(36).substring(7)}${ext}`;
+        cb(null, uniqueName);
+      },
+    }),
+    fileFilter: (req, file, cb) => {
+      if (!file.mimetype.startsWith('image/')) {
+        return cb(new BadRequestException('Solo se permiten imágenes'), false);
+      }
+      cb(null, true);
+    },
+    limits: { fileSize: 5 * 1024 * 1024 },
+  }))
+  async uploadClientLogo(@CurrentUser() user: any, @UploadedFile() file: any) {
+    if (!file) throw new BadRequestException('Archivo de logo requerido');
+    const logoUrl = `/uploads/clients/${file.filename}`;
+    return this.prisma['serviceClient'].update({
+      where: { id: user.clientId },
+      data: { logoUrl },
+      select: { id: true, name: true, logoUrl: true },
     });
   }
 
