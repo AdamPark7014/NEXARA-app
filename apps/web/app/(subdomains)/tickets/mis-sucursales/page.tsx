@@ -106,11 +106,15 @@ export default function MyBranchesPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
-        window.sessionStorage.removeItem("clientSession");
-        setSession(null);
-        setProfile(null);
-        setBranches([]);
-        setError(`No se pudo validar la sesión del portal (${res.status}). Inicia sesión nuevamente.`);
+        if (res.status === 401 || res.status === 403) {
+          window.sessionStorage.removeItem("clientSession");
+          setSession(null);
+          setProfile(null);
+          setBranches([]);
+          setError("La sesión ha expirado. Inicia sesión nuevamente.");
+        } else {
+          setError(`No se pudo cargar el perfil (error ${res.status}). Intenta recargar.`);
+        }
         return;
       }
       const data = await res.json().catch(() => null);

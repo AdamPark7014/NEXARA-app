@@ -121,6 +121,7 @@ export default function ClientTicketsPage() {
   const [error, setError] = useState<string | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<"tickets" | "nuevo" | "inventarios" | "perfil" | "sucursales">("tickets");
   const [reportRange, setReportRange] = useState<"today" | "7d" | "30d" | "custom">("7d");
   const [reportStart, setReportStart] = useState("");
@@ -290,11 +291,15 @@ export default function ClientTicketsPage() {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) {
-      window.sessionStorage.removeItem("clientSession");
-      setSession(null);
-      setProfile(null);
-      setBranches([]);
-      setError(`No se pudo validar la sesión del portal (${res.status}). Inicia sesión nuevamente.`);
+      if (res.status === 401 || res.status === 403) {
+        window.sessionStorage.removeItem("clientSession");
+        setSession(null);
+        setProfile(null);
+        setBranches([]);
+        setError("La sesión ha expirado. Inicia sesión nuevamente.");
+      } else {
+        setError(`No se pudo cargar el perfil (error ${res.status}). Intenta recargar la página.`);
+      }
       return;
     }
     const data = await res.json().catch(() => null);
@@ -499,6 +504,35 @@ export default function ClientTicketsPage() {
       return;
     }
     await fetchProfile(session.token);
+  };
+
+  const handleLogoUpload = async (file: File) => {
+    if (!session?.token || !file) return;
+    setLogoUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("logo", file);
+      const res = await fetch(buildApiUrl("client-portal/profile/logo"), {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${session.token}` },
+        body: formData,
+      });
+      if (!res.ok) {
+        setError("No se pudo subir el logo");
+        return;
+      }
+      const data = await res.json().catch(() => null);
+      if (data?.logoUrl) {
+        const nextSession = { ...session, client: { ...session.client, logoUrl: data.logoUrl } };
+        window.sessionStorage.setItem("clientSession", JSON.stringify(nextSession));
+        setSession(nextSession);
+      }
+      await fetchProfile(session.token);
+    } catch {
+      setError("No se pudo subir el logo");
+    } finally {
+      setLogoUploading(false);
+    }
   };
 
 
@@ -1255,12 +1289,34 @@ export default function ClientTicketsPage() {
           {activeTab === "perfil" && (
             <div className={styles.sectionStack}>
               <div className={`card ${styles.heroRow}`}>
-                {session.client.logoUrl && (
-                  <img src={getAssetUrl(session.client.logoUrl)} alt={session.client.name} className={styles.heroLogo} />
-                )}
+                <div style={{ position: "relative", flexShrink: 0 }}>
+                  {session.client.logoUrl ? (
+                    <img src={getAssetUrl(session.client.logoUrl)} alt={session.client.name} className={styles.heroLogo} style={{ display: "block" }} />
+                  ) : (
+                    <div className={styles.heroLogo} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "var(--surface-2)", color: "var(--text-2)", fontWeight: 700, fontSize: 24, borderRadius: 12 }}>
+                      {session.client.name.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                </div>
                 <div>
                   <h3 style={{ margin: 0 }}>{session.client.name}</h3>
                   <p className={styles.mutedText} style={{ margin: 0 }}>Acceso para consulta de tickets, reportes y seguimiento de sucursales.</p>
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 8, cursor: logoUploading ? "default" : "pointer", opacity: logoUploading ? 0.6 : 1 }}>
+                    <span className="button-secondary" style={{ padding: "4px 12px", fontSize: "0.8rem" }}>
+                      {logoUploading ? "Subiendo..." : "📷 Cambiar logo"}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      disabled={logoUploading}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleLogoUpload(file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
                 </div>
               </div>
               <div className={`card ${styles.cardSoft}`}>

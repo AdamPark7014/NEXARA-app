@@ -79,7 +79,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         const clientAttempt = await loginToEndpoint(`${API_URL}/client-auth/login`);
         if (clientAttempt.res.ok) {
           onClientLogin?.(clientAttempt.data);
-          router.replace(redirectTo);
+          if (!onClientLogin) router.replace(redirectTo);
           return;
         }
 
