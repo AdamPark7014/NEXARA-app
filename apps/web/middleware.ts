@@ -86,7 +86,9 @@ const buildCsp = () => {
     "default-src 'self'",
     `script-src ${scriptSrc}`,
     "style-src 'self' 'unsafe-inline' https:",
-    "img-src 'self' data: blob: https:",
+    isDev
+      ? "img-src 'self' data: blob: https: http://localhost:* http://127.0.0.1:* http://*.localhost:*"
+      : "img-src 'self' data: blob: https:",
     "font-src 'self' data: https:",
     `connect-src 'self' https: wss: http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:* http://*.localhost:* ws://*.localhost:* wss://*.localhost:* ${externalConnectSources}`,
     "media-src 'self' blob: https:",

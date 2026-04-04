@@ -36,7 +36,7 @@ export class BranchAuthService {
         branchNumber: branch.branchNumber,
         clientId: branch.clientId,
         clientName: branch.client?.name || null,
-        logoUrl: branch.logoUrl || null,
+        logoUrl: branch.logoUrl || branch.client?.logoUrl || null,
       },
     };
   }
