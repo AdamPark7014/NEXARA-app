@@ -393,13 +393,69 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
     return sortDirection === 'asc' ? ' ↑' : ' ↓';
   };
 
+  const sectionSurfaceStyle: React.CSSProperties = {
+    display: 'grid',
+    gap: 12,
+    padding: 16,
+    borderRadius: 16,
+    border: '1px solid color-mix(in srgb, var(--primary) 16%, transparent)',
+    background: 'linear-gradient(155deg, color-mix(in srgb, var(--surface) 92%, transparent), color-mix(in srgb, var(--primary) 5%, transparent))',
+  };
+
+  const sectionHeaderStyle: React.CSSProperties = {
+    display: 'grid',
+    gap: 4,
+  };
+
+  const sectionTitleStyle: React.CSSProperties = {
+    margin: 0,
+    fontSize: 15,
+    fontWeight: 700,
+    color: 'var(--text-primary)',
+  };
+
+  const sectionTextStyle: React.CSSProperties = {
+    margin: 0,
+    fontSize: 12,
+    color: 'var(--text-secondary)',
+  };
+
+  const statusPanelStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+    flexWrap: 'wrap',
+    padding: '16px 18px',
+    borderRadius: 14,
+    border: '1px solid rgba(31,107,186,0.18)',
+    background: 'linear-gradient(135deg, rgba(31,107,186,0.08), rgba(18,133,98,0.08))',
+  };
+
+  const footerBarStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    flexWrap: 'wrap',
+    paddingTop: 4,
+  };
+
   return (
     <div className={styles.root}>
       {/* Formulario de creación/edición */}
       <div className={styles.formCard}>
-        <h3 className={styles.sectionTitle}>
-          {editingBranchId ? 'Editar sucursal' : 'Crear nueva sucursal'}
-        </h3>
+        <div style={sectionHeaderStyle}>
+          <p style={{ margin: 0, textTransform: 'uppercase', letterSpacing: '0.18rem', fontSize: 11, fontWeight: 700, color: 'var(--primary)' }}>
+            Control de sucursales
+          </p>
+          <h3 className={styles.sectionTitle}>
+            {editingBranchId ? 'Editar sucursal' : 'Crear nueva sucursal'}
+          </h3>
+          <p style={sectionTextStyle}>
+            Configura identidad visual, ubicación y acceso operativo de cada sucursal desde una sola ficha administrativa.
+          </p>
+        </div>
 
         {error && (
           <div className={styles.errorBox}>
@@ -408,10 +464,11 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
         )}
 
         {/* Logo section */}
-        <div>
-          <label className={styles.fieldLabel}>
-            Logo de la sucursal
-          </label>
+        <div style={sectionSurfaceStyle}>
+          <div style={sectionHeaderStyle}>
+            <p style={sectionTitleStyle}>Identidad visual</p>
+            <p style={sectionTextStyle}>Carga un logo propio para la sucursal o deja el logo corporativo como respaldo.</p>
+          </div>
           <div className={styles.logoBox}>
             {/* Current/Default Logo */}
             <div className={styles.logoPreviewWrap}>
@@ -450,26 +507,33 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
         </div>
 
         {/* Datos básicos */}
-        <div className={styles.formGrid}>
-          <input
-            className="input"
-            placeholder="Nombre de la sucursal"
-            value={branchDraft.name}
-            onChange={(e) => setBranchDraft({ ...branchDraft, name: e.target.value })}
-          />
-          <input
-            className="input"
-            placeholder="Número de sucursal"
-            value={branchDraft.branchNumber}
-            onChange={(e) => setBranchDraft({ ...branchDraft, branchNumber: e.target.value })}
-          />
+        <div style={sectionSurfaceStyle}>
+          <div style={sectionHeaderStyle}>
+            <p style={sectionTitleStyle}>Datos base</p>
+            <p style={sectionTextStyle}>Define la sucursal como la reconocerán operaciones, reportes y portal de tickets.</p>
+          </div>
+          <div className={styles.formGrid}>
+            <input
+              className="input"
+              placeholder="Nombre de la sucursal"
+              value={branchDraft.name}
+              onChange={(e) => setBranchDraft({ ...branchDraft, name: e.target.value })}
+            />
+            <input
+              className="input"
+              placeholder="Número de sucursal"
+              value={branchDraft.branchNumber}
+              onChange={(e) => setBranchDraft({ ...branchDraft, branchNumber: e.target.value })}
+            />
+          </div>
         </div>
 
         {/* Ubicación */}
-        <div>
-          <label className={styles.fieldLabel}>
-            Ubicación de la sucursal
-          </label>
+        <div style={sectionSurfaceStyle}>
+          <div style={sectionHeaderStyle}>
+            <p style={sectionTitleStyle}>Ubicación</p>
+            <p style={sectionTextStyle}>Guarda una referencia precisa para navegación, georreferencia y levantamiento de tickets.</p>
+          </div>
           <ClientLocationPicker
             label="Busca la ubicación en Google Maps"
             value={{
@@ -483,57 +547,64 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
         </div>
 
         {/* Credenciales de acceso */}
-        <div className={`${styles.formGrid} ${styles.formGridSingle}`}>
-          <div className={styles.profileBlock}>
-            <label className={styles.fieldLabel}>Perfil de sucursal</label>
-            <p className={styles.profileHint}>
-              Crea usuarios internos para cada sucursal. Usaran estas credenciales en tickets.nexara.com.mx.
-            </p>
+        <div style={sectionSurfaceStyle}>
+          <div style={sectionHeaderStyle}>
+            <p style={sectionTitleStyle}>Acceso al portal</p>
+            <p style={sectionTextStyle}>Estas credenciales se usarán para ingresar al portal de tickets y registrar solicitudes desde la sucursal.</p>
           </div>
-        </div>
-
-        <div className={styles.formGrid}>
-          <input
-            className="input"
-            placeholder="Usuario acceso sucursal (email)"
-            value={branchDraft.portalEmail}
-            onChange={(e) => setBranchDraft({ ...branchDraft, portalEmail: e.target.value })}
-            type="email"
-          />
-          <div className={styles.passwordWrap}>
+          <div className={styles.formGrid}>
             <input
               className="input"
-              type={showPassword ? 'text' : 'password'}
-              placeholder={editingBranchId ? 'Nuevo password (opcional)' : 'Password sucursal'}
-              value={branchDraft.portalPassword}
-              onChange={(e) => setBranchDraft({ ...branchDraft, portalPassword: e.target.value })}
+              placeholder="Usuario acceso sucursal (email)"
+              value={branchDraft.portalEmail}
+              onChange={(e) => setBranchDraft({ ...branchDraft, portalEmail: e.target.value })}
+              type="email"
             />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className={styles.passwordToggle}
-              title={showPassword ? 'Ocultar' : 'Mostrar'}
-            >
-              {showPassword ? '👁️' : '👁️‍🗨️'}
-            </button>
+            <div className={styles.passwordWrap}>
+              <input
+                className="input"
+                type={showPassword ? 'text' : 'password'}
+                placeholder={editingBranchId ? 'Nuevo password (opcional)' : 'Password sucursal'}
+                value={branchDraft.portalPassword}
+                onChange={(e) => setBranchDraft({ ...branchDraft, portalPassword: e.target.value })}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className={styles.passwordToggle}
+                title={showPassword ? 'Ocultar' : 'Mostrar'}
+              >
+                {showPassword ? '👁️' : '👁️‍🗨️'}
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Estado activo */}
-        <div className={styles.activeRow}>
-          <label className={styles.activeLabel}>
-            <input
-              type="checkbox"
-              checked={branchDraft.isActive}
-              onChange={(e) => setBranchDraft({ ...branchDraft, isActive: e.target.checked })}
-              className={styles.checkbox}
-            />
-            <span className={styles.activeText}>Sucursal activa</span>
-          </label>
+        <div style={statusPanelStyle}>
+          <div style={sectionHeaderStyle}>
+            <p style={sectionTitleStyle}>Estado operativo</p>
+            <p style={sectionTextStyle}>{branchDraft.isActive ? 'La sucursal puede ingresar al portal y operar tickets.' : 'La sucursal queda registrada, pero sin acceso operativo activo.'}</p>
+          </div>
+          <div className={styles.activeRow}>
+            <label className={styles.activeLabel}>
+              <input
+                type="checkbox"
+                checked={branchDraft.isActive}
+                onChange={(e) => setBranchDraft({ ...branchDraft, isActive: e.target.checked })}
+                className={styles.checkbox}
+              />
+              <span className={styles.activeText}>Sucursal activa</span>
+            </label>
+          </div>
         </div>
 
         {/* Botones de acción */}
-        <div className={styles.actions}>
+        <div style={footerBarStyle}>
+          <p style={{ ...sectionTextStyle, maxWidth: 420 }}>
+            Guarda la sucursal con identidad, ubicación y acceso correctamente definidos para mantener el portal de tickets ordenado.
+          </p>
+          <div className={styles.actions} style={{ marginTop: 0 }}>
           {editingBranchId && (
             <button
               className="button-secondary"
@@ -552,6 +623,7 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
           >
             {saving ? 'Guardando...' : editingBranchId ? 'Actualizar sucursal' : 'Guardar sucursal'}
           </button>
+          </div>
         </div>
       </div>
 
