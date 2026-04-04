@@ -74,6 +74,7 @@ export default function MyBranchesPage() {
 
     return `${base}${raw.startsWith("/") ? "" : "/"}${raw}`;
   };
+  const clientAvatarUrl = profile?.logoUrl || session?.client?.logoUrl || "";
 
   // Marcar como mounted después del primer render en el cliente
   useEffect(() => {
@@ -135,6 +136,21 @@ export default function MyBranchesPage() {
       if (data) {
         setProfile(data);
         setBranches(Array.isArray(data.branches) ? data.branches : []);
+
+        if (data.logoUrl !== undefined && session?.client) {
+          const normalizedLogoUrl = data.logoUrl || null;
+          if ((session.client.logoUrl || null) !== normalizedLogoUrl) {
+            const nextSession = {
+              ...session,
+              client: {
+                ...session.client,
+                logoUrl: normalizedLogoUrl,
+              },
+            };
+            window.sessionStorage.setItem("clientSession", JSON.stringify(nextSession));
+            setSession(nextSession);
+          }
+        }
       }
     } catch (err) {
       console.error("Error fetching profile:", err);
@@ -222,10 +238,10 @@ export default function MyBranchesPage() {
         >
         <div className={consoleStyles.sidebarUser}>
           <div className={consoleStyles.sidebarAvatar}>
-            {session.client.logoUrl ? (
+            {clientAvatarUrl ? (
               <img
                 className={consoleStyles.avatarImage}
-                src={getAssetUrl(session.client.logoUrl)}
+                src={getAssetUrl(clientAvatarUrl)}
                 alt={session.client.name}
                 width={64}
                 height={64}
@@ -340,8 +356,8 @@ export default function MyBranchesPage() {
             token={session.token}
             branches={branches}
             onBranchSaved={() => fetchProfile(session.token)}
-            clientLogoUrl={profile?.logoUrl}
-            companyLogoUrl={session.client.logoUrl}
+            clientLogoUrl={clientAvatarUrl || null}
+            companyLogoUrl={clientAvatarUrl || null}
             apiUrl={API_URL}
           />
 
