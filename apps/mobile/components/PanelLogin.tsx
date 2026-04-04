@@ -30,6 +30,141 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
   const { setUser } = useUser();
   const router = useRouter();
 
+  const loginToEndpoint = async (endpoint: string, payload: string, deviceHeaders: Record<string, string>) => {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...deviceHeaders },
+      body: payload,
+    });
+
+    const responseText = await res.text();
+    const contentType = res.headers.get("content-type") || "";
+    const isHtmlResponse = /<html|<!doctype/i.test(responseText) || contentType.includes("text/html");
+
+    let parsedBody: any = null;
+    if (responseText) {
+      try {
+        parsedBody = JSON.parse(responseText);
+      } catch {
+        parsedBody = null;
+      }
+    }
+
+    return { res, parsedBody, isHtmlResponse };
+  };
+
+  const handleClientPortalLogin = (
+    data: { access_token: string; client: { id: number; name: string; logoUrl?: string | null } },
+    accountEmail: string,
+    accountPassword: string,
+  ) => {
+    const clientSession = {
+      token: data.access_token,
+      client: data.client,
+    };
+
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem("clientSession", JSON.stringify(clientSession));
+      window.sessionStorage.removeItem("branchSession");
+    }
+
+    saveAccount(accountEmail, accountPassword, {
+      name: data.client.name || accountEmail,
+      avatarUrl: data.client.logoUrl || '',
+    });
+    setSavedAccounts(getSavedAccounts());
+    router.replace("/tickets");
+  };
+
+  const handleBranchPortalLogin = (
+    data: { access_token: string; branch: { id: number; name: string; branchNumber?: string | null; clientId: number; clientName?: string | null; logoUrl?: string | null } },
+    accountEmail: string,
+    accountPassword: string,
+  ) => {
+    const branchSession = {
+      token: data.access_token,
+      branch: data.branch,
+    };
+
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem("branchSession", JSON.stringify(branchSession));
+      window.sessionStorage.removeItem("clientSession");
+    }
+
+    saveAccount(accountEmail, accountPassword, {
+      name: data.branch.name || accountEmail,
+      avatarUrl: data.branch.logoUrl || '',
+    });
+    setSavedAccounts(getSavedAccounts());
+
+    const branchSlug = data.branch.branchNumber || `branch-${data.branch.id}`;
+    router.replace(`/tickets/${branchSlug}`);
+  };
+
+  const performLogin = async (accountEmail: string, accountPassword: string) => {
+    const deviceHeaders = await getDeviceIdentityHeaders();
+    const payload = JSON.stringify({
+      email: accountEmail,
+      password: accountPassword,
+      ...(requiredPermission === PERMISSIONS.PANEL_VENTAS ? { panel: "ventas" } : {}),
+    });
+
+    let responseError = "No se pudo conectar con el servidor de autenticacion";
+
+    for (const API_URL of getApiBaseCandidates()) {
+      try {
+        const authAttempt = await loginToEndpoint(`${API_URL}/auth/login`, payload, deviceHeaders);
+
+        if (authAttempt.res.ok && authAttempt.parsedBody && typeof authAttempt.parsedBody === "object") {
+          return { kind: "internal" as const, data: authAttempt.parsedBody };
+        }
+
+        if (authAttempt.isHtmlResponse) {
+          responseError = "El servidor respondio HTML en lugar de JSON. Verifica la configuracion de /api en el host movil.";
+          continue;
+        }
+
+        const authMessage = Array.isArray(authAttempt.parsedBody?.message)
+          ? authAttempt.parsedBody.message[0]
+          : authAttempt.parsedBody?.message || authAttempt.parsedBody?.error;
+        const invalidAuth = !authAttempt.res.ok && typeof authMessage === "string" && /credenciales|unauthorized|unauthoriz/i.test(authMessage);
+
+        if (!authAttempt.res.ok && !invalidAuth) {
+          throw new Error(typeof authMessage === "string" && authMessage.trim() ? authMessage : "Credenciales incorrectas");
+        }
+
+        const clientAttempt = await loginToEndpoint(`${API_URL}/client-auth/login`, payload, deviceHeaders);
+        if (clientAttempt.res.ok && clientAttempt.parsedBody && typeof clientAttempt.parsedBody === "object") {
+          return { kind: "client" as const, data: clientAttempt.parsedBody };
+        }
+
+        const branchAttempt = await loginToEndpoint(`${API_URL}/branch-auth/login`, payload, deviceHeaders);
+        if (branchAttempt.res.ok && branchAttempt.parsedBody && typeof branchAttempt.parsedBody === "object") {
+          return { kind: "branch" as const, data: branchAttempt.parsedBody };
+        }
+
+        const branchMessage = Array.isArray(branchAttempt.parsedBody?.message)
+          ? branchAttempt.parsedBody.message[0]
+          : branchAttempt.parsedBody?.message || branchAttempt.parsedBody?.error;
+        const clientMessage = Array.isArray(clientAttempt.parsedBody?.message)
+          ? clientAttempt.parsedBody.message[0]
+          : clientAttempt.parsedBody?.message || clientAttempt.parsedBody?.error;
+        const finalMessage = branchMessage || clientMessage || authMessage;
+
+        if (typeof finalMessage === "string" && finalMessage.trim()) {
+          throw new Error(finalMessage);
+        }
+      } catch (requestError) {
+        if (requestError instanceof Error) {
+          responseError = requestError.message;
+        }
+        continue;
+      }
+    }
+
+    throw new Error(responseError);
+  };
+
   // Load saved accounts on mount (client-only)
   useEffect(() => {
     const accounts = getSavedAccounts();
@@ -74,66 +209,19 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
     pendingLoginRef.current = null;
 
     try {
-      const deviceHeaders = await getDeviceIdentityHeaders();
-      const payload = JSON.stringify({
-        email: loginEmail,
-        password: loginPassword,
-        ...(requiredPermission === PERMISSIONS.PANEL_VENTAS ? { panel: "ventas" } : {}),
-      });
+      const result = await performLogin(loginEmail, loginPassword);
 
-      let data: any = null;
-      let responseError = "No se pudo conectar con el servidor de autenticacion";
-
-      for (const API_URL of getApiBaseCandidates()) {
-        try {
-          const endpoint = `${API_URL}/auth/login`;
-          const res = await fetch(endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", ...deviceHeaders },
-            body: payload,
-          });
-
-          const responseText = await res.text();
-          const contentType = res.headers.get("content-type") || "";
-          const isHtmlResponse = /<html|<!doctype/i.test(responseText) || contentType.includes("text/html");
-
-          let parsedBody: any = null;
-          if (responseText) {
-            try {
-              parsedBody = JSON.parse(responseText);
-            } catch {
-              parsedBody = null;
-            }
-          }
-
-          if (res.ok && parsedBody && typeof parsedBody === "object") {
-            data = parsedBody;
-            break;
-          }
-
-          if (isHtmlResponse) {
-            responseError = "El servidor respondio HTML en lugar de JSON. Verifica la configuracion de /api en el host movil.";
-            continue;
-          }
-
-          if (!res.ok) {
-            const messageFromArray = Array.isArray(parsedBody?.message) ? parsedBody.message[0] : null;
-            const apiMessage = messageFromArray || parsedBody?.message || parsedBody?.error;
-            const finalMessage = typeof apiMessage === "string" && apiMessage.trim() ? apiMessage : "Credenciales incorrectas";
-            throw new Error(`AUTH_ERROR:${finalMessage}`);
-          }
-
-          responseError = "Respuesta invalida del servidor de autenticacion";
-        } catch (requestError) {
-          if (requestError instanceof Error && requestError.message.startsWith("AUTH_ERROR:")) {
-            throw new Error(requestError.message.replace("AUTH_ERROR:", ""));
-          }
-          responseError = "No se pudo conectar con el servidor de autenticacion";
-          continue;
-        }
+      if (result.kind === "client") {
+        handleClientPortalLogin(result.data, loginEmail, loginPassword);
+        return;
       }
 
-      if (!data) throw new Error(responseError);
+      if (result.kind === "branch") {
+        handleBranchPortalLogin(result.data, loginEmail, loginPassword);
+        return;
+      }
+
+      const data = result.data;
 
       const userData = {
         id: data.user.id,
@@ -190,43 +278,19 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
     setError('');
     (async () => {
       try {
-        const deviceHeaders = await getDeviceIdentityHeaders();
-        const payload = JSON.stringify({
-          email: account.email,
-          password: pw,
-          ...(requiredPermission === PERMISSIONS.PANEL_VENTAS ? { panel: 'ventas' } : {}),
-        });
+        const result = await performLogin(account.email, pw);
 
-        let data: any = null;
-        let responseError = 'No se pudo conectar con el servidor de autenticacion';
-
-        for (const API_URL of getApiBaseCandidates()) {
-          try {
-            const endpoint = `${API_URL}/auth/login`;
-            const res = await fetch(endpoint, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', ...deviceHeaders },
-              body: payload,
-            });
-            const responseText = await res.text();
-            const contentType = res.headers.get('content-type') || '';
-            const isHtmlResponse = /<html|<!doctype/i.test(responseText) || contentType.includes('text/html');
-            let parsedBody: any = null;
-            if (responseText) { try { parsedBody = JSON.parse(responseText); } catch { parsedBody = null; } }
-
-            if (res.ok && parsedBody && typeof parsedBody === 'object') { data = parsedBody; break; }
-            if (isHtmlResponse) { responseError = 'El servidor respondio HTML.'; continue; }
-            if (!res.ok) {
-              const msg = Array.isArray(parsedBody?.message) ? parsedBody.message[0] : (parsedBody?.message || parsedBody?.error);
-              throw new Error(`AUTH_ERROR:${typeof msg === 'string' && msg.trim() ? msg : 'Credenciales incorrectas'}`);
-            }
-          } catch (reqErr) {
-            if (reqErr instanceof Error && reqErr.message.startsWith('AUTH_ERROR:')) throw new Error(reqErr.message.replace('AUTH_ERROR:', ''));
-            continue;
-          }
+        if (result.kind === 'client') {
+          handleClientPortalLogin(result.data, account.email, pw);
+          return;
         }
 
-        if (!data) throw new Error(responseError);
+        if (result.kind === 'branch') {
+          handleBranchPortalLogin(result.data, account.email, pw);
+          return;
+        }
+
+        const data = result.data;
 
         const userData = {
           id: data.user.id,
