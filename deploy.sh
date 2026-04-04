@@ -84,7 +84,7 @@ echo -e "${YELLOW}🔧 Configurando Backend (NestJS)...${NC}"
 cd "$PROJECT_DIR/apps/api"
 
 # Instalar dependencias
-npm install
+npm install --include=dev --legacy-peer-deps
 
 # Verificar si existe .env
 if [ ! -f .env ]; then
@@ -132,7 +132,7 @@ echo -e "${YELLOW}🎨 Configurando Frontend (Next.js)...${NC}"
 cd "$PROJECT_DIR/apps/web"
 
 # Instalar dependencias
-npm install
+npm install --include=dev --legacy-peer-deps
 
 # Verificar si existe .env.local
 if [ ! -f .env.local ]; then
