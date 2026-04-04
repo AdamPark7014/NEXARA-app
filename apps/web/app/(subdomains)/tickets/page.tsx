@@ -312,6 +312,21 @@ export default function ClientTicketsPage() {
     if (!data) return;
     setProfile(data);
 
+    if (data.logoUrl !== undefined && session?.client) {
+      const normalizedLogoUrl = data.logoUrl || null;
+      if ((session.client.logoUrl || null) !== normalizedLogoUrl) {
+        const nextSession = {
+          ...session,
+          client: {
+            ...session.client,
+            logoUrl: normalizedLogoUrl,
+          },
+        };
+        window.sessionStorage.setItem("clientSession", JSON.stringify(nextSession));
+        setSession(nextSession);
+      }
+    }
+
     const profileBranches = Array.isArray(data.branches) ? data.branches : [];
     setBranches(profileBranches);
 
@@ -1303,8 +1318,8 @@ export default function ClientTicketsPage() {
             <div className={styles.sectionStack}>
               <div className={`card ${styles.heroRow}`}>
                 <div style={{ position: "relative", flexShrink: 0 }}>
-                  {session.client.logoUrl ? (
-                    <img src={getAssetUrl(session.client.logoUrl)} alt={session.client.name} className={styles.heroLogo} style={{ display: "block" }} />
+                  {clientAvatarUrl ? (
+                    <img src={getAssetUrl(clientAvatarUrl)} alt={session.client.name} className={styles.heroLogo} style={{ display: "block" }} />
                   ) : (
                     <div className={styles.heroLogo} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "var(--surface-2)", color: "var(--text-2)", fontWeight: 700, fontSize: 24, borderRadius: 12 }}>
                       {session.client.name.slice(0, 2).toUpperCase()}
