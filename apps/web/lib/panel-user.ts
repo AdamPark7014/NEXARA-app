@@ -1,4 +1,5 @@
 import { hasAnyPermission, hasPermission, PERMISSIONS, type UserPermissions } from "@/lib/permissions";
+import { getApiBase } from "@/lib/api-base";
 
 type PanelUser = UserPermissions & {
   nombre?: string | null;
@@ -42,7 +43,13 @@ export const getAvatarSrc = (user: PanelUser | null | undefined) => {
   if (user?.isSuperAdmin) return "/logo-nexara.png";
 
   const assignedAvatar = (user?.avatarUrl || "").trim();
-  if (assignedAvatar) return assignedAvatar;
+  if (assignedAvatar) {
+    // Ensure profile images stored as /uploads/... resolve against the API host.
+    if (/^(https?:\/\/|data:|blob:|\/\/)/i.test(assignedAvatar)) return assignedAvatar;
+    const apiOrigin = getApiBase().replace(/\/+api\/?$/, "").replace(/\/+$/, "");
+    const normalizedPath = assignedAvatar.startsWith("/") ? assignedAvatar : `/${assignedAvatar}`;
+    return `${apiOrigin}${normalizedPath}`;
+  }
 
   const seed = encodeURIComponent((user?.nombre || "NEXARA").trim());
   return `https://ui-avatars.com/api/?name=${seed}&background=0D8ABC&color=fff&size=96`;

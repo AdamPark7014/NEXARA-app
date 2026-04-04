@@ -1,4 +1,5 @@
 import { hasAnyPermission, hasPermission, PERMISSIONS, type UserPermissions } from "@/lib/permissions";
+import { getApiBase } from "@/lib/api-base";
 
 type PanelUser = UserPermissions & {
   nombre?: string | null;
@@ -44,22 +45,11 @@ export const getAvatarSrc = (user: PanelUser | null | undefined) => {
 
   const assignedAvatar = (user?.avatarUrl || "").trim();
   if (assignedAvatar) {
-    const normalized = assignedAvatar.toLowerCase();
-    const isBrandPlaceholder = ["/logo-nexara.png", "/icon.png", "logo-nexara.png", "icon.png"].includes(normalized);
-    if (!isBrandPlaceholder) {
-      if (/^https?:\/\//i.test(assignedAvatar) || assignedAvatar.startsWith("data:")) {
-        return assignedAvatar;
-      }
-
-      const apiBase = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+api\/?$/, "").replace(/\/$/, "");
-      const avatarPath = assignedAvatar.startsWith("/") ? assignedAvatar : `/${assignedAvatar}`;
-
-      if (apiBase && avatarPath.startsWith("/uploads/")) {
-        return `${apiBase}${avatarPath}`;
-      }
-
-      return assignedAvatar;
-    }
+    // Ensure profile images stored as /uploads/... resolve against the API host.
+    if (/^(https?:\/\/|data:|blob:|\/\/)/i.test(assignedAvatar)) return assignedAvatar;
+    const apiOrigin = getApiBase().replace(/\/+api\/?$/, "").replace(/\/+$/, "");
+    const normalizedPath = assignedAvatar.startsWith("/") ? assignedAvatar : `/${assignedAvatar}`;
+    return `${apiOrigin}${normalizedPath}`;
   }
 
   const seed = encodeURIComponent((user?.nombre || "NEXARA").trim());
