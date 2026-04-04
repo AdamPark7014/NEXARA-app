@@ -608,87 +608,120 @@ export default function BranchTicketsPage() {
 
           {activeTab === "request" && (
           <>
-          <div className={`card ${styles.cardSoft}`}>
-            <p className={styles.sectionTitle}>Registrar solicitud</p>
-            <div className={styles.mutedText}>
-              Sucursal: {profile?.name || session.branch.name} {profile?.branchNumber ? `(${profile.branchNumber})` : ""}
-            </div>
-            <textarea
-              className="input"
-              rows={3}
-              placeholder={draft.requestType === "PREVENTIVE_INVENTORY" ? "Describe el alcance del mantenimiento e inventario" : "Describe el problema o requerimiento"}
-              value={draft.description}
-              onChange={(e) => setDraft((prev) => ({ ...prev, description: e.target.value }))}
-            />
-            <div className={styles.grid200}>
-              <div>
-                <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Tipo de solicitud</label>
-                <select className="input" value={draft.requestType} onChange={(e) => setDraft((prev) => ({ ...prev, requestType: e.target.value as "ISSUE" | "PREVENTIVE_INVENTORY" }))}>
-                  <option value="ISSUE">Ticket por problema</option>
-                  <option value="PREVENTIVE_INVENTORY">Mantenimiento e inventario</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Urgencia</label>
-                <select className="input" value={draft.urgency} onChange={(e) => setDraft((prev) => ({ ...prev, urgency: e.target.value }))}>
-                  <option value="Baja">Baja</option>
-                  <option value="Media">Media</option>
-                  <option value="Alta">Alta</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Fecha limite</label>
-                <input className="input" type="date" value={draft.dueAt} onChange={(e) => setDraft((prev) => ({ ...prev, dueAt: e.target.value }))} />
+          <div className={`card ${styles.cardSoft} ${styles.requestFormCard}`}>
+            <div className={styles.requestFormHeader}>
+              <p className={styles.requestEyebrow}>Portal operativo</p>
+              <p className={styles.sectionTitle}>Registrar solicitud</p>
+              <p className={styles.sectionSubtitle}>Genera tickets o mantenimientos desde tu sucursal con información suficiente para acelerar el despacho.</p>
+              <div className={styles.requestBadgeRow}>
+                <span className={styles.requestBadge}>Sucursal: {profile?.name || session.branch.name}</span>
+                <span className={styles.requestBadge}>Urgencia: {draft.urgency}</span>
               </div>
             </div>
-            <ClientLocationPicker
-              label="Ubicación de la solicitud"
-              value={{
-                address: draft.address,
-                placeId: draft.placeId,
-                latitud: draft.latitud,
-                longitud: draft.longitud,
-              }}
-              onChange={(value: ClientLocationValue) =>
-                setDraft((prev) => ({
-                  ...prev,
-                  address: value.address || prev.address,
-                  placeId: value.placeId || prev.placeId,
-                  latitud: value.latitud ?? prev.latitud,
-                  longitud: value.longitud ?? prev.longitud,
-                }))
-              }
-            />
-            <div
-              onDragOver={(event) => {
-                event.preventDefault();
-                setIsDragging(true);
-              }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={(event) => {
-                event.preventDefault();
-                setIsDragging(false);
-                handleFileSelect(Array.from(event.dataTransfer.files || []));
-              }}
-              className={`${styles.dropzone} ${isDragging ? styles.dropzoneActive : ""}`}
-            >
-              <input
-                id="branch-evidence-file"
-                className="input"
-                type="file"
-                accept="image/*,application/pdf"
-                multiple
-                onChange={(e) => handleFileSelect(Array.from(e.target.files || []))}
-                style={{ display: "none" }}
+
+            <div className={styles.infoBanner}>
+              <p className={styles.formSectionTitle}>Punto de origen</p>
+              <p className={styles.formSectionText}>Sucursal: {profile?.name || session.branch.name} {profile?.branchNumber ? `(${profile.branchNumber})` : ""}</p>
+            </div>
+
+            <div className={styles.formSection}>
+              <div className={styles.formSectionHeader}>
+                <p className={styles.formSectionTitle}>Contexto de la solicitud</p>
+                <p className={styles.formSectionText}>Define el tipo de requerimiento y el nivel de prioridad antes de enviarlo al equipo.</p>
+              </div>
+              <div className={styles.fieldStack}>
+                <label className={styles.fieldLabel}>Descripción del requerimiento</label>
+                <textarea
+                  className="input"
+                  rows={4}
+                  placeholder={draft.requestType === "PREVENTIVE_INVENTORY" ? "Describe el alcance del mantenimiento e inventario" : "Describe el problema o requerimiento"}
+                  value={draft.description}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, description: e.target.value }))}
+                />
+              </div>
+              <div className={styles.grid200}>
+                <div className={styles.fieldStack}>
+                  <label className={styles.fieldLabel}>Tipo de solicitud</label>
+                  <select className="input" value={draft.requestType} onChange={(e) => setDraft((prev) => ({ ...prev, requestType: e.target.value as "ISSUE" | "PREVENTIVE_INVENTORY" }))}>
+                    <option value="ISSUE">Ticket por problema</option>
+                    <option value="PREVENTIVE_INVENTORY">Mantenimiento e inventario</option>
+                  </select>
+                </div>
+                <div className={styles.fieldStack}>
+                  <label className={styles.fieldLabel}>Urgencia</label>
+                  <select className="input" value={draft.urgency} onChange={(e) => setDraft((prev) => ({ ...prev, urgency: e.target.value }))}>
+                    <option value="Baja">Baja</option>
+                    <option value="Media">Media</option>
+                    <option value="Alta">Alta</option>
+                  </select>
+                </div>
+                <div className={styles.fieldStack}>
+                  <label className={styles.fieldLabel}>Fecha limite</label>
+                  <input className="input" type="date" value={draft.dueAt} onChange={(e) => setDraft((prev) => ({ ...prev, dueAt: e.target.value }))} />
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.formSection}>
+              <div className={styles.formSectionHeader}>
+                <p className={styles.formSectionTitle}>Ubicación y evidencia inicial</p>
+                <p className={styles.formSectionText}>Adjunta archivos y confirma ubicación para evitar aclaraciones posteriores.</p>
+              </div>
+              <ClientLocationPicker
+                label="Ubicación de la solicitud"
+                value={{
+                  address: draft.address,
+                  placeId: draft.placeId,
+                  latitud: draft.latitud,
+                  longitud: draft.longitud,
+                }}
+                onChange={(value: ClientLocationValue) =>
+                  setDraft((prev) => ({
+                    ...prev,
+                    address: value.address || prev.address,
+                    placeId: value.placeId || prev.placeId,
+                    latitud: value.latitud ?? prev.latitud,
+                    longitud: value.longitud ?? prev.longitud,
+                  }))
+                }
               />
-              <div className={styles.mutedText} style={{ marginBottom: 8 }}>
-                Arrastra tus archivos aquí o
-              </div>
-              <label htmlFor="branch-evidence-file" className="button-secondary" style={{ cursor: "pointer" }}>
-                Seleccionar archivo
-              </label>
-              <div className={styles.mutedText} style={{ marginTop: 8 }}>
-                {files.length > 0 ? `${files.length} archivo(s) seleccionados` : "Ningún archivo seleccionado"}
+              <div className={styles.uploadPanel}>
+                <div className={styles.formSectionHeader}>
+                  <p className={styles.formSectionTitle}>Archivos de apoyo</p>
+                  <p className={styles.formSectionText}>Puedes adjuntar imágenes o PDF con referencias del problema o del inventario a revisar.</p>
+                </div>
+                <div
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setIsDragging(true);
+                  }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    setIsDragging(false);
+                    handleFileSelect(Array.from(event.dataTransfer.files || []));
+                  }}
+                  className={`${styles.dropzone} ${isDragging ? styles.dropzoneActive : ""}`}
+                >
+                  <input
+                    id="branch-evidence-file"
+                    className="input"
+                    type="file"
+                    accept="image/*,application/pdf"
+                    multiple
+                    onChange={(e) => handleFileSelect(Array.from(e.target.files || []))}
+                    style={{ display: "none" }}
+                  />
+                  <div className={styles.uploadActions}>
+                    <label htmlFor="branch-evidence-file" className="button-secondary" style={{ cursor: "pointer" }}>
+                      Seleccionar archivo
+                    </label>
+                    <span className={styles.mutedText}>o arrastra tus archivos directamente a esta área</span>
+                  </div>
+                  <div className={styles.mutedText}>
+                    {files.length > 0 ? `${files.length} archivo(s) seleccionados` : "Ningún archivo seleccionado"}
+                  </div>
+                </div>
               </div>
             </div>
             {files.length > 0 && (
@@ -722,7 +755,8 @@ export default function BranchTicketsPage() {
                 </div>
               </div>
             )}
-            <div className={styles.actionRow}>
+            <div className={`${styles.actionRow} ${styles.submitRow}`}>
+              <div className={styles.submitHint}>La solicitud se enviará con descripción, prioridad, ubicación y evidencias iniciales para que el equipo la tome sin pérdida de contexto.</div>
               <button className="button-primary" type="button" onClick={handleSubmit} disabled={loading}>Enviar solicitud</button>
               {error && <span className={styles.errorText}>{error}</span>}
             </div>

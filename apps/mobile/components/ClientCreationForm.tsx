@@ -8,18 +8,41 @@ interface ClientCreationFormProps {
   onClientCreated?: () => void;
 }
 
+type NewClientForm = {
+  name: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+  address: string;
+  city: string;
+  state: string;
+  country: string;
+  accountCode: string;
+  portalEmail: string;
+  portalPassword: string;
+  isActive: boolean;
+};
+
+const initialNewClient: NewClientForm = {
+  name: '',
+  contactName: '',
+  contactEmail: '',
+  contactPhone: '',
+  address: '',
+  city: '',
+  state: '',
+  country: '',
+  accountCode: '',
+  portalEmail: '',
+  portalPassword: '',
+  isActive: true,
+};
+
 export default function ClientCreationForm({ onClientCreated }: ClientCreationFormProps) {
   const { user } = useUser();
   const clientLogoInputRef = useRef<HTMLInputElement>(null);
   
-  const [newClient, setNewClient] = useState({
-    name: '',
-    contactName: '',
-    contactEmail: '',
-    contactPhone: '',
-    portalEmail: '',
-    portalPassword: '',
-  });
+  const [newClient, setNewClient] = useState(initialNewClient);
   
   const [clientLogo, setClientLogo] = useState<File | null>(null);
   const [clientLogoPreview, setClientLogoPreview] = useState<string | null>(null);
@@ -84,6 +107,10 @@ export default function ClientCreationForm({ onClientCreated }: ClientCreationFo
     handleLogoSelect(file);
   };
 
+  const updateClientField = <K extends keyof NewClientForm>(field: K, value: NewClientForm[K]) => {
+    setNewClient((current) => ({ ...current, [field]: value }));
+  };
+
   const handleCreateClient = async () => {
     if (!user?.token) return;
     setClientFormMessage(null);
@@ -99,8 +126,14 @@ export default function ClientCreationForm({ onClientCreated }: ClientCreationFo
     if (newClient.contactName) formData.append('contactName', newClient.contactName);
     if (newClient.contactEmail) formData.append('contactEmail', newClient.contactEmail);
     if (newClient.contactPhone) formData.append('contactPhone', newClient.contactPhone);
+    if (newClient.address) formData.append('address', newClient.address);
+    if (newClient.city) formData.append('city', newClient.city);
+    if (newClient.state) formData.append('state', newClient.state);
+    if (newClient.country) formData.append('country', newClient.country);
+    if (newClient.accountCode) formData.append('accountCode', newClient.accountCode);
     if (newClient.portalEmail) formData.append('portalEmail', newClient.portalEmail);
     if (newClient.portalPassword) formData.append('portalPassword', newClient.portalPassword);
+    formData.append('isActive', String(newClient.isActive));
     if (clientLogo) formData.append('logo', clientLogo);
 
     const res = await fetch(buildApiUrl('service-clients'), {
@@ -128,14 +161,7 @@ export default function ClientCreationForm({ onClientCreated }: ClientCreationFo
     }
     
     // Reset form
-    setNewClient({
-      name: '',
-      contactName: '',
-      contactEmail: '',
-      contactPhone: '',
-      portalEmail: '',
-      portalPassword: '',
-    });
+    setNewClient(initialNewClient);
     setClientLogo(null);
     setClientLogoPreview(null);
     setShowClientPassword(false);
@@ -159,33 +185,63 @@ export default function ClientCreationForm({ onClientCreated }: ClientCreationFo
             className="input" 
             placeholder="Nombre del cliente *" 
             value={newClient.name} 
-            onChange={(e) => setNewClient({ ...newClient, name: e.target.value })} 
+            onChange={(e) => updateClientField('name', e.target.value)} 
           />
           <input 
             className="input" 
             placeholder="Nombre de contacto" 
             value={newClient.contactName} 
-            onChange={(e) => setNewClient({ ...newClient, contactName: e.target.value })} 
+            onChange={(e) => updateClientField('contactName', e.target.value)} 
           />
           <input 
             className="input" 
             placeholder="Email de contacto" 
             type="email"
             value={newClient.contactEmail} 
-            onChange={(e) => setNewClient({ ...newClient, contactEmail: e.target.value })} 
+            onChange={(e) => updateClientField('contactEmail', e.target.value)} 
           />
           <input 
             className="input" 
             placeholder="Teléfono" 
             value={newClient.contactPhone} 
-            onChange={(e) => setNewClient({ ...newClient, contactPhone: e.target.value })} 
+            onChange={(e) => updateClientField('contactPhone', e.target.value)} 
+          />
+          <input 
+            className="input" 
+            placeholder="Dirección" 
+            value={newClient.address} 
+            onChange={(e) => updateClientField('address', e.target.value)} 
+          />
+          <input 
+            className="input" 
+            placeholder="Ciudad" 
+            value={newClient.city} 
+            onChange={(e) => updateClientField('city', e.target.value)} 
+          />
+          <input 
+            className="input" 
+            placeholder="Estado" 
+            value={newClient.state} 
+            onChange={(e) => updateClientField('state', e.target.value)} 
+          />
+          <input 
+            className="input" 
+            placeholder="País" 
+            value={newClient.country} 
+            onChange={(e) => updateClientField('country', e.target.value)} 
+          />
+          <input 
+            className="input" 
+            placeholder="Codigo de cuenta" 
+            value={newClient.accountCode} 
+            onChange={(e) => updateClientField('accountCode', e.target.value)} 
           />
           <input 
             className="input" 
             placeholder="Email para portal de tickets" 
             type="email"
             value={newClient.portalEmail} 
-            onChange={(e) => setNewClient({ ...newClient, portalEmail: e.target.value })} 
+            onChange={(e) => updateClientField('portalEmail', e.target.value)} 
           />
           <div className={styles.passwordRow}>
             <input
@@ -193,7 +249,7 @@ export default function ClientCreationForm({ onClientCreated }: ClientCreationFo
               type={showClientPassword ? 'text' : 'password'}
               placeholder="Contraseña para portal"
               value={newClient.portalPassword}
-              onChange={(e) => setNewClient({ ...newClient, portalPassword: e.target.value })}
+              onChange={(e) => updateClientField('portalPassword', e.target.value)}
             />
             <button
               className="button-secondary"
@@ -201,6 +257,21 @@ export default function ClientCreationForm({ onClientCreated }: ClientCreationFo
               onClick={() => setShowClientPassword((prev) => !prev)}
             >
               {showClientPassword ? '👁️' : '👁️‍🗨️'}
+            </button>
+          </div>
+          <div className={styles.statusCard}>
+            <div className={styles.statusCopy}>
+              <div className={styles.statusLabel}>Estado del cliente</div>
+              <div className={styles.statusText}>
+                {newClient.isActive ? 'Cliente activo. Podra acceder al portal y a sus servicios.' : 'Cliente inactivo. Se crea sin acceso operativo.'}
+              </div>
+            </div>
+            <button
+              className={`${styles.statusButton} ${newClient.isActive ? styles.statusButtonActive : ''}`}
+              type="button"
+              onClick={() => updateClientField('isActive', !newClient.isActive)}
+            >
+              {newClient.isActive ? 'Activo' : 'Inactivo'}
             </button>
           </div>
           

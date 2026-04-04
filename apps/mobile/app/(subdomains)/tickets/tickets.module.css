@@ -124,6 +124,122 @@
   color: var(--primary, inherit) !important;
 }
 
+.requestFormCard {
+  gap: 18px;
+  padding: clamp(16px, 2vw, 22px);
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--primary) 8%, transparent), color-mix(in srgb, var(--secondary) 7%, transparent));
+  box-shadow: 0 18px 38px color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
+.requestFormHeader {
+  display: grid;
+  gap: 8px;
+}
+
+.requestEyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.18rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.requestBadgeRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.requestBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 11px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--primary) 18%, transparent);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.formSection {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--primary) 16%, transparent);
+  background: linear-gradient(155deg, color-mix(in srgb, var(--surface) 92%, transparent), color-mix(in srgb, var(--primary) 5%, transparent));
+}
+
+.formSectionHeader {
+  display: grid;
+  gap: 4px;
+}
+
+.formSectionTitle {
+  margin: 0;
+  font-size: 0.94rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.formSectionText {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.fieldStack {
+  display: grid;
+  gap: 6px;
+}
+
+.fieldLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.fullSpan {
+  grid-column: 1 / -1;
+}
+
+.infoBanner {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--primary) 16%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 10%, transparent), color-mix(in srgb, var(--secondary) 10%, transparent));
+}
+
+.submitRow {
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.submitHint {
+  max-width: 420px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.uploadPanel {
+  display: grid;
+  gap: 10px;
+}
+
+.uploadActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 .linkCta {
   color: #ffffff !important;
   font-weight: 700;

@@ -1127,116 +1127,166 @@ export default function ClientTicketsPage() {
           )}
           {activeTab === "nuevo" && (
             <div className={styles.sectionStack}>
-              <div className={`card ${styles.cardSoft}`}>
-                <p className={styles.sectionTitle}>Nueva solicitud</p>
-                <p className={styles.sectionSubtitle}>Elige el tipo de flujo y selecciona la ubicación del servicio.</p>
-                <div className={styles.grid200}>
-                  <div>
-                    <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Tipo de solicitud</label>
-                    <select
-                      className="input"
-                      value={requestDraft.requestType}
-                      onChange={(e) => setRequestDraft((prev) => ({ ...prev, requestType: e.target.value as "ISSUE" | "PREVENTIVE_INVENTORY" }))}
-                    >
-                      <option value="ISSUE">Ticket por problema</option>
-                      <option value="PREVENTIVE_INVENTORY">Mantenimiento preventivo e inventario</option>
-                    </select>
+              <div className={`card ${styles.cardSoft} ${styles.requestFormCard}`}>
+                <div className={styles.requestFormHeader}>
+                  <p className={styles.requestEyebrow}>Centro de solicitud</p>
+                  <p className={styles.sectionTitle}>Nueva solicitud</p>
+                  <p className={styles.sectionSubtitle}>Captura el servicio requerido con datos claros de sucursal, prioridad y ubicación para agilizar la asignación.</p>
+                  <div className={styles.requestBadgeRow}>
+                    <span className={styles.requestBadge}>Flujo: {requestDraft.requestType === "PREVENTIVE_INVENTORY" ? "Mantenimiento e inventario" : "Ticket por problema"}</span>
+                    <span className={styles.requestBadge}>Urgencia: {requestDraft.urgency}</span>
                   </div>
                 </div>
-                <div className={styles.grid200}>
-                  <div>
-                    <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Sucursal existente</label>
-                    <select
-                      className="input"
-                      value={requestDraft.branchId}
-                      onChange={(e) => handleRequestBranchSelect(e.target.value)}
-                    >
-                      <option value="">Selecciona una sucursal</option>
-                      {branches.map((branch) => (
-                        <option key={branch.id} value={branch.id}>{branch.name}</option>
-                      ))}
-                    </select>
+
+                <div className={styles.formSection}>
+                  <div className={styles.formSectionHeader}>
+                    <p className={styles.formSectionTitle}>Definición del servicio</p>
+                    <p className={styles.formSectionText}>Selecciona el flujo correcto y, si aplica, establece un compromiso de atención.</p>
                   </div>
-                  <div>
-                    <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Urgencia</label>
-                    <select
-                      className="input"
-                      value={requestDraft.urgency}
-                      onChange={(e) => setRequestDraft((prev) => ({ ...prev, urgency: e.target.value }))}
-                    >
-                      <option value="Baja">Baja</option>
-                      <option value="Media">Media</option>
-                      <option value="Alta">Alta</option>
-                    </select>
+                  <div className={styles.grid200}>
+                    <div className={styles.fieldStack}>
+                      <label className={styles.fieldLabel}>Tipo de solicitud</label>
+                      <select
+                        className="input"
+                        value={requestDraft.requestType}
+                        onChange={(e) => setRequestDraft((prev) => ({ ...prev, requestType: e.target.value as "ISSUE" | "PREVENTIVE_INVENTORY" }))}
+                      >
+                        <option value="ISSUE">Ticket por problema</option>
+                        <option value="PREVENTIVE_INVENTORY">Mantenimiento preventivo e inventario</option>
+                      </select>
+                    </div>
+                    <div className={styles.fieldStack}>
+                      <label className={styles.fieldLabel}>Urgencia</label>
+                      <select
+                        className="input"
+                        value={requestDraft.urgency}
+                        onChange={(e) => setRequestDraft((prev) => ({ ...prev, urgency: e.target.value }))}
+                      >
+                        <option value="Baja">Baja</option>
+                        <option value="Media">Media</option>
+                        <option value="Alta">Alta</option>
+                      </select>
+                    </div>
+                    <div className={styles.fieldStack}>
+                      <label className={styles.fieldLabel}>Fecha limite</label>
+                      <input
+                        className="input"
+                        type="date"
+                        value={requestDraft.dueAt}
+                        onChange={(e) => setRequestDraft((prev) => ({ ...prev, dueAt: e.target.value }))}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Fecha limite</label>
-                    <input
+                </div>
+
+                <div className={styles.formSection}>
+                  <div className={styles.formSectionHeader}>
+                    <p className={styles.formSectionTitle}>Datos de sucursal</p>
+                    <p className={styles.formSectionText}>Puedes usar una sucursal existente o completar manualmente la información del sitio.</p>
+                  </div>
+                  <div className={styles.grid200}>
+                    <div className={`${styles.fieldStack} ${styles.fullSpan}`}>
+                      <label className={styles.fieldLabel}>Sucursal existente</label>
+                      <select
+                        className="input"
+                        value={requestDraft.branchId}
+                        onChange={(e) => handleRequestBranchSelect(e.target.value)}
+                      >
+                        <option value="">Selecciona una sucursal</option>
+                        {branches.map((branch) => (
+                          <option key={branch.id} value={branch.id}>{branch.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className={styles.fieldStack}>
+                      <label className={styles.fieldLabel}>Nombre de la sucursal</label>
+                      <input
+                        className="input"
+                        placeholder="Nombre de la sucursal"
+                        value={requestDraft.branchName}
+                        onChange={(e) => setRequestDraft((prev) => ({ ...prev, branchName: e.target.value }))}
+                      />
+                    </div>
+                    <div className={styles.fieldStack}>
+                      <label className={styles.fieldLabel}>Número de sucursal</label>
+                      <input
+                        className="input"
+                        placeholder="Número de sucursal"
+                        value={requestDraft.branchNumber}
+                        onChange={(e) => setRequestDraft((prev) => ({ ...prev, branchNumber: e.target.value }))}
+                      />
+                    </div>
+                    <div className={styles.fieldStack}>
+                      <label className={styles.fieldLabel}>Ciudad</label>
+                      <input
+                        className="input"
+                        placeholder="Ciudad"
+                        value={requestDraft.city}
+                        onChange={(e) => setRequestDraft((prev) => ({ ...prev, city: e.target.value }))}
+                      />
+                    </div>
+                    <div className={styles.fieldStack}>
+                      <label className={styles.fieldLabel}>Estado</label>
+                      <input
+                        className="input"
+                        placeholder="Estado"
+                        value={requestDraft.state}
+                        onChange={(e) => setRequestDraft((prev) => ({ ...prev, state: e.target.value }))}
+                      />
+                    </div>
+                    <div className={`${styles.fieldStack} ${styles.fullSpan}`}>
+                      <label className={styles.fieldLabel}>Dirección</label>
+                      <input
+                        className="input"
+                        placeholder="Dirección"
+                        value={requestDraft.address}
+                        onChange={(e) => setRequestDraft((prev) => ({ ...prev, address: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.formSection}>
+                  <div className={styles.formSectionHeader}>
+                    <p className={styles.formSectionTitle}>Descripción y ubicación</p>
+                    <p className={styles.formSectionText}>Describe el requerimiento con el mayor contexto posible y valida la ubicación en mapa si aplica.</p>
+                  </div>
+                  <div className={styles.fieldStack}>
+                    <label className={styles.fieldLabel}>Descripción del servicio</label>
+                    <textarea
                       className="input"
-                      type="date"
-                      value={requestDraft.dueAt}
-                      onChange={(e) => setRequestDraft((prev) => ({ ...prev, dueAt: e.target.value }))}
+                      rows={4}
+                      placeholder={requestDraft.requestType === "PREVENTIVE_INVENTORY" ? "Descripción del mantenimiento e inventario a ejecutar" : "Descripción del problema"}
+                      value={requestDraft.description}
+                      onChange={(e) => setRequestDraft((prev) => ({ ...prev, description: e.target.value }))}
                     />
                   </div>
-                </div>
-                <div className={styles.grid200}>
-                  <input
-                    className="input"
-                    placeholder="Nombre de la sucursal"
-                    value={requestDraft.branchName}
-                    onChange={(e) => setRequestDraft((prev) => ({ ...prev, branchName: e.target.value }))}
-                  />
-                  <input
-                    className="input"
-                    placeholder="Número de sucursal"
-                    value={requestDraft.branchNumber}
-                    onChange={(e) => setRequestDraft((prev) => ({ ...prev, branchNumber: e.target.value }))}
-                  />
-                  <input
-                    className="input"
-                    placeholder="Ciudad"
-                    value={requestDraft.city}
-                    onChange={(e) => setRequestDraft((prev) => ({ ...prev, city: e.target.value }))}
-                  />
-                  <input
-                    className="input"
-                    placeholder="Estado"
-                    value={requestDraft.state}
-                    onChange={(e) => setRequestDraft((prev) => ({ ...prev, state: e.target.value }))}
+                  <div className={styles.infoBanner}>
+                    <p className={styles.formSectionTitle}>Ubicación del ticket</p>
+                    <p className={styles.formSectionText}>Usa el selector para dejar coordenadas y dirección precisas para el equipo de atención.</p>
+                  </div>
+                  <ClientLocationPicker
+                    label="Ubicación del ticket"
+                    value={{
+                      address: requestDraft.address,
+                      placeId: requestDraft.placeId,
+                      latitud: requestDraft.latitud,
+                      longitud: requestDraft.longitud,
+                    }}
+                    onChange={(value: ClientLocationValue) =>
+                      setRequestDraft((prev) => ({
+                        ...prev,
+                        address: value.address || prev.address,
+                        placeId: value.placeId || prev.placeId,
+                        latitud: value.latitud ?? prev.latitud,
+                        longitud: value.longitud ?? prev.longitud,
+                      }))
+                    }
                   />
                 </div>
-                <input
-                  className="input"
-                  placeholder="Dirección"
-                  value={requestDraft.address}
-                  onChange={(e) => setRequestDraft((prev) => ({ ...prev, address: e.target.value }))}
-                />
-                <textarea
-                  className="input"
-                  rows={3}
-                  placeholder={requestDraft.requestType === "PREVENTIVE_INVENTORY" ? "Descripción del mantenimiento e inventario a ejecutar" : "Descripción del problema"}
-                  value={requestDraft.description}
-                  onChange={(e) => setRequestDraft((prev) => ({ ...prev, description: e.target.value }))}
-                />
-                <ClientLocationPicker
-                  label="Ubicación del ticket"
-                  value={{
-                    address: requestDraft.address,
-                    placeId: requestDraft.placeId,
-                    latitud: requestDraft.latitud,
-                    longitud: requestDraft.longitud,
-                  }}
-                  onChange={(value: ClientLocationValue) =>
-                    setRequestDraft((prev) => ({
-                      ...prev,
-                      address: value.address || prev.address,
-                      placeId: value.placeId || prev.placeId,
-                      latitud: value.latitud ?? prev.latitud,
-                      longitud: value.longitud ?? prev.longitud,
-                    }))
-                  }
-                />
-                <div className={styles.actionRow}>
+
+                <div className={`${styles.actionRow} ${styles.submitRow}`}>
+                  <div className={styles.submitHint}>Cuando envíes la solicitud, el equipo verá sucursal, prioridad, ubicación y descripción como una sola ficha operativa.</div>
                   <button className="button-primary" type="button" onClick={handleRequestSubmit}>Enviar solicitud</button>
                   {error && <span className={styles.errorText}>{error}</span>}
                 </div>
