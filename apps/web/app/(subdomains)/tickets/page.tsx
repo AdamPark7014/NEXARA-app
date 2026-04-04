@@ -131,6 +131,7 @@ export default function ClientTicketsPage() {
   const [reportPdfData, setReportPdfData] = useState<Uint8Array | null>(null);
   const [showReportModal, setShowReportModal] = useState(false);
   const [profile, setProfile] = useState<ClientProfile | null>(null);
+  const [avatarLoadError, setAvatarLoadError] = useState(false);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [requests, setRequests] = useState<TicketRequest[]>([]);
   const [pendingFeedback, setPendingFeedback] = useState<PendingFeedback[]>([]);
@@ -194,7 +195,12 @@ export default function ClientTicketsPage() {
     if (!lat || !lng) return "";
     return `https://www.google.com/maps?q=${lat},${lng}`;
   };
+  const clientAvatarUrl = profile?.logoUrl || session?.client?.logoUrl || "";
   const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, "");
+
+  useEffect(() => {
+    setAvatarLoadError(false);
+  }, [clientAvatarUrl]);
 
   // Marcar como mounted después del primer render en el cliente
   useEffect(() => {
@@ -767,8 +773,15 @@ export default function ClientTicketsPage() {
         >
         <div className={consoleStyles.sidebarUser}>
           <div className={consoleStyles.sidebarAvatar}>
-            {session.client.logoUrl ? (
-              <img className={consoleStyles.avatarImage} src={getAssetUrl(session.client.logoUrl)} alt={session.client.name} width={64} height={64} />
+            {clientAvatarUrl && !avatarLoadError ? (
+              <img
+                className={consoleStyles.avatarImage}
+                src={getAssetUrl(clientAvatarUrl)}
+                alt={session.client.name}
+                width={64}
+                height={64}
+                onError={() => setAvatarLoadError(true)}
+              />
             ) : (
               <span className={consoleStyles.sidebarName}>{session.client.name.slice(0, 2).toUpperCase()}</span>
             )}
