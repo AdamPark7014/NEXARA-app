@@ -1,5 +1,5 @@
 import { hasAnyPermission, hasPermission, PERMISSIONS, type UserPermissions } from "@/lib/permissions";
-import { getApiBase } from "@/lib/api-base";
+import { getApiAssetOrigin } from "@/lib/api-base";
 
 type PanelUser = UserPermissions & {
   nombre?: string | null;
@@ -44,9 +44,20 @@ export const getAvatarSrc = (user: PanelUser | null | undefined) => {
 
   const assignedAvatar = (user?.avatarUrl || "").trim();
   if (assignedAvatar) {
-    // Ensure profile images stored as /uploads/... resolve against the API host.
-    if (/^(https?:\/\/|data:|blob:|\/\/)/i.test(assignedAvatar)) return assignedAvatar;
-    const apiOrigin = getApiBase().replace(/\/+api\/?$/, "").replace(/\/+$/, "");
+    const apiOrigin = getApiAssetOrigin();
+    if (/^(data:|blob:|\/\/)/i.test(assignedAvatar)) return assignedAvatar;
+    if (/^https?:\/\//i.test(assignedAvatar)) {
+      try {
+        const parsed = new URL(assignedAvatar);
+        if (parsed.pathname.startsWith("/uploads/")) {
+          return `${apiOrigin}${parsed.pathname}${parsed.search}`;
+        }
+      } catch {
+        // Keep original URL if parsing fails.
+      }
+      return assignedAvatar;
+    }
+
     const normalizedPath = assignedAvatar.startsWith("/") ? assignedAvatar : `/${assignedAvatar}`;
     return `${apiOrigin}${normalizedPath}`;
   }

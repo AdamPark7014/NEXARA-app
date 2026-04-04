@@ -114,9 +114,24 @@ export default function BranchTicketsPage() {
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
   const getAssetUrl = (url?: string | null) => {
     if (!url) return "";
-    if (url.startsWith("http")) return url;
+    const raw = url.trim();
+    if (!raw) return "";
+    if (/^(data:|blob:|\/\/)/i.test(raw)) return raw;
+
     const base = getApiAssetOrigin();
-    return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
+    if (/^https?:\/\//i.test(raw)) {
+      try {
+        const parsed = new URL(raw);
+        if (parsed.pathname.startsWith("/uploads/")) {
+          return `${base}${parsed.pathname}${parsed.search}`;
+        }
+      } catch {
+        // Keep original URL if parsing fails.
+      }
+      return raw;
+    }
+
+    return `${base}${raw.startsWith("/") ? "" : "/"}${raw}`;
   };
   const branchAvatarUrl = profile?.logoUrl || session?.branch?.logoUrl || "";
 
