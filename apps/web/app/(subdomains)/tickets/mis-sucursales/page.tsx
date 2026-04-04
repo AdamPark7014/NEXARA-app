@@ -4,6 +4,7 @@ import { io, Socket } from "socket.io-client";
 import Link from "next/link";
 import PanelLogin from "@/components/PanelLogin";
 import BranchesForm, { Branch } from "../../../../components/BranchesForm";
+import { getApiAssetOrigin } from "@/lib/api-base";
 import { useTheme } from "@/components/ThemeContext";
 import consoleStyles from "../../console/console.module.css";
 import styles from "../tickets.module.css";
@@ -57,7 +58,7 @@ export default function MyBranchesPage() {
   const getAssetUrl = (url?: string | null) => {
     if (!url) return "";
     if (url.startsWith("http")) return url;
-    const base = getSocketBaseUrl();
+    const base = getApiAssetOrigin();
     return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
   };
 

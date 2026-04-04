@@ -7,6 +7,7 @@ import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLo
 import BranchesForm from "@/components/BranchesForm";
 import TicketsInventoryManager from "@/components/TicketsInventoryManager";
 import { useTheme } from "@/components/ThemeContext";
+import { getApiAssetOrigin } from "@/lib/api-base";
 import consoleStyles from "../console/console.module.css";
 import styles from "./tickets.module.css";
 
@@ -170,7 +171,7 @@ export default function ClientTicketsPage() {
   const getAssetUrl = (url?: string | null) => {
     if (!url) return "";
     if (url.startsWith("http")) return url;
-    const base = API_URL.replace(/\/+api\/?$/, "");
+    const base = getApiAssetOrigin();
     return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
   };
   const getMapsUrl = (lat?: number | null, lng?: number | null) => {

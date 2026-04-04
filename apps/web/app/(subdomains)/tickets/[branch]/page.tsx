@@ -5,6 +5,7 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import PanelLogin from "@/components/PanelLogin";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
 import TicketsInventoryManager from "@/components/TicketsInventoryManager";
+import { getApiAssetOrigin } from "@/lib/api-base";
 import { useTheme } from "@/components/ThemeContext";
 import consoleStyles from "../../console/console.module.css";
 import styles from "../tickets.module.css";
@@ -112,7 +113,7 @@ export default function BranchTicketsPage() {
   const getAssetUrl = (url?: string | null) => {
     if (!url) return "";
     if (url.startsWith("http")) return url;
-    const base = API_URL.replace(/\/+api\/?$/, "");
+    const base = getApiAssetOrigin();
     return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
   };
   const branchAvatarUrl = profile?.logoUrl || session?.branch?.logoUrl || "";
