@@ -8,6 +8,7 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { InventoriesService } from '../inventories/inventories.service.js';
 import { ActivitiesService } from '../activities/activities.service.js';
 import { ServiceClientsService } from '../service-clients/service-clients.service.js';
+import { getUploadSubdir } from '../common/upload-paths.js';
 
 @Controller('branch-portal')
 @UseGuards(BranchPortalGuard)
@@ -167,7 +168,7 @@ export class BranchPortalController {
   }
 
   @Post('inventories/upload')
-  @UseInterceptors(FilesInterceptor('files', 30, { dest: 'apps/api/uploads/inventory-media' }))
+  @UseInterceptors(FilesInterceptor('files', 30, { dest: getUploadSubdir(__dirname, 'inventory-media') }))
   async uploadInventoryMedia(@UploadedFiles() files: any[]) {
     const urls = Array.isArray(files)
       ? files.map((file) => `/uploads/inventory-media/${file.filename}`)
@@ -228,7 +229,7 @@ export class BranchPortalController {
   }
 
   @Post('requests')
-  @UseInterceptors(FilesInterceptor('files', 10, { dest: 'apps/api/uploads/client-requests' }))
+  @UseInterceptors(FilesInterceptor('files', 10, { dest: getUploadSubdir(__dirname, 'client-requests') }))
   async createRequest(
     @CurrentUser() user: any,
     @UploadedFiles() files: any[],

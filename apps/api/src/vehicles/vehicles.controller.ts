@@ -23,6 +23,7 @@ import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { VehiclesService } from './vehicles.service.js';
 import { UsersService } from '../users/users.service.js';
+import { getUploadSubdir } from '../common/upload-paths.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
 import { ExcelImportService } from '../common/excel-import.service.js';
@@ -118,7 +119,7 @@ export class VehiclesController {
   @Post(':id/delivery-evidence')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VEHICLES_REQUEST] })
-  @UseInterceptors(FilesInterceptor('files', 15, { dest: 'apps/api/uploads/vehicles' }))
+  @UseInterceptors(FilesInterceptor('files', 15, { dest: getUploadSubdir(__dirname, 'vehicles') }))
   async submitDeliveryEvidence(
     @CurrentUser() user: any,
     @Param('id') id: string,

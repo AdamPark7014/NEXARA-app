@@ -6,6 +6,7 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { InventoriesService } from './inventories.service.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
+import { getUploadSubdir } from '../common/upload-paths.js';
 
 @Controller('inventories')
 @UseGuards(RbacGuard)
@@ -35,7 +36,7 @@ export class InventoriesController {
 
   @Post('upload')
   @RBAC({ permissions: [PERMISSIONS.EVIDENCES_CREATE] })
-  @UseInterceptors(FilesInterceptor('files', 30, { dest: 'apps/api/uploads/inventory-media' }))
+  @UseInterceptors(FilesInterceptor('files', 30, { dest: getUploadSubdir(__dirname, 'inventory-media') }))
   uploadMedia(@UploadedFiles() files: any[]) {
     const urls = Array.isArray(files)
       ? files.map((file) => `/uploads/inventory-media/${file.filename}`)

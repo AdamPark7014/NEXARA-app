@@ -17,6 +17,7 @@ import { CurrentUser } from '../common/current-user.decorator.js';
 import { EmployeePaymentsService } from './employee-payments.service.js';
 import { CreateEmployeePaymentDto } from './dto/create-employee-payment.dto.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
+import { getUploadSubdir } from '../common/upload-paths.js';
 
 @Controller('employee-payments')
 export class EmployeePaymentsController {
@@ -42,7 +43,7 @@ export class EmployeePaymentsController {
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONTABILIDAD_MANAGE] })
   @Post()
-  @UseInterceptors(FilesInterceptor('files', 10, { dest: 'apps/api/uploads/employee-payments' }))
+  @UseInterceptors(FilesInterceptor('files', 10, { dest: getUploadSubdir(__dirname, 'employee-payments') }))
   create(
     @CurrentUser() user: any,
     @Body() body: CreateEmployeePaymentDto,

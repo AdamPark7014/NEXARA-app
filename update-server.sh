@@ -102,7 +102,7 @@ pm2 stop nexara-mobile || true
 echo "📥 Descargando últimos cambios..."
 git fetch origin main
 git reset --hard origin/main
-git clean -fd
+git clean -fd -e uploads/ -e uploads/** -e apps/api/uploads/ -e apps/api/uploads/**
 
 # 5. Restaurar archivos .env
 echo "📂 Restaurando archivos .env..."
@@ -117,6 +117,12 @@ NEXT_PUBLIC_SOCKET_URL=http://${PUBLIC_HOST}:${MOBILE_PORT}
 NEXT_PUBLIC_BASE_URL=http://${PUBLIC_HOST}:${MOBILE_PORT}
 NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API=false
 EOF
+
+echo "🗂️ Normalizando directorios de uploads..."
+mkdir -p uploads
+if [ -d apps/api/uploads ]; then
+  cp -rn apps/api/uploads/. uploads/ 2>/dev/null || true
+fi
 
 # Verificar que DATABASE_URL existe
 if ! grep -q "DATABASE_URL" apps/api/.env 2>/dev/null; then

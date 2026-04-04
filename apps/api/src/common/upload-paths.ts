@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as path from 'path';
 
 /**
@@ -41,4 +42,15 @@ export function getClientDocsUploadDir(dirname: string): string {
 export function getCvsUploadDir(dirname: string): string {
   const projectRoot = resolveProjectRoot(dirname);
   return path.join(projectRoot, 'uploads', 'cvs');
+}
+
+export function getUploadSubdir(dirname: string, subdir: string): string {
+  const projectRoot = resolveProjectRoot(dirname);
+  const dir = path.join(projectRoot, 'uploads', subdir);
+
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  return dir;
 }

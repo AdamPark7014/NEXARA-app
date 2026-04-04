@@ -21,6 +21,7 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
 import { ExcelImportService } from '../common/excel-import.service.js';
+import { getUploadSubdir } from '../common/upload-paths.js';
 
 @Controller('evidences')
 export class EvidencesController {
@@ -40,7 +41,7 @@ export class EvidencesController {
   @Post()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.EVIDENCES_CREATE] })
-  @UseInterceptors(FilesInterceptor('files', 15, { dest: 'apps/api/uploads/evidences' }))
+  @UseInterceptors(FilesInterceptor('files', 15, { dest: getUploadSubdir(__dirname, 'evidences') }))
   async create(
     @CurrentUser() user: any,
     @UploadedFiles() files: any[],

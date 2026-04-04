@@ -338,6 +338,7 @@ async function bootstrap() {
   const projectRoot = resolveProjectRoot();
 
   const uploadsPath = path.join(projectRoot, 'uploads');
+  const legacyUploadsPath = path.join(projectRoot, 'apps', 'api', 'uploads');
   const clientsPath = path.join(uploadsPath, 'clients');
   const cvsPath = path.join(uploadsPath, 'cvs');
   
@@ -390,6 +391,21 @@ async function bootstrap() {
   app.use(
     '/uploads',
     express.static(uploadsPath, {
+      index: false,
+      dotfiles: 'deny',
+      fallthrough: true,
+      etag: true,
+      maxAge: '1d',
+      setHeaders: (res) => {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      },
+    }),
+  );
+
+  app.use(
+    '/uploads',
+    express.static(legacyUploadsPath, {
       index: false,
       dotfiles: 'deny',
       fallthrough: false,
