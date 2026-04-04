@@ -6,6 +6,7 @@ const ensureApiBase = (value: string) => {
 
 const MOBILE_IP_API_HOST = '138.197.42.104';
 const MOBILE_APP_PORT = '3002';
+const MOBILE_API_PORT = '3001';
 
 const normalizeSocketOrigin = (baseUrl: string) => {
   try {
@@ -132,6 +133,34 @@ export const getApiBaseCandidates = () => {
 export const buildApiUrl = (path: string) => {
   const base = getApiBase().replace(/\/+$/, "");
   return `${base}/${path.replace(/^\/+/, "")}`;
+};
+
+export const getApiAssetOrigin = () => {
+  const envBase = process.env.NEXT_PUBLIC_API_URL;
+
+  if (typeof window !== "undefined" && window.location?.origin) {
+    const protocol = window.location.protocol;
+    const host = window.location.hostname.toLowerCase();
+    const port = window.location.port;
+
+    if (host === MOBILE_IP_API_HOST && port === MOBILE_APP_PORT) {
+      return `${protocol}//${host}:${MOBILE_API_PORT}`;
+    }
+
+    if (host === 'nexara.com.mx' || host === 'www.nexara.com.mx' || host === 'app.nexara.com.mx' || host.endsWith('.nexara.com.mx')) {
+      return `${protocol}//api.nexara.com.mx`;
+    }
+  }
+
+  if (envBase && envBase.trim()) {
+    try {
+      return new URL(ensureApiBase(envBase)).origin;
+    } catch {
+      // Fall through to getApiBase-based origin.
+    }
+  }
+
+  return getApiBase().replace(/\/+api\/?$/, "").replace(/\/+$/, "");
 };
 
 export const getSocketBaseUrl = () => {
