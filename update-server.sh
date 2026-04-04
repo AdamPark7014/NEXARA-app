@@ -127,13 +127,13 @@ fi
 
 # 6. Instalar dependencias del monorepo (workspaces)
 echo "📦 Instalando dependencias del monorepo..."
-npm install --legacy-peer-deps
+npm install --include=dev --legacy-peer-deps
 
 # 7. Actualizar Backend (API)
 echo "🔧 Actualizando Backend..."
 cd apps/api
-npx prisma generate
-npx prisma migrate deploy
+npm run prisma:generate
+npm run prisma:deploy
 node ../../scripts/clear-build-cache.js api
 run_build_serial "Backend" npm run build
 
