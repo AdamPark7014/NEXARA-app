@@ -13,6 +13,7 @@ import { ServiceClientsService } from '../service-clients/service-clients.servic
 import { ActivitiesService } from '../activities/activities.service.js';
 import { InventoriesService } from '../inventories/inventories.service.js';
 import { Request } from 'express';
+import { getUploadSubdir } from '../common/upload-paths.js';
 
 const ensureBranchUploadsDir = () => {
   const segments = __dirname.split(path.sep);
@@ -503,7 +504,7 @@ export class ClientPortalController {
   }
 
   @Post('inventories/upload')
-  @UseInterceptors(FilesInterceptor('files', 30, { dest: 'apps/api/uploads/inventory-media' }))
+  @UseInterceptors(FilesInterceptor('files', 30, { dest: getUploadSubdir(__dirname, 'inventory-media') }))
   async uploadInventoryMedia(@UploadedFiles() files: any[]) {
     const urls = Array.isArray(files)
       ? files.map((file) => `/uploads/inventory-media/${file.filename}`)

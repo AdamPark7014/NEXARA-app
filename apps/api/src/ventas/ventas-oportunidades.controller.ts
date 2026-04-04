@@ -23,6 +23,7 @@ import { CreateSalesOpportunityNoteDto } from './dto/create-sales-opportunity-no
 import { CreateSalesOpportunityQuoteDto } from './dto/create-sales-opportunity-quote.dto.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { getUploadSubdir } from '../common/upload-paths.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { SalesPaginationQueryDto } from './dto/sales-pagination-query.dto.js';
 
@@ -121,7 +122,7 @@ export class VentasOportunidadesController {
   @Post(':id/evidencias')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
-  @UseInterceptors(FilesInterceptor('files', 15, { dest: 'apps/api/uploads/sales-evidences' }))
+  @UseInterceptors(FilesInterceptor('files', 15, { dest: getUploadSubdir(__dirname, 'sales-evidences') }))
   async addEvidence(
     @Param('id', ParseIntPipe) id: number,
     @UploadedFiles() files: any[],
@@ -176,7 +177,7 @@ export class VentasOportunidadesController {
   @Post(':id/cotizaciones/archivo')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
-  @UseInterceptors(FileInterceptor('file', { dest: 'apps/api/uploads/sales-quotes' }))
+  @UseInterceptors(FileInterceptor('file', { dest: getUploadSubdir(__dirname, 'sales-quotes') }))
   async addQuoteFile(
     @Param('id', ParseIntPipe) id: number,
     @UploadedFile() file: any,

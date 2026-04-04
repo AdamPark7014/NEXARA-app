@@ -22,6 +22,7 @@ import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { SalesPaginationQueryDto } from './dto/sales-pagination-query.dto.js';
+import { getUploadSubdir } from '../common/upload-paths.js';
 
 const SALES_VIEW_ACCESS = [PERMISSIONS.SALES_VIEW, PERMISSIONS.PANEL_VENTAS];
 const SALES_MANAGE_ACCESS = [PERMISSIONS.SALES_MANAGE, PERMISSIONS.PANEL_VENTAS];
@@ -91,7 +92,7 @@ export class VentasClientesController {
   @Post(':id/documentos')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
-  @UseInterceptors(FilesInterceptor('files', 10, { dest: 'apps/api/uploads/sales-docs' }))
+  @UseInterceptors(FilesInterceptor('files', 10, { dest: getUploadSubdir(__dirname, 'sales-docs') }))
   async uploadDocuments(
     @Param('id', ParseIntPipe) id: number,
     @Body('type') type: string,
