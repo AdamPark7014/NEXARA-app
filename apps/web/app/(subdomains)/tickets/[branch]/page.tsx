@@ -29,7 +29,7 @@ type BranchProfile = {
   placeId?: string | null;
   latitud?: number | null;
   longitud?: number | null;
-  client?: { name?: string | null } | null;
+  client?: { name?: string | null; logoUrl?: string | null } | null;
 };
 
 type BranchRequest = {
@@ -131,7 +131,7 @@ export default function BranchTicketsPage() {
 
     return `${base}${raw.startsWith("/") ? "" : "/"}${raw}`;
   };
-  const branchAvatarUrl = profile?.logoUrl || session?.branch?.logoUrl || "";
+  const branchAvatarUrl = profile?.logoUrl || profile?.client?.logoUrl || session?.branch?.logoUrl || "";
 
   useEffect(() => {
     setAvatarLoadError(false);
