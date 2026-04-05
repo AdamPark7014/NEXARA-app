@@ -382,6 +382,10 @@ export class UsersService {
     if (data.employeeNumber !== undefined) {
       data.employeeNumber = await this.resolveEmployeeNumber(data.employeeNumber, id, id);
     }
+    if (data.avatarUrl !== undefined) {
+      const normalizedAvatar = String(data.avatarUrl ?? '').trim();
+      data.avatarUrl = normalizedAvatar ? normalizedAvatar : null;
+    }
     return this.prisma['user'].update({
       where: { id },
       data,

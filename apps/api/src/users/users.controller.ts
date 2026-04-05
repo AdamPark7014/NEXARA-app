@@ -8,7 +8,7 @@ import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { getUsersUploadDir, getUserDocsUploadDir } from '../common/upload-paths.js';
-import { createReadStream, existsSync } from 'node:fs';
+import { createReadStream, existsSync, unlinkSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { Response } from 'express';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
@@ -262,11 +262,31 @@ export class UsersController {
     @Body() updateUserDto: UpdateUserDto,
     @UploadedFile() file?: any,
   ) {
-    // Solo CEO o supervisor de su departamento
-    if (file) {
-      updateUserDto.avatarUrl = `/uploads/users/${file.filename}`;
-    }
-    return this.usersService.update(+id, updateUserDto);
+    const userId = +id;
+    return this.usersService.findOne(userId).then(async (existingUser) => {
+      const previousAvatar = String(existingUser?.avatarUrl || '').trim();
+
+      if (file) {
+        updateUserDto.avatarUrl = `/uploads/users/${file.filename}`;
+      }
+
+      const updated = await this.usersService.update(userId, updateUserDto);
+      const nextAvatar = String(updated?.avatarUrl || '').trim();
+
+      if (previousAvatar && previousAvatar !== nextAvatar && previousAvatar.startsWith('/uploads/users/')) {
+        const oldFileName = basename(previousAvatar);
+        const oldFilePath = join(this.usersUploadDir, oldFileName);
+        if (existsSync(oldFilePath)) {
+          try {
+            unlinkSync(oldFilePath);
+          } catch {
+            // Ignore cleanup failures; avatar update already succeeded.
+          }
+        }
+      }
+
+      return updated;
+    });
   }
 
   @Delete(':id')
