@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import UserForm from "./UserForm";
 import { useUser } from '@/components/UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
+import { getApiAssetOrigin } from '@/lib/api-base';
 
 let API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 // Normaliza la URL base para evitar dobles / o .
@@ -134,22 +135,25 @@ export default function ListUsers() {
     return baseKey;
   };
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
+  const API_ASSET_ORIGIN = getApiAssetOrigin();
   const getAssetUrl = (url?: string | null) => {
     if (!url) return '';
-    const base = API_URL.replace(/\/+api\/?$/, '');
-    if (url.startsWith('http')) {
+    const value = String(url).trim().replace(/\\/g, '/');
+    if (/^(data:|blob:|\/\/)/i.test(value)) return value;
+    if (/^https?:\/\//i.test(value)) {
       try {
-        const parsed = new URL(url);
-        if (parsed.pathname.startsWith('/uploads/')) {
-          return `${base}${parsed.pathname}${parsed.search}`;
+        const parsed = new URL(value);
+        const normalizedPath = parsed.pathname.replace(/^\/api(?=\/uploads\/)/i, '');
+        if (normalizedPath.startsWith('/uploads/')) {
+          return `${API_ASSET_ORIGIN}${normalizedPath}${parsed.search}`;
         }
       } catch {
         // Keep original URL if parsing fails.
       }
-      return url;
+      return value;
     }
-    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+    const normalizedPath = (value.startsWith('/') ? value : `/${value}`).replace(/^\/api(?=\/uploads\/)/i, '');
+    return `${API_ASSET_ORIGIN}${normalizedPath}`;
   };
 
   const getDocExtension = (url: string) => {

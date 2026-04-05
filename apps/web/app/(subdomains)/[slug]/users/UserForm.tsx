@@ -9,6 +9,7 @@ import Image from "next/image";
 import { useUser } from '@/components/UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import { createUser } from "./api";
+import { getApiAssetOrigin } from '@/lib/api-base';
 
 
 // Extiende el tipo de initialUser para que su role incluya los campos de acceso
@@ -90,12 +91,27 @@ export default function UserForm({
   let API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
   API_URL = API_URL.replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
+  const API_ASSET_ORIGIN = getApiAssetOrigin();
   
   // Helper para obtener la ruta del avatar
   const getFullImageUrl = (url: string | undefined) => {
     if (!url) return '';
-    // Retornar la ruta relativa, el servidor la servirá correctamente
-    return url.startsWith('/') ? url : `/${url}`;
+    const value = String(url).trim().replace(/\\/g, '/');
+    if (/^(data:|blob:|\/\/)/i.test(value)) return value;
+    if (/^https?:\/\//i.test(value)) {
+      try {
+        const parsed = new URL(value);
+        const normalizedPath = parsed.pathname.replace(/^\/api(?=\/uploads\/)/i, '');
+        if (normalizedPath.startsWith('/uploads/')) {
+          return `${API_ASSET_ORIGIN}${normalizedPath}${parsed.search}`;
+        }
+      } catch {
+        // Keep original URL if parsing fails.
+      }
+      return value;
+    }
+    const normalizedPath = (value.startsWith('/') ? value : `/${value}`).replace(/^\/api(?=\/uploads\/)/i, '');
+    return `${API_ASSET_ORIGIN}${normalizedPath}`;
   };
 
   const prefillName = searchParams.get('prefillName') || '';

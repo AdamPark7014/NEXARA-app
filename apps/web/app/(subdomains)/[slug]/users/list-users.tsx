@@ -4,6 +4,7 @@ import UserForm from "./UserForm";
 import Image from "next/image";
 import { useUser } from '@/components/UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
+import { getApiAssetOrigin } from '@/lib/api-base';
 
 let API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 // Normaliza la URL base para evitar dobles / o .
@@ -136,11 +137,25 @@ export default function ListUsers() {
     return baseKey;
   };
 
+  const API_ASSET_ORIGIN = getApiAssetOrigin();
   const getAssetUrl = (url?: string | null) => {
     if (!url) return '';
-    if (url.startsWith('http')) return url;
-    const base = API_URL.replace(/\/+api\/?$/, '');
-    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+    const value = String(url).trim().replace(/\\/g, '/');
+    if (/^(data:|blob:|\/\/)/i.test(value)) return value;
+    if (/^https?:\/\//i.test(value)) {
+      try {
+        const parsed = new URL(value);
+        const normalizedPath = parsed.pathname.replace(/^\/api(?=\/uploads\/)/i, '');
+        if (normalizedPath.startsWith('/uploads/')) {
+          return `${API_ASSET_ORIGIN}${normalizedPath}${parsed.search}`;
+        }
+      } catch {
+        // Keep original URL if parsing fails.
+      }
+      return value;
+    }
+    const normalizedPath = (value.startsWith('/') ? value : `/${value}`).replace(/^\/api(?=\/uploads\/)/i, '');
+    return `${API_ASSET_ORIGIN}${normalizedPath}`;
   };
 
   const handleSecureDocumentAction = async (documentId: number, mode: 'view' | 'download') => {

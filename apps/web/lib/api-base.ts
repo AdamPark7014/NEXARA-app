@@ -4,6 +4,10 @@ const ensureApiBase = (value: string) => {
   return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
 };
 
+const WEB_IP_API_HOST = '138.197.42.104';
+const WEB_APP_PORT = '3002';
+const WEB_API_PORT = '3001';
+
 const normalizeSocketOrigin = (baseUrl: string) => {
   try {
     const parsed = new URL(baseUrl);
@@ -78,6 +82,11 @@ export const getApiAssetOrigin = () => {
   if (typeof window !== "undefined" && window.location?.origin) {
     const protocol = window.location.protocol;
     const host = window.location.hostname.toLowerCase();
+    const port = window.location.port;
+
+    if (host === WEB_IP_API_HOST && port === WEB_APP_PORT) {
+      return `${protocol}//${host}:${WEB_API_PORT}`;
+    }
 
     if (
       host === "nexara.com.mx" ||
