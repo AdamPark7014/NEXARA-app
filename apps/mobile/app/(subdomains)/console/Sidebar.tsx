@@ -128,7 +128,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
     }
 
     if (isIngeniero) {
-      if (!item.href.startsWith("/my-") && !["/cotizaciones", "/cvs", "/ventas", "/tools"].includes(item.href)) {
+      if (!item.href.startsWith("/my-") && !["/cotizaciones", "/cvs", "/ventas", "/tools", "/attendance"].includes(item.href)) {
         return false;
       }
       if (item.href === "/cotizaciones" && !extraAccess.accesoCotizaciones) return false;
@@ -137,7 +137,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
     }
 
     if (isVendedor) {
-      if (item.href !== "/ventas" && !["/cotizaciones", "/cvs", "/tools"].includes(item.href)) {
+      if (item.href !== "/ventas" && !["/cotizaciones", "/cvs", "/tools", "/attendance"].includes(item.href)) {
         return false;
       }
       if (item.href === "/cotizaciones" && !extraAccess.accesoCotizaciones) return false;

@@ -19,35 +19,21 @@ export const triggerFileDownload = (
   const { preferOpenOnMobile = true } = options;
   const shouldOpenMobile = preferOpenOnMobile && isLikelyMobileDevice();
 
-  if (shouldOpenMobile) {
-    const popup = window.open(fileUrl, "_blank", "noopener,noreferrer");
-    if (popup) return;
-  }
-
   const link = document.createElement("a");
   link.href = fileUrl;
   link.rel = "noopener noreferrer";
 
-  if (!shouldOpenMobile) {
-    link.download = fileName;
-  } else {
+  // En mobile forzamos descarga real para evitar visor recortado y archivos no guardados.
+  link.download = fileName;
+
+  // Mantener compatibilidad: sólo abrir en pestaña si se pide explícitamente.
+  if (shouldOpenMobile && !fileName) {
     link.target = "_blank";
   }
 
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-
-  if (shouldOpenMobile) {
-    // Fallback para WebViews que bloquean click programático sin gesto directo.
-    setTimeout(() => {
-      try {
-        window.location.href = fileUrl;
-      } catch {
-        // Ignore navigation fallback errors.
-      }
-    }, 120);
-  }
 };
 
 export const revokeObjectUrlLater = (objectUrl?: string | null, delayMs = 60000) => {

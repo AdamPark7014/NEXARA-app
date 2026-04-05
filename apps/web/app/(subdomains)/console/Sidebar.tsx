@@ -136,7 +136,7 @@ export default function Sidebar() {
     }
     // Ingeniero: solo vistas personales y módulos extra habilitados
     if (isIngeniero) {
-      if (!item.href.startsWith('/my-') && !["/dashboard", "/cotizaciones", "/cvs", "/ventas"].includes(item.href)) return false;
+      if (!item.href.startsWith('/my-') && !["/dashboard", "/cotizaciones", "/cvs", "/ventas", "/attendance"].includes(item.href)) return false;
       if (item.href === "/cotizaciones" && !(canAccessCotizaciones || canAccessCotizacionesByRole)) return false;
       if (item.href === "/cvs" && !(canAccessCvs || canAccessCvsByRole)) return false;
       if (item.href === "/ventas" && !(canAccessVentas || canAccessVentasByRole)) return false;
@@ -144,7 +144,7 @@ export default function Sidebar() {
     }
     // Vendedor: solo ventas y módulos extra habilitados
     if (isVendedor) {
-      if (!item.href.startsWith('/my-') && !["/dashboard", "/ventas", "/cotizaciones", "/cvs"].includes(item.href)) return false;
+      if (!item.href.startsWith('/my-') && !["/dashboard", "/ventas", "/cotizaciones", "/cvs", "/attendance"].includes(item.href)) return false;
       if (item.href === "/cotizaciones" && !(canAccessCotizaciones || canAccessCotizacionesByRole)) return false;
       if (item.href === "/cvs" && !(canAccessCvs || canAccessCvsByRole)) return false;
       if (item.href === "/ventas" && !(canAccessVentas || canAccessVentasByRole)) return false;

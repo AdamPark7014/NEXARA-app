@@ -449,10 +449,11 @@ export class AttendanceService {
   /**
   * Obtiene usuarios accesibles según la jerarquía del usuario actual
    * - Superadmin (gerencia/developer): Ve todos los usuarios
-   * - Console admin (ATTENDANCE_MANAGE): Ve todos los usuarios
-   * - Otros: No tiene acceso a esta funcion
+    * - Console admin (CONSOLE_ADMIN): Ve todos los usuarios
+    * - Usuario con ATTENDANCE_MANAGE sin CONSOLE_ADMIN: Solo su propio usuario
+    * - Otros: No tiene acceso a esta funcion
    * 
-   * NOTA: El filtrado de superadmins se hace en getHierarchyAttendanceRange
+    * NOTA: El filtrado final por tipo de usuario se hace en getHierarchyAttendanceRange
    */
   private async getAccessibleUsers(
     currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean },
@@ -460,50 +461,31 @@ export class AttendanceService {
     if (!currentUser?.id) {
       throw new BadRequestException('Usuario no autenticado');
     }
-    if (!currentUser.isSuperAdmin && !currentUser.permissions?.includes(PERMISSIONS.ATTENDANCE_MANAGE)) {
+    const isSuperAdmin = Boolean(currentUser.isSuperAdmin);
+    const isConsoleAdmin = Boolean(currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN));
+    const canManageAttendance = Boolean(currentUser.permissions?.includes(PERMISSIONS.ATTENDANCE_MANAGE));
+
+    if (!isSuperAdmin && !isConsoleAdmin && !canManageAttendance) {
       throw new ForbiddenException(
         'Tu nivel no te permite ver estadísticas de otros usuarios',
       );
     }
 
-    if (currentUser.isSuperAdmin || currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
+    if (isSuperAdmin || isConsoleAdmin) {
       return this.prisma.user.findMany({
         include: { role: true, department: true },
         orderBy: { nombre: 'asc' },
       });
     }
 
-    const canSeeContabilidad = currentUser.permissions?.includes(PERMISSIONS.CONTABILIDAD_VIEW)
-      || currentUser.permissions?.includes(PERMISSIONS.CONTABILIDAD_MANAGE);
-
-    if (canSeeContabilidad) {
-      return this.prisma.user.findMany({
-        where: {
-          role: {
-            OR: [
-              { accesoConsole: true },
-              { accesoConsoleAdmin: true },
-              { accesoGestionUsuarios: true },
-              { accesoGestionWeb: true },
-              { accesoGestionTienda: true },
-            ],
-          },
-          NOT: {
-            email: { in: ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'] },
-          },
-        },
-        include: { role: true, department: true },
-        orderBy: { nombre: 'asc' },
-      });
-    }
-
+    // Usuario con attendance.manage pero sin privilegios de consola:
+    // solo puede consultar su propia información.
     return this.prisma.user.findMany({
-      where: {
-        OR: [{ id: currentUser.id }, { departmentId: currentUser.departmentId }],
-      },
+      where: { id: currentUser.id },
       include: { role: true, department: true },
       orderBy: { nombre: 'asc' },
     });
+
   }
 
   /**

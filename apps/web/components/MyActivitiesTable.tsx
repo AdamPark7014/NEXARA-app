@@ -34,10 +34,15 @@ interface Activity {
     rejectedStep?: string;
     reviewNotes?: string;
     entryPhotoUrl?: string;
+    entryPhotoUploadedAt?: string;
     evidencePhotos: string[];
     serviceSheetPdfUrl?: string;
     exitPhotoUrl?: string;
+    exitPhotoUploadedAt?: string;
+    serviceSheetCompletedAt?: string;
     completedAt?: string;
+    createdAt?: string;
+    updatedAt?: string;
   } | null;
 }
 
@@ -107,6 +112,18 @@ const MyActivitiesTable: React.FC = () => {
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  const getEvidenceStartTime = (activity: Activity) => {
+    return activity.activityEvidence?.entryPhotoUploadedAt || '-';
+  };
+
+  const getEvidenceEndTime = (activity: Activity) => {
+    return (
+      activity.activityEvidence?.exitPhotoUploadedAt ||
+      activity.activityEvidence?.completedAt ||
+      '-'
+    );
   };
 
   const getMapsUrl = (activity: Activity) => {
@@ -270,7 +287,7 @@ const MyActivitiesTable: React.FC = () => {
                   {isAdmin && <th>Acciones</th>}
                   {!isAdmin && <th>Corrección</th>}
                   <th>Inicio</th>
-                  <th>Entrega</th>
+                  <th>Fin</th>
                   <th>Estimado/Max</th>
                   <th>Indicaciones</th>
                   <th>Mapa</th>
@@ -340,8 +357,8 @@ const MyActivitiesTable: React.FC = () => {
                         </td>
                       )}
                       
-                      <td>{formatDateTime(a.fechaInicio)}</td>
-                      <td>{formatDateTime(a.fechaEntregaEsperada)}</td>
+                      <td>{formatDateTime(getEvidenceStartTime(a))}</td>
+                      <td>{formatDateTime(getEvidenceEndTime(a))}</td>
                       <td>{a.tiempoEstimadoMin || 0}/{a.tiempoMaximoMin || 0}</td>
                       <td>{a.indicaciones || '-'}</td>
                       <td>
@@ -421,11 +438,11 @@ const MyActivitiesTable: React.FC = () => {
                       </div>
                       <div>
                         <div className={styles.mobileInfoLabel}>Inicio</div>
-                        <div className={styles.mobileInfoValue}>{formatDateTime(a.fechaInicio)}</div>
+                        <div className={styles.mobileInfoValue}>{formatDateTime(getEvidenceStartTime(a))}</div>
                       </div>
                       <div>
-                        <div className={styles.mobileInfoLabel}>Entrega</div>
-                        <div className={styles.mobileInfoValue}>{formatDateTime(a.fechaEntregaEsperada)}</div>
+                        <div className={styles.mobileInfoLabel}>Fin</div>
+                        <div className={styles.mobileInfoValue}>{formatDateTime(getEvidenceEndTime(a))}</div>
                       </div>
                       <div>
                         <div className={styles.mobileInfoLabel}>Tiempo Est/Max</div>
