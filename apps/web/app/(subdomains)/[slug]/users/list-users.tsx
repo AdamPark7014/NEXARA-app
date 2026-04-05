@@ -20,6 +20,7 @@ export type User = {
   id: number;
   nombre: string;
   email: string;
+  employeeNumber?: string;
   avatarUrl?: string;
   role: {
     id: number;
@@ -133,6 +134,13 @@ export default function ListUsers() {
     if (baseKey === 'licencia') return 'licencia de conducir';
     if (baseKey === 'contrato') return 'contrato o alta';
     return baseKey;
+  };
+
+  const getAssetUrl = (url?: string | null) => {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    const base = API_URL.replace(/\/+api\/?$/, '');
+    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
   };
 
   const handleSecureDocumentAction = async (documentId: number, mode: 'view' | 'download') => {
@@ -354,14 +362,19 @@ export default function ListUsers() {
               <tr key={u.id}>
                 <td data-label="Foto">
                   {u.avatarUrl ? (
-                    <Image src={u.avatarUrl} alt={u.nombre} width={40} height={40} style={{ borderRadius: "50%", objectFit: "cover" }} unoptimized />
+                    <Image src={getAssetUrl(u.avatarUrl)} alt={u.nombre} width={40} height={40} style={{ borderRadius: "50%", objectFit: "cover" }} unoptimized />
                   ) : (
                     <span style={{ width: 40, height: 40, display: "inline-block", borderRadius: "50%", background: "var(--muted)", textAlign: "center", lineHeight: "40px", color: "var(--primary)", fontWeight: 700 }}>
                       {u.nombre[0]}
                     </span>
                   )}
                 </td>
-                <td data-label="Nombre">{u.nombre}</td>
+                <td data-label="Nombre">
+                  <div style={{ display: 'grid', gap: 2 }}>
+                    <span>{u.nombre}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{u.employeeNumber || `NXR25SYS${String(u.id).padStart(3, '0')}`}</span>
+                  </div>
+                </td>
                 <td data-label="Email">{u.email}</td>
                 <td data-label="Rol">{u.role?.nombre}</td>
                 <td data-label="Departamento">{u.department?.nombre}</td>
@@ -426,7 +439,7 @@ export default function ListUsers() {
             <button onClick={() => setProfileModalOpen(false)} className="profileModalClose" aria-label="Cerrar">✕</button>
             <div className="profileModalHeader">
               {profileUser?.avatarUrl ? (
-                <Image src={profileUser.avatarUrl} alt={profileUser.nombre} width={56} height={56} style={{ borderRadius: '50%', objectFit: 'cover' }} unoptimized />
+                <Image src={getAssetUrl(profileUser.avatarUrl)} alt={profileUser.nombre} width={56} height={56} style={{ borderRadius: '50%', objectFit: 'cover' }} unoptimized />
               ) : (
                 <div className="profileAvatarFallback">
                   {profileUser?.nombre?.[0] || 'U'}
@@ -466,6 +479,7 @@ export default function ListUsers() {
                   </div>
                   <div className="profileCard">
                     <div className="profileSectionTitle">Datos personales</div>
+                    <div>No. de Empleado: {profileUser?.employeeNumber || (profileUser?.id ? `NXR25SYS${String(profileUser.id).padStart(3, '0')}` : '-')}</div>
                     <div>Teléfono: {profileData?.perfil?.telefono || '-'}</div>
                     <div>Fecha nacimiento: {profileData?.perfil?.fechaNacimiento || '-'}</div>
                     <div>CURP: {profileData?.perfil?.curp || '-'}</div>

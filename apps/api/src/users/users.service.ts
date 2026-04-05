@@ -9,6 +9,54 @@ import { PERMISSIONS } from '../common/permissions.js';
 @Injectable()
 export class UsersService {
   private readonly superAdminEmails = ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'];
+  private readonly employeeNumberPrefix = 'NXR25SYS';
+
+  private normalizeEmployeeNumber(value?: string | null) {
+    const normalized = String(value || '').trim().toUpperCase().replace(/\s+/g, '');
+    return normalized || null;
+  }
+
+  private formatEmployeeNumberFromId(id: number) {
+    const safeId = Number.isFinite(id) && id > 0 ? id : 0;
+    return `${this.employeeNumberPrefix}${String(safeId).padStart(3, '0')}`;
+  }
+
+  private withEmployeeNumber<T extends { id: number; employeeNumber?: string | null }>(item: T) {
+    return {
+      ...item,
+      employeeNumber: this.normalizeEmployeeNumber(item.employeeNumber) || this.formatEmployeeNumberFromId(item.id),
+    };
+  }
+
+  private withEmployeeNumberList<T extends { id: number; employeeNumber?: string | null }>(items: T[]) {
+    return items.map((item) => this.withEmployeeNumber(item));
+  }
+
+  private async resolveEmployeeNumber(employeeNumber: string | undefined, fallbackId: number, excludeUserId?: number) {
+    const normalized = this.normalizeEmployeeNumber(employeeNumber) || this.formatEmployeeNumberFromId(fallbackId);
+    const existing = await this.prisma['user'].findFirst({
+      where: {
+        employeeNumber: normalized,
+        ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
+      },
+      select: { id: true },
+    });
+
+    if (existing) {
+      throw new BadRequestException('El numero de empleado ya existe');
+    }
+
+    return normalized;
+  }
+
+  async getNextEmployeeNumber() {
+    const lastUser = await this.prisma['user'].findFirst({
+      orderBy: { id: 'desc' },
+      select: { id: true },
+    });
+    const nextId = (lastUser?.id || 0) + 1;
+    return this.formatEmployeeNumberFromId(nextId);
+  }
 
   // Obtener un rol por ID
   async getRoleById(roleId: unknown) {
@@ -48,9 +96,14 @@ export class UsersService {
         this.prisma['user'].findMany({ where, include, skip: query.skip, take: query.take }),
         this.prisma['user'].count({ where }),
       ]);
-      return buildPaginatedResponse(data, total, query);
+      const paginated = buildPaginatedResponse(data, total, query);
+      return {
+        ...paginated,
+        data: this.withEmployeeNumberList(paginated.data || []),
+      };
     }
-    return this.prisma['user'].findMany({ where, include });
+    const users = await this.prisma['user'].findMany({ where, include });
+    return this.withEmployeeNumberList(users);
   }
   constructor(private readonly prisma: PrismaService) {}
 
@@ -90,7 +143,7 @@ export class UsersService {
     const roleId = await this.resolveRoleId(createUserDto.roleId);
     const departmentId = await this.resolveDepartmentId(createUserDto.departmentId);
     if (!departmentId) throw new BadRequestException('Departamento requerido');
-    return this.prisma['user'].create({
+    const createdUser = await this.prisma['user'].create({
       data: {
         nombre: createUserDto.nombre,
         email: createUserDto.email,
@@ -100,6 +153,12 @@ export class UsersService {
         passwordHash: hash,
       },
     });
+    const employeeNumber = await this.resolveEmployeeNumber(createUserDto.employeeNumber, createdUser.id, createdUser.id);
+    const updatedUser = await this.prisma['user'].update({
+      where: { id: createdUser.id },
+      data: { employeeNumber },
+    });
+    return this.withEmployeeNumber(updatedUser);
   }
 
 
@@ -111,11 +170,16 @@ export class UsersService {
         this.prisma['user'].findMany({ where, include, skip: query.skip, take: query.take, orderBy: { fechaCreacion: 'desc' } }),
         this.prisma['user'].count({ where }),
       ]);
-      return buildPaginatedResponse(data, total, query);
+      const paginated = buildPaginatedResponse(data, total, query);
+      return {
+        ...paginated,
+        data: this.withEmployeeNumberList(paginated.data || []),
+      };
     }
-    return this.prisma['user'].findMany({
+    const users = await this.prisma['user'].findMany({
       include,
     });
+    return this.withEmployeeNumberList(users);
   }
 
   async findAssignableUsers(currentUser: { id: number; departmentId: number; permissions?: string[]; isSuperAdmin?: boolean; role?: any }) {
@@ -188,7 +252,7 @@ export class UsersService {
     return this.prisma['user'].findUnique({
       where: { id },
       include: { role: true, department: true },
-    });
+    }).then((user) => (user ? this.withEmployeeNumber(user) : user));
   }
 
   async getProfile(userId: number) {
@@ -315,10 +379,13 @@ export class UsersService {
     if (data.departmentId !== undefined) {
       data.departmentId = await this.resolveDepartmentId(data.departmentId);
     }
+    if (data.employeeNumber !== undefined) {
+      data.employeeNumber = await this.resolveEmployeeNumber(data.employeeNumber, id, id);
+    }
     return this.prisma['user'].update({
       where: { id },
       data,
-    });
+    }).then((user) => this.withEmployeeNumber(user));
   }
 
   remove(id: number) {

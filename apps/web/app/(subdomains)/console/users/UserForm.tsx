@@ -1,5 +1,5 @@
 "use client";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Cropper from "react-easy-crop";
 import Slider from "@mui/material/Slider";
 import Modal from "@mui/material/Modal";
@@ -29,9 +29,50 @@ export type UserFormInitialUser = {
   id?: number;
   nombre?: string;
   email?: string;
+  employeeNumber?: string;
   role?: UserRole;
   department?: { id?: number; nombre: string };
   avatarUrl?: string;
+};
+
+const EMAIL_DOMAIN = "nexara.com.mx";
+const EMPLOYEE_NUMBER_PREFIX = "NXR25SYS";
+const EMAIL_JOINER_STOPWORDS = new Set(["de", "del", "la", "las", "los", "y"]);
+
+const normalizeEmailToken = (value: string) => value
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .toLowerCase()
+  .replace(/[^a-z0-9\s]/g, " ")
+  .trim();
+
+const suggestConsoleEmail = (name: string) => {
+  const tokens = normalizeEmailToken(name).split(/\s+/).filter(Boolean);
+  if (!tokens.length) return "";
+  const [firstToken, ...restTokens] = tokens;
+  const compactRest = restTokens.filter((token) => !EMAIL_JOINER_STOPWORDS.has(token)).join("");
+  const localPart = [firstToken, compactRest].filter(Boolean).join(".");
+  return `${localPart || firstToken}@${EMAIL_DOMAIN}`;
+};
+
+const formatEmployeeNumberFromId = (id: number) => `${EMPLOYEE_NUMBER_PREFIX}${String(Math.max(1, id)).padStart(3, "0")}`;
+
+const createPasswordSeed = () => {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@$%";
+  if (typeof globalThis !== "undefined" && globalThis.crypto?.getRandomValues) {
+    const bytes = new Uint8Array(6);
+    globalThis.crypto.getRandomValues(bytes);
+    return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
+  }
+  return Math.random().toString(36).slice(-6);
+};
+
+const buildSuggestedPassword = (name: string, employeeNumber?: string, seed = "") => {
+  const token = normalizeEmailToken(name).split(/\s+/).filter(Boolean)[0] || "nexara";
+  const readable = `${token.charAt(0).toUpperCase()}${token.slice(1, 10)}`;
+  const numericSuffix = String(employeeNumber || "").replace(/\D/g, "").slice(-3);
+  const fallbackSuffix = `${new Date().getMonth() + 1}${new Date().getDate()}`.padStart(4, "0");
+  return `${readable}@${numericSuffix || fallbackSuffix}${seed}`;
 };
 
 export default function UserForm({
@@ -65,6 +106,7 @@ export default function UserForm({
   const [form, setForm] = useState({
     nombre: initialUser?.nombre || (!isEdit ? prefillName : ""),
     email: initialUser?.email || (!isEdit ? prefillEmail : ""),
+    employeeNumber: initialUser?.employeeNumber || "",
     password: "",
     departmentId: initialUser?.department?.id ? String(initialUser.department.id) : "",
     department: initialUser?.department?.nombre || "",
@@ -91,9 +133,68 @@ export default function UserForm({
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<{ width: number; height: number; x: number; y: number } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [employeeNumberPreview, setEmployeeNumberPreview] = useState("");
   const [dragActive, setDragActive] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [emailManuallyEdited, setEmailManuallyEdited] = useState(Boolean(initialUser?.email || (!isEdit ? prefillEmail : "")));
+  const [passwordManuallyEdited, setPasswordManuallyEdited] = useState(false);
+  const [passwordSeed] = useState(() => createPasswordSeed());
   const fileInput = useRef<HTMLInputElement>(null);
+
+  const loadNextEmployeeNumber = async () => {
+    if (isEdit || !user?.token) return;
+    try {
+      let nextValue = "";
+      const res = await fetch(buildApiUrl('users/next-employee-number'), {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      if (res.ok) {
+        const payload = await res.json();
+        nextValue = String(payload?.employeeNumber || '').trim();
+      }
+      if (!nextValue) {
+        const usersRes = await fetch(buildApiUrl('users?limit=5000'), {
+          headers: { Authorization: `Bearer ${user.token}` },
+        });
+        if (usersRes.ok) {
+          const usersPayload = await usersRes.json();
+          const users = Array.isArray(usersPayload)
+            ? usersPayload
+            : Array.isArray(usersPayload?.data)
+              ? usersPayload.data
+              : Array.isArray(usersPayload?.items)
+                ? usersPayload.items
+                : [];
+          const maxId = users.reduce((highest: number, item: any) => Math.max(highest, Number(item?.id) || 0), 0);
+          nextValue = formatEmployeeNumberFromId(maxId + 1);
+        }
+      }
+      if (nextValue) {
+        setEmployeeNumberPreview(nextValue);
+        setForm((prev) => {
+          const resolvedEmployeeNumber = prev.employeeNumber || nextValue;
+          return {
+            ...prev,
+            employeeNumber: resolvedEmployeeNumber,
+            password: !passwordManuallyEdited && !prev.password
+              ? buildSuggestedPassword(prev.nombre, resolvedEmployeeNumber, passwordSeed)
+              : prev.password,
+          };
+        });
+      }
+    } catch {
+      setForm((prev) => ({
+        ...prev,
+        password: !passwordManuallyEdited && !prev.password
+          ? buildSuggestedPassword(prev.nombre, prev.employeeNumber || employeeNumberPreview, passwordSeed)
+          : prev.password,
+      }));
+    }
+  };
+
+  useEffect(() => {
+    void loadNextEmployeeNumber();
+  }, [isEdit, user?.token]);
 
   if (!user || !hasPermission(user, PERMISSIONS.USERS_MANAGE)) return null;
 
@@ -101,8 +202,24 @@ export default function UserForm({
     const target = e.target as HTMLInputElement;
     const { name, value, type } = target;
     const nextValue = type === "checkbox" ? target.checked : value;
+    if (name === "email") {
+      setEmailManuallyEdited(true);
+    }
+    if (name === "password") {
+      setPasswordManuallyEdited(true);
+    }
     setForm((prev) => {
       let nextForm = { ...prev, [name]: nextValue };
+      if (name === "nombre" && !isEdit && !emailManuallyEdited) {
+        nextForm = { ...nextForm, email: suggestConsoleEmail(String(nextValue || "")) };
+      }
+      if (!isEdit && !passwordManuallyEdited && (name === "nombre" || name === "employeeNumber")) {
+        const suggestedEmployeeNumber = name === "employeeNumber"
+          ? String(nextValue || "")
+          : String(nextForm.employeeNumber || employeeNumberPreview || "");
+        const suggestedName = name === "nombre" ? String(nextValue || "") : String(nextForm.nombre || "");
+        nextForm = { ...nextForm, password: buildSuggestedPassword(suggestedName, suggestedEmployeeNumber, passwordSeed) };
+      }
       // Si cambia el nombre del departamento, limpiar el ID para que el nombre tenga efecto
       if (name === "department") {
         nextForm = { ...nextForm, departmentId: "" };
@@ -353,6 +470,7 @@ export default function UserForm({
       const data = new FormData();
       data.append("nombre", form.nombre);
       data.append("email", form.email);
+      data.append("employeeNumber", form.employeeNumber.trim() || employeeNumberPreview);
       if (form.password) data.append("password", form.password);
       data.append("roleId", String(roleId));
       const resolvedDepartment = (form.departmentId || "").trim() || (form.department || "").trim();
@@ -369,6 +487,7 @@ export default function UserForm({
         setForm({
           nombre: "",
           email: "",
+          employeeNumber: "",
           password: "",
           departmentId: "",
           department: "",
@@ -383,8 +502,10 @@ export default function UserForm({
           accesoContabilidad: false,
           accesoCotizaciones: false,
         });
+        setEmailManuallyEdited(false);
         setAvatarFile(null);
         setPreview("");
+        await loadNextEmployeeNumber();
       }
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -414,6 +535,12 @@ export default function UserForm({
         <div className="field">
           <label className="label">Email</label>
           <input name="email" type="email" value={form.email} onChange={handleChange} required className="input" />
+          <span className="helperText">Se sugiere automaticamente con el dominio nexara.com.mx y puedes editarlo antes de guardar.</span>
+        </div>
+        <div className="field">
+          <label className="label">Numero de empleado</label>
+          <input name="employeeNumber" value={form.employeeNumber || employeeNumberPreview} onChange={handleChange} className="input" />
+          <span className="helperText">Se precarga con el patron NXR25SYS### y puedes editarlo antes de guardar.</span>
         </div>
         <div className="field">
           <label className="label">Contraseña</label>
@@ -438,7 +565,7 @@ export default function UserForm({
           </div>
           {isEdit && (
             <span className="helperText">
-              Por seguridad no se puede ver la contraseña actual. Ingresa una nueva si deseas cambiarla.
+              La contraseña actual no se puede precargar porque se almacena cifrada. Si necesitas cambiarla, escribe una nueva y usa Ver para revisarla antes de guardar.
             </span>
           )}
         </div>

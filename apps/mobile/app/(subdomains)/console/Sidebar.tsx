@@ -179,7 +179,6 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
     { icon: "💼", label: "Viáticos operativos", href: "/viatics", anyPermissions: [PERMISSIONS.VIATICS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
     { icon: "🚗", label: "Control vehicular", href: "/vehicles", anyPermissions: [PERMISSIONS.VEHICLES_REVIEW, PERMISSIONS.VEHICLES_INVENTORY, PERMISSIONS.CONSOLE_ADMIN] },
     { icon: "🛰️", label: "Monitoreo GPS", href: "/gps", permissions: [PERMISSIONS.GPS_VIEW] },
-    { icon: "📋", label: "Hojas de servicio", href: "/service-sheets", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
   ];
 
   const peopleItems: MenuItem[] = [

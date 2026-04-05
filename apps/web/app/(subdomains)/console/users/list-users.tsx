@@ -20,6 +20,7 @@ export type User = {
   id: number;
   nombre: string;
   email: string;
+  employeeNumber?: string;
   avatarUrl?: string;
   role: {
     id: number;
@@ -361,7 +362,7 @@ export default function ListUsers() {
               <tr key={u.id}>
                 <td data-label="Foto">
                   {u.avatarUrl ? (
-                    <Image src={u.avatarUrl} alt={u.nombre} width={48} height={48} className="avatarImg" unoptimized />
+                    <Image src={getAssetUrl(u.avatarUrl)} alt={u.nombre} width={48} height={48} className="avatarImg" unoptimized />
                   ) : (
                     <span className="avatarFallback">{u.nombre[0]}</span>
                   )}
@@ -369,6 +370,7 @@ export default function ListUsers() {
                 <td data-label="Nombre">
                   <div className="nameCell">
                     <span className="nameMain">{u.nombre}</span>
+                    <span className="nameSub">{u.employeeNumber || `NXR25SYS${String(u.id).padStart(3, '0')}`}</span>
                   </div>
                 </td>
                 <td data-label="Email"><span className="emailText">{u.email}</span></td>
@@ -442,7 +444,7 @@ export default function ListUsers() {
             <button onClick={() => setProfileModalOpen(false)} className="profileModalClose" aria-label="Cerrar">✕</button>
             <div className="profileModalHeader">
               {profileUser?.avatarUrl ? (
-                <Image src={profileUser.avatarUrl} alt={profileUser.nombre} width={56} height={56} style={{ borderRadius: '50%', objectFit: 'cover' }} unoptimized />
+                <Image src={getAssetUrl(profileUser.avatarUrl)} alt={profileUser.nombre} width={56} height={56} style={{ borderRadius: '50%', objectFit: 'cover' }} unoptimized />
               ) : (
                 <div className="profileAvatarFallback">
                   {profileUser?.nombre?.[0] || 'U'}
@@ -484,6 +486,7 @@ export default function ListUsers() {
                   </div>
                   <div className="profileCard">
                     <div className="profileSectionTitle">Datos personales</div>
+                    <div>No. de Empleado: {profileUser?.employeeNumber || (profileUser?.id ? `NXR25SYS${String(profileUser.id).padStart(3, '0')}` : '-')}</div>
                     <div>Teléfono: {profileData?.perfil?.telefono || '-'}</div>
                     <div>Fecha nacimiento: {profileData?.perfil?.fechaNacimiento || '-'}</div>
                     <div>CURP: {profileData?.perfil?.curp || '-'}</div>
