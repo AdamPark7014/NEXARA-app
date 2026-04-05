@@ -397,7 +397,9 @@ async function bootstrap() {
       etag: true,
       maxAge: '1d',
       setHeaders: (res) => {
-        res.setHeader('X-Content-Type-Options', 'nosniff');
+        // Some legacy uploaded avatars were stored without file extension.
+        // Removing nosniff here allows browsers to render those assets.
+        res.removeHeader('X-Content-Type-Options');
         res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
       },
     }),
@@ -412,7 +414,8 @@ async function bootstrap() {
       etag: true,
       maxAge: '1d',
       setHeaders: (res) => {
-        res.setHeader('X-Content-Type-Options', 'nosniff');
+        // Same behavior for legacy upload directory.
+        res.removeHeader('X-Content-Type-Options');
         res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
       },
     }),
