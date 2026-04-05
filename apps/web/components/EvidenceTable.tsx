@@ -5,6 +5,7 @@ import { io, Socket } from "socket.io-client";
 import { useUser } from "./UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { buildApiUrl as buildApiUrlFromBase, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
+import { revokeObjectUrlLater, triggerFileDownload } from "@/lib/file-download";
 import ExcelDownloadModal from "./ExcelDownloadModal";
 import PDFViewer from "./PDFViewer";
 import styles from "./EvidenceTable.module.css";
@@ -511,12 +512,7 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
 
   const handleDownloadExcel = () => {
     if (!excelUrl) return;
-    const a = document.createElement("a");
-    a.href = excelUrl;
-    a.download = "evidencias.xlsx";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    triggerFileDownload(excelUrl, "evidencias.xlsx", { preferOpenOnMobile: true });
     closeExcelModal();
   };
 
@@ -543,13 +539,8 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
 
   const downloadPdfBlob = (blob: Blob, fileName: string) => {
     const url = window.URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = fileName;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+    triggerFileDownload(url, fileName, { preferOpenOnMobile: true });
+    revokeObjectUrlLater(url);
   };
 
   const handlePreviewTicketPdf = async (evi: Evidence) => {

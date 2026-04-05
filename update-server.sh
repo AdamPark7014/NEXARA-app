@@ -110,12 +110,41 @@ cp /tmp/nexara-backup/.env.api apps/api/.env 2>/dev/null || echo "⚠️  No se 
 cp /tmp/nexara-backup/.env.web apps/web/.env.local 2>/dev/null || echo "⚠️  No se pudo restaurar apps/web/.env.local"
 cp /tmp/nexara-backup/.env.mobile apps/mobile/.env.local 2>/dev/null || echo "⚠️  No se pudo restaurar apps/mobile/.env.local"
 
+extract_env_value() {
+  local key="$1"
+  local file="$2"
+  if [ ! -f "$file" ]; then
+    return 1
+  fi
+  grep -E "^${key}=" "$file" | tail -n 1 | cut -d '=' -f2-
+}
+
+# Prefer web values to keep mobile aligned with web production behavior.
+MOBILE_GOOGLE_MAPS_API_KEY="$(extract_env_value "NEXT_PUBLIC_GOOGLE_MAPS_API_KEY" "apps/web/.env.local" || true)"
+MOBILE_GOOGLE_MAPS_MAP_ID="$(extract_env_value "NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID" "apps/web/.env.local" || true)"
+MOBILE_API_ASSET_ORIGIN="$(extract_env_value "NEXT_PUBLIC_API_ASSET_ORIGIN" "apps/web/.env.local" || true)"
+
+if [ -z "$MOBILE_GOOGLE_MAPS_API_KEY" ]; then
+  MOBILE_GOOGLE_MAPS_API_KEY="$(extract_env_value "NEXT_PUBLIC_GOOGLE_MAPS_API_KEY" "/tmp/nexara-backup/.env.mobile" || true)"
+fi
+
+if [ -z "$MOBILE_GOOGLE_MAPS_MAP_ID" ]; then
+  MOBILE_GOOGLE_MAPS_MAP_ID="$(extract_env_value "NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID" "/tmp/nexara-backup/.env.mobile" || true)"
+fi
+
+if [ -z "$MOBILE_API_ASSET_ORIGIN" ]; then
+  MOBILE_API_ASSET_ORIGIN="http://${PUBLIC_HOST}:${API_PORT}"
+fi
+
 echo "📝 Asegurando apps/mobile/.env.local para entorno productivo (same-origin API)..."
 cat > apps/mobile/.env.local <<EOF
 NEXT_PUBLIC_API_URL=http://${PUBLIC_HOST}:${MOBILE_PORT}/api
-NEXT_PUBLIC_SOCKET_URL=http://${PUBLIC_HOST}:${MOBILE_PORT}
+NEXT_PUBLIC_SOCKET_URL=http://${PUBLIC_HOST}:${API_PORT}
 NEXT_PUBLIC_BASE_URL=http://${PUBLIC_HOST}:${MOBILE_PORT}
 NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API=false
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${MOBILE_GOOGLE_MAPS_API_KEY}
+NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID=${MOBILE_GOOGLE_MAPS_MAP_ID}
+NEXT_PUBLIC_API_ASSET_ORIGIN=${MOBILE_API_ASSET_ORIGIN}
 EOF
 
 echo "🗂️ Normalizando directorios de uploads..."

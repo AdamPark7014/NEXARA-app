@@ -1,7 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import UserForm from "./UserForm";
-import Image from "next/image";
 import { useUser } from '@/components/UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 
@@ -138,8 +137,18 @@ export default function ListUsers() {
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const getAssetUrl = (url?: string | null) => {
     if (!url) return '';
-    if (url.startsWith('http')) return url;
     const base = API_URL.replace(/\/+api\/?$/, '');
+    if (url.startsWith('http')) {
+      try {
+        const parsed = new URL(url);
+        if (parsed.pathname.startsWith('/uploads/')) {
+          return `${base}${parsed.pathname}${parsed.search}`;
+        }
+      } catch {
+        // Keep original URL if parsing fails.
+      }
+      return url;
+    }
     return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
   };
 
@@ -348,7 +357,13 @@ export default function ListUsers() {
               <tr key={u.id}>
                 <td data-label="Foto">
                   {u.avatarUrl ? (
-                    <Image src={u.avatarUrl} alt={u.nombre} width={40} height={40} style={{ borderRadius: "50%", objectFit: "cover" }} unoptimized />
+                    <img
+                      src={getAssetUrl(u.avatarUrl)}
+                      alt={u.nombre}
+                      width={40}
+                      height={40}
+                      style={{ borderRadius: "50%", objectFit: "cover" }}
+                    />
                   ) : (
                     <span style={{ width: 40, height: 40, display: "inline-block", borderRadius: "50%", background: "var(--muted)", textAlign: "center", lineHeight: "40px", color: "var(--primary)", fontWeight: 700 }}>
                       {u.nombre[0]}
@@ -420,7 +435,13 @@ export default function ListUsers() {
             <button onClick={() => setProfileModalOpen(false)} className="profileModalClose" aria-label="Cerrar">✕</button>
             <div className="profileModalHeader">
               {profileUser?.avatarUrl ? (
-                <Image src={profileUser.avatarUrl} alt={profileUser.nombre} width={56} height={56} style={{ borderRadius: '50%', objectFit: 'cover' }} unoptimized />
+                <img
+                  src={getAssetUrl(profileUser.avatarUrl)}
+                  alt={profileUser.nombre}
+                  width={56}
+                  height={56}
+                  style={{ borderRadius: '50%', objectFit: 'cover' }}
+                />
               ) : (
                 <div className="profileAvatarFallback">
                   {profileUser?.nombre?.[0] || 'U'}

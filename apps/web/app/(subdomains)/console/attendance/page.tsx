@@ -7,6 +7,7 @@ import FinesTable from '../../../../components/FinesTable';
 import { RoleGuard } from '../../../../components/RoleGuard';
 import { useUser } from '../../../../components/UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
+import { isPlatformAdmin } from '@/lib/panel-user';
 
 export default function AttendancePage() {
   const { user } = useUser();
@@ -19,7 +20,7 @@ export default function AttendancePage() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
   
-  const isAdmin = hasPermission(user, PERMISSIONS.ATTENDANCE_MANAGE);
+  const isAdmin = Boolean(user && (user.isSuperAdmin || isPlatformAdmin(user)));
   const isSuperAdmin = user?.email && ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'].includes(user.email.toLowerCase());
 
   return (

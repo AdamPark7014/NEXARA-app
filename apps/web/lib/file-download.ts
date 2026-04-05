@@ -23,10 +23,10 @@ export const triggerFileDownload = (
   link.href = fileUrl;
   link.rel = "noopener noreferrer";
 
-  // En mobile forzamos descarga real para evitar visor recortado y archivos no guardados.
+  // On mobile, prefer real download to avoid clipped viewers and missing saved files.
   link.download = fileName;
 
-  // Mantener compatibilidad: sólo abrir en pestaña si se pide explícitamente.
+  // Keep compatibility: open in a new tab only when explicitly needed.
   if (shouldOpenMobile && !fileName) {
     link.target = "_blank";
   }
