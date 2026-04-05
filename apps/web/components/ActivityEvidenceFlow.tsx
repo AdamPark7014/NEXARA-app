@@ -53,6 +53,20 @@ interface InventoryDraftItem {
   notes: string;
 }
 
+type ServiceSheetFormData = {
+  technicianName: string;
+  serviceDate: string;
+  clientCompany: string;
+  clientPhone: string;
+  managerName: string;
+  managerRole: string;
+  workSummary: string;
+  materialsUsed: string;
+  hoursWorked: string;
+  observations: string;
+  managerSignature: string | null;
+};
+
 const ActivityEvidenceFlow = () => {
   const { user } = useUser();
   const [actividades, setActividades] = useState<ActivityOption[]>([]);
@@ -68,6 +82,7 @@ const ActivityEvidenceFlow = () => {
   const [inventoryPreviousCount, setInventoryPreviousCount] = useState(0);
   const [inventoryUploadingKey, setInventoryUploadingKey] = useState<string | null>(null);
   const [pdfDragging, setPdfDragging] = useState(false);
+  const [requestedActivityId, setRequestedActivityId] = useState<number | null>(null);
   const inventoryFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/\.]+$/, '');
@@ -76,6 +91,16 @@ const ActivityEvidenceFlow = () => {
   const isCorrection = flowData?.reviewStatus === 'REJECTED';
   const selectedActivity = actividades.find((activity) => activity.id === Number(selectedActivityId || flowData?.activityId));
   const isInventoryFlow = selectedActivity?.workType === 'PREVENTIVE_INVENTORY';
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const rawActivityId = params.get('activityId');
+    const parsedActivityId = rawActivityId ? Number(rawActivityId) : NaN;
+    if (Number.isFinite(parsedActivityId) && parsedActivityId > 0) {
+      setRequestedActivityId(parsedActivityId);
+    }
+  }, []);
 
   // Cargar actividades
   useEffect(() => {
@@ -94,6 +119,12 @@ const ActivityEvidenceFlow = () => {
       })
       .catch(() => setActividades([]));
   }, [user?.token]);
+
+  useEffect(() => {
+    if (!requestedActivityId || loading || flowData?.activityId === requestedActivityId) return;
+    if (!actividades.some((activity) => activity.id === requestedActivityId)) return;
+    handleActivitySelect(requestedActivityId);
+  }, [requestedActivityId, actividades, flowData?.activityId]);
 
   // Cuando selecciona una actividad
   const handleActivitySelect = async (activityId: number) => {
@@ -258,9 +289,30 @@ const ActivityEvidenceFlow = () => {
 
   const getAssetUrl = (url?: string | null) => {
     if (!url) return '';
-    if (url.startsWith('http')) return url;
+    const raw = url.trim();
+    if (!raw) return '';
+    if (/^(data:|blob:|\/\/)/i.test(raw)) return raw;
+
+    if (/^https?:\/\//i.test(raw)) {
+      try {
+        const parsed = new URL(raw);
+        if (!/^\/(uploads|activities|evidences|activity-evidence|documents|user-docs|users|clients|vehicles)\//i.test(parsed.pathname)) {
+          return raw;
+        }
+      } catch {
+        return raw;
+      }
+    }
+
     const base = API_URL.replace(/\/+api\/?$/, '');
-    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+    const normalizedPath = raw
+      .replace(/\\+/g, '/')
+      .replace(/^https?:\/\/[^/]+/i, '')
+      .replace(/^\/api(?=\/uploads\/)/i, '')
+      .replace(/^\/?uploads\//i, '')
+      .replace(/^\/+/, '');
+    const normalized = `/uploads/${normalizedPath}`.replace(/\/uploads\/+/i, '/uploads/');
+    return `${base}${encodeURI(normalized)}`;
   };
 
   const uploadInventoryImage = async (file: File) => {
@@ -929,15 +981,31 @@ const ActivityEvidenceFlow = () => {
             <div className={styles.evidenceGalleryWrap}>
               <div className={styles.evidenceGalleryGrid}>
                 {flowData.evidencePhotos.map((photo, idx) => (
-                  <div key={idx} className={styles.evidencePhotoTile}>
+                  <div
+                    key={idx}
+                    className={styles.evidencePhotoTile}
+                    onClick={() => handleRemoveEvidencePhoto(idx)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        handleRemoveEvidencePhoto(idx);
+                      }
+                    }}
+                    title="Quitar esta evidencia"
+                  >
                     <img
-                      src={photo}
+                      src={getAssetUrl(photo)}
                       alt={`evidencia ${idx + 1}`}
                       className={styles.evidencePhotoImg}
                     />
                     <button
                       className={styles.removePhotoButton}
-                      onClick={() => handleRemoveEvidencePhoto(idx)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleRemoveEvidencePhoto(idx);
+                      }}
                     >
                       ✕
                     </button>
@@ -1069,8 +1137,8 @@ const ActivityEvidenceFlow = () => {
           {flowData.serviceSheetPdfUrl && (
             <div className={styles.pdfPreviewCard}>
               <div>✅ PDF cargado correctamente</div>
-              <object data={flowData.serviceSheetPdfUrl} type="application/pdf" width="100%" height="280">
-                <embed src={flowData.serviceSheetPdfUrl} type="application/pdf" />
+              <object data={getAssetUrl(flowData.serviceSheetPdfUrl)} type="application/pdf" width="100%" height="280">
+                <embed src={getAssetUrl(flowData.serviceSheetPdfUrl)} type="application/pdf" />
               </object>
             </div>
           )}
@@ -1084,7 +1152,7 @@ const ActivityEvidenceFlow = () => {
           <p className={styles.stepDescription}>
             Completa los datos requeridos de la hoja de servicio.
           </p>
-          <ServiceSheetForm onSubmit={handleServiceSheetFormSubmit} loading={loading} />
+          <ServiceSheetForm onSubmit={handleServiceSheetFormSubmit} loading={loading} initialData={flowData.serviceSheetData} />
         </div>
       )}
 
@@ -1149,7 +1217,7 @@ const ProgressStep = ({ step, active, completed, label }: { step: number; active
 
 // Formulario de plantilla interna
 // Pad de firma digital (mouse + touch)
-const SignaturePad = ({ onSignature, disabled }: { onSignature: (dataUrl: string | null) => void; disabled: boolean }) => {
+const SignaturePad = ({ onSignature, disabled, initialValue }: { onSignature: (dataUrl: string | null) => void; disabled: boolean; initialValue?: string | null }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawing = useRef(false);
   const lastPos = useRef({ x: 0, y: 0 });
@@ -1217,6 +1285,27 @@ const SignaturePad = ({ onSignature, disabled }: { onSignature: (dataUrl: string
     };
   }, []);
 
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    if (!initialValue) return;
+
+    const image = new Image();
+    image.onload = () => {
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      const ratio = Math.min(canvas.width / image.width, canvas.height / image.height);
+      const width = image.width * ratio;
+      const height = image.height * ratio;
+      const offsetX = (canvas.width - width) / 2;
+      const offsetY = (canvas.height - height) / 2;
+      context.drawImage(image, offsetX, offsetY, width, height);
+    };
+    image.src = initialValue;
+  }, [initialValue]);
+
   const clear = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -1254,21 +1343,26 @@ const SignaturePad = ({ onSignature, disabled }: { onSignature: (dataUrl: string
   );
 };
 
-const ServiceSheetForm = ({ onSubmit, loading }: { onSubmit: (data: any) => void; loading: boolean }) => {
-  const today = new Date().toISOString().split('T')[0];
-  const [data, setData] = useState({
-    technicianName: '',
-    serviceDate: today,
-    clientCompany: '',
-    clientPhone: '',
-    managerName: '',
-    managerRole: '',
-    workSummary: '',
-    materialsUsed: '',
-    hoursWorked: '',
-    observations: '',
-    managerSignature: null as string | null,
-  });
+const buildInitialServiceSheetFormData = (initialData?: Partial<ServiceSheetFormData> | null): ServiceSheetFormData => ({
+  technicianName: initialData?.technicianName || '',
+  serviceDate: initialData?.serviceDate || new Date().toISOString().split('T')[0],
+  clientCompany: initialData?.clientCompany || '',
+  clientPhone: initialData?.clientPhone || '',
+  managerName: initialData?.managerName || '',
+  managerRole: initialData?.managerRole || '',
+  workSummary: initialData?.workSummary || '',
+  materialsUsed: initialData?.materialsUsed || '',
+  hoursWorked: initialData?.hoursWorked || '',
+  observations: initialData?.observations || '',
+  managerSignature: initialData?.managerSignature || null,
+});
+
+const ServiceSheetForm = ({ onSubmit, loading, initialData }: { onSubmit: (data: any) => void; loading: boolean; initialData?: Partial<ServiceSheetFormData> | null }) => {
+  const [data, setData] = useState<ServiceSheetFormData>(() => buildInitialServiceSheetFormData(initialData));
+
+  useEffect(() => {
+    setData(buildInitialServiceSheetFormData(initialData));
+  }, [initialData]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1375,6 +1469,7 @@ const ServiceSheetForm = ({ onSubmit, loading }: { onSubmit: (data: any) => void
         <SignaturePad
           onSignature={(sig) => setData((prev) => ({ ...prev, managerSignature: sig }))}
           disabled={loading}
+          initialValue={data.managerSignature}
         />
       </div>
 

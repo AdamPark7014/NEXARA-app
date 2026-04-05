@@ -113,6 +113,10 @@
 	flex-wrap: wrap;
 }
 
+.toolbarMeta > * {
+	min-width: 0;
+}
+
 .resultsText {
 	font-size: 0.86rem;
 	font-weight: 700;
@@ -242,6 +246,11 @@
 }
 
 .bulkDownloadButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	max-width: 100%;
+	box-sizing: border-box;
 	white-space: nowrap;
 }
 
@@ -379,7 +388,167 @@
 	background: #f8fafc;
 }
 
+.detailModalOverlay {
+	position: fixed;
+	inset: 0;
+	background-color: rgba(15, 23, 42, 0.56);
+	backdrop-filter: blur(2px);
+	display: flex;
+	justify-content: center;
+	align-items: flex-start;
+	z-index: 10001;
+	padding: clamp(10px, 2.6vh, 22px);
+}
+
+.detailModalCard {
+	background-color: var(--surface, #fff);
+	border-radius: 16px;
+	max-width: min(1120px, 96vw);
+	width: min(1120px, 96vw);
+	max-height: 90vh;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	box-shadow: 0 22px 56px rgba(2, 8, 23, 0.34);
+}
+
+.detailModalHeader {
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	padding: 12px 16px;
+	border-bottom: 1px solid var(--border, #e5e7eb);
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 10px;
+	flex-wrap: wrap;
+	background: color-mix(in srgb, var(--surface, #fff) 92%, #f1f5f9);
+}
+
+.detailModalTitle {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 800;
+	color: var(--text-primary);
+}
+
+.detailModalSubtitle {
+	margin-top: 4px;
+	font-size: 0.82rem;
+	color: var(--text-secondary, #64748b);
+}
+
+.detailModalActions {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	flex-wrap: wrap;
+}
+
+.detailModalBody {
+	overflow: auto;
+	padding: 14px;
+	display: grid;
+	gap: 14px;
+	background: #f8fafc;
+}
+
+.detailSection {
+	padding: 14px;
+	border-radius: 14px;
+	border: 1px solid var(--border, #e5e7eb);
+	background: color-mix(in srgb, var(--surface, #fff) 98%, #f8fafc);
+	display: grid;
+	gap: 12px;
+}
+
+.detailSectionTitle {
+	margin: 0;
+	font-size: 0.92rem;
+	font-weight: 800;
+	color: var(--text-primary);
+}
+
+.detailGrid,
+.detailFormGrid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 10px 14px;
+}
+
+.detailInlineLink {
+	display: inline-flex;
+	margin-left: 8px;
+	font-size: 0.78rem;
+	font-weight: 700;
+	color: var(--primary, #2563eb);
+	text-decoration: none;
+}
+
+.detailInlineLink:hover {
+	text-decoration: underline;
+}
+
+.detailActionsRow {
+	display: flex;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+
+.detailFieldCard {
+	padding: 10px;
+	border-radius: 12px;
+	border: 1px solid rgba(148, 163, 184, 0.24);
+	background: var(--surface, #fff);
+	display: grid;
+	gap: 8px;
+}
+
+.detailFieldLabel {
+	font-size: 0.76rem;
+	font-weight: 800;
+	color: var(--text-secondary, #64748b);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.detailFieldValue {
+	font-size: 0.88rem;
+	line-height: 1.45;
+	color: var(--text-primary);
+	word-break: break-word;
+}
+
+.detailFieldImage {
+	width: 100%;
+	max-width: 260px;
+	border-radius: 12px;
+	border: 1px solid rgba(148, 163, 184, 0.28);
+	background: #fff;
+	object-fit: contain;
+}
+
 @media (max-width: 980px) {
+	.toolbarMeta {
+		display: grid;
+		grid-template-columns: 1fr;
+		align-items: stretch;
+	}
+
+	.resultsText,
+	.bulkDownloadButton,
+	.resetFilters {
+		width: 100%;
+	}
+
+	.bulkDownloadButton {
+		white-space: normal;
+		text-wrap: balance;
+		line-height: 1.3;
+		padding: 0.72rem 0.9rem;
+	}
+
 	.bulkFiltersRow {
 		grid-template-columns: 1fr;
 	}
@@ -415,6 +584,34 @@
 	.pdfViewerWrap {
 		padding: 4px;
 		max-height: calc(90vh - 52px);
+	}
+
+	.detailModalOverlay {
+		padding: 8px;
+	}
+
+	.detailModalCard {
+		width: calc(100vw - 16px);
+		max-width: calc(100vw - 16px);
+		max-height: 92vh;
+		border-radius: 12px;
+	}
+
+	.detailModalHeader {
+		padding: 10px 12px;
+	}
+
+	.detailModalBody {
+		padding: 10px;
+	}
+
+	.detailGrid,
+	.detailFormGrid {
+		grid-template-columns: 1fr;
+	}
+
+	.detailFieldImage {
+		max-width: 100%;
 	}
 }
 
@@ -840,11 +1037,6 @@
 		width: 72px;
 		height: 72px;
 	}
-	.toolbarMeta {
-		align-items: flex-start;
-		flex-direction: column;
-	}
-
 	.paginationRow {
 		justify-content: center;
 	}
@@ -852,7 +1044,20 @@
 
 @media (max-width: 640px) {
 	.metricsGrid {
-		grid-template-columns: 1fr;
+		grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+	}
+
+	.metricCard {
+		padding: 0.75rem 0.8rem;
+		border-radius: 16px;
+	}
+
+	.metricLabel {
+		font-size: 0.64rem;
+	}
+
+	.metricValue {
+		font-size: 1.15rem;
 	}
 
 	.filtersBlock {
@@ -862,6 +1067,122 @@
 
 	.resultsText {
 		font-size: 0.82rem;
+	}
+
+	.filtersRow {
+		grid-template-columns: 1fr;
+	}
+
+	.toolbarMeta,
+	.pdfModalHeader,
+	.detailModalHeader {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.fileActions,
+	.actionsButtons,
+	.detailActionsRow,
+	.pdfModalActions,
+	.detailModalActions,
+	.paginationRow {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.resultsText,
+	.bulkDownloadButton,
+	.resetFilters {
+		width: 100%;
+	}
+
+	.bulkDownloadButton {
+		white-space: normal;
+		text-align: center;
+		justify-content: center;
+		line-height: 1.3;
+		padding: 0.7rem 0.9rem;
+	}
+
+	.fileActions > *,
+	.actionsButtons > *,
+	.detailActionsRow > *,
+	.pdfModalActions > *,
+	.detailModalActions > * {
+		width: 100%;
+	}
+
+	.dataCell {
+		padding: 0.72rem 0.75rem 0.72rem 0.92rem;
+	}
+
+	.detailSection,
+	.detailFieldCard,
+	.bulkModalBody {
+		padding: 10px;
+	}
+
+	.detailInlineLink {
+		margin-left: 0;
+		margin-top: 6px;
+	}
+
+	.bulkDownloadButton,
+	.paginationRow :global(.button-secondary) {
+		width: 100%;
+	}
+}
+
+@media (max-width: 420px) {
+	.panel {
+		padding: 0.78rem;
+		border-radius: 18px;
+	}
+
+	.metricsGrid {
+		grid-template-columns: 1fr;
+	}
+
+	.panelEyebrow {
+		font-size: 0.64rem;
+		letter-spacing: 0.06em;
+	}
+
+	.title {
+		font-size: 1.08rem;
+	}
+
+	.galleryThumb {
+		width: 64px;
+	}
+
+	.thumbImg,
+	.thumbPdf,
+	.thumbError,
+	.thumbExtra {
+		width: 64px;
+		height: 64px;
+	}
+
+	.thumbLabel {
+		max-width: 64px;
+		font-size: 0.64rem;
+	}
+
+	.pdfViewerWrap {
+		min-height: 260px;
+	}
+
+	.detailModalBody,
+	.pdfViewerWrap,
+	.bulkModalBody {
+		padding: 8px;
+	}
+
+	.cellSubtext,
+	.detailFieldValue,
+	.resultsText {
+		font-size: 0.78rem;
 	}
 }
 

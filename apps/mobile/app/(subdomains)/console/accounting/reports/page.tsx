@@ -5,6 +5,7 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
 import HelpTab from "@/components/HelpTab";
+import { triggerFileDownload } from "@/lib/file-download";
 
 const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false });
 
@@ -63,10 +64,11 @@ export default function FinancialReportsPage() {
 
   const handleDownloadPdf = () => {
     if (!pdfUrl) return;
-    const a = document.createElement("a");
-    a.href = pdfUrl;
-    a.download = `reportes-financieros-${new Date().toISOString().slice(0, 10)}.pdf`;
-    a.click();
+    triggerFileDownload(
+      pdfUrl,
+      `reportes-financieros-${new Date().toISOString().slice(0, 10)}.pdf`,
+      { preferOpenOnMobile: true },
+    );
   };
 
   const fmt = (n: number) => Number(n || 0).toLocaleString("es-MX", { minimumFractionDigits: 2 });

@@ -67,7 +67,6 @@ const formatConsoleTitle = (pathname: string) => {
     "my-lunch-breaks": "Mis breaks y comidas",
     settings: "Configuración del sistema",
     "service-sheets": "Hojas de servicio",
-    "my-preferences": "Mis preferencias",
   };
   return dictionary[last] || last.replace(/-/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 };
@@ -85,7 +84,6 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   const isSuperAdmin = Boolean(user?.isSuperAdmin);
   const isAdmin = Boolean(user) && !isSuperAdmin && isPlatformAdmin(user);
   const isIngeniero = Boolean(user) && !isSuperAdmin && !isAdmin && role.includes("ingenier");
-
   const resolveConsoleRoute = (shortHref: string) => {
     if (!shortHref.startsWith("/")) return shortHref;
     if (shortHref === "/paneles" || shortHref === "/login") return shortHref;

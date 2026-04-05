@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useUser } from './UserContext';
+import { triggerFileDownload } from '@/lib/file-download';
 import PDFViewer from './PDFViewer';
 import styles from './QuoteGenerator.module.css';
 import { io, Socket } from 'socket.io-client';
@@ -173,12 +174,7 @@ export default function QuoteGenerator({ onQuoteGenerated }: QuoteGeneratorProps
 
   const downloadPdf = () => {
     if (!generatedPdf) return;
-    const a = document.createElement('a');
-    a.href = generatedPdf.pdfUrl;
-    a.download = generatedPdf.fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    triggerFileDownload(generatedPdf.pdfUrl, generatedPdf.fileName, { preferOpenOnMobile: true });
   };
 
   return (

@@ -329,6 +329,13 @@ export class AuthService {
         email: user.email,
         role: user.role?.nombre ?? '',
         roleId: user.roleId,
+        roleFlags: {
+          accesoConsole: Boolean(user.role?.accesoConsole),
+          accesoConsoleAdmin: Boolean(user.role?.accesoConsoleAdmin),
+          accesoGestionCvs: Boolean(user.role?.accesoGestionCvs),
+          accesoPanelVentas: Boolean(user.role?.accesoPanelVentas),
+          accesoCotizaciones: Boolean(user.role?.accesoCotizaciones),
+        },
         department: user.department?.nombre ?? '',
         departmentId: user.departmentId,
         permissions,

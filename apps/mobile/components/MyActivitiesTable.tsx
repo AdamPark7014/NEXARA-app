@@ -34,10 +34,15 @@ interface Activity {
     rejectedStep?: string;
     reviewNotes?: string;
     entryPhotoUrl?: string;
+    entryPhotoUploadedAt?: string;
     evidencePhotos: string[];
     serviceSheetPdfUrl?: string;
     exitPhotoUrl?: string;
+    exitPhotoUploadedAt?: string;
+    serviceSheetCompletedAt?: string;
     completedAt?: string;
+    createdAt?: string;
+    updatedAt?: string;
   } | null;
 }
 
@@ -109,10 +114,37 @@ const MyActivitiesTable: React.FC = () => {
     });
   };
 
+  const getEvidenceStartTime = (activity: Activity) => {
+    return activity.activityEvidence?.entryPhotoUploadedAt || '-';
+  };
+
+  const getEvidenceEndTime = (activity: Activity) => {
+    return (
+      activity.activityEvidence?.exitPhotoUploadedAt ||
+      activity.activityEvidence?.completedAt ||
+      '-'
+    );
+  };
+
   const getMapsUrl = (activity: Activity) => {
     const query = [activity.branchAddress, activity.branchCity, activity.branchState].filter(Boolean).join(', ');
     if (!query) return '';
     return `https://www.google.com/maps?q=${encodeURIComponent(query)}`;
+  };
+
+  const getDisplayActivityStatus = (activity: Activity) => {
+    if (activity.activityEvidence?.reviewStatus === 'REJECTED') {
+      return 'Desaprobada';
+    }
+    return activity.estatus;
+  };
+
+  const getActivityStatusClassName = (activity: Activity) => {
+    const status = getDisplayActivityStatus(activity);
+    if (status === 'Aprobada') return 'approved';
+    if (status === 'Pendiente') return 'pending';
+    if (status === 'Desaprobada' || status === 'Rechazada') return 'rejected';
+    return '';
   };
 
   const getEvidenceStatus = (activity: Activity) => {
@@ -255,7 +287,7 @@ const MyActivitiesTable: React.FC = () => {
                   {isAdmin && <th>Acciones</th>}
                   {!isAdmin && <th>Corrección</th>}
                   <th>Inicio</th>
-                  <th>Entrega</th>
+                  <th>Fin</th>
                   <th>Estimado/Max</th>
                   <th>Indicaciones</th>
                   <th>Mapa</th>
@@ -274,7 +306,7 @@ const MyActivitiesTable: React.FC = () => {
                       <td>{a.client?.name || 'Interna'}</td>
                       <td>{[a.branchName, a.branchCity, a.branchState].filter(Boolean).join(', ') || '-'}</td>
                       <td>{a.ticketType || '-'}</td>
-                      <td><span className={`badge ${a.estatus === 'Aprobada' ? 'approved' : a.estatus === 'Pendiente' ? 'pending' : ''}`}>{a.estatus}</span></td>
+                      <td><span className={`badge ${getActivityStatusClassName(a)}`}>{getDisplayActivityStatus(a)}</span></td>
                       <td>{a.prioridad}</td>
                       <td>
                         <div className={styles.evidenceCol}>
@@ -312,10 +344,10 @@ const MyActivitiesTable: React.FC = () => {
                         <td>
                           {needsCorrection ? (
                             <a
-                              href="/my-evidences"
+                              href={`/my-evidences?activityId=${a.id}&mode=edit`}
                               className={`button-primary ${styles.smallActionBtn}`}
                             >
-                              🔧 Corregir
+                              ✏️ Editar
                             </a>
                           ) : a.activityEvidence?.reviewStatus === 'APPROVED' ? (
                             <span className={styles.approvedText}>✅ Aprobada</span>
@@ -325,8 +357,8 @@ const MyActivitiesTable: React.FC = () => {
                         </td>
                       )}
                       
-                      <td>{formatDateTime(a.fechaInicio)}</td>
-                      <td>{formatDateTime(a.fechaEntregaEsperada)}</td>
+                      <td>{formatDateTime(getEvidenceStartTime(a))}</td>
+                      <td>{formatDateTime(getEvidenceEndTime(a))}</td>
                       <td>{a.tiempoEstimadoMin || 0}/{a.tiempoMaximoMin || 0}</td>
                       <td>{a.indicaciones || '-'}</td>
                       <td>
@@ -373,8 +405,8 @@ const MyActivitiesTable: React.FC = () => {
                         </div>
                       </div>
                       <div className={styles.mobileHeaderAside}>
-                        <span className={`badge ${a.estatus === 'Aprobada' ? 'approved' : a.estatus === 'Pendiente' ? 'pending' : ''}`}>
-                          {a.estatus}
+                        <span className={`badge ${getActivityStatusClassName(a)}`}>
+                          {getDisplayActivityStatus(a)}
                         </span>
                         <span className={styles.mobilePriority}>
                           Prioridad: {a.prioridad}
@@ -406,11 +438,11 @@ const MyActivitiesTable: React.FC = () => {
                       </div>
                       <div>
                         <div className={styles.mobileInfoLabel}>Inicio</div>
-                        <div className={styles.mobileInfoValue}>{formatDateTime(a.fechaInicio)}</div>
+                        <div className={styles.mobileInfoValue}>{formatDateTime(getEvidenceStartTime(a))}</div>
                       </div>
                       <div>
-                        <div className={styles.mobileInfoLabel}>Entrega</div>
-                        <div className={styles.mobileInfoValue}>{formatDateTime(a.fechaEntregaEsperada)}</div>
+                        <div className={styles.mobileInfoLabel}>Fin</div>
+                        <div className={styles.mobileInfoValue}>{formatDateTime(getEvidenceEndTime(a))}</div>
                       </div>
                       <div>
                         <div className={styles.mobileInfoLabel}>Tiempo Est/Max</div>
@@ -450,10 +482,10 @@ const MyActivitiesTable: React.FC = () => {
                       
                       {!isAdmin && needsCorrection && (
                         <a
-                          href="/my-evidences"
+                          href={`/my-evidences?activityId=${a.id}&mode=edit`}
                           className={`button-primary ${styles.mobileDangerLink}`}
                         >
-                          🔧 Corregir
+                          ✏️ Editar
                         </a>
                       )}
                     </div>

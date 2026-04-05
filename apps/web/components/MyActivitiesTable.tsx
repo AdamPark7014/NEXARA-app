@@ -115,6 +115,21 @@ const MyActivitiesTable: React.FC = () => {
     return `https://www.google.com/maps?q=${encodeURIComponent(query)}`;
   };
 
+  const getDisplayActivityStatus = (activity: Activity) => {
+    if (activity.activityEvidence?.reviewStatus === 'REJECTED') {
+      return 'Desaprobada';
+    }
+    return activity.estatus;
+  };
+
+  const getActivityStatusClassName = (activity: Activity) => {
+    const status = getDisplayActivityStatus(activity);
+    if (status === 'Aprobada') return 'approved';
+    if (status === 'Pendiente') return 'pending';
+    if (status === 'Desaprobada' || status === 'Rechazada') return 'rejected';
+    return '';
+  };
+
   const getEvidenceStatus = (activity: Activity) => {
     if (!activity.activityEvidence) return 'Sin iniciar';
     
@@ -274,7 +289,7 @@ const MyActivitiesTable: React.FC = () => {
                       <td>{a.client?.name || 'Interna'}</td>
                       <td>{[a.branchName, a.branchCity, a.branchState].filter(Boolean).join(', ') || '-'}</td>
                       <td>{a.ticketType || '-'}</td>
-                      <td><span className={`badge ${a.estatus === 'Aprobada' ? 'approved' : a.estatus === 'Pendiente' ? 'pending' : ''}`}>{a.estatus}</span></td>
+                      <td><span className={`badge ${getActivityStatusClassName(a)}`}>{getDisplayActivityStatus(a)}</span></td>
                       <td>{a.prioridad}</td>
                       <td>
                         <div className={styles.evidenceCol}>
@@ -312,10 +327,10 @@ const MyActivitiesTable: React.FC = () => {
                         <td>
                           {needsCorrection ? (
                             <a
-                              href="/my-evidences"
+                              href={`/my-evidences?activityId=${a.id}&mode=edit`}
                               className={`button-primary ${styles.smallActionBtn}`}
                             >
-                              🔧 Corregir
+                              ✏️ Editar
                             </a>
                           ) : a.activityEvidence?.reviewStatus === 'APPROVED' ? (
                             <span className={styles.approvedText}>✅ Aprobada</span>
@@ -373,8 +388,8 @@ const MyActivitiesTable: React.FC = () => {
                         </div>
                       </div>
                       <div className={styles.mobileHeaderAside}>
-                        <span className={`badge ${a.estatus === 'Aprobada' ? 'approved' : a.estatus === 'Pendiente' ? 'pending' : ''}`}>
-                          {a.estatus}
+                        <span className={`badge ${getActivityStatusClassName(a)}`}>
+                          {getDisplayActivityStatus(a)}
                         </span>
                         <span className={styles.mobilePriority}>
                           Prioridad: {a.prioridad}
@@ -450,10 +465,10 @@ const MyActivitiesTable: React.FC = () => {
                       
                       {!isAdmin && needsCorrection && (
                         <a
-                          href="/my-evidences"
+                          href={`/my-evidences?activityId=${a.id}&mode=edit`}
                           className={`button-primary ${styles.mobileDangerLink}`}
                         >
-                          🔧 Corregir
+                          ✏️ Editar
                         </a>
                       )}
                     </div>

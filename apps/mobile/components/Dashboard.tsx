@@ -222,6 +222,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const isConsoleAdmin = hasPermission(user, PERMISSIONS.CONSOLE_ADMIN);
   const isSuperAdmin = Boolean(user?.isSuperAdmin);
+  const canSeeTeamDashboard = isConsoleAdmin || isSuperAdmin;
   const normalizedUserId = user?.id ? Number(user.id) : null;
 
   const weekRange = useMemo(() => getWeekRange(new Date()), []);
@@ -340,7 +341,7 @@ export default function Dashboard() {
       ]);
 
       let visibleUsersRes: Response | null = null;
-      if (isConsoleAdmin || isSuperAdmin) {
+      if (canSeeTeamDashboard) {
         try {
           const assignableResponse = await fetchFromApiCandidates('users/assignable', { headers, signal: activeSignal });
           if (assignableResponse.ok) {
@@ -454,7 +455,7 @@ export default function Dashboard() {
         setInitialLoading(false);
       }
     }
-  }, [isConsoleAdmin, isSuperAdmin, user, weekRange.from, weekRange.to]);
+  }, [canSeeTeamDashboard, user, weekRange.from, weekRange.to]);
 
   useEffect(() => {
     if (!user?.token) return;
@@ -616,15 +617,27 @@ export default function Dashboard() {
     }, {} as Record<string, number>),
   };
 
-  // Para gráficas: mostrar datos de TODOS los usuarios, no solo el seleccionado
+  const pendingActivityCount = filteredActivities.filter((item) => {
+    const status = String(item.estatus || '').toLowerCase();
+    return ['pendiente', 'en proceso', 'asignada', 'asignado'].includes(status);
+  }).length;
+
+  const completedActivityPercent = activityTotals.total > 0
+    ? Math.round(((activityTotals.total - (activityTotals.statusCounts['Pendiente'] ?? activityTotals.total)) / activityTotals.total) * 100)
+    : 0;
+
+  // Para admins se muestran agregados del equipo; para usuarios normales, solo su propio resumen.
   const allViatics = viatics.filter((item) => isWithinWeek(item.createdAt));
   const allActivities = activities.filter((item) => {
     const dateRef = item.fechaAsignacion || item.fechaInicio || item.fechaFinalizacion || null;
     return isWithinWeek(dateRef);
   });
 
+  const chartViaticsSource = canSeeTeamDashboard ? allViatics : filteredViatics;
+  const chartActivitiesSource = canSeeTeamDashboard ? allActivities : filteredActivities;
+
   const viaticStatusData = Object.entries(
-    allViatics.reduce((acc, item) => {
+    chartViaticsSource.reduce((acc, item) => {
       const key = item.estatusPago || 'Sin estatus';
       acc[key] = (acc[key] || 0) + 1;
       return acc;
@@ -632,7 +645,7 @@ export default function Dashboard() {
   ).map(([estatus, cantidad]) => ({ estatus, cantidad }));
 
   const activityStatusData = Object.entries(
-    allActivities.reduce((acc, item) => {
+    chartActivitiesSource.reduce((acc, item) => {
       const key = item.estatus || 'Sin estatus';
       acc[key] = (acc[key] || 0) + 1;
       return acc;
@@ -685,7 +698,7 @@ export default function Dashboard() {
       <div className="heroCard">
         <div className="heroTop">
           <div className="heroLeft">
-            <p className="heroKicker">Contexto operativo</p>
+            <p className="heroKicker">{canSeeTeamDashboard ? 'Contexto operativo' : 'Mi semana'}</p>
             <span className="heroWeekRange">{formatDate(weekRange.from)} - {formatDate(weekRange.to)}</span>
             <span className="heroCurrentUser">{userName}</span>
           </div>
@@ -695,7 +708,7 @@ export default function Dashboard() {
             {refreshing && <span className="heroRefreshing">↻</span>}
           </div>
         </div>
-        {(isConsoleAdmin || isSuperAdmin) && availableUsers.length > 0 && (
+        {canSeeTeamDashboard && availableUsers.length > 0 && (
           <select
             className="userSelect"
             value={activeUserId ?? ""}
@@ -717,11 +730,19 @@ export default function Dashboard() {
           <span className="kpiValue">{formatHours(attendanceMinutes)}<span className="kpiUnit">h</span></span>
           <span className="kpiLabel">Horas<br/>semana</span>
         </div>
-        <div className="kpiCard kpiDelay2">
-          <span className="kpiIcon">🟢</span>
-          <span className="kpiValue">{activeUsersCount}</span>
-          <span className="kpiLabel">Usuarios<br/>activos</span>
-        </div>
+        {canSeeTeamDashboard ? (
+          <div className="kpiCard kpiDelay2">
+            <span className="kpiIcon">🟢</span>
+            <span className="kpiValue">{activeUsersCount}</span>
+            <span className="kpiLabel">Usuarios<br/>activos</span>
+          </div>
+        ) : (
+          <div className="kpiCard kpiDelay2">
+            <span className="kpiIcon">⏳</span>
+            <span className="kpiValue">{pendingActivityCount}</span>
+            <span className="kpiLabel">Pendientes<br/>mías</span>
+          </div>
+        )}
         <div className="kpiCard kpiDelay3">
           <span className="kpiIcon">📋</span>
           <span className="kpiValue">{activityTotals.total}</span>
@@ -739,7 +760,7 @@ export default function Dashboard() {
         </div>
         <div className="kpiCard kpiDelay6">
           <span className="kpiIcon">✅</span>
-          <span className="kpiValue">{activityTotals.total > 0 ? Math.round(((activityTotals.total - (activityTotals.statusCounts['Pendiente'] ?? activityTotals.total)) / activityTotals.total) * 100) : 0}<span className="kpiUnit">%</span></span>
+          <span className="kpiValue">{completedActivityPercent}<span className="kpiUnit">%</span></span>
           <span className="kpiLabel">Actividades<br/>completadas</span>
         </div>
       </div>
@@ -781,10 +802,10 @@ export default function Dashboard() {
           <div className="analysisHeader">
             <span className="analysisIcon">📋</span>
             <div className="analysisTitleWrap">
-              <span className="analysisEyebrow">Actividades</span>
+              <span className="analysisEyebrow">{canSeeTeamDashboard ? 'Actividades' : 'Mis actividades'}</span>
               <h3 className="analysisTitle">Por estatus</h3>
             </div>
-            <span className="analysisPill">{activityTotals.total}</span>
+            <span className="analysisPill">{chartActivitiesSource.length}</span>
           </div>
           <div className="chartWrap">
             {hasActivityData ? (
@@ -813,10 +834,10 @@ export default function Dashboard() {
           <div className="analysisHeader">
             <span className="analysisIcon">💸</span>
             <div className="analysisTitleWrap">
-              <span className="analysisEyebrow">Viáticos</span>
+              <span className="analysisEyebrow">{canSeeTeamDashboard ? 'Viáticos' : 'Mis viáticos'}</span>
               <h3 className="analysisTitle">Por estatus</h3>
             </div>
-            <span className="analysisPill">{viaticTotals.total}</span>
+            <span className="analysisPill">{chartViaticsSource.length}</span>
           </div>
           <div className="chartWrap">
             {hasViaticData ? (
@@ -840,7 +861,7 @@ export default function Dashboard() {
             )}
           </div>
         </div>
-        {weeklyUserHours.length > 0 && (
+        {canSeeTeamDashboard && weeklyUserHours.length > 0 && (
           <div className="analysisCard">
             <div className="analysisHeader">
               <span className="analysisIcon">👥</span>

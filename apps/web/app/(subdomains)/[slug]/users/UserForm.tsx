@@ -266,22 +266,54 @@ export default function UserForm({
           : null;
       };
 
-      // 1. Resolver rol para asignar al usuario en edición/creación.
-      // En edición NO se muta el rol actual del usuario para evitar impactos en otros usuarios que compartan ese rol.
-      let roleId: number | null = null;
-      if (effectiveRoleName) {
-        const existing = await fetchRoleByName();
-        if (existing?.id) {
-          const patchRes = await fetch(buildApiUrl(`roles/${existing.id}`), {
-            method: 'PATCH',
+      const roleMatchesPayload = (role: Record<string, unknown> | null | undefined) => {
+        if (!role) return false;
+        const keys = Object.keys(rolePayload) as Array<keyof typeof rolePayload>;
+        return keys.every((key) => Boolean(role[key]) === Boolean(rolePayload[key]));
+      };
+
+      const createPersonalizedRole = async () => {
+        const safeEmailPrefix = String(form.email || 'usuario')
+          .split('@')[0]
+          .replace(/[^a-zA-Z0-9_-]/g, '')
+          .slice(0, 24) || 'usuario';
+
+        const baseName = `${effectiveRoleName} · ${safeEmailPrefix}`;
+        let attempt = 0;
+        let lastError = 'Error al crear rol personalizado';
+
+        while (attempt < 5) {
+          const candidateName = attempt === 0 ? baseName : `${baseName}-${attempt + 1}`;
+          const roleRes = await fetch(buildApiUrl('roles'), {
+            method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
             },
-            body: JSON.stringify(rolePayload),
+            body: JSON.stringify({ ...rolePayload, nombre: candidateName }),
           });
-          if (!patchRes.ok) throw new Error(await getErrorMessage(patchRes, 'Error al actualizar el rol'));
-          roleId = existing.id;
+
+          if (roleRes.ok) {
+            const roleData = await roleRes.json();
+            return roleData?.id as number;
+          }
+
+          lastError = await getErrorMessage(roleRes, lastError);
+          attempt += 1;
+        }
+
+        throw new Error(lastError);
+      };
+
+      // 1. Resolver rol para asignar al usuario en edición/creación.
+      // Nunca mutar el rol compartido desde este formulario: evita propagar cambios a otros usuarios.
+      let roleId: number | null = null;
+      if (effectiveRoleName) {
+        const existing = await fetchRoleByName();
+        if (existing?.id && roleMatchesPayload(existing)) {
+          roleId = Number(existing.id);
+        } else if (existing?.id) {
+          roleId = await createPersonalizedRole();
         } else {
           const roleRes = await fetch(buildApiUrl('roles'), {
             method: 'POST',

@@ -485,7 +485,7 @@ export class ClientPortalController {
 
     return this.prisma['activity'].findMany({
       where,
-      include: { responsable: true, evidencias: true, serviceSheet: true },
+      include: { responsable: true, evidencias: true, serviceSheet: true, activityEvidence: true },
       orderBy: { fechaAsignacion: 'desc' },
     });
   }
@@ -494,7 +494,7 @@ export class ClientPortalController {
   async ticket(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number) {
     return this.prisma['activity'].findFirst({
       where: { id, clientId: user.clientId },
-      include: { responsable: true, evidencias: true, serviceSheet: true },
+      include: { responsable: true, evidencias: true, serviceSheet: true, activityEvidence: true },
     });
   }
 

@@ -67,8 +67,23 @@ const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api")
   /[\/.]+$/,
   ""
 );
+const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
 const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, "");
+
+const getStaticMapPreviewUrl = (lat: number, lng: number) => {
+  if (GOOGLE_MAPS_API_KEY) {
+    return `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=1200x500&maptype=roadmap&markers=color:red%7C${lat},${lng}&key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}`;
+  }
+  return `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=15&size=1200x500&markers=${lat},${lng},red-pushpin`;
+};
+
+const getStaticMapFallbackUrl = (lat: number, lng: number) => {
+  if (GOOGLE_MAPS_API_KEY) {
+    return `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&scale=2&size=1200x500&maptype=hybrid&markers=color:red%7C${lat},${lng}&key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}`;
+  }
+  return `https://static-maps.yandex.ru/1.x/?ll=${lng},${lat}&size=650,450&z=15&l=map&pt=${lng},${lat},pm2rdm`;
+};
 
 const toInputDate = (date: Date) => date.toISOString().slice(0, 10);
 
@@ -852,7 +867,7 @@ const ConsoleAttendanceTable = () => {
             Click fuera del mapa o presiona ESC para cerrar
           </p>
           <img
-            src={`https://staticmap.openstreetmap.de/staticmap.php?center=${mapModal.lat},${mapModal.lng}&zoom=15&size=1200x500&markers=${mapModal.lat},${mapModal.lng},red-pushpin`}
+            src={getStaticMapPreviewUrl(mapModal.lat, mapModal.lng)}
             alt="Ubicación del registro"
             style={{
               width: '100%',
@@ -864,7 +879,8 @@ const ConsoleAttendanceTable = () => {
             }}
             loading="lazy"
             onError={(e) => {
-              e.currentTarget.src = `https://static-maps.yandex.ru/1.x/?ll=${mapModal.lng},${mapModal.lat}&size=650,450&z=15&l=map&pt=${mapModal.lng},${mapModal.lat},pm2rdm`;
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = getStaticMapFallbackUrl(mapModal.lat, mapModal.lng);
             }}
           />
           <a

@@ -13,6 +13,7 @@ import {
   type SalesProjectOrder,
 } from "@/lib/sales-api";
 import { getApiBase } from "@/lib/api-base";
+import { triggerFileDownload } from "@/lib/file-download";
 import styles from "./page.module.css";
 
 type SalesProject = SalesProjectDetail;
@@ -138,14 +139,10 @@ export default function VentasProyectosPage() {
       return;
     }
     try {
-      const link = document.createElement("a");
-      link.href = order.orderPdfUrl.startsWith("http")
+      const fileUrl = order.orderPdfUrl.startsWith("http")
         ? order.orderPdfUrl
         : `${apiOrigin}${order.orderPdfUrl.startsWith("/") ? "" : "/"}${order.orderPdfUrl}`;
-      link.download = `orden-${order.orderId}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      triggerFileDownload(fileUrl, `orden-${order.orderId}.pdf`, { preferOpenOnMobile: true });
     } catch (err) {
       setError("Error al descargar el archivo");
     }

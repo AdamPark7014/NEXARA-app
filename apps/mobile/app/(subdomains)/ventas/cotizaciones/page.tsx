@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import QuoteGenerator from "@/components/QuoteGenerator";
 import { buildApiUrl } from "@/lib/api-base";
+import { triggerFileDownload } from "@/lib/file-download";
 import { linkSalesQuoteToOpportunity, listSalesQuotes, type SalesQuote } from "@/lib/sales-api";
 import styles from "./page.module.css";
 
@@ -75,12 +76,9 @@ export default function VentasCotizacionesPage() {
   };
 
   const handleDownloadPdf = (cotizacionId: number) => {
-    const link = document.createElement("a");
-    link.href = buildApiUrl(`cotizaciones/${cotizacionId}/pdf`);
-    link.download = `cotizacion-${cotizacionId}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    triggerFileDownload(buildApiUrl(`cotizaciones/${cotizacionId}/pdf`), `cotizacion-${cotizacionId}.pdf`, {
+      preferOpenOnMobile: true,
+    });
   };
 
   return (

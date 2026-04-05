@@ -188,7 +188,11 @@ export default function ListUsers() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.token]);
 
-  if (loading) return <div>Cargando usuarios...</div>;
+  if (loading) return (
+    <div style={{ textAlign: 'center', padding: '52px 0', color: 'var(--text-secondary)', fontSize: 14, opacity: 0.75 }}>
+      Cargando usuarios…
+    </div>
+  );
 
   const handleDelete = async (id: number) => {
     if (!confirm("¿Seguro que deseas eliminar este usuario?")) return;
@@ -321,16 +325,25 @@ export default function ListUsers() {
 
   return (
     <>
+      <div className="tableToolbar">
+        <span className="userCountChip">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+          </svg>
+          {users.length} {users.length === 1 ? 'usuario' : 'usuarios'}
+        </span>
+      </div>
       <div style={tableWrapStyle}>
-        <table className="table">
+        <table className="usersTable">
           <colgroup>
             <col style={{ width: "82px" }} />
-            <col style={{ width: "27%" }} />
-            <col style={{ width: "24%" }} />
+            <col style={{ width: "25%" }} />
+            <col style={{ width: "23%" }} />
+            <col style={{ width: "14%" }} />
+            <col style={{ width: "12%" }} />
             <col style={{ width: "10%" }} />
-            <col style={{ width: "12%" }} />
-            <col style={{ width: "12%" }} />
-            <col style={{ width: "15%" }} />
+            <col style={{ width: "16%" }} />
           </colgroup>
           <thead>
             <tr>
@@ -348,32 +361,39 @@ export default function ListUsers() {
               <tr key={u.id}>
                 <td data-label="Foto">
                   {u.avatarUrl ? (
-                    <Image src={u.avatarUrl} alt={u.nombre} width={40} height={40} style={{ borderRadius: "50%", objectFit: "cover" }} unoptimized />
+                    <Image src={u.avatarUrl} alt={u.nombre} width={48} height={48} className="avatarImg" unoptimized />
                   ) : (
-                    <span style={{ width: 40, height: 40, display: "inline-block", borderRadius: "50%", background: "var(--muted)", textAlign: "center", lineHeight: "40px", color: "var(--primary)", fontWeight: 700 }}>
-                      {u.nombre[0]}
-                    </span>
+                    <span className="avatarFallback">{u.nombre[0]}</span>
                   )}
                 </td>
-                <td data-label="Nombre">{u.nombre}</td>
-                <td data-label="Email">{u.email}</td>
-                <td data-label="Rol">{u.role?.nombre}</td>
-                <td data-label="Departamento">{u.department?.nombre}</td>
+                <td data-label="Nombre">
+                  <div className="nameCell">
+                    <span className="nameMain">{u.nombre}</span>
+                  </div>
+                </td>
+                <td data-label="Email"><span className="emailText">{u.email}</span></td>
+                <td data-label="Rol"><span className="rolePill">{u.role?.nombre || '—'}</span></td>
+                <td data-label="Departamento"><span className="departmentText">{u.department?.nombre || 'Sin departamento'}</span></td>
                 <td data-label="Perfil" className="tableProfileCell">
                   {hasPermission(user, PERMISSIONS.USERS_REVIEW) ? (
-                    <button
-                      className="tableAction tableActionInfo"
-                      onClick={() => handleViewProfile(u)}
-                    >
-                      Ver información
-                    </button>
+                    <span className="profileAvailability">Disponible</span>
                   ) : (
-                    <span style={{ color: 'var(--muted)', fontSize: 12 }}>Sin permisos</span>
+                    <span className="profileAvailability profileAvailabilityMuted">Sin acceso</span>
                   )}
                 </td>
                 <td data-label="Acciones" className="tableActionsCell">
-                  {user && hasPermission(user, PERMISSIONS.USERS_MANAGE) && (!user.isSuperAdmin && u.department?.id ? user.departmentId === u.department.id : true) && (
-                    <>
+                  {(hasPermission(user, PERMISSIONS.USERS_REVIEW) || (user && hasPermission(user, PERMISSIONS.USERS_MANAGE) && (!user.isSuperAdmin && u.department?.id ? user.departmentId === u.department.id : true))) && (
+                    <div className="tableActionsGroup">
+                      {hasPermission(user, PERMISSIONS.USERS_REVIEW) && (
+                        <button
+                          className="tableAction tableActionInfo"
+                          onClick={() => handleViewProfile(u)}
+                        >
+                          Ver información
+                        </button>
+                      )}
+                      {user && hasPermission(user, PERMISSIONS.USERS_MANAGE) && (!user.isSuperAdmin && u.department?.id ? user.departmentId === u.department.id : true) && (
+                        <>
                       <button
                         className="tableAction tableActionEdit"
                         onClick={() => handleEdit(u)}
@@ -386,9 +406,11 @@ export default function ListUsers() {
                       >
                         Eliminar
                       </button>
-                    </>
+                        </>
+                      )}
+                    </div>
                   )}
-                  {!hasPermission(user, PERMISSIONS.USERS_MANAGE) && (
+                  {!hasPermission(user, PERMISSIONS.USERS_REVIEW) && !hasPermission(user, PERMISSIONS.USERS_MANAGE) && (
                     <span style={{ color: 'var(--muted)', fontSize: 12 }}>Sin permisos</span>
                   )}
                 </td>
@@ -576,61 +598,60 @@ export default function ListUsers() {
       <style jsx>{`
         .usersTable {
           width: 100%;
-          border-collapse: separate;
-          border-spacing: 0;
+          border-collapse: collapse;
           table-layout: fixed;
           border-radius: 12px;
           overflow: hidden;
+          background: color-mix(in srgb, var(--surface) 96%, transparent);
         }
 
         .usersTable thead th {
-          background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 18%, var(--surface)) 0%, color-mix(in srgb, var(--secondary) 14%, var(--surface-2)) 100%);
+          background: color-mix(in srgb, var(--surface-2) 84%, var(--primary) 16%);
           color: var(--foreground);
-          border-bottom: 1px solid var(--border);
-          font-weight: 600;
-          letter-spacing: 0.04em;
+          border-bottom: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
+          font-weight: 700;
+          letter-spacing: 0.06em;
           text-transform: uppercase;
-          font-size: 0.76rem;
-          white-space: nowrap;
+          font-size: 0.72rem;
           text-align: left;
-          padding: 13px 14px;
+          padding: 13px 16px;
+          white-space: nowrap;
         }
 
         .usersTable tbody td {
           color: var(--text-primary);
-          border-bottom-color: color-mix(in srgb, var(--border) 82%, transparent);
+          border-bottom: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
           overflow-wrap: anywhere;
           vertical-align: middle;
-          line-height: 1.45;
+          line-height: 1.4;
           text-align: left;
-          padding: 13px 14px;
+          padding: 13px 16px;
+          background: transparent;
         }
 
         .usersTable tbody tr:nth-child(even) {
-          background: color-mix(in srgb, var(--surface-2) 76%, transparent);
+          background: color-mix(in srgb, var(--surface-2) 72%, transparent);
         }
 
         .usersTable tbody tr:hover {
-          background: linear-gradient(90deg, color-mix(in srgb, var(--primary) 10%, transparent), color-mix(in srgb, var(--secondary) 8%, transparent));
+          background: color-mix(in srgb, var(--primary) 8%, var(--surface));
         }
 
         .tableAction {
-          border-radius: 9px;
-          padding: 7px 12px;
+          border-radius: 8px;
+          padding: 8px 12px;
           font-weight: 600;
-          font-size: 0.84rem;
+          font-size: 0.82rem;
           cursor: pointer;
-          transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+          transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
           color: var(--foreground);
-          border: 1px solid var(--border);
-          background: color-mix(in srgb, var(--surface) 92%, transparent);
-          box-shadow: none;
+          border: 1px solid color-mix(in srgb, var(--border) 92%, transparent);
+          background: color-mix(in srgb, var(--surface) 95%, transparent);
         }
 
         .tableAction:hover {
-          background: color-mix(in srgb, var(--surface-2) 92%, transparent);
-          border-color: var(--border-strong);
-          transform: translateY(-1px);
+          border-color: color-mix(in srgb, var(--primary) 30%, var(--border));
+          background: color-mix(in srgb, var(--surface-2) 94%, transparent);
         }
 
         .tableAction:focus-visible {
@@ -639,14 +660,14 @@ export default function ListUsers() {
         }
 
         .tableActionInfo {
-          background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-          border-color: color-mix(in srgb, var(--primary) 36%, transparent);
-          color: var(--header-text);
+          background: color-mix(in srgb, var(--primary) 85%, white 15%);
+          border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+          color: #fff;
         }
 
         .tableActionEdit {
-          background: color-mix(in srgb, var(--surface) 88%, var(--primary) 12%);
-          border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
+          background: color-mix(in srgb, var(--surface) 92%, var(--primary) 8%);
+          border-color: color-mix(in srgb, var(--primary) 24%, var(--border));
         }
 
         .tableActionDelete {
@@ -658,11 +679,128 @@ export default function ListUsers() {
         .tableProfileCell,
         .tableActionsCell {
           text-align: left;
+          white-space: normal;
+        }
+
+        .tableActionsGroup {
+          display: inline-flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          align-items: center;
+        }
+
+        .profileAvailability {
+          font-size: 0.82rem;
+          font-weight: 600;
+          color: var(--text-primary);
+        }
+
+        .profileAvailabilityMuted {
+          color: var(--text-secondary);
+          font-weight: 500;
+        }
+
+        .tableActionsGroup .tableAction {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 88px;
           white-space: nowrap;
         }
 
-        .tableActionsCell .tableAction + .tableAction {
-          margin-left: 8px;
+        .tableProfileCell .tableAction {
+          white-space: nowrap;
+        }
+
+        .nameCell {
+          display: grid;
+        }
+
+        .nameMain {
+          font-weight: 700;
+          font-size: 1rem;
+          line-height: 1.2;
+          color: var(--text-primary);
+        }
+
+        .emailText {
+          font-size: 0.93rem;
+          color: var(--text-primary);
+          word-break: break-word;
+        }
+
+        .rolePill {
+          display: inline-flex;
+          align-items: center;
+          padding: 3px 10px;
+          border-radius: 999px;
+          font-size: 0.78rem;
+          font-weight: 600;
+          background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+          border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
+          color: var(--text-primary);
+          max-width: 100%;
+          white-space: normal;
+          overflow: visible;
+          text-overflow: clip;
+          overflow-wrap: normal;
+          word-break: normal;
+          line-height: 1.2;
+        }
+
+        .usersTable td[data-label="Rol"] {
+          overflow-wrap: normal;
+          word-break: normal;
+        }
+
+        .departmentText {
+          font-size: 0.9rem;
+          color: var(--text-primary);
+        }
+
+        .tableToolbar {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 12px;
+          flex-wrap: wrap;
+        }
+
+        .userCountChip {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          padding: 6px 13px;
+          border-radius: 999px;
+          font-size: 0.76rem;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          background: color-mix(in srgb, var(--surface-2) 86%, var(--primary) 14%);
+          border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--border));
+          color: var(--primary);
+        }
+
+        .avatarImg {
+          border-radius: 50%;
+          object-fit: cover;
+          border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16);
+          display: block;
+        }
+
+        .avatarFallback {
+          width: 44px;
+          height: 44px;
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          background: color-mix(in srgb, var(--primary) 20%, var(--surface));
+          border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--border));
+          color: var(--primary);
+          font-weight: 700;
+          font-size: 1rem;
+          flex-shrink: 0;
         }
 
         @media (max-width: 760px) {
@@ -680,54 +818,49 @@ export default function ListUsers() {
 
           .usersTable tbody tr {
             margin-bottom: 10px;
-            padding: 12px;
-            border-radius: 12px;
-            border: 1px solid var(--border);
-            background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 97%, transparent), color-mix(in srgb, var(--surface-2) 88%, transparent));
-            box-shadow: var(--elev-1);
+            border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+            border-radius: 10px;
+            background: color-mix(in srgb, var(--surface) 98%, transparent);
+            overflow: hidden;
           }
 
           .usersTable tbody td {
             border: none;
-            padding: 5px 0;
+            border-bottom: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+            padding: 9px 10px;
             line-height: 1.35;
+            margin-bottom: 0;
+          }
+
+          .usersTable tbody td:last-child {
+            border-bottom: none;
           }
 
           .usersTable tbody td::before {
             content: attr(data-label);
             display: block;
             margin-bottom: 2px;
-            font-size: 0.68rem;
-            font-weight: 600;
+            font-size: 0.67rem;
+            font-weight: 700;
             letter-spacing: 0.08em;
             text-transform: uppercase;
             color: var(--primary);
           }
 
-          .usersTable tbody td[data-label="Foto"] {
-            padding-top: 0;
-          }
-
-          .usersTable tbody td[data-label="Foto"]::before {
-            margin-bottom: 8px;
-          }
-
           .tableProfileCell,
           .tableActionsCell {
-            margin-top: 8px;
+            margin-top: 4px;
+            white-space: normal;
+          }
+
+          .tableActionsGroup {
+            display: grid;
+            width: 100%;
+            gap: 8px;
           }
 
           .tableAction {
             width: 100%;
-            margin: 0 0 8px 0;
-          }
-
-          .tableActionsCell .tableAction + .tableAction {
-            margin-left: 0;
-          }
-
-          .tableActionsCell .tableAction:last-child {
-            margin-bottom: 0;
           }
         }
 
@@ -777,48 +910,61 @@ export default function ListUsers() {
         .profileModalOverlay {
           position: fixed;
           inset: 0;
-          background: rgba(3, 13, 27, 0.74);
+          background: rgba(8, 16, 28, 0.56);
           display: flex;
           align-items: center;
           justify-content: center;
           z-index: 1100;
           padding: clamp(12px, 3vw, 24px);
-          backdrop-filter: blur(2px);
+          backdrop-filter: blur(4px);
         }
 
         .profileModal {
           position: relative;
-          width: min(1040px, 96vw);
+          width: min(1080px, 96vw);
           max-height: 92vh;
           overflow-y: auto;
           border-radius: 18px;
-          border: 1px solid rgba(90, 148, 206, 0.42);
-          background: linear-gradient(165deg, rgba(10, 33, 58, 0.98) 0%, rgba(12, 38, 66, 0.98) 55%, rgba(10, 30, 52, 0.98) 100%);
-          box-shadow: 0 24px 56px rgba(1, 9, 20, 0.52);
-          padding: clamp(14px, 2.6vw, 24px);
+          border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+          background: linear-gradient(
+            180deg,
+            color-mix(in srgb, var(--surface) 98%, white 2%) 0%,
+            color-mix(in srgb, var(--surface-2) 95%, transparent) 100%
+          );
+          box-shadow: 0 22px 50px rgba(4, 12, 26, 0.38);
+          padding: clamp(16px, 2.6vw, 26px);
         }
 
         .profileModalClose {
-          position: sticky;
-          top: 0;
-          margin-left: auto;
+          position: absolute;
+          top: 14px;
+          right: 14px;
           display: grid;
           place-items: center;
-          border: 1px solid rgba(154, 196, 236, 0.5);
-          background: rgba(38, 91, 142, 0.75);
-          color: #eef6ff;
-          border-radius: 8px;
-          width: 30px;
-          height: 30px;
+          border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+          background: color-mix(in srgb, var(--surface) 92%, transparent);
+          color: var(--text-secondary);
+          border-radius: 10px;
+          width: 32px;
+          height: 32px;
           cursor: pointer;
+          transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
           z-index: 2;
+        }
+
+        .profileModalClose:hover {
+          color: var(--text-primary);
+          border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
+          background: color-mix(in srgb, var(--surface-2) 92%, transparent);
         }
 
         .profileModalHeader {
           display: flex;
           align-items: center;
           gap: 14px;
-          margin: 4px 0 14px;
+          margin: 0 0 18px;
+          padding: 0 42px 14px 0;
+          border-bottom: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
         }
 
         .profileAvatarFallback {
@@ -828,25 +974,29 @@ export default function ListUsers() {
           display: grid;
           place-items: center;
           font-weight: 700;
-          color: #a7d1ff;
-          background: linear-gradient(145deg, rgba(30, 73, 120, 0.85), rgba(20, 54, 92, 0.9));
-          border: 1px solid rgba(107, 159, 211, 0.4);
+          color: var(--primary);
+          background: color-mix(in srgb, var(--primary) 14%, var(--surface));
+          border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
         }
 
         .profileTitle {
-          margin: 0 0 2px;
-          font-size: 1.55rem;
+          margin: 0 0 3px;
+          font-size: clamp(1.2rem, 1.8vw, 1.5rem);
+          color: var(--text-primary);
+          line-height: 1.2;
         }
 
         .profileSubtitle {
-          color: #d0e6ff;
-          font-size: 0.86rem;
+          color: var(--text-secondary);
+          font-size: 0.88rem;
+          word-break: break-word;
         }
 
         .profileRole {
-          color: #9bc8f5;
+          color: var(--primary);
           font-size: 0.8rem;
-          margin-top: 2px;
+          margin-top: 4px;
+          font-weight: 600;
         }
 
         .profileModalBody {
@@ -861,17 +1011,19 @@ export default function ListUsers() {
         }
 
         .profileCard {
-          background: rgba(23, 54, 89, 0.72);
-          border: 1px solid rgba(88, 142, 196, 0.38);
-          border-radius: 14px;
+          background: color-mix(in srgb, var(--surface) 95%, transparent);
+          border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+          border-radius: 12px;
           padding: 12px;
-          box-shadow: inset 0 1px 0 rgba(167, 206, 246, 0.12);
+          box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+          color: var(--text-primary);
         }
 
         .profileSectionTitle {
           font-weight: 700;
           letter-spacing: 0.02em;
           margin-bottom: 8px;
+          color: var(--text-primary);
         }
 
         .profileStatusRow {
@@ -883,12 +1035,12 @@ export default function ListUsers() {
         }
 
         .profileMetaText {
-          color: #b7d6f5;
+          color: var(--text-secondary);
           font-size: 12px;
         }
 
         .profileHintText {
-          color: #9fc4e9;
+          color: var(--text-secondary);
           font-size: 12px;
           margin-top: 8px;
         }
@@ -909,17 +1061,17 @@ export default function ListUsers() {
           display: flex;
           justify-content: space-between;
           gap: 12px;
-          align-items: center;
+          align-items: flex-start;
           padding: 10px 12px;
-          border-radius: 12px;
-          border: 1px solid rgba(80, 132, 186, 0.36);
-          background: rgba(12, 35, 61, 0.8);
+          border-radius: 10px;
+          border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+          background: color-mix(in srgb, var(--surface-2) 84%, transparent);
         }
 
         .profileDocumentActions {
           display: flex;
-          gap: 12px;
-          align-items: center;
+          gap: 10px;
+          align-items: flex-start;
           flex-wrap: wrap;
           justify-content: flex-end;
         }
@@ -928,9 +1080,9 @@ export default function ListUsers() {
           display: grid;
           gap: 10px;
           padding: 12px 14px;
-          border-radius: 12px;
-          border: 1px solid rgba(79, 132, 186, 0.38);
-          background: rgba(11, 33, 56, 0.78);
+          border-radius: 10px;
+          border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+          background: color-mix(in srgb, var(--surface) 95%, transparent);
         }
 
         .profileDocReviewHeader {
@@ -944,24 +1096,96 @@ export default function ListUsers() {
         .profileDocPreview {
           border-radius: 10px;
           overflow: hidden;
-          border: 1px solid rgba(90, 139, 187, 0.36);
-          background: rgba(8, 25, 43, 0.9);
+          border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+          background: color-mix(in srgb, var(--surface-2) 86%, transparent);
         }
 
         .profileDocPreviewSmall {
           width: 200px;
         }
 
+        .profileModal .input {
+          background: color-mix(in srgb, var(--surface) 96%, transparent);
+          border: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+          color: var(--text-primary);
+        }
+
+        .profileModal .input::placeholder {
+          color: color-mix(in srgb, var(--text-secondary) 88%, transparent);
+        }
+
+        .badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          border-radius: 999px;
+          padding: 4px 10px;
+          font-size: 0.74rem;
+          font-weight: 700;
+          letter-spacing: 0.02em;
+        }
+
+        .badge.approved {
+          color: #0f7d52;
+          background: rgba(38, 189, 132, 0.14);
+          border: 1px solid rgba(38, 189, 132, 0.34);
+        }
+
+        .badge.pending {
+          color: #856404;
+          background: rgba(255, 193, 7, 0.18);
+          border: 1px solid rgba(255, 193, 7, 0.34);
+        }
+
+        .badge.rejected {
+          color: #a23434;
+          background: rgba(214, 79, 79, 0.16);
+          border: 1px solid rgba(214, 79, 79, 0.34);
+        }
+
+        .link {
+          color: var(--primary);
+          text-decoration: none;
+          font-size: 0.83rem;
+          font-weight: 600;
+        }
+
+        .link:hover {
+          text-decoration: underline;
+        }
+
+        .button-primary,
+        .button-secondary {
+          border-radius: 8px;
+          padding: 8px 12px;
+          font-size: 0.82rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+          border: 1px solid transparent;
+        }
+
+        .button-primary {
+          color: #fff;
+          background: color-mix(in srgb, var(--primary) 86%, white 14%);
+          border-color: color-mix(in srgb, var(--primary) 42%, transparent);
+        }
+
+        .button-primary:hover {
+          background: color-mix(in srgb, var(--primary) 80%, white 20%);
+        }
+
+        .button-secondary {
+          color: var(--state-danger-text);
+          background: var(--state-danger-bg);
+          border-color: var(--state-danger-border);
+        }
+
+        .button-secondary:hover {
+          background: color-mix(in srgb, var(--state-danger-bg) 85%, white 15%);
+        }
+
         @media (max-width: 720px) {
-          .usersTable {
-            font-size: 0.84rem;
-          }
-
-          .usersTable thead th,
-          .usersTable tbody td {
-            padding: 9px 8px;
-          }
-
           .editModal {
             width: 94vw;
             padding: 20px 18px 26px;
@@ -970,10 +1194,20 @@ export default function ListUsers() {
           .profileModal {
             width: 96vw;
             border-radius: 14px;
+            padding: 14px;
+          }
+
+          .profileModalHeader {
+            padding-right: 34px;
+            align-items: flex-start;
           }
 
           .profileTitle {
             font-size: 1.2rem;
+          }
+
+          .profileSubtitle {
+            font-size: 0.82rem;
           }
 
           .profileDocumentRow {
@@ -987,6 +1221,11 @@ export default function ListUsers() {
           }
 
           .profileDocPreviewSmall {
+            width: 100%;
+          }
+
+          .profileActionRow .button-primary,
+          .profileActionRow .button-secondary {
             width: 100%;
           }
         }

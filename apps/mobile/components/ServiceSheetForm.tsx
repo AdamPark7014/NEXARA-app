@@ -1,6 +1,7 @@
 "use client";
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useUser } from './UserContext';
+import { triggerFileDownload } from '@/lib/file-download';
 import PDFViewer from './PDFViewer';
 import styles from './ServiceSheetForm.module.css';
 import { io, Socket } from 'socket.io-client';
@@ -154,10 +155,7 @@ export default function ServiceSheetForm() {
 
   const handleDownloadPdf = () => {
     if (!pdfUrl) return;
-    const link = document.createElement('a');
-    link.href = pdfUrl;
-    link.download = `hoja-servicio-${activityId}.pdf`;
-    link.click();
+    triggerFileDownload(pdfUrl, `hoja-servicio-${activityId}.pdf`, { preferOpenOnMobile: true });
   };
 
   useEffect(() => {

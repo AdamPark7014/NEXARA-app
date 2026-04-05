@@ -157,7 +157,6 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
   if (!isSuperAdmin && !isAdmin) {
     profileItems.push(
       { icon: "👤", label: "Mi perfil", href: "/my-profile", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-      { icon: "⚙️", label: "Mis preferencias", href: "/my-preferences", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
     );
   }
 

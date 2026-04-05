@@ -1,19 +1,9 @@
 'use client';
 import React from 'react';
-import dynamic from 'next/dynamic';
+import { Viewer, Worker } from '@react-pdf-viewer/core';
 import '@react-pdf-viewer/core/lib/styles/index.css';
 import styles from './PDFViewer.module.css';
-
-// Cargar Worker y Viewer dinámicamente sin SSR
-const Worker = dynamic(
-  () => import('@react-pdf-viewer/core').then(mod => mod.Worker),
-  { ssr: false, loading: () => <div>Cargando visor PDF...</div> }
-);
-
-const Viewer = dynamic(
-  () => import('@react-pdf-viewer/core').then(mod => mod.Viewer),
-  { ssr: false, loading: () => <div>Cargando documento...</div> }
-);
+import { triggerFileDownload } from '@/lib/file-download';
 
 interface PDFViewerProps {
   pdfUrl: string;
@@ -37,10 +27,7 @@ export default function PDFViewer({
   }[height] || styles.viewerH600;
 
   const handleDownload = () => {
-    const link = document.createElement('a');
-    link.href = pdfUrl;
-    link.download = fileName;
-    link.click();
+    triggerFileDownload(pdfUrl, fileName, { preferOpenOnMobile: true });
   };
 
   if (!pdfUrl) {

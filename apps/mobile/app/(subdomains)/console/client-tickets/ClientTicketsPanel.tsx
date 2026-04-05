@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { RoleGuard } from '@/components/RoleGuard';
 import { PERMISSIONS } from '@/lib/permissions';
 import { useUser } from '@/components/UserContext';
+import { revokeObjectUrlLater, triggerFileDownload } from '@/lib/file-download';
 
 type Client = {
   id: number;
@@ -171,11 +172,8 @@ export function ClientTicketsPanel({ embedded = false }: { embedded?: boolean })
     if (!res.ok) return;
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `reporte-cliente-${clientId}.pdf`;
-    link.click();
-    URL.revokeObjectURL(url);
+    triggerFileDownload(url, `reporte-cliente-${clientId}.pdf`, { preferOpenOnMobile: true });
+    revokeObjectUrlLater(url);
   };
 
   const handleTicketReportDownload = async (activityId: number) => {
@@ -186,11 +184,8 @@ export function ClientTicketsPanel({ embedded = false }: { embedded?: boolean })
     if (!res.ok) return;
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `reporte-ticket-${activityId}.pdf`;
-    link.click();
-    URL.revokeObjectURL(url);
+    triggerFileDownload(url, `reporte-ticket-${activityId}.pdf`, { preferOpenOnMobile: true });
+    revokeObjectUrlLater(url);
   };
 
   const handleInventoryReportDownload = async (inventoryId: number) => {
@@ -201,11 +196,8 @@ export function ClientTicketsPanel({ embedded = false }: { embedded?: boolean })
     if (!res.ok) return;
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `inventario-${inventoryId}.pdf`;
-    link.click();
-    URL.revokeObjectURL(url);
+    triggerFileDownload(url, `inventario-${inventoryId}.pdf`, { preferOpenOnMobile: true });
+    revokeObjectUrlLater(url);
   };
 
   const handleInventoryStatusUpdate = async (inventoryId: number, status: 'PENDING' | 'COMPLETED' | 'APPROVED' | 'REJECTED') => {

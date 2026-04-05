@@ -1,5 +1,7 @@
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
+import http from 'http';
+import https from 'https';
 import path from 'path';
 
 export type TicketEvidence = {
@@ -27,7 +29,15 @@ export type TicketReportPayload = {
   startedAt?: Date | null;
   finishedAt?: Date | null;
   responsableName?: string | null;
+  technicianName?: string | null;
+  serviceDate?: string | null;
+  clientCompany?: string | null;
+  clientPhone?: string | null;
   managerName?: string | null;
+  managerRole?: string | null;
+  managerSignature?: string | null;
+  materialsUsed?: string | null;
+  hoursWorked?: string | null;
   workSummary?: string | null;
   observations?: string | null;
   inventorySnapshot?: {
@@ -159,6 +169,80 @@ const resolveUploadPath = (fileUrl?: string | null) => {
 const getMapsUrl = (lat?: number | null, lng?: number | null) => {
   if (!lat || !lng) return null;
   return `https://www.google.com/maps?q=${lat},${lng}`;
+};
+
+const getStaticMapImageUrls = (lat?: number | null, lng?: number | null) => {
+  if (!lat || !lng) return [];
+  const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+  const urls: string[] = [];
+  if (googleMapsApiKey) {
+    urls.push(`https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=16&size=600x600&maptype=roadmap&markers=color:red%7C${lat},${lng}&key=${encodeURIComponent(googleMapsApiKey)}`);
+    urls.push(`https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&scale=2&size=600x600&maptype=hybrid&markers=color:red%7C${lat},${lng}&key=${encodeURIComponent(googleMapsApiKey)}`);
+    return urls;
+  }
+  urls.push(`https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=15&size=600x600&markers=${lat},${lng},red-pushpin`);
+  urls.push(`https://static-maps.yandex.ru/1.x/?ll=${lng},${lat}&size=450,450&z=15&l=map&pt=${lng},${lat},pm2rdm`);
+  return urls;
+};
+
+const downloadImageBuffer = (imageUrl: string): Promise<Buffer | null> => new Promise((resolve) => {
+  try {
+    const parsed = new URL(imageUrl);
+    const client = parsed.protocol === 'http:' ? http : https;
+    const webBaseUrl = (process.env.PUBLIC_WEB_URL || process.env.WEB_URL || 'http://tickets.localhost:3000').replace(/\/+$/, '');
+    const request = client.get(imageUrl, {
+      headers: {
+        'User-Agent': 'NEXARA Ticket Report PDF',
+        Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+        Referer: `${webBaseUrl}/`,
+        Origin: webBaseUrl,
+      },
+    }, (response) => {
+      if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
+        response.resume();
+        resolve(null);
+        return;
+      }
+
+      const chunks: Buffer[] = [];
+      response.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+      response.on('end', () => resolve(Buffer.concat(chunks)));
+    });
+
+    request.on('error', () => resolve(null));
+    request.setTimeout(8000, () => {
+      request.destroy();
+      resolve(null);
+    });
+  } catch {
+    resolve(null);
+  }
+});
+
+const fetchImageBuffer = async (imageUrls: string[]) => {
+  for (const imageUrl of imageUrls) {
+    const buffer = await downloadImageBuffer(imageUrl);
+    if (buffer && buffer.length > 0) {
+      return buffer;
+    }
+  }
+  return null;
+};
+
+const resolveSignatureImage = (value?: string | null) => {
+  if (!value) return null;
+  const raw = value.trim();
+  if (!raw) return null;
+  if (/^data:image\//i.test(raw)) {
+    const [, base64] = raw.split(',', 2);
+    if (!base64) return null;
+    try {
+      return Buffer.from(base64, 'base64');
+    } catch {
+      return null;
+    }
+  }
+  return resolveUploadPath(raw);
 };
 
 export const generateTicketReportPdf = async (payload: TicketReportPayload): Promise<Buffer> => {
@@ -305,8 +389,9 @@ export const generateTicketReportPdf = async (payload: TicketReportPayload): Pro
       { label: 'Inicio', value: formatDateTime(payload.startedAt) },
       { label: 'Término', value: formatDateTime(payload.finishedAt) },
       { label: 'Duración', value: formatDuration(payload.startedAt || null, payload.finishedAt || null) },
-      { label: 'Atendió', value: payload.responsableName || '-' },
+      { label: 'Atendió', value: payload.technicianName || payload.responsableName || '-' },
       { label: 'Gerente', value: payload.managerName || '-' },
+      { label: 'Cargo', value: payload.managerRole || '-' },
     ];
 
     const branchHeight = drawInfoCard(margin, infoY, leftWidth, branchLines);
@@ -378,6 +463,15 @@ export const generateTicketReportPdf = async (payload: TicketReportPayload): Pro
     }
 
     drawSectionTitle('Resumen operativo');
+    const serviceDetailsHeight = drawInfoCard(margin, doc.y, contentWidth, [
+      { label: 'Empresa', value: payload.clientCompany || payload.clientName || '-' },
+      { label: 'Teléfono', value: payload.clientPhone || '-' },
+      { label: 'Fecha serv.', value: payload.serviceDate || '-' },
+      { label: 'Horas', value: payload.hoursWorked || '-' },
+      { label: 'Materiales', value: payload.materialsUsed || '-' },
+    ]);
+    doc.y += serviceDetailsHeight + 12;
+
     doc.fillColor(colors.navy).fontSize(11).font('Helvetica-Bold').text('Trabajo realizado');
     doc.fillColor(colors.text).fontSize(10).font('Helvetica').text(payload.workSummary || '-', { width: contentWidth });
 
@@ -385,14 +479,66 @@ export const generateTicketReportPdf = async (payload: TicketReportPayload): Pro
     doc.fillColor(colors.navy).fontSize(11).font('Helvetica-Bold').text('Observaciones');
     doc.fillColor(colors.text).fontSize(10).font('Helvetica').text(payload.observations || '-', { width: contentWidth });
 
+    drawSectionTitle('Conformidad del gerente');
+    const signatureCardY = doc.y;
+    const signatureCardHeight = 122;
+    doc.save();
+    doc.roundedRect(margin, signatureCardY, contentWidth, signatureCardHeight, 8).fill(colors.softGray);
+    doc.restore();
+
+    drawInfoCard(margin + 10, signatureCardY + 10, 220, [
+      { label: 'Gerente', value: payload.managerName || '-' },
+      { label: 'Cargo', value: payload.managerRole || '-' },
+    ]);
+
+    const signatureBoxX = margin + 250;
+    const signatureBoxY = signatureCardY + 14;
+    const signatureBoxWidth = contentWidth - 260;
+    const signatureBoxHeight = 76;
+    doc.save();
+    doc.roundedRect(signatureBoxX, signatureBoxY, signatureBoxWidth, signatureBoxHeight, 8).stroke(colors.line);
+    doc.restore();
+
+    const signatureImage = resolveSignatureImage(payload.managerSignature);
+    if (signatureImage) {
+      try {
+        doc.image(signatureImage as any, signatureBoxX + 8, signatureBoxY + 8, {
+          fit: [signatureBoxWidth - 16, signatureBoxHeight - 16],
+          align: 'center',
+          valign: 'center',
+        });
+      } catch {
+        doc.fillColor(colors.muted).fontSize(9).text('Firma registrada, pero no se pudo renderizar.', signatureBoxX + 10, signatureBoxY + 28, {
+          width: signatureBoxWidth - 20,
+          align: 'center',
+        });
+      }
+    } else {
+      doc.fillColor(colors.muted).fontSize(9).text('Sin firma digital adjunta', signatureBoxX + 10, signatureBoxY + 28, {
+        width: signatureBoxWidth - 20,
+        align: 'center',
+      });
+    }
+    doc.fillColor(colors.muted).fontSize(8.5).text('Firma del gerente / representante', signatureBoxX, signatureBoxY + signatureBoxHeight + 6, {
+      width: signatureBoxWidth,
+      align: 'center',
+    });
+    doc.y = signatureCardY + signatureCardHeight + 14;
+
     drawSectionTitle('Evidencias');
 
-    const evidenceSize = 150;
+    const evidenceWidth = 220;
+    const evidenceHeight = 164;
     let x = margin;
     let y = doc.y + 10;
 
-    payload.evidences.forEach((evidence) => {
-      if (y + evidenceSize + 28 > doc.page.height - 60) {
+    const arrivalCoordinates = payload.evidences.find((evidence) =>
+      evidence.tipoEvidencia?.toLowerCase().includes('llegada') && evidence.latitud && evidence.longitud,
+    ) || payload.evidences.find((evidence) => evidence.latitud && evidence.longitud);
+
+    const drawEvidences = async () => {
+      for (const evidence of payload.evidences) {
+      if (y + evidenceHeight + 42 > doc.page.height - 60) {
         doc.addPage();
         drawHeader();
         doc.y = 140;
@@ -403,40 +549,57 @@ export const generateTicketReportPdf = async (payload: TicketReportPayload): Pro
 
       const evidencePath = resolveUploadPath(evidence.archivoUrl);
       const isPdf = evidence.archivoUrl.toLowerCase().endsWith('.pdf');
+      const mapForPdf = isPdf
+        && /(hoja de servicio|pdf adjunto|pdf)/i.test(evidence.tipoEvidencia || '')
+        && arrivalCoordinates;
 
-      if (evidencePath && !isPdf) {
+      if (mapForPdf) {
+        const mapImageUrls = getStaticMapImageUrls(arrivalCoordinates.latitud, arrivalCoordinates.longitud);
+        const mapBuffer = await fetchImageBuffer(mapImageUrls);
+        if (mapBuffer) {
+          doc.image(mapBuffer, x, y, { fit: [evidenceWidth, evidenceHeight], align: 'center', valign: 'center' });
+        } else {
+          doc.rect(x, y, evidenceWidth, evidenceHeight).fill(colors.softGray);
+          doc.fillColor(colors.muted).fontSize(9).text('Mapa no disponible', x + 8, y + 60, { width: evidenceWidth - 16, align: 'center' });
+        }
+      } else if (evidencePath && !isPdf) {
         try {
-          doc.image(evidencePath, x, y, { width: evidenceSize, height: evidenceSize, fit: [evidenceSize, evidenceSize] });
+          doc.image(evidencePath, x, y, { fit: [evidenceWidth, evidenceHeight], align: 'center', valign: 'center' });
         } catch {
-          doc.rect(x, y, evidenceSize, evidenceSize).stroke(colors.muted);
-          doc.fontSize(9).fillColor(colors.muted).text('No se pudo cargar', x + 8, y + 60, { width: evidenceSize - 16, align: 'center' });
+          doc.rect(x, y, evidenceWidth, evidenceHeight).stroke(colors.muted);
+          doc.fontSize(9).fillColor(colors.muted).text('No se pudo cargar', x + 8, y + 60, { width: evidenceWidth - 16, align: 'center' });
         }
       } else {
-        doc.rect(x, y, evidenceSize, evidenceSize).fill(colors.softGray);
-        doc.fillColor(colors.muted).fontSize(9).text(isPdf ? 'PDF adjunto' : 'Sin evidencia', x + 8, y + 60, { width: evidenceSize - 16, align: 'center' });
+        doc.rect(x, y, evidenceWidth, evidenceHeight).fill(colors.softGray);
+        doc.fillColor(colors.muted).fontSize(9).text(isPdf ? 'PDF adjunto' : 'Sin evidencia', x + 8, y + 60, { width: evidenceWidth - 16, align: 'center' });
       }
 
-      doc.fillColor(colors.text).fontSize(8).text(evidence.tipoEvidencia, x, y + evidenceSize + 4, { width: evidenceSize });
+      doc.fillColor(colors.text).fontSize(8.5).text(mapForPdf ? 'Mapa de llegada' : evidence.tipoEvidencia, x, y + evidenceHeight + 6, { width: evidenceWidth });
 
-      const mapsUrl = evidence.tipoEvidencia === 'Foto llegada'
-        ? getMapsUrl(evidence.latitud, evidence.longitud)
-        : null;
+      const mapsUrl = mapForPdf
+        ? getMapsUrl(arrivalCoordinates?.latitud, arrivalCoordinates?.longitud)
+        : evidence.tipoEvidencia === 'Foto llegada'
+          ? getMapsUrl(evidence.latitud, evidence.longitud)
+          : null;
       if (mapsUrl) {
-        doc.fillColor(colors.blue).fontSize(7).text('Ver ubicación de llegada', x, y + evidenceSize + 16, {
-          width: evidenceSize,
+        doc.fillColor(colors.blue).fontSize(7).text('Ver ubicación de llegada', x, y + evidenceHeight + 20, {
+          width: evidenceWidth,
           link: mapsUrl,
           underline: true,
         });
       }
 
-      x += evidenceSize + 12;
-      if (x + evidenceSize > margin + contentWidth) {
+      x += evidenceWidth + 18;
+      if (x + evidenceWidth > margin + contentWidth) {
         x = margin;
-        y += evidenceSize + (mapsUrl ? 40 : 28);
+        y += evidenceHeight + (mapsUrl ? 40 : 30);
       }
-    });
+      }
 
-    doc.end();
+      doc.end();
+    };
+
+    drawEvidences().catch((error) => reject(error));
   });
 };
 

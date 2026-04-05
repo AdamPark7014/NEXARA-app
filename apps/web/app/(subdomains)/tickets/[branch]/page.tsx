@@ -54,6 +54,27 @@ type Ticket = {
   fechaFinalizacion?: string | null;
   responsable?: { nombre: string } | null;
   serviceSheet?: { pdfUrl?: string | null } | null;
+  evidencias?: Array<{ id: number; archivoUrl: string; tipoEvidencia: string; latitud?: number | null; longitud?: number | null; subidoEn?: string | null }>;
+  activityEvidence?: {
+    id: number;
+    status: string;
+    entryPhotoUrl?: string | null;
+    entryPhotoUploadedAt?: string | null;
+    entryLatitude?: number | null;
+    entryLongitude?: number | null;
+    evidencePhotos?: string[];
+    evidencePhotosUploadedAt?: string | null;
+    serviceSheetPdfUrl?: string | null;
+    serviceSheetUploadedAt?: string | null;
+    serviceSheetData?: unknown;
+    serviceSheetCompletedAt?: string | null;
+    exitPhotoUrl?: string | null;
+    exitPhotoUploadedAt?: string | null;
+    exitLatitude?: number | null;
+    exitLongitude?: number | null;
+    completedAt?: string | null;
+    createdAt?: string | null;
+  } | null;
 };
 
 export default function BranchTicketsPage() {
@@ -92,6 +113,7 @@ export default function BranchTicketsPage() {
     longitud: null as number | null,
     address: "",
   });
+  const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
   const openRequests = requests.filter((request) => String(request.status || '').toUpperCase() !== 'CLOSED');
 
@@ -121,19 +143,139 @@ export default function BranchTicketsPage() {
     if (/^(data:|blob:|\/\/)/i.test(raw)) return raw;
 
     const base = getApiAssetOrigin();
+    let search = "";
     if (/^https?:\/\//i.test(raw)) {
       try {
         const parsed = new URL(raw);
-        if (parsed.pathname.startsWith("/uploads/")) {
-          return `${base}${parsed.pathname}${parsed.search}`;
+        if (!/^\/(uploads|activities|evidences|activity-evidence|documents|user-docs|users|clients|vehicles)\//i.test(parsed.pathname)) {
+          return raw;
         }
+        search = parsed.search;
       } catch {
         // Keep original URL if parsing fails.
+        return raw;
       }
-      return raw;
     }
 
-    return `${base}${raw.startsWith("/") ? "" : "/"}${raw}`;
+    const normalizedPath = raw
+      .replace(/\\+/g, "/")
+      .replace(/^https?:\/\/[^/]+/i, "")
+      .replace(/^\/api(?=\/uploads\/)/i, "")
+      .replace(/^\/?uploads\//i, "")
+      .replace(/^\/+/, "")
+      .replace(/\?.*$/, "");
+    const normalized = `/uploads/${normalizedPath}`.replace(/\/uploads\/+/, "/uploads/");
+    return `${base}${encodeURI(normalized)}${search}`;
+  };
+
+  const humanizeTicketKey = (value: string) =>
+    value
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+  const flattenTicketFields = (value: unknown, prefix = ""): Array<{ label: string; value: string; imageUrl?: string | null }> => {
+    if (value == null) return [];
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) return [];
+      if (/^data:image\//i.test(trimmed)) {
+        return [{ label: prefix || "Imagen", value: "Imagen capturada", imageUrl: trimmed }];
+      }
+      return [{ label: prefix || "Valor", value: trimmed }];
+    }
+    if (typeof value === "number" || typeof value === "boolean") {
+      return [{ label: prefix || "Valor", value: String(value) }];
+    }
+    if (Array.isArray(value)) {
+      if (!value.length) return [];
+      if (value.every((item) => ["string", "number", "boolean"].includes(typeof item))) {
+        return [{ label: prefix || "Valores", value: value.join(", ") }];
+      }
+      return value.flatMap((item, index) => flattenTicketFields(item, prefix ? `${prefix} ${index + 1}` : `Elemento ${index + 1}`));
+    }
+    if (typeof value === "object") {
+      return Object.entries(value as Record<string, unknown>).flatMap(([key, nested]) =>
+        flattenTicketFields(nested, prefix ? `${prefix} / ${humanizeTicketKey(key)}` : humanizeTicketKey(key)),
+      );
+    }
+    return [];
+  };
+
+  const getEvidenceKind = (value?: string | null): "pdf" | "image" | "file" => {
+    if (!value) return "file";
+    const normalized = value.trim().toLowerCase();
+    if (normalized.endsWith(".pdf")) return "pdf";
+    if (/\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i.test(normalized)) return "image";
+    return "file";
+  };
+
+  const hasCoordinates = (latitude?: number | null, longitude?: number | null) => latitude != null && longitude != null;
+  const formatCoordinates = (latitude?: number | null, longitude?: number | null) => {
+    if (!hasCoordinates(latitude, longitude)) return "-";
+    return `${Number(latitude).toFixed(6)}, ${Number(longitude).toFixed(6)}`;
+  };
+
+  const formatDateTime = (value?: string | null) => {
+    if (!value) return "-";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "-";
+    return date.toLocaleString("es-MX", {
+      timeZone: "America/Mexico_City",
+      year: "2-digit",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const getArrivalTime = (ticket: Ticket) => ticket.activityEvidence?.entryPhotoUploadedAt || ticket.activityEvidence?.createdAt || undefined;
+  const getDepartureTime = (ticket: Ticket) => ticket.activityEvidence?.exitPhotoUploadedAt || ticket.activityEvidence?.completedAt || ticket.fechaFinalizacion || undefined;
+
+  const buildTicketEvidenceFiles = (ticket: Ticket) => {
+    const files: Array<{ label: string; url: string; kind: "image" | "pdf" | "file" }> = [];
+    const pushFile = (label: string, value?: string | null) => {
+      const resolved = getAssetUrl(value);
+      if (!resolved) return;
+      if (files.some((file) => file.url === resolved)) return;
+      files.push({ label, url: resolved, kind: getEvidenceKind(resolved) });
+    };
+
+    pushFile("Foto llegada", ticket.activityEvidence?.entryPhotoUrl);
+    (ticket.activityEvidence?.evidencePhotos || []).forEach((photoUrl, index) => pushFile(`Evidencia ${index + 1}`, photoUrl));
+    pushFile("PDF hoja de servicio", ticket.activityEvidence?.serviceSheetPdfUrl || ticket.serviceSheet?.pdfUrl);
+    pushFile("Foto salida", ticket.activityEvidence?.exitPhotoUrl);
+    (ticket.evidencias || []).forEach((evidence) => pushFile(evidence.tipoEvidencia || "Archivo", evidence.archivoUrl));
+    return files;
+  };
+
+  const getTicketMapCoords = (ticket: Ticket) => {
+    const lat = ticket.activityEvidence?.entryLatitude ?? ticket.activityEvidence?.exitLatitude ?? null;
+    const lng = ticket.activityEvidence?.entryLongitude ?? ticket.activityEvidence?.exitLongitude ?? null;
+    return { lat, lng };
+  };
+
+  const getStaticMapPreviewUrl = (lat?: number | null, lng?: number | null) => {
+    if (!lat || !lng) return "";
+    if (GOOGLE_MAPS_API_KEY) {
+      return `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=16&size=1200x420&maptype=roadmap&markers=color:red%7C${lat},${lng}&key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}`;
+    }
+    return `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=15&size=1200x420&markers=${lat},${lng},red-pushpin`;
+  };
+
+  const shouldReplacePdfWithMap = (file: { label: string; kind: "image" | "pdf" | "file" }, ticket: Ticket) => {
+    if (file.kind !== "pdf") return false;
+    if (!/(hoja de servicio|pdf adjunto)/i.test(file.label)) return false;
+    const { lat, lng } = getTicketMapCoords(ticket);
+    return hasCoordinates(lat, lng);
+  };
+
+  const getMapsUrl = (lat?: number | null, lng?: number | null) => {
+    if (!lat || !lng) return "";
+    return `https://www.google.com/maps?q=${lat},${lng}`;
   };
   const branchAvatarUrl = profile?.logoUrl || profile?.client?.logoUrl || session?.branch?.logoUrl || "";
 
@@ -586,6 +728,87 @@ export default function BranchTicketsPage() {
                       Ver ticket (PDF)
                     </button>
                   </div>
+                  <details className={styles.ticketDetailPanel}>
+                    <summary className={styles.ticketDetailSummary}>Ver detalle operativo</summary>
+                    <div className={styles.ticketDetailBody}>
+                      <section className={styles.ticketDetailSection}>
+                        <h4 className={styles.ticketDetailTitle}>Flujo de actividad</h4>
+                        <div className={styles.ticketDetailGrid}>
+                          <div><strong>Llegada:</strong> {formatDateTime(getArrivalTime(ticket))}</div>
+                          <div><strong>Salida:</strong> {formatDateTime(getDepartureTime(ticket))}</div>
+                          <div><strong>Inicio:</strong> {formatDateTime(ticket.fechaInicio)}</div>
+                          <div><strong>Cierre:</strong> {formatDateTime(ticket.fechaFinalizacion)}</div>
+                          <div>
+                            <strong>Ubicación llegada:</strong> {formatCoordinates(ticket.activityEvidence?.entryLatitude, ticket.activityEvidence?.entryLongitude)}
+                            {hasCoordinates(ticket.activityEvidence?.entryLatitude, ticket.activityEvidence?.entryLongitude) && (
+                              <a className={styles.ticketInlineLink} href={getMapsUrl(ticket.activityEvidence?.entryLatitude, ticket.activityEvidence?.entryLongitude)} target="_blank" rel="noreferrer">Ver mapa</a>
+                            )}
+                          </div>
+                          <div>
+                            <strong>Ubicación salida:</strong> {formatCoordinates(ticket.activityEvidence?.exitLatitude, ticket.activityEvidence?.exitLongitude)}
+                            {hasCoordinates(ticket.activityEvidence?.exitLatitude, ticket.activityEvidence?.exitLongitude) && (
+                              <a className={styles.ticketInlineLink} href={getMapsUrl(ticket.activityEvidence?.exitLatitude, ticket.activityEvidence?.exitLongitude)} target="_blank" rel="noreferrer">Ver mapa</a>
+                            )}
+                          </div>
+                          <div><strong>PDF generado:</strong> {formatDateTime(ticket.activityEvidence?.serviceSheetUploadedAt)}</div>
+                          <div><strong>Formulario digital:</strong> {formatDateTime(ticket.activityEvidence?.serviceSheetCompletedAt)}</div>
+                        </div>
+                      </section>
+
+                      <section className={styles.ticketDetailSection}>
+                        <h4 className={styles.ticketDetailTitle}>Archivos y evidencias</h4>
+                        <div className={styles.ticketFileGrid}>
+                          {buildTicketEvidenceFiles(ticket).map((file) => {
+                            const mapReplacement = shouldReplacePdfWithMap(file, ticket);
+                            const coords = getTicketMapCoords(ticket);
+                            const mapUrl = getMapsUrl(coords.lat, coords.lng);
+                            const mapPreviewUrl = getStaticMapPreviewUrl(coords.lat, coords.lng);
+
+                            return (
+                              <a
+                                key={`${ticket.id}-${file.label}-${file.url}`}
+                                className={styles.ticketFileCard}
+                                href={mapReplacement ? mapUrl : file.url}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                <span className={styles.ticketFileLabel}>{mapReplacement ? "Mapa de llegada" : file.label}</span>
+                                {mapReplacement ? (
+                                  <img src={mapPreviewUrl} alt="Mapa de llegada" className={styles.ticketFileImage} />
+                                ) : file.kind === "image" ? (
+                                  <img src={file.url} alt={file.label} className={styles.ticketFileImage} />
+                                ) : (
+                                  <span className={styles.ticketFileMeta}>{file.kind === "pdf" ? "Abrir PDF" : "Abrir archivo"}</span>
+                                )}
+                              </a>
+                            );
+                          })}
+                          {buildTicketEvidenceFiles(ticket).length === 0 && <div className={styles.mutedText}>Sin archivos de evidencia.</div>}
+                        </div>
+                      </section>
+
+                      <section className={styles.ticketDetailSection}>
+                        <h4 className={styles.ticketDetailTitle}>Formulario digital</h4>
+                        <div className={styles.ticketFormGrid}>
+                          {flattenTicketFields(ticket.activityEvidence?.serviceSheetData).map((field, index) => (
+                            <div key={`${ticket.id}-${field.label}-${index}`} className={styles.ticketFormCard}>
+                              <span className={styles.ticketFormLabel}>{field.label}</span>
+                              {field.imageUrl ? (
+                                <img
+                                  src={field.imageUrl}
+                                  alt={field.label}
+                                  className={`${styles.ticketFormImage} ${/(signature|firma)/i.test(field.label) ? styles.ticketFormImageSignature : ""}`}
+                                />
+                              ) : (
+                                <span className={styles.ticketFormValue}>{field.value}</span>
+                              )}
+                            </div>
+                          ))}
+                          {flattenTicketFields(ticket.activityEvidence?.serviceSheetData).length === 0 && <div className={styles.mutedText}>No hay datos del formulario digital.</div>}
+                        </div>
+                      </section>
+                    </div>
+                  </details>
                 </div>
               ))}
             </div>

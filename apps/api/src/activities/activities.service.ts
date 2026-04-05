@@ -285,6 +285,10 @@ export class ActivitiesService {
 
     const mergedEvidences = dedupeEvidences([...flowItems, ...legacyItems]);
 
+    const serviceSheetData = flowEvidence?.serviceSheetData && typeof flowEvidence.serviceSheetData === 'object'
+      ? flowEvidence.serviceSheetData as Record<string, any>
+      : null;
+
     const pdf = await generateTicketReportPdf({
       anNumber: activity.anNumber,
       titulo: activity.titulo,
@@ -303,9 +307,17 @@ export class ActivitiesService {
       startedAt: activity.fechaInicio,
       finishedAt: activity.fechaFinalizacion,
       responsableName: activity.responsable?.nombre || null,
-      managerName: activity.serviceSheet?.managerName || null,
-      workSummary: activity.serviceSheet?.workSummary || null,
-      observations: activity.serviceSheet?.observations || null,
+      technicianName: serviceSheetData?.technicianName || activity.responsable?.nombre || null,
+      serviceDate: serviceSheetData?.serviceDate || null,
+      clientCompany: serviceSheetData?.clientCompany || activity.client?.name || null,
+      clientPhone: serviceSheetData?.clientPhone || null,
+      managerName: serviceSheetData?.managerName || activity.serviceSheet?.managerName || null,
+      managerRole: serviceSheetData?.managerRole || activity.serviceSheet?.managerRole || null,
+      managerSignature: serviceSheetData?.managerSignature || null,
+      materialsUsed: serviceSheetData?.materialsUsed || null,
+      hoursWorked: serviceSheetData?.hoursWorked || null,
+      workSummary: serviceSheetData?.workSummary || activity.serviceSheet?.workSummary || null,
+      observations: serviceSheetData?.observations || activity.serviceSheet?.observations || null,
       inventorySnapshot: activity.inventorySnapshot
         ? {
             status: activity.inventorySnapshot.status,

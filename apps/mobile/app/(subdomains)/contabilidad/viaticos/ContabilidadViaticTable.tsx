@@ -6,6 +6,7 @@ import { useUser } from "@/components/UserContext";
 import ExcelDownloadModal from "@/components/ExcelDownloadModal";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { canViewContabilidadTarget } from "@/lib/contabilidad-visibility";
+import { triggerFileDownload } from "@/lib/file-download";
 import styles from "./ContabilidadViaticTable.module.css";
 
 type Viatic = {
@@ -152,12 +153,7 @@ const ContabilidadViaticTable = () => {
 
   const handleDownloadExcel = () => {
     if (!excelUrl) return;
-    const a = document.createElement("a");
-    a.href = excelUrl;
-    a.download = "viáticos.xlsx";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    triggerFileDownload(excelUrl, "viáticos.xlsx", { preferOpenOnMobile: true });
     closeExcelModal();
   };
 

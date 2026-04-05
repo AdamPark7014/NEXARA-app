@@ -124,7 +124,7 @@ export class BranchPortalController {
 
     return this.prisma['activity'].findMany({
       where,
-      include: { responsable: true, evidencias: true, serviceSheet: true },
+      include: { responsable: true, evidencias: true, serviceSheet: true, activityEvidence: true },
       orderBy: { fechaAsignacion: 'desc' },
     });
   }

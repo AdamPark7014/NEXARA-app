@@ -7,6 +7,13 @@ export interface User {
 	email: string;
 	role: string;
 	roleId?: number;
+	roleFlags?: {
+		accesoConsole?: boolean;
+		accesoConsoleAdmin?: boolean;
+		accesoGestionCvs?: boolean;
+		accesoPanelVentas?: boolean;
+		accesoCotizaciones?: boolean;
+	};
 	department: string;
 	departmentId: number;
 	token: string;
@@ -38,6 +45,7 @@ const normalizeUser = (value: unknown): User | null => {
 		email: candidate.email,
 		role: candidate.role || '',
 		roleId: candidate.roleId,
+		roleFlags: candidate.roleFlags,
 		department: candidate.department || '',
 		departmentId: Number(candidate.departmentId || 0),
 		token: candidate.token,
@@ -82,35 +90,25 @@ const safeGetStoredUser = (): User | null => {
 		// Ignore storage access errors (Safari private mode, etc.)
 	}
 
-	try {
-		const localCandidate = parseStored(window.localStorage.getItem(USER_STORAGE_KEY));
-		if (localCandidate) return localCandidate;
-	} catch {
-		// Ignore storage access errors (Safari private mode, etc.)
-	}
-
 	return null;
 };
 
 const safePersistUser = (user: User | null) => {
 	if (typeof window === 'undefined') return;
 
-	const write = (storage: Storage) => {
-		if (user) {
-			storage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-			return;
-		}
-		storage.removeItem(USER_STORAGE_KEY);
-	};
-
 	try {
-		write(window.sessionStorage);
+		if (user) {
+			window.sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+		} else {
+			window.sessionStorage.removeItem(USER_STORAGE_KEY);
+		}
 	} catch {
 		// Ignore storage access errors
 	}
 
 	try {
-		write(window.localStorage);
+		// Limpia clave legacy global para evitar que una sesión de otra pestaña se propague.
+		window.localStorage.removeItem(USER_STORAGE_KEY);
 	} catch {
 		// Ignore storage access errors
 	}
@@ -135,23 +133,6 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 	useEffect(() => {
 		safePersistUser(user);
 	}, [user]);
-
-	// Cross-tab sync: if another tab logs out, reflect it here
-	useEffect(() => {
-		const handleStorage = (e: StorageEvent) => {
-			if (e.key !== USER_STORAGE_KEY) return;
-			if (!e.newValue) {
-				setUser(null);
-			} else {
-				const parsed = normalizeUser((() => { try { return JSON.parse(e.newValue); } catch { return null; } })());
-				if (parsed && !isTokenExpired(parsed.token)) {
-					setUser(parsed);
-				}
-			}
-		};
-		window.addEventListener('storage', handleStorage);
-		return () => window.removeEventListener('storage', handleStorage);
-	}, []);
 
 	const logout = () => setUser(null);
 

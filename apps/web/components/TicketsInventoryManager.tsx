@@ -34,6 +34,8 @@ type InventorySnapshot = {
   deltaCount?: number | null;
   updatedAt?: string | null;
   branch?: { id: number; name?: string | null; branchNumber?: string | null } | null;
+  activity?: { id: number; anNumber?: string | null; titulo?: string | null; workType?: string | null; estatus?: string | null } | null;
+  request?: { id: number; requestType?: string | null; status?: string | null } | null;
   items?: any[];
 };
 
@@ -84,6 +86,8 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
   const [inventories, setInventories] = useState<InventorySnapshot[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState<string>(fixedBranch ? String(fixedBranch.id) : "");
   const [selectedInventoryId, setSelectedInventoryId] = useState<number | null>(null);
+  const [detailInventory, setDetailInventory] = useState<InventorySnapshot | null>(null);
+  const [detailLoadingId, setDetailLoadingId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [originFilter, setOriginFilter] = useState<string>('all');
   const [fromDate, setFromDate] = useState('');
@@ -278,6 +282,11 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
     return 'Inventario proveedor';
   };
 
+  const getFlowLabel = (value?: string | null) => {
+    if (String(value || '').toUpperCase() === 'PREVENTIVE_INVENTORY') return 'Mantenimiento e inventario';
+    return 'Ticket por problema';
+  };
+
   const isItemComplete = (item: InventoryItemDraft) => {
     const resolvedGroup = item.groupName === 'OTROS'
       ? (item.customGroupName || '').trim()
@@ -429,6 +438,25 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
     setItems(nextItems.length > 0 ? nextItems : [emptyItem()]);
     setActiveItemIndex(0);
     setLoading(false);
+  };
+
+  const openInventoryDetail = async (inventoryId: number) => {
+    setDetailLoadingId(inventoryId);
+    setError(null);
+    const endpoint = mode === "branch" ? `branch-portal/inventories/${inventoryId}` : `client-portal/inventories/${inventoryId}`;
+    try {
+      const response = await fetch(buildApiUrl(endpoint), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        setError("No se pudo cargar el detalle del inventario");
+        return;
+      }
+      const detail = await response.json();
+      setDetailInventory(detail);
+    } finally {
+      setDetailLoadingId(null);
+    }
   };
 
   const resetEditor = () => {
@@ -792,6 +820,16 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
               <span className="badge">{getStatusLabel(inventory.status)}</span>
             </div>
             <div className="inventory-record-meta">Origen: {getOriginLabel(inventory)}</div>
+            {inventory.activity && (
+              <div className="inventory-record-meta">
+                Actividad: {inventory.activity.anNumber || `ACT-${inventory.activity.id}`} · {inventory.activity.titulo || '-'} · {getFlowLabel(inventory.activity.workType)}
+              </div>
+            )}
+            {inventory.request && (
+              <div className="inventory-record-meta">
+                Solicitud: #{inventory.request.id} · {getFlowLabel(inventory.request.requestType)} · {inventory.request.status || '-'}
+              </div>
+            )}
             <div className="inventory-record-meta">
               {inventory.previousCount ?? 0} previos · {inventory.currentCount ?? 0} actuales · Δ {inventory.deltaCount ?? 0}
             </div>
@@ -814,6 +852,9 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
               </div>
             )}
             <div className="chip-row">
+              <button className="button-secondary" type="button" onClick={() => openInventoryDetail(inventory.id)}>
+                {detailLoadingId === inventory.id ? 'Cargando...' : 'Detalle'}
+              </button>
               <button className="button-secondary" type="button" onClick={() => loadDetail(inventory.id)}>Ver / editar</button>
               <button className="button-secondary" type="button" onClick={() => handleReportDownload(inventory.id)}>PDF</button>
               {mode === 'branch' && (
@@ -832,6 +873,79 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
           </div>
         ))}
       </div>
+
+      {detailInventory && (
+        <div
+          style={{
+            display: 'grid',
+            gap: 12,
+            padding: 16,
+            borderRadius: 16,
+            border: '1px solid var(--border)',
+            background: 'var(--card-bg)',
+          }}
+        >
+          <div className="inventory-record-top">
+            <strong>{detailInventory.title || `Inventario INV-${detailInventory.id}`}</strong>
+            <div className="chip-row">
+              <span className="badge">{getStatusLabel(detailInventory.status)}</span>
+              <button className="button-secondary" type="button" onClick={() => setDetailInventory(null)}>Cerrar</button>
+            </div>
+          </div>
+          <div className="inventory-record-meta">Sucursal: {detailInventory.branch?.name || '-'} {detailInventory.branch?.branchNumber ? `(${detailInventory.branch.branchNumber})` : ''}</div>
+          <div className="inventory-record-meta">Origen: {getOriginLabel(detailInventory)}</div>
+          {detailInventory.activity && (
+            <div className="inventory-record-meta">Actividad ligada: {detailInventory.activity.anNumber || `ACT-${detailInventory.activity.id}`} · {detailInventory.activity.titulo || '-'} · {getFlowLabel(detailInventory.activity.workType)}</div>
+          )}
+          {detailInventory.request && (
+            <div className="inventory-record-meta">Solicitud ligada: #{detailInventory.request.id} · {getFlowLabel(detailInventory.request.requestType)} · {detailInventory.request.status || '-'}</div>
+          )}
+          <div className="inventory-record-meta">Conteo: {detailInventory.previousCount ?? 0} previos · {detailInventory.currentCount ?? 0} actuales · Δ {detailInventory.deltaCount ?? 0}</div>
+          {detailInventory.notes && <div className="inventory-record-meta">Notas: {detailInventory.notes}</div>}
+          {!!detailInventory.updatedAt && <div className="inventory-record-meta">Actualizado: {new Date(detailInventory.updatedAt).toLocaleString()}</div>}
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+              gap: 12,
+            }}
+          >
+            {(detailInventory.items || []).map((item: any, index) => (
+              <div
+                key={`${detailInventory.id}-detail-item-${item.id || index}`}
+                style={{
+                  display: 'grid',
+                  gap: 8,
+                  padding: 12,
+                  borderRadius: 14,
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface-light)',
+                }}
+              >
+                <strong>{item.equipmentName || `Equipo ${index + 1}`}</strong>
+                <div className="inventory-record-meta">Apartado: {item.sectionName || '-'} · Grupo: {item.groupName || '-'}</div>
+                <div className="inventory-record-meta">Antes: {item.serialBefore || '-'} · {item.modelBefore || '-'}</div>
+                <div className="inventory-record-meta">Después: {item.serialAfter || '-'} · {item.modelAfter || '-'}</div>
+                <div className="inventory-record-meta">Acciones: {item.maintenanceActions || '-'}</div>
+                <div className="inventory-record-meta">Comentarios: {item.maintenanceComments || item.notes || '-'}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+                  {[item.beforePanoramicPhotoUrl, item.beforeCloseupPhotoUrl, item.afterPanoramicPhotoUrl, item.afterCloseupPhotoUrl, item.maintenanceStickerPhotoUrl]
+                    .filter(Boolean)
+                    .map((url: string, photoIndex: number) => (
+                      <img
+                        key={`${detailInventory.id}-photo-${item.id || index}-${photoIndex}`}
+                        src={getAssetUrl(url)}
+                        alt={`Detalle inventario ${index + 1}`}
+                        style={{ width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--border)' }}
+                      />
+                    ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="inventory-editor" ref={editorRef}>
         <strong>{selectedInventoryId ? `Editar inventario INV-${selectedInventoryId}` : "Nuevo inventario"}</strong>

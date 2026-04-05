@@ -125,6 +125,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         email: data.user.email,
         role: data.user.role,
         roleId: data.user.roleId,
+        roleFlags: data.user.roleFlags || undefined,
         department: data.user.department,
         departmentId: data.user.departmentId,
         token: data.access_token,

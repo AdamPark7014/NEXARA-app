@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
+import { triggerFileDownload } from '@/lib/file-download';
 import ExcelDownloadModal from './ExcelDownloadModal';
 import styles from './VehicleTable.module.css';
 
@@ -91,12 +92,7 @@ const VehicleTable = () => {
 
   const handleDownloadExcel = () => {
     if (!excelUrl) return;
-    const a = document.createElement('a');
-    a.href = excelUrl;
-    a.download = 'vehiculos.xlsx';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    triggerFileDownload(excelUrl, 'vehiculos.xlsx', { preferOpenOnMobile: true });
     closeExcelModal();
   };
 
