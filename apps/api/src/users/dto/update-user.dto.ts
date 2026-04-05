@@ -7,4 +7,8 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
 	@IsOptional()
 	@IsString()
 	avatarUrl?: string;
+
+	@IsOptional()
+	@IsString()
+	employeeNumber?: string;
 }

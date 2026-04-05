@@ -66,7 +66,6 @@ const formatConsoleTitle = (pathname: string) => {
     newsletter: "Newsletter",
     "my-lunch-breaks": "Mis breaks y comidas",
     settings: "Configuración del sistema",
-    "service-sheets": "Hojas de servicio",
   };
   return dictionary[last] || last.replace(/-/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 };

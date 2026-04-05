@@ -384,6 +384,7 @@ model User {
   id                        Int                        @id @default(autoincrement())
   nombre                    String                     @db.VarChar(100)
   email                     String                     @unique @db.VarChar(150)
+  employeeNumber            String?                    @unique @db.VarChar(30)
   passwordHash              String
   roleId                    Int
   departmentId              Int

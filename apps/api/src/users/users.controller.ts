@@ -86,6 +86,13 @@ export class UsersController {
     return this.usersService.findAssignableUsers(userFull);
   }
 
+  @Get('next-employee-number')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
+  async nextEmployeeNumber() {
+    return { employeeNumber: await this.usersService.getNextEmployeeNumber() };
+  }
+
   @Get('profile/me')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
