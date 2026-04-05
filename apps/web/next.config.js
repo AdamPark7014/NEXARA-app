@@ -6,6 +6,9 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  typescript: {
+    ignoreBuildErrors: process.env.NEXT_IGNORE_TYPE_ERRORS === '1',
+  },
   
   // Habilitar SWC para compilación más rápida
   swcMinify: true,
