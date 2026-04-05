@@ -410,7 +410,7 @@ async function bootstrap() {
     express.static(legacyUploadsPath, {
       index: false,
       dotfiles: 'deny',
-      fallthrough: false,
+      fallthrough: true,
       etag: true,
       maxAge: '1d',
       setHeaders: (res) => {
