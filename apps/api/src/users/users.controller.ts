@@ -12,6 +12,41 @@ import { createReadStream, existsSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { Response } from 'express';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
+import { diskStorage } from 'multer';
+import * as fs from 'node:fs';
+
+const buildAvatarUploadOptions = (dirname: string) => {
+  const destination = getUsersUploadDir(dirname);
+  if (!fs.existsSync(destination)) {
+    fs.mkdirSync(destination, { recursive: true });
+  }
+
+  return {
+    storage: diskStorage({
+      destination: (_req, _file, cb) => cb(null, destination),
+      filename: (_req, file, cb) => {
+        const safeOriginal = String(file.originalname || '').replace(/\s+/g, '-').toLowerCase();
+        const ext = safeOriginal.includes('.')
+          ? safeOriginal.slice(safeOriginal.lastIndexOf('.'))
+          : (file.mimetype === 'image/png'
+              ? '.png'
+              : file.mimetype === 'image/webp'
+                ? '.webp'
+                : '.jpg');
+        const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`;
+        cb(null, uniqueName);
+      },
+    }),
+    fileFilter: (_req: any, file: any, cb: any) => {
+      const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      if (!allowed.includes(String(file.mimetype || '').toLowerCase())) {
+        cb(new BadRequestException('Solo se permiten imagenes JPG, PNG o WEBP'), false);
+        return;
+      }
+      cb(null, true);
+    },
+  };
+};
 
 @Controller('users')
 export class UsersController {
@@ -24,7 +59,7 @@ export class UsersController {
   @Post()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
-  @UseInterceptors(FileInterceptor('avatar', { dest: getUsersUploadDir(__dirname) }))
+  @UseInterceptors(FileInterceptor('avatar', buildAvatarUploadOptions(__dirname)))
   async create(
     @CurrentUser() user: any,
     @Body() createUserDto: CreateUserDto,
@@ -221,7 +256,7 @@ export class UsersController {
   @Patch(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })
-  @UseInterceptors(FileInterceptor('avatar', { dest: getUsersUploadDir(__dirname) }))
+  @UseInterceptors(FileInterceptor('avatar', buildAvatarUploadOptions(__dirname)))
   update(
     @Param('id') id: string,
     @Body() updateUserDto: UpdateUserDto,
