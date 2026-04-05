@@ -161,10 +161,14 @@ export default function UserForm({
     const { name, value, type } = target;
     const nextValue = type === "checkbox" ? target.checked : value;
     setForm((prev) => {
-      const nextForm = {
+      let nextForm = {
         ...prev,
         [name]: name === "roleTipo" ? (nextValue as RoleTipo) : nextValue,
       } as FormState;
+      // Si cambia el nombre del departamento, limpiar el ID para que el nombre tenga efecto
+      if (name === "department") {
+        nextForm = { ...nextForm, departmentId: "" };
+      }
       return applyRoleConstraints(nextForm);
     });
   };

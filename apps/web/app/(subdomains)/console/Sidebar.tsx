@@ -82,12 +82,28 @@ export default function Sidebar() {
   // Nueva lógica de roles principales
   const role = String(user.role || '').toLowerCase();
   const hasConsoleAdmin = isPlatformAdmin(user);
-  const extraAccess = user as typeof user & { accesoCotizaciones?: boolean; accesoGestionCvs?: boolean };
   const isSuperAdmin = Boolean(user.isSuperAdmin);
   const isAdmin = !isSuperAdmin && hasConsoleAdmin;
   const isIngeniero = !isSuperAdmin && !isAdmin && role.includes('ingenier');
   const isVendedor = !isSuperAdmin && !isAdmin && !isIngeniero;
   const userRoleLabel = getRoleLabel(user);
+  const roleFlags = user.roleFlags || {};
+  const canAccessCotizaciones = hasPermission(user, PERMISSIONS.COTIZACIONES_ACCESS);
+  const canAccessCvs = hasAnyPermission(user, [
+    PERMISSIONS.CVS_MANAGE,
+    PERMISSIONS.CVS_ADMIN_REVIEW,
+    PERMISSIONS.CVS_SUPERADMIN_REVIEW,
+    PERMISSIONS.CONSOLE_ADMIN,
+  ]);
+  const canAccessVentas = hasAnyPermission(user, [
+    PERMISSIONS.PANEL_VENTAS,
+    PERMISSIONS.SALES_VIEW,
+    PERMISSIONS.SALES_MANAGE,
+    PERMISSIONS.SALES_REPORTS_VIEW,
+  ]);
+  const canAccessCotizacionesByRole = Boolean(roleFlags.accesoCotizaciones);
+  const canAccessCvsByRole = Boolean(roleFlags.accesoGestionCvs);
+  const canAccessVentasByRole = Boolean(roleFlags.accesoPanelVentas);
 
   type MenuItem = {
     icon: string;
@@ -114,23 +130,24 @@ export default function Sidebar() {
     if (isAdmin) {
       if (item.href.startsWith('/my-')) return false;
       if (["/ventas", "/accounting", "/newsletter", "/news", "/gestion-pagina-web"].some((p) => item.href.startsWith(p))) return false;
-      if (item.href === "/cotizaciones" && !extraAccess.accesoCotizaciones) return false;
-      if (item.href === "/cvs" && !extraAccess.accesoGestionCvs) return false;
+      if (item.href === "/cotizaciones" && !(canAccessCotizaciones || canAccessCotizacionesByRole)) return false;
+      if (item.href === "/cvs" && !(canAccessCvs || canAccessCvsByRole)) return false;
       return true;
     }
     // Ingeniero: solo vistas personales y módulos extra habilitados
     if (isIngeniero) {
-      if (!item.href.startsWith('/my-') && !["/cotizaciones", "/cvs", "/ventas"].includes(item.href)) return false;
-      if (item.href === "/cotizaciones" && !extraAccess.accesoCotizaciones) return false;
-      if (item.href === "/cvs" && !extraAccess.accesoGestionCvs) return false;
-      if (item.href === "/ventas" && !role.includes('vended')) return false;
+      if (!item.href.startsWith('/my-') && !["/dashboard", "/cotizaciones", "/cvs", "/ventas"].includes(item.href)) return false;
+      if (item.href === "/cotizaciones" && !(canAccessCotizaciones || canAccessCotizacionesByRole)) return false;
+      if (item.href === "/cvs" && !(canAccessCvs || canAccessCvsByRole)) return false;
+      if (item.href === "/ventas" && !(canAccessVentas || canAccessVentasByRole)) return false;
       return true;
     }
     // Vendedor: solo ventas y módulos extra habilitados
     if (isVendedor) {
-      if (item.href !== "/ventas" && !["/cotizaciones", "/cvs"].includes(item.href)) return false;
-      if (item.href === "/cotizaciones" && !extraAccess.accesoCotizaciones) return false;
-      if (item.href === "/cvs" && !extraAccess.accesoGestionCvs) return false;
+      if (!item.href.startsWith('/my-') && !["/dashboard", "/ventas", "/cotizaciones", "/cvs"].includes(item.href)) return false;
+      if (item.href === "/cotizaciones" && !(canAccessCotizaciones || canAccessCotizacionesByRole)) return false;
+      if (item.href === "/cvs" && !(canAccessCvs || canAccessCvsByRole)) return false;
+      if (item.href === "/ventas" && !(canAccessVentas || canAccessVentasByRole)) return false;
       return true;
     }
     // Por defecto, usar permisos
@@ -147,8 +164,7 @@ export default function Sidebar() {
   const profileItems: MenuItem[] = [];
   if (!isSuperAdmin && !isAdmin) {
     profileItems.push(
-      { icon: "👤", label: "Mi perfil", href: "/my-profile", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-      { icon: "⚙️", label: "Mis preferencias", href: "/my-preferences", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] }
+      { icon: "👤", label: "Mi perfil", href: "/my-profile", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] }
     );
   }
 
@@ -156,14 +172,14 @@ export default function Sidebar() {
   const employeeItems: MenuItem[] = [
     { icon: "📊", label: "Resumen ejecutivo", href: "/dashboard", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
   ];
-  // Solo ingeniero ve vistas personales adicionales
-  if (isIngeniero) {
+  // Todo usuario de consola no admin puede ver su espacio personal
+  if (!isSuperAdmin && !isAdmin) {
     employeeItems.push(
-      { icon: "📋", label: "Mis actividades", href: "/my-activities" },
-      { icon: "📸", label: "Mis evidencias", href: "/my-evidences" },
-      { icon: "💼", label: "Mis viáticos", href: "/my-viatics" },
-      { icon: "🚗", label: "Mis vehículos", href: "/my-vehicles" },
-      { icon: "🍽️", label: "Breaks y comidas", href: "/my-lunch-breaks" }
+      { icon: "📋", label: "Mis actividades", href: "/my-activities", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+      { icon: "📸", label: "Mis evidencias", href: "/my-evidences", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+      { icon: "💼", label: "Mis viáticos", href: "/my-viatics", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+      { icon: "🚗", label: "Mis vehículos", href: "/my-vehicles", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+      { icon: "🍽️", label: "Breaks y comidas", href: "/my-lunch-breaks", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] }
     );
   }
 

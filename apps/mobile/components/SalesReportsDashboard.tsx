@@ -16,6 +16,7 @@ import {
   type SalesMetrics,
   type SalesVendorStats,
 } from '@/lib/sales-api';
+import { triggerFileDownload } from '@/lib/file-download';
 import styles from './SalesReportsDashboard.module.css';
 
 interface SalesReportsDashboardProps {
@@ -178,12 +179,11 @@ export default function SalesReportsDashboard({
 
   const handleDownloadPdf = () => {
     if (!pdfUrl) return;
-    const a = document.createElement('a');
-    a.href = pdfUrl;
-    a.download = `reporte-ventas-${currentPeriod}-${new Date().toISOString().slice(0, 10)}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    triggerFileDownload(
+      pdfUrl,
+      `reporte-ventas-${currentPeriod}-${new Date().toISOString().slice(0, 10)}.pdf`,
+      { preferOpenOnMobile: true },
+    );
   };
 
   const formatMoney = (value: number) =>

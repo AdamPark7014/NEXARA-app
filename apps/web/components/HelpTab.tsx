@@ -312,61 +312,156 @@ export default function HelpTab({ module, user }: { module: string; user?: any }
   const [open, setOpen] = React.useState(false);
   const moduleLabel = moduleNames[module] || module.replace(/-/g, " ");
 
+  const shellStyle: React.CSSProperties = {
+    position: 'fixed',
+    bottom: 20,
+    right: 20,
+    zIndex: 1000,
+    display: 'grid',
+    justifyItems: 'end',
+    gap: 10,
+  };
+
   const buttonStyle: React.CSSProperties = {
-    width: 54,
-    height: 54,
-    borderRadius: 18,
+    width: 56,
+    height: 56,
+    borderRadius: 16,
     background: darkMode
-      ? 'linear-gradient(145deg, rgba(12, 96, 214, 0.98), rgba(18, 183, 154, 0.88))'
-      : 'linear-gradient(145deg, #0f7bff, #18b79a)',
+      ? 'linear-gradient(140deg, #0a6ddf 0%, #18a48d 100%)'
+      : 'linear-gradient(140deg, #0f7bff 0%, #1cb8a0 100%)',
     color: '#fff',
-    border: 'none',
+    border: '1px solid rgba(255,255,255,0.16)',
     fontWeight: 700,
     boxShadow: darkMode
-      ? '0 18px 34px rgba(2, 12, 28, 0.46)'
-      : '0 16px 30px rgba(15, 123, 255, 0.22)',
-    transition: 'background 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease',
+      ? '0 14px 30px rgba(3, 14, 34, 0.48)'
+      : '0 14px 28px rgba(15, 88, 180, 0.24)',
+    transition: 'transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease',
     cursor: 'pointer',
     display: 'grid',
     placeItems: 'center',
     fontSize: 22,
+    backdropFilter: 'blur(4px)',
   };
 
   const panelStyle: React.CSSProperties = {
-    marginTop: 8,
-    background: darkMode ? 'linear-gradient(175deg, rgba(10, 18, 30, 0.98), rgba(7, 24, 35, 0.96))' : 'linear-gradient(175deg, rgba(255, 255, 255, 0.99), rgba(242, 249, 255, 0.98))',
-    border: darkMode ? '1px solid rgba(65, 145, 255, 0.22)' : '1px solid rgba(18, 58, 108, 0.1)',
-    borderRadius: 20,
-    padding: 18,
-    minWidth: 340,
-    maxWidth: 430,
-    color: darkMode ? '#e9f3ff' : '#12324e',
+    background: darkMode
+      ? 'linear-gradient(180deg, rgba(12, 20, 34, 0.98) 0%, rgba(13, 26, 42, 0.98) 100%)'
+      : 'linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(247, 252, 255, 0.99) 100%)',
+    border: darkMode
+      ? '1px solid rgba(74, 141, 220, 0.28)'
+      : '1px solid rgba(20, 63, 108, 0.14)',
+    borderRadius: 16,
+    width: 'min(460px, calc(100vw - 28px))',
+    maxHeight: 'min(68vh, 620px)',
+    color: darkMode ? '#e8f2ff' : '#12324e',
     boxShadow: darkMode
-      ? '0 24px 48px rgba(2, 10, 22, 0.54)'
-      : '0 22px 42px rgba(15, 45, 85, 0.16)',
-    transition: 'background 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease',
+      ? '0 20px 44px rgba(2, 10, 22, 0.58)'
+      : '0 18px 40px rgba(15, 45, 85, 0.18)',
+    overflow: 'hidden',
+  };
+
+  const headerStyle: React.CSSProperties = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+    padding: '14px 14px 12px 14px',
+    borderBottom: darkMode ? '1px solid rgba(93, 141, 202, 0.26)' : '1px solid rgba(20, 63, 108, 0.12)',
+  };
+
+  const contentWrapStyle: React.CSSProperties = {
+    padding: '12px 14px 14px 14px',
+    maxHeight: 'calc(min(68vh, 620px) - 72px)',
+    overflowY: 'auto',
+  };
+
+  const helperBadgeStyle: React.CSSProperties = {
+    padding: '5px 10px',
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: 700,
+    textTransform: 'capitalize',
+    background: darkMode ? 'rgba(40, 128, 218, 0.18)' : 'rgba(15, 123, 255, 0.11)',
+    color: darkMode ? '#9eceff' : '#1560ad',
+    border: darkMode ? '1px solid rgba(86, 157, 232, 0.34)' : '1px solid rgba(15, 123, 255, 0.22)',
+    flexShrink: 0,
+  };
+
+  const closeBtnStyle: React.CSSProperties = {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    border: darkMode ? '1px solid rgba(99, 154, 223, 0.26)' : '1px solid rgba(18, 58, 108, 0.2)',
+    background: darkMode ? 'rgba(19, 37, 58, 0.9)' : 'rgba(255, 255, 255, 0.8)',
+    color: darkMode ? '#c8def5' : '#36556f',
+    cursor: 'pointer',
+    display: 'grid',
+    placeItems: 'center',
+    fontSize: 14,
+    lineHeight: 1,
+    flexShrink: 0,
+  };
+
+  const paragraphStyle: React.CSSProperties = {
+    whiteSpace: 'pre-line',
+    fontSize: 14,
+    lineHeight: 1.65,
+    color: darkMode ? '#c4d8ef' : '#45627b',
   };
 
   return (
-    <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1000 }}>
-      <button onClick={() => setOpen((v) => !v)} style={buttonStyle}>
-        {open ? '×' : '?'}
+    <div style={shellStyle}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={buttonStyle}
+        aria-expanded={open}
+        aria-label={open ? 'Cerrar ayuda' : 'Abrir ayuda'}
+        title={open ? 'Cerrar ayuda' : 'Abrir ayuda'}
+      >
+        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>?</span>
       </button>
       {open && (
         <div style={panelStyle}>
-          <div style={{ display: 'grid', gap: 10 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-              <div>
-                <div style={{ fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: darkMode ? '#7eb2df' : '#5f7f9a', marginBottom: 4 }}>
-                  Guía rápida
-                </div>
-                <h4 style={{ margin: 0, color: darkMode ? '#f5fbff' : '#14304d' }}>{moduleLabel}</h4>
+          <div style={headerStyle}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 11, letterSpacing: '0.11em', textTransform: 'uppercase', color: darkMode ? '#89b6dd' : '#5f7f9a', marginBottom: 4, fontWeight: 700 }}>
+                Asistente del módulo
               </div>
-              <span style={{ padding: '5px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: darkMode ? 'rgba(52, 141, 255, 0.16)' : 'rgba(15, 123, 255, 0.1)', color: darkMode ? '#9fd0ff' : '#1560ad' }}>
+              <h4 style={{ margin: 0, color: darkMode ? '#f5fbff' : '#14304d', fontSize: 18, lineHeight: 1.25 }}>
+                {moduleLabel}
+              </h4>
+            </div>
+            <div style={{ display: 'grid', justifyItems: 'end', gap: 8 }}>
+              <button
+                onClick={() => setOpen(false)}
+                style={closeBtnStyle}
+                aria-label="Cerrar panel de ayuda"
+                title="Cerrar"
+              >
+                ×
+              </button>
+              <span style={helperBadgeStyle}>
                 {profile}
               </span>
             </div>
-            <div style={{ whiteSpace: 'pre-line', fontSize: 14, lineHeight: 1.6, color: darkMode ? '#bfd5ee' : '#4b647f' }}>{content}</div>
+          </div>
+
+          <div style={contentWrapStyle}>
+            <div style={paragraphStyle}>{content}</div>
+            <div style={{ marginTop: 12, fontSize: 12, color: darkMode ? '#89aac8' : '#6b849b' }}>
+              Sugerencia: si no ves una acción disponible, revisa tus permisos con administración.
+            </div>
+          </div>
+
+          <div
+            style={{
+              borderTop: darkMode ? '1px solid rgba(93, 141, 202, 0.22)' : '1px solid rgba(20, 63, 108, 0.1)',
+              padding: '8px 14px 10px 14px',
+              fontSize: 11,
+              color: darkMode ? '#7ea3c5' : '#6f889e',
+            }}
+          >
+            Centro de ayuda NEXARA
           </div>
         </div>
       )}

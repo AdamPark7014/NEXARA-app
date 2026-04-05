@@ -5,6 +5,7 @@ import { io, Socket } from "socket.io-client";
 import { useUser } from "./UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { buildApiUrl as buildApiUrlFromBase, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
+import { revokeObjectUrlLater, triggerFileDownload } from "@/lib/file-download";
 import ExcelDownloadModal from "./ExcelDownloadModal";
 import PDFViewer from "./PDFViewer";
 import styles from "./EvidenceTable.module.css";
@@ -24,6 +25,23 @@ interface Evidence {
   revisadoEn?: string | null;
   latitud?: number | null;
   longitud?: number | null;
+  entryPhotoUrl?: string | null;
+  entryPhotoUploadedAt?: string | null;
+  entryLatitude?: number | null;
+  entryLongitude?: number | null;
+  evidencePhotos?: string[];
+  evidencePhotosUploadedAt?: string | null;
+  serviceSheetPdfUrl?: string | null;
+  serviceSheetUploadedAt?: string | null;
+  serviceSheetData?: unknown;
+  serviceSheetCompletedAt?: string | null;
+  exitPhotoUrl?: string | null;
+  exitPhotoUploadedAt?: string | null;
+  exitLatitude?: number | null;
+  exitLongitude?: number | null;
+  completedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
   actividad: {
     id?: number;
     anNumber: string;
@@ -63,10 +81,13 @@ const getAssetUrl = (url?: string | null) => {
       if (parsed.pathname.startsWith('/uploads/')) {
         return `${base}${encodeURI(parsed.pathname)}${parsed.search}`;
       }
+      if (!/^\/(activities|evidences|activity-evidence|documents|user-docs|users|clients|vehicles)\//i.test(parsed.pathname)) {
+        return raw;
+      }
     } catch {
       // Keep original URL when parsing fails.
+      return raw;
     }
-    return raw;
   }
 
   const normalizedPath = raw
@@ -178,6 +199,58 @@ const formatDateTime = (value?: string | null) => {
     hour: "2-digit",
     minute: "2-digit",
   });
+};
+
+const hasCoordinates = (lat?: number | null, lng?: number | null) => lat != null && lng != null;
+
+const formatCoordinates = (lat?: number | null, lng?: number | null) => {
+  if (!hasCoordinates(lat, lng)) return '-';
+  return `${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`;
+};
+
+const humanizeKey = (value: string) =>
+  value
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+type DetailField = { label: string; value: string; imageUrl?: string | null };
+
+const flattenDetailFields = (value: unknown, prefix = ''): DetailField[] => {
+  if (value == null) return [];
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    if (/^data:image\//i.test(trimmed)) {
+      return [{ label: prefix || 'Imagen', value: 'Imagen capturada', imageUrl: trimmed }];
+    }
+    return [{ label: prefix || 'Valor', value: trimmed }];
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return [{ label: prefix || 'Valor', value: String(value) }];
+  }
+
+  if (Array.isArray(value)) {
+    if (!value.length) return [];
+    if (value.every((item) => ['string', 'number', 'boolean'].includes(typeof item))) {
+      return [{ label: prefix || 'Valores', value: value.join(', ') }];
+    }
+    return value.flatMap((item, index) =>
+      flattenDetailFields(item, prefix ? `${prefix} ${index + 1}` : `Elemento ${index + 1}`),
+    );
+  }
+
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>).flatMap(([key, nested]) =>
+      flattenDetailFields(nested, prefix ? `${prefix} / ${humanizeKey(key)}` : humanizeKey(key)),
+    );
+  }
+
+  return [];
 };
 
 // ── Inline media gallery with lightbox ──────────────────────────────────────
@@ -344,12 +417,18 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
   const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
   const [previewPdfData, setPreviewPdfData] = useState<Uint8Array | null>(null);
   const [previewPdfName, setPreviewPdfName] = useState("reporte-ticket.pdf");
+  const [detailEvidence, setDetailEvidence] = useState<Evidence | null>(null);
 
   const estatusList = ["Pendiente", "Aprobada", "Rechazada"];
   const calificacionOptions = ["Alta", "Media", "Baja"];
   const [reviewDrafts, setReviewDrafts] = useState<
     Record<number, { calificacion: string; observaciones: string }>
   >({});
+
+  const detailFormFields = useMemo(
+    () => flattenDetailFields(detailEvidence?.serviceSheetData),
+    [detailEvidence],
+  );
 
   const fetchEvidences = () => {
     if (!user?.token) return;
@@ -433,12 +512,7 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
 
   const handleDownloadExcel = () => {
     if (!excelUrl) return;
-    const a = document.createElement("a");
-    a.href = excelUrl;
-    a.download = "evidencias.xlsx";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    triggerFileDownload(excelUrl, "evidencias.xlsx", { preferOpenOnMobile: true });
     closeExcelModal();
   };
 
@@ -465,13 +539,8 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
 
   const downloadPdfBlob = (blob: Blob, fileName: string) => {
     const url = window.URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = fileName;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+    triggerFileDownload(url, fileName, { preferOpenOnMobile: true });
+    revokeObjectUrlLater(url);
   };
 
   const handlePreviewTicketPdf = async (evi: Evidence) => {
@@ -890,6 +959,104 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
         </div>
       )}
 
+      {detailEvidence && (
+        <div className={styles.detailModalOverlay} onClick={() => setDetailEvidence(null)} aria-hidden="true">
+          <div
+            className={styles.detailModalCard}
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Detalle de evidencia"
+          >
+            <div className={styles.detailModalHeader}>
+              <div>
+                <h3 className={styles.detailModalTitle}>Detalle de evidencia #{detailEvidence.id}</h3>
+                <div className={styles.detailModalSubtitle}>
+                  {detailEvidence.actividad?.anNumber} · {detailEvidence.actividad?.titulo || 'Actividad'}
+                </div>
+              </div>
+              <div className={styles.detailModalActions}>
+                <button type="button" className="button-secondary" onClick={() => setDetailEvidence(null)}>
+                  Cerrar
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.detailModalBody}>
+              <section className={styles.detailSection}>
+                <h4 className={styles.detailSectionTitle}>Actividad</h4>
+                <div className={styles.detailGrid}>
+                  <div><strong>AN:</strong> {detailEvidence.actividad?.anNumber || '-'}</div>
+                  <div><strong>Responsable:</strong> {detailEvidence.user?.nombre || detailEvidence.actividad?.responsable?.nombre || '-'}</div>
+                  <div><strong>Sucursal:</strong> {[detailEvidence.actividad?.branchName, detailEvidence.actividad?.branchCity, detailEvidence.actividad?.branchState].filter(Boolean).join(', ') || '-'}</div>
+                  <div><strong>Dirección:</strong> {detailEvidence.actividad?.branchAddress || '-'}</div>
+                  <div><strong>Estatus revisión:</strong> {detailEvidence.estatus || '-'}</div>
+                  <div><strong>Fecha evidencia:</strong> {formatDateTime(detailEvidence.fechaEvidencia)}</div>
+                </div>
+              </section>
+
+              <section className={styles.detailSection}>
+                <h4 className={styles.detailSectionTitle}>Flujo</h4>
+                <div className={styles.detailGrid}>
+                  <div><strong>Llegada:</strong> {formatDateTime(detailEvidence.entryPhotoUploadedAt || detailEvidence.createdAt)}</div>
+                  <div><strong>Salida:</strong> {formatDateTime(detailEvidence.exitPhotoUploadedAt || detailEvidence.completedAt)}</div>
+                  <div>
+                    <strong>Ubicación llegada:</strong> {formatCoordinates(detailEvidence.entryLatitude, detailEvidence.entryLongitude)}
+                    {hasCoordinates(detailEvidence.entryLatitude, detailEvidence.entryLongitude) && (
+                      <a className={styles.detailInlineLink} href={getMapsUrl(detailEvidence.entryLatitude, detailEvidence.entryLongitude)} target="_blank" rel="noreferrer">
+                        Ver mapa
+                      </a>
+                    )}
+                  </div>
+                  <div>
+                    <strong>Ubicación salida:</strong> {formatCoordinates(detailEvidence.exitLatitude, detailEvidence.exitLongitude)}
+                    {hasCoordinates(detailEvidence.exitLatitude, detailEvidence.exitLongitude) && (
+                      <a className={styles.detailInlineLink} href={getMapsUrl(detailEvidence.exitLatitude, detailEvidence.exitLongitude)} target="_blank" rel="noreferrer">
+                        Ver mapa
+                      </a>
+                    )}
+                  </div>
+                  <div><strong>PDF cargado:</strong> {formatDateTime(detailEvidence.serviceSheetUploadedAt)}</div>
+                  <div><strong>Formulario digital:</strong> {formatDateTime(detailEvidence.serviceSheetCompletedAt)}</div>
+                </div>
+              </section>
+
+              <section className={styles.detailSection}>
+                <h4 className={styles.detailSectionTitle}>Archivos</h4>
+                <MediaGallery archivos={buildEvidenceFiles(detailEvidence)} getUrl={getAssetUrl} />
+                {detailEvidence.serviceSheetPdfUrl && (
+                  <div className={styles.detailActionsRow}>
+                    <a className="button-secondary" href={getAssetUrl(detailEvidence.serviceSheetPdfUrl)} target="_blank" rel="noreferrer">
+                      Abrir PDF de evidencia
+                    </a>
+                  </div>
+                )}
+              </section>
+
+              <section className={styles.detailSection}>
+                <h4 className={styles.detailSectionTitle}>Formulario digital</h4>
+                {detailFormFields.length > 0 ? (
+                  <div className={styles.detailFormGrid}>
+                    {detailFormFields.map((field, index) => (
+                      <div key={`${field.label}-${index}`} className={styles.detailFieldCard}>
+                        <div className={styles.detailFieldLabel}>{field.label}</div>
+                        {field.imageUrl ? (
+                          <img src={field.imageUrl} alt={field.label} className={styles.detailFieldImage} />
+                        ) : (
+                          <div className={styles.detailFieldValue}>{field.value}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className={styles.cellSubtext}>No hay información digital capturada.</div>
+                )}
+              </section>
+            </div>
+          </div>
+        </div>
+      )}
+
       {importMsg && (
         <div className={importMsg.startsWith("Error") ? styles.feedbackError : styles.feedbackSuccess}>
           {importMsg}
@@ -979,8 +1146,15 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
                           getUrl={getAssetUrl}
                         />
 
+                        <div className={styles.fileActions}>
+                          <button
+                            type="button"
+                            className={`button-secondary ${styles.pdfActionBtn}`}
+                            onClick={() => setDetailEvidence(evi)}
+                          >
+                            Detalle
+                          </button>
                         {isUserView && (
-                          <div className={styles.fileActions}>
                             <button
                               type="button"
                               className={`button-secondary ${styles.pdfActionBtn}`}
@@ -989,8 +1163,8 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
                             >
                               {pdfLoadingId === evi.id ? "Procesando..." : "PDF"}
                             </button>
-                          </div>
                         )}
+                        </div>
                       </div>
                     </td>
 

@@ -132,6 +132,23 @@ export class ActivityEvidenceService {
       calificacionEficiencia: null,
       fechaEvidencia: evidence.completedAt || evidence.updatedAt || evidence.createdAt,
       revisadoEn: evidence.reviewedAt,
+      entryPhotoUrl,
+      entryPhotoUploadedAt: evidence.entryPhotoUploadedAt,
+      entryLatitude: evidence.entryLatitude != null ? Number(evidence.entryLatitude) : null,
+      entryLongitude: evidence.entryLongitude != null ? Number(evidence.entryLongitude) : null,
+      evidencePhotos: evidencePhotoUrls,
+      evidencePhotosUploadedAt: evidence.evidencePhotosUploadedAt,
+      serviceSheetPdfUrl,
+      serviceSheetUploadedAt: evidence.serviceSheetUploadedAt,
+      serviceSheetData: evidence.serviceSheetData,
+      serviceSheetCompletedAt: evidence.serviceSheetCompletedAt,
+      exitPhotoUrl,
+      exitPhotoUploadedAt: evidence.exitPhotoUploadedAt,
+      exitLatitude: evidence.exitLatitude != null ? Number(evidence.exitLatitude) : null,
+      exitLongitude: evidence.exitLongitude != null ? Number(evidence.exitLongitude) : null,
+      completedAt: evidence.completedAt,
+      createdAt: evidence.createdAt,
+      updatedAt: evidence.updatedAt,
       latitud:
         evidence.exitLatitude != null
           ? Number(evidence.exitLatitude)

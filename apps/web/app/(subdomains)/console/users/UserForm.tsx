@@ -103,6 +103,10 @@ export default function UserForm({
     const nextValue = type === "checkbox" ? target.checked : value;
     setForm((prev) => {
       let nextForm = { ...prev, [name]: nextValue };
+      // Si cambia el nombre del departamento, limpiar el ID para que el nombre tenga efecto
+      if (name === "department") {
+        nextForm = { ...nextForm, departmentId: "" };
+      }
       // Lógica de exclusividad de roles principales
       if (name === "superadmin" && nextValue) {
         nextForm = { ...nextForm, admin: false, ingeniero: false, vendedor: false };
@@ -274,34 +278,53 @@ export default function UserForm({
           : null;
       };
 
-      // 1. Crear/actualizar rol
+      const roleMatchesPayload = (role: Record<string, unknown> | null | undefined) => {
+        if (!role) return false;
+        const keys = Object.keys(rolePayload) as Array<keyof typeof rolePayload>;
+        return keys.every((key) => Boolean(role[key]) === Boolean(rolePayload[key]));
+      };
+
+      const createPersonalizedRole = async () => {
+        const safeEmailPrefix = String(form.email || 'usuario')
+          .split('@')[0]
+          .replace(/[^a-zA-Z0-9_-]/g, '')
+          .slice(0, 24) || 'usuario';
+
+        const baseName = `${form.roleNombre} · ${safeEmailPrefix}`;
+        let attempt = 0;
+        let lastError = 'Error al crear rol personalizado';
+
+        while (attempt < 5) {
+          const candidateName = attempt === 0 ? baseName : `${baseName}-${attempt + 1}`;
+          const roleRes = await fetch(buildApiUrl('roles'), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
+            },
+            body: JSON.stringify({ ...rolePayload, nombre: candidateName }),
+          });
+
+          if (roleRes.ok) {
+            const roleData = await roleRes.json();
+            return roleData?.id as number;
+          }
+
+          lastError = await getErrorMessage(roleRes, lastError);
+          attempt += 1;
+        }
+
+        throw new Error(lastError);
+      };
+
+      // 1. Resolver rol sin mutar roles compartidos
       let roleId: number | null = null;
       if (form.roleNombre) {
-        if (isEdit && initialUser?.role?.id) {
-          const existing = await fetchRoleByName();
-          if (existing && existing.id !== initialUser.role.id) {
-            const patchRes = await fetch(buildApiUrl(`roles/${existing.id}`), {
-              method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-                ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
-              },
-              body: JSON.stringify(rolePayload),
-            });
-            if (!patchRes.ok) throw new Error(await getErrorMessage(patchRes, 'Error al actualizar el rol'));
-            roleId = existing.id;
-          } else {
-            const patchRes = await fetch(buildApiUrl(`roles/${initialUser.role.id}`), {
-              method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-                ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
-              },
-              body: JSON.stringify(rolePayload),
-            });
-            if (!patchRes.ok) throw new Error(await getErrorMessage(patchRes, 'Error al actualizar el rol'));
-            roleId = initialUser.role.id;
-          }
+        const existing = await fetchRoleByName();
+        if (existing?.id && roleMatchesPayload(existing)) {
+          roleId = Number(existing.id);
+        } else if (existing?.id) {
+          roleId = await createPersonalizedRole();
         } else {
           const roleRes = await fetch(buildApiUrl('roles'), {
             method: 'POST',
@@ -316,17 +339,13 @@ export default function UserForm({
             roleId = roleData.id;
           } else {
             const match = await fetchRoleByName();
-            if (!match?.id) throw new Error('Error al crear el rol');
-            const patchRes = await fetch(buildApiUrl(`roles/${match.id}`), {
-              method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-                ...(user?.token ? { Authorization: `Bearer ${user.token}` } : {}),
-              },
-              body: JSON.stringify(rolePayload),
-            });
-            if (!patchRes.ok) throw new Error(await getErrorMessage(patchRes, 'Error al actualizar el rol'));
-            roleId = match.id;
+            if (match?.id && roleMatchesPayload(match)) {
+              roleId = Number(match.id);
+            } else if (match?.id) {
+              roleId = await createPersonalizedRole();
+            } else {
+              throw new Error('Error al crear el rol');
+            }
           }
         }
       }
@@ -433,21 +452,19 @@ export default function UserForm({
         </div>
       </div>
 
-      <div className="field">
-        <label className="label">Accesos permitidos</label>
-        <div className="checkboxGrid">
-          <label className="checkboxItem"><input type="checkbox" name="ingeniero" checked={form.ingeniero} onChange={handleChange} /> Consola usuario</label>
-          {user?.isSuperAdmin && <label className="checkboxItem"><input type="checkbox" name="admin" checked={form.admin} onChange={handleChange} /> Consola admin</label>}
-          <label className="checkboxItem"><input type="checkbox" name="accesoGestionWeb" checked={form.accesoGestionWeb} onChange={handleChange} /> Panel Web</label>
-          <label className="checkboxItem"><input type="checkbox" name="accesoGestionCvs" checked={form.accesoGestionCvs} onChange={handleChange} /> Gestión de CVs</label>
-          <label className="checkboxItem"><input type="checkbox" name="vendedor" checked={form.vendedor} onChange={handleChange} /> Panel Ventas</label>
-          {user?.isSuperAdmin && <label className="checkboxItem"><input type="checkbox" name="accesoContabilidad" checked={form.accesoContabilidad} onChange={handleChange} /> Panel Contabilidad</label>}
-          <label className="checkboxItem"><input type="checkbox" name="accesoCotizaciones" checked={form.accesoCotizaciones} onChange={handleChange} /> Pestaña de cotizaciones</label>
-        </div>
+      <div className="sectionDivider"><span>Accesos y permisos</span></div>
+      <div className="permGrid">
+        <label className="permToggle"><input type="checkbox" name="ingeniero" checked={form.ingeniero} onChange={handleChange} /><span>Consola usuario</span></label>
+        {user?.isSuperAdmin && <label className="permToggle"><input type="checkbox" name="admin" checked={form.admin} onChange={handleChange} /><span>Consola admin</span></label>}
+        <label className="permToggle"><input type="checkbox" name="accesoGestionWeb" checked={form.accesoGestionWeb} onChange={handleChange} /><span>Panel Web</span></label>
+        <label className="permToggle"><input type="checkbox" name="accesoGestionCvs" checked={form.accesoGestionCvs} onChange={handleChange} /><span>Gestión de CVs</span></label>
+        <label className="permToggle"><input type="checkbox" name="vendedor" checked={form.vendedor} onChange={handleChange} /><span>Panel Ventas</span></label>
+        {user?.isSuperAdmin && <label className="permToggle"><input type="checkbox" name="accesoContabilidad" checked={form.accesoContabilidad} onChange={handleChange} /><span>Panel Contabilidad</span></label>}
+        <label className="permToggle"><input type="checkbox" name="accesoCotizaciones" checked={form.accesoCotizaciones} onChange={handleChange} /><span>Pestaña de cotizaciones</span></label>
       </div>
 
+      <div className="sectionDivider"><span>Foto de perfil</span></div>
       <div className="field">
-        <label className="label">Foto de usuario</label>
         <div
           onDrop={handleDrop}
           onDragOver={e => e.preventDefault()}
@@ -540,12 +557,15 @@ export default function UserForm({
         }
 
         .formBadge {
-          padding: 6px 12px;
+          padding: 5px 12px;
           border-radius: 999px;
-          font-size: 12px;
-          background: rgba(255, 255, 255, 0.08);
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          color: var(--text-secondary);
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          background: linear-gradient(135deg, rgba(15, 106, 214, 0.18) 0%, rgba(15, 106, 214, 0.08) 100%);
+          border: 1px solid rgba(15, 106, 214, 0.36);
+          color: var(--primary);
         }
 
         .formGrid {
@@ -591,23 +611,91 @@ export default function UserForm({
         }
 
         .checkboxGrid {
-          display: grid;
-          gap: 8px;
-          padding: 12px;
-          border-radius: 12px;
-          background: rgba(255, 255, 255, 0.04);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          display: none;
         }
 
-        .checkboxItem {
+        .sectionDivider {
           display: flex;
-          gap: 8px;
           align-items: center;
-          font-size: 13px;
-          color: var(--text-secondary);
+          gap: 12px;
+          margin: 6px 0 4px;
         }
-
+        .sectionDivider::before,
+        .sectionDivider::after {
+          content: '';
+          flex: 1;
+          height: 1px;
+          background: rgba(255, 255, 255, 0.08);
+        }
+        .sectionDivider span {
+          font-size: 0.7rem;
+          font-weight: 700;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: var(--text-secondary);
+          white-space: nowrap;
+          padding: 0 4px;
+          opacity: 0.75;
+        }
+        .permGrid {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        .permToggle {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 16px 8px 12px;
+          border-radius: 10px;
+          border: 1px solid rgba(255, 255, 255, 0.09);
+          background: rgba(255, 255, 255, 0.04);
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--text-secondary);
+          transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+          user-select: none;
+        }
+        .permToggle:hover {
+          border-color: rgba(15, 106, 214, 0.38);
+          color: var(--text-primary);
+          background: rgba(15, 106, 214, 0.06);
+        }
+        .permToggle:has(input:checked) {
+          background: rgba(15, 106, 214, 0.14);
+          border-color: rgba(15, 106, 214, 0.5);
+          color: var(--text-primary);
+        }
+        .permToggle input[type='checkbox'] {
+          appearance: none;
+          -webkit-appearance: none;
+          width: 16px;
+          height: 16px;
+          border-radius: 5px;
+          border: 2px solid rgba(255, 255, 255, 0.25);
+          background: transparent;
+          flex-shrink: 0;
+          cursor: pointer;
+          position: relative;
+          transition: background 0.15s ease, border-color 0.15s ease;
+        }
+        .permToggle input[type='checkbox']:checked {
+          background: var(--primary);
+          border-color: var(--primary);
+        }
+        .permToggle input[type='checkbox']:checked::after {
+          content: '';
+          position: absolute;
+          top: 1px;
+          left: 4px;
+          width: 5px;
+          height: 8px;
+          border: 2px solid #fff;
+          border-top: none;
+          border-left: none;
+          transform: rotate(45deg);
+        }
         .helperText {
           color: var(--text-secondary);
           font-size: 12px;

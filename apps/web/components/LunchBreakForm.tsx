@@ -18,6 +18,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
   const [cameraFacing, setCameraFacing] = useState<'user' | 'environment'>('user');
   const [isMobile, setIsMobile] = useState(false);
   const [isSmallMobile, setIsSmallMobile] = useState(false);
@@ -29,6 +30,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
 
   const stopCamera = () => {
+    setCameraReady(false);
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -40,6 +42,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
 
   const initCamera = async (facingMode: 'user' | 'environment' = cameraFacing) => {
     stopCamera();
+    setError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: {
@@ -52,11 +55,17 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
       setError(null);
       setCameraFacing(facingMode);
       streamRef.current = stream;
+      setCameraReady(true);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+        try {
+          await videoRef.current.play();
+        } catch {
+          // Algunos navegadores rechazan play() aunque el stream sí esté activo.
+        }
       }
     } catch (err) {
+      setCameraReady(false);
       setError('No se pudo acceder a la cámara. Verifica los permisos del navegador.');
     }
   };
@@ -73,6 +82,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
         context.drawImage(videoRef.current, 0, 0, 640, 480);
         canvasRef.current.toBlob((blob) => {
           if (blob) {
+            setError(null);
             setPhoto(blob);
             setPhotoPreview(URL.createObjectURL(blob));
             setStep('confirmation');
@@ -218,7 +228,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
               className={styles.hiddenCanvas}
             />
 
-            {error && <div className={styles.errorText}>{error}</div>}
+            {error && !cameraReady && <div className={styles.errorText}>{error}</div>}
 
             <div
               className={`${styles.captureActions} ${isMobile ? styles.captureActionsMobile : ''} ${isSmallMobile ? styles.captureActionsSmall : ''}`}

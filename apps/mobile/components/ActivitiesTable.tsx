@@ -3,7 +3,47 @@ import React, { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
+import { triggerFileDownload } from '@/lib/file-download';
 import ExcelDownloadModal from './ExcelDownloadModal';
+
+const ACTIVITIES_CARD_BREAKPOINT = 1360;
+const ACTIVITIES_SMALL_BREAKPOINT = 720;
+
+const humanizeEvidenceKey = (value: string) =>
+  value
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const flattenEvidenceFields = (value: unknown, prefix = ''): Array<{ label: string; value: string; imageUrl?: string | null }> => {
+  if (value == null) return [];
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    if (/^data:image\//i.test(trimmed)) {
+      return [{ label: prefix || 'Imagen', value: 'Imagen capturada', imageUrl: trimmed }];
+    }
+    return [{ label: prefix || 'Valor', value: trimmed }];
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return [{ label: prefix || 'Valor', value: String(value) }];
+  }
+  if (Array.isArray(value)) {
+    if (!value.length) return [];
+    if (value.every((item) => ['string', 'number', 'boolean'].includes(typeof item))) {
+      return [{ label: prefix || 'Valores', value: value.join(', ') }];
+    }
+    return value.flatMap((item, index) => flattenEvidenceFields(item, prefix ? `${prefix} ${index + 1}` : `Elemento ${index + 1}`));
+  }
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>).flatMap(([key, nested]) =>
+      flattenEvidenceFields(nested, prefix ? `${prefix} / ${humanizeEvidenceKey(key)}` : humanizeEvidenceKey(key)),
+    );
+  }
+  return [];
+};
 
 const ActivitiesTable: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -16,6 +56,7 @@ const ActivitiesTable: React.FC = () => {
   const [excelBlob, setExcelBlob] = useState<Blob | null>(null);
   const [excelPreparing, setExcelPreparing] = useState(false);
   const [showAdvancedForm, setShowAdvancedForm] = useState(false);
+  const [detailActivity, setDetailActivity] = useState<Activity | null>(null);
 
   // Filtros y paginación
   const [estatus, setEstatus] = useState<string>('');
@@ -55,14 +96,22 @@ const ActivitiesTable: React.FC = () => {
       id: number;
       status: string;
       entryPhotoUrl?: string;
+      entryPhotoUploadedAt?: string;
       entryLatitude?: number;
       entryLongitude?: number;
       evidencePhotos: string[];
+      evidencePhotosUploadedAt?: string;
       serviceSheetPdfUrl?: string;
+      serviceSheetUploadedAt?: string;
+      serviceSheetData?: unknown;
+      serviceSheetCompletedAt?: string;
       exitPhotoUrl?: string;
+      exitPhotoUploadedAt?: string;
       exitLatitude?: number;
       exitLongitude?: number;
       completedAt?: string;
+      createdAt?: string;
+      updatedAt?: string;
     } | null;
     // Agrega más campos según tu modelo real
   }
@@ -88,8 +137,42 @@ const ActivitiesTable: React.FC = () => {
   const [pendingRequestId, setPendingRequestId] = useState<number | null>(null);
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
+  const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
   const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, '');
+  const resolveEvidenceUrl = (path?: string | null) => {
+    if (!path) return null;
+    const raw = path.trim();
+    if (!raw) return null;
+    if (/^(data:|blob:|\/\/)/i.test(raw)) return raw;
+
+    if (/^https?:\/\//i.test(raw)) {
+      try {
+        const parsed = new URL(raw);
+        if (!/^\/(uploads|activities|evidences|activity-evidence|documents|user-docs|users|clients|vehicles)\//i.test(parsed.pathname)) {
+          return raw;
+        }
+      } catch {
+        return raw;
+      }
+    }
+
+    const base = getSocketBaseUrl();
+    let normalizedPath = raw
+      .replace(/\\+/g, '/')
+      .replace(/^https?:\/\/[^/]+/i, '');
+    normalizedPath = `${normalizedPath.startsWith('/') ? '' : '/'}${normalizedPath}`;
+
+    if (
+      !normalizedPath.startsWith('/uploads/') &&
+      !normalizedPath.startsWith('/api/uploads/') &&
+      /^\/(activities|evidences|activity-evidence|documents|user-docs|users|clients|vehicles)\//i.test(normalizedPath)
+    ) {
+      normalizedPath = `/uploads${normalizedPath}`;
+    }
+
+    return `${base}${normalizedPath}`;
+  };
 
   const closeExcelModal = () => {
     if (excelUrl) {
@@ -121,12 +204,7 @@ const ActivitiesTable: React.FC = () => {
 
   const handleDownloadExcel = () => {
     if (!excelUrl) return;
-    const a = document.createElement('a');
-    a.href = excelUrl;
-    a.download = 'actividades.xlsx';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    triggerFileDownload(excelUrl, 'actividades.xlsx', { preferOpenOnMobile: true });
     closeExcelModal();
   };
 
@@ -332,8 +410,8 @@ const ActivitiesTable: React.FC = () => {
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 1024);
-      setIsSmallMobile(window.innerWidth <= 640);
+      setIsMobile(window.innerWidth <= ACTIVITIES_CARD_BREAKPOINT);
+      setIsSmallMobile(window.innerWidth <= ACTIVITIES_SMALL_BREAKPOINT);
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
@@ -354,9 +432,57 @@ const ActivitiesTable: React.FC = () => {
     });
   };
 
+  const hasCoordinates = (latitude?: number | null, longitude?: number | null) => latitude != null && longitude != null;
+
+  const formatCoordinates = (latitude?: number | null, longitude?: number | null) => {
+    if (!hasCoordinates(latitude, longitude)) return '-';
+    return `${Number(latitude).toFixed(6)}, ${Number(longitude).toFixed(6)}`;
+  };
+
+  const getArrivalTime = (activity: Activity) => {
+    return activity.activityEvidence?.entryPhotoUploadedAt || activity.activityEvidence?.createdAt || undefined;
+  };
+
+  const getDepartureTime = (activity: Activity) => {
+    return activity.activityEvidence?.exitPhotoUploadedAt || activity.activityEvidence?.completedAt || undefined;
+  };
+
+  const buildActivityEvidenceFiles = (activity: Activity) => {
+    const files: Array<{ label: string; type: 'image' | 'pdf'; url: string }> = [];
+    const pushFile = (label: string, type: 'image' | 'pdf', value?: string | null) => {
+      const resolved = resolveEvidenceUrl(value);
+      if (!resolved) return;
+      if (files.some((file) => file.url === resolved)) return;
+      files.push({ label, type, url: resolved });
+    };
+
+    pushFile('Entrada', 'image', activity.activityEvidence?.entryPhotoUrl);
+    (activity.activityEvidence?.evidencePhotos || []).forEach((photoUrl, index) => {
+      pushFile(`Evidencia ${index + 1}`, 'image', photoUrl);
+    });
+    pushFile('PDF', 'pdf', activity.activityEvidence?.serviceSheetPdfUrl);
+    pushFile('Salida', 'image', activity.activityEvidence?.exitPhotoUrl);
+    return files;
+  };
+
+  const detailFormFields = flattenEvidenceFields(detailActivity?.activityEvidence?.serviceSheetData);
+
   const getMapsUrl = (lat?: number | null, lng?: number | null) => {
     if (!lat || !lng) return '';
     return `https://www.google.com/maps?q=${lat},${lng}`;
+  };
+
+  const getMapsEmbedUrl = (lat?: number | null, lng?: number | null) => {
+    if (!lat || !lng) return '';
+    if (GOOGLE_MAPS_API_KEY) {
+      return `https://www.google.com/maps/embed/v1/view?key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}&center=${lat},${lng}&zoom=15&maptype=roadmap`;
+    }
+    const delta = 0.01;
+    const left = Number(lng) - delta;
+    const right = Number(lng) + delta;
+    const top = Number(lat) + delta;
+    const bottom = Number(lat) - delta;
+    return `https://www.openstreetmap.org/export/embed.html?bbox=${left}%2C${bottom}%2C${right}%2C${top}&layer=mapnik&marker=${lat}%2C${lng}`;
   };
 
   const prefillFromRequest = (request: ClientTicketRequest) => {
@@ -541,13 +667,19 @@ const ActivitiesTable: React.FC = () => {
                   <div className="activities-helper">
                     {request.address || '-'} {request.city || ''} {request.state || ''}
                   </div>
-                  {request.latitud && request.longitud && (
-                    <div className="activities-map-preview-placeholder">
-                      Vista previa de mapa no disponible en esta vista. Usa "Ver mapa" para abrir la ubicacion.
+                  {hasCoordinates(request.latitud, request.longitud) && (
+                    <div className="activities-map-embed">
+                      <iframe
+                        className="activities-map-iframe"
+                        src={getMapsEmbedUrl(request.latitud, request.longitud)}
+                        loading="lazy"
+                        title={`Mapa ${request.branchName || 'sucursal'}`}
+                        referrerPolicy="no-referrer-when-downgrade"
+                      />
                     </div>
                   )}
                   <div className="activities-request-actions">
-                    {request.latitud && request.longitud && (
+                    {hasCoordinates(request.latitud, request.longitud) && (
                       <a className="button-secondary" href={getMapsUrl(request.latitud, request.longitud)} target="_blank" rel="noreferrer">Ver mapa</a>
                     )}
                     <button className="button-primary" type="button" onClick={() => prefillFromRequest(request)}>Precargar en actividad</button>
@@ -734,6 +866,10 @@ const ActivitiesTable: React.FC = () => {
                   <th>Responsable</th>
                   <th>Prioridad</th>
                   <th>Evidencias</th>
+                  <th>Llegada</th>
+                  <th>Salida</th>
+                  <th>Ubic. llegada</th>
+                  <th>Ubic. salida</th>
                   <th>Inicio</th>
                   <th>Entrega</th>
                   <th>Estimado/Max</th>
@@ -758,54 +894,91 @@ const ActivitiesTable: React.FC = () => {
                   };
                   return (
                     <tr key={a.id}>
-                      <td>{a.anNumber}</td>
-                      <td>{a.titulo}</td>
-                      <td>{a.client?.name || 'Interna'}</td>
-                      <td>{a.branchName || '-'}</td>
-                      <td>{a.ticketType || '-'}</td>
-                      <td>{a.workType === 'PREVENTIVE_INVENTORY' ? 'Inventario/Mantenimiento' : 'Problema'}</td>
+                      <td className="activities-col-an">{a.anNumber}</td>
+                      <td className="activities-col-title">{a.titulo}</td>
+                      <td className="activities-col-client">{a.client?.name || 'Interna'}</td>
+                      <td className="activities-col-branch">{a.branchName || '-'}</td>
+                      <td className="activities-col-type">{a.ticketType || '-'}</td>
+                      <td className="activities-col-flow">{a.workType === 'PREVENTIVE_INVENTORY' ? 'Inventario/Mantenimiento' : 'Problema'}</td>
                       <td><span className={`badge ${a.estatus === 'Aprobada' ? 'approved' : a.estatus === 'Pendiente' ? 'pending' : ''}`}>{a.estatus}</span></td>
-                      <td>{a.responsable?.nombre}</td>
-                      <td>{a.prioridad}</td>
-                      <td>
-                        <span className={`activities-evidence-pill ${a.activityEvidence?.status === 'COMPLETED' ? 'is-completed' : ''}`}>
-                          {getEvidenceStatus(a)}
-                        </span>
-                        {(a.activityEvidence?.entryLatitude && a.activityEvidence?.entryLongitude) && (
-                          <div className="activities-link-row mt-6">
-                            <a href={getMapsUrl(a.activityEvidence.entryLatitude, a.activityEvidence.entryLongitude)} target="_blank" rel="noreferrer" className="activities-link-sm">
-                              Ubicación entrada
-                            </a>
-                          </div>
-                        )}
-                        {(a.activityEvidence?.exitLatitude && a.activityEvidence?.exitLongitude) && (
-                          <div className="activities-link-row mt-4">
-                            <a href={getMapsUrl(a.activityEvidence.exitLatitude, a.activityEvidence.exitLongitude)} target="_blank" rel="noreferrer" className="activities-link-sm">
-                              Ubicación salida
-                            </a>
-                          </div>
-                        )}
-                        <div className="activities-thumb-row">
-                          {a.activityEvidence?.entryPhotoUrl && (
-                            <img
-                              src={a.activityEvidence.entryPhotoUrl}
-                              alt="entrada"
-                              className="activities-thumb"
-                            />
+                      <td className="activities-col-owner">{a.responsable?.nombre}</td>
+                      <td className="activities-col-priority">{a.prioridad}</td>
+                      <td className="activities-col-evidence">
+                        <div className="activities-evidence-stack">
+                          <span className={`activities-evidence-pill ${a.activityEvidence?.status === 'COMPLETED' ? 'is-completed' : ''}`}>
+                            {getEvidenceStatus(a)}
+                          </span>
+                          {(a.activityEvidence?.entryLatitude && a.activityEvidence?.entryLongitude) && (
+                            <div className="activities-link-row activities-link-stack mt-6">
+                              <a href={getMapsUrl(a.activityEvidence.entryLatitude, a.activityEvidence.entryLongitude)} target="_blank" rel="noreferrer" className="activities-link-sm">
+                                Ubicación entrada
+                              </a>
+                            </div>
                           )}
-                          {a.activityEvidence?.exitPhotoUrl && (
-                            <img
-                              src={a.activityEvidence.exitPhotoUrl}
-                              alt="salida"
-                              className="activities-thumb"
-                            />
+                          {(a.activityEvidence?.exitLatitude && a.activityEvidence?.exitLongitude) && (
+                            <div className="activities-link-row activities-link-stack mt-4">
+                              <a href={getMapsUrl(a.activityEvidence.exitLatitude, a.activityEvidence.exitLongitude)} target="_blank" rel="noreferrer" className="activities-link-sm">
+                                Ubicación salida
+                              </a>
+                            </div>
+                          )}
+                          <div className="activities-thumb-row activities-thumb-stack">
+                            {resolveEvidenceUrl(a.activityEvidence?.entryPhotoUrl) && (
+                              <img
+                                src={resolveEvidenceUrl(a.activityEvidence?.entryPhotoUrl) || undefined}
+                                alt="entrada"
+                                className="activities-thumb"
+                                loading="lazy"
+                                onError={(event) => {
+                                  event.currentTarget.style.display = 'none';
+                                }}
+                              />
+                            )}
+                            {resolveEvidenceUrl(a.activityEvidence?.exitPhotoUrl) && (
+                              <img
+                                src={resolveEvidenceUrl(a.activityEvidence?.exitPhotoUrl) || undefined}
+                                alt="salida"
+                                className="activities-thumb"
+                                loading="lazy"
+                                onError={(event) => {
+                                  event.currentTarget.style.display = 'none';
+                                }}
+                              />
+                            )}
+                          </div>
+                          {a.activityEvidence && (
+                            <button type="button" className="button-secondary activities-detail-btn" onClick={() => setDetailActivity(a)}>
+                              Detalle evidencia
+                            </button>
                           )}
                         </div>
                       </td>
-                      <td>{formatDateTime(a.fechaInicio)}</td>
-                      <td>{formatDateTime(a.fechaEntregaEsperada)}</td>
-                      <td>{a.tiempoEstimadoMin || 0}/{a.tiempoMaximoMin || 0}</td>
-                      <td>{a.indicaciones || '-'}</td>
+                      <td className="activities-col-date">{formatDateTime(getArrivalTime(a))}</td>
+                      <td className="activities-col-date">{formatDateTime(getDepartureTime(a))}</td>
+                      <td className="activities-col-location">
+                        {hasCoordinates(a.activityEvidence?.entryLatitude, a.activityEvidence?.entryLongitude) ? (
+                          <div className="activities-location-stack">
+                            <span className="activities-location-text">{formatCoordinates(a.activityEvidence?.entryLatitude, a.activityEvidence?.entryLongitude)}</span>
+                            <a href={getMapsUrl(a.activityEvidence?.entryLatitude as number, a.activityEvidence?.entryLongitude as number)} target="_blank" rel="noreferrer" className="activities-link-sm">
+                              Ver mapa
+                            </a>
+                          </div>
+                        ) : '-'}
+                      </td>
+                      <td className="activities-col-location">
+                        {hasCoordinates(a.activityEvidence?.exitLatitude, a.activityEvidence?.exitLongitude) ? (
+                          <div className="activities-location-stack">
+                            <span className="activities-location-text">{formatCoordinates(a.activityEvidence?.exitLatitude, a.activityEvidence?.exitLongitude)}</span>
+                            <a href={getMapsUrl(a.activityEvidence?.exitLatitude as number, a.activityEvidence?.exitLongitude as number)} target="_blank" rel="noreferrer" className="activities-link-sm">
+                              Ver mapa
+                            </a>
+                          </div>
+                        ) : '-'}
+                      </td>
+                      <td className="activities-col-date">{formatDateTime(a.fechaInicio)}</td>
+                      <td className="activities-col-date">{formatDateTime(a.fechaEntregaEsperada)}</td>
+                      <td className="activities-col-estimate">{a.tiempoEstimadoMin || 0}/{a.tiempoMaximoMin || 0}</td>
+                      <td className="activities-col-notes">{a.indicaciones || '-'}</td>
                       {hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && (
                         <td>
                           <div className="activities-row-actions">
@@ -855,9 +1028,36 @@ const ActivitiesTable: React.FC = () => {
                       <div className="activities-mobile-meta-item"><strong>Flujo:</strong> {a.workType === 'PREVENTIVE_INVENTORY' ? 'Inventario/Mantenimiento' : 'Problema'}</div>
                       <div className="activities-mobile-meta-item"><strong>Prioridad:</strong> {a.prioridad}</div>
                       <div className="activities-mobile-meta-item"><strong>Responsable:</strong> {a.responsable?.nombre || '-'}</div>
+                      <div className="activities-mobile-meta-item"><strong>Llegada:</strong> {formatDateTime(getArrivalTime(a))}</div>
+                      <div className="activities-mobile-meta-item"><strong>Salida:</strong> {formatDateTime(getDepartureTime(a))}</div>
                       <div className="activities-mobile-meta-item"><strong>Estimado/Max:</strong> {a.tiempoEstimadoMin || 0}/{a.tiempoMaximoMin || 0} min</div>
                       <div className="activities-mobile-meta-item"><strong>Inicio:</strong> {formatDateTime(a.fechaInicio)}</div>
                       <div className="activities-mobile-meta-item"><strong>Entrega:</strong> {formatDateTime(a.fechaEntregaEsperada)}</div>
+                    </div>
+
+                    <div className="activities-mobile-locations">
+                      <div className="activities-mobile-location-item">
+                        <strong>Ubicación llegada:</strong>{' '}
+                        {hasCoordinates(a.activityEvidence?.entryLatitude, a.activityEvidence?.entryLongitude) ? (
+                          <>
+                            <span className="activities-location-text">{formatCoordinates(a.activityEvidence?.entryLatitude, a.activityEvidence?.entryLongitude)}</span>{' '}
+                            <a href={getMapsUrl(a.activityEvidence?.entryLatitude as number, a.activityEvidence?.entryLongitude as number)} target="_blank" rel="noreferrer" className="activities-link-sm">
+                              Ver mapa
+                            </a>
+                          </>
+                        ) : '-'}
+                      </div>
+                      <div className="activities-mobile-location-item">
+                        <strong>Ubicación salida:</strong>{' '}
+                        {hasCoordinates(a.activityEvidence?.exitLatitude, a.activityEvidence?.exitLongitude) ? (
+                          <>
+                            <span className="activities-location-text">{formatCoordinates(a.activityEvidence?.exitLatitude, a.activityEvidence?.exitLongitude)}</span>{' '}
+                            <a href={getMapsUrl(a.activityEvidence?.exitLatitude as number, a.activityEvidence?.exitLongitude as number)} target="_blank" rel="noreferrer" className="activities-link-sm">
+                              Ver mapa
+                            </a>
+                          </>
+                        ) : '-'}
+                      </div>
                     </div>
 
                     <div className="activities-mobile-evidence-wrap">
@@ -872,21 +1072,34 @@ const ActivitiesTable: React.FC = () => {
                         </div>
                       )}
                       <div className="activities-thumb-row">
-                        {a.activityEvidence?.entryPhotoUrl && (
+                        {resolveEvidenceUrl(a.activityEvidence?.entryPhotoUrl) && (
                           <img
-                            src={a.activityEvidence.entryPhotoUrl}
+                            src={resolveEvidenceUrl(a.activityEvidence?.entryPhotoUrl) || undefined}
                             alt="entrada"
                             className="activities-thumb activities-thumb-mobile"
+                            loading="lazy"
+                            onError={(event) => {
+                              event.currentTarget.style.display = 'none';
+                            }}
                           />
                         )}
-                        {a.activityEvidence?.exitPhotoUrl && (
+                        {resolveEvidenceUrl(a.activityEvidence?.exitPhotoUrl) && (
                           <img
-                            src={a.activityEvidence.exitPhotoUrl}
+                            src={resolveEvidenceUrl(a.activityEvidence?.exitPhotoUrl) || undefined}
                             alt="salida"
                             className="activities-thumb activities-thumb-mobile"
+                            loading="lazy"
+                            onError={(event) => {
+                              event.currentTarget.style.display = 'none';
+                            }}
                           />
                         )}
                       </div>
+                      {a.activityEvidence && (
+                        <button type="button" className="button-secondary activities-detail-btn" onClick={() => setDetailActivity(a)}>
+                          Detalle evidencia
+                        </button>
+                      )}
                     </div>
 
                     <div className="activities-mobile-notes">
@@ -913,6 +1126,82 @@ const ActivitiesTable: React.FC = () => {
           </div>
           <span className="activities-helper">Página {page} de {totalPages || 1}</span>
         </div>
+
+        {detailActivity && (
+          <div className="activities-detail-overlay" onClick={() => setDetailActivity(null)} aria-hidden="true">
+            <div className="activities-detail-card" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Detalle de evidencia de actividad">
+              <div className="activities-detail-head">
+                <div>
+                  <h3 className="activities-detail-title">Detalle de evidencia</h3>
+                  <div className="activities-helper">{detailActivity.anNumber} · {detailActivity.titulo}</div>
+                </div>
+                <button type="button" className="button-secondary activities-detail-btn" onClick={() => setDetailActivity(null)}>
+                  Cerrar
+                </button>
+              </div>
+
+              <div className="activities-detail-body">
+                <section className="activities-detail-section">
+                  <h4 className="activities-detail-section-title">Flujo</h4>
+                  <div className="activities-detail-grid">
+                    <div><strong>Llegada:</strong> {formatDateTime(getArrivalTime(detailActivity))}</div>
+                    <div><strong>Salida:</strong> {formatDateTime(getDepartureTime(detailActivity))}</div>
+                    <div>
+                      <strong>Ubicación llegada:</strong> {formatCoordinates(detailActivity.activityEvidence?.entryLatitude, detailActivity.activityEvidence?.entryLongitude)}
+                      {hasCoordinates(detailActivity.activityEvidence?.entryLatitude, detailActivity.activityEvidence?.entryLongitude) && (
+                        <a href={getMapsUrl(detailActivity.activityEvidence?.entryLatitude as number, detailActivity.activityEvidence?.entryLongitude as number)} target="_blank" rel="noreferrer" className="activities-link-sm activities-detail-link">
+                          Ver mapa
+                        </a>
+                      )}
+                    </div>
+                    <div>
+                      <strong>Ubicación salida:</strong> {formatCoordinates(detailActivity.activityEvidence?.exitLatitude, detailActivity.activityEvidence?.exitLongitude)}
+                      {hasCoordinates(detailActivity.activityEvidence?.exitLatitude, detailActivity.activityEvidence?.exitLongitude) && (
+                        <a href={getMapsUrl(detailActivity.activityEvidence?.exitLatitude as number, detailActivity.activityEvidence?.exitLongitude as number)} target="_blank" rel="noreferrer" className="activities-link-sm activities-detail-link">
+                          Ver mapa
+                        </a>
+                      )}
+                    </div>
+                    <div><strong>PDF cargado:</strong> {formatDateTime(detailActivity.activityEvidence?.serviceSheetUploadedAt)}</div>
+                    <div><strong>Formulario digital:</strong> {formatDateTime(detailActivity.activityEvidence?.serviceSheetCompletedAt)}</div>
+                  </div>
+                </section>
+
+                <section className="activities-detail-section">
+                  <h4 className="activities-detail-section-title">Archivos</h4>
+                  <div className="activities-detail-files">
+                    {buildActivityEvidenceFiles(detailActivity).map((file) => (
+                      <a key={`${file.label}-${file.url}`} href={file.url} target="_blank" rel="noreferrer" className="activities-detail-file">
+                        {file.label}
+                      </a>
+                    ))}
+                    {!buildActivityEvidenceFiles(detailActivity).length && <span className="activities-helper">Sin archivos adjuntos.</span>}
+                  </div>
+                </section>
+
+                <section className="activities-detail-section">
+                  <h4 className="activities-detail-section-title">Formulario digital</h4>
+                  {detailFormFields.length > 0 ? (
+                    <div className="activities-detail-form-grid">
+                      {detailFormFields.map((field, index) => (
+                        <div key={`${field.label}-${index}`} className="activities-detail-field-card">
+                          <div className="activities-detail-field-label">{field.label}</div>
+                          {field.imageUrl ? (
+                            <img src={field.imageUrl} alt={field.label} className="activities-detail-field-image" />
+                          ) : (
+                            <div className="activities-detail-field-value">{field.value}</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="activities-helper">No hay datos digitales capturados.</div>
+                  )}
+                </section>
+              </div>
+            </div>
+          </div>
+        )}
 
         <style jsx>{`
           .activities-shell {
@@ -1124,6 +1413,13 @@ const ActivitiesTable: React.FC = () => {
             background: var(--surface-2);
           }
 
+          .activities-map-iframe {
+            width: 100%;
+            min-height: 220px;
+            border: 0;
+            display: block;
+          }
+
           .activities-map-preview-placeholder {
             border: 1px dashed var(--border);
             border-radius: 16px;
@@ -1316,6 +1612,13 @@ const ActivitiesTable: React.FC = () => {
             min-width: 1200px;
           }
 
+          .activities-table-wrap :global(th),
+          .activities-table-wrap :global(td) {
+            vertical-align: top;
+            white-space: normal;
+            line-height: 1.45;
+          }
+
           .activities-table-wrap :global(thead th) {
             background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 16%, var(--surface)), color-mix(in srgb, var(--secondary) 14%, var(--surface-2)));
             color: var(--foreground);
@@ -1343,13 +1646,207 @@ const ActivitiesTable: React.FC = () => {
             color: var(--primary);
           }
 
+          .activities-location-stack,
+          .activities-mobile-locations {
+            display: grid;
+            gap: 6px;
+          }
+
+          .activities-mobile-location-item {
+            color: color-mix(in srgb, var(--text-secondary) 96%, var(--foreground));
+            font-size: 14px;
+            line-height: 1.45;
+          }
+
+          .activities-location-text {
+            color: var(--foreground);
+            font-size: 12px;
+            word-break: break-word;
+          }
+
+          .activities-detail-btn {
+            min-height: 34px;
+            padding: 0 12px;
+            border-radius: 10px;
+          }
+
+          .activities-detail-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.58);
+            backdrop-filter: blur(2px);
+            z-index: 10001;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 14px;
+          }
+
+          .activities-detail-card {
+            width: min(1040px, 96vw);
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border-radius: 16px;
+            border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+            background: color-mix(in srgb, var(--surface) 98%, transparent);
+            box-shadow: 0 22px 56px rgba(2, 8, 23, 0.34);
+          }
+
+          .activities-detail-head {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 14px 16px;
+            border-bottom: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
+            background: color-mix(in srgb, var(--surface) 94%, var(--surface-2));
+          }
+
+          .activities-detail-title,
+          .activities-detail-section-title {
+            margin: 0;
+            color: var(--foreground);
+            font-weight: 800;
+          }
+
+          .activities-detail-body {
+            overflow: auto;
+            padding: 14px;
+            display: grid;
+            gap: 14px;
+            background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+          }
+
+          .activities-detail-section {
+            display: grid;
+            gap: 12px;
+            padding: 14px;
+            border-radius: 14px;
+            border: 1px solid color-mix(in srgb, var(--border) 76%, transparent);
+            background: color-mix(in srgb, var(--surface) 99%, transparent);
+          }
+
+          .activities-detail-grid,
+          .activities-detail-form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px 14px;
+          }
+
+          .activities-detail-link {
+            margin-left: 8px;
+          }
+
+          .activities-detail-files {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+          }
+
+          .activities-detail-file {
+            display: inline-flex;
+            align-items: center;
+            min-height: 36px;
+            padding: 0 12px;
+            border-radius: 999px;
+            border: 1px solid color-mix(in srgb, var(--primary) 32%, var(--border));
+            color: var(--foreground);
+            text-decoration: none;
+            background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+          }
+
+          .activities-detail-field-card {
+            display: grid;
+            gap: 8px;
+            padding: 10px;
+            border-radius: 12px;
+            border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+            background: var(--surface);
+          }
+
+          .activities-detail-field-label {
+            font-size: 12px;
+            font-weight: 800;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+          }
+
+          .activities-detail-field-value {
+            color: var(--foreground);
+            font-size: 14px;
+            line-height: 1.45;
+            word-break: break-word;
+          }
+
+          .activities-detail-field-image {
+            width: 100%;
+            max-width: 260px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: var(--surface-2);
+          }
+
+          .activities-evidence-stack,
+          .activities-link-stack {
+            display: grid;
+            gap: 8px;
+            align-items: start;
+          }
+
+          .activities-col-an {
+            min-width: 72px;
+            font-weight: 700;
+          }
+
+          .activities-col-title {
+            min-width: 170px;
+            max-width: 220px;
+          }
+
+          .activities-col-client,
+          .activities-col-branch,
+          .activities-col-owner,
+          .activities-col-notes {
+            min-width: 140px;
+            max-width: 220px;
+          }
+
+          .activities-col-type,
+          .activities-col-flow,
+          .activities-col-priority,
+          .activities-col-estimate,
+          .activities-col-date {
+            min-width: 110px;
+          }
+
+          .activities-col-location {
+            min-width: 155px;
+            max-width: 190px;
+          }
+
+          .activities-col-evidence {
+            min-width: 190px;
+            max-width: 230px;
+          }
+
+          .activities-col-date {
+            font-size: 13px;
+          }
+
           .activities-thumb {
-            width: 64px;
-            height: 64px;
+            width: 56px;
+            height: 56px;
             object-fit: cover;
             border-radius: 14px;
             border: 1px solid var(--border);
             background: var(--surface-2);
+            flex: 0 0 auto;
           }
 
           .activities-thumb-mobile {
@@ -1427,6 +1924,26 @@ const ActivitiesTable: React.FC = () => {
               font-size: 15px;
             }
 
+            .activities-detail-card {
+              width: calc(100vw - 16px);
+              max-height: 92vh;
+              border-radius: 12px;
+            }
+
+            .activities-detail-body,
+            .activities-detail-head {
+              padding: 10px;
+            }
+
+            .activities-detail-grid,
+            .activities-detail-form-grid {
+              grid-template-columns: 1fr;
+            }
+
+            .activities-detail-field-image {
+              max-width: 100%;
+            }
+
             .activities-textarea {
               grid-column: span 1;
               min-height: 86px;
@@ -1446,6 +1963,166 @@ const ActivitiesTable: React.FC = () => {
             .activities-mobile-meta-item,
             .activities-mobile-notes {
               font-size: 13px;
+            }
+          }
+
+          @media (max-width: 640px) {
+            .activities-main {
+              padding: 10px;
+              gap: 12px;
+            }
+
+            .activities-toolbar,
+            .activities-actions-row,
+            .activities-export-actions,
+            .activities-request-actions,
+            .activities-row-actions,
+            .activities-mobile-actions,
+            .activities-pagination-buttons {
+              width: 100%;
+            }
+
+            .activities-actions-row,
+            .activities-export-actions,
+            .activities-request-actions,
+            .activities-row-actions,
+            .activities-mobile-actions,
+            .activities-pagination-buttons,
+            .activities-thumb-row {
+              gap: 8px;
+            }
+
+            .activities-actions-row > *,
+            .activities-export-actions > *,
+            .activities-request-actions > *,
+            .activities-row-actions > *,
+            .activities-mobile-actions > * {
+              flex: 1 1 100%;
+            }
+
+            .activities-request-actions .button-primary,
+            .activities-request-actions .button-secondary,
+            .activities-row-actions .button-primary,
+            .activities-row-actions .button-secondary,
+            .activities-mobile-actions .button-primary,
+            .activities-mobile-actions .button-secondary,
+            .activities-export-actions .button-secondary,
+            .activities-form-footer .button-primary,
+            .activities-pagination-buttons .button-secondary {
+              width: 100%;
+              justify-content: center;
+            }
+
+            .activities-request-item,
+            .activities-mobile-card,
+            .activities-requests-card,
+            .activities-form-card {
+              padding: 11px;
+              border-radius: 14px;
+            }
+
+            .activities-filters-row,
+            .activities-form-grid,
+            .activities-form-primary-grid,
+            .activities-form-context-grid,
+            .activities-mobile-meta-grid {
+              grid-template-columns: 1fr;
+              gap: 9px;
+            }
+
+            .activities-mobile-meta-item,
+            .activities-mobile-location-item,
+            .activities-mobile-notes,
+            .activities-mobile-evidence-wrap {
+              padding: 10px;
+              border-radius: 12px;
+              border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+              background: color-mix(in srgb, var(--surface) 92%, transparent);
+            }
+
+            .activities-thumb-row {
+              overflow-x: auto;
+              flex-wrap: nowrap;
+              padding-bottom: 2px;
+              -webkit-overflow-scrolling: touch;
+            }
+
+            .activities-thumb,
+            .activities-thumb-mobile {
+              width: 84px;
+              height: 84px;
+              border-radius: 12px;
+              flex: 0 0 auto;
+            }
+
+            .activities-map-iframe {
+              min-height: 180px;
+            }
+
+            .activities-detail-overlay {
+              padding: 8px;
+            }
+
+            .activities-detail-card {
+              width: calc(100vw - 12px);
+              max-height: 94vh;
+            }
+
+            .activities-detail-body,
+            .activities-detail-head {
+              padding: 10px;
+            }
+
+            .activities-detail-section {
+              padding: 10px;
+            }
+          }
+
+          @media (max-width: 420px) {
+            .activities-main {
+              padding: 8px;
+              border-radius: 12px;
+            }
+
+            .activities-title {
+              font-size: 1.24rem;
+            }
+
+            .activities-subtitle {
+              font-size: 0.92rem;
+            }
+
+            .activities-helper,
+            .activities-mobile-meta-item,
+            .activities-mobile-location-item,
+            .activities-mobile-notes,
+            .activities-detail-field-value {
+              font-size: 12px;
+            }
+
+            .activities-mobile-head,
+            .activities-request-top {
+              flex-direction: column;
+              align-items: flex-start;
+            }
+
+            .activities-mobile-badge {
+              align-self: flex-start;
+            }
+
+            .activities-thumb,
+            .activities-thumb-mobile {
+              width: 72px;
+              height: 72px;
+            }
+
+            .activities-map-iframe {
+              min-height: 160px;
+            }
+
+            .activities-detail-file {
+              width: 100%;
+              justify-content: center;
             }
           }
         `}</style>

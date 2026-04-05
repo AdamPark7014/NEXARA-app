@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { io, Socket } from 'socket.io-client';
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
+import { revokeObjectUrlLater, triggerFileDownload } from "@/lib/file-download";
 import styles from "./CvsManagementPanel.module.css";
 
 type CvRow = {
@@ -336,11 +337,8 @@ export default function CvsManagementPanel() {
     }
     const blob = await response.blob();
     const objectUrl = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = objectUrl;
-    anchor.download = `cv-${id}.pdf`;
-    anchor.click();
-    URL.revokeObjectURL(objectUrl);
+    triggerFileDownload(objectUrl, `cv-${id}.pdf`, { preferOpenOnMobile: true });
+    revokeObjectUrlLater(objectUrl);
   };
 
   const openWhatsapp = (phone?: string | null) => {

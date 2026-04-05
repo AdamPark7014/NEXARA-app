@@ -60,19 +60,29 @@ export default function MyBranchesPage() {
     if (/^(data:|blob:|\/\/)/i.test(raw)) return raw;
 
     const base = getApiAssetOrigin();
+    let search = "";
     if (/^https?:\/\//i.test(raw)) {
       try {
         const parsed = new URL(raw);
-        if (parsed.pathname.startsWith("/uploads/")) {
-          return `${base}${parsed.pathname}${parsed.search}`;
+        if (!/^\/(uploads|activities|evidences|activity-evidence|documents|user-docs|users|clients|vehicles)\//i.test(parsed.pathname)) {
+          return raw;
         }
+        search = parsed.search;
       } catch {
         // Keep original URL if parsing fails.
+        return raw;
       }
-      return raw;
     }
 
-    return `${base}${raw.startsWith("/") ? "" : "/"}${raw}`;
+    const normalizedPath = raw
+      .replace(/\\+/g, "/")
+      .replace(/^https?:\/\/[^/]+/i, "")
+      .replace(/^\/api(?=\/uploads\/)/i, "")
+      .replace(/^\/?uploads\//i, "")
+      .replace(/^\/+/, "")
+      .replace(/\?.*$/, "");
+    const normalized = `/uploads/${normalizedPath}`.replace(/\/uploads\/+/, "/uploads/");
+    return `${base}${encodeURI(normalized)}${search}`;
   };
   const clientAvatarUrl = profile?.logoUrl || session?.client?.logoUrl || "";
 
