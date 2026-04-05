@@ -7,6 +7,7 @@ import NotificationCenter from "@/components/NotificationCenter";
 import BottomNav from "@/components/BottomNav";
 import type { BottomNavItem } from "@/components/BottomNav";
 import PageTransition from "@/components/PageTransition";
+import GpsBackgroundTracker from "@/components/GpsBackgroundTracker";
 import { setActivePanel } from "@/lib/panel-routing";
 import { useUser } from "@/components/UserContext";
 import { isPlatformAdmin } from "@/lib/panel-user";
@@ -77,6 +78,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   const { user } = useUser();
   const [viewSubtitle, setViewSubtitle] = useState("Consola NEXARA");
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const viewTitle = useMemo(() => formatConsoleTitle(pathname || "console"), [pathname]);
   const inPrefixedConsolePath = Boolean(pathname && pathname.startsWith("/console"));
   const role = String(user?.role || "").toLowerCase();
@@ -119,6 +121,19 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   }, [isIngeniero, isSuperAdmin, isAdmin, inPrefixedConsolePath, drawerOpen]);
 
   useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 900);
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) {
+      setDrawerOpen(false);
+    }
+  }, [isMobile]);
+
+  useEffect(() => {
     const now = new Date();
     setViewSubtitle(`Consola NEXARA · ${now.toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" })}`);
     setActivePanel("console");
@@ -129,6 +144,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   }
   return (
     <div className={styles.consoleLayout}>
+      <GpsBackgroundTracker />
       <Sidebar mobileOpen={drawerOpen} onMobileClose={() => setDrawerOpen(false)} />
       <main className={styles.consoleMain}>
         <section className={styles.consoleTopbar}>
@@ -144,12 +160,14 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
           </div>
         </section>
         <div className={styles.consoleContent}><PageTransition>{children}</PageTransition></div>
-        {/* Spacer to prevent fixed BottomNav from covering last content row */}
-        <div style={{ height: 96, flexShrink: 0, pointerEvents: 'none' }} aria-hidden="true" />
+        {isMobile && (
+          <>
+            {/* Spacer to prevent fixed BottomNav from covering last content row */}
+            <div style={{ height: 96, flexShrink: 0, pointerEvents: "none" }} aria-hidden="true" />
+          </>
+        )}
       </main>
-      <BottomNav
-        items={bottomNavItems}
-      />
+      {isMobile && <BottomNav items={bottomNavItems} />}
     </div>
   );
 }

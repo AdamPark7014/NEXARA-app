@@ -7,6 +7,7 @@ type BranchOption = { id: number; name: string; branchNumber?: string | null };
 type InventoryItemDraft = {
   sectionName: string;
   groupName: string;
+  customGroupName?: string;
   equipmentName: string;
   serialBefore: string;
   modelBefore: string;
@@ -24,6 +25,8 @@ type InventoryItemDraft = {
 type InventorySnapshot = {
   id: number;
   status: string;
+  createdByType?: 'CLIENT' | 'BRANCH' | 'CONSOLE' | null;
+  activityId?: number | null;
   title?: string | null;
   notes?: string | null;
   previousCount?: number | null;
@@ -58,6 +61,7 @@ const GROUP_OPTIONS = [
 const emptyItem = (): InventoryItemDraft => ({
   sectionName: "",
   groupName: "OTROS",
+  customGroupName: "",
   equipmentName: "",
   serialBefore: "",
   modelBefore: "",
@@ -81,9 +85,14 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
   const [selectedBranchId, setSelectedBranchId] = useState<string>(fixedBranch ? String(fixedBranch.id) : "");
   const [selectedInventoryId, setSelectedInventoryId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [originFilter, setOriginFilter] = useState<string>('all');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [branchQuery, setBranchQuery] = useState('');
   const [historyQuery, setHistoryQuery] = useState('');
   const [itemQuery, setItemQuery] = useState('');
   const [groupFilter, setGroupFilter] = useState<string>('ALL');
+  const [newCustomDeviceType, setNewCustomDeviceType] = useState('');
   const [isCompact, setIsCompact] = useState(false);
   const [activeItemIndex, setActiveItemIndex] = useState(0);
   const [title, setTitle] = useState("");
@@ -92,6 +101,8 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
   const [items, setItems] = useState<InventoryItemDraft[]>([]);
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const itemCardRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const editorRef = useRef<HTMLDivElement | null>(null);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
 
   const buildApiUrl = (path: string) => `${apiUrl}/${path.replace(/^\/+/, "")}`;
   const getAssetUrl = (url?: string | null) => {
@@ -103,6 +114,20 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
 
   const activeBranchId = mode === "branch" ? fixedBranch?.id : selectedBranchId ? Number(selectedBranchId) : undefined;
 
+  const normalizeText = (value?: string | null) => String(value || '').toLowerCase().trim();
+  const smartTokenMatch = (needle: string, chunks: Array<string | number | null | undefined>) => {
+    const tokens = normalizeText(needle).split(/\s+/).filter(Boolean);
+    if (!tokens.length) return true;
+    const haystack = chunks.map((entry) => normalizeText(String(entry || ''))).filter(Boolean).join(' ');
+    return tokens.every((token) => haystack.includes(token));
+  };
+
+  const toSource = (inventory: InventorySnapshot) => {
+    const origin = String(inventory.createdByType || '').toUpperCase();
+    if (origin === 'CLIENT' || origin === 'BRANCH') return 'OWN';
+    return 'PROVIDER';
+  };
+
   const filteredInventories = useMemo(() => {
     const byBranch = mode === 'branch'
       ? inventories
@@ -110,26 +135,85 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
         ? inventories
         : inventories.filter((inventory) => Number(inventory.branch?.id || 0) === activeBranchId);
 
+    const byBranchSmart = branchQuery.trim()
+      ? byBranch.filter((inventory) =>
+          smartTokenMatch(branchQuery, [
+            inventory.branch?.name,
+            inventory.branch?.branchNumber,
+            inventory.title,
+          ]),
+        )
+      : byBranch;
+
     const byStatus = statusFilter === 'all'
-      ? byBranch
-      : byBranch.filter((inventory) => String(inventory.status || '').toUpperCase() === statusFilter);
+      ? byBranchSmart
+      : byBranchSmart.filter((inventory) => String(inventory.status || '').toUpperCase() === statusFilter);
 
-    const normalizedQuery = historyQuery.trim().toLowerCase();
-    if (!normalizedQuery) return byStatus;
+    const byOrigin = originFilter === 'all'
+      ? byStatus
+      : byStatus.filter((inventory) => toSource(inventory) === originFilter);
 
-    return byStatus.filter((inventory) => {
-      const haystack = [
+    const start = fromDate ? new Date(`${fromDate}T00:00:00`) : null;
+    const end = toDate ? new Date(`${toDate}T23:59:59.999`) : null;
+    const byDate = byOrigin.filter((inventory) => {
+      if (!start && !end) return true;
+      const raw = inventory.updatedAt;
+      if (!raw) return false;
+      const stamp = new Date(raw);
+      if (Number.isNaN(stamp.getTime())) return false;
+      if (start && stamp < start) return false;
+      if (end && stamp > end) return false;
+      return true;
+    });
+
+    if (!historyQuery.trim()) return byDate;
+    return byDate.filter((inventory) =>
+      smartTokenMatch(historyQuery, [
         inventory.id,
         inventory.title,
         inventory.status,
         inventory.branch?.name,
         inventory.branch?.branchNumber,
-      ]
-        .map((entry) => String(entry || '').toLowerCase())
-        .join(' ');
-      return haystack.includes(normalizedQuery);
+        inventory.createdByType,
+        inventory.previousCount,
+        inventory.currentCount,
+        inventory.deltaCount,
+      ]),
+    );
+  }, [inventories, mode, activeBranchId, statusFilter, originFilter, fromDate, toDate, branchQuery, historyQuery]);
+
+  const dynamicGroupOptions = useMemo(() => {
+    const set = new Set<string>(GROUP_OPTIONS);
+    inventories.forEach((inventory) => {
+      (inventory.items || []).forEach((item: any) => {
+        const group = String(item?.groupName || '').trim().toUpperCase();
+        if (group) set.add(group);
+      });
     });
-  }, [inventories, mode, activeBranchId, statusFilter, historyQuery]);
+    items.forEach((item) => {
+      const custom = String(item.customGroupName || '').trim().toUpperCase();
+      if (custom) set.add(custom);
+    });
+    return Array.from(set);
+  }, [inventories, items]);
+
+  const providerBaselineByBranch = useMemo(() => {
+    const map = new Map<number, InventorySnapshot>();
+    const providers = inventories
+      .filter((inventory) => toSource(inventory) === 'PROVIDER')
+      .sort((a, b) => {
+        const aTime = new Date(a.updatedAt || 0).getTime();
+        const bTime = new Date(b.updatedAt || 0).getTime();
+        return bTime - aTime;
+      });
+
+    providers.forEach((inventory) => {
+      const branchId = Number(inventory.branch?.id || 0);
+      if (!branchId || map.has(branchId)) return;
+      map.set(branchId, inventory);
+    });
+    return map;
+  }, [inventories]);
 
   const inventoryStats = useMemo(() => {
     const stats = {
@@ -188,8 +272,17 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
     return status || '-';
   };
 
+  const getOriginLabel = (inventory: InventorySnapshot) => {
+    const source = toSource(inventory);
+    if (source === 'OWN') return 'Inventario interno';
+    return 'Inventario proveedor';
+  };
+
   const isItemComplete = (item: InventoryItemDraft) => {
-    const hasHeader = item.sectionName.trim() && item.groupName.trim() && item.equipmentName.trim();
+    const resolvedGroup = item.groupName === 'OTROS'
+      ? (item.customGroupName || '').trim()
+      : item.groupName.trim();
+    const hasHeader = item.sectionName.trim() && resolvedGroup && item.equipmentName.trim();
     const hasBefore = item.serialBefore.trim() && item.modelBefore.trim() && item.beforePanoramicPhotoUrl.trim() && item.beforeCloseupPhotoUrl.trim();
     const hasAfter = item.serialAfter.trim() && item.modelAfter.trim() && item.afterPanoramicPhotoUrl.trim() && item.afterCloseupPhotoUrl.trim();
     const hasMaintenance = item.maintenanceStickerPhotoUrl.trim() && item.maintenanceComments.trim() && item.maintenanceActions.trim();
@@ -211,8 +304,18 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
     setLoading(true);
     setError(null);
     try {
-      const query = mode === "client" && activeBranchId ? `?branchId=${activeBranchId}` : "";
-      const endpoint = mode === "branch" ? "branch-portal/inventories" : `client-portal/inventories${query}`;
+      const params = new URLSearchParams();
+      if (mode === 'client' && activeBranchId) params.set('branchId', String(activeBranchId));
+      if (statusFilter !== 'all') params.set('status', statusFilter);
+      if (originFilter === 'OWN') params.set('origin', mode === 'branch' ? 'BRANCH' : 'CLIENT');
+      if (originFilter === 'PROVIDER') params.set('origin', 'CONSOLE');
+      if (fromDate) params.set('from', fromDate);
+      if (toDate) params.set('to', toDate);
+      if (branchQuery.trim()) params.set('search', branchQuery.trim());
+      const query = params.toString();
+      const endpoint = mode === "branch"
+        ? `branch-portal/inventories${query ? `?${query}` : ''}`
+        : `client-portal/inventories${query ? `?${query}` : ''}`;
       const response = await fetch(buildApiUrl(endpoint), {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -223,7 +326,7 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
     } finally {
       setLoading(false);
     }
-  }, [mode, activeBranchId, token, apiUrl]);
+  }, [mode, activeBranchId, token, apiUrl, statusFilter, originFilter, fromDate, toDate, branchQuery]);
 
   useEffect(() => {
     fetchInventories();
@@ -304,7 +407,12 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
     setPreviousCount(Number(detail.previousCount || 0));
     const nextItems = (Array.isArray(detail.items) ? detail.items : []).map((item: any) => ({
       sectionName: item.sectionName || "",
-      groupName: item.groupName || "OTROS",
+      groupName: GROUP_OPTIONS.includes(String(item.groupName || '').toUpperCase())
+        ? String(item.groupName || '').toUpperCase()
+        : 'OTROS',
+      customGroupName: GROUP_OPTIONS.includes(String(item.groupName || '').toUpperCase())
+        ? ''
+        : (item.groupName || ""),
       equipmentName: item.equipmentName || "",
       serialBefore: item.serialBefore || item.serialNumber || "",
       modelBefore: item.modelBefore || item.model || "",
@@ -328,13 +436,31 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
     setTitle("");
     setNotes("");
     setPreviousCount(0);
+    setNewCustomDeviceType('');
+    setGroupFilter('ALL');
     setItems([emptyItem()]);
     setActiveItemIndex(0);
   };
 
+  const handleCreateNewInventory = () => {
+    resetEditor();
+    window.setTimeout(() => {
+      editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      titleInputRef.current?.focus();
+    }, 40);
+  };
+
   const addItem = () => {
     setItems((prev) => {
-      const next = [...prev, emptyItem()];
+      const baseItem = emptyItem();
+      const normalizedCustomType = newCustomDeviceType.trim();
+      const preparedItem = groupFilter === 'OTROS'
+        ? { ...baseItem, groupName: 'OTROS', customGroupName: normalizedCustomType }
+        : groupFilter !== 'ALL'
+          ? { ...baseItem, groupName: groupFilter, customGroupName: '' }
+          : baseItem;
+
+      const next = [...prev, preparedItem];
       setActiveItemIndex(next.length - 1);
       return next;
     });
@@ -458,7 +584,10 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
 
   const validateItems = () => {
     const invalidIndex = items.findIndex((item) => {
-      const hasHeader = item.sectionName.trim() && item.groupName.trim() && item.equipmentName.trim();
+      const resolvedGroup = item.groupName === 'OTROS'
+        ? (item.customGroupName || '').trim()
+        : item.groupName.trim();
+      const hasHeader = item.sectionName.trim() && resolvedGroup && item.equipmentName.trim();
       const hasBefore = item.serialBefore.trim() && item.modelBefore.trim() && item.beforePanoramicPhotoUrl.trim() && item.beforeCloseupPhotoUrl.trim();
       const hasAfter = item.serialAfter.trim() && item.modelAfter.trim() && item.afterPanoramicPhotoUrl.trim() && item.afterCloseupPhotoUrl.trim();
       const hasMaintenance = item.maintenanceStickerPhotoUrl.trim() && item.maintenanceComments.trim() && item.maintenanceActions.trim();
@@ -505,7 +634,12 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
       notes: notes || undefined,
       completed,
       confirmDifference,
-      items,
+      items: items.map((item) => ({
+        ...item,
+        groupName: item.groupName === 'OTROS'
+          ? ((item.customGroupName || '').trim().toUpperCase() || 'OTROS')
+          : item.groupName,
+      })),
     };
     if (mode === "client") payload.branchId = activeBranchId;
 
@@ -590,8 +724,8 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
           <p className="inventory-heading">Inventarios y mantenimientos</p>
           <p className="panel-muted inventory-subtitle">
             {mode === "branch"
-              ? "Captura inventario completo de la sucursal con comparativo antes/después."
-              : "Filtra por sucursal y administra historial de inventarios y mantenimientos."}
+              ? "Administra el inventario de tu sucursal y compáralo con los inventarios del proveedor por fecha."
+              : "Consulta el panorama general de todas tus sucursales y filtra por sucursal, fecha y tipo de inventario."}
           </p>
         </div>
         {mode === "client" && (
@@ -602,6 +736,11 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
             ))}
           </select>
         )}
+        <select className="input" value={originFilter} onChange={(e) => setOriginFilter(e.target.value)} aria-label="Filtrar por tipo de inventario">
+          <option value="all">Todos los inventarios</option>
+          <option value="OWN">Inventario interno</option>
+          <option value="PROVIDER">Inventario proveedor</option>
+        </select>
         <select className="input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filtrar por estatus">
           <option value="all">Todos los estatus</option>
           <option value="PENDING">Pendiente</option>
@@ -616,6 +755,15 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
           value={historyQuery}
           onChange={(e) => setHistoryQuery(e.target.value)}
         />
+        <input
+          className="input inventory-history-search"
+          placeholder="Sucursal"
+          aria-label="Buscar sucursal"
+          value={branchQuery}
+          onChange={(e) => setBranchQuery(e.target.value)}
+        />
+        <input className="input" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} aria-label="Desde" />
+        <input className="input" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} aria-label="Hasta" />
       </div>
 
       <div className="stat-grid">
@@ -633,7 +781,7 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
       <div className="list-stack">
         <div className="inventory-list-header">
           <strong>Historial ({filteredInventories.length})</strong>
-          <button className="button-secondary" type="button" onClick={resetEditor}>Nuevo inventario</button>
+          <button className="button-secondary" type="button" onClick={handleCreateNewInventory}>Nuevo inventario</button>
         </div>
         {loading && <div className="inventory-muted">Cargando inventarios...</div>}
         {!loading && filteredInventories.length === 0 && <div className="inventory-muted">Sin inventarios registrados.</div>}
@@ -643,9 +791,23 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
               <strong>INV-{inventory.id} · {inventory.branch?.name || "Sucursal"}</strong>
               <span className="badge">{getStatusLabel(inventory.status)}</span>
             </div>
+            <div className="inventory-record-meta">Origen: {getOriginLabel(inventory)}</div>
             <div className="inventory-record-meta">
               {inventory.previousCount ?? 0} previos · {inventory.currentCount ?? 0} actuales · Δ {inventory.deltaCount ?? 0}
             </div>
+            {toSource(inventory) === 'OWN' && (() => {
+              const branchId = Number(inventory.branch?.id || 0);
+              const providerBaseline = branchId ? providerBaselineByBranch.get(branchId) : null;
+              if (!providerBaseline) return null;
+              const contrast = Number(inventory.currentCount || 0) - Number(providerBaseline.currentCount || 0);
+              const label = contrast === 0 ? 'igual' : contrast > 0 ? `+${contrast} más` : `${contrast} menos`;
+              const arrow = " → ";
+              return (
+                <div className="inventory-record-meta">
+                  Contraste vs proveedor: {providerBaseline.currentCount ?? 0}{arrow}{inventory.currentCount ?? 0} ({label})
+                </div>
+              );
+            })()}
             {!!inventory.updatedAt && (
               <div className="inventory-record-meta">
                 Actualizado: {new Date(inventory.updatedAt).toLocaleString()}
@@ -671,16 +833,25 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
         ))}
       </div>
 
-      <div className="inventory-editor">
+      <div className="inventory-editor" ref={editorRef}>
         <strong>{selectedInventoryId ? `Editar inventario INV-${selectedInventoryId}` : "Nuevo inventario"}</strong>
         <div className={`inventory-editor-filters ${isCompact ? 'is-compact' : ''}`}>
           <input className="input" placeholder="Buscar equipo en formulario" aria-label="Buscar equipo en el formulario" value={itemQuery} onChange={(e) => setItemQuery(e.target.value)} />
           <select className="input" value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} aria-label="Filtrar equipos por grupo">
             <option value="ALL">Todos los grupos</option>
-            {GROUP_OPTIONS.map((group) => (
+            {dynamicGroupOptions.map((group) => (
               <option key={`group-filter-${group}`} value={group}>{group}</option>
             ))}
           </select>
+          {groupFilter === 'OTROS' && (
+            <input
+              className="input"
+              placeholder="Nuevo tipo de dispositivo (OTROS)"
+              aria-label="Nuevo tipo de dispositivo"
+              value={newCustomDeviceType}
+              onChange={(e) => setNewCustomDeviceType(e.target.value)}
+            />
+          )}
           <div className="inventory-summary">
             Mostrando {visibleItems.length} de {items.length} equipo(s)
           </div>
@@ -689,7 +860,7 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
           <button type="button" className={groupFilter === 'ALL' ? 'button-primary' : 'button-secondary'} onClick={() => setGroupFilter('ALL')}>
             Todos
           </button>
-          {GROUP_OPTIONS.map((group) => (
+          {dynamicGroupOptions.map((group) => (
             <button
               key={`group-chip-${group}`}
               type="button"
@@ -701,7 +872,14 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
           ))}
         </div>
         <div className={`inventory-meta-grid ${isCompact ? 'is-compact' : ''}`}>
-          <input className="input" placeholder="Título del inventario" aria-label="Título del inventario" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <input
+            ref={titleInputRef}
+            className="input"
+            placeholder="Título del inventario"
+            aria-label="Título del inventario"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
           <input className="input" placeholder="Notas generales" aria-label="Notas generales" value={notes} onChange={(e) => setNotes(e.target.value)} />
         </div>
 
@@ -773,8 +951,17 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
             <div className={`inventory-item-fields ${isCompact ? 'is-compact' : ''}`}>
               <input className="input" placeholder="Apartado" aria-label={`Equipo ${index + 1}: apartado`} value={item.sectionName} onChange={(e) => updateItem(index, { sectionName: e.target.value })} />
               <select className="input" value={item.groupName} onChange={(e) => updateItem(index, { groupName: e.target.value })} aria-label={`Equipo ${index + 1}: grupo`}>
-                {GROUP_OPTIONS.map((group) => <option key={group} value={group}>{group}</option>)}
+                {dynamicGroupOptions.map((group) => <option key={group} value={group}>{group}</option>)}
               </select>
+              {item.groupName === 'OTROS' && (
+                <input
+                  className="input"
+                  placeholder="OTROS: especifique tipo de equipo"
+                  aria-label={`Equipo ${index + 1}: especifique tipo de equipo`}
+                  value={item.customGroupName || ''}
+                  onChange={(e) => updateItem(index, { customGroupName: e.target.value })}
+                />
+              )}
               <input className="input" placeholder="Nombre equipo" aria-label={`Equipo ${index + 1}: nombre`} value={item.equipmentName} onChange={(e) => updateItem(index, { equipmentName: e.target.value })} />
               <input className="input" placeholder="Serie ANTES" aria-label={`Equipo ${index + 1}: serie antes`} value={item.serialBefore} onChange={(e) => updateItem(index, { serialBefore: e.target.value })} />
               <input className="input" placeholder="Modelo ANTES" aria-label={`Equipo ${index + 1}: modelo antes`} value={item.modelBefore} onChange={(e) => updateItem(index, { modelBefore: e.target.value })} />
@@ -1117,6 +1304,48 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
 
         .inventory-footer-meta.is-compact {
           grid-column: span 2;
+        }
+
+        :global(body.dark) .inventory-heading,
+        :global(body.dark) .inventory-list-header strong,
+        :global(body.dark) .inventory-editor > strong,
+        :global(body.dark) .inventory-item-title strong,
+        :global(body.dark) .inventory-progress-header,
+        :global(body.dark) .inventory-photo-label,
+        :global(body.dark) .stat-card strong {
+          color: #e7f0ff;
+        }
+
+        :global(body.dark) .panel-muted,
+        :global(body.dark) .inventory-muted,
+        :global(body.dark) .inventory-summary,
+        :global(body.dark) .inventory-record-meta,
+        :global(body.dark) .inventory-footer-meta,
+        :global(body.dark) .inventory-empty-note,
+        :global(body.dark) .inventory-photo-placeholder,
+        :global(body.dark) .inventory-compact-preview {
+          color: #a9bfdc;
+        }
+
+        :global(body.dark) .record-card,
+        :global(body.dark) .inventory-item-card,
+        :global(body.dark) .inventory-progress,
+        :global(body.dark) .inventory-empty-note,
+        :global(body.dark) .inventory-photo-placeholder,
+        :global(body.dark) .stat-card {
+          border-color: #2a4669;
+        }
+
+        :global(body.dark) .inventory-photo-placeholder,
+        :global(body.dark) .inventory-empty-note,
+        :global(body.dark) .stat-card,
+        :global(body.dark) .inventory-progress,
+        :global(body.dark) .record-card,
+        :global(body.dark) .inventory-item-card,
+        :global(body.dark) .list-stack,
+        :global(body.dark) .inventory-editor,
+        :global(body.dark) .inventory-manager {
+          background: color-mix(in srgb, #0b1a2d 86%, #0f172a);
         }
 
         @media (max-width: 1180px) {

@@ -52,6 +52,13 @@ export default function ClientsPage() {
     return `${baseUrl}${normalizedPath}`;
   };
 
+  const getClientBranchCount = (client: any) => {
+    if (Array.isArray(client?.branches)) return client.branches.length;
+    if (typeof client?.branchCount === 'number') return client.branchCount;
+    if (typeof client?._count?.branches === 'number') return client._count.branches;
+    return 0;
+  };
+
   const fetchClients = () => {
     if (!user?.token) return;
     fetch(buildApiUrl('service-clients'), {
@@ -422,6 +429,7 @@ export default function ClientsPage() {
                     ) : (
                       clients.map((client) => {
                         const logoUrl = getLogoUrl(client.logoUrl);
+                        const branchCount = getClientBranchCount(client);
                         return (
                           <tr key={client.id}>
                             <td>
@@ -487,9 +495,9 @@ export default function ClientsPage() {
                             <td>{client.contactEmail || '-'}</td>
                             <td>{client.contactPhone || '-'}</td>
                             <td>
-                              {client.branches?.length > 0 ? (
+                              {branchCount > 0 ? (
                                 <span style={{ color: 'var(--accent)' }}>
-                                  {client.branches.length} {client.branches.length === 1 ? 'sucursal' : 'sucursales'}
+                                  {branchCount} {branchCount === 1 ? 'sucursal' : 'sucursales'}
                                 </span>
                               ) : (
                                 <span style={{ color: 'var(--text-secondary)' }}>Sin sucursales</span>

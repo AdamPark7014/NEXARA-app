@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import ClientLocationPicker, { ClientLocationValue } from './ClientLocationPicker';
 import styles from './BranchesForm.module.css';
 import { io, Socket } from 'socket.io-client';
+import { getApiAssetOrigin } from '@/lib/api-base';
 
 export type Branch = {
   id: number;
@@ -124,9 +125,24 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
 
   const getAssetUrl = (url?: string | null) => {
     if (!url) return '';
-    if (url.startsWith('http')) return url;
-    const base = apiUrl.replace(/\/+api\/?$/, '');
-    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+    const raw = url.trim();
+    if (!raw) return '';
+    if (/^(data:|blob:|\/\/)/i.test(raw)) return raw;
+
+    const base = getApiAssetOrigin();
+    if (/^https?:\/\//i.test(raw)) {
+      try {
+        const parsed = new URL(raw);
+        if (parsed.pathname.startsWith('/uploads/')) {
+          return `${base}${parsed.pathname}${parsed.search}`;
+        }
+      } catch {
+        // Keep original URL if parsing fails.
+      }
+      return raw;
+    }
+
+    return `${base}${raw.startsWith('/') ? '' : '/'}${raw}`;
   };
 
   const getDefaultLogo = () => clientLogoUrl || companyLogoUrl || '';

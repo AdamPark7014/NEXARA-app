@@ -141,11 +141,14 @@ const nextConfig = {
   async headers() {
     const isDev = process.env.NODE_ENV !== 'production';
     const scriptSrc = isDev ? "'self' 'unsafe-inline' 'unsafe-eval'" : "'self' 'unsafe-inline'";
+    const imgSrc = isDev
+      ? "'self' data: blob: https: http://localhost:* http://127.0.0.1:* http://*.localhost:*"
+      : "'self' data: blob: https:";
     const csp = [
       "default-src 'self'",
       `script-src ${scriptSrc}`,
       "style-src 'self' 'unsafe-inline' https:",
-      "img-src 'self' data: blob: https:",
+      `img-src ${imgSrc}`,
       "font-src 'self' data: https:",
       "connect-src 'self' https: wss: http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:* http://*.localhost:* ws://*.localhost:* wss://*.localhost:*",
       "media-src 'self' blob: https:",

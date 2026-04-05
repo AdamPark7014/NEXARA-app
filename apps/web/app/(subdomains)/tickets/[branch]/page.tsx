@@ -79,6 +79,8 @@ export default function BranchTicketsPage() {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
   const [showPdfModal, setShowPdfModal] = useState(false);
+  const [pdfModalTitle, setPdfModalTitle] = useState("Reporte de tickets de sucursal");
+  const [pdfFileName, setPdfFileName] = useState(`reporte-sucursal-${new Date().toISOString().slice(0, 10)}.pdf`);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
   const [draft, setDraft] = useState({
     requestType: "ISSUE" as "ISSUE" | "PREVENTIVE_INVENTORY",
@@ -91,17 +93,19 @@ export default function BranchTicketsPage() {
     address: "",
   });
 
+  const openRequests = requests.filter((request) => String(request.status || '').toUpperCase() !== 'CLOSED');
+
   const requestStats = {
-    total: requests.length,
-    pending: requests.filter((item) => {
+    total: openRequests.length,
+    pending: openRequests.filter((item) => {
       const status = String(item.status || '').toUpperCase();
       return status.includes('PEND') || status.includes('PROCES') || status.includes('ASIGN');
     }).length,
-    completed: requests.filter((item) => {
+    completed: openRequests.filter((item) => {
       const status = String(item.status || '').toUpperCase();
       return status.includes('FINAL') || status.includes('CERR') || status.includes('COMPLET');
     }).length,
-    evidences: requests.reduce((acc, item) => acc + (Array.isArray(item.evidenceUrls) ? item.evidenceUrls.length : 0), 0),
+    evidences: openRequests.reduce((acc, item) => acc + (Array.isArray(item.evidenceUrls) ? item.evidenceUrls.length : 0), 0),
   };
   const pathname = usePathname();
   const router = useRouter();
@@ -240,6 +244,8 @@ export default function BranchTicketsPage() {
       setPdfData(new Uint8Array(arrayBuffer));
       if (pdfUrl) URL.revokeObjectURL(pdfUrl);
       setPdfUrl(URL.createObjectURL(blob));
+      setPdfModalTitle("Reporte de tickets de sucursal");
+      setPdfFileName(`reporte-sucursal-${new Date().toISOString().slice(0, 10)}.pdf`);
       setShowPdfModal(true);
     } finally {
       setGeneratingPdf(false);
@@ -252,16 +258,20 @@ export default function BranchTicketsPage() {
       headers: { Authorization: `Bearer ${session.token}` },
     });
     if (!res.ok) {
-      setError("No se pudo generar el reporte del ticket");
+      setError("No se pudo previsualizar el reporte del ticket");
       return;
     }
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `reporte-ticket-${ticketId}.pdf`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const arrayBuffer = await blob.arrayBuffer();
+    const selected = tickets.find((ticket) => ticket.id === ticketId);
+    const ticketLabel = selected?.anNumber || `Ticket #${ticketId}`;
+
+    setPdfData(new Uint8Array(arrayBuffer));
+    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+    setPdfUrl(URL.createObjectURL(blob));
+    setPdfModalTitle(`Reporte individual: ${ticketLabel}`);
+    setPdfFileName(`reporte-ticket-${ticketLabel.replace(/[^a-zA-Z0-9-_]+/g, "-")}.pdf`);
+    setShowPdfModal(true);
   };
 
   useEffect(() => {
@@ -573,7 +583,7 @@ export default function BranchTicketsPage() {
                       </a>
                     )}
                     <button className="button-secondary" type="button" onClick={() => handleTicketReport(ticket.id)}>
-                      Exportar ticket (PDF)
+                      Ver ticket (PDF)
                     </button>
                   </div>
                 </div>
@@ -719,9 +729,10 @@ export default function BranchTicketsPage() {
                     <div
                       key={`${entry.file.name}-${index}`}
                       className={`${styles.previewTile} ${entry.kind === "pdf" ? styles.previewTilePdf : ""}`}
+                      style={entry.kind === "image" ? { minHeight: 120, maxHeight: 260 } : { height: "clamp(160px, 28vw, 260px)", maxHeight: 260 }}
                     >
                       {entry.kind === "image" ? (
-                        <img src={entry.url} alt={entry.file.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        <img src={entry.url} alt={entry.file.name} style={{ width: "100%", maxHeight: 260, objectFit: "contain", background: "var(--surface-light)" }} />
                       ) : (
                         <object data={entry.url} type="application/pdf" width="100%" height="100%">
                           <embed src={entry.url} type="application/pdf" />
@@ -752,8 +763,8 @@ export default function BranchTicketsPage() {
 
           <div className={`card ${styles.cardSoft}`}>
             <p className={styles.sectionTitle}>Solicitudes enviadas</p>
-            {requests.length === 0 && <div className={styles.mutedText}>No hay solicitudes registradas aún.</div>}
-            {requests.map((request) => (
+            {openRequests.length === 0 && <div className={styles.mutedText}>No hay solicitudes activas.</div>}
+            {openRequests.map((request) => (
               <div key={request.id} className={styles.itemCard}>
                 <div className={styles.itemHeader}>
                   <strong>Ticket #{request.id}</strong>
@@ -767,13 +778,20 @@ export default function BranchTicketsPage() {
                 {Array.isArray(request.evidenceUrls) && request.evidenceUrls.length > 0 && (
                   <div className={styles.grid120}>
                     {request.evidenceUrls.map((url, idx) => (
-                      <div key={`${request.id}-${idx}`} className={styles.mediaTile}>
+                      <div key={`${request.id}-${idx}`} className={styles.mediaTile} style={{ display: "grid", placeItems: "center", padding: 8, minHeight: 140 }}>
                         {url.toLowerCase().endsWith(".pdf") ? (
-                          <object data={getAssetUrl(url)} type="application/pdf" width="100%" height="120">
-                            <embed src={getAssetUrl(url)} type="application/pdf" />
-                          </object>
+                          <div className={`card ${styles.cardSoft}`} style={{ minHeight: 120, display: "grid", placeItems: "center", padding: 10 }}>
+                            <a className="button-secondary" href={getAssetUrl(url)} target="_blank" rel="noreferrer">
+                              Abrir PDF
+                            </a>
+                          </div>
                         ) : (
-                          <img src={getAssetUrl(url)} alt="evidencia" className={styles.mediaImg} />
+                          <img
+                            src={getAssetUrl(url)}
+                            alt="evidencia"
+                            className={styles.mediaImg}
+                            style={{ width: "100%", maxHeight: 220, objectFit: "contain", background: "var(--surface-light)" }}
+                          />
                         )}
                       </div>
                     ))}
@@ -796,14 +814,14 @@ export default function BranchTicketsPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>
-              <span style={{ fontWeight: 600 }}>Reporte de tickets de sucursal</span>
+              <span style={{ fontWeight: 600 }}>{pdfModalTitle}</span>
               <button onClick={() => setShowPdfModal(false)} style={{ padding: "6px 14px", background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: 8, cursor: "pointer" }}>✕ Cerrar</button>
             </div>
             <div style={{ flex: 1, overflow: "auto" }}>
               <PDFViewer
                 pdfUrl={pdfUrl}
                 pdfData={pdfData}
-                fileName={`reporte-sucursal-${new Date().toISOString().slice(0, 10)}.pdf`}
+                fileName={pdfFileName}
                 height="800px"
               />
             </div>

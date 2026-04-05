@@ -282,6 +282,29 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
     })),
   }));
 
+  const mobileQuickAccessHrefs = new Set<string>();
+  mobileQuickAccessHrefs.add(resolveConsoleHref("/dashboard"));
+  mobileQuickAccessHrefs.add(resolveConsoleHref("/attendance"));
+  if (isIngeniero) {
+    mobileQuickAccessHrefs.add(resolveConsoleHref("/my-activities"));
+    mobileQuickAccessHrefs.add(resolveConsoleHref("/my-profile"));
+  } else if (!isSuperAdmin && !isAdmin) {
+    mobileQuickAccessHrefs.add(resolveConsoleHref("/cotizaciones"));
+    mobileQuickAccessHrefs.add(resolveConsoleHref("/cvs"));
+  } else {
+    mobileQuickAccessHrefs.add(resolveConsoleHref("/activities"));
+    mobileQuickAccessHrefs.add(resolveConsoleHref("/users"));
+  }
+
+  const filteredGroupsToRender = isMobile
+    ? groupsToRender
+        .map((group) => ({
+          ...group,
+          items: group.items.filter((item) => !mobileQuickAccessHrefs.has(item.href)),
+        }))
+        .filter((group) => group.items.length > 0)
+    : groupsToRender;
+
   const isPathActive = (href: string) => pathname === href || (pathname?.startsWith(`${href}/`) ?? false);
 
   const toggleMobileGroup = (groupId: string) => {
@@ -357,7 +380,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
             </div>
           </div>
 
-          {groupsToRender.map((group) => (
+          {filteredGroupsToRender.map((group) => (
             <div key={group.id} className={styles.menuGroup}>
               {isMobile ? (
                 <button

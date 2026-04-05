@@ -31,6 +31,83 @@ export class ServiceClientsService {
     return randomBytes(6).toString('base64').replace(/[^a-zA-Z0-9]/g, '').slice(0, 10);
   }
 
+  private normalizeReportUploadUrl(value?: string | null) {
+    if (!value) return '';
+    const raw = value.trim();
+    if (!raw) return '';
+    if (/^https?:\/\//i.test(raw)) {
+      try {
+        const parsed = new URL(raw);
+        return parsed.pathname || '';
+      } catch {
+        return raw;
+      }
+    }
+
+    const normalized = raw
+      .replace(/\\+/g, '/')
+      .replace(/^\/api(?=\/uploads\/)/i, '')
+      .replace(/^\/?uploads\//i, '')
+      .replace(/^\/?activities\//i, 'activities/')
+      .replace(/^\/+/, '');
+
+    if (!normalized) return '';
+    return `/uploads/${normalized}`.replace(/\/uploads\/+/, '/uploads/');
+  }
+
+  private buildMergedReportEvidences(activity: any) {
+    const flow = activity?.activityEvidence;
+    const flowItems = [
+      flow?.entryPhotoUrl
+        ? {
+            archivoUrl: this.normalizeReportUploadUrl(flow.entryPhotoUrl),
+            tipoEvidencia: 'Foto llegada',
+            latitud: flow.entryLatitude == null ? null : Number(flow.entryLatitude),
+            longitud: flow.entryLongitude == null ? null : Number(flow.entryLongitude),
+          }
+        : null,
+      ...((flow?.evidencePhotos || []).map((url: string, index: number) => ({
+        archivoUrl: this.normalizeReportUploadUrl(url),
+        tipoEvidencia: `Evidencia ${index + 1}`,
+        latitud: null,
+        longitud: null,
+      }))),
+      flow?.serviceSheetPdfUrl
+        ? {
+            archivoUrl: this.normalizeReportUploadUrl(flow.serviceSheetPdfUrl),
+            tipoEvidencia: 'PDF hoja de servicio',
+            latitud: null,
+            longitud: null,
+          }
+        : null,
+      flow?.exitPhotoUrl
+        ? {
+            archivoUrl: this.normalizeReportUploadUrl(flow.exitPhotoUrl),
+            tipoEvidencia: 'Foto salida',
+            latitud: flow.exitLatitude == null ? null : Number(flow.exitLatitude),
+            longitud: flow.exitLongitude == null ? null : Number(flow.exitLongitude),
+          }
+        : null,
+    ].filter((item): item is { archivoUrl: string; tipoEvidencia: string; latitud: number | null; longitud: number | null } => {
+      return Boolean(item && item.archivoUrl);
+    });
+
+    const legacyItems = (activity?.evidencias || []).map((evidence: any) => ({
+      archivoUrl: this.normalizeReportUploadUrl(evidence.archivoUrl),
+      tipoEvidencia: evidence.tipoEvidencia,
+      latitud: evidence.latitud == null ? null : Number(evidence.latitud),
+      longitud: evidence.longitud == null ? null : Number(evidence.longitud),
+    })).filter((item: any) => Boolean(item.archivoUrl));
+
+    const seen = new Set<string>();
+    return [...flowItems, ...legacyItems].filter((item) => {
+      const key = item.archivoUrl.trim().toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
   private buildTransporter() {
     const host = process.env['SMTP_HOST'];
     const port = Number(process.env['SMTP_PORT'] || 587);
@@ -220,15 +297,17 @@ export class ServiceClientsService {
   }
 
   async findAll(query?: PaginationQueryDto) {
+    const includeBranchCount = { _count: { select: { branches: true } } } as const;
+
     if (query?.limit) {
       const where = query.search ? { OR: [{ companyName: { contains: query.search, mode: 'insensitive' as const } }, { contactName: { contains: query.search, mode: 'insensitive' as const } }] } : undefined;
       const [data, total] = await Promise.all([
-        this.db.serviceClient.findMany({ where, orderBy: { createdAt: 'desc' }, skip: query.skip, take: query.take }),
+        this.db.serviceClient.findMany({ where, include: includeBranchCount, orderBy: { createdAt: 'desc' }, skip: query.skip, take: query.take }),
         this.db.serviceClient.count({ where }),
       ]);
       return buildPaginatedResponse(data, total, query);
     }
-    return this.db.serviceClient.findMany({ orderBy: { createdAt: 'desc' } });
+    return this.db.serviceClient.findMany({ include: includeBranchCount, orderBy: { createdAt: 'desc' } });
   }
 
   async findOne(id: number) {
@@ -298,7 +377,7 @@ export class ServiceClientsService {
 
     const activities: any[] = await this.db.activity.findMany({
       where: { clientId, ...(rangeFilter ? rangeFilter : {}) },
-      include: { responsable: true, evidencias: true },
+      include: { responsable: true, evidencias: true, activityEvidence: true },
       orderBy: { fechaAsignacion: 'desc' },
     });
 
@@ -349,12 +428,7 @@ export class ServiceClientsService {
           ? Math.round(((activity.fechaFinalizacion.getTime() - (activity.fechaInicio || activity.fechaAsignacion).getTime()) / 60000))
           : null,
         responsableName: activity.responsable?.nombre || null,
-        evidences: (activity.evidencias || []).map((evidence: any) => ({
-          archivoUrl: evidence.archivoUrl,
-          tipoEvidencia: evidence.tipoEvidencia,
-          latitud: evidence.latitud ?? null,
-          longitud: evidence.longitud ?? null,
-        })),
+        evidences: this.buildMergedReportEvidences(activity),
       })),
     });
 
@@ -389,7 +463,7 @@ export class ServiceClientsService {
 
     const activities: any[] = await this.db.activity.findMany({
       where: { clientId, branchId, ...(rangeFilter ? rangeFilter : {}) },
-      include: { responsable: true, evidencias: true },
+      include: { responsable: true, evidencias: true, activityEvidence: true },
       orderBy: { fechaAsignacion: 'desc' },
     });
 
@@ -440,12 +514,7 @@ export class ServiceClientsService {
           ? Math.round(((activity.fechaFinalizacion.getTime() - (activity.fechaInicio || activity.fechaAsignacion).getTime()) / 60000))
           : null,
         responsableName: activity.responsable?.nombre || null,
-        evidences: (activity.evidencias || []).map((evidence: any) => ({
-          archivoUrl: evidence.archivoUrl,
-          tipoEvidencia: evidence.tipoEvidencia,
-          latitud: evidence.latitud ?? null,
-          longitud: evidence.longitud ?? null,
-        })),
+        evidences: this.buildMergedReportEvidences(activity),
       })),
     });
 

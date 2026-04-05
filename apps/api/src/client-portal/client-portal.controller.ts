@@ -288,10 +288,38 @@ export class ClientPortalController {
 
   @Get('requests')
   async requests(@CurrentUser() user: any) {
-    return this.prisma['clientTicketRequest'].findMany({
+    const requests = await this.prisma['clientTicketRequest'].findMany({
       where: { clientId: user.clientId },
       include: { branch: true, activity: true },
       orderBy: { createdAt: 'desc' },
+    });
+
+    const isClosedActivityStatus = (status?: string | null) => {
+      const value = String(status || '').toUpperCase();
+      return (
+        value.includes('FINAL') ||
+        value.includes('CERR') ||
+        value.includes('COMPLET') ||
+        value.includes('APROBAD')
+      );
+    };
+
+    const toCloseIds = requests
+      .filter((request: any) => request.status !== 'CLOSED' && request.activityId && isClosedActivityStatus(request.activity?.estatus))
+      .map((request: any) => request.id);
+
+    if (toCloseIds.length) {
+      await this.prisma['clientTicketRequest'].updateMany({
+        where: { id: { in: toCloseIds } },
+        data: { status: 'CLOSED' },
+      });
+    }
+
+    return requests.map((request: any) => {
+      if (toCloseIds.includes(request.id)) {
+        return { ...request, status: 'CLOSED' };
+      }
+      return request;
     });
   }
 
@@ -496,10 +524,30 @@ export class ClientPortalController {
   }
 
   @Get('inventories')
-  async inventories(@CurrentUser() user: any, @Query('branchId') branchId?: string) {
+  async inventories(
+    @CurrentUser() user: any,
+    @Query('branchId') branchId?: string,
+    @Query('status') status?: string,
+    @Query('origin') origin?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('search') search?: string,
+  ) {
+    const normalizedOrigin = String(origin || '').toUpperCase();
+    const createdByType = ['CLIENT', 'BRANCH', 'CONSOLE'].includes(normalizedOrigin)
+      ? (normalizedOrigin as 'CLIENT' | 'BRANCH' | 'CONSOLE')
+      : undefined;
+    const parsedFrom = from ? new Date(`${from}T00:00:00`) : undefined;
+    const parsedTo = to ? new Date(`${to}T23:59:59.999`) : undefined;
+
     return this.inventoriesService.list({
       clientId: user.clientId,
       branchId: branchId ? Number(branchId) : undefined,
+      status: status ? String(status).toUpperCase() : undefined,
+      createdByType,
+      from: parsedFrom && !Number.isNaN(parsedFrom.getTime()) ? parsedFrom : undefined,
+      to: parsedTo && !Number.isNaN(parsedTo.getTime()) ? parsedTo : undefined,
+      search: search?.trim() || undefined,
     });
   }
 

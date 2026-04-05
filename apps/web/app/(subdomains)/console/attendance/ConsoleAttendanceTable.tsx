@@ -851,18 +851,38 @@ const ConsoleAttendanceTable = () => {
           }}>
             Click fuera del mapa o presiona ESC para cerrar
           </p>
-          <iframe
-            src={`https://maps.google.com/maps?q=${mapModal.lat},${mapModal.lng}&z=15&output=embed`}
-            width="100%"
-            height="500"
+          <img
+            src={`https://staticmap.openstreetmap.de/staticmap.php?center=${mapModal.lat},${mapModal.lng}&zoom=15&size=1200x500&markers=${mapModal.lat},${mapModal.lng},red-pushpin`}
+            alt="Ubicación del registro"
             style={{
+              width: '100%',
+              height: 500,
+              objectFit: 'cover',
               border: 'none',
               borderRadius: 8,
+              background: 'var(--surface-2)',
             }}
-            allowFullScreen
             loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
+            onError={(e) => {
+              e.currentTarget.src = `https://static-maps.yandex.ru/1.x/?ll=${mapModal.lng},${mapModal.lat}&size=650,450&z=15&l=map&pt=${mapModal.lng},${mapModal.lat},pm2rdm`;
+            }}
           />
+          <a
+            href={`https://www.google.com/maps?q=${mapModal.lat},${mapModal.lng}`}
+            target="_blank"
+            rel="noreferrer"
+            style={{ marginTop: 10, fontSize: 13, color: 'var(--primary)', textAlign: 'center' }}
+          >
+            Abrir en Google Maps
+          </a>
+          <a
+            href={`https://www.openstreetmap.org/?mlat=${mapModal.lat}&mlon=${mapModal.lng}#map=15/${mapModal.lat}/${mapModal.lng}`}
+            target="_blank"
+            rel="noreferrer"
+            style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)', textAlign: 'center' }}
+          >
+            Abrir en OpenStreetMap
+          </a>
         </div>
       </div>,
       document.body

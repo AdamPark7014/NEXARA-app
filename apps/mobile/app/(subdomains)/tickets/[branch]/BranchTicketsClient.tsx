@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
+import BottomNav from "@/components/BottomNav";
 import { useUser } from "@/components/UserContext";
 import { useTheme } from "@/components/ThemeContext";
 import { getApiAssetOrigin } from "@/lib/api-base";
@@ -371,38 +372,97 @@ export default function BranchTicketsPage() {
     return null;
   }
 
+  const activeViewInfo = {
+    profile: {
+      title: "Perfil de sucursal",
+      subtitle: "Consulta la identidad y la informacion base del punto operativo.",
+    },
+    tickets: {
+      title: "Mis tickets",
+      subtitle: "Revisa avances, hojas de servicio y tickets exportables.",
+    },
+    request: {
+      title: "Nueva solicitud",
+      subtitle: "Crea un ticket o mantenimiento con evidencia y ubicacion precisa.",
+    },
+    inventories: {
+      title: "Inventarios",
+      subtitle: "Valida snapshots, mantenimientos e historial de inventario.",
+    },
+  }[activeTab];
+
+  const branchBottomNavItems = [
+    {
+      icon: "🎫",
+      label: "Tickets",
+      onPress: () => {
+        setActiveTab("tickets");
+        setMobileMenuOpen(false);
+      },
+      active: activeTab === "tickets",
+    },
+    {
+      icon: "✚",
+      label: "Nueva",
+      onPress: () => {
+        setActiveTab("request");
+        setMobileMenuOpen(false);
+      },
+      active: activeTab === "request",
+    },
+    {
+      icon: "🧰",
+      label: "Invent.",
+      onPress: () => {
+        setActiveTab("inventories");
+        setMobileMenuOpen(false);
+      },
+      active: activeTab === "inventories",
+    },
+    {
+      icon: "👤",
+      label: "Perfil",
+      onPress: () => {
+        setActiveTab("profile");
+        setMobileMenuOpen(false);
+      },
+      active: activeTab === "profile",
+    },
+    {
+      icon: mobileMenuOpen ? "✕" : "☰",
+      label: "Menu",
+      onPress: () => setMobileMenuOpen((prev) => !prev),
+      active: mobileMenuOpen,
+      hapticIntent: "medium" as const,
+    },
+  ];
+
   return (
     <div className={`${consoleStyles.consoleLayout} ${styles.ticketsConsole}`}>
+      {isMobile && mobileMenuOpen && (
+        <div
+          className={consoleStyles.sidebarOverlay}
+          onClick={() => setMobileMenuOpen(false)}
+          role="presentation"
+        ></div>
+      )}
       <aside className={consoleStyles.sidebar} data-mobile={isMobile ? "true" : "false"} data-open={mobileMenuOpen ? "true" : "false"}>
         <div className={consoleStyles.sidebarHeader}>
           <div className={consoleStyles.sidebarLogo}>
             <span className={consoleStyles.brandMark}>NEXARA</span>
             <span className={consoleStyles.brandSub}>Sucursal</span>
           </div>
-          {isMobile && (
+          {isMobile && mobileMenuOpen && (
             <button
               type="button"
-              className={consoleStyles.hamburgerButton}
-              onClick={() => setMobileMenuOpen((prev) => !prev)}
-              aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
-              aria-expanded={mobileMenuOpen}
-              aria-controls="tickets-branch-sidebar-menu"
-              data-open={mobileMenuOpen ? "true" : "false"}
+              className={consoleStyles.mobileCloseButton}
+              onClick={() => setMobileMenuOpen(false)}
+              aria-label="Cerrar menú"
             >
-              <span className={consoleStyles.hamburgerLine}></span>
-              <span className={consoleStyles.hamburgerLine}></span>
-              <span className={consoleStyles.hamburgerLine}></span>
+              <span aria-hidden="true">✕</span>
             </button>
           )}
         </div>
-
-        {isMobile && mobileMenuOpen && (
-          <div
-            className={consoleStyles.sidebarOverlay}
-            onClick={() => setMobileMenuOpen(false)}
-            role="presentation"
-          ></div>
-        )}
 
         {(!isMobile || mobileMenuOpen) && (
         <div
@@ -411,10 +471,10 @@ export default function BranchTicketsPage() {
           data-open={isMobile && mobileMenuOpen ? "true" : undefined}
         >
         <div className={consoleStyles.sidebarUser}>
-          <div className={consoleStyles.sidebarAvatar}>
+          <div className={consoleStyles.superadminAvatarWrap}>
             {branchAvatarUrl && !avatarLoadError ? (
               <img
-                className={consoleStyles.avatarImage}
+                className={`${consoleStyles.avatarImage} ${consoleStyles.avatarImageLogo}`}
                 src={getAssetUrl(branchAvatarUrl)}
                 alt={profile?.name || session.branch.name}
                 width={64}
@@ -505,16 +565,86 @@ export default function BranchTicketsPage() {
       </aside>
       <main className={consoleStyles.consoleMain}>
         <div className={styles.mainStack}>
-          <div className={`card ${styles.panelHero}`}>
-            <p className={styles.panelHeroTitle}>Portal de tickets de sucursal</p>
-            <p className={styles.panelHeroMeta}>
-              Sucursal: {profile?.name || session.branch.name} · Registra solicitudes y da seguimiento al inventario de mantenimiento.
-            </p>
-            <div className={styles.panelKpis}>
-              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{requestStats.total}</span><span className={styles.panelKpiLabel}>Solicitudes</span></div>
-              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{requestStats.pending}</span><span className={styles.panelKpiLabel}>En proceso</span></div>
-              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{requestStats.completed}</span><span className={styles.panelKpiLabel}>Completadas</span></div>
-              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{requestStats.evidences}</span><span className={styles.panelKpiLabel}>Evidencias</span></div>
+          {isMobile && (
+            <div className={styles.mobileAppChrome}>
+              <div className={styles.mobileTopbar}>
+                <div className={styles.mobileTopbarContent}>
+                  <p className={styles.mobileEyebrow}>Sucursal conectada</p>
+                  <h1 className={styles.mobileTitle}>{activeViewInfo.title}</h1>
+                  <p className={styles.mobileSubtitle}>{activeViewInfo.subtitle}</p>
+                </div>
+                <button
+                  type="button"
+                  className={styles.mobileMenuButton}
+                  onClick={() => setMobileMenuOpen((prev) => !prev)}
+                  aria-label={mobileMenuOpen ? "Cerrar menu" : "Abrir menu"}
+                  aria-expanded={mobileMenuOpen}
+                  aria-controls="tickets-branch-sidebar-menu"
+                >
+                  {mobileMenuOpen ? "✕" : "☰"}
+                </button>
+              </div>
+
+              <div className={styles.mobileIdentityCard}>
+                <div className={styles.mobileIdentityRow}>
+                  <div className={styles.mobileIdentityAvatar}>
+                    {branchAvatarUrl && !avatarLoadError ? (
+                      <img
+                        src={getAssetUrl(branchAvatarUrl)}
+                        alt={profile?.name || session.branch.name}
+                        className={styles.mobileIdentityAvatarImage}
+                      />
+                    ) : (
+                      <span>{(profile?.name || session.branch.name).slice(0, 2).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div className={styles.mobileIdentityMeta}>
+                    <div className={styles.mobileIdentityName}>{profile?.name || session.branch.name}</div>
+                    <div className={styles.mobileIdentityHint}>{profile?.client?.name || session.branch.clientName || "Cliente corporativo"}</div>
+                  </div>
+                </div>
+                <div className={styles.mobilePillRow}>
+                  <span className={styles.mobilePill}>Sucursal</span>
+                  <span className={styles.mobilePill}>{requestStats.pending} en proceso</span>
+                  <span className={styles.mobilePill}>{requestStats.evidences} evidencias</span>
+                </div>
+                <div className={styles.mobileMetricsRow}>
+                  <div className={styles.mobileMetric}>
+                    <span className={styles.mobileMetricValue}>{requestStats.total}</span>
+                    <span className={styles.mobileMetricLabel}>Solicitudes</span>
+                  </div>
+                  <div className={styles.mobileMetric}>
+                    <span className={styles.mobileMetricValue}>{tickets.length}</span>
+                    <span className={styles.mobileMetricLabel}>Tickets</span>
+                  </div>
+                  <div className={styles.mobileMetric}>
+                    <span className={styles.mobileMetricValue}>{requestStats.completed}</span>
+                    <span className={styles.mobileMetricLabel}>Cerradas</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className={`card ${styles.panelHero} ${styles.nativeHero}`}>
+            <div className={styles.heroHeadingRow}>
+              <div className={styles.heroTitleBlock}>
+                <p className={styles.heroEyebrow}>Portal operativo</p>
+                <h1 className={styles.heroTitle}>Portal de tickets de sucursal</h1>
+                <p className={styles.heroLead}>
+                  Sucursal: {profile?.name || session.branch.name} · Registra solicitudes y da seguimiento al inventario de mantenimiento.
+                </p>
+              </div>
+              <div className={styles.heroBadgeRow}>
+                <span className={styles.heroBadge}>Operacion local</span>
+                <span className={styles.heroBadge}>Flujo nativo</span>
+              </div>
+            </div>
+            <div className={styles.heroMetricGrid}>
+              <div className={styles.heroMetricCard}><span className={styles.heroMetricValue}>{requestStats.total}</span><span className={styles.heroMetricLabel}>Solicitudes</span></div>
+              <div className={styles.heroMetricCard}><span className={styles.heroMetricValue}>{requestStats.pending}</span><span className={styles.heroMetricLabel}>En proceso</span></div>
+              <div className={styles.heroMetricCard}><span className={styles.heroMetricValue}>{requestStats.completed}</span><span className={styles.heroMetricLabel}>Completadas</span></div>
+              <div className={styles.heroMetricCard}><span className={styles.heroMetricValue}>{requestStats.evidences}</span><span className={styles.heroMetricLabel}>Evidencias</span></div>
             </div>
           </div>
 
@@ -731,9 +861,10 @@ export default function BranchTicketsPage() {
                     <div
                       key={`${entry.file.name}-${index}`}
                       className={`${styles.previewTile} ${entry.kind === "pdf" ? styles.previewTilePdf : ""}`}
+                      style={entry.kind === "image" ? { minHeight: 120, maxHeight: 260 } : { height: "clamp(160px, 28vw, 260px)", maxHeight: 260 }}
                     >
                       {entry.kind === "image" ? (
-                        <img src={entry.url} alt={entry.file.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        <img src={entry.url} alt={entry.file.name} style={{ width: "100%", maxHeight: 260, objectFit: "contain", background: "var(--surface-light)" }} />
                       ) : (
                         <object data={entry.url} type="application/pdf" width="100%" height="100%">
                           <embed src={entry.url} type="application/pdf" />
@@ -779,13 +910,20 @@ export default function BranchTicketsPage() {
                 {Array.isArray(request.evidenceUrls) && request.evidenceUrls.length > 0 && (
                   <div className={styles.grid120}>
                     {request.evidenceUrls.map((url, idx) => (
-                      <div key={`${request.id}-${idx}`} className={styles.mediaTile}>
+                      <div key={`${request.id}-${idx}`} className={styles.mediaTile} style={{ display: "grid", placeItems: "center", padding: 8, minHeight: 140 }}>
                         {url.toLowerCase().endsWith(".pdf") ? (
-                          <object data={getAssetUrl(url)} type="application/pdf" width="100%" height="120">
-                            <embed src={getAssetUrl(url)} type="application/pdf" />
-                          </object>
+                          <div className={`card ${styles.cardSoft}`} style={{ minHeight: 120, display: "grid", placeItems: "center", padding: 10 }}>
+                            <a className="button-secondary" href={getAssetUrl(url)} target="_blank" rel="noreferrer">
+                              Abrir PDF
+                            </a>
+                          </div>
                         ) : (
-                          <img src={getAssetUrl(url)} alt="evidencia" className={styles.mediaImg} />
+                          <img
+                            src={getAssetUrl(url)}
+                            alt="evidencia"
+                            className={styles.mediaImg}
+                            style={{ width: "100%", maxHeight: 220, objectFit: "contain", background: "var(--surface-light)" }}
+                          />
                         )}
                       </div>
                     ))}
@@ -798,6 +936,7 @@ export default function BranchTicketsPage() {
           )}
         </div>
       </main>
+      {isMobile && <BottomNav items={branchBottomNavItems} />}
       {showPdfModal && pdfUrl && (
         <div
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}

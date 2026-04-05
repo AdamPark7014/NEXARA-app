@@ -54,10 +54,6 @@ const AttendanceForm = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const pendingCameraTypeRef = useRef<'entrada' | 'salida' | null>(null);
   
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const gpsWatchIdRef = useRef<number | null>(null);
-  const gpsLastSentRef = useRef<number>(0);
-
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
   const STORAGE_KEY = 'nexara_attendance_timer';
@@ -272,25 +268,6 @@ const AttendanceForm = () => {
     }
   };
 
-  const sendGpsLocation = async (payload: { latitud: number; longitud: number; velocidadKmh?: number | null }) => {
-    if (!user?.token) return;
-    const now = Date.now();
-    if (now - gpsLastSentRef.current < 4000) return;
-    gpsLastSentRef.current = now;
-    await fetch(buildApiUrl('gps'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${user.token}`,
-      },
-      body: JSON.stringify({
-        ...payload,
-        estaActivo: true,
-        ultimaActualizacion: new Date().toISOString(),
-      }),
-    });
-  };
-
   const updateGpsConsent = async (enabled: boolean) => {
     if (!user?.token) return;
     const res = await fetch(buildApiUrl('gps/consent'), {
@@ -310,40 +287,6 @@ const AttendanceForm = () => {
   const dispatchGpsConsent = (enabled: boolean) => {
     if (typeof window === 'undefined') return;
     window.dispatchEvent(new CustomEvent('gps:consent', { detail: { enabled } }));
-  };
-
-  const startGpsTracking = () => {
-    if (!navigator.geolocation) {
-      setError('Tu navegador no soporta geolocalizacion.');
-      return;
-    }
-    if (gpsWatchIdRef.current !== null) return;
-
-    gpsWatchIdRef.current = navigator.geolocation.watchPosition(
-      async (pos) => {
-        const payload = {
-          latitud: pos.coords.latitude,
-          longitud: pos.coords.longitude,
-          velocidadKmh: pos.coords.speed ? pos.coords.speed * 3.6 : null,
-        };
-        try {
-          await sendGpsLocation(payload);
-        } catch {
-          setError('No se pudo enviar la ubicación.');
-        }
-      },
-      () => {
-        setError('No se pudo obtener la ubicación. Revisa los permisos.');
-      },
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
-    );
-  };
-
-  const stopGpsTracking = () => {
-    if (gpsWatchIdRef.current !== null && navigator.geolocation) {
-      navigator.geolocation.clearWatch(gpsWatchIdRef.current);
-      gpsWatchIdRef.current = null;
-    }
   };
 
   const toLocalDateKey = (value: Date) => value.toLocaleDateString('sv-SE');
@@ -450,9 +393,6 @@ const AttendanceForm = () => {
     fetchRange();
   }, [user, rangeFrom, rangeTo]);
 
-  // Cleanup GPS tracking en desmontaje
-  useEffect(() => () => stopGpsTracking(), []);
-
   const handleRegister = async (tipo: 'entrada' | 'salida', photoBase64?: string) => {
     setStatus(null);
     setError(null);
@@ -515,14 +455,12 @@ const AttendanceForm = () => {
         setStatus('✓ Entrada registrada correctamente. Compartiendo ubicación...');
         try {
           await updateGpsConsent(true);
-          startGpsTracking();
           dispatchGpsConsent(true);
         } catch (gpsErr) {
           setError(gpsErr instanceof Error ? gpsErr.message : 'No se pudo activar el GPS');
         }
       } else {
         setStatus('✓ Salida registrada correctamente. Se detuvo el compartir ubicación.');
-        stopGpsTracking();
         try {
           await updateGpsConsent(false);
           dispatchGpsConsent(false);

@@ -3,11 +3,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useUser } from './UserContext';
 import styles from './ActivityEvidenceFlow.module.css';
 import { io, Socket } from 'socket.io-client';
+import { buildApiUrl as buildApiUrlFromBase, getApiAssetOrigin, getSocketBaseUrl } from '@/lib/api-base';
 
 interface ActivityOption {
   id: number;
   anNumber: string;
   titulo?: string;
+  estatus?: string;
   workType?: 'ISSUE' | 'PREVENTIVE_INVENTORY';
 }
 
@@ -69,8 +71,7 @@ const ActivityEvidenceFlow = () => {
   const [pdfDragging, setPdfDragging] = useState(false);
   const inventoryFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/\.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
+  const buildApiUrl = (path: string) => buildApiUrlFromBase(path);
 
   const isCorrection = flowData?.reviewStatus === 'REJECTED';
   const selectedActivity = actividades.find((activity) => activity.id === Number(selectedActivityId || flowData?.activityId));
@@ -83,7 +84,14 @@ const ActivityEvidenceFlow = () => {
       headers: { Authorization: `Bearer ${user.token}` },
     })
       .then((res) => res.ok ? res.json() : [])
-      .then((data) => setActividades(Array.isArray(data) ? data : []))
+      .then((data) => {
+        const rows = Array.isArray(data) ? data : [];
+        const available = rows.filter((activity: ActivityOption) => {
+          const status = (activity?.estatus || '').trim().toLowerCase();
+          return status !== 'aprobada';
+        });
+        setActividades(available);
+      })
       .catch(() => setActividades([]));
   }, [user?.token]);
 
@@ -177,7 +185,7 @@ const ActivityEvidenceFlow = () => {
   useEffect(() => {
     if (!user?.token || !selectedActivityId) return;
 
-    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -199,7 +207,7 @@ const ActivityEvidenceFlow = () => {
       if (refreshTimer) clearTimeout(refreshTimer);
       socket.disconnect();
     };
-  }, [user?.token, API_URL, selectedActivityId]);
+  }, [user?.token, selectedActivityId]);
 
   // Capturar foto desde cámara
   const capturePhoto = async (): Promise<string> => {
@@ -250,9 +258,19 @@ const ActivityEvidenceFlow = () => {
 
   const getAssetUrl = (url?: string | null) => {
     if (!url) return '';
-    if (url.startsWith('http')) return url;
-    const base = API_URL.replace(/\/+api\/?$/, '');
-    return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+    const raw = url.trim();
+    if (!raw) return '';
+    if (/^(data:|blob:|\/\/)/i.test(raw)) return raw;
+    if (/^https?:\/\//i.test(raw)) return raw;
+    const base = getApiAssetOrigin();
+    const normalizedPath = raw
+      .replace(/\\+/g, '/')
+      .replace(/^https?:\/\/[^/]+/i, '')
+      .replace(/^\/api(?=\/uploads\/)/i, '')
+      .replace(/^\/?uploads\//i, '')
+      .replace(/^\/+/, '');
+    const normalized = `/uploads/${normalizedPath}`.replace(/\/uploads\/+/i, '/uploads/');
+    return `${base}${encodeURI(normalized)}`;
   };
 
   const uploadInventoryImage = async (file: File) => {
@@ -985,17 +1003,77 @@ const ActivityEvidenceFlow = () => {
               setPdfDragging(false);
               handleServiceSheetPdfFile(event.dataTransfer.files?.[0]);
             }}
-            className={`${styles.pdfDropzone} ${pdfDragging ? styles.pdfDropzoneDragging : ''}`}
+            style={{
+              border: `2px dashed ${pdfDragging ? '#0f6ad6' : '#d1d5db'}`,
+              borderRadius: '8px',
+              padding: '12px',
+              marginBottom: '16px',
+              background: pdfDragging ? 'rgba(15, 106, 214, 0.08)' : 'transparent',
+              transition: 'all 0.2s ease',
+            }}
           >
             <input
-              className={styles.pdfInput}
+              ref={(ref) => {
+                if (ref) (window as any).pdfInputRef = ref;
+              }}
               type="file"
               accept=".pdf,application/pdf"
               onChange={handleServiceSheetPdfUpload}
               disabled={loading}
+              style={{ position: 'absolute', width: 0, height: 0, opacity: 0, overflow: 'hidden', pointerEvents: 'none' }}
             />
-            <div className={styles.smallHint}>
-              Arrastra el PDF aquí para cargarlo con preview embebido.
+            <div
+              onClick={() => {
+                const input = (window as any).pdfInputRef;
+                if (input && !loading) input.click();
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '16px',
+                padding: '24px',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s ease',
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, rgba(249, 144, 0, 0.05) 0%, rgba(249, 144, 0, 0.02) 100%)',
+                opacity: loading ? 0.6 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (!loading) {
+                  (e.currentTarget as any).style.background = 'linear-gradient(135deg, rgba(249, 144, 0, 0.12) 0%, rgba(249, 144, 0, 0.08) 100%)';
+                  (e.currentTarget as any).style.transform = 'translateY(-2px)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as any).style.background = 'linear-gradient(135deg, rgba(249, 144, 0, 0.05) 0%, rgba(249, 144, 0, 0.02) 100%)';
+                (e.currentTarget as any).style.transform = 'translateY(0)';
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '64px',
+                  height: '64px',
+                  borderRadius: '12px',
+                  background: 'rgba(249, 144, 0, 0.15)',
+                  fontSize: '32px',
+                  flexShrink: 0,
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                📄
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: '#1f2937' }}>
+                  Seleccionar PDF
+                </div>
+                <div style={{ fontSize: '13px', color: '#6b7280' }}>
+                  o arrastra aquí
+                </div>
+              </div>
             </div>
           </div>
           {flowData.serviceSheetPdfUrl && (
@@ -1079,55 +1157,237 @@ const ProgressStep = ({ step, active, completed, label }: { step: number; active
   </div>
 );
 
+// Pad de firma digital (mouse + touch)
+const SignaturePad = ({ onSignature, disabled }: { onSignature: (dataUrl: string | null) => void; disabled: boolean }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const isDrawing = useRef(false);
+  const lastPos = useRef({ x: 0, y: 0 });
+  const onSigRef = useRef(onSignature);
+  const disabledRef = useRef(disabled);
+  useEffect(() => { onSigRef.current = onSignature; });
+  useEffect(() => { disabledRef.current = disabled; });
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+
+    const getPos = (e: MouseEvent | TouchEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      if ('touches' in e && e.touches.length > 0) {
+        return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+      }
+      return { x: (e as MouseEvent).clientX - rect.left, y: (e as MouseEvent).clientY - rect.top };
+    };
+
+    const onStart = (e: MouseEvent | TouchEvent) => {
+      if (disabledRef.current) return;
+      e.preventDefault();
+      isDrawing.current = true;
+      lastPos.current = getPos(e);
+    };
+
+    const onMove = (e: MouseEvent | TouchEvent) => {
+      if (!isDrawing.current) return;
+      e.preventDefault();
+      const ctx = canvas.getContext('2d')!;
+      const pos = getPos(e);
+      ctx.beginPath();
+      ctx.moveTo(lastPos.current.x, lastPos.current.y);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.strokeStyle = '#1a2e4a';
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+      lastPos.current = pos;
+      onSigRef.current(canvas.toDataURL('image/png'));
+    };
+
+    const onEnd = () => { isDrawing.current = false; };
+
+    canvas.addEventListener('mousedown', onStart);
+    canvas.addEventListener('mousemove', onMove);
+    canvas.addEventListener('mouseup', onEnd);
+    canvas.addEventListener('mouseleave', onEnd);
+    canvas.addEventListener('touchstart', onStart, { passive: false });
+    canvas.addEventListener('touchmove', onMove, { passive: false });
+    canvas.addEventListener('touchend', onEnd);
+
+    return () => {
+      canvas.removeEventListener('mousedown', onStart);
+      canvas.removeEventListener('mousemove', onMove);
+      canvas.removeEventListener('mouseup', onEnd);
+      canvas.removeEventListener('mouseleave', onEnd);
+      canvas.removeEventListener('touchstart', onStart);
+      canvas.removeEventListener('touchmove', onMove);
+      canvas.removeEventListener('touchend', onEnd);
+    };
+  }, []);
+
+  const clear = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.getContext('2d')!.clearRect(0, 0, canvas.width, canvas.height);
+    onSigRef.current(null);
+  };
+
+  return (
+    <div style={{ marginTop: '4px' }}>
+      <canvas
+        ref={canvasRef}
+        style={{
+          width: '100%',
+          height: '150px',
+          border: '1.5px dashed #9ca3af',
+          borderRadius: '10px',
+          background: '#f9fafb',
+          cursor: disabled ? 'not-allowed' : 'crosshair',
+          touchAction: 'none',
+          display: 'block',
+        }}
+      />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+        <span style={{ fontSize: '12px', color: '#9ca3af' }}>✍️ Firmar con el dedo o el mouse</span>
+        <button
+          type="button"
+          onClick={clear}
+          disabled={disabled}
+          style={{ fontSize: '12px', color: '#ef4444', background: 'none', border: 'none', cursor: disabled ? 'not-allowed' : 'pointer', padding: '2px 8px' }}
+        >
+          🗑️ Limpiar
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // Formulario de plantilla interna
 const ServiceSheetForm = ({ onSubmit, loading }: { onSubmit: (data: any) => void; loading: boolean }) => {
+  const today = new Date().toISOString().split('T')[0];
   const [data, setData] = useState({
+    technicianName: '',
+    serviceDate: today,
+    clientCompany: '',
+    clientPhone: '',
     managerName: '',
     managerRole: '',
     workSummary: '',
+    materialsUsed: '',
+    hoursWorked: '',
     observations: '',
+    managerSignature: null as string | null,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!data.managerSignature) {
+      alert('La firma del gerente es obligatoria');
+      return;
+    }
     onSubmit(data);
+  };
+
+  const inp: React.CSSProperties = {
+    width: '100%', padding: '10px 14px', borderRadius: '8px',
+    border: '1.5px solid #d1d5db', fontSize: '14px', background: '#fff',
+    outline: 'none', boxSizing: 'border-box', marginBottom: '10px',
+  };
+  const lbl: React.CSSProperties = {
+    fontSize: '12px', fontWeight: 600, color: '#6b7280',
+    textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px', display: 'block',
+  };
+  const sec: React.CSSProperties = {
+    background: '#f8fafc', border: '1px solid #e5e7eb',
+    borderRadius: '10px', padding: '14px', marginBottom: '14px',
+  };
+  const secTitle: React.CSSProperties = {
+    fontSize: '13px', fontWeight: 700, color: '#374151',
+    marginBottom: '12px', paddingBottom: '6px', borderBottom: '1px solid #e5e7eb',
   };
 
   return (
     <form onSubmit={handleSubmit} className={styles.serviceForm}>
-      <input
-        type="text"
-        className="input"
-        placeholder="Nombre del Gerente"
-        value={data.managerName}
-        onChange={(e) => setData({ ...data, managerName: e.target.value })}
-        required
-        disabled={loading}
-      />
-      <input
-        type="text"
-        className="input"
-        placeholder="Cargo del Gerente"
-        value={data.managerRole}
-        onChange={(e) => setData({ ...data, managerRole: e.target.value })}
-        required
-        disabled={loading}
-      />
-      <textarea
-        className={`input ${styles.serviceTextarea}`}
-        placeholder="Resumen del trabajo realizado"
-        value={data.workSummary}
-        onChange={(e) => setData({ ...data, workSummary: e.target.value })}
-        required
-        disabled={loading}
-      />
-      <textarea
-        className={`input ${styles.serviceTextarea}`}
-        placeholder="Observaciones"
-        value={data.observations}
-        onChange={(e) => setData({ ...data, observations: e.target.value })}
-        disabled={loading}
-      />
+
+      {/* Datos del Servicio */}
+      <div style={sec}>
+        <div style={secTitle}>📋 Datos del Servicio</div>
+        <label style={lbl}>Nombre del Técnico</label>
+        <input type="text" style={inp} placeholder="Nombre completo del técnico"
+          value={data.technicianName} onChange={(e) => setData({ ...data, technicianName: e.target.value })}
+          required disabled={loading} />
+        <label style={lbl}>Fecha del Servicio</label>
+        <input type="date" style={inp} value={data.serviceDate}
+          onChange={(e) => setData({ ...data, serviceDate: e.target.value })}
+          required disabled={loading} />
+      </div>
+
+      {/* Datos del Cliente */}
+      <div style={sec}>
+        <div style={secTitle}>🏢 Datos del Cliente</div>
+        <label style={lbl}>Empresa / Organización</label>
+        <input type="text" style={inp} placeholder="Nombre de la empresa o cliente"
+          value={data.clientCompany} onChange={(e) => setData({ ...data, clientCompany: e.target.value })}
+          required disabled={loading} />
+        <label style={lbl}>Teléfono de Contacto</label>
+        <input type="tel" style={inp} placeholder="Número de teléfono"
+          value={data.clientPhone} onChange={(e) => setData({ ...data, clientPhone: e.target.value })}
+          disabled={loading} />
+      </div>
+
+      {/* Trabajo Realizado */}
+      <div style={sec}>
+        <div style={secTitle}>🔧 Trabajo Realizado</div>
+        <label style={lbl}>Resumen del trabajo realizado</label>
+        <textarea style={{ ...inp, minHeight: '90px', resize: 'vertical' } as React.CSSProperties}
+          placeholder="Describe el trabajo realizado..."
+          value={data.workSummary} onChange={(e) => setData({ ...data, workSummary: e.target.value })}
+          required disabled={loading} />
+        <label style={lbl}>Materiales / Equipos utilizados</label>
+        <textarea style={{ ...inp, minHeight: '70px', resize: 'vertical' } as React.CSSProperties}
+          placeholder="Lista de materiales o equipos utilizados"
+          value={data.materialsUsed} onChange={(e) => setData({ ...data, materialsUsed: e.target.value })}
+          disabled={loading} />
+        <label style={lbl}>Horas trabajadas</label>
+        <input type="number" style={{ ...inp, width: '140px' }} placeholder="ej. 4.5"
+          min="0" step="0.5" value={data.hoursWorked}
+          onChange={(e) => setData({ ...data, hoursWorked: e.target.value })}
+          disabled={loading} />
+        <label style={lbl}>Observaciones</label>
+        <textarea style={{ ...inp, minHeight: '70px', resize: 'vertical' } as React.CSSProperties}
+          placeholder="Observaciones adicionales"
+          value={data.observations} onChange={(e) => setData({ ...data, observations: e.target.value })}
+          disabled={loading} />
+      </div>
+
+      {/* Conformidad del Gerente */}
+      <div style={{ ...sec, borderColor: data.managerSignature ? '#10b981' : '#e5e7eb' }}>
+        <div style={{ ...secTitle, color: data.managerSignature ? '#059669' : '#374151' }}>
+          ✅ Conformidad del Gerente / Representante
+        </div>
+        <label style={lbl}>Nombre del Gerente / Representante</label>
+        <input type="text" style={inp} placeholder="Nombre completo"
+          value={data.managerName} onChange={(e) => setData({ ...data, managerName: e.target.value })}
+          required disabled={loading} />
+        <label style={lbl}>Cargo</label>
+        <input type="text" style={inp} placeholder="Cargo del gerente o representante"
+          value={data.managerRole} onChange={(e) => setData({ ...data, managerRole: e.target.value })}
+          required disabled={loading} />
+        <label style={{ ...lbl, marginTop: '4px' }}>
+          Firma Digital <span style={{ color: '#ef4444' }}>*</span>
+        </label>
+        {data.managerSignature && (
+          <div style={{ marginBottom: '8px', padding: '6px', background: '#ecfdf5', borderRadius: '6px', border: '1px solid #a7f3d0', fontSize: '12px', color: '#059669' }}>
+            ✓ Firma capturada correctamente
+          </div>
+        )}
+        <SignaturePad
+          onSignature={(sig) => setData((prev) => ({ ...prev, managerSignature: sig }))}
+          disabled={loading}
+        />
+      </div>
+
       <button
         type="submit"
         className={`button-primary ${styles.serviceSubmit}`}

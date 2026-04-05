@@ -19,12 +19,26 @@ export class InventoriesController {
     @Query('clientId') clientId?: string,
     @Query('branchId') branchId?: string,
     @Query('status') status?: string,
+    @Query('createdByType') createdByType?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('search') search?: string,
     @Query() query?: PaginationQueryDto,
   ) {
+    const parsedFrom = from ? new Date(`${from}T00:00:00`) : undefined;
+    const parsedTo = to ? new Date(`${to}T23:59:59.999`) : undefined;
+
     return this.inventoriesService.list({
       clientId: clientId ? Number(clientId) : undefined,
       branchId: branchId ? Number(branchId) : undefined,
       status: status ? String(status).toUpperCase() : undefined,
+      createdByType:
+        createdByType && ['CLIENT', 'BRANCH', 'CONSOLE'].includes(String(createdByType).toUpperCase())
+          ? (String(createdByType).toUpperCase() as 'CLIENT' | 'BRANCH' | 'CONSOLE')
+          : undefined,
+      from: parsedFrom && !Number.isNaN(parsedFrom.getTime()) ? parsedFrom : undefined,
+      to: parsedTo && !Number.isNaN(parsedTo.getTime()) ? parsedTo : undefined,
+      search: search?.trim() || undefined,
     }, query);
   }
 

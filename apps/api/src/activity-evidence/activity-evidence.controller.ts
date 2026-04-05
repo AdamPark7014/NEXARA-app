@@ -4,16 +4,62 @@ import {
   Post,
   Body,
   Param,
+  Query,
   BadRequestException,
+  Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { ActivityEvidenceService } from './activity-evidence.service';
 import { RbacGuard } from '../common/rbac.guard.js';
+import { saveBase64Photo, saveBase64Pdf } from '../common/file-upload.util';
+import { Response } from 'express';
 
 @Controller('activity-evidence')
 @UseGuards(RbacGuard)
 export class ActivityEvidenceController {
   constructor(private service: ActivityEvidenceService) {}
+
+  @Get('history')
+  async getOwnEvidenceHistory(@Req() req: any) {
+    return this.service.getOwnEvidenceHistory(req.user?.id);
+  }
+
+  @Get('review-history')
+  async getReviewEvidenceHistory(@Req() req: any) {
+    return this.service.getReviewEvidenceHistory(req.user);
+  }
+
+  @Get('history/report')
+  async getOwnEvidenceHistoryReport(
+    @Req() req: any,
+    @Query('from') from: string | undefined,
+    @Query('to') to: string | undefined,
+    @Res() res: Response,
+  ) {
+    const pdf = await this.service.generateOwnHistorySummaryReport(req.user?.id, from, to);
+    const filename = `reporte-evidencias-${from || 'inicio'}-${to || 'hoy'}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    return res.send(pdf);
+  }
+
+  @Get(':activityId/report')
+  async getOwnTicketReport(
+    @Param('activityId') activityId: string,
+    @Req() req: any,
+    @Res() res: Response,
+  ) {
+    const parsedId = parseInt(activityId, 10);
+    if (!Number.isFinite(parsedId) || parsedId <= 0) {
+      throw new BadRequestException('ID de actividad inválido');
+    }
+
+    const result = await this.service.generateOwnTicketReport(parsedId, req.user?.id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=reporte-ticket-${parsedId}.pdf`);
+    return res.send(result.pdf);
+  }
 
   @Get(':activityId')
   async getActivityEvidence(@Param('activityId') activityId: string) {
@@ -25,9 +71,16 @@ export class ActivityEvidenceController {
     @Param('activityId') activityId: string,
     @Body() body: { photoUrl: string; latitude: number; longitude: number },
   ) {
+    // Check if photoUrl contains base64 data and convert it
+    let fileUrl = body.photoUrl;
+    if (body.photoUrl && (body.photoUrl.startsWith('data:') || body.photoUrl.includes(';base64,'))) {
+      // It's base64 data, save it to disk
+      fileUrl = saveBase64Photo(body.photoUrl, __dirname, 'activities');
+    }
+
     return this.service.saveEntryPhoto(
       parseInt(activityId, 10),
-      body.photoUrl,
+      fileUrl,
       body.latitude,
       body.longitude,
     );
@@ -38,7 +91,15 @@ export class ActivityEvidenceController {
     @Param('activityId') activityId: string,
     @Body() body: { photoUrls: string[] },
   ) {
-    return this.service.saveEvidencePhotos(parseInt(activityId, 10), body.photoUrls);
+    // Convert any base64 data URLs to file URLs
+    const processedUrls = body.photoUrls.map((photoUrl) => {
+      if (photoUrl && (photoUrl.startsWith('data:') || photoUrl.includes(';base64,'))) {
+        return saveBase64Photo(photoUrl, __dirname, 'activities');
+      }
+      return photoUrl;
+    });
+
+    return this.service.saveEvidencePhotos(parseInt(activityId, 10), processedUrls);
   }
 
   @Post(':activityId/service-sheet-pdf')
@@ -46,7 +107,17 @@ export class ActivityEvidenceController {
     @Param('activityId') activityId: string,
     @Body() body: { pdfUrl: string },
   ) {
-    return this.service.saveServiceSheetPdf(parseInt(activityId, 10), body.pdfUrl);
+    let fileUrl = body.pdfUrl;
+    // Detect base64 PDF data: data URI prefix OR raw base64 (longer than a URL would be)
+    if (
+      body.pdfUrl &&
+      (body.pdfUrl.startsWith('data:') ||
+        body.pdfUrl.includes(';base64,') ||
+        (body.pdfUrl.length > 500 && !body.pdfUrl.startsWith('/') && !body.pdfUrl.startsWith('http')))
+    ) {
+      fileUrl = saveBase64Pdf(body.pdfUrl, __dirname, 'activities');
+    }
+    return this.service.saveServiceSheetPdf(parseInt(activityId, 10), fileUrl);
   }
 
   @Post(':activityId/service-sheet-data')
@@ -62,9 +133,16 @@ export class ActivityEvidenceController {
     @Param('activityId') activityId: string,
     @Body() body: { photoUrl: string; latitude: number; longitude: number },
   ) {
+    // Check if photoUrl contains base64 data and convert it
+    let fileUrl = body.photoUrl;
+    if (body.photoUrl && (body.photoUrl.startsWith('data:') || body.photoUrl.includes(';base64,'))) {
+      // It's base64 data, save it to disk
+      fileUrl = saveBase64Photo(body.photoUrl, __dirname, 'activities');
+    }
+
     return this.service.saveExitPhoto(
       parseInt(activityId, 10),
-      body.photoUrl,
+      fileUrl,
       body.latitude,
       body.longitude,
     );
@@ -76,10 +154,17 @@ export class ActivityEvidenceController {
     @Param('index') index: string,
     @Body() body: { photoUrl: string },
   ) {
+    // Check if photoUrl contains base64 data and convert it
+    let fileUrl = body.photoUrl;
+    if (body.photoUrl && (body.photoUrl.startsWith('data:') || body.photoUrl.includes(';base64,'))) {
+      // It's base64 data, save it to disk
+      fileUrl = saveBase64Photo(body.photoUrl, __dirname, 'activities');
+    }
+
     return this.service.updateEvidencePhoto(
       parseInt(activityId, 10),
       parseInt(index, 10),
-      body.photoUrl,
+      fileUrl,
     );
   }
 
