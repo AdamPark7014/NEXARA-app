@@ -130,10 +130,14 @@ export default function ClientTicketsPage() {
   const [reportPdfUrl, setReportPdfUrl] = useState<string | null>(null);
   const [reportPdfData, setReportPdfData] = useState<Uint8Array | null>(null);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [reportModalTitle, setReportModalTitle] = useState("Reporte consolidado de tickets");
+  const [reportFileName, setReportFileName] = useState(`reporte-tickets-${new Date().toISOString().slice(0, 10)}.pdf`);
   const [profile, setProfile] = useState<ClientProfile | null>(null);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [requests, setRequests] = useState<TicketRequest[]>([]);
+  const [evidenceLoadErrors, setEvidenceLoadErrors] = useState<Record<string, boolean>>({});
+  const [mapPreviewErrors, setMapPreviewErrors] = useState<Record<string, number>>({});
   const [pendingFeedback, setPendingFeedback] = useState<PendingFeedback[]>([]);
   const [feedbackDrafts, setFeedbackDrafts] = useState<Record<number, {
     rating: string;
@@ -191,9 +195,38 @@ export default function ClientTicketsPage() {
 
     return `${base}${raw.startsWith("/") ? "" : "/"}${raw}`;
   };
+
+  const getEvidenceKind = (value?: string | null): "pdf" | "image" | "file" => {
+    if (!value) return "file";
+    const normalized = value.trim();
+    if (!normalized) return "file";
+
+    let pathname = normalized;
+    try {
+      const parsed = /^https?:\/\//i.test(normalized)
+        ? new URL(normalized)
+        : new URL(normalized, typeof window !== "undefined" ? window.location.origin : "http://localhost");
+      pathname = parsed.pathname || normalized;
+    } catch {
+      pathname = normalized.split("?")[0] || normalized;
+    }
+
+    const lower = pathname.toLowerCase();
+    if (lower.endsWith(".pdf")) return "pdf";
+    if (/\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i.test(lower)) return "image";
+    return "file";
+  };
   const getMapsUrl = (lat?: number | null, lng?: number | null) => {
     if (!lat || !lng) return "";
     return `https://www.google.com/maps?q=${lat},${lng}`;
+  };
+  const getStaticMapPreviewUrl = (lat?: number | null, lng?: number | null) => {
+    if (!lat || !lng) return "";
+    return `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=15&size=1200x260&markers=${lat},${lng},red-pushpin`;
+  };
+  const getFallbackStaticMapPreviewUrl = (lat?: number | null, lng?: number | null) => {
+    if (!lat || !lng) return "";
+    return `https://static-maps.yandex.ru/1.x/?ll=${lng},${lat}&size=650,260&z=15&l=map&pt=${lng},${lat},pm2rdm`;
   };
   const clientAvatarUrl = profile?.logoUrl || session?.client?.logoUrl || "";
   const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, "");
@@ -429,15 +462,33 @@ export default function ClientTicketsPage() {
     return Array.from(grouped.entries());
   }, [sortedTickets]);
 
+  const openRequests = useMemo(() => {
+    return requests.filter((request) => String(request.status || "").toUpperCase() !== "CLOSED");
+  }, [requests]);
+
   const ticketStats = useMemo(() => {
+    const isClosedTicket = (ticket: Ticket) => {
+      const status = String(ticket.estatus || "").toUpperCase();
+      return (
+        status.includes("FINAL") ||
+        status.includes("CERR") ||
+        status.includes("COMPLET") ||
+        status.includes("APROBAD") ||
+        Boolean(ticket.fechaFinalizacion)
+      );
+    };
+
     const normalized = sortedTickets.map((ticket) => String(ticket.estatus || "").toUpperCase());
     return {
       total: sortedTickets.length,
-      pending: normalized.filter((status) => status.includes("PEND") || status.includes("ASIGN") || status.includes("PROCES")).length,
-      closed: normalized.filter((status) => status.includes("FINAL") || status.includes("CERR") || status.includes("COMPLET")).length,
-      requests: requests.length,
+      pending: sortedTickets.filter((ticket) => {
+        const status = String(ticket.estatus || "").toUpperCase();
+        return !isClosedTicket(ticket) && (status.includes("PEND") || status.includes("ASIGN") || status.includes("PROCES"));
+      }).length,
+      closed: sortedTickets.filter((ticket) => isClosedTicket(ticket)).length,
+      requests: openRequests.length,
     };
-  }, [sortedTickets, requests.length]);
+  }, [sortedTickets, openRequests.length]);
 
   const loadingPlaceholders = useMemo(() => Array.from({ length: 3 }, (_, index) => index), []);
 
@@ -479,6 +530,8 @@ export default function ClientTicketsPage() {
     setReportPdfData(new Uint8Array(arrayBuffer));
     if (reportPdfUrl) URL.revokeObjectURL(reportPdfUrl);
     setReportPdfUrl(URL.createObjectURL(blob));
+    setReportModalTitle("Reporte consolidado de tickets");
+    setReportFileName(`reporte-tickets-${new Date().toISOString().slice(0, 10)}.pdf`);
     setShowReportModal(true);
     setReportGenerating(false);
   };
@@ -489,16 +542,20 @@ export default function ClientTicketsPage() {
       headers: { Authorization: `Bearer ${session.token}` },
     });
     if (!res.ok) {
-      setError("No se pudo descargar el reporte del ticket");
+      setError("No se pudo previsualizar el reporte del ticket");
       return;
     }
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `reporte-ticket-${ticketId}.pdf`;
-    link.click();
-    URL.revokeObjectURL(url);
+    const arrayBuffer = await blob.arrayBuffer();
+    const selected = tickets.find((ticket) => ticket.id === ticketId);
+    const ticketLabel = selected?.anNumber || `Ticket #${ticketId}`;
+
+    setReportPdfData(new Uint8Array(arrayBuffer));
+    if (reportPdfUrl) URL.revokeObjectURL(reportPdfUrl);
+    setReportPdfUrl(URL.createObjectURL(blob));
+    setReportModalTitle(`Reporte individual: ${ticketLabel}`);
+    setReportFileName(`reporte-ticket-${ticketLabel.replace(/[^a-zA-Z0-9-_]+/g, "-")}.pdf`);
+    setShowReportModal(true);
   };
 
   const handleLogout = () => {
@@ -1092,16 +1149,18 @@ export default function ClientTicketsPage() {
                       </a>
                     )}
                     <button className="button-secondary" type="button" onClick={() => handleTicketReport(ticket.id)}>
-                      Exportar ticket (PDF)
+                      Ver ticket (PDF)
                     </button>
                   </div>
                   <div className={styles.grid140}>
                     {(ticket.evidencias || []).map((ev) => (
                       <div key={ev.id} className={`card ${styles.cardSoft}`} style={{ padding: 8 }}>
                         {ev.archivoUrl.endsWith(".pdf") ? (
-                          <object data={getAssetUrl(ev.archivoUrl)} type="application/pdf" width="100%" height="140">
-                            <embed src={getAssetUrl(ev.archivoUrl)} type="application/pdf" />
-                          </object>
+                          <div className={`card ${styles.cardSoft}`} style={{ minHeight: 140, display: "grid", placeItems: "center", padding: 10 }}>
+                            <a className="button-secondary" href={getAssetUrl(ev.archivoUrl)} target="_blank" rel="noreferrer">
+                              Abrir PDF
+                            </a>
+                          </div>
                         ) : (
                           <img src={getAssetUrl(ev.archivoUrl)} alt={ev.tipoEvidencia} style={{ width: "100%", height: 140, objectFit: "cover", borderRadius: 8 }} />
                         )}
@@ -1293,8 +1352,8 @@ export default function ClientTicketsPage() {
               </div>
               <div className={`card ${styles.cardSoft}`}>
                 <p className={styles.sectionTitle}>Solicitudes registradas</p>
-                {requests.length === 0 && <div className={styles.mutedText}>No hay solicitudes registradas aún.</div>}
-                {requests.map((request) => (
+                {openRequests.length === 0 && <div className={styles.mutedText}>No hay solicitudes activas.</div>}
+                {openRequests.map((request) => (
                   <div key={request.id} className={styles.itemCard}>
                     <div className={styles.itemHeader}>
                       <strong>{request.branchName || "Ticket"}</strong>
@@ -1312,25 +1371,62 @@ export default function ClientTicketsPage() {
                       <a href={getMapsUrl(request.latitud, request.longitud)} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>Ver ubicación</a>
                     )}
                     {request.latitud && request.longitud && (
-                      <iframe
-                        title={`request-${request.id}`}
-                        src={`https://maps.google.com/maps?q=${request.latitud},${request.longitud}&z=15&output=embed`}
-                        width="100%"
-                        height="160"
-                        style={{ border: 0, borderRadius: 12 }}
-                        loading="lazy"
-                      />
+                      <a
+                        href={getMapsUrl(request.latitud, request.longitud)}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ display: "block", borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", background: "var(--surface-light)" }}
+                      >
+                        {(() => {
+                          const mapKey = `${request.id}-map`;
+                          const failCount = mapPreviewErrors[mapKey] || 0;
+                          const src = failCount === 0
+                            ? getStaticMapPreviewUrl(request.latitud, request.longitud)
+                            : getFallbackStaticMapPreviewUrl(request.latitud, request.longitud);
+
+                          if (failCount >= 2) {
+                            return (
+                              <div style={{ height: 180, display: "grid", placeItems: "center", color: "var(--text-secondary)", fontSize: 12 }}>
+                                Vista previa de mapa no disponible
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <img
+                              src={src}
+                              alt="Vista previa de ubicación"
+                              style={{ display: "block", width: "100%", height: 180, objectFit: "cover" }}
+                              onError={() => setMapPreviewErrors((prev) => ({ ...prev, [mapKey]: failCount + 1 }))}
+                            />
+                          );
+                        })()}
+                      </a>
                     )}
                     {Array.isArray(request.evidenceUrls) && request.evidenceUrls.length > 0 && (
                       <div className={styles.grid120}>
                         {request.evidenceUrls.map((url, idx) => (
-                          <div key={`${request.id}-${idx}`} className={styles.mediaTile}>
-                            {url.toLowerCase().endsWith(".pdf") ? (
-                              <object data={getAssetUrl(url)} type="application/pdf" width="100%" height="120">
-                                <embed src={getAssetUrl(url)} type="application/pdf" />
-                              </object>
+                          <div key={`${request.id}-${idx}`} className={styles.mediaTile} style={{ display: "grid", placeItems: "center", padding: 8, minHeight: 140 }}>
+                            {getEvidenceKind(url) === "pdf" ? (
+                              <div className={`card ${styles.cardSoft}`} style={{ minHeight: 120, display: "grid", placeItems: "center", padding: 10 }}>
+                                <a className="button-secondary" href={getAssetUrl(url)} target="_blank" rel="noreferrer">
+                                  Abrir PDF
+                                </a>
+                              </div>
+                            ) : !evidenceLoadErrors[`${request.id}-${idx}`] ? (
+                              <img
+                                src={getAssetUrl(url)}
+                                alt="evidencia"
+                                className={styles.mediaImg}
+                                style={{ width: "100%", maxHeight: 220, objectFit: "contain", background: "var(--surface-light)" }}
+                                onError={() => setEvidenceLoadErrors((prev) => ({ ...prev, [`${request.id}-${idx}`]: true }))}
+                              />
                             ) : (
-                              <img src={getAssetUrl(url)} alt="evidencia" className={styles.mediaImg} />
+                              <div className={`card ${styles.cardSoft}`} style={{ minHeight: 120, display: "grid", placeItems: "center", padding: 10 }}>
+                                <a className="button-secondary" href={getAssetUrl(url)} target="_blank" rel="noreferrer">
+                                  Abrir archivo
+                                </a>
+                              </div>
                             )}
                           </div>
                         ))}
@@ -1446,14 +1542,14 @@ export default function ClientTicketsPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>
-              <span style={{ fontWeight: 600 }}>Reporte consolidado de tickets</span>
+              <span style={{ fontWeight: 600 }}>{reportModalTitle}</span>
               <button onClick={() => setShowReportModal(false)} style={{ padding: "6px 14px", background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: 8, cursor: "pointer" }}>✕ Cerrar</button>
             </div>
             <div style={{ flex: 1, overflow: "auto" }}>
               <PDFViewer
                 pdfUrl={reportPdfUrl}
                 pdfData={reportPdfData}
-                fileName={`reporte-tickets-${new Date().toISOString().slice(0, 10)}.pdf`}
+                fileName={reportFileName}
                 height="800px"
               />
             </div>

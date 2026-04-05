@@ -50,6 +50,14 @@ const formatDuration = (minutes?: number | null) => {
   return `${hours} h ${mins} min`;
 };
 
+const formatTicketType = (value?: string | null) => {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (!normalized) return '-';
+  if (normalized === 'PREVENTIVE_INVENTORY') return 'Mantenimiento e inventario';
+  if (normalized === 'ISSUE') return 'Ticket por problema';
+  return value || '-';
+};
+
 const loadLogo = (relativePath: string) => {
   try {
     if (fs.existsSync(relativePath)) {
@@ -61,19 +69,98 @@ const loadLogo = (relativePath: string) => {
   return null;
 };
 
+const resolveExistingUpload = (relativeUploadPath: string) => {
+  const cleaned = relativeUploadPath.replace(/^\/+/, '');
+  const candidates = [
+    path.resolve(process.cwd(), 'uploads', cleaned),
+    path.resolve(process.cwd(), 'apps', 'api', 'uploads', cleaned),
+    path.resolve(process.cwd(), '..', 'uploads', cleaned),
+    path.resolve(process.cwd(), '..', '..', 'uploads', cleaned),
+    path.resolve(process.cwd(), '..', '..', '..', 'uploads', cleaned),
+    path.resolve(__dirname, '..', '..', 'uploads', cleaned),
+    path.resolve(__dirname, '..', '..', '..', 'uploads', cleaned),
+    path.resolve(__dirname, '..', '..', '..', '..', 'uploads', cleaned),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    } catch {
+      // Continue checking remaining candidate paths.
+    }
+  }
+
+  return null;
+};
+
 const resolveLogoPath = (logoUrl?: string | null) => {
   if (!logoUrl) return null;
-  if (logoUrl.startsWith('/uploads/')) {
-    return path.resolve(process.cwd(), `.${logoUrl}`);
+  const raw = logoUrl.trim();
+  if (!raw) return null;
+  const sanitized = raw.replace(/\\+/g, '/').replace(/[?#].*$/, '');
+
+  if (sanitized.startsWith('/uploads/')) {
+    return resolveExistingUpload(sanitized.replace(/^\/uploads\//, ''));
   }
+
+  if (/^https?:\/\//i.test(sanitized)) {
+    try {
+      const parsed = new URL(sanitized);
+      if (parsed.pathname.startsWith('/uploads/')) {
+        return resolveExistingUpload(parsed.pathname.replace(/^\/uploads\//, ''));
+      }
+    } catch {
+      return null;
+    }
+  }
+
   return null;
 };
 
 const resolveUploadPath = (fileUrl?: string | null) => {
   if (!fileUrl) return null;
-  if (fileUrl.startsWith('/uploads/')) {
-    return path.resolve(process.cwd(), `.${fileUrl}`);
+  const raw = fileUrl.trim();
+  if (!raw) return null;
+
+  const sanitizedRaw = raw
+    .replace(/\\+/g, '/')
+    .replace(/[?#].*$/, '')
+    .trim();
+
+  if (!sanitizedRaw) return null;
+
+  if (sanitizedRaw.startsWith('/uploads/')) {
+    return resolveExistingUpload(sanitizedRaw.replace(/^\/uploads\//, ''));
   }
+
+  if (sanitizedRaw.startsWith('/activities/')) {
+    return resolveExistingUpload(sanitizedRaw.replace(/^\//, ''));
+  }
+
+  if (sanitizedRaw.startsWith('activities/')) {
+    return resolveExistingUpload(sanitizedRaw);
+  }
+
+  if (/^https?:\/\//i.test(sanitizedRaw)) {
+    try {
+      const parsed = new URL(sanitizedRaw);
+      if (parsed.pathname.startsWith('/uploads/')) {
+        return resolveExistingUpload(parsed.pathname.replace(/^\/uploads\//, ''));
+      }
+      if (parsed.pathname.startsWith('/activities/')) {
+        return resolveExistingUpload(parsed.pathname.replace(/^\//, ''));
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  if (sanitizedRaw.startsWith('/api/uploads/')) {
+    return resolveExistingUpload(sanitizedRaw.replace(/^\/api\/uploads\//, ''));
+  }
+
   return null;
 };
 
@@ -121,13 +208,18 @@ export const generateClientReportPdf = async (payload: ClientReportPayload): Pro
         doc.image(nexaraLogo, logoBox.x, logoBox.y, { fit: [logoBox.w, logoBox.h] });
       }
 
-      const clientBox = { x: pageWidth - margin - 90, y: 22, w: 90, h: 64 };
+      const rightColumnWidth = 190;
+      const infoX = pageWidth - margin - rightColumnWidth;
+      const clientBox = {
+        x: pageWidth - margin - 80,
+        y: 16,
+        w: 80,
+        h: 52,
+      };
       if (clientLogo) {
         doc.image(clientLogo, clientBox.x, clientBox.y, { fit: [clientBox.w, clientBox.h] });
       }
 
-      const infoWidth = 180;
-      const infoX = pageWidth - margin - infoWidth;
       const titleX = margin + logoBox.w + 12;
       const titleWidth = infoX - titleX - 12;
 
@@ -139,16 +231,26 @@ export const generateClientReportPdf = async (payload: ClientReportPayload): Pro
       });
 
       doc.fillColor(colors.text).fontSize(9);
-      doc.text(`Cliente: ${payload.clientName}`, infoX, 28, { width: infoWidth, align: 'right' });
-      doc.text(`Generado: ${formatDateTime(payload.generatedAt)}`, infoX, 42, { width: infoWidth, align: 'right' });
-      doc.text(`Total: ${payload.totalTickets}`, infoX, 56, { width: infoWidth, align: 'right' });
-      doc.text(`Finalizados: ${payload.closedTickets}`, infoX, 70, { width: infoWidth, align: 'right' });
+      doc.text(`Cliente: ${payload.clientName}`, infoX, 72, { width: rightColumnWidth, align: 'right' });
+      doc.text(`Generado: ${formatDateTime(payload.generatedAt)}`, infoX, 84, { width: rightColumnWidth, align: 'right' });
+      doc.text(`Total: ${payload.totalTickets}`, infoX, 96, { width: rightColumnWidth, align: 'right' });
+      doc.text(`Finalizados: ${payload.closedTickets}`, infoX, 108, { width: rightColumnWidth, align: 'right' });
     };
 
     const drawSectionTitle = (label: string) => {
       doc.moveDown(0.6);
       doc.fillColor(colors.navy).fontSize(12).font('Helvetica-Bold').text(label, margin, doc.y);
       doc.moveDown(0.2);
+    };
+
+    const ensurePageSpace = (requiredHeight: number, sectionToRepeat?: string) => {
+      if (doc.y + requiredHeight <= doc.page.height - 60) return;
+      doc.addPage();
+      drawHeader();
+      doc.y = 140;
+      if (sectionToRepeat) {
+        drawSectionTitle(sectionToRepeat);
+      }
     };
 
     const drawSummaryCard = (x: number, y: number, width: number) => {
@@ -280,34 +382,75 @@ export const generateClientReportPdf = async (payload: ClientReportPayload): Pro
       }
     });
 
+    drawSectionTitle('Detalle completo por ticket');
+    payload.activities.forEach((activity) => {
+      ensurePageSpace(120, 'Detalle completo por ticket');
+
+      const cardY = doc.y;
+      const cardPadding = 12;
+      const lineHeight = 14;
+
+      const detailLines = [
+        `Ticket: ${activity.anNumber || '-'} · ${activity.titulo || 'Sin titulo'}`,
+        `Flujo: ${formatTicketType(activity.ticketType)} · Estatus: ${activity.estatus || '-'} · Prioridad: ${activity.prioridad || '-'}`,
+        `Sucursal: ${activity.branchName || '-'}${activity.branchCity ? ` · ${activity.branchCity}` : ''}${activity.branchState ? `, ${activity.branchState}` : ''}`,
+        `Atendio: ${activity.responsableName || '-'} · Inicio: ${formatDateTime(activity.startedAt || activity.assignedAt || null)} · Cierre: ${formatDateTime(activity.finishedAt || null)}`,
+        `Duracion: ${formatDuration(activity.durationMin)} · Eficiencia: ${activity.eficiencia || '-'}`,
+      ];
+
+      const detailHeight = cardPadding * 2 + detailLines.length * lineHeight;
+      doc.save();
+      doc.roundedRect(margin, cardY, contentWidth, detailHeight, 8).fill(colors.softGray);
+      doc.restore();
+
+      let lineY = cardY + cardPadding;
+      detailLines.forEach((line, index) => {
+        doc
+          .fillColor(index === 0 ? colors.navy : colors.text)
+          .font(index === 0 ? 'Helvetica-Bold' : 'Helvetica')
+          .fontSize(index === 0 ? 10 : 9)
+          .text(line, margin + cardPadding, lineY, { width: contentWidth - cardPadding * 2 });
+        lineY += lineHeight;
+      });
+
+      doc.y = cardY + detailHeight + 10;
+    });
+
     drawSectionTitle('Evidencias por ticket');
     const thumbSize = 96;
     payload.activities.forEach((activity) => {
       const evidences = activity.evidences || [];
       if (!evidences.length) return;
 
-      if (doc.y > doc.page.height - 140) {
-        doc.addPage();
-        drawHeader();
-        doc.y = 140;
-        drawSectionTitle('Evidencias por ticket');
-      }
+      ensurePageSpace(140, 'Evidencias por ticket');
 
       doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(10).text(`${activity.anNumber} · ${activity.titulo || ''}`, margin, doc.y, {
         width: contentWidth,
       });
       doc.moveDown(0.3);
 
+      const tileWidth = 160;
+      const tileHeight = 120;
+      const tileGap = 10;
+      const captionHeight = 26;
+      const columns = Math.max(1, Math.floor((contentWidth + tileGap) / (tileWidth + tileGap)));
       let x = margin;
       let y = doc.y;
+      let col = 0;
+
       evidences.forEach((evidence) => {
-        if (y + thumbSize + 24 > doc.page.height - 60) {
+        if (y + tileHeight + captionHeight > doc.page.height - 60) {
           doc.addPage();
           drawHeader();
           doc.y = 140;
           drawSectionTitle('Evidencias por ticket');
+          doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(10).text(`${activity.anNumber} · ${activity.titulo || ''}`, margin, doc.y, {
+            width: contentWidth,
+          });
+          doc.moveDown(0.3);
           x = margin;
           y = doc.y;
+          col = 0;
         }
 
         const evidencePath = resolveUploadPath(evidence.archivoUrl);
@@ -315,37 +458,44 @@ export const generateClientReportPdf = async (payload: ClientReportPayload): Pro
 
         if (evidencePath && !isPdf) {
           try {
-            doc.image(evidencePath, x, y, { width: thumbSize, height: thumbSize, fit: [thumbSize, thumbSize] });
+            doc.image(evidencePath, x, y, { fit: [tileWidth, tileHeight], align: 'center', valign: 'center' });
+            doc.rect(x, y, tileWidth, tileHeight).stroke(colors.line);
           } catch {
-            doc.rect(x, y, thumbSize, thumbSize).stroke(colors.muted);
-            doc.fontSize(8).fillColor(colors.muted).text('No se pudo cargar', x + 6, y + 40, { width: thumbSize - 12, align: 'center' });
+            doc.rect(x, y, tileWidth, tileHeight).stroke(colors.muted);
+            doc.fontSize(8).fillColor(colors.muted).text('No se pudo cargar', x + 6, y + 54, { width: tileWidth - 12, align: 'center' });
           }
         } else {
-          doc.rect(x, y, thumbSize, thumbSize).fill(colors.softGray);
-          doc.fillColor(colors.muted).fontSize(8).text(isPdf ? 'PDF adjunto' : 'Sin evidencia', x + 6, y + 40, { width: thumbSize - 12, align: 'center' });
+          doc.rect(x, y, tileWidth, tileHeight).fill(colors.softGray);
+          doc.fillColor(colors.muted).fontSize(8).text(isPdf ? 'PDF adjunto' : 'Sin evidencia', x + 6, y + 54, { width: tileWidth - 12, align: 'center' });
         }
 
-        doc.fillColor(colors.text).fontSize(7).text(evidence.tipoEvidencia, x, y + thumbSize + 4, { width: thumbSize });
+        doc.fillColor(colors.text).fontSize(7).text(evidence.tipoEvidencia, x, y + tileHeight + 4, { width: tileWidth });
 
         const mapsUrl = evidence.tipoEvidencia === 'Foto llegada'
           ? getMapsUrl(evidence.latitud, evidence.longitud)
           : null;
         if (mapsUrl) {
-          doc.fillColor(colors.blue).fontSize(7).text('Ver llegada', x, y + thumbSize + 14, {
-            width: thumbSize,
+          doc.fillColor(colors.blue).fontSize(7).text('Ver llegada', x, y + tileHeight + 14, {
+            width: tileWidth,
             link: mapsUrl,
             underline: true,
           });
         }
 
-        x += thumbSize + 10;
-        if (x + thumbSize > margin + contentWidth) {
+        col += 1;
+        if (col >= columns) {
+          col = 0;
           x = margin;
-          y += thumbSize + (mapsUrl ? 34 : 22);
+          y += tileHeight + captionHeight;
+        } else {
+          x += tileWidth + tileGap;
         }
       });
 
-      doc.y = y + thumbSize + 26;
+      if (col > 0) {
+        y += tileHeight + captionHeight;
+      }
+      doc.y = y + 8;
     });
 
     doc.end();

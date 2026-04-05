@@ -90,11 +90,40 @@ export class InventoriesService {
       });
   }
 
-  async list(filters?: { clientId?: number; branchId?: number; status?: string }, query?: PaginationQueryDto) {
+  async list(
+    filters?: {
+      clientId?: number;
+      branchId?: number;
+      status?: string;
+      createdByType?: 'CLIENT' | 'BRANCH' | 'CONSOLE';
+      from?: Date;
+      to?: Date;
+      search?: string;
+    },
+    query?: PaginationQueryDto,
+  ) {
     const where: Record<string, any> = {};
     if (filters?.clientId) where.clientId = filters.clientId;
     if (filters?.branchId) where.branchId = filters.branchId;
     if (filters?.status) where.status = filters.status;
+    if (filters?.createdByType) where.createdByType = filters.createdByType;
+
+    if (filters?.from || filters?.to) {
+      where.updatedAt = {
+        ...(filters.from ? { gte: filters.from } : {}),
+        ...(filters.to ? { lte: filters.to } : {}),
+      };
+    }
+
+    if (filters?.search?.trim()) {
+      const search = filters.search.trim();
+      where.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { status: { contains: search, mode: 'insensitive' } },
+        { branch: { name: { contains: search, mode: 'insensitive' } } },
+        { branch: { branchNumber: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
 
     const include = {
       client: true,
@@ -227,6 +256,7 @@ export class InventoriesService {
       where: {
         clientId: activity.clientId,
         branchId: branch.id,
+        createdByType: { in: ['CLIENT', 'BRANCH'] },
         ...(current ? { id: { not: current.id } } : {}),
       },
       orderBy: { createdAt: 'desc' },

@@ -4,7 +4,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { useUser } from "./UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
+import { buildApiUrl as buildApiUrlFromBase, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
 import ExcelDownloadModal from "./ExcelDownloadModal";
+import PDFViewer from "./PDFViewer";
 import styles from "./EvidenceTable.module.css";
 
 interface Evidence {
@@ -12,18 +14,25 @@ interface Evidence {
   userId?: number;
   tipoEvidencia: string;
   archivoUrl: string;
+  archivos?: Array<{ label: string; type: 'image' | 'pdf'; url: string }>;
   aprobada: boolean;
   estatus?: string;
   comentarios?: string | null;
   observacionesRevision?: string | null;
   calificacionEficiencia?: string | null;
+  fechaEvidencia?: string | null;
   revisadoEn?: string | null;
   latitud?: number | null;
   longitud?: number | null;
   actividad: {
+    id?: number;
     anNumber: string;
     titulo?: string;
     indicaciones?: string | null;
+    branchName?: string | null;
+    branchCity?: string | null;
+    branchState?: string | null;
+    branchAddress?: string | null;
     creador?: { nombre: string } | null;
     responsable?: { nombre: string } | null;
   };
@@ -31,15 +40,125 @@ interface Evidence {
   aprobadoPor?: { nombre: string } | null;
 }
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
-const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
-const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, "");
+const buildApiUrl = (path: string) => buildApiUrlFromBase(path);
+
+const inferFileType = (value: string): 'image' | 'pdf' => {
+  const lower = value.toLowerCase();
+  if (lower.endsWith('.pdf') || lower.includes('/pdf') || lower.includes('application/pdf')) {
+    return 'pdf';
+  }
+  return 'image';
+};
 
 const getAssetUrl = (url?: string | null) => {
   if (!url) return "";
-  if (url.startsWith("http")) return url;
-  const base = API_URL.replace(/\/+api\/?$/, "");
-  return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
+  const raw = url.trim();
+  if (!raw) return "";
+  if (/^(data:|blob:|\/\/)/i.test(raw)) return raw;
+
+  const base = getApiAssetOrigin();
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      const parsed = new URL(raw);
+      if (parsed.pathname.startsWith('/uploads/')) {
+        return `${base}${encodeURI(parsed.pathname)}${parsed.search}`;
+      }
+    } catch {
+      // Keep original URL when parsing fails.
+    }
+    return raw;
+  }
+
+  const normalizedPath = raw
+    .replace(/\\+/g, "/")
+    .replace(/^https?:\/\/[^/]+/i, "")
+    .replace(/^\/api(?=\/uploads\/)/i, "")
+    .replace(/^\/?uploads\//i, "")
+    .replace(/^\/+/, "");
+
+  const normalized = `/uploads/${normalizedPath}`.replace(/\/uploads\/+/i, "/uploads/");
+  return `${base}${encodeURI(normalized)}`;
+};
+
+const normalizeText = (value?: string | null) => (value || "").toLowerCase().trim();
+
+const smartTokenMatch = (needle: string, chunks: Array<string | null | undefined>) => {
+  const tokens = normalizeText(needle).split(/\s+/).filter(Boolean);
+  if (!tokens.length) return true;
+  const haystack = chunks.map((chunk) => normalizeText(chunk)).filter(Boolean).join(" ");
+  return tokens.every((token) => haystack.includes(token));
+};
+
+const buildEvidenceFiles = (evi: Evidence): GalleryFile[] => {
+  const normalizedFiles: GalleryFile[] = [];
+  const seen = new Set<string>();
+
+  const pushFile = (candidateUrl?: string | null, label?: string, explicitType?: 'image' | 'pdf') => {
+    const url = (candidateUrl || '').trim();
+    if (!url) return;
+    const key = url.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    normalizedFiles.push({
+      label: (label || 'Archivo').trim() || 'Archivo',
+      type: explicitType || inferFileType(url),
+      url,
+    });
+  };
+
+  const absorb = (value: unknown) => {
+    if (!value) return;
+
+    if (typeof value === 'string') {
+      const text = value.trim();
+      if (!text) return;
+
+      if ((text.startsWith('[') && text.endsWith(']')) || (text.startsWith('{') && text.endsWith('}'))) {
+        try {
+          absorb(JSON.parse(text));
+          return;
+        } catch {
+          // Fall through as plain string.
+        }
+      }
+
+      if (text.includes('|')) {
+        text
+          .split('|')
+          .map((part) => part.trim())
+          .filter(Boolean)
+          .forEach((part, index) => pushFile(part, `Archivo ${index + 1}`));
+        return;
+      }
+
+      pushFile(text, 'Archivo');
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach(absorb);
+      return;
+    }
+
+    if (typeof value === 'object') {
+      const item = value as Record<string, unknown>;
+      const maybeUrl =
+        (typeof item.url === 'string' && item.url) ||
+        (typeof item.archivoUrl === 'string' && item.archivoUrl) ||
+        (typeof item.path === 'string' && item.path) ||
+        '';
+      const maybeLabel = typeof item.label === 'string' ? item.label : 'Archivo';
+      const maybeType = item.type === 'pdf' || item.type === 'image' ? item.type : undefined;
+      if (maybeUrl) {
+        pushFile(maybeUrl, maybeLabel, maybeType);
+      }
+    }
+  };
+
+  absorb((evi as unknown as Record<string, unknown>).archivos);
+  absorb(evi.archivoUrl);
+
+  return normalizedFiles;
 };
 
 const getMapsUrl = (lat?: number | null, lng?: number | null) => {
@@ -61,11 +180,146 @@ const formatDateTime = (value?: string | null) => {
   });
 };
 
+// ── Inline media gallery with lightbox ──────────────────────────────────────
+type GalleryFile = { label: string; type: 'image' | 'pdf'; url: string };
+const MediaGallery: React.FC<{ archivos: GalleryFile[]; getUrl: (u: string) => string }> = ({ archivos, getUrl }) => {
+  const [open, setOpen] = useState(false);
+  const [idx, setIdx] = useState(0);
+  const [imgErrors, setImgErrors] = useState<Record<number, boolean>>({});
+  const PREVIEW = 4;
+  if (!archivos.length) return <span style={{ color: 'var(--text-secondary)' }}>-</span>;
+  const extra = archivos.length - PREVIEW;
+  const handlePrev = () => setIdx(i => (i - 1 + archivos.length) % archivos.length);
+  const handleNext = () => setIdx(i => (i + 1) % archivos.length);
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowLeft') handlePrev();
+    if (e.key === 'ArrowRight') handleNext();
+    if (e.key === 'Escape') setOpen(false);
+  };
+  return (
+    <>
+      <div className={styles.galleryStrip}>
+        {archivos.slice(0, PREVIEW).map((f, i) => {
+          const resolvedUrl = getUrl(f.url);
+          return (
+            <button
+              key={i}
+              type="button"
+              className={styles.galleryThumb}
+              onClick={() => { setIdx(i); setOpen(true); }}
+              title={f.label}
+              aria-label={`Ver ${f.label}`}
+            >
+              {f.type === 'pdf' ? (
+                <div className={styles.thumbPdf}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+                  <span>PDF</span>
+                </div>
+              ) : imgErrors[i] ? (
+                <div className={styles.thumbError}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </div>
+              ) : (
+                <img
+                  src={resolvedUrl}
+                  alt={f.label}
+                  className={styles.thumbImg}
+                  onError={() => setImgErrors(e => ({ ...e, [i]: true }))}
+                />
+              )}
+              <div className={styles.thumbLabel}>{f.label}</div>
+              {i === PREVIEW - 1 && extra > 0 && (
+                <div className={styles.thumbExtra}>+{extra}</div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      {open && (
+        <div
+          className={styles.lightboxOverlay}
+          onClick={() => setOpen(false)}
+          onKeyDown={handleKeyDown}
+          tabIndex={0}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className={styles.lightboxBox} onClick={e => e.stopPropagation()}>
+            <div className={styles.lightboxHeader}>
+              <span className={styles.lightboxLabel}>{archivos[idx].label}</span>
+              <span className={styles.lightboxCounter}>{idx + 1} / {archivos.length}</span>
+              <a
+                href={getUrl(archivos[idx].url)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.lightboxOpen}
+                onClick={e => e.stopPropagation()}
+                title="Abrir en nueva pestaña"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              </a>
+              <button className={styles.lightboxClose} onClick={() => setOpen(false)} aria-label="Cerrar">&#10005;</button>
+            </div>
+            <div className={styles.lightboxMedia}>
+              {archivos[idx].type === 'pdf' ? (
+                <iframe src={getUrl(archivos[idx].url)} className={styles.lightboxPdf} title={archivos[idx].label} />
+              ) : imgErrors[idx] ? (
+                <div className={styles.lightboxFallback}>
+                  <span>Vista previa no disponible</span>
+                  <a
+                    href={getUrl(archivos[idx].url)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="button-secondary"
+                  >
+                    Abrir archivo
+                  </a>
+                </div>
+              ) : (
+                <img
+                  src={getUrl(archivos[idx].url)}
+                  alt={archivos[idx].label}
+                  className={styles.lightboxImg}
+                  title={archivos[idx].label}
+                  onError={() => setImgErrors(e => ({ ...e, [idx]: true }))}
+                />
+              )}
+            </div>
+            {archivos.length > 1 && (
+              <>
+                <button type="button" className={`${styles.lightboxNav} ${styles.lightboxNavPrev}`} onClick={e => { e.stopPropagation(); handlePrev(); }} aria-label="Anterior">&#8249;</button>
+                <button type="button" className={`${styles.lightboxNav} ${styles.lightboxNavNext}`} onClick={e => { e.stopPropagation(); handleNext(); }} aria-label="Siguiente">&#8250;</button>
+              </>
+            )}
+            {archivos.length > 1 && (
+              <div className={styles.lightboxDots}>
+                {archivos.map((f, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    className={`${styles.dot} ${i === idx ? styles.dotActive : ''}`}
+                    onClick={e => { e.stopPropagation(); setIdx(i); }}
+                    title={f.label}
+                    aria-label={f.label}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
 const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }> = ({
   mode = "admin",
   title = "Evidencias",
 }) => {
+  const isUserView = mode === "user" || /mis evidencias/i.test(title || "");
   const { user } = useUser();
+  const canReview = mode === "admin" && hasPermission(user, PERMISSIONS.EVIDENCES_REVIEW);
+  const canExport = mode === "admin" && hasPermission(user, PERMISSIONS.EVIDENCES_EXPORT);
 
   const [loading, setLoading] = useState(true);
   const [evidences, setEvidences] = useState<Evidence[]>([]);
@@ -81,6 +335,15 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
   const [excelBlob, setExcelBlob] = useState<Blob | null>(null);
   const [excelPreparing, setExcelPreparing] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
+  const [pdfLoadingId, setPdfLoadingId] = useState<number | null>(null);
+  const [showBulkPdfModal, setShowBulkPdfModal] = useState(false);
+  const [bulkFromDate, setBulkFromDate] = useState("");
+  const [bulkToDate, setBulkToDate] = useState("");
+  const [bulkReportLoading, setBulkReportLoading] = useState(false);
+  const [showPdfViewer, setShowPdfViewer] = useState(false);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+  const [previewPdfData, setPreviewPdfData] = useState<Uint8Array | null>(null);
+  const [previewPdfName, setPreviewPdfName] = useState("reporte-ticket.pdf");
 
   const estatusList = ["Pendiente", "Aprobada", "Rechazada"];
   const calificacionOptions = ["Alta", "Media", "Baja"];
@@ -91,14 +354,22 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
   const fetchEvidences = () => {
     if (!user?.token) return;
     setLoading(true);
-    fetch(buildApiUrl("evidences"), {
+    const endpoint = isUserView ? "activity-evidence/history" : "activity-evidence/review-history";
+    fetch(buildApiUrl(endpoint), {
       headers: { Authorization: `Bearer ${user.token}` },
     })
       .then((res) => {
         if (!res.ok) throw new Error("No autorizado");
         return res.json();
       })
-      .then((data) => setEvidences(Array.isArray(data) ? data : []))
+      .then((data) => {
+        const rows = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.data)
+            ? data.data
+            : [];
+        setEvidences(rows);
+      })
       .catch(() => setEvidences([]))
       .finally(() => setLoading(false));
   };
@@ -114,7 +385,8 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
     const socket: Socket = io(socketUrl, { transports: ["polling", "websocket"] });
 
     socket.on("entity:updated", (payload: { model?: string }) => {
-      if (payload?.model === "Evidence") {
+      const model = payload?.model?.toLowerCase();
+      if (model === "evidence" || model === "activityevidence") {
         fetchEvidences();
       }
     });
@@ -127,8 +399,9 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
   useEffect(() => {
     return () => {
       if (excelUrl) window.URL.revokeObjectURL(excelUrl);
+      if (previewPdfUrl) window.URL.revokeObjectURL(previewPdfUrl);
     };
-  }, [excelUrl]);
+  }, [excelUrl, previewPdfUrl]);
 
   const closeExcelModal = () => {
     if (excelUrl) {
@@ -169,13 +442,87 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
     closeExcelModal();
   };
 
+  const buildReportFileName = (evi: Evidence, index?: number) => {
+    const an = (evi.actividad?.anNumber || `ticket-${evi.id}`).trim();
+    const safeAn = an.replace(/[^a-z0-9-_.]+/gi, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+    const suffix = typeof index === "number" ? `-${String(index + 1).padStart(2, "0")}` : "";
+    return `reporte-${safeAn || `ticket-${evi.id}`}${suffix}.pdf`;
+  };
+
+  const fetchTicketReportBlob = async (activityId: number) => {
+    if (!user?.token) throw new Error("Sesión no válida");
+    const endpoint = isUserView ? `activity-evidence/${activityId}/report` : `activities/${activityId}/report`;
+    const response = await fetch(buildApiUrl(endpoint), {
+      headers: {
+        Authorization: `Bearer ${user.token}`,
+      },
+    });
+    if (!response.ok) {
+      throw new Error("No se pudo generar el PDF");
+    }
+    return response.blob();
+  };
+
+  const downloadPdfBlob = (blob: Blob, fileName: string) => {
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+  };
+
+  const handlePreviewTicketPdf = async (evi: Evidence) => {
+    const activityId = evi.actividad?.id;
+    if (!activityId) {
+      alert("No se encontró la actividad asociada para generar el PDF.");
+      return;
+    }
+    setPdfLoadingId(evi.id);
+    try {
+      const blob = await fetchTicketReportBlob(activityId);
+      const arrayBuffer = await blob.arrayBuffer();
+      if (previewPdfUrl) {
+        window.URL.revokeObjectURL(previewPdfUrl);
+      }
+      const url = window.URL.createObjectURL(blob);
+      setPreviewPdfUrl(url);
+      setPreviewPdfData(new Uint8Array(arrayBuffer));
+      setPreviewPdfName(buildReportFileName(evi));
+      setShowPdfViewer(true);
+    } catch {
+      alert("No se pudo abrir la vista previa del PDF.");
+    } finally {
+      setPdfLoadingId((current) => (current === evi.id ? null : current));
+    }
+  };
+
+  const closePdfViewer = () => {
+    setShowPdfViewer(false);
+    setPreviewPdfData(null);
+    if (previewPdfUrl) {
+      window.URL.revokeObjectURL(previewPdfUrl);
+      setPreviewPdfUrl(null);
+    }
+  };
+
   const filtered = useMemo(
     () =>
       evidences.filter(
         (evi) =>
           (estatus ? evi.estatus === estatus : true) &&
           (actividad
-            ? evi.actividad?.anNumber?.toLowerCase().includes(actividad.toLowerCase())
+            ? smartTokenMatch(actividad, [
+                evi.actividad?.anNumber,
+                evi.actividad?.titulo,
+                evi.actividad?.indicaciones,
+                evi.actividad?.branchName,
+                evi.actividad?.branchCity,
+                evi.actividad?.branchState,
+                evi.actividad?.branchAddress,
+              ])
             : true) &&
           (responsable
             ? (evi.user?.nombre || evi.actividad?.responsable?.nombre || "")
@@ -185,6 +532,87 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
       ),
     [evidences, estatus, actividad, responsable]
   );
+
+  const responsibleOptions = useMemo(() => {
+    const unique = new Set<string>();
+    evidences.forEach((evi) => {
+      const name = (evi.user?.nombre || evi.actividad?.responsable?.nombre || "").trim();
+      if (name) unique.add(name);
+    });
+    return Array.from(unique).sort((a, b) => a.localeCompare(b, "es"));
+  }, [evidences]);
+
+  const resolveEvidenceDate = (evi: Evidence) => {
+    const raw = evi.fechaEvidencia || evi.revisadoEn || null;
+    if (!raw) return null;
+    const date = new Date(raw);
+    return Number.isNaN(date.getTime()) ? null : date;
+  };
+
+  const bulkCandidates = useMemo(() => {
+    const start = bulkFromDate ? new Date(`${bulkFromDate}T00:00:00`) : null;
+    const end = bulkToDate ? new Date(`${bulkToDate}T23:59:59.999`) : null;
+
+    return filtered
+      .filter((evi) => Boolean(evi.actividad?.id))
+      .filter((evi) => {
+        const date = resolveEvidenceDate(evi);
+        if (!start && !end) return true;
+        if (!date) return false;
+        if (start && date < start) return false;
+        if (end && date > end) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const aTime = resolveEvidenceDate(a)?.getTime() || 0;
+        const bTime = resolveEvidenceDate(b)?.getTime() || 0;
+        return aTime - bTime;
+      });
+  }, [filtered, bulkFromDate, bulkToDate]);
+
+  const handlePreviewBulkPdfReport = async () => {
+    if (bulkReportLoading) return;
+    if (!bulkCandidates.length) {
+      alert("No hay tickets con actividad válida para descargar.");
+      return;
+    }
+
+    setBulkReportLoading(true);
+
+    try {
+      const params = new URLSearchParams();
+      if (bulkFromDate) params.set("from", bulkFromDate);
+      if (bulkToDate) params.set("to", bulkToDate);
+
+      const query = params.toString();
+      const endpoint = `activity-evidence/history/report${query ? `?${query}` : ""}`;
+      const response = await fetch(buildApiUrl(endpoint), {
+        headers: {
+          Authorization: `Bearer ${user?.token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("No se pudo generar el reporte consolidado");
+      }
+
+      const blob = await response.blob();
+      const arrayBuffer = await blob.arrayBuffer();
+      if (previewPdfUrl) {
+        window.URL.revokeObjectURL(previewPdfUrl);
+      }
+      const url = window.URL.createObjectURL(blob);
+      setPreviewPdfUrl(url);
+      setPreviewPdfData(new Uint8Array(arrayBuffer));
+      setPreviewPdfName(`reporte-evidencias-${bulkFromDate || "inicio"}-${bulkToDate || "hoy"}.pdf`);
+      setShowBulkPdfModal(false);
+      setShowPdfViewer(true);
+    } catch {
+      alert("No se pudo generar el PDF consolidado.");
+    } finally {
+      setBulkReportLoading(false);
+    }
+  };
 
   const pendingCount = filtered.filter((evi) => evi.estatus === "Pendiente").length;
   const approvedCount = filtered.filter((evi) => evi.estatus === "Aprobada").length;
@@ -211,18 +639,36 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
     }));
   };
 
-  const handleReview = async (id: number, approved: boolean) => {
+  const handleReview = async (evi: Evidence, approved: boolean) => {
     if (!user?.token) return;
-    const draft = reviewDrafts[id] || { calificacion: "", observaciones: "" };
-    const payload = {
-      aprobada: approved,
-      estatus: approved ? "Aprobada" : "Rechazada",
-      calificacionEficiencia: draft.calificacion || null,
-      observacionesRevision: draft.observaciones || null,
-    };
+    const isPendingReview = (evi.estatus || "").toLowerCase() === "pendiente";
+    if (!isPendingReview) {
+      alert("Esta evidencia ya fue revisada y no puede volver a cambiarse.");
+      return;
+    }
+    const activityId = evi.actividad?.id;
+    if (!activityId || !user?.id) {
+      alert("No se encontró la actividad para revisar esta evidencia.");
+      return;
+    }
 
-    const res = await fetch(buildApiUrl(`evidences/${id}`), {
-      method: "PATCH",
+    const draft = reviewDrafts[evi.id] || { calificacion: "", observaciones: "" };
+    const endpoint = approved
+      ? `activity-evidence/${activityId}/approve`
+      : `activity-evidence/${activityId}/reject`;
+    const payload = approved
+      ? {
+          reviewerId: user.id,
+          notes: draft.observaciones || undefined,
+        }
+      : {
+          reviewerId: user.id,
+          rejectedStep: "EVIDENCE_PHOTOS",
+          notes: draft.observaciones || "Evidencia rechazada por administracion",
+        };
+
+    const res = await fetch(buildApiUrl(endpoint), {
+      method: "POST",
       headers: {
         Authorization: `Bearer ${user.token}`,
         "Content-Type": "application/json",
@@ -233,15 +679,6 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
     if (res.ok) {
       fetchEvidences();
     }
-  };
-
-  const handleRemoveOwn = async (id: number) => {
-    if (!user?.token) return;
-    const res = await fetch(buildApiUrl(`evidences/self/${id}`), {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${user.token}` },
-    });
-    if (res.ok) fetchEvidences();
   };
 
   if (loading) return <div>Cargando evidencias...</div>;
@@ -292,19 +729,25 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
 
           <input
             className="input"
-            placeholder="Actividad"
+            placeholder="Actividad, AN o sucursal"
             value={actividad}
             onChange={(e) => setActividad(e.target.value)}
           />
 
-          <input
-            className="input"
-            placeholder="Responsable"
-            value={responsable}
-            onChange={(e) => setResponsable(e.target.value)}
-          />
+          {!isUserView && (
+            <select
+              className="input"
+              value={responsable}
+              onChange={(e) => setResponsable(e.target.value)}
+            >
+              <option value="">Todos los responsables</option>
+              {responsibleOptions.map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+          )}
 
-          {hasPermission(user, PERMISSIONS.EVIDENCES_EXPORT) && (
+          {canExport && (
             <button
               className="button-primary"
               onClick={handlePrepareExcelExport}
@@ -313,13 +756,24 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
               {excelPreparing ? "Preparando..." : "Exportar Excel"}
             </button>
           )}
+
         </div>
 
         <div className={styles.toolbarMeta}>
           <span className={styles.resultsText}>
             {filtered.length === 1 ? "1 evidencia encontrada" : `${filtered.length} evidencias encontradas`}
           </span>
-          {(estatus || actividad || responsable) && (
+          {isUserView && (
+            <button
+              type="button"
+              className={`button-secondary ${styles.bulkDownloadButton}`}
+              onClick={() => setShowBulkPdfModal(true)}
+              disabled={bulkReportLoading || !filtered.length}
+            >
+              {bulkReportLoading ? "Generando PDF..." : "Descargar todos los tickets (PDF)"}
+            </button>
+          )}
+          {(estatus || actividad || (!isUserView && responsable)) && (
             <button
               type="button"
               className={styles.resetFilters}
@@ -343,6 +797,98 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
         onClose={closeExcelModal}
         onDownload={handleDownloadExcel}
       />
+
+      {showBulkPdfModal && (
+        <div className={styles.bulkModalOverlay} onClick={() => !bulkReportLoading && setShowBulkPdfModal(false)} aria-hidden="true">
+          <div className={styles.bulkModalCard} onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Descargar PDFs por fecha">
+            <div className={styles.bulkModalHeader}>
+              <h3 className={styles.bulkModalTitle}>Descargar PDFs por fecha</h3>
+              <button type="button" className="button-secondary" onClick={() => setShowBulkPdfModal(false)} disabled={bulkReportLoading}>
+                Cerrar
+              </button>
+            </div>
+
+            <div className={styles.bulkModalBody}>
+              <div className={styles.bulkFiltersRow}>
+                <label className={styles.bulkField}>
+                  <span>Desde</span>
+                  <input
+                    type="date"
+                    className="input"
+                    value={bulkFromDate}
+                    onChange={(event) => setBulkFromDate(event.target.value)}
+                    disabled={bulkReportLoading}
+                  />
+                </label>
+                <label className={styles.bulkField}>
+                  <span>Hasta</span>
+                  <input
+                    type="date"
+                    className="input"
+                    value={bulkToDate}
+                    onChange={(event) => setBulkToDate(event.target.value)}
+                    disabled={bulkReportLoading}
+                  />
+                </label>
+              </div>
+
+              <div className={styles.bulkSummary}>
+                <strong>{bulkCandidates.length}</strong> tickets listos para descarga
+                {bulkReportLoading && (
+                  <span> • Generando reporte...</span>
+                )}
+              </div>
+
+              <div className={styles.bulkActions}>
+                <button
+                  type="button"
+                  className="button-secondary"
+                  onClick={() => {
+                    setBulkFromDate("");
+                    setBulkToDate("");
+                  }}
+                  disabled={bulkReportLoading}
+                >
+                  Limpiar fechas
+                </button>
+                <button
+                  type="button"
+                  className="button-primary"
+                  onClick={handlePreviewBulkPdfReport}
+                  disabled={bulkReportLoading || !bulkCandidates.length}
+                >
+                  {bulkReportLoading ? "Generando..." : "Ver preview PDF"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPdfViewer && previewPdfUrl && (
+        <div className={styles.pdfModalOverlay} onClick={closePdfViewer} aria-hidden="true">
+          <div
+            className={styles.pdfModalCard}
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Vista previa del ticket en PDF"
+          >
+            <div className={styles.pdfModalHeader}>
+              <h3 className={styles.pdfModalTitle}>Vista previa del ticket</h3>
+              <div className={styles.pdfModalActions}>
+                <button type="button" className="button-secondary" onClick={closePdfViewer}>
+                  Cerrar
+                </button>
+              </div>
+            </div>
+
+            <div className={styles.pdfViewerWrap}>
+              <PDFViewer pdfUrl={previewPdfUrl} pdfData={previewPdfData} fileName={previewPdfName} height="620px" />
+            </div>
+          </div>
+        </div>
+      )}
 
       {importMsg && (
         <div className={importMsg.startsWith("Error") ? styles.feedbackError : styles.feedbackSuccess}>
@@ -370,13 +916,13 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
                 <th>Comentarios</th>
                 <th>Ubicación</th>
                 <th>Revision</th>
-                {hasPermission(user, PERMISSIONS.EVIDENCES_REVIEW) && <th>Acciones</th>}
-                {mode === "user" && <th>Gestión</th>}
+                {canReview && <th>Acciones</th>}
               </tr>
             </thead>
 
             <tbody className={styles.tableBody}>
               {paginated.map((evi) => {
+                const evidenceFiles = buildEvidenceFiles(evi);
                 const statusClass =
                   evi.estatus === "Aprobada"
                     ? styles.rowApproved
@@ -427,29 +973,25 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
                     </td>
 
                     <td className={styles.dataCell} data-label="Archivo">
-                      {evi.archivoUrl ? (
-                        <div className={styles.fileCell}>
-                          {evi.archivoUrl.toLowerCase().endsWith(".pdf") ? (
-                            <div className={styles.filePreviewPdf}>PDF</div>
-                          ) : (
-                            <img
-                              src={getAssetUrl(evi.archivoUrl)}
-                              alt="Evidencia"
-                              className={styles.filePreviewImage}
-                            />
-                          )}
-                          <a
-                            className="link"
-                            href={getAssetUrl(evi.archivoUrl)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            Ver archivo
-                          </a>
-                        </div>
-                      ) : (
-                        "-"
-                      )}
+                      <div className={styles.fileCell}>
+                        <MediaGallery
+                          archivos={evidenceFiles}
+                          getUrl={getAssetUrl}
+                        />
+
+                        {isUserView && (
+                          <div className={styles.fileActions}>
+                            <button
+                              type="button"
+                              className={`button-secondary ${styles.pdfActionBtn}`}
+                              onClick={() => handlePreviewTicketPdf(evi)}
+                              disabled={pdfLoadingId === evi.id || bulkReportLoading || !evi.actividad?.id}
+                            >
+                              {pdfLoadingId === evi.id ? "Procesando..." : "PDF"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </td>
 
                     <td className={styles.dataCell} data-label="Comentarios">
@@ -481,8 +1023,13 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
                       <div className={styles.cellSubtext}>{formatDateTime(evi.revisadoEn)}</div>
                     </td>
 
-                    {hasPermission(user, PERMISSIONS.EVIDENCES_REVIEW) && (
+                    {canReview && (
                       <td className={styles.dataCell} data-label="Acciones">
+                        {((evi.estatus || "").toLowerCase() !== "pendiente") ? (
+                          <div className={styles.cellSubtext}>
+                            Revisada: {evi.estatus || "-"}
+                          </div>
+                        ) : (
                         <div className={styles.actionsCell}>
                           <select
                             className="input"
@@ -510,28 +1057,18 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
                           />
 
                           <div className={styles.actionsButtons}>
-                            <button className="button-primary" onClick={() => handleReview(evi.id, true)}>
+                            <button className="button-primary" onClick={() => handleReview(evi, true)}>
                               Aprobar
                             </button>
-                            <button className="button-secondary" onClick={() => handleReview(evi.id, false)}>
+                            <button className="button-secondary" onClick={() => handleReview(evi, false)}>
                               Rechazar
                             </button>
                           </div>
                         </div>
-                      </td>
-                    )}
-
-                    {mode === "user" && (
-                      <td className={styles.dataCell} data-label="Gestión">
-                        {evi.estatus === "Pendiente" ? (
-                          <button className="button-secondary" onClick={() => handleRemoveOwn(evi.id)}>
-                            Quitar
-                          </button>
-                        ) : (
-                          <span className={styles.lockedLabel}>Bloqueado</span>
                         )}
                       </td>
                     )}
+
                   </tr>
                 );
               })}

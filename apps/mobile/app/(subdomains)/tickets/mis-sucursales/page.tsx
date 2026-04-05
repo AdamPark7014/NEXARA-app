@@ -237,10 +237,10 @@ export default function MyBranchesPage() {
           data-open={isMobile && mobileMenuOpen ? "true" : undefined}
         >
         <div className={consoleStyles.sidebarUser}>
-          <div className={consoleStyles.sidebarAvatar}>
+          <div className={consoleStyles.superadminAvatarWrap}>
             {clientAvatarUrl ? (
               <img
-                className={consoleStyles.avatarImage}
+                className={`${consoleStyles.avatarImage} ${consoleStyles.avatarImageLogo}`}
                 src={getAssetUrl(clientAvatarUrl)}
                 alt={session.client.name}
                 width={64}

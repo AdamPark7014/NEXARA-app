@@ -21,6 +21,7 @@ const ActivitiesTable: React.FC = () => {
   const [estatus, setEstatus] = useState<string>('');
   const [responsable, setResponsable] = useState<string>('');
   const [prioridad, setPrioridad] = useState<string>('');
+  const [activitySearch, setActivitySearch] = useState<string>('');
   const [page, setPage] = useState<number>(1);
   const [pageSize] = useState<number>(10);
   const estatusList = ['Pendiente', 'Aprobada', 'En proceso', 'Finalizada'];
@@ -40,6 +41,7 @@ const ActivitiesTable: React.FC = () => {
     branchNumber?: string;
     branchCity?: string;
     branchState?: string;
+    branchAddress?: string;
     descripcion?: string;
     indicaciones?: string;
     tiempoEstimadoMin?: number;
@@ -231,14 +233,46 @@ const ActivitiesTable: React.FC = () => {
       .catch(() => setNextAn(''));
   };
 
+  const normalizeText = (value?: string | null) => (value || '').toLowerCase().trim();
+
+  const smartTokenMatch = (needle: string, chunks: Array<string | null | undefined>) => {
+    const tokens = normalizeText(needle).split(/\s+/).filter(Boolean);
+    if (!tokens.length) return true;
+    const haystack = chunks.map((chunk) => normalizeText(chunk)).filter(Boolean).join(' ');
+    return tokens.every((token) => haystack.includes(token));
+  };
+
   // Filtrado
   const filtered = activities.filter(a =>
     (estatus ? a.estatus === estatus : true) &&
+    (activitySearch ? smartTokenMatch(activitySearch, [
+      a.anNumber,
+      a.titulo,
+      a.descripcion,
+      a.indicaciones,
+      a.branchName,
+      a.branchNumber,
+      a.branchCity,
+      a.branchState,
+      a.branchAddress,
+      a.client?.name,
+      a.responsable?.nombre,
+      a.ticketType,
+      a.workType,
+    ]) : true) &&
     (responsable ? a.responsable?.nombre?.toLowerCase().includes(responsable.toLowerCase()) : true) &&
     (prioridad ? a.prioridad === prioridad : true)
   );
   const totalPages = Math.ceil(filtered.length / pageSize) || 1;
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [estatus, activitySearch, responsable, prioridad]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
 
   // Importar actividades
@@ -508,14 +542,9 @@ const ActivitiesTable: React.FC = () => {
                     {request.address || '-'} {request.city || ''} {request.state || ''}
                   </div>
                   {request.latitud && request.longitud && (
-                    <iframe
-                      title={`map-${request.id}`}
-                      src={`https://maps.google.com/maps?q=${request.latitud},${request.longitud}&z=15&output=embed`}
-                      width="100%"
-                      height="160"
-                      className="activities-map-embed"
-                      loading="lazy"
-                    />
+                    <div className="activities-map-preview-placeholder">
+                      Vista previa de mapa no disponible en esta vista. Usa "Ver mapa" para abrir la ubicacion.
+                    </div>
                   )}
                   <div className="activities-request-actions">
                     {request.latitud && request.longitud && (
@@ -648,6 +677,12 @@ const ActivitiesTable: React.FC = () => {
               <option value="">Todos los estatus</option>
               {estatusList.map((e: string) => <option key={e} value={e}>{e}</option>)}
             </select>
+            <input
+              className="input"
+              placeholder="Buscar actividad, AN, sucursal o cliente"
+              value={activitySearch}
+              onChange={e => setActivitySearch(e.target.value)}
+            />
             <input
               className="input"
               placeholder="Responsable"
@@ -1087,6 +1122,16 @@ const ActivitiesTable: React.FC = () => {
             border-radius: 16px;
             overflow: hidden;
             background: var(--surface-2);
+          }
+
+          .activities-map-preview-placeholder {
+            border: 1px dashed var(--border);
+            border-radius: 16px;
+            background: var(--surface-2);
+            color: var(--text-secondary);
+            font-size: 12px;
+            line-height: 1.4;
+            padding: 14px;
           }
 
           .activities-request-actions,

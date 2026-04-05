@@ -13,6 +13,7 @@ export type TicketReportPayload = {
   anNumber: string;
   titulo?: string | null;
   estatus?: string | null;
+  workType?: string | null;
   clientName?: string | null;
   clientLogoUrl?: string | null;
   branchName?: string | null;
@@ -29,6 +30,25 @@ export type TicketReportPayload = {
   managerName?: string | null;
   workSummary?: string | null;
   observations?: string | null;
+  inventorySnapshot?: {
+    status?: string | null;
+    previousCount?: number | null;
+    currentCount?: number | null;
+    deltaCount?: number | null;
+    completedAt?: Date | null;
+    items?: Array<{
+      groupName?: string | null;
+      sectionName?: string | null;
+      equipmentName?: string | null;
+      serialBefore?: string | null;
+      serialAfter?: string | null;
+      modelBefore?: string | null;
+      modelAfter?: string | null;
+      itemStatus?: string | null;
+      compareState?: string | null;
+      maintenanceComments?: string | null;
+    }>;
+  } | null;
   evidences: TicketEvidence[];
 };
 
@@ -67,9 +87,72 @@ const loadLogo = (relativePath: string) => {
 
 const resolveUploadPath = (fileUrl?: string | null) => {
   if (!fileUrl) return null;
-  if (fileUrl.startsWith('/uploads/')) {
-    return path.resolve(process.cwd(), `.${fileUrl}`);
+  const raw = fileUrl.trim();
+  if (!raw) return null;
+
+  const sanitizedRaw = raw
+    .replace(/\\+/g, '/')
+    .replace(/[?#].*$/, '')
+    .trim();
+
+  if (!sanitizedRaw) return null;
+
+  const resolveExistingUpload = (relativeUploadPath: string) => {
+    const cleaned = relativeUploadPath.replace(/^\/+/, '');
+    const candidates = [
+      path.resolve(process.cwd(), 'uploads', cleaned),
+      path.resolve(process.cwd(), 'apps', 'api', 'uploads', cleaned),
+      path.resolve(process.cwd(), '..', 'uploads', cleaned),
+      path.resolve(process.cwd(), '..', '..', 'uploads', cleaned),
+      path.resolve(process.cwd(), '..', '..', '..', 'uploads', cleaned),
+      path.resolve(__dirname, '..', '..', 'uploads', cleaned),
+      path.resolve(__dirname, '..', '..', '..', 'uploads', cleaned),
+      path.resolve(__dirname, '..', '..', '..', '..', 'uploads', cleaned),
+    ];
+
+    for (const candidate of candidates) {
+      try {
+        if (fs.existsSync(candidate)) {
+          return candidate;
+        }
+      } catch {
+        // Continue checking other candidate paths.
+      }
+    }
+
+    return null;
+  };
+
+  if (sanitizedRaw.startsWith('/uploads/')) {
+    return resolveExistingUpload(sanitizedRaw.replace(/^\/uploads\//, ''));
   }
+
+  if (sanitizedRaw.startsWith('/activities/')) {
+    return resolveExistingUpload(sanitizedRaw.replace(/^\//, ''));
+  }
+
+  if (sanitizedRaw.startsWith('activities/')) {
+    return resolveExistingUpload(sanitizedRaw);
+  }
+
+  if (/^https?:\/\//i.test(sanitizedRaw)) {
+    try {
+      const parsed = new URL(sanitizedRaw);
+      if (parsed.pathname.startsWith('/uploads/')) {
+        return resolveExistingUpload(parsed.pathname.replace(/^\/uploads\//, ''));
+      }
+      if (parsed.pathname.startsWith('/activities/')) {
+        return resolveExistingUpload(parsed.pathname.replace(/^\//, ''));
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  if (sanitizedRaw.startsWith('/api/uploads/')) {
+    return resolveExistingUpload(sanitizedRaw.replace(/^\/api\/uploads\//, ''));
+  }
+
   return null;
 };
 
@@ -108,7 +191,7 @@ export const generateTicketReportPdf = async (payload: TicketReportPayload): Pro
 
     const drawHeader = () => {
       doc.save();
-      doc.rect(0, 0, pageWidth, 120).fill(colors.lightBlue);
+      doc.rect(0, 0, pageWidth, 126).fill(colors.lightBlue);
       doc.rect(0, 0, pageWidth, 6).fill(colors.blue);
       doc.restore();
 
@@ -117,28 +200,49 @@ export const generateTicketReportPdf = async (payload: TicketReportPayload): Pro
         doc.image(nexaraLogo, logoBox.x, logoBox.y, { fit: [logoBox.w, logoBox.h] });
       }
 
-      const clientBox = { x: pageWidth - margin - 90, y: 22, w: 90, h: 64 };
-      if (clientLogo) {
-        doc.image(clientLogo, clientBox.x, clientBox.y, { fit: [clientBox.w, clientBox.h] });
-      }
-
-      const infoWidth = 180;
+      const infoWidth = 200;
       const infoX = pageWidth - margin - infoWidth;
+      const infoY = 16;
+      const infoHeight = 94;
+
+      doc.save();
+      doc.fillOpacity(0.92);
+      doc.roundedRect(infoX, infoY, infoWidth, infoHeight, 8).fill('#ffffff');
+      doc.restore();
+
       const titleX = margin + logoBox.w + 12;
-      const titleWidth = infoX - titleX - 12;
+      const titleRightLimit = infoX - 14;
+      const titleWidth = Math.max(170, titleRightLimit - titleX);
 
       doc.fillColor(colors.navy).font('Helvetica-Bold').fontSize(20).text('Reporte de Ticket', titleX, 30, {
-        width: Math.max(140, titleWidth),
+        width: titleWidth,
       });
-      doc.fontSize(10).font('Helvetica').fillColor(colors.muted).text('Mantenimiento preventivo/correctivo', titleX, 56, {
-        width: Math.max(140, titleWidth),
+      const flowLabel = payload.workType === 'PREVENTIVE_INVENTORY'
+        ? 'Mantenimiento e inventario comparativo'
+        : 'Ticket por problema';
+      doc.fontSize(10).font('Helvetica').fillColor(colors.muted).text(flowLabel, titleX, 58, {
+        width: titleWidth,
       });
 
+      if (clientLogo) {
+        const clientBox = { x: infoX + 8, y: infoY + 8, w: 44, h: 34 };
+        doc.save();
+        doc.roundedRect(clientBox.x - 2, clientBox.y - 2, clientBox.w + 4, clientBox.h + 4, 5).fill('#ffffff');
+        doc.restore();
+        doc.image(clientLogo, clientBox.x, clientBox.y, {
+          fit: [clientBox.w, clientBox.h],
+          align: 'center',
+          valign: 'center',
+        });
+      }
+
       doc.fillColor(colors.text).fontSize(9);
-      doc.text(`Ticket: ${payload.anNumber}`, infoX, 28, { width: infoWidth, align: 'right' });
-      doc.text(`Cliente: ${payload.clientName || '-'}`, infoX, 42, { width: infoWidth, align: 'right' });
-      doc.text(`Tipo: ${payload.ticketType || '-'}`, infoX, 56, { width: infoWidth, align: 'right' });
-      doc.text(`Prioridad: ${payload.prioridad || '-'}`, infoX, 70, { width: infoWidth, align: 'right' });
+      const metaX = infoX + 56;
+      const metaWidth = infoWidth - 64;
+      doc.text(`Ticket: ${payload.anNumber}`, metaX, infoY + 10, { width: metaWidth, align: 'left' });
+      doc.text(`Cliente: ${payload.clientName || '-'}`, metaX, infoY + 26, { width: metaWidth, align: 'left' });
+      doc.text(`Tipo: ${payload.ticketType || '-'}`, metaX, infoY + 42, { width: metaWidth, align: 'left' });
+      doc.text(`Prioridad: ${payload.prioridad || '-'}`, metaX, infoY + 58, { width: metaWidth, align: 'left' });
     };
 
     const drawSectionTitle = (label: string) => {
@@ -222,6 +326,56 @@ export const generateTicketReportPdf = async (payload: TicketReportPayload): Pro
     ];
     const indicatorsHeight = drawInfoCard(margin, doc.y, contentWidth, indicatorsLines);
     doc.y += indicatorsHeight + 16;
+
+    if (payload.inventorySnapshot) {
+      drawSectionTitle('Inventario comparativo');
+
+      const inventory = payload.inventorySnapshot;
+      const inventorySummary = [
+        { label: 'Estatus inventario', value: inventory.status || '-' },
+        { label: 'Equipos previos', value: String(inventory.previousCount ?? 0) },
+        { label: 'Equipos actuales', value: String(inventory.currentCount ?? 0) },
+        { label: 'Diferencia', value: String(inventory.deltaCount ?? 0) },
+        { label: 'Corte', value: formatDateTime(inventory.completedAt || null) },
+      ];
+
+      const inventoryHeight = drawInfoCard(margin, doc.y, contentWidth, inventorySummary);
+      doc.y += inventoryHeight + 10;
+
+      const items = inventory.items || [];
+      if (items.length > 0) {
+        doc.fillColor(colors.navy).fontSize(11).font('Helvetica-Bold').text('Detalle técnico de equipos');
+        doc.moveDown(0.3);
+        doc.fillColor(colors.muted).fontSize(9).font('Helvetica')
+          .text(`Total equipos capturados: ${items.length}`);
+        doc.moveDown(0.3);
+
+        const maxRows = 18;
+        items.slice(0, maxRows).forEach((item, index) => {
+          if (doc.y + 42 > doc.page.height - doc.page.margins.bottom) {
+            doc.addPage();
+            drawHeader();
+            doc.y = 140;
+            drawSectionTitle('Inventario comparativo (continuación)');
+          }
+
+          const lineA = `${index + 1}. ${item.groupName || 'GENERAL'} · ${item.sectionName || '-'} · ${item.equipmentName || 'Equipo sin nombre'}`;
+          const lineB = `Serie: ${item.serialBefore || '-'} -> ${item.serialAfter || '-'} | Modelo: ${item.modelBefore || '-'} -> ${item.modelAfter || '-'} | Estado: ${item.itemStatus || '-'} | Cambio: ${item.compareState || '-'}`;
+          doc.fillColor(colors.text).fontSize(8.8).font('Helvetica-Bold').text(lineA, margin, doc.y, { width: contentWidth });
+          doc.fillColor(colors.text).fontSize(8.4).font('Helvetica').text(lineB, margin, doc.y + 1, { width: contentWidth });
+          if (item.maintenanceComments) {
+            doc.fillColor(colors.muted).fontSize(8).text(`Nota: ${item.maintenanceComments}`, margin, doc.y + 1, { width: contentWidth });
+          }
+          doc.moveDown(0.35);
+        });
+
+        if (items.length > maxRows) {
+          doc.fillColor(colors.muted).fontSize(8.5).font('Helvetica')
+            .text(`... y ${items.length - maxRows} equipos adicionales en el reporte de inventario detallado.`);
+        }
+        doc.moveDown(0.5);
+      }
+    }
 
     drawSectionTitle('Resumen operativo');
     doc.fillColor(colors.navy).fontSize(11).font('Helvetica-Bold').text('Trabajo realizado');

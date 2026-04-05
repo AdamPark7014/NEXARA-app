@@ -104,11 +104,24 @@ const buildCsp = (hostname?: string) => {
     ? `http://${hostWithoutPort}:* ws://${hostWithoutPort}:*`
     : '';
 
+  const directHostAssetSources = shouldAllowHttpHost
+    ? `http://${hostWithoutPort}:*`
+    : '';
+
+  const devLocalAssetSources = "http://localhost:* http://127.0.0.1:* http://*.localhost:*";
+  const imgSrc = isDev
+    ? `'self' data: blob: https: ${devLocalAssetSources} ${directHostAssetSources}`
+    : "'self' data: blob: https:";
+  const frameSrc = isDev
+    ? `'self' https: ${devLocalAssetSources} ${directHostAssetSources}`
+    : "'self' https:";
+
   const cspDirectives = [
     "default-src 'self'",
     `script-src ${scriptSrc}`,
     "style-src 'self' 'unsafe-inline' https:",
-    "img-src 'self' data: blob: https:",
+    `img-src ${imgSrc}`,
+    `frame-src ${frameSrc}`,
     "font-src 'self' data: https:",
     `connect-src 'self' https: wss: http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:* http://*.localhost:* ws://*.localhost:* wss://*.localhost:* ${directHostConnectSources} ${externalConnectSources}`,
     "media-src 'self' blob: https:",
@@ -118,7 +131,7 @@ const buildCsp = (hostname?: string) => {
     "form-action 'self'",
   ];
 
-  if (!shouldAllowHttpHost) {
+  if (!isDev && !shouldAllowHttpHost) {
     cspDirectives.push('upgrade-insecure-requests');
   }
 

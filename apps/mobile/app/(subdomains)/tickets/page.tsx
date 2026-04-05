@@ -5,6 +5,7 @@ import { io, Socket } from "socket.io-client";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { useTheme } from "@/components/ThemeContext";
+import BottomNav from "@/components/BottomNav";
 import { getApiAssetOrigin } from "@/lib/api-base";
 import { getAccessiblePanels } from "@/lib/panel-routing";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
@@ -128,6 +129,8 @@ export default function ClientTicketsPage() {
   const [profile, setProfile] = useState<ClientProfile | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [requests, setRequests] = useState<TicketRequest[]>([]);
+  const [evidenceLoadErrors, setEvidenceLoadErrors] = useState<Record<string, boolean>>({});
+  const [mapPreviewErrors, setMapPreviewErrors] = useState<Record<string, number>>({});
   const [pendingFeedback, setPendingFeedback] = useState<PendingFeedback[]>([]);
   const [feedbackDrafts, setFeedbackDrafts] = useState<Record<number, {
     rating: string;
@@ -185,10 +188,39 @@ export default function ClientTicketsPage() {
 
     return `${base}${raw.startsWith("/") ? "" : "/"}${raw}`;
   };
+
+  const getEvidenceKind = (value?: string | null): "pdf" | "image" | "file" => {
+    if (!value) return "file";
+    const normalized = value.trim();
+    if (!normalized) return "file";
+
+    let pathname = normalized;
+    try {
+      const parsed = /^https?:\/\//i.test(normalized)
+        ? new URL(normalized)
+        : new URL(normalized, typeof window !== "undefined" ? window.location.origin : "http://localhost");
+      pathname = parsed.pathname || normalized;
+    } catch {
+      pathname = normalized.split("?")[0] || normalized;
+    }
+
+    const lower = pathname.toLowerCase();
+    if (lower.endsWith(".pdf")) return "pdf";
+    if (/\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i.test(lower)) return "image";
+    return "file";
+  };
   const clientAvatarUrl = profile?.logoUrl || session?.client?.logoUrl || "";
   const getMapsUrl = (lat?: number | null, lng?: number | null) => {
     if (!lat || !lng) return "";
     return `https://www.google.com/maps?q=${lat},${lng}`;
+  };
+  const getStaticMapPreviewUrl = (lat?: number | null, lng?: number | null) => {
+    if (!lat || !lng) return "";
+    return `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=15&size=1200x260&markers=${lat},${lng},red-pushpin`;
+  };
+  const getFallbackStaticMapPreviewUrl = (lat?: number | null, lng?: number | null) => {
+    if (!lat || !lng) return "";
+    return `https://static-maps.yandex.ru/1.x/?ll=${lng},${lat}&size=650,260&z=15&l=map&pt=${lng},${lat},pm2rdm`;
   };
   const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, "");
 
@@ -683,49 +715,120 @@ export default function ClientTicketsPage() {
     return null;
   }
 
+  const activeViewInfo = {
+    tickets: {
+      title: "Estado de tickets",
+      subtitle: "Seguimiento en vivo, evidencias y reportes desde una sola vista.",
+    },
+    nuevo: {
+      title: "Nueva solicitud",
+      subtitle: "Levanta un requerimiento con el contexto correcto y envialo sin friccion.",
+    },
+    inventarios: {
+      title: "Inventarios",
+      subtitle: "Consulta mantenimientos, conteos y snapshots operativos por sucursal.",
+    },
+    perfil: {
+      title: "Perfil corporativo",
+      subtitle: "Actualiza el punto de contacto y los datos base de tu cuenta.",
+    },
+    sucursales: {
+      title: "Sucursales",
+      subtitle: "Gestiona accesos, identidad y operacion de cada sucursal.",
+    },
+  }[activeTab];
+
+  const clientBottomNavItems = [
+    {
+      icon: "🏠",
+      label: "Estado",
+      onPress: () => {
+        setActiveTab("tickets");
+        setMobileMenuOpen(false);
+      },
+      active: activeTab === "tickets",
+    },
+    {
+      icon: "✚",
+      label: "Nueva",
+      onPress: () => {
+        setActiveTab("nuevo");
+        setMobileMenuOpen(false);
+      },
+      active: activeTab === "nuevo",
+    },
+    {
+      icon: "🧰",
+      label: "Invent.",
+      onPress: () => {
+        setActiveTab("inventarios");
+        setMobileMenuOpen(false);
+      },
+      active: activeTab === "inventarios",
+    },
+    {
+      icon: "👤",
+      label: "Perfil",
+      onPress: () => {
+        setActiveTab("perfil");
+        setMobileMenuOpen(false);
+      },
+      active: activeTab === "perfil",
+    },
+    {
+      icon: "🏬",
+      label: "Sucurs.",
+      onPress: () => {
+        setActiveTab("sucursales");
+        setMobileMenuOpen(false);
+      },
+      active: activeTab === "sucursales",
+      hapticIntent: "medium" as const,
+    },
+  ];
+
   return (
     <div className={`${consoleStyles.consoleLayout} ${styles.ticketsConsole}`}>
+      {isMobile && mobileMenuOpen && (
+        <div
+          className={consoleStyles.sidebarOverlay}
+          onClick={() => setMobileMenuOpen(false)}
+          role="presentation"
+        ></div>
+      )}
       <aside className={consoleStyles.sidebar} data-mobile={isMobile ? "true" : "false"} data-open={mobileMenuOpen ? "true" : "false"}>
         <div className={consoleStyles.sidebarHeader}>
           <div className={consoleStyles.sidebarLogo}>
             <span className={consoleStyles.brandMark}>NEXARA</span>
             <span className={consoleStyles.brandSub}>Portal</span>
           </div>
-          {isMobile && (
+          {isMobile && mobileMenuOpen && (
             <button
               type="button"
-              className={consoleStyles.hamburgerButton}
-              onClick={() => setMobileMenuOpen((prev) => !prev)}
-              aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
-              aria-expanded={mobileMenuOpen}
-              aria-controls="tickets-sidebar-menu"
-              data-open={mobileMenuOpen ? "true" : "false"}
+              className={consoleStyles.mobileCloseButton}
+              onClick={() => setMobileMenuOpen(false)}
+              aria-label="Cerrar menú"
             >
-              <span className={consoleStyles.hamburgerLine}></span>
-              <span className={consoleStyles.hamburgerLine}></span>
-              <span className={consoleStyles.hamburgerLine}></span>
+              <span aria-hidden="true">✕</span>
             </button>
           )}
         </div>
 
-        {isMobile && mobileMenuOpen && (
-          <div
-            className={consoleStyles.sidebarOverlay}
-            onClick={() => setMobileMenuOpen(false)}
-            role="presentation"
-          ></div>
-        )}
-
-        {(!isMobile || mobileMenuOpen) && (
         <div
           className={consoleStyles.sidebarContent}
           id="tickets-sidebar-menu"
           data-open={isMobile && mobileMenuOpen ? "true" : undefined}
         >
         <div className={consoleStyles.sidebarUser}>
-          <div className={consoleStyles.sidebarAvatar}>
+          <div className={consoleStyles.superadminAvatarWrap}>
             {clientAvatarUrl ? (
-              <img className={consoleStyles.avatarImage} src={getAssetUrl(clientAvatarUrl)} alt={session.client.name} width={64} height={64} />
+              <img
+                className={`${consoleStyles.avatarImage} ${consoleStyles.avatarImageLogo}`}
+                src={getAssetUrl(clientAvatarUrl)}
+                alt={session.client.name}
+                width={64}
+                height={64}
+              />
             ) : (
               <span className={consoleStyles.sidebarName}>{session.client.name.slice(0, 2).toUpperCase()}</span>
             )}
@@ -738,18 +841,20 @@ export default function ClientTicketsPage() {
         </div>
         <div className={consoleStyles.menuTitle}>Cuenta corporativa</div>
         <ul className={consoleStyles.sidebarMenu}>
-          <li className={consoleStyles.sidebarMenuItem}>
-            <button
-              type="button"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "perfil" ? consoleStyles.active : ""}`}
-              onClick={() => {
-                setActiveTab("perfil");
-                setMobileMenuOpen(false);
-              }}
-            >
-              🪪 Mi perfil corporativo
-            </button>
-          </li>
+          {!isMobile && (
+            <li className={consoleStyles.sidebarMenuItem}>
+              <button
+                type="button"
+                className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "perfil" ? consoleStyles.active : ""}`}
+                onClick={() => {
+                  setActiveTab("perfil");
+                  setMobileMenuOpen(false);
+                }}
+              >
+                🪪 Mi perfil corporativo
+              </button>
+            </li>
+          )}
           <li className={consoleStyles.sidebarMenuItem}>
             <button
               type="button"
@@ -764,45 +869,49 @@ export default function ClientTicketsPage() {
           </li>
         </ul>
 
-        <div className={consoleStyles.menuTitle}>Servicio y solicitudes</div>
-        <ul className={consoleStyles.sidebarMenu}>
-          <li className={consoleStyles.sidebarMenuItem}>
-            <button
-              type="button"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "tickets" ? consoleStyles.active : ""}`}
-              onClick={() => {
-                setActiveTab("tickets");
-                setMobileMenuOpen(false);
-              }}
-            >
-              🎫 Estado de tickets
-            </button>
-          </li>
-          <li className={consoleStyles.sidebarMenuItem}>
-            <button
-              type="button"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "nuevo" ? consoleStyles.active : ""}`}
-              onClick={() => {
-                setActiveTab("nuevo");
-                setMobileMenuOpen(false);
-              }}
-            >
-              ➕ Nueva solicitud
-            </button>
-          </li>
-          <li className={consoleStyles.sidebarMenuItem}>
-            <button
-              type="button"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "inventarios" ? consoleStyles.active : ""}`}
-              onClick={() => {
-                setActiveTab("inventarios");
-                setMobileMenuOpen(false);
-              }}
-            >
-              🧰 Inventarios
-            </button>
-          </li>
-        </ul>
+        {!isMobile && (
+          <>
+            <div className={consoleStyles.menuTitle}>Servicio y solicitudes</div>
+            <ul className={consoleStyles.sidebarMenu}>
+              <li className={consoleStyles.sidebarMenuItem}>
+                <button
+                  type="button"
+                  className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "tickets" ? consoleStyles.active : ""}`}
+                  onClick={() => {
+                    setActiveTab("tickets");
+                    setMobileMenuOpen(false);
+                  }}
+                >
+                  🎫 Estado de tickets
+                </button>
+              </li>
+              <li className={consoleStyles.sidebarMenuItem}>
+                <button
+                  type="button"
+                  className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "nuevo" ? consoleStyles.active : ""}`}
+                  onClick={() => {
+                    setActiveTab("nuevo");
+                    setMobileMenuOpen(false);
+                  }}
+                >
+                  ➕ Nueva solicitud
+                </button>
+              </li>
+              <li className={consoleStyles.sidebarMenuItem}>
+                <button
+                  type="button"
+                  className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${activeTab === "inventarios" ? consoleStyles.active : ""}`}
+                  onClick={() => {
+                    setActiveTab("inventarios");
+                    setMobileMenuOpen(false);
+                  }}
+                >
+                  🧰 Inventarios
+                </button>
+              </li>
+            </ul>
+          </>
+        )}
 
         <div className={consoleStyles.menuTitle}>Sesión</div>
         <ul className={consoleStyles.sidebarMenu}>
@@ -837,20 +946,97 @@ export default function ClientTicketsPage() {
           </li>
         </ul>
         </div>
-        )}
       </aside>
       <main className={consoleStyles.consoleMain}>
         <div className={styles.mainStack}>
-          <div className={`card ${styles.panelHero}`}>
-            <p className={styles.panelHeroTitle}>Panel de tickets corporativo</p>
-            <p className={styles.panelHeroMeta}>
-              Cliente: {session.client.name} · Administra solicitudes, inventarios y seguimiento en un solo flujo.
-            </p>
-            <div className={styles.panelKpis}>
-              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{ticketStats.total}</span><span className={styles.panelKpiLabel}>Tickets</span></div>
-              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{ticketStats.pending}</span><span className={styles.panelKpiLabel}>En proceso</span></div>
-              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{ticketStats.closed}</span><span className={styles.panelKpiLabel}>Cerrados</span></div>
-              <div className={styles.panelKpi}><span className={styles.panelKpiValue}>{ticketStats.requests}</span><span className={styles.panelKpiLabel}>Solicitudes</span></div>
+          {isMobile && (
+            <div className={styles.mobileAppChrome}>
+              <div className={styles.mobileTopbar}>
+                <div className={styles.mobileTopbarContent}>
+                  <p className={styles.mobileEyebrow}>NEXARA Tickets</p>
+                  <h1 className={styles.mobileTitle}>{activeViewInfo.title}</h1>
+                  <p className={styles.mobileSubtitle}>{activeViewInfo.subtitle}</p>
+                </div>
+                <div className={styles.mobileTopbarActions}>
+                  <button
+                    type="button"
+                    className={styles.mobileTopAction}
+                    onClick={toggleDarkMode}
+                    aria-label={darkMode ? "Cambiar a vista clara" : "Cambiar a vista oscura"}
+                  >
+                    {darkMode ? "☀️ Claro" : "🌙 Oscuro"}
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.mobileTopAction} ${styles.mobileTopActionDanger}`}
+                    onClick={handleLogout}
+                    aria-label="Cerrar sesión"
+                  >
+                    ⎋ Salir
+                  </button>
+                </div>
+              </div>
+
+              <div className={styles.mobileIdentityCard}>
+                <div className={styles.mobileIdentityRow}>
+                  <div className={styles.mobileIdentityAvatar}>
+                    {clientAvatarUrl ? (
+                      <img
+                        src={getAssetUrl(clientAvatarUrl)}
+                        alt={session.client.name}
+                        className={styles.mobileIdentityAvatarImage}
+                      />
+                    ) : (
+                      <span>{session.client.name.slice(0, 2).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div className={styles.mobileIdentityMeta}>
+                    <div className={styles.mobileIdentityName}>{session.client.name}</div>
+                    <div className={styles.mobileIdentityHint}>Portal corporativo de tickets y servicio</div>
+                  </div>
+                </div>
+                <div className={styles.mobilePillRow}>
+                  <span className={styles.mobilePill}>Cliente corporativo</span>
+                  <span className={styles.mobilePill}>{ticketStats.pending} en proceso</span>
+                  <span className={styles.mobilePill}>{requests.length} solicitudes</span>
+                </div>
+                <div className={styles.mobileMetricsRow}>
+                  <div className={styles.mobileMetric}>
+                    <span className={styles.mobileMetricValue}>{ticketStats.total}</span>
+                    <span className={styles.mobileMetricLabel}>Tickets</span>
+                  </div>
+                  <div className={styles.mobileMetric}>
+                    <span className={styles.mobileMetricValue}>{ticketStats.closed}</span>
+                    <span className={styles.mobileMetricLabel}>Cerrados</span>
+                  </div>
+                  <div className={styles.mobileMetric}>
+                    <span className={styles.mobileMetricValue}>{branches.length}</span>
+                    <span className={styles.mobileMetricLabel}>Sucursales</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className={`card ${styles.panelHero} ${styles.nativeHero}`}>
+            <div className={styles.heroHeadingRow}>
+              <div className={styles.heroTitleBlock}>
+                <p className={styles.heroEyebrow}>NEXARA Tickets</p>
+                <h1 className={styles.heroTitle}>Panel de tickets corporativo</h1>
+                <p className={styles.heroLead}>
+                  Cliente: {session.client.name} · Administra solicitudes, inventarios y seguimiento en un solo flujo.
+                </p>
+              </div>
+              <div className={styles.heroBadgeRow}>
+                <span className={styles.heroBadge}>Servicio centralizado</span>
+                <span className={styles.heroBadge}>Vista ejecutiva</span>
+              </div>
+            </div>
+            <div className={styles.heroMetricGrid}>
+              <div className={styles.heroMetricCard}><span className={styles.heroMetricValue}>{ticketStats.total}</span><span className={styles.heroMetricLabel}>Tickets</span></div>
+              <div className={styles.heroMetricCard}><span className={styles.heroMetricValue}>{ticketStats.pending}</span><span className={styles.heroMetricLabel}>En proceso</span></div>
+              <div className={styles.heroMetricCard}><span className={styles.heroMetricValue}>{ticketStats.closed}</span><span className={styles.heroMetricLabel}>Cerrados</span></div>
+              <div className={styles.heroMetricCard}><span className={styles.heroMetricValue}>{ticketStats.requests}</span><span className={styles.heroMetricLabel}>Solicitudes</span></div>
             </div>
           </div>
 
@@ -1039,9 +1225,11 @@ export default function ClientTicketsPage() {
                     {(ticket.evidencias || []).map((ev) => (
                       <div key={ev.id} className={`card ${styles.cardSoft}`} style={{ padding: 8 }}>
                         {ev.archivoUrl.endsWith(".pdf") ? (
-                          <object data={getAssetUrl(ev.archivoUrl)} type="application/pdf" width="100%" height="140">
-                            <embed src={getAssetUrl(ev.archivoUrl)} type="application/pdf" />
-                          </object>
+                          <div className={`card ${styles.cardSoft}`} style={{ minHeight: 140, display: "grid", placeItems: "center", padding: 10 }}>
+                            <a className="button-secondary" href={getAssetUrl(ev.archivoUrl)} target="_blank" rel="noreferrer">
+                              Abrir PDF
+                            </a>
+                          </div>
                         ) : (
                           <img src={getAssetUrl(ev.archivoUrl)} alt={ev.tipoEvidencia} style={{ width: "100%", height: 140, objectFit: "cover", borderRadius: 8 }} />
                         )}
@@ -1252,25 +1440,62 @@ export default function ClientTicketsPage() {
                       <a href={getMapsUrl(request.latitud, request.longitud)} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>Ver ubicación</a>
                     )}
                     {request.latitud && request.longitud && (
-                      <iframe
-                        title={`request-${request.id}`}
-                        src={`https://maps.google.com/maps?q=${request.latitud},${request.longitud}&z=15&output=embed`}
-                        width="100%"
-                        height="160"
-                        style={{ border: 0, borderRadius: 12 }}
-                        loading="lazy"
-                      />
+                      <a
+                        href={getMapsUrl(request.latitud, request.longitud)}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ display: "block", borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", background: "var(--surface-light)" }}
+                      >
+                        {(() => {
+                          const mapKey = `${request.id}-map`;
+                          const failCount = mapPreviewErrors[mapKey] || 0;
+                          const src = failCount === 0
+                            ? getStaticMapPreviewUrl(request.latitud, request.longitud)
+                            : getFallbackStaticMapPreviewUrl(request.latitud, request.longitud);
+
+                          if (failCount >= 2) {
+                            return (
+                              <div style={{ height: 180, display: "grid", placeItems: "center", color: "var(--text-secondary)", fontSize: 12 }}>
+                                Vista previa de mapa no disponible
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <img
+                              src={src}
+                              alt="Vista previa de ubicación"
+                              style={{ display: "block", width: "100%", height: 180, objectFit: "cover" }}
+                              onError={() => setMapPreviewErrors((prev) => ({ ...prev, [mapKey]: failCount + 1 }))}
+                            />
+                          );
+                        })()}
+                      </a>
                     )}
                     {Array.isArray(request.evidenceUrls) && request.evidenceUrls.length > 0 && (
                       <div className={styles.grid120}>
                         {request.evidenceUrls.map((url, idx) => (
-                          <div key={`${request.id}-${idx}`} className={styles.mediaTile}>
-                            {url.toLowerCase().endsWith(".pdf") ? (
-                              <object data={getAssetUrl(url)} type="application/pdf" width="100%" height="120">
-                                <embed src={getAssetUrl(url)} type="application/pdf" />
-                              </object>
+                          <div key={`${request.id}-${idx}`} className={styles.mediaTile} style={{ display: "grid", placeItems: "center", padding: 8, minHeight: 140 }}>
+                            {getEvidenceKind(url) === "pdf" ? (
+                              <div className={`card ${styles.cardSoft}`} style={{ minHeight: 120, display: "grid", placeItems: "center", padding: 10 }}>
+                                <a className="button-secondary" href={getAssetUrl(url)} target="_blank" rel="noreferrer">
+                                  Abrir PDF
+                                </a>
+                              </div>
+                            ) : !evidenceLoadErrors[`${request.id}-${idx}`] ? (
+                              <img
+                                src={getAssetUrl(url)}
+                                alt="evidencia"
+                                className={styles.mediaImg}
+                                style={{ width: "100%", maxHeight: 220, objectFit: "contain", background: "var(--surface-light)" }}
+                                onError={() => setEvidenceLoadErrors((prev) => ({ ...prev, [`${request.id}-${idx}`]: true }))}
+                              />
                             ) : (
-                              <img src={getAssetUrl(url)} alt="evidencia" className={styles.mediaImg} />
+                              <div className={`card ${styles.cardSoft}`} style={{ minHeight: 120, display: "grid", placeItems: "center", padding: 10 }}>
+                                <a className="button-secondary" href={getAssetUrl(url)} target="_blank" rel="noreferrer">
+                                  Abrir archivo
+                                </a>
+                              </div>
                             )}
                           </div>
                         ))}
@@ -1352,8 +1577,10 @@ export default function ClientTicketsPage() {
               </div>
             </div>
           )}
+          {isMobile && <div className={styles.mobileBottomSpacer} aria-hidden="true" />}
         </div>
       </main>
+      {isMobile && <BottomNav items={clientBottomNavItems} />}
       {showReportModal && reportPdfUrl && (
         <div
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}

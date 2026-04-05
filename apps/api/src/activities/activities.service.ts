@@ -187,9 +187,103 @@ export class ActivitiesService {
   async generateTicketReport(activityId: number) {
     const activity = await this.prisma['activity'].findUnique({
       where: { id: activityId },
-      include: { client: true, responsable: true, serviceSheet: true, evidencias: true },
+      include: {
+        client: true,
+        responsable: true,
+        serviceSheet: true,
+        evidencias: true,
+        activityEvidence: true,
+        inventorySnapshot: {
+          include: {
+            items: {
+              orderBy: [{ groupName: 'asc' }, { sortOrder: 'asc' }, { id: 'asc' }],
+            },
+          },
+        },
+      },
     });
     if (!activity) return null;
+
+    const normalizeReportUploadUrl = (value?: string | null) => {
+      if (!value) return '';
+      const raw = value.trim();
+      if (!raw) return '';
+      if (/^https?:\/\//i.test(raw)) {
+        try {
+          const parsed = new URL(raw);
+          return parsed.pathname || '';
+        } catch {
+          return raw;
+        }
+      }
+
+      const normalized = raw
+        .replace(/\\+/g, '/')
+        .replace(/^\/api(?=\/uploads\/)/i, '')
+        .replace(/^\/?uploads\//i, '')
+        .replace(/^\/?activities\//i, 'activities/')
+        .replace(/^\/+/, '');
+
+      if (!normalized) return '';
+      return `/uploads/${normalized}`.replace(/\/uploads\/+/, '/uploads/');
+    };
+
+    const flowEvidence = activity.activityEvidence;
+    const flowItems = [
+      flowEvidence?.entryPhotoUrl
+        ? {
+            archivoUrl: normalizeReportUploadUrl(flowEvidence.entryPhotoUrl),
+            tipoEvidencia: 'Foto llegada',
+            latitud: flowEvidence.entryLatitude == null ? null : Number(flowEvidence.entryLatitude),
+            longitud: flowEvidence.entryLongitude == null ? null : Number(flowEvidence.entryLongitude),
+          }
+        : null,
+      ...((flowEvidence?.evidencePhotos || []).map((url, index) => ({
+        archivoUrl: normalizeReportUploadUrl(url),
+        tipoEvidencia: `Evidencia ${index + 1}`,
+        latitud: null,
+        longitud: null,
+      }))),
+      flowEvidence?.serviceSheetPdfUrl
+        ? {
+            archivoUrl: normalizeReportUploadUrl(flowEvidence.serviceSheetPdfUrl),
+            tipoEvidencia: 'PDF hoja de servicio',
+            latitud: null,
+            longitud: null,
+          }
+        : null,
+      flowEvidence?.exitPhotoUrl
+        ? {
+            archivoUrl: normalizeReportUploadUrl(flowEvidence.exitPhotoUrl),
+            tipoEvidencia: 'Foto salida',
+            latitud: flowEvidence.exitLatitude == null ? null : Number(flowEvidence.exitLatitude),
+            longitud: flowEvidence.exitLongitude == null ? null : Number(flowEvidence.exitLongitude),
+          }
+        : null,
+    ].filter((item): item is { archivoUrl: string; tipoEvidencia: string; latitud: number | null; longitud: number | null } => {
+      return Boolean(item && item.archivoUrl);
+    });
+
+    const legacyItems = (activity.evidencias || []).map((evidence) => ({
+      archivoUrl: normalizeReportUploadUrl(evidence.archivoUrl),
+      tipoEvidencia: evidence.tipoEvidencia,
+      latitud: evidence.latitud === null || evidence.latitud === undefined ? null : Number(evidence.latitud),
+      longitud: evidence.longitud === null || evidence.longitud === undefined ? null : Number(evidence.longitud),
+    })).filter((item) => Boolean(item.archivoUrl));
+
+    const dedupeEvidences = (
+      items: Array<{ archivoUrl: string; tipoEvidencia: string; latitud: number | null; longitud: number | null }>,
+    ) => {
+      const seen = new Set<string>();
+      return items.filter((item) => {
+        const key = item.archivoUrl.trim().toLowerCase();
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    };
+
+    const mergedEvidences = dedupeEvidences([...flowItems, ...legacyItems]);
 
     const pdf = await generateTicketReportPdf({
       anNumber: activity.anNumber,
@@ -202,6 +296,7 @@ export class ActivitiesService {
       branchCity: activity.branchCity,
       branchState: activity.branchState,
       branchAddress: activity.branchAddress,
+      workType: activity.workType,
       ticketType: activity.ticketType,
       prioridad: activity.prioridad,
       dueAt: activity.fechaEntregaEsperada,
@@ -211,12 +306,28 @@ export class ActivitiesService {
       managerName: activity.serviceSheet?.managerName || null,
       workSummary: activity.serviceSheet?.workSummary || null,
       observations: activity.serviceSheet?.observations || null,
-      evidences: (activity.evidencias || []).map((evidence) => ({
-        archivoUrl: evidence.archivoUrl,
-        tipoEvidencia: evidence.tipoEvidencia,
-        latitud: evidence.latitud === null || evidence.latitud === undefined ? null : Number(evidence.latitud),
-        longitud: evidence.longitud === null || evidence.longitud === undefined ? null : Number(evidence.longitud),
-      })),
+      inventorySnapshot: activity.inventorySnapshot
+        ? {
+            status: activity.inventorySnapshot.status,
+            previousCount: activity.inventorySnapshot.previousCount,
+            currentCount: activity.inventorySnapshot.currentCount,
+            deltaCount: activity.inventorySnapshot.deltaCount,
+            completedAt: activity.inventorySnapshot.completedAt,
+            items: (activity.inventorySnapshot.items || []).map((item) => ({
+              groupName: item.groupName,
+              sectionName: item.sectionName,
+              equipmentName: item.equipmentName,
+              serialBefore: item.serialBefore,
+              serialAfter: item.serialAfter,
+              modelBefore: item.modelBefore,
+              modelAfter: item.modelAfter,
+              itemStatus: item.itemStatus,
+              compareState: item.compareState,
+              maintenanceComments: item.maintenanceComments,
+            })),
+          }
+        : null,
+      evidences: mergedEvidences,
     });
 
     const dir = path.resolve(process.cwd(), 'uploads', 'ticket-reports');

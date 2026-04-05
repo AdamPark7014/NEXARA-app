@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import EvidenceReviewModal from './EvidenceReviewModal';
@@ -26,6 +26,7 @@ interface Activity {
   fechaMaxima?: string;
   fechaEntregaEsperada?: string;
   creador?: { nombre: string };
+  responsable?: { nombre: string };
   activityEvidence?: {
     id: number;
     status: string;
@@ -46,6 +47,7 @@ const MyActivitiesTable: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [reviewModal, setReviewModal] = useState<{ activityId: number; activityNumber: string } | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [activitySearch, setActivitySearch] = useState('');
   const MOBILE_BREAKPOINT = 1024;
 
   const isAdmin = user?.permissions?.includes('CONSOLE_ADMIN') || false;
@@ -148,6 +150,36 @@ const MyActivitiesTable: React.FC = () => {
     return statusMap[status] || status;
   };
 
+  const normalizeText = (value?: string | null) => (value || '').toLowerCase().trim();
+
+  const smartTokenMatch = (needle: string, chunks: Array<string | null | undefined>) => {
+    const tokens = normalizeText(needle).split(/\s+/).filter(Boolean);
+    if (!tokens.length) return true;
+    const haystack = chunks.map((chunk) => normalizeText(chunk)).filter(Boolean).join(' ');
+    return tokens.every((token) => haystack.includes(token));
+  };
+
+  const filteredActivities = useMemo(
+    () =>
+      activities.filter((activity) =>
+        smartTokenMatch(activitySearch, [
+          activity.anNumber,
+          activity.titulo,
+          activity.descripcion,
+          activity.indicaciones,
+          activity.client?.name,
+          activity.branchName,
+          activity.branchCity,
+          activity.branchState,
+          activity.branchAddress,
+          activity.responsable?.nombre,
+          activity.ticketType,
+          activity.prioridad,
+        ]),
+      ),
+    [activities, activitySearch],
+  );
+
   const getReviewStatusColor = (evidence: Activity['activityEvidence']) => {
     if (!evidence) return { bg: '#fef', color: '#f90' };
     
@@ -196,6 +228,15 @@ const MyActivitiesTable: React.FC = () => {
     <>
       <div className="card">
         <h2 className={styles.title}>Mis Actividades</h2>
+        <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
+          <input
+            className="input"
+            placeholder="Buscar por actividad, AN, sucursal o cliente"
+            value={activitySearch}
+            onChange={(event) => setActivitySearch(event.target.value)}
+          />
+          <div className={styles.mutedSmall}>Total visibles: {filteredActivities.length}</div>
+        </div>
         
         {/* Vista Desktop - Tabla */}
         {!isMobile && (
@@ -221,7 +262,7 @@ const MyActivitiesTable: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {activities.map((a) => {
+                {filteredActivities.map((a) => {
                   const colors = getReviewStatusColor(a.activityEvidence);
                   const canReview = isAdmin && a.activityEvidence?.status === 'COMPLETED' && a.activityEvidence?.reviewStatus === 'PENDING';
                   const needsCorrection = !isAdmin && a.activityEvidence?.reviewStatus === 'REJECTED';
@@ -306,12 +347,12 @@ const MyActivitiesTable: React.FC = () => {
         {/* Vista Móvil - Cards */}
         {isMobile && (
           <div className={styles.mobileList}>
-            {activities.length === 0 ? (
+            {filteredActivities.length === 0 ? (
               <div className={styles.mobileEmpty}>
-                No tienes actividades asignadas
+                No hay actividades que coincidan con tu búsqueda
               </div>
             ) : (
-              activities.map((a) => {
+              filteredActivities.map((a) => {
                 const colors = getReviewStatusColor(a.activityEvidence);
                 const canReview = isAdmin && a.activityEvidence?.status === 'COMPLETED' && a.activityEvidence?.reviewStatus === 'PENDING';
                 const needsCorrection = !isAdmin && a.activityEvidence?.reviewStatus === 'REJECTED';
