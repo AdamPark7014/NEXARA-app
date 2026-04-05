@@ -4,7 +4,7 @@ import UserForm from "./UserForm";
 import Image from "next/image";
 import { useUser } from '@/components/UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
-import { getApiAssetOrigin } from '@/lib/api-base';
+import { resolveUserAvatarUrl } from '@/lib/user-avatar';
 
 let API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 // Normaliza la URL base para evitar dobles / o .
@@ -126,6 +126,7 @@ export default function ListUsers() {
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileReviewNote, setProfileReviewNote] = useState('');
   const [docReviewNotes, setDocReviewNotes] = useState<Record<number, string>>({});
+  const [brokenAvatarIds, setBrokenAvatarIds] = useState<Record<number, boolean>>({});
   const { user } = useUser();
 
   const normalizeDocumentKey = (raw: string) => {
@@ -137,26 +138,7 @@ export default function ListUsers() {
     return baseKey;
   };
 
-  const API_ASSET_ORIGIN = getApiAssetOrigin();
-  const getAssetUrl = (url?: string | null) => {
-    if (!url) return '';
-    const value = String(url).trim().replace(/\\/g, '/');
-    if (/^(data:|blob:|\/\/)/i.test(value)) return value;
-    if (/^https?:\/\//i.test(value)) {
-      try {
-        const parsed = new URL(value);
-        const normalizedPath = parsed.pathname.replace(/^\/api(?=\/uploads\/)/i, '');
-        if (normalizedPath.startsWith('/uploads/')) {
-          return `${API_ASSET_ORIGIN}${normalizedPath}${parsed.search}`;
-        }
-      } catch {
-        // Keep original URL if parsing fails.
-      }
-      return value;
-    }
-    const normalizedPath = (value.startsWith('/') ? value : `/${value}`).replace(/^\/api(?=\/uploads\/)/i, '');
-    return `${API_ASSET_ORIGIN}${normalizedPath}`;
-  };
+  const getAssetUrl = (url?: string | null) => resolveUserAvatarUrl(url);
 
   const getDocExtension = (url: string) => {
     const clean = url.split('?')[0].split('#')[0];
@@ -190,6 +172,7 @@ export default function ListUsers() {
               return email !== 'gerencia@nexara.com.mx' && email !== 'developer@nexara.com.mx';
             });
         setUsers(filtered);
+        setBrokenAvatarIds({});
         setLoading(false);
       })
       .catch(() => {
@@ -375,8 +358,8 @@ export default function ListUsers() {
             {users.map((u) => (
               <tr key={u.id}>
                 <td data-label="Foto">
-                  {u.avatarUrl ? (
-                    <Image src={getAssetUrl(u.avatarUrl)} alt={u.nombre} width={48} height={48} className="avatarImg" unoptimized />
+                  {u.avatarUrl && !brokenAvatarIds[u.id] ? (
+                    <Image src={getAssetUrl(u.avatarUrl)} alt={u.nombre} width={48} height={48} className="avatarImg" unoptimized onError={() => setBrokenAvatarIds((prev) => ({ ...prev, [u.id]: true }))} />
                   ) : (
                     <span className="avatarFallback">{u.nombre[0]}</span>
                   )}
@@ -457,8 +440,8 @@ export default function ListUsers() {
           <div className="profileModal">
             <button onClick={() => setProfileModalOpen(false)} className="profileModalClose" aria-label="Cerrar">✕</button>
             <div className="profileModalHeader">
-              {profileUser?.avatarUrl ? (
-                <Image src={getAssetUrl(profileUser.avatarUrl)} alt={profileUser.nombre} width={56} height={56} style={{ borderRadius: '50%', objectFit: 'cover' }} unoptimized />
+              {profileUser?.avatarUrl && !brokenAvatarIds[profileUser.id] ? (
+                <Image src={getAssetUrl(profileUser.avatarUrl)} alt={profileUser.nombre} width={56} height={56} style={{ borderRadius: '50%', objectFit: 'cover' }} unoptimized onError={() => setBrokenAvatarIds((prev) => ({ ...prev, [profileUser.id]: true }))} />
               ) : (
                 <div className="profileAvatarFallback">
                   {profileUser?.nombre?.[0] || 'U'}

@@ -9,7 +9,7 @@ import Image from "next/image";
 import { useUser } from '@/components/UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import { createUser } from "./api";
-import { getApiAssetOrigin } from '@/lib/api-base';
+import { appendAvatarToFormData, resolveUserAvatarUrl } from '@/lib/user-avatar';
 
 
 // Extiende el tipo de initialUser para que su role incluya los campos de acceso
@@ -92,28 +92,8 @@ export default function UserForm({
   let API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
   API_URL = API_URL.replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
-  const API_ASSET_ORIGIN = getApiAssetOrigin();
   
-  // Helper para obtener la ruta del avatar
-  const getFullImageUrl = (url: string | undefined) => {
-    if (!url) return '';
-    const value = String(url).trim().replace(/\\/g, '/');
-    if (/^(data:|blob:|\/\/)/i.test(value)) return value;
-    if (/^https?:\/\//i.test(value)) {
-      try {
-        const parsed = new URL(value);
-        const normalizedPath = parsed.pathname.replace(/^\/api(?=\/uploads\/)/i, '');
-        if (normalizedPath.startsWith('/uploads/')) {
-          return `${API_ASSET_ORIGIN}${normalizedPath}${parsed.search}`;
-        }
-      } catch {
-        // Keep original URL if parsing fails.
-      }
-      return value;
-    }
-    const normalizedPath = (value.startsWith('/') ? value : `/${value}`).replace(/^\/api(?=\/uploads\/)/i, '');
-    return `${API_ASSET_ORIGIN}${normalizedPath}`;
-  };
+  const getFullImageUrl = (url: string | undefined) => resolveUserAvatarUrl(url);
 
   const prefillName = searchParams.get('prefillName') || '';
   const prefillEmail = searchParams.get('prefillEmail') || '';
@@ -139,6 +119,7 @@ export default function UserForm({
     accesoCotizaciones: initialUser?.role?.accesoCotizaciones || false,
   });
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarRemoved, setAvatarRemoved] = useState(false);
 
   // ...existing code...
 
@@ -345,6 +326,7 @@ export default function UserForm({
     if (!cropImage || !croppedAreaPixels) return;
     const cropped = await getCroppedImg(cropImage, croppedAreaPixels);
     setAvatarFile(cropped.file);
+    setAvatarRemoved(false);
     setPreview(cropped.url);
     setCropModal(false);
   };
@@ -491,9 +473,7 @@ export default function UserForm({
       data.append("roleId", String(roleId));
       const resolvedDepartment = (form.departmentId || "").trim() || (form.department || "").trim();
       data.append("departmentId", resolvedDepartment);
-      if (avatarFile) {
-        data.append("avatar", avatarFile);
-      }
+      appendAvatarToFormData(data, avatarFile, avatarRemoved);
       if (isEdit && initialUser?.id) {
         if (onUserUpdated) await onUserUpdated(data, initialUser.id);
       } else {
@@ -520,6 +500,7 @@ export default function UserForm({
         });
         setEmailManuallyEdited(false);
         setAvatarFile(null);
+        setAvatarRemoved(false);
         setPreview("");
         await loadNextEmployeeNumber();
       }
@@ -630,7 +611,7 @@ export default function UserForm({
           )}
         </div>
         {preview && (
-          <button type="button" className="ghostButton" onClick={() => { setAvatarFile(null); setPreview(""); }}>
+          <button type="button" className="ghostButton" onClick={() => { setAvatarFile(null); setAvatarRemoved(true); setPreview(""); }}>
             Quitar foto
           </button>
         )}
