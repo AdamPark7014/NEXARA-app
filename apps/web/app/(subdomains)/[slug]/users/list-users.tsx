@@ -366,11 +366,17 @@ export default function ListUsers() {
               <tr key={u.id}>
                 <td data-label="Foto">
                   {u.avatarUrl && !brokenAvatarIds[u.id] ? (
-                    <Image src={getAssetUrl(u.avatarUrl)} alt={u.nombre} width={40} height={40} style={{ borderRadius: "50%", objectFit: "cover" }} unoptimized onError={() => setBrokenAvatarIds((prev) => ({ ...prev, [u.id]: true }))} />
-                  ) : (
-                    <span style={{ width: 40, height: 40, display: "inline-block", borderRadius: "50%", background: "var(--muted)", textAlign: "center", lineHeight: "40px", color: "var(--primary)", fontWeight: 700 }}>
-                      {u.nombre[0]}
+                    <span className="avatarFrame avatarFrameSm">
+                      <img
+                        src={getAssetUrl(u.avatarUrl)}
+                        alt={u.nombre}
+                        className="avatarImg"
+                        loading="lazy"
+                        onError={() => setBrokenAvatarIds((prev) => ({ ...prev, [u.id]: true }))}
+                      />
                     </span>
+                  ) : (
+                    <span className="avatarFallback avatarFallbackSm">{u.nombre[0]}</span>
                   )}
                 </td>
                 <td data-label="Nombre">
@@ -443,7 +449,15 @@ export default function ListUsers() {
             <button onClick={() => setProfileModalOpen(false)} className="profileModalClose" aria-label="Cerrar">✕</button>
             <div className="profileModalHeader">
               {profileUser?.avatarUrl && !brokenAvatarIds[profileUser.id] ? (
-                <Image src={getAssetUrl(profileUser.avatarUrl)} alt={profileUser.nombre} width={56} height={56} style={{ borderRadius: '50%', objectFit: 'cover' }} unoptimized onError={() => setBrokenAvatarIds((prev) => ({ ...prev, [profileUser.id]: true }))} />
+                <span className="avatarFrame avatarFrameLg">
+                  <img
+                    src={getAssetUrl(profileUser.avatarUrl)}
+                    alt={profileUser.nombre}
+                    className="avatarImg"
+                    loading="lazy"
+                    onError={() => setBrokenAvatarIds((prev) => ({ ...prev, [profileUser.id]: true }))}
+                  />
+                </span>
               ) : (
                 <div className="profileAvatarFallback">
                   {profileUser?.nombre?.[0] || 'U'}
@@ -671,6 +685,53 @@ export default function ListUsers() {
         .tableActionsCell {
           text-align: left;
           white-space: nowrap;
+        }
+
+        .avatarFrame {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          overflow: hidden;
+          background: color-mix(in srgb, var(--surface-2) 84%, transparent);
+          border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16);
+          flex-shrink: 0;
+        }
+
+        .avatarFrameSm {
+          width: 40px;
+          height: 40px;
+        }
+
+        .avatarFrameLg {
+          width: 56px;
+          height: 56px;
+        }
+
+        .avatarImg {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+
+        .avatarFallback {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          background: color-mix(in srgb, var(--primary) 20%, var(--surface));
+          border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--border));
+          color: var(--primary);
+          font-weight: 700;
+          flex-shrink: 0;
+        }
+
+        .avatarFallbackSm {
+          width: 40px;
+          height: 40px;
+          font-size: 1rem;
         }
 
         .tableActionsCell .tableAction + .tableAction {

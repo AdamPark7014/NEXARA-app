@@ -1,7 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import UserForm from "./UserForm";
-import Image from "next/image";
 import { useUser } from '@/components/UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import { resolveUserAvatarUrl } from '@/lib/user-avatar';
@@ -359,7 +358,15 @@ export default function ListUsers() {
               <tr key={u.id}>
                 <td data-label="Foto">
                   {u.avatarUrl && !brokenAvatarIds[u.id] ? (
-                    <Image src={getAssetUrl(u.avatarUrl)} alt={u.nombre} width={48} height={48} className="avatarImg" unoptimized onError={() => setBrokenAvatarIds((prev) => ({ ...prev, [u.id]: true }))} />
+                    <span className="avatarFrame avatarFrameMd">
+                      <img
+                        src={getAssetUrl(u.avatarUrl)}
+                        alt={u.nombre}
+                        className="avatarImg"
+                        loading="lazy"
+                        onError={() => setBrokenAvatarIds((prev) => ({ ...prev, [u.id]: true }))}
+                      />
+                    </span>
                   ) : (
                     <span className="avatarFallback">{u.nombre[0]}</span>
                   )}
@@ -441,7 +448,15 @@ export default function ListUsers() {
             <button onClick={() => setProfileModalOpen(false)} className="profileModalClose" aria-label="Cerrar">✕</button>
             <div className="profileModalHeader">
               {profileUser?.avatarUrl && !brokenAvatarIds[profileUser.id] ? (
-                <Image src={getAssetUrl(profileUser.avatarUrl)} alt={profileUser.nombre} width={56} height={56} style={{ borderRadius: '50%', objectFit: 'cover' }} unoptimized onError={() => setBrokenAvatarIds((prev) => ({ ...prev, [profileUser.id]: true }))} />
+                <span className="avatarFrame avatarFrameLg">
+                  <img
+                    src={getAssetUrl(profileUser.avatarUrl)}
+                    alt={profileUser.nombre}
+                    className="avatarImg"
+                    loading="lazy"
+                    onError={() => setBrokenAvatarIds((prev) => ({ ...prev, [profileUser.id]: true }))}
+                  />
+                </span>
               ) : (
                 <div className="profileAvatarFallback">
                   {profileUser?.nombre?.[0] || 'U'}
@@ -781,11 +796,32 @@ export default function ListUsers() {
           color: var(--primary);
         }
 
-        .avatarImg {
+        .avatarFrame {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           border-radius: 50%;
-          object-fit: cover;
+          overflow: hidden;
+          background: color-mix(in srgb, var(--surface-2) 84%, transparent);
           border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
           box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16);
+          flex-shrink: 0;
+        }
+
+        .avatarFrameMd {
+          width: 48px;
+          height: 48px;
+        }
+
+        .avatarFrameLg {
+          width: 56px;
+          height: 56px;
+        }
+
+        .avatarImg {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
           display: block;
         }
 
