@@ -139,10 +139,8 @@ export const getApiAssetOrigin = () => {
   const envAssetOrigin = process.env.NEXT_PUBLIC_API_ASSET_ORIGIN;
   const envBase = process.env.NEXT_PUBLIC_API_URL;
 
-  if (envAssetOrigin && envAssetOrigin.trim()) {
-    return envAssetOrigin.trim().replace(/\/+$/, '');
-  }
-
+  // Browser-based detection takes priority for nexara.com.mx subdomains and direct-IP
+  // dev mode, so that a stale/HTTP env var never causes mixed-content failures on HTTPS.
   if (typeof window !== "undefined" && window.location?.origin) {
     const protocol = window.location.protocol;
     const host = window.location.hostname.toLowerCase();
@@ -153,8 +151,22 @@ export const getApiAssetOrigin = () => {
     }
 
     if (host === 'nexara.com.mx' || host === 'www.nexara.com.mx' || host === 'app.nexara.com.mx' || host.endsWith('.nexara.com.mx')) {
-      return `${protocol}//api.nexara.com.mx`;
+      // Always use HTTPS for production nexara subdomains, regardless of env vars.
+      return `https://api.nexara.com.mx`;
     }
+  }
+
+  if (envAssetOrigin && envAssetOrigin.trim()) {
+    let origin = envAssetOrigin.trim().replace(/\/+$/, '');
+    // Upgrade HTTP→HTTPS when the page is served over HTTPS to avoid mixed content.
+    if (
+      typeof window !== "undefined" &&
+      window.location?.protocol === 'https:' &&
+      origin.startsWith('http://')
+    ) {
+      origin = origin.replace(/^http:\/\//i, 'https://');
+    }
+    return origin;
   }
 
   if (envBase && envBase.trim()) {

@@ -10,6 +10,7 @@ import { useUser } from '@/components/UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import { createUser } from "./api";
 import { appendAvatarToFormData, resolveUserAvatarUrl } from '@/lib/user-avatar';
+import { buildApiUrl } from '@/lib/api-base';
 
 
 // Extiende el tipo de initialUser para que su role incluya los campos de acceso
@@ -143,9 +144,6 @@ export default function UserForm({
 }) {
   const { user } = useUser();
   const searchParams = useSearchParams();
-  let API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-  API_URL = API_URL.replace(/[\/.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
   
   const getFullImageUrl = (url: string | undefined) => resolveUserAvatarUrl(url);
 
