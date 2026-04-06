@@ -92,8 +92,10 @@ export const getApiAssetOrigin = () => {
       host === "app.nexara.com.mx" ||
       host.endsWith(".nexara.com.mx")
     ) {
-      // Always use HTTPS for production nexara subdomains, regardless of env vars.
-      return `https://api.nexara.com.mx`;
+      // Return same page origin so Next.js can proxy /uploads internally.
+      // api.nexara.com.mx is not a real subdomain; API and uploads run behind
+      // the same reverse-proxy as the page (e.g. consola.nexara.com.mx).
+      return window.location.origin;
     }
   }
 
