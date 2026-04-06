@@ -42,6 +42,10 @@ export class CreateActivityDto {
   ticketType?: TicketType;
 
   @IsOptional()
+  @IsString()
+  ticketTypeCustom?: string;
+
+  @IsOptional()
   @IsEnum(ActivityWorkType)
   workType?: ActivityWorkType;
 

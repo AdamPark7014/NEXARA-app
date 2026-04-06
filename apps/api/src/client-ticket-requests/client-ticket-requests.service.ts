@@ -39,7 +39,10 @@ export class ClientTicketRequestsService {
     return this.prisma.$transaction(async (tx) => {
       await tx.activity.update({
         where: { id: activityId },
-        data: { workType },
+        data:
+          workType === 'PREVENTIVE_INVENTORY'
+            ? { workType, ticketType: 'PREVENTIVO', ticketTypeCustom: null }
+            : { workType },
       });
 
       const assigned = await tx.clientTicketRequest.update({

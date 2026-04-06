@@ -600,6 +600,7 @@ model Activity {
   prioridad               String?                 @db.VarChar(20)
   activityType            ActivityType?           @default(CLIENT)
   ticketType              TicketType?             @default(PREVENTIVO)
+  ticketTypeCustom        String?                 @db.VarChar(120)
   workType                ActivityWorkType        @default(ISSUE)
   projectId               Int?
   clientId                Int?

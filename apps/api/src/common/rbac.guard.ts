@@ -22,23 +22,38 @@ export class RbacGuard extends AuthGuard('jwt') {
     const rbac: RbacOptions = this.reflector.get<RbacOptions>('rbac', context.getHandler()) || {};
     const user = request.user;
     if (!user) throw new ForbiddenException('No user in request');
+    const permissions: string[] = user.permissions || [];
+    const isConsoleAdmin = Boolean(
+      user.admin ||
+      user.roleFlags?.accesoConsoleAdmin ||
+      permissions.includes(PERMISSIONS.CONSOLE_ADMIN),
+    );
+    const isSalesUser = Boolean(
+      user.vendedor ||
+      user.roleFlags?.accesoPanelVentas ||
+      permissions.includes(PERMISSIONS.PANEL_VENTAS),
+    );
+    const isConsoleUser = Boolean(
+      user.ingeniero ||
+      user.roleFlags?.accesoConsole ||
+      permissions.includes(PERMISSIONS.CONSOLE_ACCESS),
+    );
     // Superadmin acceso total
     if (user.superadmin || user.isSuperAdmin) return true;
 
     // Lógica de exclusión por rol principal
     if (rbac.permissions || rbac.anyPermissions) {
       // Si el endpoint requiere permisos de admin, ingeniero o vendedor, validar el rol principal
-      if (rbac.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) && !user.admin) {
+      if (rbac.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) && !isConsoleAdmin) {
         throw new ForbiddenException('Solo administradores pueden acceder');
       }
-      if (rbac.permissions?.includes(PERMISSIONS.PANEL_VENTAS) && !user.vendedor) {
+      if (rbac.permissions?.includes(PERMISSIONS.PANEL_VENTAS) && !isSalesUser) {
         throw new ForbiddenException('Solo vendedores pueden acceder');
       }
-      if (rbac.permissions?.includes(PERMISSIONS.CONSOLE_ACCESS) && !user.ingeniero) {
+      if (rbac.permissions?.includes(PERMISSIONS.CONSOLE_ACCESS) && !isConsoleUser) {
         throw new ForbiddenException('Solo ingenieros pueden acceder');
       }
     }
-    const permissions: string[] = user.permissions || [];
     if (rbac.permissions && rbac.permissions.length > 0) {
       const hasAll = rbac.permissions.every((permission) => permissions.includes(permission));
       if (!hasAll) throw new ForbiddenException('No tienes permisos para esta acción');

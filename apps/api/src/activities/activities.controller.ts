@@ -134,7 +134,15 @@ export class ActivitiesController {
   @Get()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_VIEW] })
-  async findAll(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
+  async findAll(
+    @CurrentUser() user: any,
+    @Query() query: PaginationQueryDto,
+    @Query('scope') scope?: string,
+  ) {
+    if (scope === 'mine') {
+      return this.activitiesService.findByResponsible(user.id);
+    }
+
     if (user.isSuperAdmin) {
       return this.activitiesService.findAll(query);
     } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {

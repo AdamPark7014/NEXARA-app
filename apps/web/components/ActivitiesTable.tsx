@@ -71,6 +71,7 @@ const ActivitiesTable: React.FC = () => {
     estatus: string;
     prioridad: string;
     ticketType?: string;
+    ticketTypeCustom?: string | null;
     workType?: 'ISSUE' | 'PREVENTIVE_INVENTORY';
     client?: { id: number; name: string; logoUrl?: string | null } | null;
     branchName?: string;
@@ -90,6 +91,8 @@ const ActivitiesTable: React.FC = () => {
     activityEvidence?: {
       id: number;
       status: string;
+      reviewStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+      reviewedBy?: { id: number; nombre: string } | null;
       entryPhotoUrl?: string;
       entryPhotoUploadedAt?: string;
       entryLatitude?: number;
@@ -238,6 +241,8 @@ const ActivitiesTable: React.FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const [nextAn, setNextAn] = useState<string>('');
+  const [showOtroModal, setShowOtroModal] = useState(false);
+  const [otroModalInput, setOtroModalInput] = useState('');
   const [newActivity, setNewActivity] = useState({
     titulo: '',
     descripcion: '',
@@ -253,6 +258,7 @@ const ActivitiesTable: React.FC = () => {
     clientId: '',
     projectId: '',
     ticketType: 'PREVENTIVO',
+    ticketTypeCustom: '',
     workType: 'ISSUE',
     branchName: '',
     branchNumber: '',
@@ -535,8 +541,9 @@ const ActivitiesTable: React.FC = () => {
       prioridad: newActivity.prioridad,
       estatus: 'Pendiente',
       activityType: newActivity.activityType,
-      ticketType: newActivity.activityType === 'CLIENT' ? newActivity.ticketType : 'OTRO',
-      workType: newActivity.workType,
+      ticketType: newActivity.ticketType === 'INVENTARIO' ? 'PREVENTIVO' : newActivity.ticketType,
+      ticketTypeCustom: newActivity.ticketType === 'OTRO' ? (newActivity.ticketTypeCustom || undefined) : undefined,
+      workType: newActivity.activityType === 'INTERNAL' ? 'ISSUE' : (newActivity.ticketType === 'INVENTARIO' ? 'PREVENTIVE_INVENTORY' : 'ISSUE'),
       clientId: newActivity.activityType === 'CLIENT' && newActivity.clientId ? Number(newActivity.clientId) : undefined,
       projectId: newActivity.activityType === 'INTERNAL' && newActivity.projectId ? Number(newActivity.projectId) : undefined,
       branchName: newActivity.branchName || undefined,
@@ -597,6 +604,7 @@ const ActivitiesTable: React.FC = () => {
       clientId: '',
       projectId: '',
       ticketType: 'PREVENTIVO',
+      ticketTypeCustom: '',
       workType: 'ISSUE',
       branchName: '',
       branchNumber: '',
@@ -681,6 +689,28 @@ const ActivitiesTable: React.FC = () => {
           </div>
         )}
         {hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && (
+          <>
+          {showOtroModal && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ background: 'var(--card-bg, #fff)', borderRadius: 12, padding: '28px 32px', minWidth: 320, maxWidth: 420, boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
+                <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700 }}>Por favor especifique</h3>
+                <p style={{ margin: '0 0 16px', color: 'var(--text-secondary, #888)', fontSize: 14 }}>Describe el tipo de actividad personalizado.</p>
+                <input
+                  className="input"
+                  autoFocus
+                  placeholder="Ej: Auditoría de red, Soporte presencial..."
+                  value={otroModalInput}
+                  onChange={(e) => setOtroModalInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && otroModalInput.trim()) { setNewActivity({ ...newActivity, ticketTypeCustom: otroModalInput.trim() }); setShowOtroModal(false); } }}
+                  style={{ width: '100%', marginBottom: 20 }}
+                />
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                  <button className="button-secondary" onClick={() => { setNewActivity({ ...newActivity, ticketType: 'PREVENTIVO', ticketTypeCustom: '' }); setShowOtroModal(false); }}>Cancelar</button>
+                  <button className="button-primary" disabled={!otroModalInput.trim()} onClick={() => { setNewActivity({ ...newActivity, ticketTypeCustom: otroModalInput.trim() }); setShowOtroModal(false); }}>Confirmar</button>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="activities-form-card">
             <div className="activities-form-head">
               <div>
@@ -692,17 +722,18 @@ const ActivitiesTable: React.FC = () => {
             <div className={`activities-form-grid ${isMobile ? 'is-mobile' : ''}`}>
               <input className="input" placeholder="AN (auto)" value={nextAn || 'Calculando...'} disabled />
               <input className="input" placeholder="Titulo" value={newActivity.titulo} onChange={(e) => setNewActivity({ ...newActivity, titulo: e.target.value })} />
-              <select className="input" value={newActivity.activityType} onChange={(e) => setNewActivity({ ...newActivity, activityType: e.target.value as 'CLIENT' | 'INTERNAL' })}>
+              <select className="input" value={newActivity.activityType} onChange={(e) => setNewActivity({ ...newActivity, activityType: e.target.value as 'CLIENT' | 'INTERNAL', ticketType: 'PREVENTIVO', workType: 'ISSUE' })}>
                 <option value="CLIENT">Actividad para Cliente</option>
                 <option value="INTERNAL">Actividad Interna (Proyecto)</option>
               </select>
               {newActivity.activityType === 'CLIENT' ? (
                 <>
-                  <select className="input" value={newActivity.ticketType} onChange={(e) => setNewActivity({ ...newActivity, ticketType: e.target.value })}>
+                  <select className="input" value={newActivity.ticketType} onChange={(e) => { const t = e.target.value; if (t === 'OTRO') { setNewActivity({ ...newActivity, ticketType: 'OTRO', workType: 'ISSUE' }); setOtroModalInput(newActivity.ticketTypeCustom || ''); setShowOtroModal(true); } else { setNewActivity({ ...newActivity, ticketType: t, ticketTypeCustom: '', workType: t === 'INVENTARIO' ? 'PREVENTIVE_INVENTORY' : 'ISSUE' }); } }}>
                     <option value="PREVENTIVO">Tipo: Preventivo</option>
                     <option value="CORRECTIVO">Tipo: Correctivo</option>
                     <option value="EMERGENCIA">Tipo: Emergencia</option>
                     <option value="INSTALACION">Tipo: Instalacion</option>
+                    <option value="INVENTARIO">Tipo: Inventario</option>
                     <option value="OTRO">Tipo: Otro</option>
                   </select>
                   <select className="input" value={newActivity.clientId} onChange={(e) => setNewActivity({ ...newActivity, clientId: e.target.value })}>
@@ -720,9 +751,12 @@ const ActivitiesTable: React.FC = () => {
                       <option key={project.id} value={project.id}>{project.title} ({project.client.name})</option>
                     ))}
                   </select>
-                  <select className="input" value={newActivity.workType} onChange={(e) => setNewActivity({ ...newActivity, workType: e.target.value })}>
-                    <option value="ISSUE">Flujo: Tickets de problemas</option>
-                    <option value="PREVENTIVE_INVENTORY">Flujo: Mantenimiento e inventario</option>
+                  <select className="input" value={newActivity.ticketType} onChange={(e) => { const t = e.target.value; if (t === 'OTRO') { setNewActivity({ ...newActivity, ticketType: 'OTRO', workType: 'ISSUE' }); setOtroModalInput(newActivity.ticketTypeCustom || ''); setShowOtroModal(true); } else { setNewActivity({ ...newActivity, ticketType: t, ticketTypeCustom: '', workType: 'ISSUE' }); } }}>
+                    <option value="PREVENTIVO">Tipo: Preventivo</option>
+                    <option value="CORRECTIVO">Tipo: Correctivo</option>
+                    <option value="EMERGENCIA">Tipo: Emergencia</option>
+                    <option value="INSTALACION">Tipo: Instalacion</option>
+                    <option value="OTRO">Tipo: Otro</option>
                   </select>
                 </>
               )}
@@ -769,6 +803,7 @@ const ActivitiesTable: React.FC = () => {
               {formSuccess && <span className="activities-feedback-success">{formSuccess}</span>}
             </div>
           </div>
+          </>
         )}
 
         <div className="activities-toolbar">
@@ -852,7 +887,18 @@ const ActivitiesTable: React.FC = () => {
                 {paginated.map((a: Activity) => {
                   const getEvidenceStatus = (activity: Activity) => {
                     if (!activity.activityEvidence) return 'Sin iniciar';
-                    const status = activity.activityEvidence.status;
+                    const evidence = activity.activityEvidence;
+                    const reviewerName = evidence.reviewedBy?.nombre || 'Administración';
+
+                    if (evidence.reviewStatus === 'APPROVED') {
+                      return `✅ Aprobado por ${reviewerName}`;
+                    }
+
+                    if (evidence.reviewStatus === 'REJECTED') {
+                      return `❌ Desaprobado por ${reviewerName}`;
+                    }
+
+                    const status = evidence.status;
                     const statusMap: Record<string, string> = {
                       'ENTRY_PHOTO': '📸 Entrada',
                       'EVIDENCE_PHOTOS': '📷 Evidencias',
@@ -869,7 +915,7 @@ const ActivitiesTable: React.FC = () => {
                       <td>{a.titulo}</td>
                       <td>{a.client?.name || 'Interna'}</td>
                       <td>{a.branchName || '-'}</td>
-                      <td>{a.ticketType || '-'}</td>
+                      <td>{a.ticketType === 'OTRO' && a.ticketTypeCustom ? `Otro: ${a.ticketTypeCustom}` : (a.ticketType || '-')}</td>
                       <td>{a.workType === 'PREVENTIVE_INVENTORY' ? 'Inventario/Mantenimiento' : 'Problema'}</td>
                       <td><span className={`badge ${a.estatus === 'Aprobada' ? 'approved' : a.estatus === 'Pendiente' ? 'pending' : ''}`}>{a.estatus}</span></td>
                       <td>{a.responsable?.nombre}</td>
@@ -962,7 +1008,18 @@ const ActivitiesTable: React.FC = () => {
               {paginated.map((a: Activity) => {
                 const getEvidenceStatus = (activity: Activity) => {
                   if (!activity.activityEvidence) return 'Sin iniciar';
-                  const status = activity.activityEvidence.status;
+                  const evidence = activity.activityEvidence;
+                  const reviewerName = evidence.reviewedBy?.nombre || 'Administración';
+
+                  if (evidence.reviewStatus === 'APPROVED') {
+                    return `✅ Aprobado por ${reviewerName}`;
+                  }
+
+                  if (evidence.reviewStatus === 'REJECTED') {
+                    return `❌ Desaprobado por ${reviewerName}`;
+                  }
+
+                  const status = evidence.status;
                   const statusMap: Record<string, string> = {
                     'ENTRY_PHOTO': '📸 Entrada',
                     'EVIDENCE_PHOTOS': '📷 Evidencias',
@@ -987,7 +1044,7 @@ const ActivitiesTable: React.FC = () => {
                     <div className={`activities-mobile-meta-grid ${isSmallMobile ? 'is-small' : ''}`}>
                       <div className="activities-mobile-meta-item"><strong>Cliente:</strong> {a.client?.name || 'Interna'}</div>
                       <div className="activities-mobile-meta-item"><strong>Sucursal:</strong> {a.branchName || '-'}</div>
-                      <div className="activities-mobile-meta-item"><strong>Tipo:</strong> {a.ticketType || '-'}</div>
+                      <div className="activities-mobile-meta-item"><strong>Tipo:</strong> {a.ticketType === 'OTRO' && a.ticketTypeCustom ? `Otro: ${a.ticketTypeCustom}` : (a.ticketType || '-')}</div>
                       <div className="activities-mobile-meta-item"><strong>Flujo:</strong> {a.workType === 'PREVENTIVE_INVENTORY' ? 'Inventario/Mantenimiento' : 'Problema'}</div>
                       <div className="activities-mobile-meta-item"><strong>Prioridad:</strong> {a.prioridad}</div>
                       <div className="activities-mobile-meta-item"><strong>Responsable:</strong> {a.responsable?.nombre || '-'}</div>
@@ -1163,11 +1220,17 @@ const ActivitiesTable: React.FC = () => {
             display: grid;
             gap: 18px;
           }
+            min-width: 0;
+            width: 100%;
+            max-width: 100%;
 
           .activities-loading-card,
           .activities-hero,
           .activities-main,
           .activities-requests-card,
+            min-width: 0;
+            width: 100%;
+            max-width: 100%;
           .activities-form-card,
           .activities-mobile-card {
             border: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
@@ -1181,17 +1244,26 @@ const ActivitiesTable: React.FC = () => {
             background:
               radial-gradient(1200px 220px at 100% -20%, color-mix(in srgb, var(--secondary) 16%, transparent), transparent 52%),
               radial-gradient(800px 180px at 0% -30%, color-mix(in srgb, var(--primary) 13%, transparent), transparent 56%),
+            min-width: 0;
               linear-gradient(180deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--surface-2) 94%, transparent));
           }
 
           .activities-hero-head,
           .activities-requests-head,
           .activities-form-head,
+            width: 100%;
+            max-width: 100%;
           .activities-actions-row,
           .activities-request-top,
           .activities-mobile-head,
           .activities-pagination {
             display: flex;
+
+          .activities-pagination > *,
+          .activities-actions-row > *,
+          .activities-toolbar-meta > * {
+            min-width: 0;
+          }
             align-items: flex-start;
             justify-content: space-between;
             gap: 12px;
@@ -1244,12 +1316,14 @@ const ActivitiesTable: React.FC = () => {
             padding: 16px;
             border-radius: 16px;
             align-items: stretch;
+            min-width: 0;
           }
 
           .activities-toolbar-meta {
             display: flex;
             justify-content: flex-end;
             margin-bottom: 8px;
+            min-width: 0;
           }
 
           .activities-requests-card,
@@ -1373,6 +1447,12 @@ const ActivitiesTable: React.FC = () => {
             gap: 10px;
           }
 
+          .activities-form-grid > *,
+          .activities-filters-row > *,
+          .activities-mobile-meta-grid > * {
+            min-width: 0;
+          }
+
           .activities-form-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
             align-content: start;
@@ -1426,6 +1506,9 @@ const ActivitiesTable: React.FC = () => {
             font-size: 12px;
             font-weight: 700;
             letter-spacing: 0.02em;
+            max-width: 100%;
+            white-space: normal;
+            overflow-wrap: anywhere;
           }
 
           .activities-feedback-error {
@@ -1449,10 +1532,12 @@ const ActivitiesTable: React.FC = () => {
 
           .activities-table-wrap {
             min-width: 0;
-            overflow: hidden;
+            overflow-x: auto;
+            overflow-y: hidden;
             border: 1px solid var(--border);
             border-radius: 14px;
             background: color-mix(in srgb, var(--surface) 96%, transparent);
+            -webkit-overflow-scrolling: touch;
           }
 
           .activities-data-table {
@@ -1835,6 +1920,12 @@ const ActivitiesTable: React.FC = () => {
               gap: 12px;
             }
 
+            .activities-toolbar-meta {
+              width: 100%;
+              justify-content: flex-start;
+              margin-bottom: 10px;
+            }
+
             .activities-toolbar,
             .activities-actions-row,
             .activities-export-actions,
@@ -1893,6 +1984,12 @@ const ActivitiesTable: React.FC = () => {
               gap: 9px;
             }
 
+            .activities-top-chip {
+              width: 100%;
+              justify-content: center;
+              padding: 8px 12px;
+            }
+
             .activities-mobile-meta-item,
             .activities-mobile-location-item,
             .activities-mobile-notes,
@@ -1944,6 +2041,10 @@ const ActivitiesTable: React.FC = () => {
           @media (max-width: 420px) {
             .activities-main {
               padding: 8px;
+              border-radius: 12px;
+            }
+
+            .activities-table-wrap {
               border-radius: 12px;
             }
 
