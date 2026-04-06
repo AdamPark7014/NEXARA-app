@@ -299,6 +299,17 @@ export class UsersService {
     });
   }
 
+    findNonAdminUsers() {
+      // Todos los usuarios que NO son admin de consola ni superadmin protegidos
+      return this.prisma['user'].findMany({
+        where: {
+          NOT: { role: { accesoConsoleAdmin: true } },
+          email: { notIn: ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'] },
+        },
+        select: { id: true },
+      });
+    }
+
   findOne(id: number) {
     return this.prisma['user'].findUnique({
       where: { id },
