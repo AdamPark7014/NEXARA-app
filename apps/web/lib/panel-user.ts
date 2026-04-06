@@ -18,10 +18,22 @@ export const isSalesManagerUser = (user: PanelUser | null | undefined) => {
   return isPlatformAdmin(user);
 };
 
+const sanitizeRoleLabel = (value?: string | null) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+
+  // Legacy role names were persisted as "Rol · prefijoCorreo".
+  const withoutLegacySuffix = raw.split('·')[0]?.trim() || raw;
+
+  return withoutLegacySuffix
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
 export const getRoleLabel = (user: PanelUser | null | undefined) => {
   if (!user) return "Vendedor";
   if (user.isSuperAdmin) return "Superadmin";
-  const roleRaw = String(user.role || "").trim();
+  const roleRaw = sanitizeRoleLabel(user.role);
   const role = roleRaw.toLowerCase();
 
   // Vendedor se mantiene fijo por regla de negocio.

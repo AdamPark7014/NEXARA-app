@@ -400,17 +400,12 @@ export default function UserForm({
       };
 
       const createPersonalizedRole = async () => {
-        const safeEmailPrefix = String(form.email || 'usuario')
-          .split('@')[0]
-          .replace(/[^a-zA-Z0-9_-]/g, '')
-          .slice(0, 24) || 'usuario';
-
-        const baseName = `${form.roleNombre} · ${safeEmailPrefix}`;
+        const baseName = form.roleNombre.trim() || 'Rol';
         let attempt = 0;
         let lastError = 'Error al crear rol personalizado';
 
         while (attempt < 5) {
-          const candidateName = attempt === 0 ? baseName : `${baseName}-${attempt + 1}`;
+          const candidateName = attempt === 0 ? baseName : `${baseName} ${attempt + 1}`;
           const roleRes = await fetch(buildApiUrl('roles'), {
             method: 'POST',
             headers: {
