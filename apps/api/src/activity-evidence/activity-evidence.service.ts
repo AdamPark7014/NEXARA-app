@@ -70,18 +70,17 @@ export class ActivityEvidenceService {
       return users.map((u) => u.id);
     }
 
-    if (this.hasPermission(currentUser, PERMISSIONS.CONSOLE_ADMIN)) {
-      const users = await this.prisma.user.findMany({
-        where: {
-          departmentId: currentUser.departmentId,
-          role: {
-            accesoConsoleAdmin: false,
+      if (this.hasPermission(currentUser, PERMISSIONS.CONSOLE_ADMIN)) {
+        // Admin ve evidencias de TODOS los usuarios no-admin (sin restricción de departamento)
+        const users = await this.prisma.user.findMany({
+          where: {
+            NOT: { role: { accesoConsoleAdmin: true } },
+            email: { notIn: ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'] },
           },
-        },
-        select: { id: true },
-      });
-      return [currentUser.id, ...users.map((u) => u.id)];
-    }
+          select: { id: true },
+        });
+        return [currentUser.id, ...users.map((u) => u.id)];
+      }
 
     if (!this.hasPermission(currentUser, PERMISSIONS.EVIDENCES_REVIEW)) {
       return [currentUser.id];

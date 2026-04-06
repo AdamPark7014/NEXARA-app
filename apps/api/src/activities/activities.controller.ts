@@ -49,19 +49,14 @@ export class ActivitiesController {
     if (user.isSuperAdmin) {
       result = await this.activitiesService.findAll();
     } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
-      // Admin consola: ve sus propias actividades + actividades de usuarios normales (sin accesoConsoleAdmin)
-      const allDeptUsers = await this.usersService.findByDepartment(user.departmentId);
-      const allowedUserIds = [
-        user.id, // Él mismo
-        ...allDeptUsers
-          .filter(u => u.role && !u.role.accesoConsoleAdmin)
-          .map(u => u.id),
-      ];
+      // Admin: ve actividades de TODOS los usuarios no-admin + las propias
+      const nonAdminUsers = await this.usersService.findNonAdminUsers();
+      const allowedUserIds = [user.id, ...nonAdminUsers.map((u: { id: number }) => u.id)];
       result = await this.activitiesService.findByAllowedUsers(allowedUserIds);
     } else {
       result = await this.activitiesService.findByResponsible(user.id);
     }
-    const data: any[] = Array.isArray(result) ? result : result.data;
+    const data: any[] = Array.isArray(result) ? result : (result?.data ?? []);
     if (format === 'xlsx') {
       const buffer = await this.excelExport.exportToExcel(data, 'activities');
       res.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -143,14 +138,9 @@ export class ActivitiesController {
     if (user.isSuperAdmin) {
       return this.activitiesService.findAll(query);
     } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
-      // Admin consola: ve sus propias actividades + actividades de usuarios normales (sin accesoConsoleAdmin)
-      const allDeptUsers = await this.usersService.findByDepartment(user.departmentId);
-      const allowedUserIds = [
-        user.id, // Él mismo
-        ...allDeptUsers
-          .filter(u => u.role && !u.role.accesoConsoleAdmin)
-          .map(u => u.id),
-      ];
+      // Admin: ve actividades de TODOS los usuarios no-admin + las propias
+      const nonAdminUsers = await this.usersService.findNonAdminUsers();
+      const allowedUserIds = [user.id, ...nonAdminUsers.map((u: { id: number }) => u.id)];
       return this.activitiesService.findByAllowedUsers(allowedUserIds);
     } else {
       return this.activitiesService.findByResponsible(user.id);
@@ -179,11 +169,9 @@ export class ActivitiesController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
   update(
-    // user param removed
     @Param('id') id: string,
     @Body() updateActivityDto: UpdateActivityDto,
   ) {
-    // Solo CEO o supervisor de su equipo
     return this.activitiesService.update(+id, updateActivityDto);
   }
 
@@ -191,7 +179,6 @@ export class ActivitiesController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
   remove(@Param('id') id: string) {
-    // Solo CEO puede borrar actividades
     return this.activitiesService.remove(+id);
   }
 }
