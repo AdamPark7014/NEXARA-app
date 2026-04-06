@@ -147,7 +147,10 @@ export const getApiAssetOrigin = () => {
     const port = window.location.port;
 
     if (host === MOBILE_IP_API_HOST && port === MOBILE_APP_PORT) {
-      return `${protocol}//${host}:${MOBILE_API_PORT}`;
+      // Return same origin as the page (port 3002) so images are served via
+      // the /uploads proxy rewrite in next.config.js instead of hitting port
+      // 3001 directly (which may not be accessible from the browser).
+      return `${protocol}//${host}:${port}`;
     }
 
     if (host === 'nexara.com.mx' || host === 'www.nexara.com.mx' || host === 'app.nexara.com.mx' || host.endsWith('.nexara.com.mx')) {
