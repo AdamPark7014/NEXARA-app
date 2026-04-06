@@ -472,17 +472,12 @@ const ActivitiesTable: React.FC = () => {
     return `https://www.google.com/maps?q=${lat},${lng}`;
   };
 
-  const getMapsEmbedUrl = (lat?: number | null, lng?: number | null) => {
+  const getStaticMapPreviewUrl = (lat?: number | null, lng?: number | null) => {
     if (!lat || !lng) return '';
     if (GOOGLE_MAPS_API_KEY) {
-      return `https://www.google.com/maps/embed/v1/view?key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}&center=${lat},${lng}&zoom=15&maptype=roadmap`;
+      return `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=16&size=1200x420&maptype=roadmap&markers=color:red%7C${lat},${lng}&key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}`;
     }
-    const delta = 0.01;
-    const left = Number(lng) - delta;
-    const right = Number(lng) + delta;
-    const top = Number(lat) + delta;
-    const bottom = Number(lat) - delta;
-    return `https://www.openstreetmap.org/export/embed.html?bbox=${left}%2C${bottom}%2C${right}%2C${top}&layer=mapnik&marker=${lat}%2C${lng}`;
+    return `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=15&size=1200x420&markers=${lat},${lng},red-pushpin`;
   };
 
   const prefillFromRequest = (request: ClientTicketRequest) => {
@@ -661,13 +656,14 @@ const ActivitiesTable: React.FC = () => {
                   </div>
                   {hasCoordinates(request.latitud, request.longitud) && (
                     <div className="activities-map-embed">
-                      <iframe
-                        className="activities-map-iframe"
-                        src={getMapsEmbedUrl(request.latitud, request.longitud)}
-                        loading="lazy"
-                        title={`Mapa ${request.branchName || 'sucursal'}`}
-                        referrerPolicy="no-referrer-when-downgrade"
-                      />
+                      <a href={getMapsUrl(request.latitud, request.longitud)} target="_blank" rel="noreferrer">
+                        <img
+                          className="activities-map-iframe"
+                          src={getStaticMapPreviewUrl(request.latitud, request.longitud)}
+                          loading="lazy"
+                          alt={`Mapa ${request.branchName || 'sucursal'}`}
+                        />
+                      </a>
                     </div>
                   )}
                   <div className="activities-request-actions">
