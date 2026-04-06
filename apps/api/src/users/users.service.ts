@@ -13,7 +13,24 @@ export class UsersService {
 
   private normalizeEmployeeNumber(value?: string | null) {
     const normalized = String(value || '').trim().toUpperCase().replace(/\s+/g, '');
-    return normalized || null;
+    if (!normalized) return null;
+
+    // Allow short numeric input like "4" or "04" and normalize it to
+    // the canonical employee number format (NXR25SYS004).
+    if (/^\d+$/.test(normalized)) {
+      const parsed = Number.parseInt(normalized, 10);
+      return this.formatEmployeeNumberFromId(parsed);
+    }
+
+    // Normalize already-prefixed values so numeric suffix keeps fixed width.
+    if (normalized.startsWith(this.employeeNumberPrefix)) {
+      const suffix = normalized.slice(this.employeeNumberPrefix.length).replace(/\D+/g, '');
+      if (suffix) {
+        return `${this.employeeNumberPrefix}${suffix.padStart(3, '0')}`;
+      }
+    }
+
+    return normalized;
   }
 
   private formatEmployeeNumberFromId(id: number) {
@@ -39,11 +56,15 @@ export class UsersService {
         employeeNumber: normalized,
         ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
       },
-      select: { id: true },
+      select: { id: true, email: true, nombre: true },
     });
 
     if (existing) {
-      throw new BadRequestException('El numero de empleado ya existe');
+      if (this.isProtectedSuperAdminEmail(existing.email)) {
+        throw new BadRequestException('El numero de empleado ya existe (reservado por un usuario protegido no visible en la lista)');
+      }
+
+      throw new BadRequestException(`El numero de empleado ya existe (usuario: ${existing.nombre || existing.email})`);
     }
 
     return normalized;
