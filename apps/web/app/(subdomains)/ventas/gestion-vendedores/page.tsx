@@ -286,23 +286,24 @@ export default function VentasGestionVendedoresPage() {
   if (loading) return <div style={{ padding: 16 }}>Cargando panel ejecutivo...</div>;
 
   return (
-    <section style={{ display: "grid", gap: 18, padding: "12px 4px 28px", position: "relative" }}>
+    <section className="salesCockpit">
       <HelpTab module="sales-management" user={user} />
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
+
+      <header className="salesHero card">
         <div>
-          <p style={{ margin: 0, letterSpacing: "0.12em", textTransform: "uppercase", fontSize: 11, color: "var(--text-secondary)" }}>Ventas · Control Ejecutivo</p>
-          <h1 style={{ margin: "4px 0" }}>Gestión integral de vendedores</h1>
-          <p style={{ margin: 0, color: "var(--text-secondary)", maxWidth: 760 }}>
+          <p className="salesEyebrow">Ventas · Control Ejecutivo</p>
+          <h1 className="salesTitle">Gestión integral de vendedores</h1>
+          <p className="salesSubtitle">
             Supervisión de cumplimiento comercial y productividad diaria en una sola vista ({periodLabel}).
           </p>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="periodTabs" role="tablist" aria-label="Periodo de análisis">
           {(["week", "month", "year"] as const).map((item) => (
             <button
               key={item}
               type="button"
               onClick={() => setPeriod(item)}
-              className={period === item ? "btn" : "button-secondary"}
+              className={`periodBtn ${period === item ? "isActive" : ""}`}
             >
               {item === "week" ? "Semana" : item === "month" ? "Mes" : "Año"}
             </button>
@@ -310,45 +311,48 @@ export default function VentasGestionVendedoresPage() {
         </div>
       </header>
 
-      {error && <div className="card" style={{ color: "var(--state-danger-text, #d54444)" }}>{error}</div>}
+      {error && <div className="card errorCard">{error}</div>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12 }}>
-        <article className="card" style={{ display: "grid", gap: 6 }}>
-          <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-secondary)" }}>Pipeline activo</p>
-          <h3>{formatMoney(metrics?.pipelineValue || 0)}</h3>
-          <span>{metrics?.opportunityCount || 0} oportunidades</span>
+      <div className="kpiGrid">
+        <article className="card kpiCard">
+          <p className="kpiLabel">Pipeline activo</p>
+          <h3 className="kpiValue">{formatMoney(metrics?.pipelineValue || 0)}</h3>
+          <span className="kpiMeta">{metrics?.opportunityCount || 0} oportunidades</span>
         </article>
-        <article className="card" style={{ display: "grid", gap: 6 }}>
-          <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-secondary)" }}>Ingreso total</p>
-          <h3>{formatMoney(metrics?.totalRevenue || 0)}</h3>
-          <span>Margen promedio {Number(metrics?.averageMargin || 0).toFixed(1)}%</span>
+        <article className="card kpiCard">
+          <p className="kpiLabel">Ingreso total</p>
+          <h3 className="kpiValue">{formatMoney(metrics?.totalRevenue || 0)}</h3>
+          <span className="kpiMeta">Margen promedio {Number(metrics?.averageMargin || 0).toFixed(1)}%</span>
         </article>
-        <article className="card" style={{ display: "grid", gap: 6 }}>
-          <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-secondary)" }}>Vendedores activos</p>
-          <h3>{attendanceInsights.activeUsers}</h3>
-          <span>Con actividad operativa registrada</span>
+        <article className="card kpiCard">
+          <p className="kpiLabel">Vendedores activos</p>
+          <h3 className="kpiValue">{attendanceInsights.activeUsers}</h3>
+          <span className="kpiMeta">Con actividad operativa registrada</span>
         </article>
-        <article className="card" style={{ display: "grid", gap: 6 }}>
-          <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-secondary)" }}>Puntualidad diaria</p>
-          <h3>{attendanceInsights.punctualityRate.toFixed(0)}%</h3>
-          <span>Entrada antes de 9:15 AM</span>
+        <article className="card kpiCard">
+          <p className="kpiLabel">Puntualidad diaria</p>
+          <h3 className="kpiValue">{attendanceInsights.punctualityRate.toFixed(0)}%</h3>
+          <span className="kpiMeta">Entrada antes de 9:15 AM</span>
         </article>
-        <article className="card" style={{ display: "grid", gap: 6 }}>
-          <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-secondary)" }}>Productividad media</p>
-          <h3>{attendanceInsights.averageProductivity.toFixed(1)}</h3>
-          <span>Score promedio del equipo</span>
+        <article className="card kpiCard">
+          <p className="kpiLabel">Productividad media</p>
+          <h3 className="kpiValue">{attendanceInsights.averageProductivity.toFixed(1)}</h3>
+          <span className="kpiMeta">Score promedio del equipo</span>
         </article>
-        <article className="card" style={{ display: "grid", gap: 6 }}>
-          <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--text-secondary)" }}>Vendedores en riesgo</p>
-          <h3>{Math.max(attendanceInsights.lowProductivityUsers, cockpit?.summary.coachingQueue || 0)}</h3>
-          <span>Requieren coaching inmediato</span>
+        <article className="card kpiCard">
+          <p className="kpiLabel">Vendedores en riesgo</p>
+          <h3 className="kpiValue">{Math.max(attendanceInsights.lowProductivityUsers, cockpit?.summary.coachingQueue || 0)}</h3>
+          <span className="kpiMeta">Requieren coaching inmediato</span>
         </article>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 12 }}>
-        <article className="card">
-          <h2>Leaderboard comercial</h2>
-          <div style={{ overflowX: "auto" }}>
+      <div className="splitGrid">
+        <article className="card panelCard">
+          <div className="panelHead">
+            <h2>Leaderboard comercial</h2>
+            <span className="panelHint">Top {Math.max(topPerformers.length, 0)} vendedores</span>
+          </div>
+          <div className="tableWrap">
             <table className="table">
               <thead>
                 <tr>
@@ -365,7 +369,7 @@ export default function VentasGestionVendedoresPage() {
                     <td>{Number(seller.performance || 0).toFixed(1)}</td>
                     <td>{formatMoney(seller.revenue || 0)}</td>
                     <td>
-                      <span className={badgeClass(seller.status)} style={{ padding: "4px 8px", borderRadius: 999, fontSize: "0.72rem", fontWeight: 700, display: "inline-block" }}>
+                      <span className={`statusPill ${badgeClass(seller.status)}`}>
                         {statusLabel(seller.status)}
                       </span>
                     </td>
@@ -373,7 +377,7 @@ export default function VentasGestionVendedoresPage() {
                 ))}
                 {topPerformers.length === 0 && (
                   <tr>
-                    <td colSpan={4}>Sin datos disponibles.</td>
+                    <td colSpan={4} className="emptyCell">Sin datos disponibles.</td>
                   </tr>
                 )}
               </tbody>
@@ -381,26 +385,32 @@ export default function VentasGestionVendedoresPage() {
           </div>
         </article>
 
-        <article className="card">
-          <h2>Prioridades de coaching</h2>
-          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+        <article className="card panelCard">
+          <div className="panelHead">
+            <h2>Prioridades de coaching</h2>
+            <span className="panelHint">Enfoque inmediato</span>
+          </div>
+          <ul className="coachingList">
             {(cockpit?.coachingPriorities || []).slice(0, 10).map((item) => (
-              <li key={item.opportunityId} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "10px 12px" }}>
+              <li key={item.opportunityId} className="coachingItem">
                 <div>
                   <strong>{item.ownerName}</strong>
-                  <p style={{ margin: 0 }}>{item.title}</p>
+                  <p>{item.title}</p>
                 </div>
-                <span style={{ flexShrink: 0, fontSize: "0.75rem", padding: "3px 8px", borderRadius: 999, background: "rgba(241,139,31,0.14)", color: "#d3781b" }}>Riesgo {item.riskScore}</span>
+                <span className="riskChip">Riesgo {item.riskScore}</span>
               </li>
             ))}
-            {!cockpit?.coachingPriorities?.length && <li style={{ opacity: 0.5, padding: "8px 0" }}>Sin prioridades activas.</li>}
+            {!cockpit?.coachingPriorities?.length && <li className="emptyState">Sin prioridades activas.</li>}
           </ul>
         </article>
       </div>
 
-      <article className="card">
-        <h2>Proyectos operacionales por vendedor</h2>
-        <div style={{ overflowX: "auto" }}>
+      <article className="card panelCard">
+        <div className="panelHead">
+          <h2>Proyectos operacionales por vendedor</h2>
+          <span className="panelHint">Carga por estatus y volumen operativo</span>
+        </div>
+        <div className="tableWrap">
           <table className="table">
             <thead>
               <tr>
@@ -415,7 +425,7 @@ export default function VentasGestionVendedoresPage() {
             <tbody>
               {projectRowsByVendor.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ color: "var(--text-secondary)" }}>Sin proyectos operacionales registrados.</td>
+                  <td colSpan={6} className="emptyCell">Sin proyectos operacionales registrados.</td>
                 </tr>
               )}
               {projectRowsByVendor.map((row) => (
@@ -433,9 +443,12 @@ export default function VentasGestionVendedoresPage() {
         </div>
       </article>
 
-      <article className="card">
-        <h2>Verificación diaria de productividad</h2>
-        <div style={{ overflowX: "auto" }}>
+      <article className="card panelCard">
+        <div className="panelHead">
+          <h2>Verificación diaria de productividad</h2>
+          <span className="panelHint">Horas efectivas y score por vendedor</span>
+        </div>
+        <div className="tableWrap">
           <table className="table">
             <thead>
               <tr>
@@ -458,7 +471,7 @@ export default function VentasGestionVendedoresPage() {
               ))}
               {!attendance?.users?.length && (
                 <tr>
-                  <td colSpan={5}>No hay datos de asistencia/productividad para el periodo.</td>
+                  <td colSpan={5} className="emptyCell">No hay datos de asistencia/productividad para el periodo.</td>
                 </tr>
               )}
             </tbody>
@@ -466,19 +479,271 @@ export default function VentasGestionVendedoresPage() {
         </div>
       </article>
 
-      <article className="card">
-        <h2>Focos rojos y acciones sugeridas</h2>
-        <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+      <article className="card panelCard">
+        <div className="panelHead">
+          <h2>Focos rojos y acciones sugeridas</h2>
+          <span className="panelHint">Alertas para intervención operativa</span>
+        </div>
+        <ul className="riskList">
           {riskRows.map((risk) => (
-            <li key={risk.key} className="card" style={{ display: "grid", gap: 4, padding: "10px 12px" }}>
+            <li key={risk.key} className="riskItem">
               <strong>{risk.seller}</strong>
               <span>{risk.area}</span>
-              <p style={{ margin: 0 }}>{risk.signal}</p>
+              <p>{risk.signal}</p>
             </li>
           ))}
-          {riskRows.length === 0 && <li style={{ opacity: 0.5, padding: "8px 0" }}>Sin alertas críticas detectadas.</li>}
+          {riskRows.length === 0 && <li className="emptyState">Sin alertas críticas detectadas.</li>}
         </ul>
       </article>
+
+      <style jsx>{`
+        .salesCockpit {
+          display: grid;
+          gap: 16px;
+          padding: 10px 2px 28px;
+          position: relative;
+        }
+
+        .salesHero {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 16px;
+          flex-wrap: wrap;
+          border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+          background:
+            radial-gradient(120% 100% at 100% 0%, color-mix(in srgb, var(--primary) 16%, transparent), transparent 58%),
+            linear-gradient(180deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--surface-2) 92%, transparent));
+        }
+
+        .salesEyebrow {
+          margin: 0;
+          letter-spacing: 0.13em;
+          text-transform: uppercase;
+          font-size: 0.68rem;
+          font-weight: 700;
+          color: var(--text-secondary);
+        }
+
+        .salesTitle {
+          margin: 6px 0 8px;
+          font-size: clamp(1.7rem, 3vw, 2.6rem);
+          line-height: 1.1;
+        }
+
+        .salesSubtitle {
+          margin: 0;
+          color: var(--text-secondary);
+          max-width: 760px;
+        }
+
+        .periodTabs {
+          display: inline-flex;
+          gap: 8px;
+          padding: 4px;
+          border-radius: 14px;
+          background: color-mix(in srgb, var(--surface-2) 88%, transparent);
+          border: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
+        }
+
+        .periodBtn {
+          border: 1px solid transparent;
+          background: transparent;
+          color: var(--text-primary);
+          border-radius: 10px;
+          padding: 8px 14px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.18s ease;
+        }
+
+        .periodBtn:hover {
+          background: color-mix(in srgb, var(--surface) 84%, var(--primary) 16%);
+        }
+
+        .periodBtn.isActive {
+          color: #fff;
+          border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+          background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 88%, white 12%), color-mix(in srgb, var(--secondary) 84%, white 16%));
+          box-shadow: 0 8px 16px color-mix(in srgb, var(--primary) 28%, transparent);
+        }
+
+        .errorCard {
+          color: var(--state-danger-text, #d54444);
+          border: 1px solid color-mix(in srgb, var(--state-danger-border, #d54444) 40%, transparent);
+          background: color-mix(in srgb, var(--state-danger-bg, #ffefef) 78%, transparent);
+        }
+
+        .kpiGrid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 12px;
+        }
+
+        .kpiCard {
+          display: grid;
+          gap: 4px;
+          border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+          background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--surface-2) 90%, transparent));
+        }
+
+        .kpiCard::before {
+          content: "";
+          display: block;
+          width: 44px;
+          height: 3px;
+          border-radius: 999px;
+          margin-bottom: 4px;
+          background: linear-gradient(90deg, var(--primary), var(--secondary));
+        }
+
+        .kpiLabel {
+          margin: 0;
+          font-size: 0.82rem;
+          color: var(--text-secondary);
+        }
+
+        .kpiValue {
+          margin: 0;
+          font-size: 2rem;
+          line-height: 1.05;
+          letter-spacing: -0.02em;
+        }
+
+        .kpiMeta {
+          color: var(--text-secondary);
+          font-size: 0.9rem;
+        }
+
+        .splitGrid {
+          display: grid;
+          grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+          gap: 12px;
+        }
+
+        .panelCard {
+          border: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+          background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--surface-2) 92%, transparent));
+        }
+
+        .panelHead {
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          gap: 10px;
+          flex-wrap: wrap;
+          margin-bottom: 10px;
+        }
+
+        .panelHead h2 {
+          margin: 0;
+          font-size: 1.7rem;
+          line-height: 1.1;
+        }
+
+        .panelHint {
+          font-size: 0.8rem;
+          color: var(--text-secondary);
+          font-weight: 600;
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+        }
+
+        .tableWrap {
+          overflow-x: auto;
+          border: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
+          border-radius: 12px;
+        }
+
+        .statusPill {
+          padding: 4px 9px;
+          border-radius: 999px;
+          font-size: 0.72rem;
+          font-weight: 700;
+          display: inline-block;
+        }
+
+        .coachingList,
+        .riskList {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+          display: grid;
+          gap: 8px;
+        }
+
+        .coachingItem,
+        .riskItem {
+          border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+          border-radius: 12px;
+          padding: 10px 12px;
+          background: color-mix(in srgb, var(--surface) 94%, transparent);
+        }
+
+        .coachingItem {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .coachingItem p,
+        .riskItem p {
+          margin: 0;
+          color: var(--text-secondary);
+        }
+
+        .riskItem {
+          display: grid;
+          gap: 4px;
+        }
+
+        .riskChip {
+          flex-shrink: 0;
+          font-size: 0.75rem;
+          font-weight: 700;
+          padding: 4px 9px;
+          border-radius: 999px;
+          background: rgba(241, 139, 31, 0.14);
+          color: #d3781b;
+        }
+
+        .emptyCell,
+        .emptyState {
+          color: var(--text-secondary);
+          opacity: 0.78;
+          padding: 10px 0;
+        }
+
+        @media (max-width: 1040px) {
+          .splitGrid {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        @media (max-width: 760px) {
+          .salesTitle {
+            font-size: 1.9rem;
+          }
+
+          .periodTabs {
+            width: 100%;
+            justify-content: space-between;
+          }
+
+          .periodBtn {
+            flex: 1;
+          }
+
+          .kpiGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .panelHead h2 {
+            font-size: 1.35rem;
+          }
+        }
+      `}</style>
     </section>
   );
 }
