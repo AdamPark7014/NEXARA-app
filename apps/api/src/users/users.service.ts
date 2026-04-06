@@ -38,22 +38,45 @@ export class UsersService {
     return `${this.employeeNumberPrefix}${String(safeId).padStart(3, '0')}`;
   }
 
-  private withEmployeeNumber<T extends { id: number; employeeNumber?: string | null }>(item: T) {
+  private withEmployeeNumber<T extends { id: number; email?: string | null; employeeNumber?: string | null }>(item: T) {
+    if (this.isProtectedSuperAdminEmail(item.email)) {
+      return {
+        ...item,
+        employeeNumber: null,
+      };
+    }
+
     return {
       ...item,
       employeeNumber: this.normalizeEmployeeNumber(item.employeeNumber) || this.formatEmployeeNumberFromId(item.id),
     };
   }
 
-  private withEmployeeNumberList<T extends { id: number; employeeNumber?: string | null }>(items: T[]) {
+  private withEmployeeNumberList<T extends { id: number; email?: string | null; employeeNumber?: string | null }>(items: T[]) {
     return items.map((item) => this.withEmployeeNumber(item));
+  }
+
+  private async clearEmployeeNumberForProtectedUsers() {
+    await this.prisma['user'].updateMany({
+      where: {
+        email: { in: this.superAdminEmails },
+        employeeNumber: { not: null },
+      },
+      data: { employeeNumber: null },
+    });
   }
 
   private async resolveEmployeeNumber(employeeNumber: string | undefined, fallbackId: number, excludeUserId?: number) {
     const normalized = this.normalizeEmployeeNumber(employeeNumber) || this.formatEmployeeNumberFromId(fallbackId);
+
+    // Keep protected superadmin users without employee numbers so they never
+    // consume values from the operational employee numbering sequence.
+    await this.clearEmployeeNumberForProtectedUsers();
+
     const existing = await this.prisma['user'].findFirst({
       where: {
         employeeNumber: normalized,
+        email: { notIn: this.superAdminEmails },
         ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
       },
       select: { id: true, email: true, nombre: true },
@@ -160,6 +183,8 @@ export class UsersService {
   }
 
   async create(createUserDto: CreateUserDto) {
+    await this.clearEmployeeNumberForProtectedUsers();
+
     const hash = await bcrypt.hash(createUserDto.password, 10);
     const roleId = await this.resolveRoleId(createUserDto.roleId);
     const departmentId = await this.resolveDepartmentId(createUserDto.departmentId);
@@ -174,6 +199,11 @@ export class UsersService {
         passwordHash: hash,
       },
     });
+
+    if (this.isProtectedSuperAdminEmail(createdUser.email)) {
+      return this.withEmployeeNumber(createdUser);
+    }
+
     const employeeNumber = await this.resolveEmployeeNumber(createUserDto.employeeNumber, createdUser.id, createdUser.id);
     const updatedUser = await this.prisma['user'].update({
       where: { id: createdUser.id },
@@ -389,7 +419,17 @@ export class UsersService {
   }
 
   async update(id: number, updateUserDto: UpdateUserDto) {
+    await this.clearEmployeeNumberForProtectedUsers();
+
     const data: any = { ...updateUserDto };
+    const currentUser = await this.prisma['user'].findUnique({
+      where: { id },
+      select: { email: true },
+    });
+
+    const nextEmail = data.email !== undefined ? String(data.email || '') : String(currentUser?.email || '');
+    const isProtectedUser = this.isProtectedSuperAdminEmail(nextEmail);
+
     if (data.password) {
       data.passwordHash = await bcrypt.hash(data.password, 10);
       delete data.password;
@@ -400,7 +440,9 @@ export class UsersService {
     if (data.departmentId !== undefined) {
       data.departmentId = await this.resolveDepartmentId(data.departmentId);
     }
-    if (data.employeeNumber !== undefined) {
+    if (isProtectedUser) {
+      data.employeeNumber = null;
+    } else if (data.employeeNumber !== undefined) {
       data.employeeNumber = await this.resolveEmployeeNumber(data.employeeNumber, id, id);
     }
     if (data.avatarUrl !== undefined) {
