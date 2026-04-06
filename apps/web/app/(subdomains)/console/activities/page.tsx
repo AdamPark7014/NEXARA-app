@@ -43,11 +43,17 @@ export default function ActivitiesPage() {
         .activities-page-shell {
           display: grid;
           gap: 22px;
+          min-width: 0;
+          width: 100%;
+          max-width: 100%;
         }
 
         .activities-page-section {
           display: grid;
           gap: 14px;
+          min-width: 0;
+          width: 100%;
+          max-width: 100%;
         }
 
         .activities-page-head {

@@ -12,6 +12,7 @@ interface Activity {
   estatus: string;
   prioridad: string;
   ticketType?: string;
+  ticketTypeCustom?: string | null;
   client?: { id: number; name: string } | null;
   branchName?: string;
   branchCity?: string;
@@ -31,6 +32,8 @@ interface Activity {
     id: number;
     status: string;
     reviewStatus?: string;  // PENDING, APPROVED, REJECTED
+    reviewedById?: number;
+    reviewedBy?: { id: number; nombre: string } | null;
     rejectedStep?: string;
     reviewNotes?: string;
     entryPhotoUrl?: string;
@@ -71,7 +74,7 @@ const MyActivitiesTable: React.FC = () => {
   const fetchActivities = () => {
     if (!user?.token) return;
     setLoading(true);
-    fetch(buildApiUrl('activities'), {
+    fetch(buildApiUrl('activities?scope=mine'), {
       headers: { Authorization: `Bearer ${user.token}` },
     })
       .then((res) => res.ok ? res.json() : [])
@@ -162,12 +165,14 @@ const MyActivitiesTable: React.FC = () => {
         'SERVICE_SHEET_DATA': '❌ Rechazado: Plantilla',
         'EXIT_PHOTO': '❌ Rechazado: Foto Salida',
       };
-      return stepNames[evidence.rejectedStep] || '❌ Rechazado';
+      const reviewerName = evidence.reviewedBy?.nombre || 'Administración';
+      return `${stepNames[evidence.rejectedStep] || '❌ Rechazado'} por ${reviewerName}`;
     }
     
     // Si está aprobado
     if (evidence.reviewStatus === 'APPROVED') {
-      return '✅ Aprobado';
+      const reviewerName = evidence.reviewedBy?.nombre || 'Administración';
+      return `✅ Aprobado por ${reviewerName}`;
     }
     
     // Estados normales del flujo
@@ -305,7 +310,7 @@ const MyActivitiesTable: React.FC = () => {
                       <td>{a.titulo}</td>
                       <td>{a.client?.name || 'Interna'}</td>
                       <td>{[a.branchName, a.branchCity, a.branchState].filter(Boolean).join(', ') || '-'}</td>
-                      <td>{a.ticketType || '-'}</td>
+                      <td>{a.ticketType === 'OTRO' && a.ticketTypeCustom ? `Otro: ${a.ticketTypeCustom}` : (a.ticketType || '-')}</td>
                       <td><span className={`badge ${getActivityStatusClassName(a)}`}>{getDisplayActivityStatus(a)}</span></td>
                       <td>{a.prioridad}</td>
                       <td>
@@ -330,7 +335,9 @@ const MyActivitiesTable: React.FC = () => {
                             >
                               📋 Revisar
                             </button>
-                          ) : a.activityEvidence?.reviewStatus === 'APPROVED' ? (
+                          ) :
+                          a.activityEvidence?.reviewStatus === 'APPROVED' &&
+                          a.activityEvidence?.reviewedById === user?.id ? (
                             <span className={styles.approvedText}>✅ Aprobada</span>
                           ) : a.activityEvidence?.reviewStatus === 'REJECTED' ? (
                             <span className={styles.rejectedText}>❌ Rechazada</span>
@@ -434,7 +441,7 @@ const MyActivitiesTable: React.FC = () => {
                       </div>
                       <div>
                         <div className={styles.mobileInfoLabel}>Tipo</div>
-                        <div className={styles.mobileInfoValue}>{a.ticketType || '-'}</div>
+                        <div className={styles.mobileInfoValue}>{a.ticketType === 'OTRO' && a.ticketTypeCustom ? `Otro: ${a.ticketTypeCustom}` : (a.ticketType || '-')}</div>
                       </div>
                       <div>
                         <div className={styles.mobileInfoLabel}>Inicio</div>

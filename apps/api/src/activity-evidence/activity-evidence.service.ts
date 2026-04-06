@@ -965,8 +965,13 @@ export class ActivityEvidenceService {
       throw new BadRequestException('Índice de foto inválido');
     }
 
-    if (evidence.evidencePhotos.length <= 4) {
-      throw new BadRequestException('Mínimo 4 fotos de evidencia son requeridas');
+    const activity = await this.prisma.activity.findUnique({
+      where: { id: activityId },
+      select: { workType: true },
+    });
+    const minPhotos = activity?.workType === 'PREVENTIVE_INVENTORY' ? 1 : 4;
+    if (evidence.evidencePhotos.length <= minPhotos) {
+      throw new BadRequestException(`Mínimo ${minPhotos} foto${minPhotos > 1 ? 's' : ''} de evidencia son requeridas`);
     }
 
     const updatedPhotos = evidence.evidencePhotos.filter((_: string, i: number) => i !== index);

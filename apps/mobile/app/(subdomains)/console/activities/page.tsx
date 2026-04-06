@@ -42,10 +42,16 @@ export default function ActivitiesPage() {
           .activities-page-section {
             display: grid;
             gap: 8px;
+            min-width: 0;
+            width: 100%;
+            max-width: 100%;
           }
 
           .activities-fines-wrap {
             margin-top: 8px;
+            min-width: 0;
+            width: 100%;
+            max-width: 100%;
           }
         `}</style>
       </div>

@@ -43,6 +43,55 @@ type SyncInventoryInput = {
 export class InventoriesService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private cloneSnapshotItems(items: any[] = []) {
+    return items.map((item, index) => ({
+      sectionName: item.sectionName,
+      groupName: item.groupName,
+      equipmentName: item.equipmentName,
+      serialNumber: item.serialNumber,
+      model: item.model,
+      panoramicPhotoUrl: item.panoramicPhotoUrl,
+      closeupPhotoUrl: item.closeupPhotoUrl,
+      stickerPhotoUrl: item.stickerPhotoUrl,
+      serialBefore: item.serialAfter || item.serialBefore || item.serialNumber,
+      serialAfter: item.serialAfter || item.serialBefore || item.serialNumber,
+      modelBefore: item.modelAfter || item.modelBefore || item.model,
+      modelAfter: item.modelAfter || item.modelBefore || item.model,
+      beforePanoramicPhotoUrl:
+        item.beforePanoramicPhotoUrl || item.afterPanoramicPhotoUrl || item.panoramicPhotoUrl,
+      beforeCloseupPhotoUrl:
+        item.beforeCloseupPhotoUrl || item.afterCloseupPhotoUrl || item.closeupPhotoUrl,
+      afterPanoramicPhotoUrl:
+        item.afterPanoramicPhotoUrl || item.beforePanoramicPhotoUrl || item.panoramicPhotoUrl,
+      afterCloseupPhotoUrl:
+        item.afterCloseupPhotoUrl || item.beforeCloseupPhotoUrl || item.closeupPhotoUrl,
+      maintenanceStickerPhotoUrl: item.maintenanceStickerPhotoUrl || item.stickerPhotoUrl,
+      maintenanceActions: item.maintenanceActions,
+      maintenanceComments: item.maintenanceComments,
+      itemStatus: item.itemStatus,
+      compareState: 'UNCHANGED',
+      notes: item.notes,
+      sortOrder: index,
+    }));
+  }
+
+  private async findPreviousSnapshot(
+    clientId: number,
+    branchId: number,
+    excludeSnapshotId?: number,
+  ) {
+    return this.prisma.inventorySnapshot.findFirst({
+      where: {
+        clientId,
+        branchId,
+        status: { in: ['COMPLETED', 'APPROVED'] },
+        ...(excludeSnapshotId ? { id: { not: excludeSnapshotId } } : {}),
+      },
+      orderBy: [{ approvedAt: 'desc' }, { completedAt: 'desc' }, { updatedAt: 'desc' }],
+      include: { items: true },
+    });
+  }
+
   private sanitizeItems(rawItems: any[]) {
     return rawItems
       .filter((item) => item && String(item.equipmentName || '').trim())
@@ -178,11 +227,8 @@ export class InventoriesService {
 
     if (!snapshot) {
       const branch = await this.findBranchForActivity(activity);
-      const previous = await this.prisma.inventorySnapshot.findFirst({
-        where: { clientId: activity.clientId || undefined, branchId: branch.id },
-        orderBy: { createdAt: 'desc' },
-        include: { items: true },
-      });
+      const previous = await this.findPreviousSnapshot(activity.clientId as number, branch.id);
+      const previousItems = this.cloneSnapshotItems(previous?.items || []);
 
       snapshot = await this.prisma.inventorySnapshot.create({
         data: {
@@ -197,37 +243,7 @@ export class InventoriesService {
           createdByType: 'CONSOLE',
           createdById: activity.responsableId || activity.creadoPorId,
           items: {
-            create:
-              previous?.items?.map((item, index) => ({
-                sectionName: item.sectionName,
-                groupName: item.groupName,
-                equipmentName: item.equipmentName,
-                serialNumber: item.serialNumber,
-                model: item.model,
-                panoramicPhotoUrl: item.panoramicPhotoUrl,
-                closeupPhotoUrl: item.closeupPhotoUrl,
-                stickerPhotoUrl: item.stickerPhotoUrl,
-                serialBefore: item.serialAfter || item.serialBefore || item.serialNumber,
-                serialAfter: item.serialAfter || item.serialBefore || item.serialNumber,
-                modelBefore: item.modelAfter || item.modelBefore || item.model,
-                modelAfter: item.modelAfter || item.modelBefore || item.model,
-                beforePanoramicPhotoUrl:
-                  item.beforePanoramicPhotoUrl || item.afterPanoramicPhotoUrl || item.panoramicPhotoUrl,
-                beforeCloseupPhotoUrl:
-                  item.beforeCloseupPhotoUrl || item.afterCloseupPhotoUrl || item.closeupPhotoUrl,
-                afterPanoramicPhotoUrl:
-                  item.afterPanoramicPhotoUrl || item.beforePanoramicPhotoUrl || item.panoramicPhotoUrl,
-                afterCloseupPhotoUrl:
-                  item.afterCloseupPhotoUrl || item.beforeCloseupPhotoUrl || item.closeupPhotoUrl,
-                maintenanceStickerPhotoUrl:
-                  item.maintenanceStickerPhotoUrl || item.stickerPhotoUrl,
-                maintenanceActions: item.maintenanceActions,
-                maintenanceComments: item.maintenanceComments,
-                itemStatus: item.itemStatus,
-                compareState: 'UNCHANGED',
-                notes: item.notes,
-                sortOrder: index,
-              })) || [],
+            create: previousItems,
           },
         },
         include: {
@@ -236,6 +252,23 @@ export class InventoriesService {
           items: { orderBy: [{ groupName: 'asc' }, { sortOrder: 'asc' }, { id: 'asc' }] },
         },
       });
+    }
+
+    if (snapshot.clientId && snapshot.branchId) {
+      const previous = await this.findPreviousSnapshot(
+        snapshot.clientId,
+        snapshot.branchId,
+        snapshot.id,
+      );
+      const previousItems = this.cloneSnapshotItems(previous?.items || []);
+
+      if ((snapshot.items?.length || 0) === 0 && previousItems.length > 0) {
+        await this.prisma.inventoryItem.createMany({
+          data: previousItems.map((item) => ({ ...item, snapshotId: snapshot!.id })),
+        });
+
+        return this.detail(snapshot.id);
+      }
     }
 
     return snapshot;
@@ -252,16 +285,7 @@ export class InventoriesService {
       include: { items: true },
     });
 
-    const previous = await this.prisma.inventorySnapshot.findFirst({
-      where: {
-        clientId: activity.clientId,
-        branchId: branch.id,
-        createdByType: { in: ['CLIENT', 'BRANCH'] },
-        ...(current ? { id: { not: current.id } } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      include: { items: true },
-    });
+    const previous = await this.findPreviousSnapshot(activity.clientId, branch.id, current?.id);
 
     const rawItems = Array.isArray(payload.items) ? payload.items : current?.items || [];
     const sanitizedItems = this.sanitizeItems(rawItems);
@@ -350,16 +374,11 @@ export class InventoriesService {
           include: { items: true },
         });
 
-    const previous = await this.prisma.inventorySnapshot.findFirst({
-      where: {
-        clientId: context.clientId,
-        branchId: context.branchId,
-        activityId: null,
-        ...(current ? { id: { not: current.id } } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      include: { items: true },
-    });
+    const previous = await this.findPreviousSnapshot(
+      context.clientId,
+      context.branchId,
+      current?.id,
+    );
 
     const rawItems = Array.isArray(payload.items) ? payload.items : current?.items || [];
     const sanitizedItems = this.sanitizeItems(rawItems);
