@@ -268,6 +268,22 @@ const AttendanceForm = () => {
     }
   };
 
+  const sendGpsLocation = async (payload: { latitud: number; longitud: number; velocidadKmh?: number | null }) => {
+    if (!user?.token) return;
+    await fetch(buildApiUrl('gps'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${user.token}`,
+      },
+      body: JSON.stringify({
+        ...payload,
+        estaActivo: true,
+        ultimaActualizacion: new Date().toISOString(),
+      }),
+    });
+  };
+
   const updateGpsConsent = async (enabled: boolean) => {
     if (!user?.token) return;
     const res = await fetch(buildApiUrl('gps/consent'), {
