@@ -8,6 +8,12 @@ import { CreateGpsDto } from './dto/create-gps.dto.js';
 export class GpsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private getTodayDateOnly() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+  }
+
   create(createGpsDto: CreateGpsDto) {
     if (createGpsDto.usuarioId === undefined) {
       throw new Error('usuarioId requerido');
@@ -25,10 +31,17 @@ export class GpsService {
   }
 
   async findMe(userId: number) {
+    const today = this.getTodayDateOnly();
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { locationConsent: true },
     });
+    const openDay = await this.prisma.attendanceDay.findUnique({
+      where: { userId_date: { userId, date: today } },
+      select: { isOpen: true },
+    });
+    const effectiveConsent = Boolean(user?.locationConsent && openDay?.isOpen);
+
     const location = await this.prisma['locationTracking'].findFirst({
       where: { usuarioId: userId, estaActivo: true },
       orderBy: { ultimaActualizacion: 'desc' },
@@ -38,8 +51,8 @@ export class GpsService {
       },
     });
     return {
-      consent: Boolean(user?.locationConsent),
-      location,
+      consent: effectiveConsent,
+      location: effectiveConsent ? location : null,
     };
   }
 
@@ -75,11 +88,18 @@ export class GpsService {
   }
 
   async findTeamLocations(requester: { id: number; departmentId?: number; permissions?: string[]; isSuperAdmin?: boolean }) {
+    const today = this.getTodayDateOnly();
     const canSeeAll = this.hasPermission(requester, PERMISSIONS.CONSOLE_ADMIN)
       || this.hasPermission(requester, PERMISSIONS.GPS_MANAGE);
     const userFilter: any = {
       locationConsent: true,
       role: { accesoGps: true },
+      attendanceDays: {
+        some: {
+          date: today,
+          isOpen: true,
+        },
+      },
     };
 
     if (!canSeeAll && requester.departmentId) {

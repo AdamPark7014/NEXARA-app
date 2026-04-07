@@ -251,6 +251,26 @@ export class AttendanceService {
           isOpen: true,
         },
       });
+
+      // Abrir consentimiento de ubicación al iniciar jornada y dejar un primer punto GPS
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { locationConsent: true },
+      });
+
+      if (typeof dto.latitude === 'number' && typeof dto.longitude === 'number') {
+        await this.prisma['locationTracking'].create({
+          data: {
+            usuarioId: userId,
+            latitud: dto.latitude,
+            longitud: dto.longitude,
+            velocidadKmh: null,
+            estaActivo: true,
+            ultimaActualizacion: now,
+          },
+        });
+      }
+
       this.emitAttendanceUpdate(userId, dto.type, now, attendance.user);
 
       try {
@@ -306,6 +326,18 @@ export class AttendanceService {
         isOpen: false,
       },
     });
+
+    // Cerrar consentimiento de ubicación al finalizar jornada y desactivar tracking activo
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { locationConsent: false },
+    });
+
+    await this.prisma['locationTracking'].updateMany({
+      where: { usuarioId: userId, estaActivo: true },
+      data: { estaActivo: false, ultimaActualizacion: now },
+    });
+
     this.emitAttendanceUpdate(userId, dto.type, now, attendance.user);
 
     try {
