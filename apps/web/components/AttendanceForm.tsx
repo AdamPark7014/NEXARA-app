@@ -482,6 +482,9 @@ const AttendanceForm = () => {
         setStatus('✓ Entrada registrada correctamente. Compartiendo ubicación...');
         try {
           await updateGpsConsent(true);
+          if (typeof latitude === 'number' && typeof longitude === 'number') {
+            await sendGpsLocation({ latitud: latitude, longitud: longitude, velocidadKmh: null });
+          }
           startGpsTracking();
           dispatchGpsConsent(true);
         } catch (gpsErr) {

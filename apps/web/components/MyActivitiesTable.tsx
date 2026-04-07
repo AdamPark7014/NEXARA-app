@@ -71,16 +71,38 @@ const MyActivitiesTable: React.FC = () => {
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
   const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, '');
 
-  const fetchActivities = () => {
+  const normalizeActivitiesPayload = (data: unknown): Activity[] => {
+    if (Array.isArray(data)) return data as Activity[];
+    if (data && typeof data === 'object' && Array.isArray((data as { data?: unknown }).data)) {
+      return (data as { data: Activity[] }).data;
+    }
+    return [];
+  };
+
+  const fetchActivities = async () => {
     if (!user?.token) return;
     setLoading(true);
-    fetch(buildApiUrl('activities?scope=mine'), {
-      headers: { Authorization: `Bearer ${user.token}` },
-    })
-      .then((res) => res.ok ? res.json() : [])
-      .then((data) => setActivities(Array.isArray(data) ? data : []))
-      .catch(() => setActivities([]))
-      .finally(() => setLoading(false));
+    try {
+      const mineRes = await fetch(buildApiUrl('activities?scope=mine'), {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+
+      if (mineRes.ok) {
+        const mineData = await mineRes.json().catch(() => null);
+        setActivities(normalizeActivitiesPayload(mineData));
+        return;
+      }
+
+      const fallbackRes = await fetch(buildApiUrl('activities'), {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      const fallbackData = fallbackRes.ok ? await fallbackRes.json().catch(() => null) : null;
+      setActivities(normalizeActivitiesPayload(fallbackData));
+    } catch {
+      setActivities([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {

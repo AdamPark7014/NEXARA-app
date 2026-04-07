@@ -724,7 +724,7 @@ const ActivitiesTable: React.FC = () => {
               <input className="input" placeholder="Titulo" value={newActivity.titulo} onChange={(e) => setNewActivity({ ...newActivity, titulo: e.target.value })} />
               <select className="input" value={newActivity.activityType} onChange={(e) => setNewActivity({ ...newActivity, activityType: e.target.value as 'CLIENT' | 'INTERNAL', ticketType: 'PREVENTIVO', workType: 'ISSUE' })}>
                 <option value="CLIENT">Actividad para Cliente</option>
-                <option value="INTERNAL">Actividad Interna (Proyecto)</option>
+                <option value="INTERNAL">Actividad Proyecto</option>
               </select>
               {newActivity.activityType === 'CLIENT' ? (
                 <>

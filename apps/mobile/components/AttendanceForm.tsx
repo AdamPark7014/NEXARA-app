@@ -455,6 +455,9 @@ const AttendanceForm = () => {
         setStatus('✓ Entrada registrada correctamente. Compartiendo ubicación...');
         try {
           await updateGpsConsent(true);
+          if (typeof latitude === 'number' && typeof longitude === 'number') {
+            await sendGpsLocation({ latitud: latitude, longitud: longitude, velocidadKmh: null });
+          }
           dispatchGpsConsent(true);
         } catch (gpsErr) {
           setError(gpsErr instanceof Error ? gpsErr.message : 'No se pudo activar el GPS');

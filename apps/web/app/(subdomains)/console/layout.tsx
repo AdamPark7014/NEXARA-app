@@ -4,6 +4,7 @@ import Sidebar from "./Sidebar";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import NotificationCenter from "@/components/NotificationCenter";
+import GpsBackgroundTracker from "@/components/GpsBackgroundTracker";
 import { setActivePanel } from "@/lib/panel-routing";
 
 const formatConsoleTitle = (pathname: string) => {
@@ -81,6 +82,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   }
   return (
     <div className={styles.consoleLayout}>
+      <GpsBackgroundTracker />
       <Sidebar />
       <main className={styles.consoleMain}>
         <section className={styles.consoleTopbar}>
