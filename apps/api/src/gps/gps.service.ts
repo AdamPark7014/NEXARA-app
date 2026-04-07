@@ -93,7 +93,6 @@ export class GpsService {
       || this.hasPermission(requester, PERMISSIONS.GPS_MANAGE);
     const userFilter: any = {
       locationConsent: true,
-      role: { accesoGps: true },
       attendanceDays: {
         some: {
           date: today,

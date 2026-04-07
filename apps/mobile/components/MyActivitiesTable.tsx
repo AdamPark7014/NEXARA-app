@@ -86,18 +86,8 @@ const MyActivitiesTable: React.FC = () => {
       const mineRes = await fetch(buildApiUrl('activities?scope=mine'), {
         headers: { Authorization: `Bearer ${user.token}` },
       });
-
-      if (mineRes.ok) {
-        const mineData = await mineRes.json().catch(() => null);
-        setActivities(normalizeActivitiesPayload(mineData));
-        return;
-      }
-
-      const fallbackRes = await fetch(buildApiUrl('activities'), {
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-      const fallbackData = fallbackRes.ok ? await fallbackRes.json().catch(() => null) : null;
-      setActivities(normalizeActivitiesPayload(fallbackData));
+      const mineData = mineRes.ok ? await mineRes.json().catch(() => null) : null;
+      setActivities(normalizeActivitiesPayload(mineData));
     } catch {
       setActivities([]);
     } finally {

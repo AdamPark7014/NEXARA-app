@@ -56,10 +56,14 @@ const AttendanceForm = () => {
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
-  const STORAGE_KEY = 'nexara_attendance_timer';
+  const STORAGE_KEY = user?.id ? `nexara_attendance_timer_${user.id}` : 'nexara_attendance_timer_guest';
 
-  // Cargar timer persistente al montar y recuperar de localStorage
+  // Cargar timer persistente al montar y recuperar de localStorage (user-specific)
   useEffect(() => {
+    if (!user?.id) {
+      setStartTime(null);
+      return;
+    }
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
@@ -71,19 +75,16 @@ const AttendanceForm = () => {
           const recoveredStartTime = new Date(startTimeStr);
           if (!Number.isNaN(recoveredStartTime.getTime())) {
             setStartTime(recoveredStartTime);
-            console.log('⏱️ Timer recuperado de localStorage:', startTimeStr);
           }
         } else {
           // Si el timer es de otro día, limpiar localStorage
           localStorage.removeItem(STORAGE_KEY);
-          console.log('🧹 Timer de otro día detectado y limpiado');
         }
-      } catch (err) {
-        console.error('Error recuperando timer:', err);
+      } catch {
         localStorage.removeItem(STORAGE_KEY);
       }
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 900px)');
@@ -342,7 +343,8 @@ const AttendanceForm = () => {
         const day = await dayRes.json();
         if (!day) {
           setTotalMinutes(0);
-          if (!isToday(selectedDate)) setStartTime(null);
+          setStartTime(null);
+          localStorage.removeItem(STORAGE_KEY);
         } else {
           setTotalMinutes(day.totalMinutes || 0);
           if (isToday(selectedDate) && day.isOpen && day.lastEntryAt) {
@@ -546,6 +548,11 @@ const AttendanceForm = () => {
       } else {
         setError('Error desconocido');
       }
+      // Si el intento de salida falló (sin entrada abierta), limpiar timer fantasma
+      if (tipo === 'salida') {
+        setStartTime(null);
+        localStorage.removeItem(STORAGE_KEY);
+      }
     } finally {
       setLoading(false);
     }
@@ -653,6 +660,8 @@ const AttendanceForm = () => {
             <strong>Total del dia:</strong> {formatTotal(totalMinutes + Math.floor(elapsed / 60000))}
           </div>
         )}
+        {status && <p className={styles.statusText}>{status}</p>}
+        {error && <p className={styles.errorText}>{error}</p>}
         {history.length > 0 && (
           <div className={styles.historySection}>
             <div className={styles.sectionLabel}><strong>Historial del dia</strong></div>
@@ -710,8 +719,6 @@ const AttendanceForm = () => {
             </div>
           )}
         </div>
-        {status && <p className={styles.statusText}>{status}</p>}
-        {error && <p className={styles.errorText}>{error}</p>}
       </div>
     </div>
   );
