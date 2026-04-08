@@ -1,2 +1,188 @@
-/* Map container styled as a card, theme-aware */.mapContainer {  max-width: 100%;  width: 100%;  height: 100%;  margin: 0 auto;  border-radius: 10px;  overflow: hidden;  border: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent);  background: var(--surface);  box-shadow: 0 6px 18px color-mix(in srgb, var(--gray-alpha-200, rgba(0,0,0,0.15)) 100%, transparent);}/* The map wrapper uses full height */.mapWrapper {  width: 100%;  height: 100%;  min-height: 180px;  border-radius: 10px;  overflow: hidden;}/* Force Google Maps InfoWindow to show full content */.mapContainer :global(.gm-style .gm-style-iw-d) {  overflow: visible !important;  max-height: none !important;}.mapContainer :global(.gm-style .gm-style-iw-c) {  padding: 0 !important;  max-width: 300px !important;  max-height: none !important;  border-radius: 14px !important;  box-shadow: 0 8px 32px rgba(0,0,0,0.18) !important;}.mapContainer :global(.gm-style .gm-style-iw-tc) {  display: none;}/* Global InfoWindow styles - Corporate design with theme transitions */.mapContainer :global(.nexara-map-info) {  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;  text-align: center;  padding: 8px 10px 10px;  min-width: 110px;  max-width: 140px;  box-sizing: border-box;  background: #ffffff;  border-radius: 8px;}.mapContainer :global(.nexara-map-logo) {  width: 24px;  height: 24px;  object-fit: contain;  margin: 0 auto 4px;  display: block;  border-radius: 6px;  padding: 3px;  background: linear-gradient(135deg, rgba(37,99,235,0.1) 0%, rgba(14,165,233,0.1) 100%);}.mapContainer :global(.nexara-map-title) {  margin: 0 0 1px;  font-size: 11px;  font-weight: 700;  color: #0f172a;  letter-spacing: 0.2px;}.mapContainer :global(.nexara-map-subtitle) {  margin: 0 0 6px;  font-size: 8px;  font-weight: 500;  color: #64748b;  letter-spacing: 0.1px;}.mapContainer :global(.nexara-map-btn) {  display: block;  width: 100%;  padding: 5px 10px;  border-radius: 5px;  border: none;  text-decoration: none;  text-align: center;  color: #fff !important;  font-size: 9px;  font-weight: 600;  letter-spacing: 0.1px;  background: linear-gradient(135deg, #1e40af 0%, #2563eb 50%, #0284c7 100%) !important;  box-shadow: 0 2px 6px rgba(30,64,175,0.25);  transition: transform 0.2s ease, box-shadow 0.2s ease;}.mapContainer :global(.nexara-map-btn:hover) {  transform: translateY(-2px);  box-shadow: 0 6px 16px rgba(30,64,175,0.4), inset 0 1px 0 rgba(255,255,255,0.15);}.mapContainer :global(.nexara-map-btn:active) {  transform: translateY(0);  box-shadow: 0 2px 6px rgba(30,64,175,0.25);}/* Dark mode styles for Google Maps InfoWindow */.mapContainer :global(.gm-style .gm-style-iw-c) {  transition: background-color 0.3s ease !important;}:global(body.dark) .mapContainer :global(.nexara-map-info) {  background: #1e293b;}:global(body.dark) .mapContainer :global(.nexara-map-logo) {  background: linear-gradient(135deg, rgba(59,130,246,0.15) 0%, rgba(14,165,233,0.15) 100%);}:global(body.dark) .mapContainer :global(.nexara-map-title) {  color: #f1f5f9;}:global(body.dark) .mapContainer :global(.nexara-map-subtitle) {  color: #94a3b8;}:global(body.dark) .mapContainer :global(.nexara-map-btn) {  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 50%, #0ea5e9 100%);  box-shadow: 0 2px 10px rgba(59,130,246,0.4), inset 0 1px 0 rgba(255,255,255,0.1);}:global(body.dark) .mapContainer :global(.nexara-map-btn:hover) {  box-shadow: 0 6px 20px rgba(59,130,246,0.5), inset 0 1px 0 rgba(255,255,255,0.1);}.mapError {  width: 100%;  height: 100%;  min-height: 150px;  border-radius: 10px;  display: flex;  flex-direction: column;  align-items: center;  justify-content: center;  padding: 14px;  text-align: center;  color: color-mix(in srgb, var(--primary) 55%, var(--danger));  background: color-mix(in srgb, var(--primary) 7%, var(--surface));  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);  box-shadow: 0 4px 12px color-mix(in srgb, var(--danger) 20%, transparent);  font-size: 0.85rem;}/* Theme variants */:global(body.light) .mapContainer {  background: var(--surface-light, #ffffff);  border-color: color-mix(in srgb, var(--primary) 24%, transparent);  box-shadow: 0 6px 18px color-mix(in srgb, var(--gray-alpha-200, rgba(0,0,0,0.15)) 100%, transparent);}:global(body.dark) .mapContainer {  background: var(--surface-dark, #111315);  border-color: color-mix(in srgb, var(--gray-alpha-200, rgba(255,255,255,0.14)) 100%, transparent);  box-shadow: 0 10px 24px color-mix(in srgb, rgba(0,0,0,0.4) 100%, transparent);}@media (max-width: 900px) {  .mapWrapper,  .mapError {    min-height: 160px;  }}@media (max-width: 600px) {  .mapContainer {    border-radius: 8px;  }    .mapWrapper,  .mapError {    min-height: 150px;    border-radius: 8px;  }    .mapError {    padding: 12px;  }  .mapContainer :global(.nexara-map-info) {    padding: 10px 12px 12px;    min-width: 140px;  }  .mapContainer :global(.nexara-map-logo) {    width: 32px;    height: 32px;    margin-bottom: 6px;  }  .mapContainer :global(.nexara-map-title) {    font-size: 14px;    margin-bottom: 2px;  }  .mapContainer :global(.nexara-map-subtitle) {    font-size: 10px;    margin-bottom: 10px;  }  .mapContainer :global(.nexara-map-btn) {    padding: 8px 12px;    font-size: 11px;  }}@media (max-width: 400px) {  .mapWrapper,  .mapError {    min-height: 140px;  }  .mapContainer :global(.nexara-map-info) {    padding: 8px 10px 10px;    min-width: 120px;  }  .mapContainer :global(.nexara-map-subtitle) {    font-size: 9px;    margin-bottom: 8px;  }  .mapContainer :global(.nexara-map-btn) {    padding: 7px 10px;    font-size: 10px;  }}
+/* Map container: consistent card (footer + contacto) */
+.mapContainer {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 6px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--primary) 16%, var(--border));
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--primary) 10%, transparent), transparent 58%),
+    radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--secondary) 10%, transparent), transparent 60%),
+    linear-gradient(160deg, var(--surface-clean), var(--surface-clean-soft));
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--shadow) 22%, transparent);
+}
+
+/* Inner frame for Google tiles */
+.mapWrapper {
+  width: 100%;
+  height: 100%;
+  min-height: 180px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #0f1c28;
+  border: 1px solid color-mix(in srgb, var(--primary) 10%, var(--border));
+}
+
+/* Force Google Maps InfoWindow to show full content */
+.mapContainer :global(.gm-style .gm-style-iw-d) {
+  overflow: visible !important;
+  max-height: none !important;
+}
+
+.mapContainer :global(.gm-style .gm-style-iw-c) {
+  padding: 0 !important;
+  max-width: 320px !important;
+  max-height: none !important;
+  border-radius: 14px !important;
+  border: 1px solid color-mix(in srgb, var(--primary) 14%, rgba(0, 0, 0, 0.12)) !important;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.22) !important;
+  background: transparent !important;
+}
+
+.mapContainer :global(.gm-style .gm-style-iw-tc) {
+  display: none;
+}
+
+/* Remove native InfoWindow chrome (white header area) */
+.mapContainer :global(.gm-style .gm-style-iw-chr) {
+  display: none !important;
+}
+
+.mapContainer :global(.gm-style .gm-ui-hover-effect) {
+  display: none !important;
+}
+
+/* InfoWindow styles - consistent with public site */
+.mapContainer :global(.nexara-map-info) {
+  font-family: var(--font-body, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  text-align: center;
+  padding: 12px 14px 14px;
+  min-width: 180px;
+  box-sizing: border-box;
+  background: #ffffff;
+  border-radius: 14px;
+}
+
+.mapContainer :global(.nexara-map-logo) {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  margin: 0 auto 8px;
+  display: block;
+  border-radius: 10px;
+  padding: 6px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--primary) 10%, transparent),
+    color-mix(in srgb, var(--secondary) 10%, transparent)
+  );
+}
+
+.mapContainer :global(.nexara-map-title) {
+  margin: 0 0 2px;
+  font-size: 0.92rem;
+  font-weight: 850;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
+
+.mapContainer :global(.nexara-map-subtitle) {
+  margin: 0 0 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.mapContainer :global(.nexara-map-btn) {
+  display: inline-flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  text-decoration: none;
+  color: #fff !important;
+  font-size: 0.82rem;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--primary) 92%, #0a2840),
+    var(--secondary)
+  ) !important;
+  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  box-shadow: 0 8px 18px rgba(9, 22, 40, 0.18);
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.mapContainer :global(.nexara-map-btn:hover) {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.mapContainer :global(.nexara-map-btn:active) {
+  transform: translateY(0);
+}
+
+.mapError {
+  width: 100%;
+  height: 100%;
+  min-height: 160px;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  text-align: center;
+  color: color-mix(in srgb, var(--primary) 55%, var(--danger));
+  background: color-mix(in srgb, var(--primary) 7%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--danger) 16%, transparent);
+  font-size: 0.85rem;
+}
+
+:global(body.dark) .mapContainer {
+  border-color: color-mix(in srgb, var(--primary) 20%, var(--border));
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--primary) 12%, transparent), transparent 60%),
+    radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--secondary) 12%, transparent), transparent 60%),
+    linear-gradient(160deg, color-mix(in srgb, var(--surface) 92%, #050a10), color-mix(in srgb, #0a1620 90%, var(--surface)));
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.38);
+}
+
+:global(body.dark) .mapContainer :global(.nexara-map-info) {
+  background: #122234;
+}
+
+:global(body.dark) .mapContainer :global(.nexara-map-title) {
+  color: #eef6ff;
+}
+
+:global(body.dark) .mapContainer :global(.nexara-map-subtitle) {
+  color: #a9bbce;
+}
+
+@media (max-width: 900px) {
+  .mapWrapper,
+  .mapError {
+    min-height: 160px;
+  }
+}
+
+@media (max-width: 600px) {
+  .mapContainer {
+    border-radius: 14px;
+    padding: 5px;
+  }
+
+  .mapWrapper,
+  .mapError {
+    min-height: 150px;
+    border-radius: 12px;
+  }
+}
 

@@ -256,43 +256,6 @@
   opacity: 0.82;
 }
 
-:global(body.light) .fab {
-  border-color: color-mix(in srgb, var(--primary) 42%, var(--surface));
-  box-shadow:
-    0 10px 22px color-mix(in srgb, var(--primary) 24%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #ffffff 30%, transparent);
-}
-
-:global(body.light) .panel {
-  background: linear-gradient(
-    165deg,
-    color-mix(in srgb, var(--surface) 96%, #ffffff) 0%,
-    color-mix(in srgb, var(--surface-2) 92%, var(--primary) 8%) 100%
-  );
-  border-color: color-mix(in srgb, var(--primary) 32%, transparent);
-  box-shadow: 0 24px 58px color-mix(in srgb, var(--primary) 18%, transparent);
-}
-
-:global(body.light) .panelHeader {
-  border-bottom-color: color-mix(in srgb, var(--primary) 24%, transparent);
-}
-
-:global(body.light) .panelHeader h3 {
-  color: #ffffff;
-}
-
-:global(body.light) .panelEyebrow {
-  color: color-mix(in srgb, #ffffff 88%, var(--secondary) 12%);
-}
-
-:global(body.light) .closeButton {
-  color: #ffffff;
-}
-
-:global(body.light) .closeButton:hover {
-  background: color-mix(in srgb, #ffffff 22%, transparent);
-}
-
 :global(body.dark) .fab {
   border-color: color-mix(in srgb, var(--primary) 40%, transparent);
 }

@@ -1,5 +1,5 @@
 "use client";
-import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 
 interface ThemeContextType {
   darkMode: boolean;
@@ -10,6 +10,8 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [darkMode, setDarkMode] = useState(false);
+  /** No forzar clase en el primer paint: el sitio público aplica dark vía PublicSiteThemeLock. */
+  const hasUserThemePreference = useRef(false);
 
   // Helper to sync class only on <body>
   const syncDarkClass = (isDark: boolean) => {
@@ -24,18 +26,14 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Always start in light mode on each load.
+  // Solo sincronizar <body> cuando el usuario usa el toggle (no pisar rutas públicas).
   useEffect(() => {
-    setDarkMode(false);
-    syncDarkClass(false);
-  }, []);
-
-  // Sync class on change
-  useEffect(() => {
+    if (!hasUserThemePreference.current) return;
     syncDarkClass(darkMode);
   }, [darkMode]);
 
   const toggleDarkMode = () => {
+    hasUserThemePreference.current = true;
     setDarkMode((prev) => !prev);
   };
 

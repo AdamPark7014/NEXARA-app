@@ -1,24 +1,25 @@
 .container {
   width: 100%;
-  max-width: 980px;
+  max-width: var(--content-max);
   margin: 0 auto;
-  padding: 24px 14px 44px;
+  padding: var(--page-padding-y) var(--page-padding-x) calc(var(--page-padding-y) * 1.55);
   display: grid;
-  gap: 22px;
+  gap: clamp(28px, 4vw, 44px);
 }
 
 .hero {
   border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
-  border-radius: 16px;
-  padding: 18px;
+  border-radius: 20px;
+  padding: clamp(20px, 2.6vw, 28px);
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 14px;
-  align-items: end;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: clamp(16px, 2.2vw, 22px);
+  align-items: start;
   background:
     radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--primary) 12%, transparent), transparent 56%),
     radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--secondary) 12%, transparent), transparent 58%),
-    color-mix(in srgb, var(--surface) 96%, #f0f4f8);
+    linear-gradient(160deg, var(--surface-clean), var(--surface-clean-soft));
+  box-shadow: 0 14px 36px color-mix(in srgb, var(--shadow) 38%, transparent);
 }
 
 .kicker {
@@ -46,7 +47,7 @@
 
 .pdfButton {
   width: fit-content;
-  min-height: 42px;
+  min-height: 44px;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--border));
   background: color-mix(in srgb, var(--surface) 94%, var(--primary) 6%);
@@ -57,12 +58,23 @@
   text-decoration: none;
   font-weight: 700;
   font-size: 0.92rem;
-  padding: 0 18px;
+  padding: 0 20px;
+  white-space: nowrap;
+  align-self: start;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.pdfButton:hover {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--primary) 22%, transparent);
 }
 
 .consultButton {
   width: fit-content;
-  min-height: 42px;
+  min-height: 44px;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--secondary) 35%, var(--border));
   background: linear-gradient(135deg, var(--primary), var(--secondary));
@@ -73,14 +85,21 @@
   text-decoration: none;
   font-weight: 700;
   font-size: 0.92rem;
-  padding: 0 18px;
+  padding: 0 20px;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.consultButton:hover {
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--primary) 35%, transparent);
 }
 
 .block {
   border: 1px solid color-mix(in srgb, var(--secondary) 22%, var(--border));
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--surface) 96%, #f0f4f8);
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--shadow) 34%, transparent);
+  border-radius: var(--radius-md);
+  background: linear-gradient(160deg, var(--surface-clean), var(--surface-clean-soft));
+  box-shadow: var(--elev-1);
   overflow: hidden;
 }
 
@@ -92,14 +111,18 @@
   text-transform: uppercase;
   font-weight: 800;
   color: #ffffff;
-  background: linear-gradient(90deg, #88acd0 0%, #0d4d82 100%);
+  background: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--primary) 72%, #0f3f64),
+    color-mix(in srgb, var(--secondary) 72%, #185a7d)
+  );
 }
 
 .blockBody {
   position: relative;
-  padding: 20px 20px 24px;
+  padding: clamp(18px, 2.2vw, 26px);
   display: grid;
-  gap: 22px;
+  gap: clamp(18px, 2.4vw, 26px);
 }
 
 .blockBody::before {
@@ -112,116 +135,582 @@
   pointer-events: none;
 }
 
-.sectorRow {
+/* ——— Sectores: secciones limpias (sin bloque “tabla” ni banda teal) ——— */
+.sectorSection {
+  margin-top: clamp(28px, 4vw, 44px);
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.sectorSectionHead {
+  margin-bottom: clamp(20px, 2.8vw, 28px);
+  max-width: 52rem;
+}
+
+.sectorSectionTitle {
+  margin: 0 0 10px 0;
+  font-size: clamp(1.2rem, 2.1vw, 1.45rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  color: var(--foreground);
+}
+
+.sectorSectionTitle::after {
+  content: "";
+  display: block;
+  width: 44px;
+  height: 3px;
+  margin-top: 12px;
+  border-radius: 3px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--primary) 85%, transparent),
+    color-mix(in srgb, var(--secondary) 75%, transparent)
+  );
+}
+
+.sectorSectionLead {
+  margin: 0;
+  font-size: 0.94rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  max-width: 58ch;
+}
+
+/* Nombre de clase sin "card": evita reglas globales [class*="card"] en globals.scss */
+.sectorGrid {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
-  gap: 20px;
-  align-items: center;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  gap: clamp(14px, 2vw, 18px);
+  max-width: 1200px;
 }
 
-.rowReverse {
-  grid-template-columns: 260px minmax(0, 1fr);
+@media (min-width: 900px) {
+  .sectorGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px 18px;
+  }
 }
 
-.rowReverse .sectorContent {
-  order: 2;
+@media (min-width: 1280px) {
+  .sectorGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    max-width: 1280px;
+  }
 }
 
-.rowReverse .sectorImageWrap {
-  order: 1;
-}
-
-.sectorContent {
-  display: grid;
-  gap: 8px;
-}
-
-.sectorTitle {
-  margin: 0;
-  font-size: 1.24rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  font-weight: 800;
-  color: color-mix(in srgb, var(--secondary) 74%, var(--foreground));
-}
-
-.sectorBullets {
-  margin: 0;
-  padding-left: 22px;
-  display: grid;
-  gap: 8px;
-}
-
-.sectorBullets li {
-  font-size: 1.08rem;
-  line-height: 1.6;
-  color: color-mix(in srgb, var(--foreground) 90%, var(--primary));
-}
-
-.sectorImageWrap {
+.sectorTile,
+.sectorTileMuted {
   position: relative;
-  min-height: 190px;
-  border-radius: 6px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--border));
+  border: none;
+  outline: none;
+  background: color-mix(in srgb, var(--surface) 97%, var(--background));
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--shadow) 18%, transparent);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
-.sectorImage {
+.sectorTile:hover,
+.sectorTileMuted:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--shadow) 24%, transparent);
+}
+
+.sectorTileMuted {
+  background: color-mix(in srgb, var(--surface) 95%, var(--background));
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--shadow) 14%, transparent);
+}
+
+.sectorTileMedia {
+  position: relative;
+  aspect-ratio: 5 / 3;
+  max-height: 120px;
+  flex-shrink: 0;
+  background: linear-gradient(160deg, #0f1c28, #152a3d);
+}
+
+.sectorTileMuted .sectorTileMedia {
+  max-height: 112px;
+  opacity: 0.97;
+}
+
+.sectorTileImg {
   object-fit: cover;
+}
+
+.sectorTileBody {
+  padding: 12px 14px 14px;
+  display: grid;
+  gap: 8px;
+  flex: 1;
+}
+
+.sectorTileTitle {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+  color: var(--foreground);
+}
+
+.sectorTileList {
+  margin: 0;
+  padding: 0 0 0 1.05rem;
+  list-style: disc;
+  display: grid;
+  gap: 6px;
+}
+
+.sectorTileList li {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--text-secondary) 98%, var(--foreground));
+  padding: 0;
+  margin: 0;
+  border: none;
+  outline: none;
+}
+
+.sectorTileMuted .sectorTileList li {
+  color: color-mix(in srgb, var(--text-secondary) 100%, var(--foreground));
 }
 
 .bottomActions {
   display: flex;
   justify-content: center;
-  gap: 10px;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: clamp(18px, 2.2vw, 24px);
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--border));
+  background: linear-gradient(165deg, var(--surface-clean), var(--surface-clean-soft));
+  box-shadow: var(--elev-1);
+}
+
+/* Noticias (movidas desde Inicio): al final del catálogo */
+.newsHub {
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--border));
+  border-radius: var(--radius-md);
+  background: linear-gradient(160deg, var(--surface-clean), var(--surface-clean-soft));
+  box-shadow: var(--elev-1);
+  padding: clamp(18px, 2.2vw, 26px);
+  display: grid;
+  gap: 14px;
+}
+
+.newsHubHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
   flex-wrap: wrap;
 }
 
+.newsHubBrand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.newsHubLogo {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 18px color-mix(in srgb, var(--shadow) 55%, transparent));
+}
+
+.newsHubTitle {
+  margin: 0;
+  font-size: clamp(1.25rem, 2.1vw, 1.7rem);
+  line-height: 1.15;
+  color: color-mix(in srgb, var(--foreground) 92%, var(--primary));
+  font-weight: 900;
+}
+
+.newsHubSubtitle {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  max-width: 70ch;
+  line-height: 1.6;
+}
+
+.newsHubCta {
+  min-height: 42px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--secondary) 35%, var(--border));
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.newsHubGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.newsHubCard {
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
+  background: color-mix(in srgb, var(--surface) 96%, var(--background));
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--shadow) 46%, transparent);
+  padding: 14px 14px 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.newsHubMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: var(--text-tertiary);
+}
+
+.newsHubCardTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.25;
+  color: color-mix(in srgb, var(--foreground) 92%, var(--primary));
+}
+
+.newsHubCardSummary {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  font-size: 0.95rem;
+}
+
+.newsHubEmpty {
+  border-radius: 14px;
+  border: 1px dashed color-mix(in srgb, var(--primary) 22%, var(--border));
+  padding: 18px;
+  text-align: center;
+  color: var(--text-secondary);
+  display: grid;
+  gap: 4px;
+}
+
 @media (max-width: 900px) {
-  .container {
-    max-width: 760px;
+  .newsHubGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Casos publicados (antes en inicio): alineado al hero y a filas de sector */
+.casosSection {
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--border));
+  border-radius: 20px;
+  background: linear-gradient(160deg, var(--surface-clean), var(--surface-clean-soft));
+  box-shadow: var(--elev-1);
+  padding: clamp(22px, 2.6vw, 32px);
+  display: grid;
+  gap: clamp(22px, 3vw, 30px);
+  scroll-margin-top: calc(var(--header-offset) + 12px);
+  overflow: hidden;
+}
+
+.casosSectionHead {
+  display: grid;
+  gap: 12px;
+  padding-bottom: clamp(14px, 2vw, 18px);
+  border-bottom: 1px solid color-mix(in srgb, var(--primary) 14%, var(--border));
+}
+
+.casosKicker {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--text-tertiary);
+}
+
+.casosTitleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.casosTitle {
+  margin: 0;
+  font-size: clamp(1.35rem, 2.4vw, 1.85rem);
+  line-height: 1.12;
+  font-weight: 800;
+  color: color-mix(in srgb, var(--foreground) 92%, var(--primary));
+}
+
+.casosLead {
+  margin: 8px 0 0;
+  max-width: 72ch;
+  color: var(--text-secondary);
+  line-height: 1.58;
+  font-size: 0.98rem;
+}
+
+.casosEmpty {
+  margin: 0;
+  padding: 20px;
+  text-align: center;
+  border-radius: 12px;
+  border: 1px dashed color-mix(in srgb, var(--primary) 28%, var(--border));
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.casosList {
+  display: grid;
+  gap: clamp(24px, 3.2vw, 36px);
+}
+
+.caseCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.92fr);
+  gap: clamp(20px, 2.8vw, 28px);
+  align-items: stretch;
+  padding: clamp(20px, 2.4vw, 28px);
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--primary) 16%, var(--border));
+  background:
+    radial-gradient(900px 280px at 0% 0%, color-mix(in srgb, var(--primary) 8%, transparent), transparent 55%),
+    color-mix(in srgb, var(--surface) 97%, var(--background));
+  box-shadow:
+    0 12px 32px color-mix(in srgb, var(--shadow) 42%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 10%, transparent);
+}
+
+.caseCardReverse {
+  grid-template-columns: minmax(280px, 0.95fr) minmax(0, 1fr);
+}
+
+.caseCardReverse .caseContent {
+  order: 2;
+}
+
+.caseCardReverse .caseVisual {
+  order: 1;
+}
+
+.caseContent {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  min-width: 0;
+}
+
+.caseSector {
+  margin: 0;
+  width: fit-content;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--secondary) 30%, var(--border));
+  background: color-mix(in srgb, var(--secondary) 10%, var(--surface));
+  color: color-mix(in srgb, var(--foreground) 88%, var(--secondary));
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.caseTitle {
+  margin: 0;
+  font-size: clamp(1.15rem, 1.9vw, 1.45rem);
+  line-height: 1.2;
+  font-weight: 800;
+  color: color-mix(in srgb, var(--foreground) 94%, var(--primary));
+}
+
+.caseSummary {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.98rem;
+  line-height: 1.62;
+  max-width: 62ch;
+}
+
+.caseMetaWrap {
+  margin-top: 4px;
+}
+
+.caseMeta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--primary) 12%, var(--border));
+  background: color-mix(in srgb, var(--surface-2, var(--surface)) 88%, var(--background));
+}
+
+.caseMetaItem {
+  display: grid;
+  gap: 3px;
+}
+
+.caseMetaItem span {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.caseMetaItem strong {
+  font-size: 0.88rem;
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--foreground) 92%, var(--primary));
+}
+
+.caseTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.caseTag {
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--border));
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+  font-size: 0.76rem;
+  font-weight: 650;
+  color: color-mix(in srgb, var(--foreground) 90%, var(--primary));
+}
+
+.caseHighlights {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.caseHighlights li {
+  position: relative;
+  padding-left: 14px;
+  color: color-mix(in srgb, var(--foreground) 90%, var(--primary));
+  line-height: 1.5;
+  font-size: 0.92rem;
+}
+
+.caseHighlights li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.45em;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 78%, var(--secondary));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.caseVisual {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.caseMainPhoto {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  min-height: 200px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--primary) 16%, var(--border));
+  background: color-mix(in srgb, var(--background) 92%, var(--foreground));
+}
+
+.caseThumbs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.caseThumb {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  min-height: 88px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--primary) 14%, var(--border));
+  background: color-mix(in srgb, var(--background) 94%, var(--foreground));
+}
+
+.caseThumbsPlaceholder {
+  grid-column: 1 / -1;
+  min-height: 96px;
+  border-radius: 10px;
+  border: 1px dashed color-mix(in srgb, var(--primary) 24%, var(--border));
+  display: grid;
+  place-items: center;
+  color: var(--text-tertiary);
+  font-size: 0.82rem;
+}
+
+.casePhoto {
+  object-fit: cover;
+}
+
+@media (max-width: 900px) {
+  .caseCard,
+  .caseCardReverse {
+    grid-template-columns: 1fr;
   }
 
-  .sectorRow {
-    grid-template-columns: minmax(0, 1fr) 220px;
+  .caseCardReverse .caseContent,
+  .caseCardReverse .caseVisual {
+    order: 0;
   }
 
-  .rowReverse {
-    grid-template-columns: 220px minmax(0, 1fr);
+  .caseMeta {
+    grid-template-columns: 1fr;
   }
 
-  .sectorTitle {
-    font-size: 1.05rem;
+  .caseMainPhoto {
+    aspect-ratio: 16 / 10;
+    min-height: 220px;
   }
 
-  .sectorBullets li {
-    font-size: 0.96rem;
+  .sectorTileTitle {
+    font-size: 0.9rem;
+  }
+
+  .sectorTileList li {
+    font-size: 0.78rem;
   }
 }
 
 @media (max-width: 700px) {
   .container {
-    padding: 12px 10px 24px;
+    padding: 12px var(--page-padding-x) 28px;
+  }
+
+  .casosSection {
+    padding: 14px;
   }
 
   .hero {
     grid-template-columns: 1fr;
-  }
-
-  .sectorRow,
-  .rowReverse {
-    grid-template-columns: 1fr;
-  }
-
-  .rowReverse .sectorContent,
-  .rowReverse .sectorImageWrap {
-    order: 0;
-  }
-
-  .sectorImageWrap {
-    min-height: 230px;
   }
 
   .pdfButton,
@@ -229,11 +718,11 @@
     width: 100%;
   }
 
-  .sectorTitle {
-    font-size: 1rem;
+  .sectorTileTitle {
+    font-size: 0.88rem;
   }
 
-  .sectorBullets li {
-    font-size: 0.94rem;
+  .sectorTileList li {
+    font-size: 0.76rem;
   }
 }

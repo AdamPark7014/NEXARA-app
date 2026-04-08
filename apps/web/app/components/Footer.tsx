@@ -155,7 +155,6 @@ export default function Footer() {
               </div>
             </div>
 
-            {/* Map */}
             <div className={styles.mapCenter}>
               <Map />
             </div>
@@ -188,28 +187,28 @@ export default function Footer() {
                   <li><Link href="/nexara">Sobre Nexara</Link></li>
                   <li><Link href="/proyectos">Proyectos</Link></li>
                   <li><Link href="/contacto">Contacto</Link></li>
+                  <li><Link href="/contacto#ubicacion">Ubicación</Link></li>
                 </ul>
               </div>
             </div>
           </div>
 
-          {/* Row 2: Contact Cards Side by Side */}
           <div className={styles.contactRow}>
-            {/* Sales Card */}
-            <div className={styles.contactCard}>
-              <div className={styles.cardHeader}>
-                <div className={styles.cardIcon}><Icon.Briefcase /></div>
-                <div className={styles.cardHeaderText}>
-                  <h3 className={styles.cardTitle}>Ventas</h3>
-                  <p className={styles.cardDesc}>Cotizaciones y proyectos</p>
+            {/* Sales Block */}
+            <div className={styles.contactBlock}>
+              <div className={styles.blockHead}>
+                <div className={styles.iconBox}><Icon.Briefcase /></div>
+                <div className={styles.blockHeadText}>
+                  <h3 className={styles.blockTitle}>Ventas</h3>
+                  <p className={styles.blockDesc}>Cotizaciones y proyectos</p>
                 </div>
               </div>
-              <div className={styles.cardBody}>
-                <div className={styles.cardContact}>
+              <div className={styles.blockBody}>
+                <div className={styles.blockInfo}>
                   <span className={styles.contactInfo}><Icon.Phone /> +52 1 55 3650 5044</span>
                   <span className={styles.contactInfo}><Icon.Email /> ventas@nexara.com.mx</span>
                 </div>
-                <div className={styles.cardActions}>
+                <div className={styles.blockActions}>
                   <Link className={styles.actionBtn} href="mailto:ventas@nexara.com.mx?subject=Solicitud de información" data-type="email">
                     <Icon.Email /> Email
                   </Link>
@@ -220,21 +219,21 @@ export default function Footer() {
               </div>
             </div>
 
-            {/* Support Card */}
-            <div className={styles.contactCard}>
-              <div className={styles.cardHeader}>
-                <div className={styles.cardIcon}><Icon.Headphones /></div>
-                <div className={styles.cardHeaderText}>
-                  <h3 className={styles.cardTitle}>Soporte</h3>
-                  <p className={styles.cardDesc}>Ayuda técnica</p>
+            {/* Support Block */}
+            <div className={styles.contactBlock}>
+              <div className={styles.blockHead}>
+                <div className={styles.iconBox}><Icon.Headphones /></div>
+                <div className={styles.blockHeadText}>
+                  <h3 className={styles.blockTitle}>Soporte</h3>
+                  <p className={styles.blockDesc}>Ayuda técnica</p>
                 </div>
               </div>
-              <div className={styles.cardBody}>
-                <div className={styles.cardContact}>
+              <div className={styles.blockBody}>
+                <div className={styles.blockInfo}>
                   <span className={styles.contactInfo}><Icon.Phone /> +52 1 55 4926 8141</span>
                   <span className={styles.contactInfo}><Icon.Email /> soporte@nexara.com.mx</span>
                 </div>
-                <div className={styles.cardActions}>
+                <div className={styles.blockActions}>
                   <Link className={styles.actionBtn} href="mailto:soporte@nexara.com.mx?subject=Solicitud de soporte" data-type="email">
                     <Icon.Email /> Email
                   </Link>

@@ -2,7 +2,8 @@ import Image from "next/image";
 import type { Metadata } from "next";
 import styles from "./page.module.css";
 import { buildApiUrl, getApiBase } from "@/lib/api-base";
-import SeoInterlinkHub from "@/components/SeoInterlinkHub";
+import CatalogShowcase from "./CatalogShowcase";
+import { PROYECTOS_SECTOR_COVERS } from "./proyectosSectorCovers";
 
 const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
 
@@ -47,15 +48,28 @@ type Project = {
   services: string[];
   tags: string[];
   highlights: string[];
+  gallery: string[];
   mainImage?: string | null;
   showInCatalog: boolean;
   createdAt: string;
 };
 
-type SectorTemplate = {
-  key: string;
+type NewsPost = {
+  id: number;
   title: string;
-  image: string;
+  slug: string;
+  status?: string;
+  summary?: string | null;
+  content: string;
+  coverImageUrl?: string | null;
+  publishedAt?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+};
+
+type SectorTemplate = {
+  key: keyof typeof PROYECTOS_SECTOR_COVERS;
+  title: string;
   bullets: string[];
   group: "main" | "other";
 };
@@ -100,6 +114,9 @@ const getProjects = async (): Promise<Project[]> => {
         highlights: Array.isArray(item.highlights)
           ? item.highlights.filter((value): value is string => typeof value === "string")
           : [],
+        gallery: Array.isArray(item.gallery)
+          ? item.gallery.filter((value): value is string => typeof value === "string")
+          : [],
         mainImage: typeof item.mainImage === "string" ? item.mainImage : null,
         showInCatalog: Boolean(item.showInCatalog),
         createdAt:
@@ -113,11 +130,43 @@ const getProjects = async (): Promise<Project[]> => {
   }
 };
 
+const getNews = async (): Promise<NewsPost[]> => {
+  try {
+    const response = await fetch(buildApiUrl("news"), { cache: "no-store" });
+    if (!response.ok) return [];
+    const raw = (await response.json()) as unknown;
+    const rows = Array.isArray(raw) ? raw : [];
+    const normalized = rows.map((entry) => {
+      const item = (entry ?? {}) as Partial<NewsPost>;
+      return {
+        id: Number(item.id) || 0,
+        title: typeof item.title === "string" ? item.title : "Sin título",
+        slug: typeof item.slug === "string" ? item.slug : "",
+        status: typeof item.status === "string" ? item.status : undefined,
+        summary: typeof item.summary === "string" ? item.summary : null,
+        content: typeof item.content === "string" ? item.content : "",
+        coverImageUrl: typeof item.coverImageUrl === "string" ? item.coverImageUrl : null,
+        publishedAt: typeof item.publishedAt === "string" ? item.publishedAt : null,
+        createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
+        updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : undefined,
+      } as NewsPost;
+    });
+
+    return normalized
+      .filter((item) => {
+        const status = String((item.status ?? "")).toUpperCase();
+        return !status || status === "PUBLISHED";
+      })
+      .sort((a, b) => new Date(b.publishedAt || b.createdAt).getTime() - new Date(a.publishedAt || a.createdAt).getTime());
+  } catch {
+    return [];
+  }
+};
+
 const sectorTemplates: SectorTemplate[] = [
   {
     key: "computo-empresarial",
     title: "Computo empresarial",
-    image: "/servicios/square-1.jpg",
     bullets: [
       "Suministro y configuración de equipos listos para operación y crecimiento.",
       "Accesorios: laptops, workstations y servidores.",
@@ -127,7 +176,6 @@ const sectorTemplates: SectorTemplate[] = [
   {
     key: "redes-conectividad",
     title: "Redes y conectividad",
-    image: "/servicios/square-2.jpg",
     bullets: [
       "Diseño e implementación de redes estables, seguras y administrables.",
       "Accesorios: switches, access points y cableado.",
@@ -137,7 +185,6 @@ const sectorTemplates: SectorTemplate[] = [
   {
     key: "videovigilancia-seguridad",
     title: "Videovigilancia y seguridad",
-    image: "/servicios/square-3.jpg",
     bullets: [
       "Cobertura integral para proteger activos físicos y digitales.",
       "Accesorios: CCTV, control de acceso y monitoreo.",
@@ -147,7 +194,6 @@ const sectorTemplates: SectorTemplate[] = [
   {
     key: "licenciamiento",
     title: "Licenciamiento",
-    image: "/servicios/square-4.jpg",
     bullets: [
       "Gestión de licencias y cumplimiento para operar con software legal y actualizado.",
       "Accesorios: productividad, seguridad y colaboración.",
@@ -157,7 +203,6 @@ const sectorTemplates: SectorTemplate[] = [
   {
     key: "gubernamental",
     title: "Gubernamental",
-    image: "/soluciones/rect-a.jpg",
     bullets: [
       "Modernizamos entornos públicos con infraestructura segura, equipamiento y soporte operativo continuo.",
     ],
@@ -166,7 +211,6 @@ const sectorTemplates: SectorTemplate[] = [
   {
     key: "educativo",
     title: "Educativo",
-    image: "/soluciones/rect-b.jpg",
     bullets: [
       "Implementamos aulas y redes institucionales para aprendizaje digital con alta disponibilidad.",
     ],
@@ -175,7 +219,6 @@ const sectorTemplates: SectorTemplate[] = [
   {
     key: "pymes",
     title: "Pymes",
-    image: "/soluciones/rect-c.jpg",
     bullets: [
       "Diseñamos paquetes tecnológicos escalables para crecer sin frenar la operación.",
     ],
@@ -184,7 +227,6 @@ const sectorTemplates: SectorTemplate[] = [
   {
     key: "salud",
     title: "Salud",
-    image: "/soluciones/rect-d.jpg",
     bullets: [
       "Aseguramos continuidad y protección de información en clínicas y centros médicos.",
     ],
@@ -193,7 +235,6 @@ const sectorTemplates: SectorTemplate[] = [
   {
     key: "industrial",
     title: "Industrial",
-    image: "/soluciones/rect-e.jpg",
     bullets: [
       "Integración de TI para plantas y operaciones con foco en control, seguridad y productividad.",
     ],
@@ -203,9 +244,13 @@ const sectorTemplates: SectorTemplate[] = [
 
 export default async function ProjectsPage() {
   const projects = await getProjects();
+  const news = await getNews();
   const sortedProjects = [...projects].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
+
+  const catalogForShowcase = sortedProjects.filter((p) => p.showInCatalog);
+  const showcaseProjects = (catalogForShowcase.length ? catalogForShowcase : sortedProjects).slice(0, 6);
 
   const catalogSchema = {
     "@context": "https://schema.org",
@@ -229,7 +274,7 @@ export default async function ProjectsPage() {
       slug: project?.slug,
       title: template.title,
       bullets: template.bullets,
-      image: template.image,
+      image: PROYECTOS_SECTOR_COVERS[template.key],
       alt: template.title,
       group: template.group,
     };
@@ -237,40 +282,37 @@ export default async function ProjectsPage() {
 
   const mainSectors = sectors.filter((sector) => sector.group === "main");
   const otherSectors = sectors.filter((sector) => sector.group === "other");
+  const latestNews = news.slice(0, 3);
 
-  const renderSectorRow = (
+  const renderSectorCard = (
     sector: (typeof sectors)[number],
-    index: number,
-  ) => {
-    const reverse = index % 2 === 1;
-
-    return (
-      <article
-        key={sector.id}
-        id={sector.slug || sector.key}
-        className={`${styles.sectorRow} ${reverse ? styles.rowReverse : ""}`}
-      >
-        <div className={styles.sectorContent}>
-          <h3 className={styles.sectorTitle}>{sector.title}</h3>
-          <ul className={styles.sectorBullets}>
-            {sector.bullets.map((bullet, bulletIndex) => (
-              <li key={`${sector.id}-${bulletIndex}`}>{bullet}</li>
-            ))}
-          </ul>
-        </div>
-        <div className={styles.sectorImageWrap}>
-          <Image
-            src={sector.image}
-            alt={sector.alt}
-            fill
-            sizes="(max-width: 700px) 100vw, 210px"
-            className={styles.sectorImage}
-            unoptimized
-          />
-        </div>
-      </article>
-    );
-  };
+    variant: "main" | "other",
+  ) => (
+    <article
+      key={sector.id}
+      id={sector.slug || sector.key}
+      className={variant === "main" ? styles.sectorTile : styles.sectorTileMuted}
+      data-reveal="up"
+    >
+      <div className={styles.sectorTileMedia}>
+        <Image
+          src={sector.image}
+          alt={sector.alt}
+          fill
+          sizes="(max-width: 640px) 100vw, (max-width: 1000px) 33vw, 260px"
+          className={styles.sectorTileImg}
+        />
+      </div>
+      <div className={styles.sectorTileBody}>
+        <h3 className={styles.sectorTileTitle}>{sector.title}</h3>
+        <ul className={styles.sectorTileList}>
+          {sector.bullets.map((bullet, bulletIndex) => (
+            <li key={`${sector.id}-${bulletIndex}`}>{bullet}</li>
+          ))}
+        </ul>
+      </div>
+    </article>
+  );
 
   return (
     <main className={`${styles.container} public-section-page ultra-corp-page ultra-corp-proyectos ultra-corp-strict`} aria-label="Catálogo de proyectos Nexara">
@@ -278,13 +320,13 @@ export default async function ProjectsPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(catalogSchema) }}
       />
-      <header className={styles.hero}>
+      <header className={styles.hero} data-reveal="soft">
         <div>
           <p className={styles.kicker}>PORTAFOLIO TECNOLÓGICO</p>
           <h1 className={styles.heroTitle}>Sectores donde ya generamos impacto real</h1>
           <p className={styles.heroText}>
-            Este catálogo resume líneas de solución y sectores atendidos para facilitar decisiones
-            de compra e implementación con un enfoque empresarial.
+            Arriba encontrarás casos publicados con detalle e imágenes; más abajo, líneas de solución
+            y sectores atendidos para orientar compra e implementación con criterio empresarial.
           </p>
         </div>
         <a
@@ -297,21 +339,39 @@ export default async function ProjectsPage() {
         </a>
       </header>
 
-      <section className={styles.block} aria-labelledby="sectores-principales-title">
-        <h2 id="sectores-principales-title" className={styles.blockBand}>Sectores principales</h2>
-        <div className={styles.blockBody}>
-          {mainSectors.map((sector, index) => renderSectorRow(sector, index))}
+      <div data-reveal="up">
+        <CatalogShowcase projects={showcaseProjects} />
+      </div>
+
+      <section className={styles.sectorSection} aria-labelledby="sectores-principales-title" data-reveal="up">
+        <header className={styles.sectorSectionHead}>
+          <h2 id="sectores-principales-title" className={styles.sectorSectionTitle}>
+            Sectores principales
+          </h2>
+          <p className={styles.sectorSectionLead}>
+            Líneas núcleo donde solemos intervenir con equipamiento, redes, videovigilancia y cumplimiento de software.
+          </p>
+        </header>
+        <div className={styles.sectorGrid} data-reveal-stagger>
+          {mainSectors.map((s) => renderSectorCard(s, "main"))}
         </div>
       </section>
 
-      <section className={styles.block} aria-labelledby="otros-sectores-title">
-        <h2 id="otros-sectores-title" className={styles.blockBand}>Otros sectores</h2>
-        <div className={styles.blockBody}>
-          {otherSectors.map((sector, index) => renderSectorRow(sector, index))}
+      <section className={styles.sectorSection} aria-labelledby="otros-sectores-title" data-reveal="up">
+        <header className={styles.sectorSectionHead}>
+          <h2 id="otros-sectores-title" className={styles.sectorSectionTitle}>
+            Otros sectores
+          </h2>
+          <p className={styles.sectorSectionLead}>
+            Verticales complementarias con el mismo criterio de continuidad, seguridad y soporte operativo.
+          </p>
+        </header>
+        <div className={styles.sectorGrid} data-reveal-stagger>
+          {otherSectors.map((s) => renderSectorCard(s, "other"))}
         </div>
       </section>
 
-      <section className={styles.bottomActions}>
+      <section className={styles.bottomActions} data-reveal="up">
         <a href="/contacto" data-track-conversion="projects_consult_cta" className={styles.consultButton}>
           Solicitar asesoría para mi sector
         </a>
@@ -326,7 +386,40 @@ export default async function ProjectsPage() {
         </a>
       </section>
 
-      <SeoInterlinkHub title="Explora soluciones por industria" currentPath="/proyectos" maxItems={12} />
+      <section className={styles.newsHub} aria-labelledby="news-hub-heading" data-reveal="up">
+        <div className={styles.newsHubHead}>
+          <div className={styles.newsHubBrand}>
+            <Image src="/logo-nexara.png" alt="Nexara" width={48} height={48} className={styles.newsHubLogo} />
+            <div>
+              <h2 id="news-hub-heading" className={styles.newsHubTitle}>Entérate lo que pasa en Nexara</h2>
+              <p className={styles.newsHubSubtitle}>
+                Actualizaciones, novedades y comunicados relevantes para operación, compras y dirección.
+              </p>
+            </div>
+          </div>
+          <a className={styles.newsHubCta} href="/contacto">Recibir novedades</a>
+        </div>
+
+        {latestNews.length ? (
+          <div className={styles.newsHubGrid} data-reveal-stagger>
+            {latestNews.map((item) => (
+              <article key={item.id} className={styles.newsHubCard} data-reveal="up">
+                <div className={styles.newsHubMeta}>
+                  <span>Actualización</span>
+                  <span>{new Date(item.publishedAt || item.createdAt).toLocaleDateString("es-MX")}</span>
+                </div>
+                <h3 className={styles.newsHubCardTitle}>{item.title}</h3>
+                <p className={styles.newsHubCardSummary}>{item.summary || "Nueva actualización disponible."}</p>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.newsHubEmpty}>
+            <strong>Próximamente</strong>
+            <span>Estamos preparando nuevas publicaciones.</span>
+          </div>
+        )}
+      </section>
     </main>
   );
 }

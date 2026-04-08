@@ -2,8 +2,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import styles from "./page.module.css";
+import Map from "@/app/components/Map";
 import { buildApiUrl } from "@/lib/api-base";
-import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 
 export default function ContactoPage() {
   const [submitted, setSubmitted] = useState(false);
@@ -64,9 +64,12 @@ export default function ContactoPage() {
   };
 
   return (
-    <main className={`${styles.container} ultra-corp-page ultra-corp-contacto ultra-corp-strict`} aria-label="Página de contacto">
+    <main
+      className={`${styles.container} public-section-page ultra-corp-page ultra-corp-contacto ultra-corp-strict`}
+      aria-label="Página de contacto"
+    >
       {/* Hero Section */}
-      <section className={styles.hero}>
+      <section className={styles.hero} data-reveal="soft">
         <div className={styles.heroContent}>
           <p className={styles.heroKicker}>NEXARA CONTACT CENTER</p>
           <h1 className={styles.heroTitle}>Contáctanos</h1>
@@ -77,10 +80,10 @@ export default function ContactoPage() {
         </div>
       </section>
 
-      <div className={styles.contentGrid}>
+      <div className={styles.contentGrid} data-reveal-stagger>
         {/* Contact Information */}
-        <aside className={styles.contactInfo}>
-          <div className={styles.infoCard}>
+        <aside className={styles.contactInfo} data-reveal="up">
+          <div className={styles.infoTile} data-reveal="up">
             <div className={styles.infoIcon}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
@@ -94,7 +97,7 @@ export default function ContactoPage() {
             </div>
           </div>
 
-          <div className={styles.infoCard}>
+          <div className={styles.infoTile} data-reveal="up">
             <div className={styles.infoIcon}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
@@ -111,7 +114,7 @@ export default function ContactoPage() {
             </div>
           </div>
 
-          <div className={styles.infoCard}>
+          <div className={styles.infoTile} data-reveal="up">
             <div className={styles.infoIcon}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
@@ -129,7 +132,7 @@ export default function ContactoPage() {
             </div>
           </div>
 
-          <div className={styles.infoCard}>
+          <div className={styles.infoTile} data-reveal="up">
             <div className={styles.infoIcon}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
@@ -152,7 +155,7 @@ export default function ContactoPage() {
           </div>
 
           {/* Quick Links */}
-          <div className={styles.quickLinks}>
+          <div className={styles.quickLinks} data-reveal="up">
             <h4>Enlaces rápidos</h4>
             <ul>
               <li>
@@ -167,7 +170,7 @@ export default function ContactoPage() {
             </ul>
           </div>
 
-          <div className={styles.quickLinks}>
+          <div className={styles.quickLinks} data-reveal="up">
             <h4>Antes de contactarnos</h4>
             <ul>
               <li><span>1.</span> Describe el objetivo de negocio.</li>
@@ -178,8 +181,8 @@ export default function ContactoPage() {
         </aside>
 
         {/* Contact Form */}
-        <section className={styles.formSection}>
-          <div className={styles.formHeader}>
+        <section className={styles.formSection} data-reveal="up">
+          <div className={styles.formHeader} data-reveal="soft">
             <h2>Envia tu requerimiento</h2>
             <p>Completa el formulario y un especialista te responderá con una ruta de acción clara.</p>
           </div>
@@ -321,7 +324,7 @@ export default function ContactoPage() {
               </button>
 
               <p className={styles.formNote}>
-                Al enviar este formulario, aceptas nuestra politica de privacidad.
+                Al enviar este formulario, aceptas nuestra política de privacidad.
               </p>
             </form>
           ) : (
@@ -354,44 +357,16 @@ export default function ContactoPage() {
         </section>
       </div>
 
-      {/* Extra CTA Section */}
-      <section className={styles.extraCta}>
-        <div className={styles.ctaCard}>
-          <div className={styles.ctaIcon}>
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 6v6l4 2" />
-            </svg>
-          </div>
-          <div>
-            <h3>¿Necesitas atención urgente?</h3>
-            <p>Nuestro equipo está disponible para soporte 24/7</p>
-            <a href="tel:+525536505044" data-track-conversion="contact_call_now" className={styles.ctaButton}>
-              Llamar ahora
-            </a>
-          </div>
+      <section id="ubicacion" className={styles.mapSection} aria-labelledby="ubicacion-heading" data-reveal="up">
+        <h2 id="ubicacion-heading" className={styles.mapSectionTitle}>
+          Ubicación
+        </h2>
+        <p className={styles.mapSectionLead}>
+          Consulta nuestra sede en el mapa. También atendemos con cobertura nacional.
+        </p>
+        <div className={styles.mapEmbed}>
+          <Map />
         </div>
-
-        <div className={styles.ctaCard}>
-          <div className={styles.ctaIcon}>
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="3" width="20" height="14" rx="2" />
-              <line x1="8" y1="21" x2="16" y2="21" />
-              <line x1="12" y1="17" x2="12" y2="21" />
-            </svg>
-          </div>
-          <div>
-            <h3>¿Buscas una cotización?</h3>
-            <p>Conoce nuestras soluciones y servicios especializados</p>
-            <Link href="/servicios" data-track-conversion="contact_view_services" className={styles.ctaButton}>
-              Ver soluciones
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section style={{ marginTop: 18 }}>
-        <SeoInterlinkHub title="Explora rutas de soluciones" currentPath="/contacto" maxItems={10} />
       </section>
     </main>
   );
