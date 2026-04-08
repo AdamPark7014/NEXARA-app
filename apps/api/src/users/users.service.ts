@@ -292,6 +292,23 @@ export class UsersService {
     }
   }
 
+  async findPublicTeam(limit = 12) {
+    const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(24, Math.trunc(limit))) : 12;
+    return this.prisma['user'].findMany({
+      where: {
+        email: { notIn: this.superAdminEmails },
+      },
+      select: {
+        id: true,
+        nombre: true,
+        avatarUrl: true,
+        role: { select: { nombre: true } },
+      },
+      orderBy: [{ fechaCreacion: 'desc' }, { id: 'desc' }],
+      take: safeLimit,
+    });
+  }
+
   findByDepartment(departmentId: number) {
     return this.prisma['user'].findMany({
       where: { departmentId },

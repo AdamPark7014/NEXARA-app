@@ -100,26 +100,23 @@ import styles from './Header.module.css';
 import { usePathname } from 'next/navigation';
 
 const navLinks = [
-  { name: 'Inicio', href: '/' },
-  { name: 'Sobre nosotros', href: '/nexara' },
+  { name: 'Nosotros', href: '/nexara' },
   { name: 'Servicios', href: '/servicios' },
-  { name: 'Catálogo', href: '/proyectos' },
+  { name: 'Cobertura', href: '/#cobertura' },
+  { name: 'Proyectos', href: '/proyectos' },
   { name: 'Contacto', href: '/contacto' },
 ];
 
-import { useTheme } from './ThemeContext';
-
-
 export default function Header() {
-  const { darkMode, toggleDarkMode } = useTheme();
   const pathname = usePathname();
   const isConsole = Boolean(pathname && pathname.startsWith('/console'));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isActiveLink = (href: string) => {
     if (!pathname) return false;
-    if (href === '/') return pathname === '/';
-    return pathname === href || pathname.startsWith(`${href}/`);
+    const baseHref = href.split("#")[0] || "/";
+    if (baseHref === "/") return pathname === "/";
+    return pathname === baseHref || pathname.startsWith(`${baseHref}/`);
   };
 
   const toggleMobileMenu = () => {
@@ -159,7 +156,7 @@ export default function Header() {
       <div className={styles.headerInner}>
         <div className={styles.logoSection}>
           <Link href="/" onClick={closeMobileMenu}>
-            <Image src="/logo-nexara.png" alt="Nexara Logo" className={styles.logo} width={120} height={40} priority />
+            <Image src="/logo-nexara.png" alt="Nexara Logo" className={styles.logo} width={200} height={62} priority />
           </Link>
         </div>
         
@@ -179,15 +176,7 @@ export default function Header() {
 
         <div className={styles.rightSection}>
           {(pathname && pathname.startsWith('/console')) && <BackupRestorePanel />}
-          <button
-            type="button"
-            className={styles.switch}
-            onClick={toggleDarkMode}
-            aria-label={darkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-          >
-            {darkMode ? '🌙' : '☀️'}
-          </button>
-          
+
           {/* Mobile Menu Button */}
           <button 
             type="button"

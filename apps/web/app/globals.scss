@@ -61,6 +61,67 @@ html {
   text-size-adjust: 100%;
 }
 
+/* Scroll-reveal micro animations (public site)
+   Important: we only hide/blur once JS marks "reveal-ready",
+   so above-the-fold content is crisp on initial load. */
+[data-reveal] {
+  --reveal-delay: 0ms;
+  --reveal-duration: 720ms;
+  --reveal-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  opacity: 1;
+  transform: none;
+  filter: none;
+  transition:
+    opacity var(--reveal-duration) var(--reveal-ease) var(--reveal-delay),
+    transform var(--reveal-duration) var(--reveal-ease) var(--reveal-delay),
+    filter calc(var(--reveal-duration) * 0.8) var(--reveal-ease) var(--reveal-delay);
+  will-change: opacity, transform, filter;
+}
+
+/* If we explicitly skip a reveal transition (above-the-fold on load) */
+[data-reveal-skip] {
+  transition: none !important;
+}
+
+/* Hidden state only after JS initializes */
+html.reveal-ready [data-reveal]:not(.reveal-visible) {
+  opacity: 0;
+  transform: translate3d(0, 14px, 0) scale(0.985);
+  filter: blur(8px);
+}
+
+html.reveal-ready [data-reveal="left"]:not(.reveal-visible) {
+  transform: translate3d(-14px, 0, 0) scale(0.99);
+}
+
+html.reveal-ready [data-reveal="right"]:not(.reveal-visible) {
+  transform: translate3d(14px, 0, 0) scale(0.99);
+}
+
+html.reveal-ready [data-reveal="up"]:not(.reveal-visible) {
+  transform: translate3d(0, 14px, 0) scale(0.985);
+}
+
+html.reveal-ready [data-reveal="soft"]:not(.reveal-visible) {
+  transform: translate3d(0, 10px, 0);
+  filter: blur(6px);
+}
+
+.reveal-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+  filter: blur(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+    transition: none !important;
+  }
+}
+
 /* Light theme: refined corporate palette with enhanced sophistication */
 body,
 body.light {
@@ -333,7 +394,7 @@ body :where([data-ui="landing-news"],
 [data-ui="landing-delivery"],
 [data-ui="landing-clients"],
 [data-ui="landing-cta"],
-[data-ui="landing-recent-projects"]) {
+[data-ui="landing-coverage-map"]) {
   border: 1px solid color-mix(in srgb, var(--primary) 28%, transparent) !important;
   border-radius: var(--radius-lg) !important;
   background: linear-gradient(160deg, var(--surface-clean), var(--surface-clean-soft)) !important;
@@ -362,7 +423,6 @@ body :where([data-ui="landing-quicknav"]) {
 }
 
 /* Extra pass: professional aqua styling for Inicio internals */
-body [data-ui="landing-recent-projects"] article,
 body [data-ui="landing-news"] [id="news-active-slide"],
 body [data-ui="landing-qa"],
 body [data-ui="landing-cta"] {
@@ -372,7 +432,6 @@ body [data-ui="landing-cta"] {
   box-shadow: 0 12px 24px color-mix(in srgb, var(--shadow) 54%, transparent) !important;
 }
 
-body [data-ui="landing-recent-projects"] :where(h2, h3),
 body [data-ui="landing-news"] :where(h2, h3),
 body [data-ui="landing-capabilities"] :where(h2, h3),
 body [data-ui="landing-solutions"] :where(h2, h3),

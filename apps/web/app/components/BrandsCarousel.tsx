@@ -82,10 +82,10 @@ export default function BrandsCarousel() {
   return (
     <section className={styles.brandsSection}>
       <div className={styles.brandsHeader}>
-        <div className={styles.brandsBadge}>NUESTROS ALIADOS</div>
-        <h2 className={styles.brandsTitle}>Marcas Líderes</h2>
+        <div className={styles.brandsBadge}>MARCAS</div>
+        <h2 className={styles.brandsTitle}>Marcas que confían en nosotros</h2>
         <p className={styles.brandsDescription}>
-          Trabajamos con las marcas más reconocidas a nivel mundial para ofrecerte productos de la más alta calidad y confiabilidad.
+          Aliados estratégicos con los que integramos soluciones confiables para operación empresarial.
         </p>
       </div>
 

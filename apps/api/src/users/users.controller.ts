@@ -121,6 +121,12 @@ export class UsersController {
     return this.usersService.findAssignableUsers(userFull);
   }
 
+  @Get('public-team')
+  async findPublicTeam(@Query('limit') limit?: string) {
+    const parsed = Number(limit);
+    return this.usersService.findPublicTeam(Number.isFinite(parsed) ? parsed : 12);
+  }
+
   @Get('next-employee-number')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.USERS_MANAGE] })

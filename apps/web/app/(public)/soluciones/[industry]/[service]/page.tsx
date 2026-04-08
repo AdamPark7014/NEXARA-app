@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -7,6 +8,9 @@ import {
   getProgrammaticLandings,
 } from "@/lib/seo/programmatic-landings";
 import { getPageKeywords, categoryFromSlug } from "@/lib/seo/keywords";
+import SeoInterlinkHub from "@/components/SeoInterlinkHub";
+import { getSolucionHeroImage } from "../../solucionesLandingImagery";
+import styles from "./page.module.css";
 
 type Params = {
   industry: string;
@@ -38,9 +42,10 @@ export function generateMetadata({ params }: { params: Params }): Metadata {
   const path = `/soluciones/${industry.slug}/${service.slug}`;
   const title = `${service.name} en Puebla y Mexico | Nexara`;
   const description = `${service.summary} Servicio profesional en Puebla, CDMX y toda la Republica Mexicana. Nexara — tecnologia confiable para tu empresa.`;
+  const ogImage = getSolucionHeroImage(service.slug);
 
   const category = categoryFromSlug(service.slug);
-  const pageKeywords = getPageKeywords(category, 'Puebla');
+  const pageKeywords = getPageKeywords(category, "Puebla");
 
   return {
     title,
@@ -62,13 +67,13 @@ export function generateMetadata({ params }: { params: Params }): Metadata {
       url: `${siteUrl}${path}`,
       title,
       description,
-      images: [{ url: "/logo-nexara.png", width: 1200, height: 630, alt: title }],
+      images: [{ url: ogImage, width: 1200, height: 630, alt: title }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: ["/logo-nexara.png"],
+      images: [ogImage],
     },
   };
 }
@@ -82,6 +87,7 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
   }
 
   const landingPath = `/soluciones/${industry.slug}/${service.slug}`;
+  const heroImage = getSolucionHeroImage(service.slug);
 
   const related = getProgrammaticLandings()
     .filter((item) => item.industry.slug === industry.slug || item.service.slug === service.slug)
@@ -95,6 +101,7 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
     serviceType: service.name,
     areaServed: "MX",
     url: `${siteUrl}${landingPath}`,
+    image: heroImage,
     provider: {
       "@type": "Organization",
       name: "NEXARA",
@@ -119,76 +126,99 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
       {
         "@type": "ListItem",
         position: 2,
-        name: "Soluciones",
-        item: `${siteUrl}/soluciones`,
+        name: "Servicios",
+        item: `${siteUrl}/servicios`,
       },
       {
         "@type": "ListItem",
         position: 3,
-        name: industry.name,
-        item: `${siteUrl}/soluciones/${industry.slug}`,
-      },
-      {
-        "@type": "ListItem",
-        position: 4,
-        name: service.name,
+        name: `${service.name} para ${industry.name}`,
         item: `${siteUrl}${landingPath}`,
       },
     ],
   };
 
   return (
-    <main style={{ maxWidth: 1080, margin: "0 auto", padding: "48px 20px", display: "grid", gap: 24 }}>
+    <main
+      className={`${styles.container} public-section-page ultra-corp-page ultra-corp-soluciones ultra-corp-strict`}
+      aria-label={`Solución ${service.name} para ${industry.name}`}
+    >
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(pageSchema) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+      />
 
-      <header style={{ display: "grid", gap: 12 }}>
-        <p style={{ margin: 0, letterSpacing: 1.2, fontSize: 12, color: "#6b7280", textTransform: "uppercase" }}>
-          Solucion especializada
-        </p>
-        <h1 style={{ margin: 0, fontSize: "clamp(30px, 5vw, 48px)", lineHeight: 1.08, color: "#0f172a" }}>
-          {service.name} para {industry.name}
-        </h1>
-        <p style={{ margin: 0, fontSize: 18, color: "#334155", maxWidth: 920 }}>
-          {industry.painPoint} {service.summary}
-        </p>
+      <nav aria-label="Ruta de navegación">
+        <ol className={styles.breadcrumb}>
+          <li>
+            <Link href="/">Inicio</Link>
+          </li>
+          <li>
+            <Link href="/servicios">Servicios</Link>
+          </li>
+          <li aria-current="page">
+            {service.name} · {industry.name}
+          </li>
+        </ol>
+      </nav>
+
+      <header className={styles.hero}>
+        <div className={styles.heroSplit}>
+          <div className={styles.heroCopy}>
+            <p className={styles.kicker}>Solución especializada</p>
+            <h1 className={styles.pageTitle}>
+              {service.name} para {industry.name}
+            </h1>
+            <p className={styles.pageLead}>
+              {industry.painPoint} {service.summary}
+            </p>
+          </div>
+          <div className={styles.heroVisual}>
+            <Image
+              src={heroImage}
+              alt={`${service.name} — referencia visual`}
+              fill
+              className={styles.heroImg}
+              sizes="(max-width: 900px) 100vw, 42vw"
+              priority
+            />
+          </div>
+        </div>
       </header>
 
-      <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 14 }}>
+      <section className={styles.outcomeGrid} aria-label="Resultados esperados">
         {industry.outcomes.map((outcome) => (
-          <article key={outcome} style={{ border: "1px solid #cbd5e1", borderRadius: 14, padding: 16, background: "#f8fafc" }}>
-            <h2 style={{ margin: 0, fontSize: 17, color: "#0f172a" }}>{outcome}</h2>
+          <article key={outcome} className={styles.outcomeTile}>
+            <h2>{outcome}</h2>
           </article>
         ))}
       </section>
 
-      <section style={{ border: "1px solid #cbd5e1", borderRadius: 14, padding: 18, background: "#ffffff" }}>
-        <h2 style={{ marginTop: 0, marginBottom: 10, color: "#0f172a" }}>Que implementamos</h2>
-        <ul style={{ margin: 0, paddingLeft: 20, color: "#334155", display: "grid", gap: 8 }}>
+      <section className={styles.detailShell} aria-labelledby="implement-heading">
+        <div className={styles.sectionHead}>
+          <h2 id="implement-heading" className={styles.sectionTitle}>
+            Qué implementamos
+          </h2>
+        </div>
+        <ul className={styles.proseList}>
           {service.deliverables.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
       </section>
 
-      <section style={{ border: "1px solid #1d4ed8", background: "#eff6ff", borderRadius: 14, padding: 18, display: "grid", gap: 12 }}>
-        <h2 style={{ margin: 0, color: "#1e3a8a" }}>Solicita una propuesta para {industry.name}</h2>
-        <p style={{ margin: 0, color: "#1e3a8a" }}>
-          Te enviamos una ruta de implementacion por fases y objetivos medibles para tu operacion.
+      <section className={styles.ctaBand} aria-label="Contacto comercial">
+        <h2>Solicita una propuesta para {industry.name}</h2>
+        <p>
+          Te enviamos una ruta de implementación por fases y objetivos medibles para tu operación.
         </p>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+        <div className={styles.ctaRow}>
           <Link
             href={`/contacto?industry=${industry.slug}&service=${service.slug}`}
             data-track-conversion="landing_primary_cta"
             data-landing-path={landingPath}
-            style={{
-              background: "#1d4ed8",
-              color: "#fff",
-              textDecoration: "none",
-              padding: "10px 14px",
-              borderRadius: 10,
-              fontWeight: 700,
-            }}
+            className={styles.ctaPrimary}
           >
             Hablar con un especialista
           </Link>
@@ -196,44 +226,56 @@ export default function ProgrammaticLandingPage({ params }: { params: Params }) 
             href="/servicios"
             data-track-conversion="landing_secondary_cta"
             data-landing-path={landingPath}
-            style={{
-              border: "1px solid #1d4ed8",
-              color: "#1d4ed8",
-              textDecoration: "none",
-              padding: "10px 14px",
-              borderRadius: 10,
-              fontWeight: 700,
-            }}
+            className={styles.ctaSecondary}
           >
             Ver todos los servicios
           </Link>
         </div>
       </section>
 
-      <section style={{ display: "grid", gap: 10 }}>
-        <h2 style={{ margin: 0, color: "#0f172a" }}>Rutas relacionadas</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 10 }}>
-          {related.map((item) => {
-            const href = `/soluciones/${item.industry.slug}/${item.service.slug}`;
-            return (
-              <Link
-                key={href}
-                href={href}
-                style={{
-                  textDecoration: "none",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: 10,
-                  padding: "12px 14px",
-                  color: "#0f172a",
-                  background: "#fff",
-                }}
-              >
-                <strong style={{ display: "block", marginBottom: 2 }}>{item.service.name}</strong>
-                <span style={{ color: "#64748b" }}>{item.industry.name}</span>
-              </Link>
-            );
-          })}
-        </div>
+      {related.length > 0 ? (
+        <section className={styles.relatedSection} aria-labelledby="related-heading">
+          <div className={styles.sectionHead}>
+            <h2 id="related-heading" className={styles.sectionTitle}>
+              Rutas relacionadas
+            </h2>
+            <p className={styles.pageLead}>Otras combinaciones sector + servicio que suelen consultarse junto a esta.</p>
+          </div>
+          <div className={styles.relatedGrid}>
+            {related.map((item) => {
+              const href = `/soluciones/${item.industry.slug}/${item.service.slug}`;
+              const img = getSolucionHeroImage(item.service.slug);
+              return (
+                <Link key={href} href={href} className={styles.relatedTile}>
+                  <div className={styles.relatedTileMedia}>
+                    <Image
+                      src={img}
+                      alt=""
+                      fill
+                      className={styles.relatedTileImg}
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                    />
+                  </div>
+                  <div className={styles.relatedTileBody}>
+                    <strong>{item.service.name}</strong>
+                    <span>{item.industry.name}</span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      <section className={styles.hubShell} aria-label="Más soluciones por industria">
+        <SeoInterlinkHub
+          title="Soluciones recomendadas por industria"
+          subtitle="Cada columna agrupa enlaces de contexto; el conjunto cubre distintas combinaciones sector + servicio."
+          currentPath={landingPath}
+          maxItems={12}
+          maxIndustries={6}
+          maxServicesPerIndustry={3}
+        />
       </section>
     </main>
   );
