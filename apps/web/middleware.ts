@@ -274,8 +274,15 @@ export function middleware(request: NextRequest) {
     return applyNoStoreForHtml(request, response);
   }
 
-  // Dominio principal o www: mantener como está, Next.js maneja normalmente
-  const response = applyNoStoreForHtml(request, applySecurityHeaders(NextResponse.next()));
+  // Dominio principal: reescribir / para servir /nexara/page.tsx sin cambiar URL
+  if ((request.method === 'GET' || request.method === 'HEAD') && request.nextUrl.pathname === '/') {
+    const url = request.nextUrl.clone();
+    url.pathname = '/nexara';
+    const rewriteResponse = applySecurityHeaders(NextResponse.rewrite(url), request);
+    return applyNoStoreForHtml(request, rewriteResponse);
+  }
+
+  const response = applyNoStoreForHtml(request, applySecurityHeaders(NextResponse.next(), request));
   if (SENSITIVE_PATH_PATTERN.test(request.nextUrl.pathname)) {
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
     response.headers.set('Pragma', 'no-cache');

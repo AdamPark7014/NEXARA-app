@@ -100,9 +100,9 @@ import styles from './Header.module.css';
 import { usePathname } from 'next/navigation';
 
 const navLinks = [
-  { name: 'Nosotros', href: '/nexara' },
+  { name: 'Nosotros', href: '/' },
   { name: 'Servicios', href: '/servicios' },
-  { name: 'Cobertura', href: '/#cobertura' },
+  { name: 'Cobertura', href: '/cobertura' },
   { name: 'Proyectos', href: '/proyectos' },
   { name: 'Contacto', href: '/contacto' },
 ];
