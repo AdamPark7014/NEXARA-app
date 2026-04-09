@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 import { useUser } from "./UserContext";
 import { flushOfflineQueue, getOfflineQueueLength } from "@/lib/offline-queue";
+import { revalidateHotApiCache } from "@/lib/offline-api-cache";
+import { getNativeFetch } from "@/lib/native-fetch";
 
 function portalSessionBearer(): string | undefined {
   try {
@@ -29,7 +31,9 @@ export default function OfflineQueueFlusher() {
     };
 
     const run = () => {
-      flushOfflineQueue(resolveAuth);
+      void flushOfflineQueue(resolveAuth).then(() => {
+        if (resolveAuth()) void revalidateHotApiCache(getNativeFetch(), resolveAuth, 72);
+      });
     };
 
     const onVisible = () => {

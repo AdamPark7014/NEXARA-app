@@ -6,6 +6,8 @@ import android.os.Build;
 import android.os.Bundle;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import android.webkit.WebSettings;
+import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,6 +20,19 @@ public class MainActivity extends BridgeActivity {
   public void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     requestNeededPermissions();
+  }
+
+  /**
+   * Prioriza caché HTTP del WebView cuando hay copia local (mejor comportamiento sin red
+   * para el shell remoto de Capacitor). No sustituye a la caché lógica del API en JS.
+   */
+  @Override
+  public void onResume() {
+    super.onResume();
+    Bridge bridge = getBridge();
+    if (bridge != null && bridge.getWebView() != null) {
+      bridge.getWebView().getSettings().setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
+    }
   }
 
   private void requestNeededPermissions() {

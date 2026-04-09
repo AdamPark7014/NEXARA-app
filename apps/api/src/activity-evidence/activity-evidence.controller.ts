@@ -62,8 +62,8 @@ export class ActivityEvidenceController {
   }
 
   @Get(':activityId')
-  async getActivityEvidence(@Param('activityId') activityId: string) {
-    return this.service.getActivityEvidence(parseInt(activityId, 10));
+  async getActivityEvidence(@Param('activityId') activityId: string, @Req() req: any) {
+    return this.service.getActivityEvidence(parseInt(activityId, 10), req.user);
   }
 
   @Post(':activityId/entry-photo')

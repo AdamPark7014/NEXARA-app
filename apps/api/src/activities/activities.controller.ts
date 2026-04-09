@@ -49,9 +49,8 @@ export class ActivitiesController {
     if (user.isSuperAdmin) {
       result = await this.activitiesService.findAll();
     } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
-      // Admin: ve actividades de TODOS los usuarios no-admin + las propias
-      const nonAdminUsers = await this.usersService.findNonAdminUsers();
-      const allowedUserIds = [user.id, ...nonAdminUsers.map((u: { id: number }) => u.id)];
+      const scopeUsers = await this.usersService.findUsersForConsoleActivityScope();
+      const allowedUserIds = scopeUsers.map((u: { id: number }) => u.id);
       result = await this.activitiesService.findByAllowedUsers(allowedUserIds);
     } else {
       result = await this.activitiesService.findByResponsible(user.id);
@@ -146,9 +145,8 @@ export class ActivitiesController {
     if (user.isSuperAdmin) {
       return this.activitiesService.findAll(query);
     } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
-      // Admin: ve actividades de TODOS los usuarios no-admin + las propias
-      const nonAdminUsers = await this.usersService.findNonAdminUsers();
-      const allowedUserIds = [user.id, ...nonAdminUsers.map((u: { id: number }) => u.id)];
+      const scopeUsers = await this.usersService.findUsersForConsoleActivityScope();
+      const allowedUserIds = scopeUsers.map((u: { id: number }) => u.id);
       return this.activitiesService.findByAllowedUsers(allowedUserIds);
     } else {
       return this.activitiesService.findByResponsible(user.id);

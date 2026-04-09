@@ -16,9 +16,10 @@ type PanelLoginProps = {
   onBranchLogin?: (data: { access_token: string; branch: { id: number; name: string; branchNumber?: string | null; clientId: number; clientName?: string | null } }) => void;
   title?: string;
   subtitle?: string;
+  accessNotice?: string;
 };
 
-export default function PanelLogin({ redirectTo, requiredPermission, mode = "console", onClientLogin, onBranchLogin, title, subtitle }: PanelLoginProps) {
+export default function PanelLogin({ redirectTo, requiredPermission, mode = "console", onClientLogin, onBranchLogin, title, subtitle, accessNotice }: PanelLoginProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -390,6 +391,17 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
           outline-offset: 2px;
         }
 
+        .access-notice {
+          margin-bottom: 14px;
+          padding: 12px 14px;
+          border-radius: var(--radius-sm);
+          border: 1px solid color-mix(in srgb, var(--primary) 42%, var(--border));
+          background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+          color: var(--text-primary);
+          font-size: 0.87rem;
+          line-height: 1.45;
+        }
+
         .error-message {
           margin-top: 18px;
           padding: 12px 14px;
@@ -483,6 +495,11 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
 
       <div className="login-container">
         <div className="login-card">
+          {accessNotice ? (
+            <div className="access-notice" role="status">
+              {accessNotice}
+            </div>
+          ) : null}
           <div className="logo-container">
             <div className="logo">
               <Image src="/logo-nexara.png" alt="Nexara" width={64} height={64} className="logoImage" priority />

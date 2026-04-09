@@ -214,7 +214,7 @@ export class ActivitiesService {
   }
 
   async findByAllowedUsers(userIds: number[]) {
-    // Busca actividades solo de usuarios permitidos (admin de consola viendo usuarios normales)
+    // Actividades cuyo responsable está en la lista (p. ej. alcance de consola para admin)
     if (!userIds || userIds.length === 0) return [];
     return this.prisma['activity'].findMany({
       where: { responsableId: { in: userIds } },

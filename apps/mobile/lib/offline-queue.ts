@@ -2,6 +2,11 @@ import { getNativeFetch } from "./native-fetch";
 
 export const OFFLINE_QUEUE_STORAGE_KEY = "nexara-offline-queue-v1";
 
+/** Partes serializadas de FormData para reenvío al volver online. */
+export type SerializedFormPart =
+  | { t: "s"; name: string; value: string }
+  | { t: "f"; name: string; fileName: string; mime: string; b64: string };
+
 export type QueuedFetch = {
   id: string;
   url: string;
@@ -9,6 +14,8 @@ export type QueuedFetch = {
   headers: Record<string, string>;
   body: string | null;
   createdAt: number;
+  /** Si está definido, se reconstruye FormData en lugar de enviar `body` como texto. */
+  formParts?: SerializedFormPart[];
 };
 
 function readQueue(): QueuedFetch[] {
@@ -30,7 +37,15 @@ export function getOfflineQueueLength(): number {
 
 function writeQueue(items: QueuedFetch[]) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(OFFLINE_QUEUE_STORAGE_KEY, JSON.stringify(items.slice(-120)));
+  const trimmed = items.slice(-120);
+  try {
+    const ser = JSON.stringify(trimmed);
+    if (ser.length < 2_400_000) {
+      localStorage.setItem(OFFLINE_QUEUE_STORAGE_KEY, ser);
+    }
+  } catch {
+    /* cola muy grande (p. ej. adjuntos): solo IDB vía idbPutItem */
+  }
   window.dispatchEvent(new Event("nexara-offline-queue"));
 }
 
@@ -73,12 +88,31 @@ export async function flushOfflineQueue(getAuthHeader: () => string | undefined)
   for (const item of pending) {
     try {
       const headers = { ...item.headers, Authorization: auth };
-      const res = await http(item.url, {
-        method: item.method,
-        headers,
-        body: item.body || undefined,
-      });
-      if (!res.ok) remaining.push(item);
+      const h = new Headers(headers);
+      h.delete("Content-Type");
+
+      if (item.formParts?.length) {
+        const fd = new FormData();
+        for (const p of item.formParts) {
+          if (p.t === "s") {
+            fd.append(p.name, p.value);
+          } else {
+            const bin = atob(p.b64);
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            fd.append(p.name, new Blob([bytes], { type: p.mime || "application/octet-stream" }), p.fileName);
+          }
+        }
+        const res = await http(item.url, { method: item.method, headers: h, body: fd });
+        if (!res.ok) remaining.push(item);
+      } else {
+        const res = await http(item.url, {
+          method: item.method,
+          headers,
+          body: item.body || undefined,
+        });
+        if (!res.ok) remaining.push(item);
+      }
     } catch {
       remaining.push(item);
     }

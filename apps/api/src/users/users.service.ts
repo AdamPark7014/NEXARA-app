@@ -270,13 +270,12 @@ export class UsersService {
       const canAssignByHierarchy = hasConsoleAdminPermission || hasUsersManagePermission || isConsoleAdminByRole;
       
       if (canAssignByHierarchy) {
-        // Admin puede asignar a usuarios normales (sin accesoConsoleAdmin) de cualquier departamento
+        // Admin/supervisor de consola puede asignar a cualquier usuario operativo (incluye otros admins), excepto superadmins de plataforma
         return this.prisma['user'].findMany({
           where: {
             AND: [
               { id: { not: currentUser.id } },
               { email: { notIn: superAdminEmails } },
-              { role: { accesoConsoleAdmin: false } }, // Solo usuarios normales
             ],
           },
           select: { id: true, nombre: true, email: true, role: true, avatarUrl: true },
@@ -316,16 +315,15 @@ export class UsersService {
     });
   }
 
-    findNonAdminUsers() {
-      // Todos los usuarios que NO son admin de consola ni superadmin protegidos
-      return this.prisma['user'].findMany({
-        where: {
-          NOT: { role: { accesoConsoleAdmin: true } },
-          email: { notIn: ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'] },
-        },
-        select: { id: true },
-      });
-    }
+  /** Actividades visibles para CONSOLE_ADMIN: todo el personal excepto cuentas de plataforma. */
+  findUsersForConsoleActivityScope() {
+    return this.prisma['user'].findMany({
+      where: {
+        email: { notIn: this.superAdminEmails },
+      },
+      select: { id: true },
+    });
+  }
 
   findOne(id: number) {
     return this.prisma['user'].findUnique({

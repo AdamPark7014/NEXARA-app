@@ -105,7 +105,7 @@ const ActivityEvidenceFlow = () => {
   // Cargar actividades
   useEffect(() => {
     if (!user?.token) return;
-    fetch(buildApiUrl('activities'), {
+    fetch(buildApiUrl('activities?scope=mine'), {
       headers: { Authorization: `Bearer ${user.token}` },
     })
       .then((res) => res.ok ? res.json() : [])
@@ -777,26 +777,28 @@ const ActivityEvidenceFlow = () => {
       )}
 
       {/* Banner de Rechazo */}
-      {flowData.reviewStatus === 'REJECTED' && flowData.rejectedStep && flowData.reviewNotes && (
+      {flowData.reviewStatus === 'REJECTED' && (flowData.rejectedStep || flowData.reviewNotes) && (
         <div className={styles.rejectedBanner}>
           <h3 className={styles.rejectedTitle}>
             <span className={styles.rejectedEmoji}>⚠️</span>
             Tu evidencia fue rechazada
           </h3>
-          <div className={styles.rejectedStepRow}>
-            <strong className={styles.rejectedStrong}>Paso rechazado:</strong>{' '}
-            <span className={styles.rejectedStepText}>
-              {flowData.rejectedStep === 'ENTRY_PHOTO' && '📸 Paso 1: Foto de Entrada'}
-              {flowData.rejectedStep === 'EVIDENCE_PHOTOS' && '📷 Paso 2: Fotos de Evidencia'}
-              {flowData.rejectedStep === 'SERVICE_SHEET_PDF' && '📄 Paso 3: PDF Hoja de Servicio'}
-              {flowData.rejectedStep === 'SERVICE_SHEET_DATA' && '📝 Paso 4: Plantilla Interna'}
-              {flowData.rejectedStep === 'EXIT_PHOTO' && '🚪 Paso 5: Foto de Salida'}
-            </span>
-          </div>
+          {flowData.rejectedStep && (
+            <div className={styles.rejectedStepRow}>
+              <strong className={styles.rejectedStrong}>Paso rechazado:</strong>{' '}
+              <span className={styles.rejectedStepText}>
+                {flowData.rejectedStep === 'ENTRY_PHOTO' && '📸 Paso 1: Foto de Entrada'}
+                {flowData.rejectedStep === 'EVIDENCE_PHOTOS' && '📷 Paso 2: Fotos de Evidencia'}
+                {flowData.rejectedStep === 'SERVICE_SHEET_PDF' && '📄 Paso 3: PDF Hoja de Servicio'}
+                {flowData.rejectedStep === 'SERVICE_SHEET_DATA' && '📝 Paso 4: Plantilla Interna'}
+                {flowData.rejectedStep === 'EXIT_PHOTO' && '🚪 Paso 5: Foto de Salida'}
+              </span>
+            </div>
+          )}
           <div>
             <strong className={styles.rejectedStrong}>Observaciones del revisor:</strong>
             <p className={styles.rejectedNotes}>
-              {flowData.reviewNotes}
+              {(flowData.reviewNotes || '').trim() || 'Sin observaciones registradas.'}
             </p>
           </div>
           <div className={styles.rejectedHint}>
