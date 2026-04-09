@@ -20,6 +20,7 @@ import { VehiclesModule } from './vehicles/vehicles.module';
 import { ExpensesModule } from './expenses/expenses.module';
 import { GpsModule } from './gps/gps.module';
 import { NotificationsModule } from './notifications/notifications.module.js';
+import { DevicesModule } from './devices/devices.module.js';
 import { ViaticosModule } from './viaticos/viaticos.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { ProjectsModule } from './projects/projects.module';
@@ -76,6 +77,7 @@ import { SearchModule } from './search/search.module.js';
     ExpensesModule,
     GpsModule,
     ScheduleModule.forRoot(),
+    DevicesModule,
     NotificationsModule,
     ViaticosModule,
     AttendanceModule,

@@ -278,11 +278,11 @@ export function middleware(request: NextRequest) {
   if ((request.method === 'GET' || request.method === 'HEAD') && request.nextUrl.pathname === '/') {
     const url = request.nextUrl.clone();
     url.pathname = '/nexara';
-    const rewriteResponse = applySecurityHeaders(NextResponse.rewrite(url), request);
+    const rewriteResponse = applySecurityHeaders(NextResponse.rewrite(url));
     return applyNoStoreForHtml(request, rewriteResponse);
   }
 
-  const response = applyNoStoreForHtml(request, applySecurityHeaders(NextResponse.next(), request));
+  const response = applyNoStoreForHtml(request, applySecurityHeaders(NextResponse.next()));
   if (SENSITIVE_PATH_PATTERN.test(request.nextUrl.pathname)) {
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
     response.headers.set('Pragma', 'no-cache');

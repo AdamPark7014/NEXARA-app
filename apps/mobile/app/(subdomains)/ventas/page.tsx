@@ -22,7 +22,7 @@ export default function VentasIndex() {
       return;
     }
 
-    router.replace("/ventas/dashboard");
+    router.replace("/ventas/my-profile");
   }, [router, user]);
 
   return null;

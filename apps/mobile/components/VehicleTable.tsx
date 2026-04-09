@@ -3,7 +3,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
-import { triggerFileDownload } from '@/lib/file-download';
+import { triggerBlobDownload } from '@/lib/file-download';
+import { openExternalUrl } from '@/lib/open-external-url';
 import ExcelDownloadModal from './ExcelDownloadModal';
 import styles from './VehicleTable.module.css';
 
@@ -74,7 +75,9 @@ const VehicleTable = () => {
     if (excelPreparing) return;
     setExcelPreparing(true);
     try {
-      const res = await fetch(buildApiUrl('export/vehicle'));
+      const res = await fetch(buildApiUrl('export/vehicle'), {
+        headers: user?.token ? { Authorization: `Bearer ${user.token}` } : {},
+      });
       if (!res.ok) throw new Error('Error al exportar');
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
@@ -91,9 +94,13 @@ const VehicleTable = () => {
   };
 
   const handleDownloadExcel = () => {
-    if (!excelUrl) return;
-    triggerFileDownload(excelUrl, 'vehiculos.xlsx', { preferOpenOnMobile: true });
-    closeExcelModal();
+    if (!excelBlob) return;
+    void (async () => {
+      await triggerBlobDownload(excelBlob, 'vehiculos.xlsx', {
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      closeExcelModal();
+    })();
   };
 
   useEffect(() => {
@@ -506,14 +513,18 @@ const VehicleTable = () => {
                   <td>
                     <div>
                       {vehicle.evidenciaEntregaUrl ? (
-                        <a className="link" href={vehicle.evidenciaEntregaUrl} target="_blank" rel="noopener noreferrer">Entrega</a>
+                        <button type="button" className="link" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit', textDecoration: 'underline' }} onClick={() => void openExternalUrl(vehicle.evidenciaEntregaUrl!)}>
+                          Entrega
+                        </button>
                       ) : (
                         <span className={styles.muted}>Entrega: -</span>
                       )}
                     </div>
                     <div>
                       {vehicle.evidenciaDevolucionUrl ? (
-                        <a className="link" href={vehicle.evidenciaDevolucionUrl} target="_blank" rel="noopener noreferrer">Devolucion</a>
+                        <button type="button" className="link" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit', textDecoration: 'underline' }} onClick={() => void openExternalUrl(vehicle.evidenciaDevolucionUrl!)}>
+                          Devolucion
+                        </button>
                       ) : (
                         <span className={styles.muted}>Devolucion: -</span>
                       )}
@@ -673,8 +684,20 @@ const VehicleTable = () => {
 
               <div className={styles.mobileList}>
                 <div className={styles.mobileEvidenceLinks}>
-                  {vehicle.evidenciaEntregaUrl ? <a className="link" href={vehicle.evidenciaEntregaUrl} target="_blank" rel="noopener noreferrer">Entrega</a> : <span className={styles.muted}>Entrega: -</span>}
-                  {vehicle.evidenciaDevolucionUrl ? <a className="link" href={vehicle.evidenciaDevolucionUrl} target="_blank" rel="noopener noreferrer">Devolucion</a> : <span className={styles.muted}>Devolucion: -</span>}
+                  {vehicle.evidenciaEntregaUrl ? (
+                    <button type="button" className="link" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit', textDecoration: 'underline' }} onClick={() => void openExternalUrl(vehicle.evidenciaEntregaUrl!)}>
+                      Entrega
+                    </button>
+                  ) : (
+                    <span className={styles.muted}>Entrega: -</span>
+                  )}
+                  {vehicle.evidenciaDevolucionUrl ? (
+                    <button type="button" className="link" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit', textDecoration: 'underline' }} onClick={() => void openExternalUrl(vehicle.evidenciaDevolucionUrl!)}>
+                      Devolucion
+                    </button>
+                  ) : (
+                    <span className={styles.muted}>Devolucion: -</span>
+                  )}
                 </div>
                 <div className={styles.smallMuted}>Entrega fotos: {Array.isArray(vehicle.entregaFotos) ? vehicle.entregaFotos.length : 0} · Estatus: {vehicle.entregaEstatus || 'Pendiente'}</div>
               </div>

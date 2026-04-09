@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import styles from "./page.module.css";
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
+import { openExternalUrl } from "@/lib/open-external-url";
 
 type ContactMessage = {
   id: number;
@@ -162,7 +163,7 @@ export default function ContactosWeb() {
       if (sendResponse && sendChannel === "WHATSAPP") {
         const phoneDigits = (selectedMessage.phone || "").replace(/\D/g, "");
         const url = `https://wa.me/${phoneDigits}?text=${encodeURIComponent(trimmedResponse)}`;
-        window.open(url, "_blank", "noopener,noreferrer");
+        void openExternalUrl(url);
       }
       fetchMessages();
     } catch (err) {
@@ -302,14 +303,17 @@ export default function ContactosWeb() {
                   {selectedMessage.company && <p>{selectedMessage.company}</p>}
                 </div>
                 <div className={styles.actions}>
-                  <a
+                  <button
+                    type="button"
                     className={styles.secondaryButton}
-                    href={`mailto:${selectedMessage.email}?subject=${encodeURIComponent(
-                      selectedMessage.subject || "Contacto Nexara"
-                    )}`}
+                    onClick={() =>
+                      void openExternalUrl(
+                        `mailto:${selectedMessage.email}?subject=${encodeURIComponent(selectedMessage.subject || "Contacto Nexara")}`
+                      )
+                    }
                   >
                     Abrir correo
-                  </a>
+                  </button>
                   <button
                     type="button"
                     className={styles.ghostButton}

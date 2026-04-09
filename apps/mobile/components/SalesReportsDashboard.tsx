@@ -16,7 +16,7 @@ import {
   type SalesMetrics,
   type SalesVendorStats,
 } from '@/lib/sales-api';
-import { triggerFileDownload } from '@/lib/file-download';
+import { triggerBlobDownload, triggerFileDownload } from '@/lib/file-download';
 import styles from './SalesReportsDashboard.module.css';
 
 interface SalesReportsDashboardProps {
@@ -178,12 +178,15 @@ export default function SalesReportsDashboard({
   };
 
   const handleDownloadPdf = () => {
+    const name = `reporte-ventas-${currentPeriod}-${new Date().toISOString().slice(0, 10)}.pdf`;
+    if (pdfData?.length) {
+      void triggerBlobDownload(new Blob([new Uint8Array(pdfData)], { type: "application/pdf" }), name, {
+        mimeType: "application/pdf",
+      });
+      return;
+    }
     if (!pdfUrl) return;
-    triggerFileDownload(
-      pdfUrl,
-      `reporte-ventas-${currentPeriod}-${new Date().toISOString().slice(0, 10)}.pdf`,
-      { preferOpenOnMobile: true },
-    );
+    void triggerFileDownload(pdfUrl, name, { preferOpenOnMobile: true, mimeType: "application/pdf" });
   };
 
   const formatMoney = (value: number) =>
@@ -776,11 +779,12 @@ export default function SalesReportsDashboard({
               </div>
             </div>
             <div className={styles.pdfViewerContainer}>
-              <PDFViewer 
-                pdfUrl={pdfUrl} 
+              <PDFViewer
+                pdfUrl={pdfUrl}
                 pdfData={pdfData}
                 fileName={`reporte-ventas-${currentPeriod}.pdf`}
-                height="70vh"
+                height="600px"
+                fillParent
               />
             </div>
           </div>

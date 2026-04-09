@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationType } from '@prisma/client';
 import { Cron } from '@nestjs/schedule';
 import { PERMISSIONS } from '../common/permissions.js';
+import { PushDispatchService } from '../devices/push-dispatch.service.js';
 
 export interface INotificationPayload {
   userId: number;
@@ -24,6 +25,7 @@ export class NotificationsService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly pushDispatch: PushDispatchService,
     @Optional() @Inject('NOTIFICATIONS_GATEWAY') private readonly gateway?: any,
   ) {}
 
@@ -248,6 +250,14 @@ export class NotificationsService {
           notification,
         });
       }
+
+      void this.pushDispatch
+        .sendToUser(payload.userId, {
+          title: payload.title,
+          body: payload.message,
+          relatedUrl: payload.relatedUrl,
+        })
+        .catch((err) => this.logger.warn(`Push dispatch: ${err instanceof Error ? err.message : err}`));
 
       return notification;
     } catch (error) {

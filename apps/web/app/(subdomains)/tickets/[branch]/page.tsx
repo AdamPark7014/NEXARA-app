@@ -9,6 +9,8 @@ import { getApiAssetOrigin } from "@/lib/api-base";
 import { useTheme } from "@/components/ThemeContext";
 import consoleStyles from "../../console/console.module.css";
 import styles from "../tickets.module.css";
+import { openExternalUrl } from "@/lib/open-external-url";
+import { isCapacitorNative } from "@/lib/capacitor-env";
 
 const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false });
 
@@ -294,6 +296,12 @@ export default function BranchTicketsPage() {
   }, []);
 
   useEffect(() => {
+    if (session?.token) {
+      window.dispatchEvent(new Event("nexara-portal-session-changed"));
+    }
+  }, [session?.token]);
+
+  useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth <= 900);
     onResize();
     window.addEventListener("resize", onResize);
@@ -427,6 +435,7 @@ export default function BranchTicketsPage() {
   const handleBranchLogin = (data: { access_token: string; branch: BranchSession["branch"] }) => {
     const next = { token: data.access_token, branch: data.branch };
     window.sessionStorage.setItem("branchSession", JSON.stringify(next));
+    window.dispatchEvent(new Event("nexara-portal-session-changed"));
     setSession(next);
     setError(null);
     const expectedSlug = data.branch.branchNumber || `branch-${data.branch.id}`;
@@ -458,6 +467,10 @@ export default function BranchTicketsPage() {
     if (!session?.token) return;
     if (!draft.description.trim()) {
       setError(draft.requestType === "PREVENTIVE_INVENTORY" ? "Describe el alcance del mantenimiento e inventario" : "Describe el problema para levantar el ticket");
+      return;
+    }
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setError("Sin conexión: las solicitudes con archivos requieren internet. Conéctate e inténtalo de nuevo.");
       return;
     }
     setLoading(true);
@@ -495,6 +508,7 @@ export default function BranchTicketsPage() {
   const handleLogout = () => {
     window.sessionStorage.removeItem("branchSession");
     window.sessionStorage.removeItem("clientSession");
+    window.dispatchEvent(new Event("nexara-portal-session-changed"));
     setSession(null);
     window.location.replace("/tickets");
   };
@@ -720,9 +734,13 @@ export default function BranchTicketsPage() {
                   </div>
                   <div className={styles.actionRow}>
                     {ticket.serviceSheet?.pdfUrl && (
-                      <a className="button-secondary" href={getAssetUrl(ticket.serviceSheet.pdfUrl)} target="_blank" rel="noreferrer">
+                      <button
+                        type="button"
+                        className="button-secondary"
+                        onClick={() => void openExternalUrl(getAssetUrl(ticket.serviceSheet!.pdfUrl!))}
+                      >
                         Hoja de servicio (PDF)
-                      </a>
+                      </button>
                     )}
                     <button className="button-secondary" type="button" onClick={() => handleTicketReport(ticket.id)}>
                       Ver ticket (PDF)
@@ -741,13 +759,25 @@ export default function BranchTicketsPage() {
                           <div>
                             <strong>Ubicación llegada:</strong> {formatCoordinates(ticket.activityEvidence?.entryLatitude, ticket.activityEvidence?.entryLongitude)}
                             {hasCoordinates(ticket.activityEvidence?.entryLatitude, ticket.activityEvidence?.entryLongitude) && (
-                              <a className={styles.ticketInlineLink} href={getMapsUrl(ticket.activityEvidence?.entryLatitude, ticket.activityEvidence?.entryLongitude)} target="_blank" rel="noreferrer">Ver mapa</a>
+                              <button
+                                type="button"
+                                className={styles.ticketInlineLink}
+                                onClick={() => void openExternalUrl(getMapsUrl(ticket.activityEvidence?.entryLatitude, ticket.activityEvidence?.entryLongitude))}
+                              >
+                                Ver mapa
+                              </button>
                             )}
                           </div>
                           <div>
                             <strong>Ubicación salida:</strong> {formatCoordinates(ticket.activityEvidence?.exitLatitude, ticket.activityEvidence?.exitLongitude)}
                             {hasCoordinates(ticket.activityEvidence?.exitLatitude, ticket.activityEvidence?.exitLongitude) && (
-                              <a className={styles.ticketInlineLink} href={getMapsUrl(ticket.activityEvidence?.exitLatitude, ticket.activityEvidence?.exitLongitude)} target="_blank" rel="noreferrer">Ver mapa</a>
+                              <button
+                                type="button"
+                                className={styles.ticketInlineLink}
+                                onClick={() => void openExternalUrl(getMapsUrl(ticket.activityEvidence?.exitLatitude, ticket.activityEvidence?.exitLongitude))}
+                              >
+                                Ver mapa
+                              </button>
                             )}
                           </div>
                           <div><strong>PDF generado:</strong> {formatDateTime(ticket.activityEvidence?.serviceSheetUploadedAt)}</div>
@@ -764,13 +794,18 @@ export default function BranchTicketsPage() {
                             const mapUrl = getMapsUrl(coords.lat, coords.lng);
                             const mapPreviewUrl = getStaticMapPreviewUrl(coords.lat, coords.lng);
 
+                            const fileHref = mapReplacement ? mapUrl : file.url;
                             return (
                               <a
                                 key={`${ticket.id}-${file.label}-${file.url}`}
                                 className={styles.ticketFileCard}
-                                href={mapReplacement ? mapUrl : file.url}
-                                target="_blank"
+                                href={fileHref}
                                 rel="noreferrer"
+                                onClick={(e) => {
+                                  if (!isCapacitorNative()) return;
+                                  e.preventDefault();
+                                  void openExternalUrl(fileHref);
+                                }}
                               >
                                 <span className={styles.ticketFileLabel}>{mapReplacement ? "Mapa de llegada" : file.label}</span>
                                 {mapReplacement ? (
@@ -1004,9 +1039,13 @@ export default function BranchTicketsPage() {
                       <div key={`${request.id}-${idx}`} className={styles.mediaTile} style={{ display: "grid", placeItems: "center", padding: 8, minHeight: 140 }}>
                         {url.toLowerCase().endsWith(".pdf") ? (
                           <div className={`card ${styles.cardSoft}`} style={{ minHeight: 120, display: "grid", placeItems: "center", padding: 10 }}>
-                            <a className="button-secondary" href={getAssetUrl(url)} target="_blank" rel="noreferrer">
+                            <button
+                              type="button"
+                              className="button-secondary"
+                              onClick={() => void openExternalUrl(getAssetUrl(url))}
+                            >
                               Abrir PDF
-                            </a>
+                            </button>
                           </div>
                         ) : (
                           <img
@@ -1033,19 +1072,31 @@ export default function BranchTicketsPage() {
           onClick={() => setShowPdfModal(false)}
         >
           <div
-            style={{ background: "var(--surface, #fff)", borderRadius: 12, width: "100%", maxWidth: 980, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" }}
+            style={{
+              background: "var(--surface, #fff)",
+              borderRadius: 12,
+              width: "100%",
+              maxWidth: 980,
+              maxHeight: "min(92dvh, 920px)",
+              height: "min(92dvh, 920px)",
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
               <span style={{ fontWeight: 600 }}>{pdfModalTitle}</span>
               <button onClick={() => setShowPdfModal(false)} style={{ padding: "6px 14px", background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: 8, cursor: "pointer" }}>✕ Cerrar</button>
             </div>
-            <div style={{ flex: 1, overflow: "auto" }}>
+            <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
               <PDFViewer
                 pdfUrl={pdfUrl}
                 pdfData={pdfData}
                 fileName={pdfFileName}
                 height="800px"
+                fillParent
               />
             </div>
           </div>

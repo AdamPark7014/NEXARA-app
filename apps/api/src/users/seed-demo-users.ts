@@ -21,220 +21,361 @@ const upsertUser = async (data: {
     create: data,
   });
 
+const normalizeIdentity = (value: string) =>
+  value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\([^)]*\)/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+const PROTECTED_EMAILS = new Set(['gerencia@nexara.com.mx', 'developer@nexara.com.mx']);
+
+const buildRoleAccess = (overrides: Partial<{
+  accesoConsole: boolean;
+  accesoConsoleAdmin: boolean;
+  accesoActividades: boolean;
+  accesoEvidencias: boolean;
+  accesoViaticos: boolean;
+  accesoVehiculos: boolean;
+  accesoAsistencia: boolean;
+  accesoGps: boolean;
+  accesoGestionUsuarios: boolean;
+  accesoGestionTienda: boolean;
+  accesoGestionWeb: boolean;
+  accesoGestionCvs: boolean;
+  accesoPanelVentas: boolean;
+  accesoContabilidad: boolean;
+  accesoCotizaciones: boolean;
+  accesoInventario: boolean;
+  accesoCompras: boolean;
+  accesoManufactura: boolean;
+  accesoCalidad: boolean;
+  accesoMantenimiento: boolean;
+  accesoSeguridad: boolean;
+  accesoDocumentos: boolean;
+  accesoWorkflow: boolean;
+  accesoAuditoria: boolean;
+  accesoBI: boolean;
+  accesoBanca: boolean;
+  accesoMultas: boolean;
+  accesoClientes: boolean;
+  accesoLunchBreaks: boolean;
+}>) => ({
+  nivelAutoridad: 0,
+  accesoConsole: false,
+  accesoConsoleAdmin: false,
+  accesoActividades: false,
+  accesoEvidencias: false,
+  accesoViaticos: false,
+  accesoVehiculos: false,
+  accesoAsistencia: false,
+  accesoGps: false,
+  accesoGestionUsuarios: false,
+  accesoGestionTienda: false,
+  accesoGestionWeb: false,
+  accesoGestionCvs: false,
+  accesoPanelVentas: false,
+  accesoContabilidad: false,
+  accesoCotizaciones: false,
+  accesoInventario: false,
+  accesoCompras: false,
+  accesoManufactura: false,
+  accesoCalidad: false,
+  accesoMantenimiento: false,
+  accesoSeguridad: false,
+  accesoDocumentos: false,
+  accesoWorkflow: false,
+  accesoAuditoria: false,
+  accesoBI: false,
+  accesoBanca: false,
+  accesoMultas: false,
+  accesoClientes: false,
+  accesoLunchBreaks: false,
+  ...overrides,
+});
+
+const upsertRoleWithAccess = async (
+  nombre: string,
+  access: Parameters<typeof buildRoleAccess>[0],
+) => {
+  const payload = buildRoleAccess(access);
+  return prisma.role.upsert({
+    where: { nombre },
+    update: payload,
+    create: {
+      nombre,
+      ...payload,
+    },
+  });
+};
+
+const syncUserByIdentity = async (data: {
+  nombre: string;
+  email: string;
+  passwordHash: string;
+  roleId: number;
+  departmentId: number;
+  emailAliases?: string[];
+  nameAliases?: string[];
+}) => {
+  const aliases = [...new Set([data.email, ...(data.emailAliases ?? [])])];
+  const normalizedTargetNames = [data.nombre, ...(data.nameAliases ?? [])].map(normalizeIdentity);
+
+  const direct = await prisma.user.findUnique({ where: { email: data.email } });
+
+  const candidates = direct
+    ? [direct]
+    : await prisma.user.findMany({
+        where: {
+          OR: [
+            { email: { in: aliases } },
+            { nombre: { equals: data.nombre, mode: 'insensitive' as const } },
+            ...((data.nameAliases ?? []).map((alias) => ({
+              nombre: { equals: alias, mode: 'insensitive' as const },
+            }))),
+          ],
+        },
+      });
+
+  const bestMatch =
+    candidates.find((u) => u.email === data.email) ??
+    candidates.find((u) => aliases.includes(u.email)) ??
+    candidates.find((u) => normalizedTargetNames.includes(normalizeIdentity(u.nombre)));
+
+  if (!bestMatch) {
+    return upsertUser({
+      nombre: data.nombre,
+      email: data.email,
+      passwordHash: data.passwordHash,
+      roleId: data.roleId,
+      departmentId: data.departmentId,
+    });
+  }
+
+  return prisma.user.update({
+    where: { id: bestMatch.id },
+    data: {
+      nombre: data.nombre,
+      email: data.email,
+      passwordHash: data.passwordHash,
+      roleId: data.roleId,
+      departmentId: data.departmentId,
+    },
+  });
+};
+
+const cleanupIdentityDuplicates = async (data: {
+  targetUserId: number;
+  email: string;
+  emailAliases?: string[];
+  nombre: string;
+  nameAliases?: string[];
+}) => {
+  const emails = [...new Set([data.email, ...(data.emailAliases ?? [])])];
+  const normalizedNames = new Set(
+    [data.nombre, ...(data.nameAliases ?? [])].map((entry) => normalizeIdentity(entry)),
+  );
+
+  const pool = await prisma.user.findMany({
+    where: {
+      email: { endsWith: '@nexara.com.mx' },
+    },
+    select: { id: true, email: true, nombre: true },
+  });
+
+  const duplicateIds = pool
+    .filter((u) => {
+      if (u.id === data.targetUserId) return false;
+      if (PROTECTED_EMAILS.has(u.email)) return false;
+
+      const sameEmailIdentity = emails.includes(u.email);
+      const sameNameIdentity = normalizedNames.has(normalizeIdentity(u.nombre));
+      return sameEmailIdentity || sameNameIdentity;
+    })
+    .map((u) => u.id);
+
+  if (duplicateIds.length === 0) return 0;
+
+  const deleted = await prisma.user.deleteMany({
+    where: { id: { in: duplicateIds } },
+  });
+
+  return deleted.count;
+};
+
 async function main() {
-  // Crear roles y departamento únicos
-  const ceoRole = await prisma.role.upsert({
-    where: { nombre: 'CEO' },
-    update: {
-      nivelAutoridad: 0,
-      accesoConsole: true,
-      accesoConsoleAdmin: true,
-      accesoActividades: true,
-      accesoEvidencias: true,
-      accesoViaticos: true,
-      accesoVehiculos: true,
-      accesoAsistencia: true,
-      accesoGps: true,
-      accesoGestionUsuarios: true,
-      accesoGestionTienda: true,
-      accesoGestionWeb: true,
-      accesoContabilidad: true,
-    },
-    create: {
-      nombre: 'CEO',
-      nivelAutoridad: 0,
-      accesoConsole: true,
-      accesoConsoleAdmin: true,
-      accesoActividades: true,
-      accesoEvidencias: true,
-      accesoViaticos: true,
-      accesoVehiculos: true,
-      accesoAsistencia: true,
-      accesoGps: true,
-      accesoGestionUsuarios: true,
-      accesoGestionTienda: true,
-      accesoGestionWeb: true,
-      accesoContabilidad: true,
-    },
+  // Roles con permisos explícitos según requerimiento
+  const roleConsolaUsuario = await upsertRoleWithAccess('Consola Usuario', {
+    accesoConsole: true,
   });
-  const cooRole = await prisma.role.upsert({
-    where: { nombre: 'COO' },
-    update: {
-      nivelAutoridad: 0,
-      accesoConsole: true,
-      accesoConsoleAdmin: true,
-      accesoActividades: true,
-      accesoEvidencias: true,
-      accesoViaticos: true,
-      accesoVehiculos: true,
-      accesoAsistencia: true,
-      accesoGps: true,
-      accesoGestionUsuarios: true,
-      accesoContabilidad: true,
-    },
-    create: {
-      nombre: 'COO',
-      nivelAutoridad: 0,
-      accesoConsole: true,
-      accesoConsoleAdmin: true,
-      accesoActividades: true,
-      accesoEvidencias: true,
-      accesoViaticos: true,
-      accesoVehiculos: true,
-      accesoAsistencia: true,
-      accesoGps: true,
-      accesoGestionUsuarios: true,
-      accesoContabilidad: true,
-    },
+  const rolePanelVentasSolo = await upsertRoleWithAccess('Panel Ventas', {
+    accesoPanelVentas: true,
   });
-  const staffRole = await prisma.role.upsert({
-    where: { nombre: 'Staff' },
-    update: {
-      nivelAutoridad: 0,
-      accesoConsole: true,
-      accesoActividades: true,
-      accesoEvidencias: true,
-      accesoViaticos: true,
-      accesoVehiculos: true,
-      accesoAsistencia: true,
-      accesoGps: true,
-    },
-    create: {
-      nombre: 'Staff',
-      nivelAutoridad: 0,
-      accesoConsole: true,
-      accesoActividades: true,
-      accesoEvidencias: true,
-      accesoViaticos: true,
-      accesoVehiculos: true,
-      accesoAsistencia: true,
-      accesoGps: true,
-    },
+  const roleConsolaCotizaciones = await upsertRoleWithAccess('Consola + Cotizaciones', {
+    accesoConsole: true,
+    accesoCotizaciones: true,
   });
-  // Nuevos roles
-  const panelWebRole = await prisma.role.upsert({
-    where: { nombre: 'PanelWeb' },
-    update: { nivelAutoridad: 0, accesoGestionWeb: true },
-    create: { nombre: 'PanelWeb', nivelAutoridad: 0, accesoGestionWeb: true },
+  const roleConsolaGestionCvs = await upsertRoleWithAccess('Consola + Gestion CVs', {
+    accesoConsole: true,
+    accesoGestionCvs: true,
   });
-  const panelTiendaRole = await prisma.role.upsert({
-    where: { nombre: 'PanelTienda' },
-    update: { nivelAutoridad: 0, accesoGestionTienda: true },
-    create: { nombre: 'PanelTienda', nivelAutoridad: 0, accesoGestionTienda: true },
+  const roleAdmin4Accesos = await upsertRoleWithAccess('Admin 4 Accesos', {
+    accesoConsole: true,
+    accesoConsoleAdmin: true,
+    accesoGestionUsuarios: true,
+    accesoContabilidad: true,
   });
-  const panelInternoRole = await prisma.role.upsert({
-    where: { nombre: 'PanelInterno' },
-    update: {
-      nivelAutoridad: 0,
-      accesoConsole: true,
-      accesoConsoleAdmin: true,
-      accesoActividades: true,
-      accesoEvidencias: true,
-      accesoViaticos: true,
-      accesoVehiculos: true,
-      accesoAsistencia: true,
-      accesoGps: true,
-    },
-    create: {
-      nombre: 'PanelInterno',
-      nivelAutoridad: 0,
-      accesoConsole: true,
-      accesoConsoleAdmin: true,
-      accesoActividades: true,
-      accesoEvidencias: true,
-      accesoViaticos: true,
-      accesoVehiculos: true,
-      accesoAsistencia: true,
-      accesoGps: true,
-    },
-  });
-  const deptGeneral = await prisma.department.upsert({
-    where: { nombre: 'General' },
+
+  // Departamentos específicos según tabla operativa
+  const deptVentas = await prisma.department.upsert({
+    where: { nombre: 'Ventas' },
     update: {},
-    create: { nombre: 'General' },
+    create: { nombre: 'Ventas' },
+  });
+  const deptIngCampo = await prisma.department.upsert({
+    where: { nombre: 'Ingeniería de campo' },
+    update: {},
+    create: { nombre: 'Ingeniería de campo' },
+  });
+  const deptAdministracion = await prisma.department.upsert({
+    where: { nombre: 'Administración' },
+    update: {},
+    create: { nombre: 'Administración' },
+  });
+  const deptOperaciones = await prisma.department.upsert({
+    where: { nombre: 'Operaciones' },
+    update: {},
+    create: { nombre: 'Operaciones' },
   });
 
   // Actualizar o crear usuarios demo por email
 
   // Contraseñas memorizables, diferenciadas y con mayor dificultad para altos rangos
-  const passCEO1 = 'NexaraCeo2026@!2888';
-  const passCEO2 = 'NexaraDev2026@!30';
   const passCOO = 'NexaraCoo2026!@';
-  const passStaff1 = 'NexaraSoporte2026!';
-  const passStaff2 = 'NexaraSistemas2026!';
-  // Contraseñas para nuevos roles demo
-  const passPanelWeb = 'DemoPanelWeb2026!';
-  const passPanelTienda = 'DemoPanelTienda2026!';
-  const passPanelInterno = 'DemoPanelInterno2026!';
-  // Usuarios demo para nuevos roles
-  await upsertUser({
-    nombre: 'Usuario Demo Panel Web',
-    email: 'demo.panelweb@nexara.com.mx',
-    passwordHash: await bcrypt.hash(passPanelWeb, 10),
-    roleId: panelWebRole.id,
-    departmentId: deptGeneral.id,
-  });
-  await upsertUser({
-    nombre: 'Usuario Demo Panel Tienda',
-    email: 'demo.paneltienda@nexara.com.mx',
-    passwordHash: await bcrypt.hash(passPanelTienda, 10),
-    roleId: panelTiendaRole.id,
-    departmentId: deptGeneral.id,
-  });
-  await upsertUser({
-    nombre: 'Usuario Demo Panel Interno',
-    email: 'demo.panelinterno@nexara.com.mx',
-    passwordHash: await bcrypt.hash(passPanelInterno, 10),
-    roleId: panelInternoRole.id,
-    departmentId: deptGeneral.id,
-  });
-
-  await upsertUser({
-    nombre: 'Christian Del Pozo (CEO)',
-    email: 'gerencia@nexara.com.mx',
-    passwordHash: await bcrypt.hash(passCEO1, 10),
-    roleId: ceoRole.id,
-    departmentId: deptGeneral.id,
-  });
-  await upsertUser({
-    nombre: 'Karen Elizalde Sarmiento (COO)',
+  const passSoporte = 'NexaraSoporte2026!';
+  const passOperaciones = 'NexaraSistemas2026!';
+  const passVendedor = 'vendedor2026@!';
+  const passJulio = 'Julio@006Pr7NHv';
+  const passDavid = 'David@005Q6txCt';
+  const passIsrael = 'Israel@0269$74uB';
+  const passLuis = 'NexaraLui2026!@';
+  const passLizbeth = 'Lizeth@0098%nzrv';
+  const userKaren = await syncUserByIdentity({
+    nombre: 'Karen Elizalde Sarmiento',
     email: 'ventas@nexara.com.mx',
     passwordHash: await bcrypt.hash(passCOO, 10),
-    roleId: cooRole.id,
-    departmentId: deptGeneral.id,
+    roleId: roleConsolaCotizaciones.id,
+    departmentId: deptVentas.id,
+    nameAliases: ['Karen Elizalde Sarmiento', 'Karen'],
   });
-  await upsertUser({
-    nombre: 'Carolina Juarez Alvarez (Ingeniera de Soporte)',
+  const userCarolina = await syncUserByIdentity({
+    nombre: 'Carolina Juarez Alvarez',
     email: 'soporte@nexara.com.mx',
-    passwordHash: await bcrypt.hash(passStaff1, 10),
-    roleId: staffRole.id,
-    departmentId: deptGeneral.id,
+    passwordHash: await bcrypt.hash(passSoporte, 10),
+    roleId: roleConsolaUsuario.id,
+    departmentId: deptIngCampo.id,
+    nameAliases: ['Carolina Juarez Alvarez', 'Carolina'],
   });
-  await upsertUser({
-    nombre: 'Alejandro Gonzales (Ingeniero de Sistemas)',
-    email: 'sistemas@nexara.com.mx',
-    passwordHash: await bcrypt.hash(passStaff2, 10),
-    roleId: staffRole.id,
-    departmentId: deptGeneral.id,
+  const userAlejandro = await syncUserByIdentity({
+    nombre: 'Alejandro Gonzales Bustamante',
+    email: 'operaciones@nexara.com.mx',
+    passwordHash: await bcrypt.hash(passOperaciones, 10),
+    roleId: roleConsolaGestionCvs.id,
+    departmentId: deptIngCampo.id,
+    emailAliases: ['sistemas@nexara.com.mx'],
+    nameAliases: ['Alejandro Gonzales Bustamante', 'Alejandro Gonzales', 'Alejandro'],
   });
-  await upsertUser({
-    nombre: 'Adam Del Pozo (Desarrollador)',
-    email: 'developer@nexara.com.mx',
-    passwordHash: await bcrypt.hash(passCEO2, 10),
-    roleId: ceoRole.id,
-    departmentId: deptGeneral.id,
+  const userKarina = await syncUserByIdentity({
+    nombre: 'Karina Martinez Flores',
+    email: 'vendedor@nexara.com.mx',
+    passwordHash: await bcrypt.hash(passVendedor, 10),
+    roleId: rolePanelVentasSolo.id,
+    departmentId: deptVentas.id,
+    nameAliases: ['Karina Martinez Flores', 'Karina'],
+  });
+  const userJulio = await syncUserByIdentity({
+    nombre: 'Julio Cesar Rivera Vazquez',
+    email: 'julio.rivazquez@nexara.com.mx',
+    passwordHash: await bcrypt.hash(passJulio, 10),
+    roleId: roleConsolaUsuario.id,
+    departmentId: deptIngCampo.id,
+    nameAliases: ['Julio Cesar Rivera Vazquez', 'Julio César Rivera Vázquez', 'Julio'],
+  });
+  const userDavid = await syncUserByIdentity({
+    nombre: 'David Morales Zenon',
+    email: 'david.morzenon@nexara.com.mx',
+    passwordHash: await bcrypt.hash(passDavid, 10),
+    roleId: roleConsolaUsuario.id,
+    departmentId: deptIngCampo.id,
+    nameAliases: ['David Morales Zenon', 'David'],
+  });
+  const userIsrael = await syncUserByIdentity({
+    nombre: 'Israel Ramos Lima',
+    email: 'israel.ralima@nexara.com.mx',
+    passwordHash: await bcrypt.hash(passIsrael, 10),
+    roleId: roleConsolaUsuario.id,
+    departmentId: deptIngCampo.id,
+    nameAliases: ['Israel Ramos Lima', 'Israel'],
+  });
+  const userLuis = await syncUserByIdentity({
+    nombre: 'Luis Joel Aguilar',
+    email: 'direccion.operaciones@nexara.com.mx',
+    passwordHash: await bcrypt.hash(passLuis, 10),
+    roleId: roleAdmin4Accesos.id,
+    departmentId: deptOperaciones.id,
+    nameAliases: ['Luis Joel Aguilar', 'Luis'],
+  });
+  const userLizeth = await syncUserByIdentity({
+    nombre: 'Lizeth Antele Antonio',
+    email: 'administracion@nexara.com.mx',
+    passwordHash: await bcrypt.hash(passLizbeth, 10),
+    roleId: roleAdmin4Accesos.id,
+    departmentId: deptAdministracion.id,
+    nameAliases: ['Lizeth Antele Antonio', 'Lizbeth Antele Antonio', 'Lizeth', 'Lizbeth'],
+  });
+
+  const duplicateCounts = await Promise.all([
+    cleanupIdentityDuplicates({ targetUserId: userKaren.id, email: 'ventas@nexara.com.mx', nombre: 'Karen Elizalde Sarmiento', nameAliases: ['Karen Elizalde Sarmiento', 'Karen'] }),
+    cleanupIdentityDuplicates({ targetUserId: userCarolina.id, email: 'soporte@nexara.com.mx', nombre: 'Carolina Juarez Alvarez', nameAliases: ['Carolina Juarez Alvarez', 'Carolina'] }),
+    cleanupIdentityDuplicates({ targetUserId: userAlejandro.id, email: 'operaciones@nexara.com.mx', emailAliases: ['sistemas@nexara.com.mx'], nombre: 'Alejandro Gonzales Bustamante', nameAliases: ['Alejandro Gonzales Bustamante', 'Alejandro Gonzales', 'Alejandro'] }),
+    cleanupIdentityDuplicates({ targetUserId: userKarina.id, email: 'vendedor@nexara.com.mx', nombre: 'Karina Martinez Flores', nameAliases: ['Karina Martinez Flores', 'Karina'] }),
+    cleanupIdentityDuplicates({ targetUserId: userJulio.id, email: 'julio.rivazquez@nexara.com.mx', nombre: 'Julio Cesar Rivera Vazquez', nameAliases: ['Julio Cesar Rivera Vazquez', 'Julio César Rivera Vázquez', 'Julio'] }),
+    cleanupIdentityDuplicates({ targetUserId: userDavid.id, email: 'david.morzenon@nexara.com.mx', nombre: 'David Morales Zenon', nameAliases: ['David Morales Zenon', 'David'] }),
+    cleanupIdentityDuplicates({ targetUserId: userIsrael.id, email: 'israel.ralima@nexara.com.mx', nombre: 'Israel Ramos Lima', nameAliases: ['Israel Ramos Lima', 'Israel'] }),
+    cleanupIdentityDuplicates({ targetUserId: userLuis.id, email: 'direccion.operaciones@nexara.com.mx', nombre: 'Luis Joel Aguilar', nameAliases: ['Luis Joel Aguilar', 'Luis'] }),
+    cleanupIdentityDuplicates({ targetUserId: userLizeth.id, email: 'administracion@nexara.com.mx', nombre: 'Lizeth Antele Antonio', nameAliases: ['Lizeth Antele Antonio', 'Lizbeth Antele Antonio', 'Lizeth', 'Lizbeth'] }),
+  ]);
+
+  const duplicatesRemoved = duplicateCounts.reduce((sum, count) => sum + count, 0);
+
+  const removedDemoEmails = [
+    'demo.panelweb@nexara.com.mx',
+    'demo.paneltienda@nexara.com.mx',
+    'demo.panelinterno@nexara.com.mx',
+    'sistemas@nexara.com.mx',
+  ];
+
+  const removedUsers = await prisma.user.deleteMany({
+    where: {
+      email: { in: removedDemoEmails },
+    },
   });
 
   console.log('Contraseñas asignadas:');
-  console.log('Christian Del Pozo (CEO):', passCEO1);
-  console.log('Adam Del Pozo (Desarrollador):', passCEO2);
   console.log('Karen Elizalde Sarmiento (COO):', passCOO);
-  console.log('Carolina Juarez Alvarez (Ingeniera de Soporte):', passStaff1);
-  console.log('Alejandro Gonzales (Ingeniero de Sistemas):', passStaff2);
-  console.log('Usuario Demo Panel Web:', passPanelWeb);
-  console.log('Usuario Demo Panel Tienda:', passPanelTienda);
-  console.log('Usuario Demo Panel Interno:', passPanelInterno);
-
+  console.log('Carolina Juarez Alvarez (Ingeniera de Soporte):', passSoporte);
+  console.log('Alejandro Gonzales Bustamante (Ingeniero de Sistemas):', passOperaciones);
+  console.log('Karina Martinez Flores (Vendedora):', passVendedor);
+  console.log('Julio Cesar Rivera Vazquez (IDC/Instalador):', passJulio);
+  console.log('David Morales Zenon (IDC/Instalador):', passDavid);
+  console.log('Israel Ramos Lima (IDC/Instalador):', passIsrael);
+  console.log('Luis Joel Aguilar (Coordinador de Operaciones):', passLuis);
+  console.log('Lizbeth Antele Antonio (Administracion):', passLizbeth);
+  console.log('Usuarios eliminados por limpieza de seed:', removedUsers.count);
+  console.log('Duplicados eliminados por match de identidad:', duplicatesRemoved);
+  console.log('Superadmins no modificados: gerencia@nexara.com.mx, developer@nexara.com.mx');
   console.log('Usuarios demo actualizados.');
 }
 

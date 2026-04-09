@@ -207,17 +207,34 @@ export default function ProcurementDashboardPage() {
           onClick={() => setShowPdfModal(false)}
         >
           <div
-            style={{ background: "var(--surface, #fff)", borderRadius: 12, width: "100%", maxWidth: 900, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" }}
+            style={{
+              background: "var(--surface, #fff)",
+              borderRadius: 12,
+              width: "100%",
+              maxWidth: 900,
+              maxHeight: "min(92dvh, 920px)",
+              height: "min(92dvh, 920px)",
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
               <span style={{ fontWeight: 600 }}>📦 Reporte de Compras</span>
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={() => setShowPdfModal(false)} style={{ padding: "6px 14px", background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: 8, cursor: "pointer" }}>✕ Cerrar</button>
               </div>
             </div>
-            <div style={{ flex: 1, overflow: "auto" }}>
-              <PDFViewer pdfUrl={pdfUrl} pdfData={pdfData} fileName={`reporte-compras-${new Date().toISOString().slice(0, 10)}.pdf`} height="800px" />
+            <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+              <PDFViewer
+                pdfUrl={pdfUrl}
+                pdfData={pdfData}
+                fileName={`reporte-compras-${new Date().toISOString().slice(0, 10)}.pdf`}
+                height="800px"
+                fillParent
+              />
             </div>
           </div>
         </div>

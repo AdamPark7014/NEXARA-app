@@ -7,6 +7,7 @@ import ExcelDownloadModal from "@/components/ExcelDownloadModal";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { canViewContabilidadTarget } from "@/lib/contabilidad-visibility";
 import styles from "./ContabilidadViaticTable.module.css";
+import { openExternalUrl } from "@/lib/open-external-url";
 
 type Viatic = {
   id: number;
@@ -376,9 +377,9 @@ const ContabilidadViaticTable = () => {
                   <td>{v.razonGasto}</td>
                   <td>
                     {v.ticketEvidenciaUrl ? (
-                      <a className={styles.link} href={v.ticketEvidenciaUrl} target="_blank" rel="noopener noreferrer">
+                      <button type="button" className={styles.link} onClick={() => void openExternalUrl(v.ticketEvidenciaUrl)}>
                         Ver
-                      </a>
+                      </button>
                     ) : (
                       "-"
                     )}
@@ -461,9 +462,14 @@ const ContabilidadViaticTable = () => {
                 <div style={mobileMetaItemStyle}>
                   <span style={mobileMetaLabelStyle}>Ticket</span>
                   {v.ticketEvidenciaUrl ? (
-                    <a className={styles.link} href={v.ticketEvidenciaUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: "14px" }}>
+                    <button
+                      type="button"
+                      className={styles.link}
+                      style={{ fontSize: "14px" }}
+                      onClick={() => void openExternalUrl(v.ticketEvidenciaUrl)}
+                    >
                       Ver evidencia
-                    </a>
+                    </button>
                   ) : (
                     <span style={{ fontSize: "14px", color: "#9ca3af" }}>Sin ticket</span>
                   )}

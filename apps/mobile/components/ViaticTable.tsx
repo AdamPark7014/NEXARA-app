@@ -3,7 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
-import { triggerFileDownload } from '@/lib/file-download';
+import { triggerBlobDownload } from '@/lib/file-download';
+import { openExternalUrl } from '@/lib/open-external-url';
 import ExcelDownloadModal from './ExcelDownloadModal';
 import styles from './ViaticTable.module.css';
 
@@ -53,7 +54,9 @@ const ViaticTable = () => {
     if (excelPreparing) return;
     setExcelPreparing(true);
     try {
-      const res = await fetch(buildApiUrl('export/viatic'));
+      const res = await fetch(buildApiUrl('export/viatic'), {
+        headers: user?.token ? { Authorization: `Bearer ${user.token}` } : {},
+      });
       if (!res.ok) throw new Error('Error al exportar');
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
@@ -70,9 +73,13 @@ const ViaticTable = () => {
   };
 
   const handleDownloadExcel = () => {
-    if (!excelUrl) return;
-    triggerFileDownload(excelUrl, 'viáticos.xlsx', { preferOpenOnMobile: true });
-    closeExcelModal();
+    if (!excelBlob) return;
+    void (async () => {
+      await triggerBlobDownload(excelBlob, 'viáticos.xlsx', {
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      closeExcelModal();
+    })();
   };
 
   useEffect(() => {
@@ -267,7 +274,15 @@ const ViaticTable = () => {
                   <td>{v.actividad?.anNumber}</td>
                   <td>${v.montoSolicitado}</td>
                   <td>{v.razonGasto}</td>
-                  <td>{v.ticketEvidenciaUrl ? <a className="link" href={v.ticketEvidenciaUrl} target="_blank" rel="noopener noreferrer">Ver</a> : '-'}</td>
+                  <td>
+                    {v.ticketEvidenciaUrl ? (
+                      <button type="button" className="link" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit', textDecoration: 'underline' }} onClick={() => void openExternalUrl(v.ticketEvidenciaUrl)}>
+                        Ver
+                      </button>
+                    ) : (
+                      '-'
+                    )}
+                  </td>
                   <td>
                     <span className={`badge ${v.estatusPago === 'Aprobado' ? 'approved' : v.estatusPago === 'Pendiente' ? 'pending' : v.estatusPago === 'Rechazado' ? 'rejected' : ''}`}>{v.estatusPago}</span>
                   </td>
@@ -314,9 +329,15 @@ const ViaticTable = () => {
               </div>
 
               <div className={hasPermission(user, PERMISSIONS.VIATICS_MANAGE) && v.estatusPago === 'Pendiente' ? styles.mobileActionsTriple : styles.mobileActionsSingle}>
-                <a className={`button-secondary ${styles.ticketLink} ${v.ticketEvidenciaUrl ? '' : styles.ticketLinkDisabled}`} href={v.ticketEvidenciaUrl || '#'} target="_blank" rel="noopener noreferrer">
-                  Ver ticket
-                </a>
+                {v.ticketEvidenciaUrl ? (
+                  <button type="button" className={`button-secondary ${styles.ticketLink}`} onClick={() => void openExternalUrl(v.ticketEvidenciaUrl)}>
+                    Ver ticket
+                  </button>
+                ) : (
+                  <span className={`button-secondary ${styles.ticketLink} ${styles.ticketLinkDisabled}`} aria-disabled>
+                    Ver ticket
+                  </span>
+                )}
 
                 {hasPermission(user, PERMISSIONS.VIATICS_MANAGE) && v.estatusPago === 'Pendiente' && (
                   <>

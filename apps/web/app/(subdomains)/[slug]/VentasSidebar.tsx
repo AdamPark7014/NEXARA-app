@@ -6,6 +6,7 @@ import styles from "./VentasSidebar.module.css";
 import { useUser } from "@/components/UserContext";
 import { useTheme } from "@/components/ThemeContext";
 import { useState, useMemo } from "react";
+import { getRoleLabel } from "@/lib/panel-user";
 
 interface MenuItem {
   label: string;
@@ -89,8 +90,8 @@ export default function VentasSidebar() {
           </div>
           <div className={styles.userInfo}>
             <p className={styles.userName}>{user.nombre}</p>
-            <p className={styles.userRole}>Vendedor</p>
-            {user.isSuperAdmin && <span className={styles.badgeAdmin}>Admin</span>}
+            <p className={styles.userRole}>{getRoleLabel(user)}</p>
+            {user.isSuperAdmin && <span className={styles.badgeAdmin}>Superadmin</span>}
           </div>
         </div>
       )}

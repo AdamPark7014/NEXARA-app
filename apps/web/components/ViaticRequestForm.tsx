@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import styles from './ViaticRequestForm.module.css';
+import { openExternalUrl } from '@/lib/open-external-url';
 
 
 const ViaticRequestForm = ({ actividadId }: { actividadId: number }) => {
@@ -231,7 +232,9 @@ const ViaticRequestForm = ({ actividadId }: { actividadId: number }) => {
                     aria-label="Vista previa PDF"
                   >
                     <embed src={ticketPreview.url} type="application/pdf" />
-                    <a href={ticketPreview.url} target="_blank" rel="noreferrer">Abrir PDF</a>
+                    <button type="button" className="link" onClick={() => void openExternalUrl(ticketPreview.url)}>
+                      Abrir PDF
+                    </button>
                   </object>
                 </div>
               )}

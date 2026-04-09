@@ -12,12 +12,20 @@
     ],
     "baseUrl": ".",
     "paths": {
-      "@/components/*": ["./components/*"],
-      "@/app/*": ["./app/*"],
-      "@/*": ["./*"]
+      "@/components/*": [
+        "./components/*"
+      ],
+      "@/app/*": [
+        "./app/*"
+      ],
+      "@nexara/offline-shared": [
+        "../../shared/offline-fetch-rules.ts"
+      ],
+      "@/*": [
+        "./*"
+      ]
     },
     "outDir": "./build",
-    "rootDir": ".",
     "strict": true,
     "esModuleInterop": true,
     "moduleResolution": "node",

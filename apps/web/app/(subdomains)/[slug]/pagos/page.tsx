@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useUser } from "@/components/UserContext";
+import { openExternalUrl } from "@/lib/open-external-url";
 import styles from "./page.module.css";
 
 interface PaymentUser {
@@ -163,7 +164,9 @@ export default function ContabilidadPagos() {
       return (
         <div className={styles.evidenceItem}>
           <object data={absoluteUrl} type="application/pdf" width="96" height="110">
-            <a href={absoluteUrl} target="_blank" rel="noreferrer">PDF</a>
+            <button type="button" className="link" onClick={() => void openExternalUrl(absoluteUrl)}>
+              PDF
+            </button>
           </object>
         </div>
       );

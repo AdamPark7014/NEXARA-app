@@ -1,7 +1,7 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useUser } from './UserContext';
-import { revokeObjectUrlLater, triggerFileDownload } from '@/lib/file-download';
+import { revokeObjectUrlLater, triggerBlobDownload } from '@/lib/file-download';
 import styles from './MyProfileForm.module.css';
 import { io, Socket } from 'socket.io-client';
 
@@ -318,10 +318,10 @@ const MyProfileForm: React.FC = () => {
         throw new Error(data.message || 'No fue posible abrir el documento');
       }
       const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
       if (mode === 'download') {
-        triggerFileDownload(url, `documento-${docId}.pdf`, { preferOpenOnMobile: true });
+        void triggerBlobDownload(blob, `documento-${docId}.pdf`, { mimeType: 'application/pdf' });
       } else {
+        const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
         link.target = '_blank';
@@ -329,8 +329,8 @@ const MyProfileForm: React.FC = () => {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        revokeObjectUrlLater(url);
       }
-      revokeObjectUrlLater(url);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'No fue posible abrir el documento');
     }

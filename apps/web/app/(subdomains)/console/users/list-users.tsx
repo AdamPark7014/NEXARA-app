@@ -4,6 +4,7 @@ import UserForm from "./UserForm";
 import { useUser } from '@/components/UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import { resolveUserAvatarUrl } from '@/lib/user-avatar';
+import { openExternalUrl } from "@/lib/open-external-url";
 
 let API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 // Normaliza la URL base para evitar dobles / o .
@@ -549,7 +550,13 @@ export default function ListUsers() {
                                     <div style={{ padding: 12, color: 'var(--text-secondary)', fontSize: 12 }}>Formato no soportado</div>
                                   )}
                                 </div>
-                                <a className="link" href={getAssetUrl(match.archivoUrl)} target="_blank" rel="noopener noreferrer">Ver documento</a>
+                                <button
+                                  type="button"
+                                  className="link"
+                                  onClick={() => void openExternalUrl(getAssetUrl(match.archivoUrl))}
+                                >
+                                  Ver documento
+                                </button>
                               </div>
                             ) : (
                               <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>No cargado</span>
@@ -572,7 +579,13 @@ export default function ListUsers() {
                               <div style={{ fontWeight: 600 }}>{doc.tipo}</div>
                               <div className="profileMetaText">Estatus: {doc.estatus || 'Pendiente'}</div>
                             </div>
-                            <a className="link" href={getAssetUrl(doc.archivoUrl)} target="_blank" rel="noopener noreferrer">Ver documento</a>
+                            <button
+                              type="button"
+                              className="link"
+                              onClick={() => void openExternalUrl(getAssetUrl(doc.archivoUrl))}
+                            >
+                              Ver documento
+                            </button>
                           </div>
                           {doc.archivoUrl && (
                             <div className="profileDocPreview">

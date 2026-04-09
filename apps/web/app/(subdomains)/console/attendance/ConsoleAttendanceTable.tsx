@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { io, Socket } from "socket.io-client";
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
+import { openExternalUrl } from "@/lib/open-external-url";
 import styles from "./ConsoleAttendanceTable.module.css";
 
 type AttendanceEvent = { 
@@ -32,6 +33,7 @@ type UserAttendanceStats = {
   userId: number;
   userName: string;
   email: string;
+  employeeNumber?: string | null;
   department: string;
   roleName: string;
   totalMinutes: number;
@@ -456,6 +458,7 @@ const ConsoleAttendanceTable = () => {
           <thead>
             <tr>
               <th>Usuario</th>
+              <th>No. empleado</th>
               <th>Departamento</th>
               <th>Rol</th>
               <th>Dias trabajados</th>
@@ -481,6 +484,10 @@ const ConsoleAttendanceTable = () => {
                       <strong>{userStat.userName}</strong>
                       <span>{userStat.email}</span>
                     </td>
+                    <td>
+                      {userStat.employeeNumber?.trim() ||
+                        `NXR25SYS${String(userStat.userId).padStart(3, "0")}`}
+                    </td>
                     <td>{userStat.department || "-"}</td>
                     <td>{userStat.roleName || "-"}</td>
                     <td>{userStat.workDays}</td>
@@ -502,7 +509,7 @@ const ConsoleAttendanceTable = () => {
                   </tr>
                   {expandedUsers.has(userStat.userId) && (
                     <tr>
-                      <td colSpan={8} className={styles.detailCell}>
+                      <td colSpan={9} className={styles.detailCell}>
                         <div className={styles.detailHeader}>
                           <div>
                             <h4>Detalle de jornadas</h4>
@@ -883,22 +890,22 @@ const ConsoleAttendanceTable = () => {
               e.currentTarget.src = getStaticMapFallbackUrl(mapModal.lat, mapModal.lng);
             }}
           />
-          <a
-            href={`https://www.google.com/maps?q=${mapModal.lat},${mapModal.lng}`}
-            target="_blank"
-            rel="noreferrer"
-            style={{ marginTop: 10, fontSize: 13, color: 'var(--primary)', textAlign: 'center' }}
+          <button
+            type="button"
+            className="link"
+            style={{ marginTop: 10, fontSize: 13, textAlign: "center", justifySelf: "center" }}
+            onClick={() => void openExternalUrl(`https://www.google.com/maps?q=${mapModal.lat},${mapModal.lng}`)}
           >
             Abrir en Google Maps
-          </a>
-          <a
-            href={`https://www.openstreetmap.org/?mlat=${mapModal.lat}&mlon=${mapModal.lng}#map=15/${mapModal.lat}/${mapModal.lng}`}
-            target="_blank"
-            rel="noreferrer"
-            style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)', textAlign: 'center' }}
+          </button>
+          <button
+            type="button"
+            className="link"
+            style={{ marginTop: 6, fontSize: 12, textAlign: "center", justifySelf: "center", color: "var(--muted)" }}
+            onClick={() => void openExternalUrl(`https://www.openstreetmap.org/?mlat=${mapModal.lat}&mlon=${mapModal.lng}#map=15/${mapModal.lat}/${mapModal.lng}`)}
           >
             Abrir en OpenStreetMap
-          </a>
+          </button>
         </div>
       </div>,
       document.body

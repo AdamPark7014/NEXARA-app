@@ -5,6 +5,7 @@ import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import ExcelDownloadModal from './ExcelDownloadModal';
 import styles from './VehicleTable.module.css';
+import { openExternalUrl } from '@/lib/open-external-url';
 
 interface Vehicle {
   id: number;
@@ -510,14 +511,18 @@ const VehicleTable = () => {
                   <td>
                     <div>
                       {vehicle.evidenciaEntregaUrl ? (
-                        <a className="link" href={vehicle.evidenciaEntregaUrl} target="_blank" rel="noopener noreferrer">Entrega</a>
+                        <button type="button" className="link" onClick={() => void openExternalUrl(vehicle.evidenciaEntregaUrl)}>
+                          Entrega
+                        </button>
                       ) : (
                         <span className={styles.muted}>Entrega: -</span>
                       )}
                     </div>
                     <div>
                       {vehicle.evidenciaDevolucionUrl ? (
-                        <a className="link" href={vehicle.evidenciaDevolucionUrl} target="_blank" rel="noopener noreferrer">Devolucion</a>
+                        <button type="button" className="link" onClick={() => void openExternalUrl(vehicle.evidenciaDevolucionUrl)}>
+                          Devolucion
+                        </button>
                       ) : (
                         <span className={styles.muted}>Devolucion: -</span>
                       )}
@@ -677,8 +682,20 @@ const VehicleTable = () => {
 
               <div className={styles.mobileList}>
                 <div className={styles.mobileEvidenceLinks}>
-                  {vehicle.evidenciaEntregaUrl ? <a className="link" href={vehicle.evidenciaEntregaUrl} target="_blank" rel="noopener noreferrer">Entrega</a> : <span className={styles.muted}>Entrega: -</span>}
-                  {vehicle.evidenciaDevolucionUrl ? <a className="link" href={vehicle.evidenciaDevolucionUrl} target="_blank" rel="noopener noreferrer">Devolucion</a> : <span className={styles.muted}>Devolucion: -</span>}
+                  {vehicle.evidenciaEntregaUrl ? (
+                    <button type="button" className="link" onClick={() => void openExternalUrl(vehicle.evidenciaEntregaUrl)}>
+                      Entrega
+                    </button>
+                  ) : (
+                    <span className={styles.muted}>Entrega: -</span>
+                  )}
+                  {vehicle.evidenciaDevolucionUrl ? (
+                    <button type="button" className="link" onClick={() => void openExternalUrl(vehicle.evidenciaDevolucionUrl)}>
+                      Devolucion
+                    </button>
+                  ) : (
+                    <span className={styles.muted}>Devolucion: -</span>
+                  )}
                 </div>
                 <div className={styles.smallMuted}>Entrega fotos: {Array.isArray(vehicle.entregaFotos) ? vehicle.entregaFotos.length : 0} · Estatus: {vehicle.entregaEstatus || 'Pendiente'}</div>
               </div>

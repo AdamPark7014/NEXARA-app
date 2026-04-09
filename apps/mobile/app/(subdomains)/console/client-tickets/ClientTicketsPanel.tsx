@@ -3,7 +3,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { RoleGuard } from '@/components/RoleGuard';
 import { PERMISSIONS } from '@/lib/permissions';
 import { useUser } from '@/components/UserContext';
-import { revokeObjectUrlLater, triggerFileDownload } from '@/lib/file-download';
+import { triggerBlobDownload } from '@/lib/file-download';
+import { openExternalUrl } from '@/lib/open-external-url';
 
 type Client = {
   id: number;
@@ -171,9 +172,7 @@ export function ClientTicketsPanel({ embedded = false }: { embedded?: boolean })
     });
     if (!res.ok) return;
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    triggerFileDownload(url, `reporte-cliente-${clientId}.pdf`, { preferOpenOnMobile: true });
-    revokeObjectUrlLater(url);
+    void triggerBlobDownload(blob, `reporte-cliente-${clientId}.pdf`, { mimeType: "application/pdf" });
   };
 
   const handleTicketReportDownload = async (activityId: number) => {
@@ -183,9 +182,7 @@ export function ClientTicketsPanel({ embedded = false }: { embedded?: boolean })
     });
     if (!res.ok) return;
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    triggerFileDownload(url, `reporte-ticket-${activityId}.pdf`, { preferOpenOnMobile: true });
-    revokeObjectUrlLater(url);
+    void triggerBlobDownload(blob, `reporte-ticket-${activityId}.pdf`, { mimeType: "application/pdf" });
   };
 
   const handleInventoryReportDownload = async (inventoryId: number) => {
@@ -195,9 +192,7 @@ export function ClientTicketsPanel({ embedded = false }: { embedded?: boolean })
     });
     if (!res.ok) return;
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    triggerFileDownload(url, `inventario-${inventoryId}.pdf`, { preferOpenOnMobile: true });
-    revokeObjectUrlLater(url);
+    void triggerBlobDownload(blob, `inventario-${inventoryId}.pdf`, { mimeType: "application/pdf" });
   };
 
   const handleInventoryStatusUpdate = async (inventoryId: number, status: 'PENDING' | 'COMPLETED' | 'APPROVED' | 'REJECTED') => {
@@ -362,9 +357,13 @@ export function ClientTicketsPanel({ embedded = false }: { embedded?: boolean })
                       )}
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         {activity.serviceSheet?.pdfUrl && (
-                          <a className="button-secondary" href={getAssetUrl(activity.serviceSheet.pdfUrl)} target="_blank" rel="noreferrer">
+                          <button
+                            type="button"
+                            className="button-secondary"
+                            onClick={() => void openExternalUrl(getAssetUrl(activity.serviceSheet!.pdfUrl!))}
+                          >
                             Ver hoja de servicio
-                          </a>
+                          </button>
                         )}
                         <button className="button-secondary" type="button" onClick={() => handleTicketReportDownload(activity.id)}>
                           Reporte del ticket
@@ -396,7 +395,13 @@ export function ClientTicketsPanel({ embedded = false }: { embedded?: boolean })
                               <div style={{ padding: 8, fontSize: 12 }}>{evidence.tipoEvidencia}</div>
                               {evidence.latitud && evidence.longitud && (
                                 <div style={{ padding: '0 8px 8px', fontSize: 12 }}>
-                                  <a href={getMapsUrl(evidence.latitud, evidence.longitud)} target="_blank" rel="noreferrer">Ver ubicación</a>
+                                  <button
+                                    type="button"
+                                    className="link"
+                                    onClick={() => void openExternalUrl(getMapsUrl(evidence.latitud, evidence.longitud))}
+                                  >
+                                    Ver ubicación
+                                  </button>
                                 </div>
                               )}
                             </div>

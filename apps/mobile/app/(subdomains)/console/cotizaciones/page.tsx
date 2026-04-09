@@ -3,7 +3,7 @@ import React, { useMemo, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { PERMISSIONS } from "@/lib/permissions";
 import { useUser } from "@/components/UserContext";
-import { revokeObjectUrlLater, triggerFileDownload } from "@/lib/file-download";
+import { triggerBlobDownload } from "@/lib/file-download";
 
 type QuoteItem = {
   id: string;
@@ -339,9 +339,9 @@ export default function CotizacionesPage() {
       return;
     }
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    triggerFileDownload(url, `cotizacion-${saved.quoteNumber || saved.id}.pdf`, { preferOpenOnMobile: true });
-    revokeObjectUrlLater(url);
+    void triggerBlobDownload(blob, `cotizacion-${saved.quoteNumber || saved.id}.pdf`, {
+      mimeType: "application/pdf",
+    });
   };
 
   const handleSend = async () => {

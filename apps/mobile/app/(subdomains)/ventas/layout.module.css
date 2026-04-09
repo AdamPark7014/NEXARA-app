@@ -19,6 +19,10 @@
   background: var(--surface-clean);
 }
 
+.salesMainPadForBottomNav {
+  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important;
+}
+
 .salesWorkspace {
   display: grid;
   gap: 12px;
@@ -223,4 +227,41 @@
   .salesWorkspaceContent :global([class*='panel']) {
     box-shadow: 0 10px 20px color-mix(in srgb, var(--shadow) 30%, transparent);
   }
+}
+
+/* ERP shell — alineado con web */
+.salesMain {
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #ffffff 6%, transparent),
+    var(--elev-1);
+}
+
+.salesWorkspaceHeader {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--surface) 94%, var(--primary) 6%) 0%,
+    color-mix(in srgb, var(--surface) 88%, var(--primary) 4%) 100%
+  );
+  border-color: color-mix(in srgb, var(--primary) 22%, var(--border));
+  box-shadow: var(--elev-1);
+}
+
+.salesWorkspacePill {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.salesQuickLinks {
+  padding: 2px 0 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.salesQuickLink {
+  box-shadow: var(--elev-1);
+  transition: box-shadow var(--motion-fast) ease, transform var(--motion-fast) ease, border-color var(--motion-fast) ease;
+}
+
+.salesQuickLink:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--elev-2);
 }

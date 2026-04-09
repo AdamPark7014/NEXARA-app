@@ -6,22 +6,25 @@ import React, { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "@/components/ThemeContext";
 import { useUser } from "@/components/UserContext";
-import { getAvatarSrc, getRoleLabel, isPlatformAdmin } from "@/lib/panel-user";
+import { canAccessContabilidadPanel, getAvatarSrc, getRoleLabel, isPlatformAdmin } from "@/lib/panel-user";
+import { isCapacitorNative } from "@/lib/capacitor-env";
 import consoleStyles from "../console/console.module.css";
 import styles from "./layout.module.css";
 import { setActivePanel } from "@/lib/panel-routing";
 import BottomNav from "@/components/BottomNav";
 import PageTransition from "@/components/PageTransition";
 import { hapticTap } from "@/lib/haptics";
+import { useCompactBottomNav } from "@/lib/use-compact-bottom-nav";
 
 export default function ContabilidadLayout({ children }: { children: React.ReactNode }) {
   const MOBILE_BREAKPOINT = 980;
   const pathname = usePathname();
   const router = useRouter();
   const { darkMode, toggleDarkMode } = useTheme();
-  const { user, logout } = useUser();
+  const { user, logout, isContextReady } = useUser();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const showCompactBottomNav = useCompactBottomNav();
   const [workspaceDateLabel, setWorkspaceDateLabel] = useState("");
 
   const currentPath = pathname ? pathname.replace(/\/+$/, "") : "";
@@ -72,6 +75,17 @@ export default function ContabilidadLayout({ children }: { children: React.React
   ];
 
   const flatNavItems = useMemo(() => navGroups.flatMap((group) => group.items), []);
+
+  const contaBottomShortcuts = useMemo(
+    () => [
+      { icon: "📊", label: "Resumen", href: resolveContaHref("/dashboard") },
+      { icon: "📒", label: "Contabilidad", href: resolveContaHref("/accounting") },
+      { icon: "💰", label: "Nómina", href: resolveContaHref("/employee-payments") },
+      { icon: "📊", label: "Gastos", href: resolveContaHref("/expenses") },
+    ],
+    [inPrefixedContaPath],
+  );
+
   const activeNavItem = useMemo(() => {
     return flatNavItems.find((item) => {
       const itemPath = item.href.replace(/\/+$/, "");
@@ -120,6 +134,18 @@ export default function ContabilidadLayout({ children }: { children: React.React
     setActivePanel("contabilidad");
   }, []);
 
+  useEffect(() => {
+    if (!isContextReady || (pathname && pathname.includes("/login"))) return;
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
+    if (!canAccessContabilidadPanel(user)) {
+      const dest = isCapacitorNative() ? "/paneles" : "/login?denied=contabilidad";
+      router.replace(dest);
+    }
+  }, [isContextReady, user, pathname, router]);
+
   const handleLogout = () => {
     void hapticTap("heavy");
     logout();
@@ -130,6 +156,16 @@ export default function ContabilidadLayout({ children }: { children: React.React
   // Si estamos en login, no renderizar el sidebar
   if (pathname && pathname.includes("/login")) {
     return <>{children}</>;
+  }
+
+  const accessBlocked =
+    isContextReady && (!user || (user && !canAccessContabilidadPanel(user)));
+  if (!isContextReady || accessBlocked) {
+    return (
+      <div className={styles.contaRoot} style={{ minHeight: "50vh", display: "grid", placeItems: "center", padding: 24 }}>
+        <p style={{ margin: 0, color: "var(--text-secondary, #445668)" }}>Cargando panel…</p>
+      </div>
+    );
   }
 
   return (
@@ -177,6 +213,29 @@ export default function ContabilidadLayout({ children }: { children: React.React
           <span className={consoleStyles.brandMark}>NEXARA</span>
           <span className={consoleStyles.brandSub}>Contabilidad</span>
         </div>
+
+        {isMobile && !showCompactBottomNav && (
+          <div className={styles.contaSidebarShortcuts} role="navigation" aria-label="Accesos rápidos">
+            {contaBottomShortcuts.map((item) => {
+              const itemPath = item.href.replace(/\/+$/, "");
+              const active = currentPath === itemPath || currentPath.endsWith(itemPath);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`${styles.contaSidebarShortcut} ${active ? styles.contaSidebarShortcutActive : ""}`}
+                  onClick={() => {
+                    void hapticTap("selection");
+                    setMobileMenuOpen(false);
+                  }}
+                >
+                  <span aria-hidden="true">{item.icon}</span>
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
 
         <div className={consoleStyles.sidebarUser}>
           <div className={consoleStyles.sidebarAvatar}>
@@ -266,7 +325,9 @@ export default function ContabilidadLayout({ children }: { children: React.React
           </li>
         </ul>
       </aside>
-      <main className={consoleStyles.consoleMain}>
+      <main
+        className={`${consoleStyles.consoleMain} ${styles.contaMain} ${isMobile && showCompactBottomNav ? styles.contaMainPadForBottomNav : ""}`}
+      >
         <section className={styles.workspaceShell}>
           <div className={styles.workspaceHeader}>
             <div>
@@ -304,15 +365,17 @@ export default function ContabilidadLayout({ children }: { children: React.React
           <div className={styles.workspaceContent}><PageTransition>{children}</PageTransition></div>
         </section>
       </main>
-      <BottomNav
-        items={[
-          { icon: "📊", label: "Resumen", href: resolveContaHref("/dashboard"), hapticIntent: "selection" },
-          { icon: "📒", label: "Contabilidad", href: resolveContaHref("/accounting"), hapticIntent: "selection" },
-          { icon: "💰", label: "Nómina", href: resolveContaHref("/employee-payments"), hapticIntent: "selection" },
-          { icon: "📊", label: "Gastos", href: resolveContaHref("/expenses"), hapticIntent: "selection" },
-          { icon: "☰", label: "Menú", onPress: () => setMobileMenuOpen(true), hapticIntent: "medium" },
-        ]}
-      />
+      {isMobile && showCompactBottomNav && (
+        <BottomNav
+          items={[
+            { icon: "📊", label: "Resumen", href: resolveContaHref("/dashboard"), hapticIntent: "selection" },
+            { icon: "📒", label: "Contabilidad", href: resolveContaHref("/accounting"), hapticIntent: "selection" },
+            { icon: "💰", label: "Nómina", href: resolveContaHref("/employee-payments"), hapticIntent: "selection" },
+            { icon: "📊", label: "Gastos", href: resolveContaHref("/expenses"), hapticIntent: "selection" },
+            { icon: "☰", label: "Menú", onPress: () => setMobileMenuOpen(true), hapticIntent: "medium" },
+          ]}
+        />
+      )}
     </div>
   );
 }

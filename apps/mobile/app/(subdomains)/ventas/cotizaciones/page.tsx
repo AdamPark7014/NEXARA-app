@@ -76,8 +76,11 @@ export default function VentasCotizacionesPage() {
   };
 
   const handleDownloadPdf = (cotizacionId: number) => {
-    triggerFileDownload(buildApiUrl(`cotizaciones/${cotizacionId}/pdf`), `cotizacion-${cotizacionId}.pdf`, {
+    if (!user?.token) return;
+    void triggerFileDownload(buildApiUrl(`cotizaciones/${cotizacionId}/pdf`), `cotizacion-${cotizacionId}.pdf`, {
       preferOpenOnMobile: true,
+      authToken: user.token,
+      mimeType: "application/pdf",
     });
   };
 

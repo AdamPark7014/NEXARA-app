@@ -20,8 +20,8 @@ export default function AttendancePage() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
   
-  const isAdmin = Boolean(user && (user.isSuperAdmin || isPlatformAdmin(user)));
-  const isSuperAdmin = user?.email && ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'].includes(user.email.toLowerCase());
+  const isSuperAdmin = Boolean(user?.isSuperAdmin);
+  const isAdmin = Boolean(user && (isSuperAdmin || isPlatformAdmin(user)));
 
   return (
     <RoleGuard permissions={[PERMISSIONS.ATTENDANCE_VIEW]}>

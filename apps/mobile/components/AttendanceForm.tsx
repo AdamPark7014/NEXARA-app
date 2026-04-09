@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { useUser } from './UserContext';
 import styles from './AttendanceForm.module.css';
 import { io, Socket } from 'socket.io-client';
+import { fetchWithOfflineQueue, isQueuedResponse } from '@/lib/fetch-offline';
 
 
 const AttendanceForm = () => {
@@ -456,11 +457,22 @@ const AttendanceForm = () => {
         hasGPS: !!(latitude && longitude),
       });
 
-      const res = await fetch(buildApiUrl('attendance'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${user.token}` },
-        body: JSON.stringify(payload),
-      });
+      const res = await fetchWithOfflineQueue(
+        buildApiUrl('attendance'),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${user.token}` },
+          body: JSON.stringify(payload),
+        },
+        () => user?.token,
+      );
+
+      if (isQueuedResponse(res)) {
+        setStatus('Sin conexión: tu registro quedó en cola y se enviará al recuperar conexión.');
+        setLoading(false);
+        return;
+      }
+
       const data = await res.json().catch(() => ({}));
       
       console.log('📥 Respuesta del servidor:', data);

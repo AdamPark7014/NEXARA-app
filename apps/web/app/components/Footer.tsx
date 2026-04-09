@@ -4,6 +4,7 @@ import Link from "next/link";
 import styles from "./Footer.module.css";
 import Map from "./Map";
 import { buildApiUrl } from "@/lib/api-base";
+import { openExternalUrl } from "@/lib/open-external-url";
 
 const Icon = {
   Facebook: () => (
@@ -148,10 +149,10 @@ export default function Footer() {
               <div className={styles.brandName}>NEXARA</div>
               <div className={styles.brandTagline}>Transformamos tecnología en resultados reales</div>
               <div className={styles.socials}>
-                <a className={styles.social} data-network="facebook" href="https://www.facebook.com/nexara.mexico/" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><Icon.Facebook /></a>
-                <a className={styles.social} data-network="tiktok" href="https://www.tiktok.com/@nexara_mx?_r=1&_t=ZS-948WJNIEdeu" target="_blank" rel="noopener noreferrer" aria-label="TikTok"><Icon.TikTok /></a>
-                <a className={styles.social} data-network="linkedin" href="https://www.linkedin.com/in/nexara-mx-413717359/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn"><Icon.LinkedIn /></a>
-                <a className={styles.social} data-network="instagram" href="https://www.instagram.com/nexara_mx/" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><Icon.Instagram /></a>
+                <button type="button" className={styles.social} data-network="facebook" onClick={() => void openExternalUrl("https://www.facebook.com/nexara.mexico/")} aria-label="Facebook"><Icon.Facebook /></button>
+                <button type="button" className={styles.social} data-network="tiktok" onClick={() => void openExternalUrl("https://www.tiktok.com/@nexara_mx?_r=1&_t=ZS-948WJNIEdeu")} aria-label="TikTok"><Icon.TikTok /></button>
+                <button type="button" className={styles.social} data-network="linkedin" onClick={() => void openExternalUrl("https://www.linkedin.com/in/nexara-mx-413717359/")} aria-label="LinkedIn"><Icon.LinkedIn /></button>
+                <button type="button" className={styles.social} data-network="instagram" onClick={() => void openExternalUrl("https://www.instagram.com/nexara_mx/")} aria-label="Instagram"><Icon.Instagram /></button>
               </div>
             </div>
 
@@ -209,12 +210,22 @@ export default function Footer() {
                   <span className={styles.contactInfo}><Icon.Email /> ventas@nexara.com.mx</span>
                 </div>
                 <div className={styles.blockActions}>
-                  <Link className={styles.actionBtn} href="mailto:ventas@nexara.com.mx?subject=Solicitud de información" data-type="email">
+                  <button
+                    type="button"
+                    className={styles.actionBtn}
+                    data-type="email"
+                    onClick={() => void openExternalUrl("mailto:ventas@nexara.com.mx?subject=Solicitud%20de%20informaci%C3%B3n")}
+                  >
                     <Icon.Email /> Email
-                  </Link>
-                  <Link className={styles.actionBtn} href="https://wa.me/5215536505044?text=Hola,%20me%20interesa%20información%20sobre%20sus%20servicios" target="_blank" rel="noopener noreferrer" data-type="whatsapp">
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.actionBtn}
+                    data-type="whatsapp"
+                    onClick={() => void openExternalUrl("https://wa.me/5215536505044?text=Hola,%20me%20interesa%20información%20sobre%20sus%20servicios")}
+                  >
                     <Icon.WhatsApp /> WhatsApp
-                  </Link>
+                  </button>
                 </div>
               </div>
             </div>
@@ -234,12 +245,22 @@ export default function Footer() {
                   <span className={styles.contactInfo}><Icon.Email /> soporte@nexara.com.mx</span>
                 </div>
                 <div className={styles.blockActions}>
-                  <Link className={styles.actionBtn} href="mailto:soporte@nexara.com.mx?subject=Solicitud de soporte" data-type="email">
+                  <button
+                    type="button"
+                    className={styles.actionBtn}
+                    data-type="email"
+                    onClick={() => void openExternalUrl("mailto:soporte@nexara.com.mx?subject=Solicitud%20de%20soporte")}
+                  >
                     <Icon.Email /> Email
-                  </Link>
-                  <Link className={styles.actionBtn} href="https://wa.me/5215549268141?text=Hola,%20necesito%20soporte%20técnico" target="_blank" rel="noopener noreferrer" data-type="whatsapp">
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.actionBtn}
+                    data-type="whatsapp"
+                    onClick={() => void openExternalUrl("https://wa.me/5215549268141?text=Hola,%20necesito%20soporte%20técnico")}
+                  >
                     <Icon.WhatsApp /> WhatsApp
-                  </Link>
+                  </button>
                 </div>
               </div>
             </div>

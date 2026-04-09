@@ -4,6 +4,7 @@ import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import ExcelDownloadModal from './ExcelDownloadModal';
+import { openExternalUrl } from '@/lib/open-external-url';
 
 const humanizeEvidenceKey = (value: string) =>
   value
@@ -664,19 +665,29 @@ const ActivitiesTable: React.FC = () => {
                   </div>
                   {hasCoordinates(request.latitud, request.longitud) && (
                     <div className="activities-map-embed">
-                      <a href={getMapsUrl(request.latitud, request.longitud)} target="_blank" rel="noreferrer">
+                      <button
+                        type="button"
+                        onClick={() => void openExternalUrl(getMapsUrl(request.latitud, request.longitud))}
+                        style={{ display: "block", padding: 0, border: "none", background: "transparent", cursor: "pointer" }}
+                      >
                         <img
                           className="activities-map-iframe"
                           src={getStaticMapPreviewUrl(request.latitud, request.longitud)}
                           loading="lazy"
                           alt={`Mapa ${request.branchName || 'sucursal'}`}
                         />
-                      </a>
+                      </button>
                     </div>
                   )}
                   <div className="activities-request-actions">
                     {hasCoordinates(request.latitud, request.longitud) && (
-                      <a className="button-secondary" href={getMapsUrl(request.latitud, request.longitud)} target="_blank" rel="noreferrer">Ver mapa</a>
+                      <button
+                        type="button"
+                        className="button-secondary"
+                        onClick={() => void openExternalUrl(getMapsUrl(request.latitud, request.longitud))}
+                      >
+                        Ver mapa
+                      </button>
                     )}
                     <button className="button-primary" type="button" onClick={() => prefillFromRequest(request)}>Precargar en actividad</button>
                     {request.status !== 'CLOSED' && (
@@ -926,16 +937,24 @@ const ActivitiesTable: React.FC = () => {
                         </span>
                         {(a.activityEvidence?.entryLatitude && a.activityEvidence?.entryLongitude) && (
                           <div className="activities-link-row mt-6">
-                            <a href={getMapsUrl(a.activityEvidence.entryLatitude, a.activityEvidence.entryLongitude)} target="_blank" rel="noreferrer" className="activities-link-sm">
+                            <button
+                              type="button"
+                              className="activities-link-sm"
+                              onClick={() => void openExternalUrl(getMapsUrl(a.activityEvidence!.entryLatitude!, a.activityEvidence!.entryLongitude!))}
+                            >
                               Ubicación entrada
-                            </a>
+                            </button>
                           </div>
                         )}
                         {(a.activityEvidence?.exitLatitude && a.activityEvidence?.exitLongitude) && (
                           <div className="activities-link-row mt-4">
-                            <a href={getMapsUrl(a.activityEvidence.exitLatitude, a.activityEvidence.exitLongitude)} target="_blank" rel="noreferrer" className="activities-link-sm">
+                            <button
+                              type="button"
+                              className="activities-link-sm"
+                              onClick={() => void openExternalUrl(getMapsUrl(a.activityEvidence!.exitLatitude!, a.activityEvidence!.exitLongitude!))}
+                            >
                               Ubicación salida
-                            </a>
+                            </button>
                           </div>
                         )}
                         <div className="activities-thumb-row">
@@ -968,9 +987,13 @@ const ActivitiesTable: React.FC = () => {
                         {hasCoordinates(a.activityEvidence?.entryLatitude, a.activityEvidence?.entryLongitude) ? (
                           <div className="activities-location-stack">
                             <span className="activities-location-text">{formatCoordinates(a.activityEvidence?.entryLatitude, a.activityEvidence?.entryLongitude)}</span>
-                            <a href={getMapsUrl(a.activityEvidence?.entryLatitude as number, a.activityEvidence?.entryLongitude as number)} target="_blank" rel="noreferrer" className="activities-link-sm">
+                            <button
+                              type="button"
+                              className="activities-link-sm"
+                              onClick={() => void openExternalUrl(getMapsUrl(a.activityEvidence?.entryLatitude as number, a.activityEvidence?.entryLongitude as number))}
+                            >
                               Ver mapa
-                            </a>
+                            </button>
                           </div>
                         ) : '-'}
                       </td>
@@ -978,9 +1001,13 @@ const ActivitiesTable: React.FC = () => {
                         {hasCoordinates(a.activityEvidence?.exitLatitude, a.activityEvidence?.exitLongitude) ? (
                           <div className="activities-location-stack">
                             <span className="activities-location-text">{formatCoordinates(a.activityEvidence?.exitLatitude, a.activityEvidence?.exitLongitude)}</span>
-                            <a href={getMapsUrl(a.activityEvidence?.exitLatitude as number, a.activityEvidence?.exitLongitude as number)} target="_blank" rel="noreferrer" className="activities-link-sm">
+                            <button
+                              type="button"
+                              className="activities-link-sm"
+                              onClick={() => void openExternalUrl(getMapsUrl(a.activityEvidence?.exitLatitude as number, a.activityEvidence?.exitLongitude as number))}
+                            >
                               Ver mapa
-                            </a>
+                            </button>
                           </div>
                         ) : '-'}
                       </td>
@@ -1061,9 +1088,13 @@ const ActivitiesTable: React.FC = () => {
                         {hasCoordinates(a.activityEvidence?.entryLatitude, a.activityEvidence?.entryLongitude) ? (
                           <>
                             <span className="activities-location-text">{formatCoordinates(a.activityEvidence?.entryLatitude, a.activityEvidence?.entryLongitude)}</span>{' '}
-                            <a href={getMapsUrl(a.activityEvidence?.entryLatitude as number, a.activityEvidence?.entryLongitude as number)} target="_blank" rel="noreferrer" className="activities-link-sm">
+                            <button
+                              type="button"
+                              className="activities-link-sm"
+                              onClick={() => void openExternalUrl(getMapsUrl(a.activityEvidence?.entryLatitude as number, a.activityEvidence?.entryLongitude as number))}
+                            >
                               Ver mapa
-                            </a>
+                            </button>
                           </>
                         ) : '-'}
                       </div>
@@ -1072,9 +1103,13 @@ const ActivitiesTable: React.FC = () => {
                         {hasCoordinates(a.activityEvidence?.exitLatitude, a.activityEvidence?.exitLongitude) ? (
                           <>
                             <span className="activities-location-text">{formatCoordinates(a.activityEvidence?.exitLatitude, a.activityEvidence?.exitLongitude)}</span>{' '}
-                            <a href={getMapsUrl(a.activityEvidence?.exitLatitude as number, a.activityEvidence?.exitLongitude as number)} target="_blank" rel="noreferrer" className="activities-link-sm">
+                            <button
+                              type="button"
+                              className="activities-link-sm"
+                              onClick={() => void openExternalUrl(getMapsUrl(a.activityEvidence?.exitLatitude as number, a.activityEvidence?.exitLongitude as number))}
+                            >
                               Ver mapa
-                            </a>
+                            </button>
                           </>
                         ) : '-'}
                       </div>
@@ -1086,9 +1121,13 @@ const ActivitiesTable: React.FC = () => {
                       </span>
                       {(a.activityEvidence?.entryLatitude && a.activityEvidence?.entryLongitude) && (
                         <div className="activities-link-row mt-6">
-                          <a href={getMapsUrl(a.activityEvidence.entryLatitude, a.activityEvidence.entryLongitude)} target="_blank" rel="noreferrer" className="activities-link-sm">
+                          <button
+                            type="button"
+                            className="activities-link-sm"
+                            onClick={() => void openExternalUrl(getMapsUrl(a.activityEvidence!.entryLatitude!, a.activityEvidence!.entryLongitude!))}
+                          >
                             Ver ubicación entrada
-                          </a>
+                          </button>
                         </div>
                       )}
                       <div className="activities-thumb-row">
@@ -1161,17 +1200,25 @@ const ActivitiesTable: React.FC = () => {
                     <div>
                       <strong>Ubicación llegada:</strong> {formatCoordinates(detailActivity.activityEvidence?.entryLatitude, detailActivity.activityEvidence?.entryLongitude)}
                       {hasCoordinates(detailActivity.activityEvidence?.entryLatitude, detailActivity.activityEvidence?.entryLongitude) && (
-                        <a href={getMapsUrl(detailActivity.activityEvidence?.entryLatitude as number, detailActivity.activityEvidence?.entryLongitude as number)} target="_blank" rel="noreferrer" className="activities-link-sm activities-detail-link">
+                        <button
+                          type="button"
+                          className="activities-link-sm activities-detail-link"
+                          onClick={() => void openExternalUrl(getMapsUrl(detailActivity.activityEvidence?.entryLatitude as number, detailActivity.activityEvidence?.entryLongitude as number))}
+                        >
                           Ver mapa
-                        </a>
+                        </button>
                       )}
                     </div>
                     <div>
                       <strong>Ubicación salida:</strong> {formatCoordinates(detailActivity.activityEvidence?.exitLatitude, detailActivity.activityEvidence?.exitLongitude)}
                       {hasCoordinates(detailActivity.activityEvidence?.exitLatitude, detailActivity.activityEvidence?.exitLongitude) && (
-                        <a href={getMapsUrl(detailActivity.activityEvidence?.exitLatitude as number, detailActivity.activityEvidence?.exitLongitude as number)} target="_blank" rel="noreferrer" className="activities-link-sm activities-detail-link">
+                        <button
+                          type="button"
+                          className="activities-link-sm activities-detail-link"
+                          onClick={() => void openExternalUrl(getMapsUrl(detailActivity.activityEvidence?.exitLatitude as number, detailActivity.activityEvidence?.exitLongitude as number))}
+                        >
                           Ver mapa
-                        </a>
+                        </button>
                       )}
                     </div>
                     <div><strong>PDF cargado:</strong> {formatDateTime(detailActivity.activityEvidence?.serviceSheetUploadedAt)}</div>
@@ -1183,9 +1230,14 @@ const ActivitiesTable: React.FC = () => {
                   <h4 className="activities-detail-section-title">Archivos</h4>
                   <div className="activities-detail-files">
                     {buildActivityEvidenceFiles(detailActivity).map((file) => (
-                      <a key={`${file.label}-${file.url}`} href={file.url} target="_blank" rel="noreferrer" className="activities-detail-file">
+                      <button
+                        key={`${file.label}-${file.url}`}
+                        type="button"
+                        className="activities-detail-file"
+                        onClick={() => void openExternalUrl(file.url)}
+                      >
                         {file.label}
-                      </a>
+                      </button>
                     ))}
                     {!buildActivityEvidenceFiles(detailActivity).length && <span className="activities-helper">Sin archivos adjuntos.</span>}
                   </div>

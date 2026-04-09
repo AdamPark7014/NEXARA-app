@@ -344,7 +344,9 @@
 	border-radius: 16px;
 	max-width: min(1040px, 95vw);
 	width: min(1040px, 95vw);
-	max-height: 86vh;
+	max-height: 92dvh;
+	height: min(92dvh, 900px);
+	min-height: 0;
 	display: flex;
 	flex-direction: column;
 	overflow: hidden;
@@ -380,11 +382,12 @@
 }
 
 .pdfViewerWrap {
-	flex: 1;
-	overflow: auto;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: hidden;
 	padding: 6px;
-	min-height: 320px;
-	max-height: calc(86vh - 58px);
+	display: flex;
+	flex-direction: column;
 	background: #f8fafc;
 }
 
@@ -569,7 +572,8 @@
 	.pdfModalCard {
 		width: calc(100vw - 16px);
 		max-width: calc(100vw - 16px);
-		max-height: 90vh;
+		max-height: 92dvh;
+		height: min(92dvh, 100%);
 		border-radius: 12px;
 	}
 
@@ -583,7 +587,6 @@
 
 	.pdfViewerWrap {
 		padding: 4px;
-		max-height: calc(90vh - 52px);
 	}
 
 	.detailModalOverlay {

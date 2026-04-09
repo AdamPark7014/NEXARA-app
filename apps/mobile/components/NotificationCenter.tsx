@@ -29,6 +29,7 @@ interface NotificationCenterProps {
   maxNotifications?: number;
   autoCloseTime?: number;
   inlineTrigger?: boolean;
+  mirrorToSystemNotifications?: boolean;
 }
 
 const getCategoryIcon = (category: string): string => {
@@ -109,23 +110,45 @@ const formatDateTime = (isoDate: string) =>
     minute: '2-digit',
   });
 
+const trySystemNotification = (title: string, body: string, tag: string) => {
+  if (typeof window === 'undefined' || !('Notification' in window)) return;
+  const Sys = window.Notification;
+  if (Sys.permission !== 'granted') return;
+  try {
+    new Sys(title, { body, tag });
+  } catch {
+    /* ignore */
+  }
+};
+
 const NotificationCenter: React.FC<NotificationCenterProps> = ({
   position = 'top-right',
   maxNotifications = 5,
   autoCloseTime = 5000,
   inlineTrigger = false,
+  mirrorToSystemNotifications = false,
 }) => {
   const { user } = useUser();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [displayedNotifications, setDisplayedNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showPanel, setShowPanel] = useState(false);
+  const [sysNotifyPermission, setSysNotifyPermission] = useState<'default' | 'denied' | 'granted' | 'unsupported'>('unsupported');
   const bellButtonRef = useRef<HTMLButtonElement | null>(null);
   const sidePanelRef = useRef<HTMLDivElement | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const notificationTimers = useRef<Map<number, NodeJS.Timeout>>(new Map());
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+
+  useEffect(() => {
+    if (!mirrorToSystemNotifications || typeof window === 'undefined') return;
+    if (!('Notification' in window)) {
+      setSysNotifyPermission('unsupported');
+      return;
+    }
+    setSysNotifyPermission(window.Notification.permission);
+  }, [mirrorToSystemNotifications]);
 
   const fetchNotifications = useCallback(async () => {
     if (!user?.token) return;
@@ -144,6 +167,14 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
       console.error('Error fetching notifications:', error);
     }
   }, [user?.token, API_URL]);
+
+  useEffect(() => {
+    const onNativePush = () => {
+      void fetchNotifications();
+    };
+    window.addEventListener('nexara-native-push', onNativePush);
+    return () => window.removeEventListener('nexara-native-push', onNativePush);
+  }, [fetchNotifications]);
 
   // Conectar WebSocket
   useEffect(() => {
@@ -179,6 +210,14 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
         return [notification, ...prev].slice(0, maxNotifications);
       });
       setUnreadCount(prev => (notification.isRead ? prev : prev + 1));
+
+      if (mirrorToSystemNotifications) {
+        trySystemNotification(
+          notification.title,
+          notification.message,
+          `nexara-notification-${notification.id}`,
+        );
+      }
 
       // Auto cerrar notificación
       const timer = setTimeout(() => {
@@ -218,7 +257,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
       notificationTimers.current.forEach(timer => clearTimeout(timer));
       if (refreshTimer) clearTimeout(refreshTimer);
     };
-  }, [user?.token, maxNotifications, autoCloseTime, fetchNotifications]);
+  }, [user?.token, maxNotifications, autoCloseTime, fetchNotifications, mirrorToSystemNotifications]);
 
   // Cargar notificaciones iniciales
   useEffect(() => {
@@ -426,6 +465,23 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
               ✕
             </button>
           </div>
+
+          {mirrorToSystemNotifications && sysNotifyPermission === 'default' && (
+            <div className={styles.systemNotifyRow}>
+              <button
+                type="button"
+                className={styles.systemNotifyBtn}
+                onClick={async () => {
+                  if (!('Notification' in window)) return;
+                  const next = await window.Notification.requestPermission();
+                  setSysNotifyPermission(next);
+                }}
+              >
+                Activar avisos del sistema
+              </button>
+              <span className={styles.systemNotifyHint}>Recibe alertas aunque cambies de pestaña.</span>
+            </div>
+          )}
 
           {/* Stats */}
           {unreadCount > 0 && (

@@ -20,7 +20,7 @@ export default function VentasIndex() {
       return;
     }
 
-    router.replace("/dashboard");
+    router.replace("/my-profile");
   }, [router, user]);
 
   return null;

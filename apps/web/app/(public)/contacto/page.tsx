@@ -4,6 +4,7 @@ import Link from "next/link";
 import styles from "./page.module.css";
 import Map from "@/app/components/Map";
 import { buildApiUrl } from "@/lib/api-base";
+import ExternalLinkButton from "@/components/ExternalLinkButton";
 
 export default function ContactoPage() {
   const [submitted, setSubmitted] = useState(false);
@@ -106,9 +107,9 @@ export default function ContactoPage() {
             <div>
               <h3>Teléfono</h3>
               <p>
-                <a href="tel:+525536505044" className={styles.contactLink}>
+                <ExternalLinkButton href="tel:+525536505044" className={styles.contactLink}>
                   +52 55 3650 5044
-                </a>
+                </ExternalLinkButton>
               </p>
               <p className={styles.infoDetail}>Lun - Vie: 9:00 AM - 6:00 PM</p>
             </div>
@@ -124,9 +125,9 @@ export default function ContactoPage() {
             <div>
               <h3>Email</h3>
               <p>
-                <a href="mailto:contacto@nexara.com.mx" className={styles.contactLink}>
+                <ExternalLinkButton href="mailto:contacto@nexara.com.mx" className={styles.contactLink}>
                   contacto@nexara.com.mx
-                </a>
+                </ExternalLinkButton>
               </p>
               <p className={styles.infoDetail}>Respuesta en 24h</p>
             </div>
@@ -141,14 +142,9 @@ export default function ContactoPage() {
             <div>
               <h3>WhatsApp</h3>
               <p>
-                <a 
-                  href="https://wa.me/525536505044" 
-                  className={styles.contactLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
+                <ExternalLinkButton href="https://wa.me/525536505044" className={styles.contactLink}>
                   Chat directo
-                </a>
+                </ExternalLinkButton>
               </p>
               <p className={styles.infoDetail}>Respuesta inmediata</p>
             </div>

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import * as XLSX from "xlsx";
+import { isCapacitorNative } from "@/lib/capacitor-env";
 import styles from "./ExcelDownloadModal.module.css";
 
 type PreviewRow = (string | number | boolean | null | undefined)[];
@@ -103,7 +104,7 @@ export default function ExcelDownloadModal({
             Cerrar
           </button>
           <button type="button" className="button-primary" onClick={onDownload} disabled={isPreparing}>
-            {isPreparing ? "Preparando…" : "Descargar"}
+            {isPreparing ? "Preparando…" : isCapacitorNative() ? "Guardar / compartir" : "Descargar"}
           </button>
         </div>
       </div>

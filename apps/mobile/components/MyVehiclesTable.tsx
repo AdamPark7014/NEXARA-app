@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import styles from './MyVehiclesTable.module.css';
+import { openExternalUrl } from '@/lib/open-external-url';
 
 interface VehicleRequest {
   id: number;
@@ -255,7 +256,7 @@ const MyVehiclesTable: React.FC = () => {
                         src={foto}
                         alt={`Entrega ${index + 1}`}
                         className={styles.photoThumb}
-                        onClick={() => window.open(foto, '_blank')}
+                        onClick={() => void openExternalUrl(foto)}
                       />
                     ))}
                   </div>

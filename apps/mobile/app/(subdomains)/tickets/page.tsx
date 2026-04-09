@@ -14,7 +14,10 @@ import TicketsInventoryManager from "@/components/TicketsInventoryManager";
 import consoleStyles from "../console/console.module.css";
 import styles from "./tickets.module.css";
 import { setActivePanel } from "@/lib/panel-routing";
-import { revokeObjectUrlLater, triggerFileDownload } from "@/lib/file-download";
+import { triggerBlobDownload } from "@/lib/file-download";
+import { openExternalUrl } from "@/lib/open-external-url";
+import { isCapacitorNative } from "@/lib/capacitor-env";
+import { fetchWithOfflineQueue, isQueuedResponse } from "@/lib/fetch-offline";
 
 const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false });
 
@@ -393,6 +396,7 @@ export default function ClientTicketsPage() {
     };
     setSession(unifiedSession);
     window.sessionStorage.setItem("clientSession", JSON.stringify(unifiedSession));
+    window.dispatchEvent(new Event("nexara-portal-session-changed"));
   }, [canAccessTicketsPanel, mounted, router, session, user]);
 
   useEffect(() => {
@@ -624,9 +628,7 @@ export default function ClientTicketsPage() {
       return;
     }
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    triggerFileDownload(url, `reporte-ticket-${ticketId}.pdf`, { preferOpenOnMobile: true });
-    revokeObjectUrlLater(url);
+    void triggerBlobDownload(blob, `reporte-ticket-${ticketId}.pdf`, { mimeType: "application/pdf" });
   };
 
   const handleLogout = () => {
@@ -644,11 +646,19 @@ export default function ClientTicketsPage() {
 
   const handleProfileSave = async () => {
     if (!session?.token) return;
-    const res = await fetch(buildApiUrl("client-portal/profile"), {
-      method: "PUT",
-      headers: { Authorization: `Bearer ${session.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify(profileDraft),
-    });
+    const res = await fetchWithOfflineQueue(
+      buildApiUrl("client-portal/profile"),
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profileDraft),
+      },
+      () => session?.token,
+    );
+    if (isQueuedResponse(res)) {
+      setError(null);
+      return;
+    }
     if (!res.ok) {
       setError("No se pudo guardar el perfil");
       return;
@@ -680,11 +690,19 @@ export default function ClientTicketsPage() {
       urgency: requestDraft.urgency,
       dueAt: requestDraft.dueAt || undefined,
     };
-    const res = await fetch(buildApiUrl("client-portal/requests"), {
-      method: "POST",
-      headers: { Authorization: `Bearer ${session.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const res = await fetchWithOfflineQueue(
+      buildApiUrl("client-portal/requests"),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+      () => session?.token,
+    );
+    if (isQueuedResponse(res)) {
+      setError(null);
+      return;
+    }
     if (!res.ok) {
       const errorData = await res.json().catch(() => null);
       const message = Array.isArray(errorData?.message)
@@ -714,11 +732,19 @@ export default function ClientTicketsPage() {
 
   const handleDecision = async (id: number, decision: "APPROVED" | "REJECTED") => {
     if (!session?.token) return;
-    const res = await fetch(buildApiUrl(`client-portal/requests/${id}/decision`), {
-      method: "PUT",
-      headers: { Authorization: `Bearer ${session.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ decision }),
-    });
+    const res = await fetchWithOfflineQueue(
+      buildApiUrl(`client-portal/requests/${id}/decision`),
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision }),
+      },
+      () => session?.token,
+    );
+    if (isQueuedResponse(res)) {
+      setError(null);
+      return;
+    }
     if (!res.ok) {
       setError("No se pudo actualizar la solicitud");
       return;
@@ -728,10 +754,15 @@ export default function ClientTicketsPage() {
 
   const handleRequestClose = async (id: number) => {
     if (!session?.token) return;
-    const res = await fetch(buildApiUrl(`client-portal/requests/${id}/close`), {
-      method: "PUT",
-      headers: { Authorization: `Bearer ${session.token}` },
-    });
+    const res = await fetchWithOfflineQueue(
+      buildApiUrl(`client-portal/requests/${id}/close`),
+      { method: "PUT" },
+      () => session?.token,
+    );
+    if (isQueuedResponse(res)) {
+      setError(null);
+      return;
+    }
     if (!res.ok) {
       setError("No se pudo cerrar la solicitud");
       return;
@@ -774,11 +805,19 @@ export default function ClientTicketsPage() {
       wasSolved: draft.wasSolved === "si" ? true : draft.wasSolved === "no" ? false : null,
       comments: draft.comments || undefined,
     };
-    const res = await fetch(buildApiUrl("client-portal/feedback"), {
-      method: "POST",
-      headers: { Authorization: `Bearer ${session.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const res = await fetchWithOfflineQueue(
+      buildApiUrl("client-portal/feedback"),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+      () => session?.token,
+    );
+    if (isQueuedResponse(res)) {
+      setError(null);
+      return;
+    }
     if (!res.ok) {
       setError("No se pudo enviar la encuesta");
       return;
@@ -1335,15 +1374,28 @@ export default function ClientTicketsPage() {
                     <span>Cierre: {ticket.fechaFinalizacion || "-"}</span>
                     {arrivalEvidenceFor(ticket)?.latitud && arrivalEvidenceFor(ticket)?.longitud && (
                       <span>
-                        Ubicación llegada: <a href={getMapsUrl(arrivalEvidenceFor(ticket)?.latitud, arrivalEvidenceFor(ticket)?.longitud)} target="_blank" rel="noreferrer">ver mapa</a>
+                        Ubicación llegada:{" "}
+                        <button
+                          type="button"
+                          className={styles.ticketInlineLink}
+                          onClick={() =>
+                            void openExternalUrl(getMapsUrl(arrivalEvidenceFor(ticket)?.latitud, arrivalEvidenceFor(ticket)?.longitud))
+                          }
+                        >
+                          ver mapa
+                        </button>
                       </span>
                     )}
                   </div>
                   <div className={styles.actionRow}>
                     {ticket.estatus === "Finalizada" && ticket.serviceSheet?.pdfUrl && (
-                      <a className="button-secondary" href={getAssetUrl(ticket.serviceSheet.pdfUrl)} target="_blank" rel="noreferrer">
+                      <button
+                        type="button"
+                        className="button-secondary"
+                        onClick={() => void openExternalUrl(getAssetUrl(ticket.serviceSheet!.pdfUrl!))}
+                      >
                         Hoja de servicio (PDF)
-                      </a>
+                      </button>
                     )}
                     <button className="button-secondary" type="button" onClick={() => handleTicketReport(ticket.id)}>
                       Exportar ticket (PDF)
@@ -1354,9 +1406,13 @@ export default function ClientTicketsPage() {
                       <div key={ev.id} className={`card ${styles.cardSoft}`} style={{ padding: 8 }}>
                         {ev.archivoUrl.endsWith(".pdf") ? (
                           <div className={`card ${styles.cardSoft}`} style={{ minHeight: 140, display: "grid", placeItems: "center", padding: 10 }}>
-                            <a className="button-secondary" href={getAssetUrl(ev.archivoUrl)} target="_blank" rel="noreferrer">
+                            <button
+                              type="button"
+                              className="button-secondary"
+                              onClick={() => void openExternalUrl(getAssetUrl(ev.archivoUrl))}
+                            >
                               Abrir PDF
-                            </a>
+                            </button>
                           </div>
                         ) : (
                           <img src={getAssetUrl(ev.archivoUrl)} alt={ev.tipoEvidencia} style={{ width: "100%", height: 140, objectFit: "cover", borderRadius: 8 }} />
@@ -1378,13 +1434,25 @@ export default function ClientTicketsPage() {
                           <div>
                             <strong>Ubicación llegada:</strong> {formatCoordinates(ticket.activityEvidence?.entryLatitude, ticket.activityEvidence?.entryLongitude)}
                             {hasCoordinates(ticket.activityEvidence?.entryLatitude, ticket.activityEvidence?.entryLongitude) && (
-                              <a className={styles.ticketInlineLink} href={getMapsUrl(ticket.activityEvidence?.entryLatitude, ticket.activityEvidence?.entryLongitude)} target="_blank" rel="noreferrer">Ver mapa</a>
+                              <button
+                                type="button"
+                                className={styles.ticketInlineLink}
+                                onClick={() => void openExternalUrl(getMapsUrl(ticket.activityEvidence?.entryLatitude, ticket.activityEvidence?.entryLongitude))}
+                              >
+                                Ver mapa
+                              </button>
                             )}
                           </div>
                           <div>
                             <strong>Ubicación salida:</strong> {formatCoordinates(ticket.activityEvidence?.exitLatitude, ticket.activityEvidence?.exitLongitude)}
                             {hasCoordinates(ticket.activityEvidence?.exitLatitude, ticket.activityEvidence?.exitLongitude) && (
-                              <a className={styles.ticketInlineLink} href={getMapsUrl(ticket.activityEvidence?.exitLatitude, ticket.activityEvidence?.exitLongitude)} target="_blank" rel="noreferrer">Ver mapa</a>
+                              <button
+                                type="button"
+                                className={styles.ticketInlineLink}
+                                onClick={() => void openExternalUrl(getMapsUrl(ticket.activityEvidence?.exitLatitude, ticket.activityEvidence?.exitLongitude))}
+                              >
+                                Ver mapa
+                              </button>
                             )}
                           </div>
                           <div><strong>PDF generado:</strong> {formatDateTime(ticket.activityEvidence?.serviceSheetUploadedAt)}</div>
@@ -1401,13 +1469,18 @@ export default function ClientTicketsPage() {
                             const mapUrl = getMapsUrl(coords.lat, coords.lng);
                             const mapPreviewUrl = getStaticMapPreviewUrl(coords.lat, coords.lng);
 
+                            const fileHref = mapReplacement ? mapUrl : file.url;
                             return (
                               <a
                                 key={`${ticket.id}-${file.label}-${file.url}`}
                                 className={styles.ticketFileCard}
-                                href={mapReplacement ? mapUrl : file.url}
-                                target="_blank"
+                                href={fileHref}
                                 rel="noreferrer"
+                                onClick={(e) => {
+                                  if (!isCapacitorNative()) return;
+                                  e.preventDefault();
+                                  void openExternalUrl(fileHref);
+                                }}
                               >
                                 <span className={styles.ticketFileLabel}>{mapReplacement ? "Mapa de llegada" : file.label}</span>
                                 {mapReplacement ? (
@@ -1452,9 +1525,15 @@ export default function ClientTicketsPage() {
                             <span className={styles.ticketMapCoordinates}>
                               Coordenadas: {formatCoordinates(arrivalEvidenceFor(ticket)?.latitud, arrivalEvidenceFor(ticket)?.longitud)}
                             </span>
-                            <a className={styles.ticketInlineLink} href={getMapsUrl(arrivalEvidenceFor(ticket)?.latitud, arrivalEvidenceFor(ticket)?.longitud)} target="_blank" rel="noreferrer">
+                            <button
+                              type="button"
+                              className={styles.ticketInlineLink}
+                              onClick={() =>
+                                void openExternalUrl(getMapsUrl(arrivalEvidenceFor(ticket)?.latitud, arrivalEvidenceFor(ticket)?.longitud))
+                              }
+                            >
                               Abrir en Google Maps
-                            </a>
+                            </button>
                           </div>
                           {(() => {
                             const lat = arrivalEvidenceFor(ticket)?.latitud;
@@ -1466,11 +1545,10 @@ export default function ClientTicketsPage() {
                               : getFallbackStaticMapPreviewUrl(lat, lng);
 
                             return (
-                              <a
+                              <button
+                                type="button"
                                 className={styles.ticketMapPreviewLink}
-                                href={getMapsUrl(lat, lng)}
-                                target="_blank"
-                                rel="noreferrer"
+                                onClick={() => void openExternalUrl(getMapsUrl(lat, lng))}
                               >
                                 {failCount >= 2 ? (
                                   <div className={styles.ticketMapPreviewFallback}>
@@ -1484,7 +1562,7 @@ export default function ClientTicketsPage() {
                                     onError={() => setMapPreviewErrors((prev) => ({ ...prev, [mapKey]: failCount + 1 }))}
                                   />
                                 )}
-                              </a>
+                              </button>
                             );
                           })()}
                         </section>
@@ -1681,14 +1759,29 @@ export default function ClientTicketsPage() {
                       <div className={styles.mutedText}>Asignado a: {request.activity.anNumber}</div>
                     )}
                     {request.latitud && request.longitud && (
-                      <a href={getMapsUrl(request.latitud, request.longitud)} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>Ver ubicación</a>
+                      <button
+                        type="button"
+                        className={styles.ticketInlineLink}
+                        style={{ fontSize: 12, justifySelf: "start" }}
+                        onClick={() => void openExternalUrl(getMapsUrl(request.latitud, request.longitud))}
+                      >
+                        Ver ubicación
+                      </button>
                     )}
                     {request.latitud && request.longitud && (
-                      <a
-                        href={getMapsUrl(request.latitud, request.longitud)}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ display: "block", borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", background: "var(--surface-light)" }}
+                      <button
+                        type="button"
+                        onClick={() => void openExternalUrl(getMapsUrl(request.latitud, request.longitud))}
+                        style={{
+                          display: "block",
+                          padding: 0,
+                          textAlign: "left",
+                          borderRadius: 12,
+                          overflow: "hidden",
+                          border: "1px solid var(--border)",
+                          background: "var(--surface-light)",
+                          cursor: "pointer",
+                        }}
                       >
                         {(() => {
                           const mapKey = `${request.id}-map`;
@@ -1714,7 +1807,7 @@ export default function ClientTicketsPage() {
                             />
                           );
                         })()}
-                      </a>
+                      </button>
                     )}
                     {Array.isArray(request.evidenceUrls) && request.evidenceUrls.length > 0 && (
                       <div className={styles.grid120}>
@@ -1722,9 +1815,13 @@ export default function ClientTicketsPage() {
                           <div key={`${request.id}-${idx}`} className={styles.mediaTile} style={{ display: "grid", placeItems: "center", padding: 8, minHeight: 140 }}>
                             {getEvidenceKind(url) === "pdf" ? (
                               <div className={`card ${styles.cardSoft}`} style={{ minHeight: 120, display: "grid", placeItems: "center", padding: 10 }}>
-                                <a className="button-secondary" href={getAssetUrl(url)} target="_blank" rel="noreferrer">
+                                <button
+                                  type="button"
+                                  className="button-secondary"
+                                  onClick={() => void openExternalUrl(getAssetUrl(url))}
+                                >
                                   Abrir PDF
-                                </a>
+                                </button>
                               </div>
                             ) : !evidenceLoadErrors[`${request.id}-${idx}`] ? (
                               <img
@@ -1736,9 +1833,13 @@ export default function ClientTicketsPage() {
                               />
                             ) : (
                               <div className={`card ${styles.cardSoft}`} style={{ minHeight: 120, display: "grid", placeItems: "center", padding: 10 }}>
-                                <a className="button-secondary" href={getAssetUrl(url)} target="_blank" rel="noreferrer">
+                                <button
+                                  type="button"
+                                  className="button-secondary"
+                                  onClick={() => void openExternalUrl(getAssetUrl(url))}
+                                >
                                   Abrir archivo
-                                </a>
+                                </button>
                               </div>
                             )}
                           </div>
@@ -1831,19 +1932,31 @@ export default function ClientTicketsPage() {
           onClick={() => setShowReportModal(false)}
         >
           <div
-            style={{ background: "var(--surface, #fff)", borderRadius: 12, width: "100%", maxWidth: 980, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" }}
+            style={{
+              background: "var(--surface, #fff)",
+              borderRadius: 12,
+              width: "100%",
+              maxWidth: 980,
+              maxHeight: "min(92dvh, 920px)",
+              height: "min(92dvh, 920px)",
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
               <span style={{ fontWeight: 600 }}>Reporte consolidado de tickets</span>
               <button onClick={() => setShowReportModal(false)} style={{ padding: "6px 14px", background: "var(--bg-secondary)", border: "1px solid var(--border)", borderRadius: 8, cursor: "pointer" }}>✕ Cerrar</button>
             </div>
-            <div style={{ flex: 1, overflow: "auto" }}>
+            <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
               <PDFViewer
                 pdfUrl={reportPdfUrl}
                 pdfData={reportPdfData}
                 fileName={`reporte-tickets-${new Date().toISOString().slice(0, 10)}.pdf`}
                 height="800px"
+                fillParent
               />
             </div>
           </div>

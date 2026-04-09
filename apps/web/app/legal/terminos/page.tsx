@@ -1,4 +1,5 @@
 export default function TerminosPage() {
+  const mailHref = "mailto:ventas@nexara.com.mx";
   return (
     <main style={{ maxWidth: 900, margin: "0 auto", padding: "clamp(20px, 6vw, 48px) clamp(14px, 4vw, 20px)", color: "var(--text-primary)" }}>
       <h1 style={{ fontSize: "clamp(1.75rem, 5.5vw, 2rem)", marginBottom: 12, lineHeight: 1.2 }}>Términos y Condiciones</h1>
@@ -11,7 +12,7 @@ export default function TerminosPage() {
         NEXARA puede actualizar funcionalidades, políticas y condiciones de servicio en cualquier momento.
       </p>
       <p style={{ lineHeight: 1.7 }}>
-        Para dudas sobre estos términos, contáctanos en {" "}<a href="mailto:ventas@nexara.com.mx">ventas@nexara.com.mx</a>.
+        Para dudas sobre estos términos, contáctanos en {" "}<a href={mailHref}>{mailHref.replace(/^mailto:/, "")}</a>.
       </p>
     </main>
   );

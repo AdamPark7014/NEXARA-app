@@ -4,6 +4,7 @@ import Sidebar from "./Sidebar";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import NotificationCenter from "@/components/NotificationCenter";
+import { isCapacitorNative } from "@/lib/capacitor-env";
 import BottomNav from "@/components/BottomNav";
 import type { BottomNavItem } from "@/components/BottomNav";
 import PageTransition from "@/components/PageTransition";
@@ -11,6 +12,7 @@ import GpsBackgroundTracker from "@/components/GpsBackgroundTracker";
 import { setActivePanel } from "@/lib/panel-routing";
 import { useUser } from "@/components/UserContext";
 import { isPlatformAdmin } from "@/lib/panel-user";
+import { useCompactBottomNav } from "@/lib/use-compact-bottom-nav";
 
 const formatConsoleTitle = (pathname: string) => {
   const normalized = pathname.replace(/^\/+/, "").split("?")[0];
@@ -77,6 +79,8 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   const [viewSubtitle, setViewSubtitle] = useState("Consola NEXARA");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const showCompactBottomNav = useCompactBottomNav();
+  const [nativeShell, setNativeShell] = useState<boolean | null>(null);
   const viewTitle = useMemo(() => formatConsoleTitle(pathname || "console"), [pathname]);
   const inPrefixedConsolePath = Boolean(pathname && pathname.startsWith("/console"));
   const role = String(user?.role || "").toLowerCase();
@@ -135,6 +139,10 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
     setViewSubtitle(`Consola NEXARA · ${now.toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" })}`);
     setActivePanel("console");
   }, []);
+
+  useEffect(() => {
+    setNativeShell(isCapacitorNative());
+  }, []);
   // Si estamos en rutas de autenticacion, no renderizar shell de consola
   if (pathname && (pathname.includes("/login") || pathname.includes("/auth"))) {
     return <>{children}</>;
@@ -152,19 +160,26 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
               <span className={styles.consoleViewMeta}>{viewSubtitle}</span>
             </div>
             <div className={styles.consoleTopbarActions}>
-              <NotificationCenter inlineTrigger position="top-right" maxNotifications={5} autoCloseTime={6000} />
+              {nativeShell === null ? null : (
+                <NotificationCenter
+                  inlineTrigger
+                  position="top-right"
+                  maxNotifications={5}
+                  autoCloseTime={6000}
+                  mirrorToSystemNotifications={!nativeShell}
+                />
+              )}
             </div>
           </div>
         </section>
         <div className={styles.consoleContent}><PageTransition>{children}</PageTransition></div>
-        {isMobile && (
+        {isMobile && showCompactBottomNav && (
           <>
-            {/* Spacer to prevent fixed BottomNav from covering last content row */}
             <div style={{ height: 96, flexShrink: 0, pointerEvents: "none" }} aria-hidden="true" />
           </>
         )}
       </main>
-      {isMobile && <BottomNav items={bottomNavItems} />}
+      {isMobile && showCompactBottomNav && <BottomNav items={bottomNavItems} />}
     </div>
   );
 }

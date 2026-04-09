@@ -5,7 +5,8 @@ import { io, Socket } from "socket.io-client";
 import { useUser } from "./UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { buildApiUrl as buildApiUrlFromBase, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
-import { revokeObjectUrlLater, triggerFileDownload } from "@/lib/file-download";
+import { triggerBlobDownload, triggerFileDownload } from "@/lib/file-download";
+import { openExternalUrl } from "@/lib/open-external-url";
 import ExcelDownloadModal from "./ExcelDownloadModal";
 import PDFViewer from "./PDFViewer";
 import styles from "./EvidenceTable.module.css";
@@ -323,10 +324,11 @@ const MediaGallery: React.FC<{ archivos: GalleryFile[]; getUrl: (u: string) => s
               <span className={styles.lightboxCounter}>{idx + 1} / {archivos.length}</span>
               <a
                 href={getUrl(archivos[idx].url)}
-                target="_blank"
-                rel="noopener noreferrer"
                 className={styles.lightboxOpen}
-                onClick={e => e.stopPropagation()}
+                onClick={e => {
+                  e.stopPropagation();
+                  void openExternalUrl(getUrl(archivos[idx].url));
+                }}
                 title="Abrir en nueva pestaña"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
@@ -339,14 +341,9 @@ const MediaGallery: React.FC<{ archivos: GalleryFile[]; getUrl: (u: string) => s
               ) : imgErrors[idx] ? (
                 <div className={styles.lightboxFallback}>
                   <span>Vista previa no disponible</span>
-                  <a
-                    href={getUrl(archivos[idx].url)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="button-secondary"
-                  >
+                  <button type="button" className="button-secondary" onClick={() => void openExternalUrl(getUrl(archivos[idx].url))}>
                     Abrir archivo
-                  </a>
+                  </button>
                 </div>
               ) : (
                 <img
@@ -511,8 +508,14 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
   };
 
   const handleDownloadExcel = () => {
+    const xlsxMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    if (excelBlob?.size) {
+      void triggerBlobDownload(excelBlob, "evidencias.xlsx", { mimeType: xlsxMime });
+      closeExcelModal();
+      return;
+    }
     if (!excelUrl) return;
-    triggerFileDownload(excelUrl, "evidencias.xlsx", { preferOpenOnMobile: true });
+    void triggerFileDownload(excelUrl, "evidencias.xlsx", { preferOpenOnMobile: true, mimeType: xlsxMime });
     closeExcelModal();
   };
 
@@ -538,9 +541,7 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
   };
 
   const downloadPdfBlob = (blob: Blob, fileName: string) => {
-    const url = window.URL.createObjectURL(blob);
-    triggerFileDownload(url, fileName, { preferOpenOnMobile: true });
-    revokeObjectUrlLater(url);
+    void triggerBlobDownload(blob, fileName, { mimeType: "application/pdf" });
   };
 
   const handlePreviewTicketPdf = async (evi: Evidence) => {
@@ -953,7 +954,13 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
             </div>
 
             <div className={styles.pdfViewerWrap}>
-              <PDFViewer pdfUrl={previewPdfUrl} pdfData={previewPdfData} fileName={previewPdfName} height="620px" />
+              <PDFViewer
+                pdfUrl={previewPdfUrl}
+                pdfData={previewPdfData}
+                fileName={previewPdfName}
+                height="620px"
+                fillParent
+              />
             </div>
           </div>
         </div>
@@ -1003,17 +1010,25 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
                   <div>
                     <strong>Ubicación llegada:</strong> {formatCoordinates(detailEvidence.entryLatitude, detailEvidence.entryLongitude)}
                     {hasCoordinates(detailEvidence.entryLatitude, detailEvidence.entryLongitude) && (
-                      <a className={styles.detailInlineLink} href={getMapsUrl(detailEvidence.entryLatitude, detailEvidence.entryLongitude)} target="_blank" rel="noreferrer">
+                      <button
+                        type="button"
+                        className={styles.detailInlineLink}
+                        onClick={() => void openExternalUrl(getMapsUrl(detailEvidence.entryLatitude, detailEvidence.entryLongitude))}
+                      >
                         Ver mapa
-                      </a>
+                      </button>
                     )}
                   </div>
                   <div>
                     <strong>Ubicación salida:</strong> {formatCoordinates(detailEvidence.exitLatitude, detailEvidence.exitLongitude)}
                     {hasCoordinates(detailEvidence.exitLatitude, detailEvidence.exitLongitude) && (
-                      <a className={styles.detailInlineLink} href={getMapsUrl(detailEvidence.exitLatitude, detailEvidence.exitLongitude)} target="_blank" rel="noreferrer">
+                      <button
+                        type="button"
+                        className={styles.detailInlineLink}
+                        onClick={() => void openExternalUrl(getMapsUrl(detailEvidence.exitLatitude, detailEvidence.exitLongitude))}
+                      >
                         Ver mapa
-                      </a>
+                      </button>
                     )}
                   </div>
                   <div><strong>PDF cargado:</strong> {formatDateTime(detailEvidence.serviceSheetUploadedAt)}</div>
@@ -1026,9 +1041,13 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
                 <MediaGallery archivos={buildEvidenceFiles(detailEvidence)} getUrl={getAssetUrl} />
                 {detailEvidence.serviceSheetPdfUrl && (
                   <div className={styles.detailActionsRow}>
-                    <a className="button-secondary" href={getAssetUrl(detailEvidence.serviceSheetPdfUrl)} target="_blank" rel="noreferrer">
+                    <button
+                      type="button"
+                      className="button-secondary"
+                      onClick={() => void openExternalUrl(getAssetUrl(detailEvidence.serviceSheetPdfUrl))}
+                    >
                       Abrir PDF de evidencia
-                    </a>
+                    </button>
                   </div>
                 )}
               </section>
@@ -1175,14 +1194,13 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
 
                     <td className={styles.dataCell} data-label="Ubicación">
                       {getMapsUrl(evi.latitud, evi.longitud) ? (
-                        <a
+                        <button
+                          type="button"
                           className="link"
-                          href={getMapsUrl(evi.latitud, evi.longitud)}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          onClick={() => void openExternalUrl(getMapsUrl(evi.latitud, evi.longitud))}
                         >
                           Ver mapa
-                        </a>
+                        </button>
                       ) : (
                         "-"
                       )}

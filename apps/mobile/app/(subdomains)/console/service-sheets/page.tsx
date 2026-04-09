@@ -4,7 +4,7 @@ import HelpTab from '@/components/HelpTab';
 import React, { useEffect, useState } from 'react';
 import { RoleGuard } from '../../../../components/RoleGuard';
 import { useUser } from '../../../../components/UserContext';
-import { revokeObjectUrlLater, triggerFileDownload } from '@/lib/file-download';
+import { triggerBlobDownload } from '@/lib/file-download';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
@@ -91,9 +91,7 @@ export default function ServiceSheetsPage() {
       });
       if (res.ok) {
         const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        triggerFileDownload(url, `hoja-servicio-${activityId}.pdf`, { preferOpenOnMobile: true });
-        revokeObjectUrlLater(url);
+        void triggerBlobDownload(blob, `hoja-servicio-${activityId}.pdf`, { mimeType: "application/pdf" });
       }
     } catch { /* ignore */ }
   };
