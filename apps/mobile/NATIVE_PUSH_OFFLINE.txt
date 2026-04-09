@@ -1,0 +1,48 @@
+NEXARA — APK, push y modo offline (referencia rápida)
+=====================================================
+
+1) Firebase (Android)
+-----------------------
+- Consola Firebase: crea proyecto → agrega app Android con package "mx.nexara.mobile".
+- Descarga google-services.json y cópialo como:
+  apps/mobile/android/app/google-services.json
+  (parte de google-services.json.example como plantilla; el ejemplo NO es válido para FCM real.)
+- En Firebase → Cloud Messaging, habilita API legacy si aplica a tu flujo.
+- En el servidor: variable FIREBASE_SERVICE_ACCOUNT_JSON (JSON de cuenta de servicio) para enviar desde la API.
+
+2) Sincronizar Capacitor
+------------------------
+Desde apps/mobile:
+  npm run cap:sync
+o build completo:
+  npm run cap:build
+
+3) iOS (cuando agregues la plataforma)
+---------------------------------------
+  npx cap add ios
+  npm run cap:sync
+En Apple Developer: identificador de app = mx.nexara.mobile, Push Notifications ON.
+Sube la clave APNs (.p8) o certificados según uses FCM para iOS o APNs directo.
+Xcode: Signing & Capabilities → + Push Notifications.
+Info.plist: UIBackgroundModes incluye "remote-notification" (Capacitor suele añadirlo con el plugin).
+
+4) Probar push en dispositivo
+-----------------------------
+- Instala la APK/debug en teléfono con google-services.json válido.
+- Inicia sesión en la app (cualquier ruta; ConsolePushSetup está en providers) → se registra el token en POST /devices/push-token (si no hay red, el POST puede quedar en cola offline).
+- Genera una notificación desde el backend (cualquier flujo que cree Notification) → debe llegar FCM si FIREBASE_SERVICE_ACCOUNT_JSON está bien.
+
+5) Modo offline (implementado en la app móvil)
+----------------------------------------------
+- Cola en localStorage + IndexedDB; reintento al volver online (OfflineQueueFlusher).
+- fetchWithOfflineQueue: JSON mutaciones en cola si no hay red; FormData (subidas) requieren conexión.
+- Parche global `window.fetch` (installOfflineFetchGlobal en providers): mutaciones JSON al API pasan por la cola; excluye login, public-analytics, POST público a contact-messages, cotizaciones/public, newsletter/subscribe; no encola FormData/URLSearchParams/Blob/stream.
+- Portal sucursal: envío con archivos (FormData) muestra error claro si no hay red; evento nexara-portal-session-changed al iniciar/cerrar sesión sucursal (banner).
+- Pantallas cableadas: Asistencia (marcaje), flujo de evidencias (pasos JSON), portal cliente Tickets (mutaciones JSON: perfil, solicitudes, feedback). En apps/web el mismo portal Tickets + cola/banner comparten lógica equivalente.
+- En consola nativa, el centro de notificaciones refresca la lista al recibir push en primer plano (evento nexara-native-push).
+- Banner superior: estado red + operaciones pendientes.
+- Sesión "degradada": si el JWT venció pero no hay red, se muestra el perfil hasta que haya internet (luego se pide login si sigue vencido).
+
+6) Play Store / App Store
+---------------------------
+- Política de privacidad, iconos, capturas, firma release (key.properties en android/), revisión de permisos declarados en el manifiesto.

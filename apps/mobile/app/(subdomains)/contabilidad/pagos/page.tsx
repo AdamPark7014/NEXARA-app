@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import { canViewContabilidadTarget } from "@/lib/contabilidad-visibility";
 import styles from "./page.module.css";
+import { openExternalUrl } from "@/lib/open-external-url";
 
 interface PaymentUser {
   id: number;
@@ -209,7 +210,9 @@ export default function ContabilidadPagos() {
       return (
         <div className={styles.evidenceItem}>
           <object data={absoluteUrl} type="application/pdf" width="96" height="110">
-            <a href={absoluteUrl} target="_blank" rel="noreferrer">PDF</a>
+            <button type="button" className={styles.evidencePdfBtn} onClick={() => void openExternalUrl(absoluteUrl)}>
+              PDF
+            </button>
           </object>
         </div>
       );

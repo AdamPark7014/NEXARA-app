@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import ProjectCostTracker from "@/components/ProjectCostTracker";
+import { getSalesScope } from "@/lib/sales-scope";
 import {
   closeSalesProject,
   createSalesProject,
@@ -21,10 +22,7 @@ type SalesProject = SalesProjectDetail;
 export default function VentasProyectosPage() {
   const { user } = useUser();
   const router = useRouter();
-  const selectedOwnerId =
-    typeof window === "undefined"
-      ? undefined
-      : Number(new URLSearchParams(window.location.search).get("ownerId") || 0) || undefined;
+  const scope = getSalesScope(user, typeof window === "undefined" ? "" : window.location.search);
   const apiOrigin = getApiBase().replace(/\/+api\/?$/, "");
   const [projects, setProjects] = useState<SalesProject[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +45,7 @@ export default function VentasProyectosPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await listSalesProjects(user.token, { ownerId: selectedOwnerId });
+      const data = await listSalesProjects(user.token, { ownerId: scope.ownerId });
       setProjects(data);
 
       // Fetch orders for each project
@@ -70,7 +68,7 @@ export default function VentasProyectosPage() {
 
   useEffect(() => {
     fetchProjects();
-  }, [selectedOwnerId, user?.token]);
+  }, [scope.ownerId, user?.token]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -142,7 +140,11 @@ export default function VentasProyectosPage() {
       const fileUrl = order.orderPdfUrl.startsWith("http")
         ? order.orderPdfUrl
         : `${apiOrigin}${order.orderPdfUrl.startsWith("/") ? "" : "/"}${order.orderPdfUrl}`;
-      triggerFileDownload(fileUrl, `orden-${order.orderId}.pdf`, { preferOpenOnMobile: true });
+      void triggerFileDownload(fileUrl, `orden-${order.orderId}.pdf`, {
+        preferOpenOnMobile: true,
+        authToken: user?.token,
+        mimeType: "application/pdf",
+      });
     } catch (err) {
       setError("Error al descargar el archivo");
     }

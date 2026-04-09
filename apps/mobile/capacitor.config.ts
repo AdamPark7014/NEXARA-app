@@ -21,10 +21,9 @@ const config: CapacitorConfig = {
     cleartext: isHttpUrl,
   },
   plugins: {
-    // Push notifications (add @capacitor/push-notifications if needed)
-    // SplashScreen: {
-    //   launchShowDuration: 2000,
-    // },
+    PushNotifications: {
+      presentationOptions: ['badge', 'sound', 'alert'],
+    },
   },
   android: {
     // Minimum SDK to target; 24 covers ~99 % of active Android devices

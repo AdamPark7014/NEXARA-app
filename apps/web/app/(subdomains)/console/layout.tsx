@@ -4,6 +4,7 @@ import Sidebar from "./Sidebar";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import NotificationCenter from "@/components/NotificationCenter";
+import ConsoleWebPushRegister from "@/components/ConsoleWebPushRegister";
 import GpsBackgroundTracker from "@/components/GpsBackgroundTracker";
 import { setActivePanel } from "@/lib/panel-routing";
 
@@ -82,6 +83,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   }
   return (
     <div className={styles.consoleLayout}>
+      <ConsoleWebPushRegister />
       <GpsBackgroundTracker />
       <Sidebar />
       <main className={styles.consoleMain}>
@@ -93,7 +95,13 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
               <span className={styles.consoleViewMeta}>{viewSubtitle}</span>
             </div>
             <div className={styles.consoleTopbarActions}>
-              <NotificationCenter inlineTrigger position="top-right" maxNotifications={5} autoCloseTime={6000} />
+              <NotificationCenter
+                inlineTrigger
+                position="top-right"
+                maxNotifications={5}
+                autoCloseTime={6000}
+                mirrorToSystemNotifications
+              />
             </div>
           </div>
         </section>

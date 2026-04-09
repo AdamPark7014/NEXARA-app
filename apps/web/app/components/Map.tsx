@@ -192,9 +192,9 @@ export default function Map() {
               <img src="/logo-nexara.png" alt="NEXARA" class="nexara-map-logo" />
               <h3 class="nexara-map-title">NEXARA</h3>
               <p class="nexara-map-subtitle">Soluciones Tecnológicas</p>
-              <a href="https://maps.app.goo.gl/34XSHPwUSeMAB7x69" target="_blank" rel="noopener" class="nexara-map-btn">
+              <button class="nexara-map-btn" onclick="window.location.href='https://maps.app.goo.gl/34XSHPwUSeMAB7x69'">
                 Ver ubicación
-              </a>
+              </button>
             </div>
           `,
           maxWidth: 280,

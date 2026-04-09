@@ -144,6 +144,12 @@ export default function MyBranchesPage() {
   }, [session?.token]);
 
   useEffect(() => {
+    if (session?.token) {
+      window.dispatchEvent(new Event("nexara-portal-session-changed"));
+    }
+  }, [session?.token]);
+
+  useEffect(() => {
     if (!session?.token) return undefined;
     const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ["polling", "websocket"] });
@@ -162,11 +168,13 @@ export default function MyBranchesPage() {
     window.sessionStorage.setItem("clientSession", JSON.stringify(nextSession));
     setSession(nextSession);
     setError(null);
+    window.dispatchEvent(new Event("nexara-portal-session-changed"));
   };
 
   const handleLogout = () => {
     window.sessionStorage.removeItem("clientSession");
     window.sessionStorage.removeItem("branchSession");
+    window.dispatchEvent(new Event("nexara-portal-session-changed"));
     setSession(null);
     setProfile(null);
     setBranches([]);

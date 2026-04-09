@@ -4,6 +4,7 @@ import { useUser } from './UserContext';
 import styles from './ActivityEvidenceFlow.module.css';
 import { io, Socket } from 'socket.io-client';
 import { buildApiUrl as buildApiUrlFromBase, getApiAssetOrigin, getSocketBaseUrl } from '@/lib/api-base';
+import { fetchWithOfflineQueue, isQueuedResponse } from '@/lib/fetch-offline';
 
 interface ActivityOption {
   id: number;
@@ -87,6 +88,20 @@ const ActivityEvidenceFlow = () => {
   const inventoryFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const buildApiUrl = (path: string) => buildApiUrlFromBase(path);
+
+  const postJsonOffline = (path: string, body: unknown) =>
+    fetchWithOfflineQueue(
+      buildApiUrl(path),
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${user!.token}`,
+        },
+        body: JSON.stringify(body),
+      },
+      () => user?.token,
+    );
 
   const isCorrection = flowData?.reviewStatus === 'REJECTED';
   const selectedActivity = actividades.find((activity) => activity.id === Number(selectedActivityId || flowData?.activityId));
@@ -385,14 +400,13 @@ const ActivityEvidenceFlow = () => {
         ? { step: 'ENTRY_PHOTO', data: { photoUrl, latitude, longitude } }
         : { photoUrl, latitude, longitude };
 
-      const res = await fetch(buildApiUrl(endpoint), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${user!.token}`,
-        },
-        body: JSON.stringify(body),
-      });
+      const res = await postJsonOffline(endpoint, body);
+
+      if (isQueuedResponse(res)) {
+        setSuccessMsg('Sin conexión: paso en cola. Reconecta para sincronizar.');
+        setLoading(false);
+        return;
+      }
 
       if (res.ok) {
         const updated = await res.json();
@@ -485,19 +499,17 @@ const ActivityEvidenceFlow = () => {
 
     try {
       if (isInventoryFlow) {
-        await fetch(buildApiUrl(`inventories/activity/${flowData.activityId}/sync`), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${user!.token}`,
-          },
-          body: JSON.stringify({
-            title: `Inventario comparativo ${selectedActivity?.anNumber || flowData.activityId}`,
-            notes: inventoryNotes,
-            completed: false,
-            items: inventoryItems,
-          }),
+        const syncRes = await postJsonOffline(`inventories/activity/${flowData.activityId}/sync`, {
+          title: `Inventario comparativo ${selectedActivity?.anNumber || flowData.activityId}`,
+          notes: inventoryNotes,
+          completed: false,
+          items: inventoryItems,
         });
+        if (isQueuedResponse(syncRes)) {
+          setSuccessMsg('Sin conexión: inventario en cola. Reconecta para sincronizar.');
+          setLoading(false);
+          return;
+        }
       }
 
       const endpoint = isCorrection
@@ -508,14 +520,13 @@ const ActivityEvidenceFlow = () => {
         ? { step: 'EVIDENCE_PHOTOS', data: { photoUrls: flowData.evidencePhotos } }
         : { photoUrls: flowData.evidencePhotos };
 
-      const res = await fetch(buildApiUrl(endpoint), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${user!.token}`,
-        },
-        body: JSON.stringify(body),
-      });
+      const res = await postJsonOffline(endpoint, body);
+
+      if (isQueuedResponse(res)) {
+        setSuccessMsg('Sin conexión: evidencias en cola. Reconecta para sincronizar.');
+        setLoading(false);
+        return;
+      }
 
       if (res.ok) {
         setFlowData({ 
@@ -568,14 +579,13 @@ const ActivityEvidenceFlow = () => {
           ? { step: 'SERVICE_SHEET_PDF', data: { pdfUrl } }
           : { pdfUrl };
 
-        const res = await fetch(buildApiUrl(endpoint), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${user!.token}`,
-          },
-          body: JSON.stringify(body),
-        });
+        const res = await postJsonOffline(endpoint, body);
+
+        if (isQueuedResponse(res)) {
+          setSuccessMsg('Sin conexión: PDF en cola. Reconecta para sincronizar.');
+          setLoading(false);
+          return;
+        }
 
         if (res.ok) {
           setFlowData({ 
@@ -616,14 +626,13 @@ const ActivityEvidenceFlow = () => {
         ? { step: 'SERVICE_SHEET_DATA', data: { formData: data } }
         : data;
 
-      const res = await fetch(buildApiUrl(endpoint), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${user!.token}`,
-        },
-        body: JSON.stringify(body),
-      });
+      const res = await postJsonOffline(endpoint, body);
+
+      if (isQueuedResponse(res)) {
+        setSuccessMsg('Sin conexión: plantilla en cola. Reconecta para sincronizar.');
+        setLoading(false);
+        return;
+      }
 
       if (res.ok) {
         setFlowData({ 
@@ -666,20 +675,19 @@ const ActivityEvidenceFlow = () => {
           }
         }
 
-        const syncRes = await fetch(buildApiUrl(`inventories/activity/${flowData.activityId}/sync`), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${user!.token}`,
-          },
-          body: JSON.stringify({
-            title: `Inventario comparativo ${selectedActivity?.anNumber || flowData.activityId}`,
-            notes: inventoryNotes,
-            completed: true,
-            confirmDifference: true,
-            items: inventoryItems,
-          }),
+        const syncRes = await postJsonOffline(`inventories/activity/${flowData.activityId}/sync`, {
+          title: `Inventario comparativo ${selectedActivity?.anNumber || flowData.activityId}`,
+          notes: inventoryNotes,
+          completed: true,
+          confirmDifference: true,
+          items: inventoryItems,
         });
+
+        if (isQueuedResponse(syncRes)) {
+          setSuccessMsg('Sin conexión: inventario final en cola. Reconecta para sincronizar.');
+          setLoading(false);
+          return;
+        }
 
         if (!syncRes.ok) {
           const syncError = await syncRes.json().catch(() => ({}));
@@ -700,14 +708,13 @@ const ActivityEvidenceFlow = () => {
         ? { step: 'EXIT_PHOTO', data: { photoUrl, latitude, longitude } }
         : { photoUrl, latitude, longitude };
 
-      const res = await fetch(buildApiUrl(endpoint), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${user!.token}`,
-        },
-        body: JSON.stringify(body),
-      });
+      const res = await postJsonOffline(endpoint, body);
+
+      if (isQueuedResponse(res)) {
+        setSuccessMsg('Sin conexión: cierre en cola. Reconecta para sincronizar.');
+        setLoading(false);
+        return;
+      }
 
       if (res.ok) {
         setFlowData({

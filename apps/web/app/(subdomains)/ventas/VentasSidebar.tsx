@@ -17,6 +17,7 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
+  { label: "Mi perfil", icon: "👤", href: "/my-profile", section: "Cuenta y panorama", description: "Resumen y datos personales" },
   { label: "Dashboard", icon: "📊", href: "/dashboard", section: "Cuenta y panorama", description: "Visión general de ventas" },
 
   { label: "Leads", icon: "🎯", href: "/leads", section: "Prospección comercial", description: "Gestiona leads potenciales" },
@@ -28,9 +29,6 @@ const menuItems: MenuItem[] = [
   { label: "Plantillas", icon: "🎨", href: "/plantillas", section: "Clientes y ejecución", description: "Plantillas de órdenes PDF" },
 
   { label: "Notificaciones", icon: "🔔", href: "/notificaciones", section: "Comunicación y seguimiento", description: "Centro de notificaciones" },
-
-  { label: "Reportes", icon: "📈", href: "/reportes", section: "Análisis y estrategia", description: "Reportes detallados" },
-  { label: "Crecimiento", icon: "📶", href: "/crecimiento", section: "Análisis y estrategia", description: "Análisis de crecimiento" },
 ];
 
 const sectionOrder = [
@@ -118,6 +116,11 @@ export default function VentasSidebar() {
         section: "Análisis y estrategia",
         description: "Control ejecutivo y productividad diaria",
       });
+      items.push(
+        { label: "Reportes", icon: "📈", href: "/reportes", section: "Análisis y estrategia", description: "Reportes ejecutivos del equipo" },
+        { label: "Crecimiento", icon: "📶", href: "/crecimiento", section: "Análisis y estrategia", description: "Análisis de crecimiento anual" },
+        { label: "Equipo comparativa", icon: "🧮", href: "/equipo-comparativa", section: "Análisis y estrategia", description: "Comparativa por vendedor" },
+      );
     }
 
     const normalizedQuery = navQuery.trim().toLowerCase();

@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import styles from "./page.module.css";
 import SeoInterlinkHub from "@/components/SeoInterlinkHub";
 import { SERVICIOS_IMAGES } from "./serviciosImagery";
+import ExternalLinkButton from "@/components/ExternalLinkButton";
 
 const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
 
@@ -319,15 +320,13 @@ export default function ServiciosPage() {
           >
             Contactar
           </Link>
-          <Link
+          <ExternalLinkButton
             href="https://wa.me/525536505044"
             data-track-conversion="services_whatsapp_cta"
             className={styles.secondaryCta}
-            target="_blank"
-            rel="noopener noreferrer"
           >
             WhatsApp
-          </Link>
+          </ExternalLinkButton>
         </div>
       </section>
 

@@ -5,6 +5,7 @@ import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import ExcelDownloadModal from './ExcelDownloadModal';
 import styles from './ViaticTable.module.css';
+import { openExternalUrl } from '@/lib/open-external-url';
 
 interface Viatic {
   id: number;
@@ -271,7 +272,15 @@ const ViaticTable = () => {
                   <td>{v.actividad?.anNumber}</td>
                   <td>${v.montoSolicitado}</td>
                   <td>{v.razonGasto}</td>
-                  <td>{v.ticketEvidenciaUrl ? <a className="link" href={v.ticketEvidenciaUrl} target="_blank" rel="noopener noreferrer">Ver</a> : '-'}</td>
+                  <td>
+                    {v.ticketEvidenciaUrl ? (
+                      <button type="button" className="link" onClick={() => void openExternalUrl(v.ticketEvidenciaUrl)}>
+                        Ver
+                      </button>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
                   <td>
                     <span className={`badge ${v.estatusPago === 'Aprobado' ? 'approved' : v.estatusPago === 'Pendiente' ? 'pending' : v.estatusPago === 'Rechazado' ? 'rejected' : ''}`}>{v.estatusPago}</span>
                   </td>
@@ -318,9 +327,17 @@ const ViaticTable = () => {
               </div>
 
               <div className={hasPermission(user, PERMISSIONS.VIATICS_MANAGE) && v.estatusPago === 'Pendiente' ? styles.mobileActionsTriple : styles.mobileActionsSingle}>
-                <a className={`button-secondary ${styles.ticketLink} ${v.ticketEvidenciaUrl ? '' : styles.ticketLinkDisabled}`} href={v.ticketEvidenciaUrl || '#'} target="_blank" rel="noopener noreferrer">
+                <button
+                  type="button"
+                  className={`button-secondary ${styles.ticketLink} ${v.ticketEvidenciaUrl ? '' : styles.ticketLinkDisabled}`}
+                  disabled={!v.ticketEvidenciaUrl}
+                  onClick={() => {
+                    if (!v.ticketEvidenciaUrl) return;
+                    void openExternalUrl(v.ticketEvidenciaUrl);
+                  }}
+                >
                   Ver ticket
-                </a>
+                </button>
 
                 {hasPermission(user, PERMISSIONS.VIATICS_MANAGE) && v.estatusPago === 'Pendiente' && (
                   <>

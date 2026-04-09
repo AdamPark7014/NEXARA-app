@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { io, Socket } from 'socket.io-client';
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
-import { revokeObjectUrlLater, triggerFileDownload } from "@/lib/file-download";
+import { triggerBlobDownload } from "@/lib/file-download";
+import { openExternalUrl } from "@/lib/open-external-url";
 import styles from "./CvsManagementPanel.module.css";
 
 type CvRow = {
@@ -326,7 +327,7 @@ export default function CvsManagementPanel() {
   };
 
   const openPreview = (id: number) => {
-    window.open(toApi(`cvs/${id}/preview`), "_blank", "noopener,noreferrer");
+    void openExternalUrl(toApi(`cvs/${id}/preview`));
   };
 
   const downloadCv = async (id: number) => {
@@ -336,21 +337,19 @@ export default function CvsManagementPanel() {
       return;
     }
     const blob = await response.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    triggerFileDownload(objectUrl, `cv-${id}.pdf`, { preferOpenOnMobile: true });
-    revokeObjectUrlLater(objectUrl);
+    void triggerBlobDownload(blob, `cv-${id}.pdf`, { mimeType: "application/pdf" });
   };
 
   const openWhatsapp = (phone?: string | null) => {
     if (!phone) return;
     const normalized = phone.replace(/[^\d]/g, "");
     if (!normalized) return;
-    window.open(`https://wa.me/${normalized}`, "_blank", "noopener,noreferrer");
+    void openExternalUrl(`https://wa.me/${normalized}`);
   };
 
   const openEmail = (email?: string | null) => {
     if (!email) return;
-    window.open(`mailto:${email}`, "_self");
+    void openExternalUrl(`mailto:${email}`);
   };
 
   const handleCreateUser = async (id: number) => {

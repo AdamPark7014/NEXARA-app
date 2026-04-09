@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import VentasSidebar from "./VentasSidebar";
@@ -12,6 +12,9 @@ import { setActivePanel } from "@/lib/panel-routing";
 import { getRoleLabel, isSalesManagerUser } from "@/lib/panel-user";
 import { getSalesVendorStats, type SalesVendorStats } from "@/lib/sales-api";
 import { hapticTap } from "@/lib/haptics";
+import { useCompactBottomNav } from "@/lib/use-compact-bottom-nav";
+
+const VENTAS_MOBILE_BREAKPOINT = 768;
 
 export default function VentasLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -20,12 +23,26 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
   const roleLabel = getRoleLabel(user);
   const [workspaceDateLabel, setWorkspaceDateLabel] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isNarrowShell, setIsNarrowShell] = useState(false);
+  const showCompactBottomNav = useCompactBottomNav();
   const [vendorStats, setVendorStats] = useState<SalesVendorStats[]>([]);
   const selectedOwnerId =
     typeof window === "undefined"
       ? undefined
       : Number(new URLSearchParams(window.location.search).get("ownerId") || 0) || undefined;
   const currentPath = pathname ? pathname.replace(/\/+$/, "") : "";
+  const inPrefixedVentasPath = Boolean(pathname && pathname.startsWith("/ventas"));
+
+  const resolveVentasHref = (href: string) => {
+    if (!href.startsWith("/")) return href;
+    if (href === "/paneles" || href === "/login") return href;
+    if (href === "/ventas" || href.startsWith("/ventas/")) return href;
+    return inPrefixedVentasPath ? `/ventas${href}` : href;
+  };
+
+  const selectedVendorName = canManageSellers && selectedOwnerId
+    ? vendorStats.find((v) => v.userId === selectedOwnerId)?.userName
+    : undefined;
 
   const withOwnerFilter = (href: string, ownerId?: number) => {
     const value = ownerId ?? selectedOwnerId;
@@ -33,16 +50,33 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
     return `${href}?ownerId=${value}`;
   };
 
-  const quickLinks = [
-    ...(canManageSellers ? [{ label: "Gestión Vendedores", href: "/gestion-vendedores" }] : []),
-    { label: "Dashboard", href: "/dashboard" },
-    { label: "Leads", href: "/leads" },
-    { label: "Oportunidades", href: "/oportunidades" },
-    { label: "Clientes", href: "/clientes" },
-    { label: "Proyectos", href: "/proyectos" },
-    { label: "Cotizaciones", href: "/cotizaciones" },
-    { label: "Reportes", href: "/reportes" },
-  ];
+  const quickLinks = useMemo(
+    () => [
+      ...(canManageSellers ? [{ label: "Gestión Vendedores", href: resolveVentasHref("/gestion-vendedores") }] : []),
+      ...(!canManageSellers ? [{ label: "Mi perfil", href: resolveVentasHref("/my-profile") }] : []),
+      { label: "Dashboard", href: resolveVentasHref("/dashboard") },
+      { label: "Leads", href: resolveVentasHref("/leads") },
+      { label: "Oportunidades", href: resolveVentasHref("/oportunidades") },
+      { label: "Clientes", href: resolveVentasHref("/clientes") },
+      { label: "Proyectos", href: resolveVentasHref("/proyectos") },
+      { label: "Cotizaciones", href: resolveVentasHref("/cotizaciones") },
+      ...(canManageSellers ? [{ label: "Reportes", href: resolveVentasHref("/reportes") }] : []),
+    ],
+    [canManageSellers, inPrefixedVentasPath],
+  );
+
+  const ventasShortcutStrip = useMemo(() => {
+    const dash = resolveVentasHref("/dashboard");
+    const op = resolveVentasHref("/oportunidades");
+    const cli = resolveVentasHref("/clientes");
+    const cot = resolveVentasHref("/cotizaciones");
+    return [
+      { icon: "📊", label: "Dashboard", href: withOwnerFilter(dash) },
+      { icon: "💼", label: "Oportunidades", href: withOwnerFilter(op) },
+      { icon: "👥", label: "Clientes", href: withOwnerFilter(cli) },
+      { icon: "📄", label: "Cotizaciones", href: withOwnerFilter(cot) },
+    ];
+  }, [inPrefixedVentasPath, canManageSellers, selectedOwnerId]);
 
   const activeLabel = quickLinks.find((item) => {
     const itemPath = item.href.replace(/\/+$/, "");
@@ -52,6 +86,13 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
   useEffect(() => {
     setWorkspaceDateLabel(new Date().toLocaleDateString("es-MX"));
     setActivePanel("ventas");
+  }, []);
+
+  useEffect(() => {
+    const update = () => setIsNarrowShell(window.innerWidth <= VENTAS_MOBILE_BREAKPOINT);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
   }, []);
 
   useEffect(() => {
@@ -79,8 +120,14 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
 
   return (
     <div className={styles.salesRoot}>
-      <VentasSidebar mobileOpen={drawerOpen} onMobileClose={() => setDrawerOpen(false)} />
-      <main className={styles.salesMain}>
+      <VentasSidebar
+        mobileOpen={drawerOpen}
+        onMobileClose={() => setDrawerOpen(false)}
+        shortcutStrip={isNarrowShell && !showCompactBottomNav ? ventasShortcutStrip : undefined}
+      />
+      <main
+        className={`${styles.salesMain} ${isNarrowShell && showCompactBottomNav ? styles.salesMainPadForBottomNav : ""}`}
+      >
         <section className={styles.salesWorkspace}>
           <div className={styles.salesWorkspaceHeader}>
             <div>
@@ -95,6 +142,11 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
             <div className={styles.salesWorkspaceMeta}>
               <span className={styles.salesWorkspacePill}>{user?.nombre || "Equipo comercial"}</span>
               <span className={styles.salesWorkspacePill}>{roleLabel}</span>
+              {canManageSellers && (
+                <span className={styles.salesWorkspacePill}>
+                  Viendo: {selectedVendorName || "Todos"}
+                </span>
+              )}
               <span className={styles.salesWorkspacePill}>{workspaceDateLabel}</span>
             </div>
           </div>
@@ -122,7 +174,7 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
             <div style={{ display: "grid", gap: 10, marginBottom: 14 }}>
               <div style={{ fontSize: 13, fontWeight: 700, opacity: 0.9 }}>Division por vendedor (mes actual)</div>
               <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))" }}>
-                <Link href={pathname || "/dashboard"} style={{ textDecoration: "none" }}>
+                <Link href={withOwnerFilter(pathname || resolveVentasHref("/dashboard"))} style={{ textDecoration: "none" }}>
                   <div
                     style={{
                       border: selectedOwnerId ? "1px solid rgba(120,120,120,0.25)" : "2px solid rgba(20,120,220,0.7)",
@@ -136,7 +188,7 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
                   </div>
                 </Link>
                 {vendorStats.map((vendor) => (
-                  <Link key={vendor.userId} href={withOwnerFilter(pathname || "/dashboard", vendor.userId)} style={{ textDecoration: "none" }}>
+                  <Link key={vendor.userId} href={withOwnerFilter(pathname || resolveVentasHref("/dashboard"), vendor.userId)} style={{ textDecoration: "none" }}>
                     <div
                       style={{
                         border: selectedOwnerId === vendor.userId ? "2px solid rgba(20,120,220,0.7)" : "1px solid rgba(120,120,120,0.25)",
@@ -162,15 +214,17 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
           <div className={styles.salesWorkspaceContent}><PageTransition>{children}</PageTransition></div>
         </section>
       </main>
-      <BottomNav
-        items={[
-          { icon: "📊", label: "Dashboard", href: "/dashboard", hapticIntent: "selection" },
-          { icon: "💼", label: "Oportunidades", href: "/oportunidades", hapticIntent: "selection" },
-          { icon: "👥", label: "Clientes", href: "/clientes", hapticIntent: "selection" },
-          { icon: "📄", label: "Cotizaciones", href: "/cotizaciones", hapticIntent: "selection" },
-          { icon: "☰", label: "Menú", onPress: () => setDrawerOpen(true), hapticIntent: "medium" },
-        ]}
-      />
+      {isNarrowShell && showCompactBottomNav && (
+        <BottomNav
+          items={[
+            { icon: "📊", label: "Dashboard", href: withOwnerFilter(resolveVentasHref("/dashboard")), hapticIntent: "selection" },
+            { icon: "💼", label: "Oportunidades", href: withOwnerFilter(resolveVentasHref("/oportunidades")), hapticIntent: "selection" },
+            { icon: "👥", label: "Clientes", href: withOwnerFilter(resolveVentasHref("/clientes")), hapticIntent: "selection" },
+            { icon: "📄", label: "Cotizaciones", href: withOwnerFilter(resolveVentasHref("/cotizaciones")), hapticIntent: "selection" },
+            { icon: "☰", label: "Menú", onPress: () => setDrawerOpen(true), hapticIntent: "medium" },
+          ]}
+        />
+      )}
     </div>
   );
 }

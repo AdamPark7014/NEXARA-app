@@ -112,7 +112,6 @@ export default function FloatingContactForm() {
           <div className={styles.overlay} onClick={handleClose} />
           <div
             className={styles.panel}
-            style={{ top: "calc(var(--header-offset, 72px) + 10px)", bottom: "72px" }}
             role="dialog"
             aria-modal="true"
             aria-labelledby="floating-contact-title"
@@ -211,7 +210,7 @@ export default function FloatingContactForm() {
                   <textarea
                     id="float-message"
                     name="message"
-                    rows={4}
+                    rows={3}
                     required
                     placeholder="¿En qué podemos ayudarte?"
                     disabled={loading}

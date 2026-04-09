@@ -519,3 +519,31 @@
     padding: 8px 9px;
   }
 }
+
+.shortcutStrip {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+.shortcutChip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 52px;
+  padding: 8px 6px;
+  border-radius: 12px;
+  text-decoration: none;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-align: center;
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--surface-2) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  -webkit-tap-highlight-color: transparent;
+}

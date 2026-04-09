@@ -10,14 +10,12 @@ import {
   type SalesClientDocument,
 } from "@/lib/sales-api";
 import { getApiBase } from "@/lib/api-base";
+import { getSalesScope } from "@/lib/sales-scope";
 import styles from "./page.module.css";
 
 export default function VentasClientesPage() {
   const { user } = useUser();
-  const selectedOwnerId =
-    typeof window === "undefined"
-      ? undefined
-      : Number(new URLSearchParams(window.location.search).get("ownerId") || 0) || undefined;
+  const scope = getSalesScope(user, typeof window === "undefined" ? "" : window.location.search);
   const [clients, setClients] = useState<SalesClient[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +42,7 @@ export default function VentasClientesPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await listSalesClients(user.token, { ownerId: selectedOwnerId });
+      const data = await listSalesClients(user.token, { ownerId: scope.ownerId });
       setClients(data);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error inesperado");
@@ -55,7 +53,7 @@ export default function VentasClientesPage() {
 
   useEffect(() => {
     fetchClients();
-  }, [selectedOwnerId, user?.token]);
+  }, [scope.ownerId, user?.token]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;

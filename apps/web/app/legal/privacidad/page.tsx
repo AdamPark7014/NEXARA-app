@@ -1,4 +1,5 @@
 export default function PrivacidadPage() {
+  const mailHref = "mailto:ventas@nexara.com.mx";
   return (
     <main style={{ maxWidth: 900, margin: "0 auto", padding: "clamp(20px, 6vw, 48px) clamp(14px, 4vw, 20px)", color: "var(--text-primary)" }}>
       <h1 style={{ fontSize: "clamp(1.75rem, 5.5vw, 2rem)", marginBottom: 12, lineHeight: 1.2 }}>Aviso de Privacidad</h1>
@@ -10,7 +11,8 @@ export default function PrivacidadPage() {
       </p>
       <p style={{ lineHeight: 1.7, marginBottom: 16 }}>
         Puedes solicitar acceso, rectificación, cancelación u oposición (ARCO) escribiendo a
-        {" "}<a href="mailto:ventas@nexara.com.mx">ventas@nexara.com.mx</a>.
+        {" "}
+        <a href={mailHref}>{mailHref.replace(/^mailto:/, "")}</a>.
       </p>
       <p style={{ lineHeight: 1.7 }}>
         Al utilizar este sitio, aceptas este aviso de privacidad y sus actualizaciones.

@@ -23,10 +23,12 @@
   },
   "dependencies": {
     "@capacitor/android": "^8.2.0",
+    "@capacitor/browser": "^8.0.0",
     "@capacitor/cli": "^8.2.0",
     "@capacitor/core": "^8.2.0",
     "@capacitor/haptics": "^8.0.1",
     "@capacitor/ios": "^8.2.0",
+    "@capacitor/push-notifications": "^8.0.1",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.7",

@@ -6,6 +6,7 @@ import { io, Socket } from 'socket.io-client';
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import styles from "./CvsManagementPanel.module.css";
+import { openExternalUrl } from "@/lib/open-external-url";
 
 type CvRow = {
   id: number;
@@ -325,7 +326,7 @@ export default function CvsManagementPanel() {
   };
 
   const openPreview = (id: number) => {
-    window.open(toApi(`cvs/${id}/preview`), "_blank", "noopener,noreferrer");
+    void openExternalUrl(toApi(`cvs/${id}/preview`));
   };
 
   const downloadCv = async (id: number) => {
@@ -347,12 +348,12 @@ export default function CvsManagementPanel() {
     if (!phone) return;
     const normalized = phone.replace(/[^\d]/g, "");
     if (!normalized) return;
-    window.open(`https://wa.me/${normalized}`, "_blank", "noopener,noreferrer");
+    void openExternalUrl(`https://wa.me/${normalized}`);
   };
 
   const openEmail = (email?: string | null) => {
     if (!email) return;
-    window.open(`mailto:${email}`, "_self");
+    void openExternalUrl(`mailto:${email}`);
   };
 
   const handleCreateUser = async (id: number) => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import HelpTab from "@/components/HelpTab";
 import { useUser } from "@/components/UserContext";
 import { isSalesManagerUser } from "@/lib/panel-user";
@@ -100,6 +101,10 @@ const getFirstEntry = (attendances: AttendanceEvent[]) => {
 
 export default function VentasGestionVendedoresPage() {
   const { user } = useUser();
+  const selectedOwnerId =
+    typeof window === "undefined"
+      ? undefined
+      : Number(new URLSearchParams(window.location.search).get("ownerId") || 0) || undefined;
   const [period, setPeriod] = useState<Period>("week");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -112,6 +117,10 @@ export default function VentasGestionVendedoresPage() {
   const canManageSellers = isSalesManagerUser(user);
 
   const periodLabel = period === "week" ? "Semana" : period === "month" ? "Mes" : "Año";
+
+  const selectedVendor = selectedOwnerId
+    ? vendorStats.find((v) => v.userId === selectedOwnerId) || null
+    : null;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -312,6 +321,110 @@ export default function VentasGestionVendedoresPage() {
       </header>
 
       {error && <div className="card errorCard">{error}</div>}
+
+      <div className="card panelCard directoryCard" aria-label="Directorio de vendedores">
+        <div className="panelHead">
+          <h2>Directorio de vendedores</h2>
+          <span className="panelHint">
+            Contexto activo: <strong>{selectedVendor?.userName || "Todos"}</strong>
+          </span>
+        </div>
+        <div className="directoryGrid">
+          <div className="tableWrap">
+            <table className="table directoryTable">
+              <thead>
+                <tr>
+                  <th>Vendedor</th>
+                  <th>Ingresos</th>
+                  <th>Oportunidades</th>
+                  <th>Proyectos</th>
+                  <th>Performance</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className={!selectedOwnerId ? "isSelectedRow" : ""}>
+                  <td>
+                    <Link href="/gestion-vendedores" className="rowLink">
+                      Todos los vendedores
+                    </Link>
+                  </td>
+                  <td>{formatMoney(vendorStats.reduce((s, v) => s + Number(v.revenue || 0), 0))}</td>
+                  <td>{vendorStats.reduce((s, v) => s + Number(v.opportunities || 0), 0)}</td>
+                  <td>{vendorStats.reduce((s, v) => s + Number(v.projects || 0), 0)}</td>
+                  <td>—</td>
+                </tr>
+                {vendorStats.map((v) => (
+                  <tr key={v.userId} className={selectedOwnerId === v.userId ? "isSelectedRow" : ""}>
+                    <td>
+                      <Link href={`/gestion-vendedores?ownerId=${v.userId}`} className="rowLink">
+                        {v.userName}
+                      </Link>
+                    </td>
+                    <td>{formatMoney(v.revenue || 0)}</td>
+                    <td>{v.opportunities}</td>
+                    <td>{v.projects}</td>
+                    <td>
+                      <span className={`statusPill ${badgeClass(v.status)}`}>
+                        {statusLabel(v.status)} · {Number(v.performance || 0).toFixed(0)}%
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {vendorStats.length === 0 && (
+                  <tr>
+                    <td colSpan={5} style={{ color: "var(--text-tertiary)" }}>
+                      No hay vendedores configurados con acceso a Panel Ventas.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <aside className="directoryDetail card" aria-label="Perfil del vendedor seleccionado">
+            <div className="detailHead">
+              <p className="detailKicker">Perfil</p>
+              <h3 className="detailTitle">{selectedVendor?.userName || "Vista global"}</h3>
+              <p className="detailSubtitle">
+                {selectedVendor
+                  ? "Accesos directos a módulos con el filtro del vendedor aplicado."
+                  : "Selecciona un vendedor para abrir su contexto en los módulos."}
+              </p>
+            </div>
+            <div className="detailKpis">
+              <div className="miniKpi">
+                <strong>{selectedVendor ? formatMoney(selectedVendor.revenue || 0) : "—"}</strong>
+                <span>Ingresos</span>
+              </div>
+              <div className="miniKpi">
+                <strong>{selectedVendor ? selectedVendor.opportunities : "—"}</strong>
+                <span>Oportunidades</span>
+              </div>
+              <div className="miniKpi">
+                <strong>{selectedVendor ? selectedVendor.projects : "—"}</strong>
+                <span>Proyectos</span>
+              </div>
+            </div>
+            <div className="detailActions">
+              <Link className="actionBtn" href={selectedVendor ? `/dashboard?ownerId=${selectedVendor.userId}` : "/dashboard"}>
+                Abrir dashboard
+              </Link>
+              <Link className="actionBtn" href={selectedVendor ? `/oportunidades?ownerId=${selectedVendor.userId}` : "/oportunidades"}>
+                Pipeline (oportunidades)
+              </Link>
+              <Link className="actionBtn" href={selectedVendor ? `/leads?ownerId=${selectedVendor.userId}` : "/leads"}>
+                Leads
+              </Link>
+              <Link className="actionBtn" href={selectedVendor ? `/clientes?ownerId=${selectedVendor.userId}` : "/clientes"}>
+                Clientes
+              </Link>
+              <Link className="actionBtn" href={selectedVendor ? `/proyectos?ownerId=${selectedVendor.userId}` : "/proyectos"}>
+                Proyectos
+              </Link>
+            </div>
+          </aside>
+        </div>
+      </div>
 
       <div className="kpiGrid">
         <article className="card kpiCard">
@@ -514,6 +627,109 @@ export default function VentasGestionVendedoresPage() {
           background:
             radial-gradient(120% 100% at 100% 0%, color-mix(in srgb, var(--primary) 16%, transparent), transparent 58%),
             linear-gradient(180deg, color-mix(in srgb, var(--surface) 98%, transparent), color-mix(in srgb, var(--surface-2) 92%, transparent));
+        }
+
+        .directoryCard {
+          padding: 18px 18px;
+        }
+
+        .directoryGrid {
+          display: grid;
+          grid-template-columns: minmax(0, 1.55fr) minmax(260px, 0.75fr);
+          gap: 14px;
+          align-items: start;
+          margin-top: 12px;
+        }
+
+        .directoryTable .rowLink {
+          color: inherit;
+          text-decoration: none;
+          font-weight: 700;
+        }
+
+        .directoryTable tr.isSelectedRow {
+          background: color-mix(in srgb, var(--primary) 10%, transparent);
+        }
+
+        .directoryDetail {
+          position: sticky;
+          top: 14px;
+          padding: 16px 16px;
+          border-radius: 16px;
+        }
+
+        .detailKicker {
+          margin: 0;
+          text-transform: uppercase;
+          letter-spacing: 0.14em;
+          font-size: 0.7rem;
+          color: var(--text-tertiary);
+          font-weight: 800;
+        }
+
+        .detailTitle {
+          margin: 6px 0 6px;
+          letter-spacing: -0.02em;
+        }
+
+        .detailSubtitle {
+          margin: 0;
+          color: var(--text-secondary);
+          font-size: 0.9rem;
+          line-height: 1.5;
+        }
+
+        .detailKpis {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 8px;
+          margin-top: 14px;
+        }
+
+        .miniKpi {
+          padding: 10px 10px;
+          border-radius: 14px;
+          border: 1px solid color-mix(in srgb, var(--primary) 14%, var(--border));
+          background: color-mix(in srgb, var(--primary) 7%, var(--surface));
+        }
+
+        .miniKpi strong {
+          display: block;
+          font-size: 0.95rem;
+          letter-spacing: -0.02em;
+        }
+
+        .miniKpi span {
+          display: block;
+          margin-top: 4px;
+          font-size: 0.78rem;
+          color: var(--text-secondary);
+        }
+
+        .detailActions {
+          display: grid;
+          gap: 8px;
+          margin-top: 14px;
+        }
+
+        .detailActions .actionBtn {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 10px 12px;
+          border-radius: 14px;
+          border: 1px solid var(--border);
+          background: var(--surface-clean);
+          color: var(--foreground);
+          text-decoration: none;
+          transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+          font-weight: 650;
+        }
+
+        .detailActions .actionBtn:hover {
+          transform: translateY(-1px);
+          background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+          border-color: color-mix(in srgb, var(--primary) 22%, var(--border));
         }
 
         .salesEyebrow {
@@ -741,6 +957,16 @@ export default function VentasGestionVendedoresPage() {
 
           .panelHead h2 {
             font-size: 1.35rem;
+          }
+        }
+
+        @media (max-width: 980px) {
+          .directoryGrid {
+            grid-template-columns: 1fr;
+          }
+
+          .directoryDetail {
+            position: static;
           }
         }
       `}</style>

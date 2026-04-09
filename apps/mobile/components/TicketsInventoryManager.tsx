@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { io, Socket } from 'socket.io-client';
-import { revokeObjectUrlLater, triggerFileDownload } from '@/lib/file-download';
+import { triggerBlobDownload } from '@/lib/file-download';
 
 type BranchOption = { id: number; name: string; branchNumber?: string | null };
 
@@ -611,9 +611,7 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
       return;
     }
     const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    triggerFileDownload(url, `inventario-${id}.pdf`, { preferOpenOnMobile: true });
-    revokeObjectUrlLater(url);
+    void triggerBlobDownload(blob, `inventario-${id}.pdf`, { mimeType: "application/pdf" });
   };
 
   return (

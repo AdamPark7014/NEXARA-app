@@ -1,5 +1,6 @@
 "use client";
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { clearActivePanel } from '@/lib/panel-routing';
 
 export interface User {
 	id: number;
@@ -21,6 +22,8 @@ export interface User {
 	permissions: string[];
 	isSuperAdmin?: boolean;
 	loginDevice?: string;
+	/** Sesión sin validar token: solo UI offline (token puede estar vencido). */
+	offlineDegraded?: boolean;
 }
 
 interface UserContextType {
@@ -55,6 +58,7 @@ const normalizeUser = (value: unknown): User | null => {
 			: [],
 		isSuperAdmin: Boolean(candidate.isSuperAdmin),
 		loginDevice: candidate.loginDevice,
+		offlineDegraded: Boolean(candidate.offlineDegraded),
 	};
 };
 
@@ -90,25 +94,36 @@ const safeGetStoredUser = (): User | null => {
 		// Ignore storage access errors (Safari private mode, etc.)
 	}
 
+	try {
+		const localCandidate = parseStored(window.localStorage.getItem(USER_STORAGE_KEY));
+		if (localCandidate) return localCandidate;
+	} catch {
+		// Ignore storage access errors (Safari private mode, etc.)
+	}
+
 	return null;
 };
 
 const safePersistUser = (user: User | null) => {
 	if (typeof window === 'undefined') return;
 
-	try {
+	const write = (storage: Storage) => {
 		if (user) {
-			window.sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-		} else {
-			window.sessionStorage.removeItem(USER_STORAGE_KEY);
+			const { offlineDegraded: _omit, ...persistable } = user;
+			storage.setItem(USER_STORAGE_KEY, JSON.stringify(persistable));
+			return;
 		}
+		storage.removeItem(USER_STORAGE_KEY);
+	};
+
+	try {
+		write(window.sessionStorage);
 	} catch {
 		// Ignore storage access errors
 	}
 
 	try {
-		// Limpia clave legacy global para evitar que una sesión de otra pestaña se propague.
-		window.localStorage.removeItem(USER_STORAGE_KEY);
+		write(window.localStorage);
 	} catch {
 		// Ignore storage access errors
 	}
@@ -120,9 +135,14 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
 	useEffect(() => {
 		const storedUser = safeGetStoredUser();
+		const online = typeof navigator !== "undefined" && navigator.onLine;
 		if (storedUser) {
 			if (isTokenExpired(storedUser.token)) {
-				safePersistUser(null);
+				if (!online) {
+					setUser({ ...storedUser, offlineDegraded: true });
+				} else {
+					safePersistUser(null);
+				}
 			} else {
 				setUser(storedUser);
 			}
@@ -131,10 +151,51 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 	}, []);
 
 	useEffect(() => {
+		const onOnline = () => {
+			setUser((prev) => {
+				if (!prev?.offlineDegraded) return prev;
+				if (isTokenExpired(prev.token)) {
+					safePersistUser(null);
+					return null;
+				}
+				const { offlineDegraded: _o, ...rest } = prev;
+				return rest;
+			});
+		};
+		window.addEventListener("online", onOnline);
+		return () => window.removeEventListener("online", onOnline);
+	}, []);
+
+	useEffect(() => {
 		safePersistUser(user);
 	}, [user]);
 
-	const logout = () => setUser(null);
+	useEffect(() => {
+		const handleStorage = (e: StorageEvent) => {
+			if (e.key !== USER_STORAGE_KEY) return;
+			if (!e.newValue) {
+				setUser(null);
+			} else {
+				const parsed = normalizeUser((() => {
+					try {
+						return JSON.parse(e.newValue);
+					} catch {
+						return null;
+					}
+				})());
+				if (parsed && !isTokenExpired(parsed.token)) {
+					setUser(parsed);
+				}
+			}
+		};
+		window.addEventListener("storage", handleStorage);
+		return () => window.removeEventListener("storage", handleStorage);
+	}, []);
+
+	const logout = () => {
+		clearActivePanel();
+		setUser(null);
+	};
 
 	return (
 		<UserContext.Provider value={{ user, setUser, logout, isContextReady }}>

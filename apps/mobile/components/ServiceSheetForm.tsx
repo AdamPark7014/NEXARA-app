@@ -1,7 +1,7 @@
 "use client";
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useUser } from './UserContext';
-import { triggerFileDownload } from '@/lib/file-download';
+import { triggerBlobDownload, triggerFileDownload } from '@/lib/file-download';
 import PDFViewer from './PDFViewer';
 import styles from './ServiceSheetForm.module.css';
 import { io, Socket } from 'socket.io-client';
@@ -154,8 +154,15 @@ export default function ServiceSheetForm() {
   };
 
   const handleDownloadPdf = () => {
+    const name = `hoja-servicio-${activityId}.pdf`;
+    if (pdfData?.length) {
+      void triggerBlobDownload(new Blob([new Uint8Array(pdfData)], { type: 'application/pdf' }), name, {
+        mimeType: 'application/pdf',
+      });
+      return;
+    }
     if (!pdfUrl) return;
-    triggerFileDownload(pdfUrl, `hoja-servicio-${activityId}.pdf`, { preferOpenOnMobile: true });
+    void triggerFileDownload(pdfUrl, name, { preferOpenOnMobile: true, mimeType: 'application/pdf' });
   };
 
   useEffect(() => {
@@ -369,11 +376,12 @@ export default function ServiceSheetForm() {
               </div>
             </div>
             <div className={styles.viewerWrap}>
-              <PDFViewer 
-                pdfUrl={pdfUrl} 
+              <PDFViewer
+                pdfUrl={pdfUrl}
                 pdfData={pdfData}
                 fileName={`hoja-servicio-${activityId}.pdf`}
-                height="calc(90vh - 80px)"
+                height="600px"
+                fillParent
               />
             </div>
           </div>

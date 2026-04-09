@@ -1,14 +1,20 @@
 ﻿"use client";
+
 import Link from "next/link";
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "@/components/ThemeContext";
 import { useUser } from "@/components/UserContext";
-import { useEffect } from "react";
 import { setActivePanel } from "@/lib/panel-routing";
 import { getAvatarSrc, getRoleLabel } from "@/lib/panel-user";
+import { useCompactBottomNav } from "@/lib/use-compact-bottom-nav";
+import BottomNav from "@/components/BottomNav";
+import { hapticTap } from "@/lib/haptics";
+import consoleStyles from "../console/console.module.css";
 import styles from "./layout.module.css";
+
+const WEB_SHELL_MOBILE_PX = 960;
 
 export default function WebPanelLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -18,44 +24,127 @@ export default function WebPanelLayout({ children }: { children: React.ReactNode
   const currentPath = pathname ? pathname.replace(/\/+$/, "") : "";
   const userRoleLabel = getRoleLabel(user);
   const userAvatarSrc = getAvatarSrc(user);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isMobileShell, setIsMobileShell] = useState(false);
+  const showCompactBottomNav = useCompactBottomNav();
+
+  const inWebPath = Boolean(pathname && pathname.startsWith("/web"));
+  const resolveWebHref = (path: string) => {
+    if (!path.startsWith("/")) return `/web/${path}`;
+    if (path === "/paneles" || path === "/login") return path;
+    if (path === "/web" || path.startsWith("/web/")) return path;
+    return inWebPath ? `/web${path}` : path;
+  };
+
+  const navItems = useMemo(
+    () => [
+      { label: "Dashboard", icon: "📊", href: resolveWebHref("/dashboard") },
+      { label: "Clientes", icon: "👥", href: resolveWebHref("/clientes") },
+      { label: "Proyectos", icon: "📁", href: resolveWebHref("/proyectos") },
+      { label: "Contactos", icon: "✉️", href: resolveWebHref("/contactos") },
+      { label: "Noticias", icon: "📰", href: resolveWebHref("/noticias") },
+    ],
+    [inWebPath],
+  );
+
+  const closeDrawer = () => setDrawerOpen(false);
 
   useEffect(() => {
     setActivePanel("web");
   }, []);
 
-  const withWebPrefix = (href: string) => {
-    if (!href.startsWith('/')) return `/web/${href}`;
-    if (href === '/paneles' || href === '/login') return href;
-    if (href === '/web' || href.startsWith('/web/')) return href;
-    return `/web${href}`;
-  };
+  useEffect(() => {
+    const update = () => setIsMobileShell(window.innerWidth <= WEB_SHELL_MOBILE_PX);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
-  const navItems = [
-    { label: "Dashboard", href: withWebPrefix("/dashboard") },
-    { label: "Clientes", href: withWebPrefix("/clientes") },
-    { label: "Proyectos", href: withWebPrefix("/proyectos") },
-    { label: "Contactos", href: withWebPrefix("/contactos") },
-    { label: "Noticias", href: withWebPrefix("/noticias") },
-  ];
+  useEffect(() => {
+    if (!isMobileShell) {
+      setDrawerOpen(false);
+    }
+  }, [isMobileShell]);
 
-  // Si estamos en login, no renderizar el sidebar
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
+
   if (pathname && pathname.includes("/login")) {
     return <main className={styles.webPanelMain}>{children}</main>;
   }
+
   return (
     <div className={styles.webPanelRoot}>
-      <aside className={styles.webPanelSidebar}>
+      {isMobileShell && (
+        <header className={styles.webMobileTopbar}>
+          <div className={styles.webMobileBrand}>
+            <span className={styles.brandMark}>NEXARA</span>
+            <span className={styles.brandSub}>Panel Web</span>
+          </div>
+          <button
+            type="button"
+            className={consoleStyles.hamburgerButton}
+            onClick={() => {
+              void hapticTap("light");
+              setDrawerOpen((prev) => !prev);
+            }}
+            aria-label={drawerOpen ? "Cerrar menú" : "Abrir menú"}
+            aria-expanded={drawerOpen}
+            aria-controls="web-panel-sidebar"
+          >
+            <span className={consoleStyles.hamburgerLine} />
+            <span className={consoleStyles.hamburgerLine} />
+            <span className={consoleStyles.hamburgerLine} />
+          </button>
+        </header>
+      )}
+
+      {isMobileShell && drawerOpen && (
+        <button
+          type="button"
+          className={styles.webSidebarBackdrop}
+          onClick={closeDrawer}
+          aria-label="Cerrar menú"
+        />
+      )}
+
+      <aside
+        id="web-panel-sidebar"
+        className={`${styles.webPanelSidebar} ${isMobileShell ? styles.webPanelSidebarDrawer : ""} ${isMobileShell && drawerOpen ? styles.webPanelSidebarDrawerOpen : ""}`}
+      >
         <div className={styles.webPanelBrand}>
           <div className={styles.brandMark}>NEXARA</div>
           <div className={styles.brandSub}>Panel Web</div>
         </div>
         <div className={styles.webPanelDivider} />
         <div className={styles.webPanelMenuTitle}>Menú principal</div>
+
+        {isMobileShell && !showCompactBottomNav && (
+          <div className={styles.webShortcuts} role="navigation" aria-label="Accesos rápidos">
+            {navItems.slice(0, 4).map((item) => {
+              const itemPath = item.href.replace(/\/+$/, "");
+              const active = itemPath === currentPath;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`${styles.webShortcutChip} ${active ? styles.webShortcutChipActive : ""}`}
+                  onClick={closeDrawer}
+                >
+                  <span aria-hidden="true">{item.icon}</span>
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+
         <div className={styles.webPanelUser}>
           <div style={{ width: 44, height: 44, borderRadius: "50%", overflow: "hidden", marginBottom: 8 }}>
             <Image
               src={userAvatarSrc}
-              alt={user?.isSuperAdmin ? "NEXARA" : (user?.nombre || "Usuario")}
+              alt={user?.isSuperAdmin ? "NEXARA" : user?.nombre || "Usuario"}
               width={44}
               height={44}
               style={{ width: "100%", height: "100%", objectFit: "cover" }}
@@ -77,6 +166,7 @@ export default function WebPanelLayout({ children }: { children: React.ReactNode
                   href={item.href}
                   className={`${styles.navLink} ${isActive ? styles.active : ""}`}
                   style={{ animationDelay: `${0.08 + index * 0.05}s` }}
+                  onClick={closeDrawer}
                 >
                   <span className={styles.navLabel}>{item.label}</span>
                   <span className={styles.navPulse} />
@@ -86,19 +176,21 @@ export default function WebPanelLayout({ children }: { children: React.ReactNode
           </nav>
         </div>
         <div className={styles.themeSection}>
-          <Link href="/paneles" className={styles.themeButton}>
+          <Link href="/paneles" className={styles.themeButton} onClick={closeDrawer}>
             <span className={styles.themeIcon}>⇄</span>
             <span>Cambiar panel</span>
           </Link>
           <button
+            type="button"
             onClick={toggleDarkMode}
             className={styles.themeButton}
-            aria-label={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            aria-label={darkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
           >
-            <span className={styles.themeIcon}>{darkMode ? '🌙' : '☀️'}</span>
-            <span>{darkMode ? 'Modo Oscuro' : 'Modo Claro'}</span>
+            <span className={styles.themeIcon}>{darkMode ? "🌙" : "☀️"}</span>
+            <span>{darkMode ? "Modo Oscuro" : "Modo Claro"}</span>
           </button>
           <button
+            type="button"
             onClick={() => {
               logout();
               router.replace("/login");
@@ -115,7 +207,27 @@ export default function WebPanelLayout({ children }: { children: React.ReactNode
           <strong>Online</strong>
         </div>
       </aside>
-      <main className={styles.webPanelMain}>{children}</main>
+      <main
+        className={`${styles.webPanelMain} ${isMobileShell && showCompactBottomNav ? styles.webMainPadForBottomNav : ""}`}
+      >
+        {children}
+      </main>
+      {isMobileShell && showCompactBottomNav && (
+        <BottomNav
+          items={[
+            { icon: "📊", label: "Inicio", href: resolveWebHref("/dashboard"), hapticIntent: "selection" },
+            { icon: "👥", label: "Clientes", href: resolveWebHref("/clientes"), hapticIntent: "selection" },
+            { icon: "📁", label: "Proyectos", href: resolveWebHref("/proyectos"), hapticIntent: "selection" },
+            { icon: "✉️", label: "Contactos", href: resolveWebHref("/contactos"), hapticIntent: "selection" },
+            {
+              icon: "☰",
+              label: "Menú",
+              onPress: () => setDrawerOpen(true),
+              hapticIntent: "medium",
+            },
+          ]}
+        />
+      )}
     </div>
   );
 }

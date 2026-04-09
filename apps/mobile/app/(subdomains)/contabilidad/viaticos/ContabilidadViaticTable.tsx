@@ -6,7 +6,8 @@ import { useUser } from "@/components/UserContext";
 import ExcelDownloadModal from "@/components/ExcelDownloadModal";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { canViewContabilidadTarget } from "@/lib/contabilidad-visibility";
-import { triggerFileDownload } from "@/lib/file-download";
+import { triggerBlobDownload } from "@/lib/file-download";
+import { openExternalUrl } from "@/lib/open-external-url";
 import styles from "./ContabilidadViaticTable.module.css";
 
 type Viatic = {
@@ -135,7 +136,9 @@ const ContabilidadViaticTable = () => {
     if (excelPreparing) return;
     setExcelPreparing(true);
     try {
-      const res = await fetch(buildApiUrl("export/viatic"));
+      const res = await fetch(buildApiUrl("export/viatic"), {
+        headers: user?.token ? { Authorization: `Bearer ${user.token}` } : {},
+      });
       if (!res.ok) throw new Error("Error al exportar");
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
@@ -152,9 +155,13 @@ const ContabilidadViaticTable = () => {
   };
 
   const handleDownloadExcel = () => {
-    if (!excelUrl) return;
-    triggerFileDownload(excelUrl, "viáticos.xlsx", { preferOpenOnMobile: true });
-    closeExcelModal();
+    if (!excelBlob) return;
+    void (async () => {
+      await triggerBlobDownload(excelBlob, "viáticos.xlsx", {
+        mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      closeExcelModal();
+    })();
   };
 
   useEffect(() => {
@@ -372,9 +379,14 @@ const ContabilidadViaticTable = () => {
                   <td>{v.razonGasto}</td>
                   <td>
                     {v.ticketEvidenciaUrl ? (
-                      <a className={styles.link} href={v.ticketEvidenciaUrl} target="_blank" rel="noopener noreferrer">
+                      <button
+                        type="button"
+                        className={styles.link}
+                        style={{ background: "none", border: "none", padding: 0, cursor: "pointer", font: "inherit", textDecoration: "underline" }}
+                        onClick={() => void openExternalUrl(v.ticketEvidenciaUrl)}
+                      >
                         Ver
-                      </a>
+                      </button>
                     ) : (
                       "-"
                     )}
@@ -457,9 +469,14 @@ const ContabilidadViaticTable = () => {
                 <div style={mobileMetaItemStyle}>
                   <span style={mobileMetaLabelStyle}>Ticket</span>
                   {v.ticketEvidenciaUrl ? (
-                    <a className={styles.link} href={v.ticketEvidenciaUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: "14px" }}>
+                    <button
+                      type="button"
+                      className={styles.link}
+                      style={{ background: "none", border: "none", padding: 0, cursor: "pointer", font: "inherit", textDecoration: "underline", fontSize: "14px" }}
+                      onClick={() => void openExternalUrl(v.ticketEvidenciaUrl)}
+                    >
                       Ver evidencia
-                    </a>
+                    </button>
                   ) : (
                     <span style={{ fontSize: "14px", color: "#9ca3af" }}>Sin ticket</span>
                   )}

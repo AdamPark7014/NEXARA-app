@@ -22,6 +22,7 @@ type UserAttendanceStats = {
   userId: number;
   userName: string;
   email: string;
+  employeeNumber?: string | null;
   department: string;
   roleName: string;
   totalMinutes: number;
@@ -381,6 +382,7 @@ const ConsoleAttendanceTable = () => {
           <thead>
             <tr>
               <th>Usuario</th>
+              <th>No. empleado</th>
               <th>Departamento</th>
               <th>Rol</th>
               <th>Dias trabajados</th>
@@ -406,6 +408,10 @@ const ConsoleAttendanceTable = () => {
                       <strong>{userStat.userName}</strong>
                       <span>{userStat.email}</span>
                     </td>
+                    <td>
+                      {userStat.employeeNumber?.trim() ||
+                        `NXR25SYS${String(userStat.userId).padStart(3, "0")}`}
+                    </td>
                     <td>{userStat.department || "-"}</td>
                     <td>{userStat.roleName || "-"}</td>
                     <td>{userStat.workDays}</td>
@@ -427,7 +433,7 @@ const ConsoleAttendanceTable = () => {
                   </tr>
                   {expandedUsers.has(userStat.userId) && (
                     <tr>
-                      <td colSpan={8} className={styles.detailCell}>
+                      <td colSpan={9} className={styles.detailCell}>
                         <div className={styles.detailHeader}>
                           <div>
                             <h4>Detalle de jornadas</h4>

@@ -18,6 +18,7 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
+  { label: "Mi perfil", icon: "👤", href: "/my-profile", section: "Cuenta y panorama", description: "Resumen y datos personales" },
   { label: "Dashboard", icon: "📊", href: "/dashboard", section: "Cuenta y panorama", description: "Visión general de ventas" },
 
   { label: "Leads", icon: "🎯", href: "/leads", section: "Prospección comercial", description: "Gestiona leads potenciales" },
@@ -29,9 +30,6 @@ const menuItems: MenuItem[] = [
   { label: "Plantillas", icon: "🎨", href: "/plantillas", section: "Clientes y ejecución", description: "Plantillas de órdenes PDF" },
 
   { label: "Notificaciones", icon: "🔔", href: "/notificaciones", section: "Comunicación y seguimiento", description: "Centro de notificaciones" },
-
-  { label: "Reportes", icon: "📈", href: "/reportes", section: "Análisis y estrategia", description: "Reportes detallados" },
-  { label: "Crecimiento", icon: "📶", href: "/crecimiento", section: "Análisis y estrategia", description: "Análisis de crecimiento" },
 ];
 
 const sectionOrder = [
@@ -45,9 +43,11 @@ const sectionOrder = [
 interface VentasSidebarProps {
   mobileOpen?: boolean;
   onMobileClose?: () => void;
+  /** Accesos tipo barra inferior cuando el ancho es tablet (sin bottom nav). */
+  shortcutStrip?: { icon: string; label: string; href: string }[];
 }
 
-export default function VentasSidebar({ mobileOpen, onMobileClose }: VentasSidebarProps = {}) {
+export default function VentasSidebar({ mobileOpen, onMobileClose, shortcutStrip }: VentasSidebarProps = {}) {
   const MOBILE_BREAKPOINT = 768;
   const pathname = usePathname();
   const router = useRouter();
@@ -115,9 +115,18 @@ export default function VentasSidebar({ mobileOpen, onMobileClose }: VentasSideb
     return `${href}?ownerId=${selectedOwnerId}`;
   };
 
+  const inPrefixedVentasPath = Boolean(pathname && pathname.startsWith("/ventas"));
+  const resolveVentasHref = (href: string) => {
+    if (!href.startsWith("/")) return href;
+    if (href === "/paneles" || href === "/login") return href;
+    if (href === "/ventas" || href.startsWith("/ventas/")) return href;
+    return inPrefixedVentasPath ? `/ventas${href}` : href;
+  };
+
   const isActive = (href: string) => {
     if (!pathname) return false;
-    return pathname.startsWith(href);
+    const resolved = resolveVentasHref(href);
+    return pathname === resolved || pathname.startsWith(`${resolved}/`);
   };
 
   const showExpandedContent = sidebarOpen || isMobile;
@@ -132,6 +141,11 @@ export default function VentasSidebar({ mobileOpen, onMobileClose }: VentasSideb
         section: "Análisis y estrategia",
         description: "Control ejecutivo y productividad diaria",
       });
+      items.push(
+        { label: "Reportes", icon: "📈", href: "/reportes", section: "Análisis y estrategia", description: "Reportes ejecutivos del equipo" },
+        { label: "Crecimiento", icon: "📶", href: "/crecimiento", section: "Análisis y estrategia", description: "Análisis de crecimiento anual" },
+        { label: "Equipo comparativa", icon: "🧮", href: "/equipo-comparativa", section: "Análisis y estrategia", description: "Comparativa por vendedor" },
+      );
     }
 
     const normalizedQuery = navQuery.trim().toLowerCase();
@@ -236,6 +250,22 @@ export default function VentasSidebar({ mobileOpen, onMobileClose }: VentasSideb
         </div>
       )}
 
+      {shortcutStrip && shortcutStrip.length > 0 && showExpandedContent && (
+        <div className={styles.shortcutStrip} role="navigation" aria-label="Accesos rápidos">
+          {shortcutStrip.map((s) => (
+            <Link
+              key={s.href}
+              href={s.href}
+              className={styles.shortcutChip}
+              onClick={closeMenu}
+            >
+              <span aria-hidden="true">{s.icon}</span>
+              <span>{s.label}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+
       {showExpandedContent && (
         <div className={styles.navSearchWrap}>
           <input
@@ -261,7 +291,7 @@ export default function VentasSidebar({ mobileOpen, onMobileClose }: VentasSideb
                 return (
                   <li key={item.href} className={styles.navListItem}>
                     <Link
-                      href={withOwnerFilter(item.href)}
+                      href={withOwnerFilter(resolveVentasHref(item.href))}
                       className={`${styles.navLink} ${active ? styles.navLinkActive : ""}`}
                       title={item.label}
                       aria-current={active ? "page" : undefined}

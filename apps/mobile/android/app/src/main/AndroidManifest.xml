@@ -39,6 +39,9 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 13+ (API 33): notificaciones tipo sistema -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- Camera: required for selfie/photo capture in attendance and lunch breaks -->
     <uses-permission android:name="android.permission.CAMERA" />

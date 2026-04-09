@@ -1,4 +1,23 @@
 import { hasAnyPermission, hasPermission, PERMISSIONS, type UserPermissions } from "@/lib/permissions";
+
+const CONTABILIDAD_ACCESS_PERMISSIONS = [
+  PERMISSIONS.CONTABILIDAD_VIEW,
+  PERMISSIONS.CONTABILIDAD_MANAGE,
+  PERMISSIONS.ACCOUNTING_VIEW,
+  PERMISSIONS.ACCOUNTING_MANAGE,
+  PERMISSIONS.ACCOUNTING_POST,
+  PERMISSIONS.INVOICING_VIEW,
+  PERMISSIONS.INVOICING_MANAGE,
+  PERMISSIONS.BANKING_VIEW,
+  PERMISSIONS.BANKING_MANAGE,
+];
+
+const SALES_FLAVORED_PERMISSIONS = [
+  PERMISSIONS.PANEL_VENTAS,
+  PERMISSIONS.SALES_VIEW,
+  PERMISSIONS.SALES_MANAGE,
+  PERMISSIONS.SALES_REPORTS_VIEW,
+];
 import { getApiAssetOrigin } from "@/lib/api-base";
 
 type PanelUser = UserPermissions & {
@@ -18,6 +37,13 @@ export const isSalesManagerUser = (user: PanelUser | null | undefined) => {
   return isPlatformAdmin(user);
 };
 
+export const canAccessContabilidadPanel = (user: PanelUser | null | undefined) => {
+  if (!user) return false;
+  if (user.isSuperAdmin) return true;
+  if (hasPermission(user, PERMISSIONS.CONSOLE_ADMIN)) return true;
+  return hasAnyPermission(user, CONTABILIDAD_ACCESS_PERMISSIONS);
+};
+
 const sanitizeRoleLabel = (value?: string | null) => {
   const raw = String(value || '').trim();
   if (!raw) return '';
@@ -31,12 +57,13 @@ const sanitizeRoleLabel = (value?: string | null) => {
 };
 
 export const getRoleLabel = (user: PanelUser | null | undefined) => {
-  if (!user) return "Vendedor";
+  if (!user) return "Invitado";
   if (user.isSuperAdmin) return "Superadmin";
+  if (isPlatformAdmin(user)) return "Admin";
+
   const roleRaw = sanitizeRoleLabel(user.role);
   const role = roleRaw.toLowerCase();
 
-  // Vendedor se mantiene fijo por regla de negocio.
   if (role.includes("vended")) return "Vendedor";
 
   if (roleRaw) {
@@ -47,8 +74,9 @@ export const getRoleLabel = (user: PanelUser | null | undefined) => {
       .join(" ");
   }
 
-  if (isPlatformAdmin(user)) return "Admin";
-  return "Vendedor";
+  if (hasAnyPermission(user, CONTABILIDAD_ACCESS_PERMISSIONS)) return "Contabilidad";
+  if (hasAnyPermission(user, SALES_FLAVORED_PERMISSIONS)) return "Vendedor";
+  return "Colaborador";
 };
 
 export const getAvatarSrc = (user: PanelUser | null | undefined) => {

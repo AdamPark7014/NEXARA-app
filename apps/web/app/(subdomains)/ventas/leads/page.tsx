@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import { createSalesLead, listSalesLeads, updateSalesLead, type SalesLead } from "@/lib/sales-api";
+import { getSalesScope } from "@/lib/sales-scope";
 import styles from "./page.module.css";
 
 type LeadFilter = "PENDING" | "NURTURING" | "LOST" | "CONVERTED" | "ALL";
@@ -25,10 +26,7 @@ const matchesFilter = (lead: SalesLead, filter: LeadFilter) => {
 
 export default function VentasLeadsPage() {
   const { user } = useUser();
-  const selectedOwnerId =
-    typeof window === "undefined"
-      ? undefined
-      : Number(new URLSearchParams(window.location.search).get("ownerId") || 0) || undefined;
+  const scope = getSalesScope(user, typeof window === "undefined" ? "" : window.location.search);
   const [leads, setLeads] = useState<SalesLead[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -50,7 +48,7 @@ export default function VentasLeadsPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await listSalesLeads(user.token, { ownerId: selectedOwnerId });
+      const data = await listSalesLeads(user.token, { ownerId: scope.ownerId });
       setLeads(data);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error inesperado");
@@ -61,7 +59,7 @@ export default function VentasLeadsPage() {
 
   useEffect(() => {
     fetchLeads();
-  }, [selectedOwnerId, user?.token]);
+  }, [scope.ownerId, user?.token]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;

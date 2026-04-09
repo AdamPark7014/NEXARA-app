@@ -4,6 +4,7 @@ import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import EvidenceReviewModal from './EvidenceReviewModal';
 import styles from './MyActivitiesTable.module.css';
+import { openExternalUrl } from '@/lib/open-external-url';
 
 interface Activity {
   id: number;
@@ -382,7 +383,9 @@ const MyActivitiesTable: React.FC = () => {
                       <td>{a.indicaciones || '-'}</td>
                       <td>
                         {getMapsUrl(a) ? (
-                          <a href={getMapsUrl(a)} target="_blank" rel="noreferrer">Cómo llegar</a>
+                          <button type="button" className="link" onClick={() => void openExternalUrl(getMapsUrl(a)!)}>
+                            Cómo llegar
+                          </button>
                         ) : (
                           '-'
                         )}
@@ -480,14 +483,13 @@ const MyActivitiesTable: React.FC = () => {
                     {/* Actions */}
                     <div className={styles.mobileActions}>
                       {getMapsUrl(a) && (
-                        <a 
-                          href={getMapsUrl(a)} 
-                          target="_blank" 
-                          rel="noreferrer"
+                        <button
+                          type="button"
                           className={`button-secondary ${styles.mobileActionLink}`}
+                          onClick={() => void openExternalUrl(getMapsUrl(a)!)}
                         >
                           📍 Cómo llegar
-                        </a>
+                        </button>
                       )}
                       
                       {isAdmin && canReview && (

@@ -5,6 +5,7 @@ import { useUser } from './UserContext';
 import PDFViewer from './PDFViewer';
 import styles from './QuoteGenerator.module.css';
 import { io, Socket } from 'socket.io-client';
+import { triggerBlobDownload } from '@/lib/file-download';
 
 interface Quote {
   id: number;
@@ -173,13 +174,12 @@ export default function QuoteGenerator({ onQuoteGenerated }: QuoteGeneratorProps
   };
 
   const downloadPdf = () => {
-    if (!generatedPdf) return;
-    const a = document.createElement('a');
-    a.href = generatedPdf.pdfUrl;
-    a.download = generatedPdf.fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    if (!generatedPdf?.pdfData?.length) return;
+    void triggerBlobDownload(
+      new Blob([new Uint8Array(generatedPdf.pdfData)], { type: 'application/pdf' }),
+      generatedPdf.fileName,
+      { mimeType: 'application/pdf' },
+    );
   };
 
   return (

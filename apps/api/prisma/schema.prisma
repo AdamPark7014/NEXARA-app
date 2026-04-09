@@ -478,6 +478,7 @@ model User {
   workflowApprovals       WorkflowApproval[]     @relation("ApprovalDecider")
   auditLogs               AuditLog[]             @relation("AuditLogUser")
   preferences             UserPreference[]       @relation("UserPreferences")
+  pushEndpoints           UserPushEndpoint[]
 
   // === HR Relations ===
   leaveRequests           LeaveRequest[]      @relation("LeaveRequester")
@@ -3215,6 +3216,21 @@ model UserPreference {
   @@unique([userId, key])
   @@index([userId])
   @@map("user_preferences")
+}
+
+/// Tokens FCM (APK) y suscripciones Web Push (navegador) para alertas fuera de la app.
+model UserPushEndpoint {
+  id                Int      @id @default(autoincrement())
+  userId            Int
+  fcmToken          String?  @unique @db.VarChar(512)
+  webPushEndpoint   String?  @unique @db.VarChar(2048)
+  webPushKeys       Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("UserPushEndpoint")
 }
 
 // ============================================================================

@@ -15,6 +15,8 @@ export interface User {
 	permissions: string[];
 	isSuperAdmin?: boolean;
 	loginDevice?: string;
+	/** Sesión sin validar token: solo UI offline (token puede estar vencido). */
+	offlineDegraded?: boolean;
 }
 
 interface UserContextType {
@@ -48,6 +50,7 @@ const normalizeUser = (value: unknown): User | null => {
 			: [],
 		isSuperAdmin: Boolean(candidate.isSuperAdmin),
 		loginDevice: candidate.loginDevice,
+		offlineDegraded: Boolean(candidate.offlineDegraded),
 	};
 };
 
@@ -98,7 +101,8 @@ const safePersistUser = (user: User | null) => {
 
 	const write = (storage: Storage) => {
 		if (user) {
-			storage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+			const { offlineDegraded: _omit, ...persistable } = user;
+			storage.setItem(USER_STORAGE_KEY, JSON.stringify(persistable));
 			return;
 		}
 		storage.removeItem(USER_STORAGE_KEY);
@@ -123,14 +127,35 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
 	useEffect(() => {
 		const storedUser = safeGetStoredUser();
+		const online = typeof navigator !== "undefined" && navigator.onLine;
 		if (storedUser) {
 			if (isTokenExpired(storedUser.token)) {
-				safePersistUser(null);
+				if (!online) {
+					setUser({ ...storedUser, offlineDegraded: true });
+				} else {
+					safePersistUser(null);
+				}
 			} else {
 				setUser(storedUser);
 			}
 		}
 		setIsContextReady(true);
+	}, []);
+
+	useEffect(() => {
+		const onOnline = () => {
+			setUser((prev) => {
+				if (!prev?.offlineDegraded) return prev;
+				if (isTokenExpired(prev.token)) {
+					safePersistUser(null);
+					return null;
+				}
+				const { offlineDegraded: _o, ...rest } = prev;
+				return rest;
+			});
+		};
+		window.addEventListener("online", onOnline);
+		return () => window.removeEventListener("online", onOnline);
 	}, []);
 
 	useEffect(() => {

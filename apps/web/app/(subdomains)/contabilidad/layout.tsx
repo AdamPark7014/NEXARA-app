@@ -6,7 +6,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "@/components/ThemeContext";
 import { useUser } from "@/components/UserContext";
-import { getAvatarSrc, getRoleLabel, isPlatformAdmin } from "@/lib/panel-user";
+import { canAccessContabilidadPanel, getAvatarSrc, getRoleLabel, isPlatformAdmin } from "@/lib/panel-user";
+import { isCapacitorNative } from "@/lib/capacitor-env";
 import consoleStyles from "../console/console.module.css";
 import styles from "./layout.module.css";
 
@@ -15,7 +16,7 @@ export default function ContabilidadLayout({ children }: { children: React.React
   const pathname = usePathname();
   const router = useRouter();
   const { darkMode, toggleDarkMode } = useTheme();
-  const { user, logout } = useUser();
+  const { user, logout, isContextReady } = useUser();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [workspaceDateLabel, setWorkspaceDateLabel] = useState("");
@@ -110,6 +111,18 @@ export default function ContabilidadLayout({ children }: { children: React.React
     setWorkspaceDateLabel(new Date().toLocaleDateString("es-MX"));
   }, []);
 
+  useEffect(() => {
+    if (!isContextReady || (pathname && pathname.includes("/login"))) return;
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
+    if (!canAccessContabilidadPanel(user)) {
+      const dest = isCapacitorNative() ? "/paneles" : "/login?denied=contabilidad";
+      router.replace(dest);
+    }
+  }, [isContextReady, user, pathname, router]);
+
   const handleLogout = () => {
     logout();
     setMobileMenuOpen(false);
@@ -119,6 +132,16 @@ export default function ContabilidadLayout({ children }: { children: React.React
   // Si estamos en login, no renderizar el sidebar
   if (pathname && pathname.includes("/login")) {
     return <>{children}</>;
+  }
+
+  const accessBlocked =
+    isContextReady && (!user || (user && !canAccessContabilidadPanel(user)));
+  if (!isContextReady || accessBlocked) {
+    return (
+      <div className={styles.contaRoot} style={{ minHeight: "50vh", display: "grid", placeItems: "center", padding: 24 }}>
+        <p style={{ margin: 0, color: "var(--text-secondary, #445668)" }}>Cargando panel…</p>
+      </div>
+    );
   }
 
   return (
@@ -235,7 +258,7 @@ export default function ContabilidadLayout({ children }: { children: React.React
         </ul>
       </aside>
       )}
-      <main className={consoleStyles.consoleMain}>
+      <main className={`${consoleStyles.consoleMain} ${styles.contaMain}`}>
         <section className={styles.workspaceShell}>
           <div className={styles.workspaceHeader}>
             <div>

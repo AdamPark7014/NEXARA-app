@@ -695,6 +695,7 @@ export class AttendanceService {
           userId: user.id,
           userName: user.nombre,
           email: user.email,
+          employeeNumber: user.employeeNumber || null,
           department: user.department?.nombre,
           roleName: user.role.nombre,
           roleFlags: {

@@ -4,6 +4,7 @@ import styles from "./page.module.css";
 import { buildApiUrl, getApiBase } from "@/lib/api-base";
 import CatalogShowcase from "./CatalogShowcase";
 import { PROYECTOS_SECTOR_COVERS } from "./proyectosSectorCovers";
+import ExternalLinkButton from "@/components/ExternalLinkButton";
 
 const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
 
@@ -329,14 +330,9 @@ export default async function ProjectsPage() {
             y sectores atendidos para orientar compra e implementación con criterio empresarial.
           </p>
         </div>
-        <a
-          href={`${API_URL}/projects/catalog-pdf/download`}
-          className={styles.pdfButton}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+        <ExternalLinkButton href={`${API_URL}/projects/catalog-pdf/download`} className={styles.pdfButton}>
           Descargar PDF completo
-        </a>
+        </ExternalLinkButton>
       </header>
 
       <div data-reveal="up">
@@ -375,15 +371,13 @@ export default async function ProjectsPage() {
         <a href="/contacto" data-track-conversion="projects_consult_cta" className={styles.consultButton}>
           Solicitar asesoría para mi sector
         </a>
-        <a
+        <ExternalLinkButton
           href={`${API_URL}/projects/catalog-pdf/download`}
           data-track-conversion="projects_catalog_pdf"
           className={styles.pdfButton}
-          target="_blank"
-          rel="noopener noreferrer"
         >
           Descargar PDF completo de proyectos
-        </a>
+        </ExternalLinkButton>
       </section>
 
       <section className={styles.newsHub} aria-labelledby="news-hub-heading" data-reveal="up">

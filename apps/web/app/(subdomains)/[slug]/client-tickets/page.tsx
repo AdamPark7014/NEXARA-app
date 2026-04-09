@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { RoleGuard } from '@/components/RoleGuard';
 import { PERMISSIONS } from '@/lib/permissions';
 import { useUser } from '@/components/UserContext';
+import { openExternalUrl } from '@/lib/open-external-url';
 
 type Client = {
   id: number;
@@ -293,9 +294,13 @@ export default function ClientTicketsPage() {
                         )}
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                           {activity.serviceSheet?.pdfUrl && (
-                            <a className="button-secondary" href={getAssetUrl(activity.serviceSheet.pdfUrl)} target="_blank" rel="noreferrer">
+                            <button
+                              type="button"
+                              className="button-secondary"
+                              onClick={() => void openExternalUrl(getAssetUrl(activity.serviceSheet!.pdfUrl!))}
+                            >
                               Ver hoja de servicio
-                            </a>
+                            </button>
                           )}
                           <button className="button-secondary" type="button" onClick={() => handleTicketReportDownload(activity.id)}>
                             Reporte del ticket
@@ -327,7 +332,13 @@ export default function ClientTicketsPage() {
                                 <div style={{ padding: 8, fontSize: 12 }}>{evidence.tipoEvidencia}</div>
                                 {evidence.latitud && evidence.longitud && (
                                   <div style={{ padding: '0 8px 8px', fontSize: 12 }}>
-                                    <a href={getMapsUrl(evidence.latitud, evidence.longitud)} target="_blank" rel="noreferrer">Ver ubicación</a>
+                                    <button
+                                      type="button"
+                                      className="link"
+                                      onClick={() => void openExternalUrl(getMapsUrl(evidence.latitud, evidence.longitud))}
+                                    >
+                                      Ver ubicación
+                                    </button>
                                   </div>
                                 )}
                               </div>

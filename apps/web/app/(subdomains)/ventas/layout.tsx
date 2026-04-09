@@ -22,6 +22,15 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
       : Number(new URLSearchParams(window.location.search).get("ownerId") || 0) || undefined;
   const currentPath = pathname ? pathname.replace(/\/+$/, "") : "";
 
+  const normalizedUserId = user?.id ? Number(user.id) : undefined;
+  const filteredVendorStats = canManageSellers && user?.isSuperAdmin && normalizedUserId
+    ? vendorStats.filter((v) => v.userId !== normalizedUserId)
+    : vendorStats;
+
+  const selectedVendorName = canManageSellers && selectedOwnerId
+    ? filteredVendorStats.find((v) => v.userId === selectedOwnerId)?.userName
+    : undefined;
+
   const withOwnerFilter = (href: string, ownerId?: number) => {
     const value = ownerId ?? selectedOwnerId;
     if (!canManageSellers || !value) return href;
@@ -30,13 +39,14 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
 
   const quickLinks = [
     ...(canManageSellers ? [{ label: "Gestión Vendedores", href: "/gestion-vendedores" }] : []),
+    ...(!canManageSellers ? [{ label: "Mi perfil", href: "/my-profile" }] : []),
     { label: "Dashboard", href: "/dashboard" },
     { label: "Leads", href: "/leads" },
     { label: "Oportunidades", href: "/oportunidades" },
     { label: "Clientes", href: "/clientes" },
     { label: "Proyectos", href: "/proyectos" },
     { label: "Cotizaciones", href: "/cotizaciones" },
-    { label: "Reportes", href: "/reportes" },
+    ...(canManageSellers ? [{ label: "Reportes", href: "/reportes" }] : []),
   ];
 
   const activeLabel = quickLinks.find((item) => {
@@ -89,6 +99,11 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
             <div className={styles.salesWorkspaceMeta}>
               <span className={styles.salesWorkspacePill}>{user?.nombre || "Equipo comercial"}</span>
               <span className={styles.salesWorkspacePill}>{roleLabel}</span>
+              {canManageSellers && (
+                <span className={styles.salesWorkspacePill}>
+                  Viendo: {selectedVendorName || "Todos"}
+                </span>
+              )}
               <span className={styles.salesWorkspacePill}>{workspaceDateLabel}</span>
             </div>
           </div>
@@ -113,7 +128,7 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
                   <div className={styles.vendorCardName}>Todos los vendedores</div>
                   <div className={styles.vendorCardMeta}>Vista global del equipo</div>
                 </Link>
-                {vendorStats.map((vendor) => (
+                {filteredVendorStats.map((vendor) => (
                   <Link key={vendor.userId} href={withOwnerFilter(pathname || "/dashboard", vendor.userId)} className={`${styles.vendorCard} ${selectedOwnerId === vendor.userId ? styles.vendorCardActive : ""}`}>
                     <div className={styles.vendorCardName}>{vendor.userName}</div>
                     <div className={styles.vendorCardMeta}>Oportunidades: {vendor.opportunities}</div>
@@ -121,7 +136,7 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
                     <div className={styles.vendorCardMeta}>Performance: {vendor.performance}%</div>
                   </Link>
                 ))}
-                {vendorStats.length === 0 && (
+                {filteredVendorStats.length === 0 && (
                   <div className={styles.vendorCardEmpty}>No hay métricas por vendedor disponibles.</div>
                 )}
               </div>
