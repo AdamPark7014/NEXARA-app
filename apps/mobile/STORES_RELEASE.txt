@@ -1,0 +1,36 @@
+Nexara mobile — checklist tiendas y offline
+============================================
+
+1) URL y API (obligatorio en producción)
+   - Build Next: CAPACITOR=1 y NEXT_PUBLIC_API_URL=https://TU_DOMINIO/api (o mismo origen si /api va en el host de la app).
+   - Si el API es otro dominio: NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API=true
+   - Capacitor sync: CAPACITOR_SERVER_URL=https://TU_APP_HOST (HTTPS para App Store).
+   - HTTP solo en Android con cleartext; en iOS usar HTTPS.
+   - Modo sin servidor remoto: CAPACITOR_SERVER_URL=bundled + webDir con export estático (hoy fallan rutas dinámicas sin generateStaticParams).
+
+2) Android — Play Console
+   - Coloca google-services.json en android/app/ (desde Firebase; archivo en .gitignore).
+   - Copia android/key.properties.example → android/key.properties y apunta al keystore.
+   - Sube versionCode en android/app/build.gradle en cada release.
+   - Completa “Seguridad de datos” y declaración de permisos acorde a cámara/ubicación/medios/notificaciones.
+
+3) iOS — App Store Connect
+   - En Xcode: Signing & Capabilities → Push Notifications (el proyecto incluye App.entitlements con aps-environment).
+   - Para TestFlight/App Store release suele usarse aps-environment = production (edita App.entitlements antes del archive o usa configuraciones separadas).
+   - Crea clave APNs en Apple Developer y enlázala a Firebase si usas FCM en iOS.
+   - Información de privacidad de la app (etiquetas) en App Store Connect.
+   - Archive → Privacy Report por si Xcode marca SDKs adicionales.
+
+4) Offline en esta versión
+   - La UI sigue cargándose desde CAPACITOR_SERVER_URL (Next remoto) salvo modo bundled.
+   - GET del API: caché en IndexedDB; sin red se sirve copia local si existía.
+   - POST/PUT/PATCH/DELETE: cola JSON + FormData (hasta ~12 MB serializado) y reenvío al volver online.
+   - No sustituye export estático completo ni sincronización server-authoritative de todos los módulos sin más trabajo de producto.
+   - Recomendación backend: endpoints idempotentes o deduplicación por cliente para reintentos de cola (evitar doble alta si el servidor ya procesó la petición).
+
+5) Comandos útiles
+   npm run build:capacitor && npx cap sync
+   # Producción ejemplo:
+   # set CAPACITOR_SERVER_URL=https://app.ejemplo.com
+   # set NEXT_PUBLIC_API_URL=https://api.ejemplo.com/api
+   # set NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API=true

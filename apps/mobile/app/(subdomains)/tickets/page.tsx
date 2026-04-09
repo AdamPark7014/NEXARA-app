@@ -18,6 +18,7 @@ import { triggerBlobDownload } from "@/lib/file-download";
 import { openExternalUrl } from "@/lib/open-external-url";
 import { isCapacitorNative } from "@/lib/capacitor-env";
 import { fetchWithOfflineQueue, isQueuedResponse } from "@/lib/fetch-offline";
+import { useCompactBottomNav } from "@/lib/use-compact-bottom-nav";
 
 const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false });
 
@@ -138,6 +139,7 @@ export default function ClientTicketsPage() {
   });
   const [mounted, setMounted] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const showCompactBottomNav = useCompactBottomNav();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -1008,7 +1010,7 @@ export default function ClientTicketsPage() {
         </div>
         <div className={consoleStyles.menuTitle}>Cuenta corporativa</div>
         <ul className={consoleStyles.sidebarMenu}>
-          {!isMobile && (
+          {(!isMobile || (isMobile && !showCompactBottomNav)) && (
             <li className={consoleStyles.sidebarMenuItem}>
               <button
                 type="button"
@@ -1036,7 +1038,7 @@ export default function ClientTicketsPage() {
           </li>
         </ul>
 
-        {!isMobile && (
+        {(!isMobile || (isMobile && !showCompactBottomNav)) && (
           <>
             <div className={consoleStyles.menuTitle}>Servicio y solicitudes</div>
             <ul className={consoleStyles.sidebarMenu}>
@@ -1922,10 +1924,10 @@ export default function ClientTicketsPage() {
               </div>
             </div>
           )}
-          {isMobile && <div className={styles.mobileBottomSpacer} aria-hidden="true" />}
+          {isMobile && showCompactBottomNav && <div className={styles.mobileBottomSpacer} aria-hidden="true" />}
         </div>
       </main>
-      {isMobile && <BottomNav items={clientBottomNavItems} />}
+      {isMobile && showCompactBottomNav && <BottomNav items={clientBottomNavItems} />}
       {showReportModal && reportPdfUrl && (
         <div
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}

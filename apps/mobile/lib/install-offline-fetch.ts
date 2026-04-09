@@ -1,5 +1,12 @@
 import { getApiBase } from "./api-base";
 import { fetchWithOfflineQueue } from "./fetch-offline";
+import {
+  authCacheTag,
+  readApiGetCache,
+  responseFromApiCache,
+  shouldCacheApiGet,
+  storeApiGetCache,
+} from "./offline-api-cache";
 import { setNativeFetch } from "./native-fetch";
 import { isNeverQueuePath } from "@nexara/offline-shared";
 
@@ -38,12 +45,13 @@ async function maybeQueueMutation(
 
   const body = init?.body;
   if (
-    body instanceof FormData ||
-    body instanceof URLSearchParams ||
     body instanceof Blob ||
     body instanceof ArrayBuffer ||
     (typeof ReadableStream !== "undefined" && body instanceof ReadableStream)
   ) {
+    return null;
+  }
+  if (body instanceof URLSearchParams) {
     return null;
   }
 
@@ -86,6 +94,34 @@ function getPanelAuthToken(): string | undefined {
   return undefined;
 }
 
+async function getWithApiCache(abs: string, nativeExec: () => Promise<Response>): Promise<Response> {
+  if (!shouldCacheApiGet(abs)) return nativeExec();
+  const token = getPanelAuthToken();
+  const tag = authCacheTag(token);
+  const offline = typeof navigator !== "undefined" && !navigator.onLine;
+  if (offline) {
+    const hit = await readApiGetCache(abs, tag);
+    if (hit) return responseFromApiCache(hit, true);
+    return new Response(
+      JSON.stringify({
+        message: "Sin conexión",
+        offline: true,
+        hint: "Abre esta sección al menos una vez con internet para guardar una copia local.",
+      }),
+      { status: 503, headers: { "Content-Type": "application/json" } },
+    );
+  }
+  try {
+    const res = await nativeExec();
+    if (res.ok) void storeApiGetCache(abs, tag, res.clone()).catch(() => {});
+    return res;
+  } catch {
+    const hit = await readApiGetCache(abs, tag);
+    if (hit) return responseFromApiCache(hit, true);
+    throw new Error("Sin conexión y sin copia local de esta consulta.");
+  }
+}
+
 export function installOfflineFetchGlobal(): void {
   if (typeof window === "undefined") return;
   const w = window as unknown as Record<string, unknown>;
@@ -105,6 +141,10 @@ export function installOfflineFetchGlobal(): void {
         return native(input, init);
       }
       const method = (init?.method ?? req.method ?? "GET").toUpperCase();
+
+      if (method === "GET" && init?.body === undefined && !req.bodyUsed) {
+        return getWithApiCache(abs, () => native(input, init));
+      }
 
       if (init?.body !== undefined) {
         const merged: RequestInit = {
@@ -152,6 +192,11 @@ export function installOfflineFetchGlobal(): void {
     }
 
     const method = (init?.method || "GET").toUpperCase();
+
+    if (method === "GET" && (!init || init.body === undefined)) {
+      return getWithApiCache(abs, () => native(input, init));
+    }
+
     const merged: RequestInit = { ...init, method: init?.method ?? method };
     const queued = await maybeQueueMutation(abs, method, merged, getPanelAuthToken);
     if (queued) return queued;

@@ -1,0 +1,10 @@
+# Copia a key.properties (no versionar). Ejemplo:
+# storeFile=../nexara-release.keystore
+# storePassword=***
+# keyAlias=nexara
+# keyPassword=***
+
+storeFile=ruta/absoluta/o/relativa/nexara-release.keystore
+storePassword=cambiar
+keyAlias=nexara
+keyPassword=cambiar

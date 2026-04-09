@@ -71,15 +71,13 @@ export class ActivityEvidenceService {
     }
 
       if (this.hasPermission(currentUser, PERMISSIONS.CONSOLE_ADMIN)) {
-        // Admin ve evidencias de TODOS los usuarios no-admin (sin restricción de departamento)
         const users = await this.prisma.user.findMany({
           where: {
-            NOT: { role: { accesoConsoleAdmin: true } },
             email: { notIn: ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'] },
           },
           select: { id: true },
         });
-        return [currentUser.id, ...users.map((u) => u.id)];
+        return users.map((u) => u.id);
       }
 
     if (!this.hasPermission(currentUser, PERMISSIONS.EVIDENCES_REVIEW)) {
@@ -362,7 +360,10 @@ export class ActivityEvidenceService {
   /**
    * Obtener evidencias de una actividad
    */
-  async getActivityEvidence(activityId: number) {
+  async getActivityEvidence(
+    activityId: number,
+    requester?: { id: number; permissions?: string[]; isSuperAdmin?: boolean },
+  ) {
     const evidence = await this.prisma.activityEvidence.findUnique({
       where: { activityId },
       include: {
@@ -372,6 +373,17 @@ export class ActivityEvidenceService {
 
     if (!evidence) {
       throw new NotFoundException('Evidencias no encontradas');
+    }
+
+    if (requester?.id) {
+      const isResponsible = evidence.activity.responsableId === requester.id;
+      const canReview =
+        Boolean(requester.isSuperAdmin) ||
+        this.hasPermission(requester, PERMISSIONS.CONSOLE_ADMIN) ||
+        this.hasPermission(requester, PERMISSIONS.EVIDENCES_REVIEW);
+      if (!isResponsible && !canReview) {
+        throw new ForbiddenException('No tienes acceso a las evidencias de esta actividad');
+      }
     }
 
     return evidence;

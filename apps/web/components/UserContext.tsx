@@ -1,6 +1,7 @@
 "use client";
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { clearActivePanel } from '@/lib/panel-routing';
+import { isCapacitorNative } from '@/lib/capacitor-env';
 
 export interface User {
 	id: number;
@@ -87,6 +88,16 @@ const safeGetStoredUser = (): User | null => {
 		}
 	};
 
+	const migrateLocalToSession = (u: User): void => {
+		try {
+			const { offlineDegraded: _omit, ...persistable } = u;
+			window.sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(persistable));
+			window.localStorage.removeItem(USER_STORAGE_KEY);
+		} catch {
+			/* ignore */
+		}
+	};
+
 	try {
 		const sessionCandidate = parseStored(window.sessionStorage.getItem(USER_STORAGE_KEY));
 		if (sessionCandidate) return sessionCandidate;
@@ -94,14 +105,18 @@ const safeGetStoredUser = (): User | null => {
 		// Ignore storage access errors (Safari private mode, etc.)
 	}
 
+	const native = isCapacitorNative();
+
 	try {
 		const localCandidate = parseStored(window.localStorage.getItem(USER_STORAGE_KEY));
-		if (localCandidate) return localCandidate;
+		if (!localCandidate) return null;
+		if (native) return localCandidate;
+		// Navegador: una sesión por pestaña — migrar legacy localStorage → session y no compartir entre tabs
+		migrateLocalToSession(localCandidate);
+		return localCandidate;
 	} catch {
-		// Ignore storage access errors (Safari private mode, etc.)
+		return null;
 	}
-
-	return null;
 };
 
 const safePersistUser = (user: User | null) => {
@@ -122,10 +137,18 @@ const safePersistUser = (user: User | null) => {
 		// Ignore storage access errors
 	}
 
-	try {
-		write(window.localStorage);
-	} catch {
-		// Ignore storage access errors
+	if (isCapacitorNative()) {
+		try {
+			write(window.localStorage);
+		} catch {
+			// Ignore storage access errors
+		}
+	} else {
+		try {
+			window.localStorage.removeItem(USER_STORAGE_KEY);
+		} catch {
+			/* ignore */
+		}
 	}
 };
 
@@ -169,28 +192,6 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 	useEffect(() => {
 		safePersistUser(user);
 	}, [user]);
-
-	useEffect(() => {
-		const handleStorage = (e: StorageEvent) => {
-			if (e.key !== USER_STORAGE_KEY) return;
-			if (!e.newValue) {
-				setUser(null);
-			} else {
-				const parsed = normalizeUser((() => {
-					try {
-						return JSON.parse(e.newValue);
-					} catch {
-						return null;
-					}
-				})());
-				if (parsed && !isTokenExpired(parsed.token)) {
-					setUser(parsed);
-				}
-			}
-		};
-		window.addEventListener("storage", handleStorage);
-		return () => window.removeEventListener("storage", handleStorage);
-	}, []);
 
 	const logout = () => {
 		clearActivePanel();

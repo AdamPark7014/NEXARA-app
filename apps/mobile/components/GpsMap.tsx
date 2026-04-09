@@ -48,6 +48,7 @@ const GpsMap = () => {
   const teamMapInstance = useRef<any>(null);
   const myMarkersRef = useRef<Map<string, any>>(new Map());
   const teamMarkersRef = useRef<Map<string, any>>(new Map());
+  const markerLibraryRef = useRef<{ AdvancedMarkerElement?: new (opts: object) => any } | null>(null);
 
   const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
@@ -142,9 +143,15 @@ const GpsMap = () => {
     return Number.isFinite(parsed) ? parsed : null;
   };
 
-  const createMapMarker = (mapsLib: any, map: any, position: { lat: number; lng: number }, label?: string) => {
-    if (googleMapsMapId && mapsLib?.marker?.AdvancedMarkerElement) {
-      return new mapsLib.marker.AdvancedMarkerElement({
+  const canUseAdvancedMarkers = () =>
+    Boolean(googleMapsMapId && markerLibraryRef.current?.AdvancedMarkerElement);
+
+  const createMapMarker = (map: any, position: { lat: number; lng: number }, label?: string) => {
+    const mapsLib = window.google?.maps as any;
+    if (!mapsLib) return null;
+    const Adv = markerLibraryRef.current?.AdvancedMarkerElement;
+    if (googleMapsMapId && Adv) {
+      return new Adv({
         map,
         position,
         title: label,
@@ -374,11 +381,19 @@ const GpsMap = () => {
         if (!ctor) {
           throw new Error('Google Maps Map constructor no disponible');
         }
+        markerLibraryRef.current = null;
+        if (googleMapsMapId && window.google?.maps && typeof (window.google.maps as any).importLibrary === 'function') {
+          try {
+            markerLibraryRef.current = await (window.google.maps as any).importLibrary('marker');
+          } catch {
+            markerLibraryRef.current = null;
+          }
+        }
         setMapCtor(() => ctor);
         setMapsReady(true);
       })
       .catch((err) => setError(err.message));
-  }, [canUseMaps]);
+  }, [canUseMaps, googleMapsMapId]);
 
   useEffect(() => {
     if (!mapsReady || !window.google?.maps || !mapCtor) return;
@@ -387,12 +402,14 @@ const GpsMap = () => {
       setError('Constructor de Google Maps no disponible. Reintentando...');
       return;
     }
+    const mapIdOpts = canUseAdvancedMarkers() ? { mapId: googleMapsMapId } : {};
+
     if (myMapRef.current && !myMapInstance.current) {
       try {
         myMapInstance.current = new mapCtor(myMapRef.current, {
           center: { lat: 19.4326, lng: -99.1332 },
           zoom: 14,
-          ...(googleMapsMapId ? { mapId: googleMapsMapId } : {}),
+          ...mapIdOpts,
           zoomControl: false,
           mapTypeControl: false,
           fullscreenControl: false,
@@ -409,7 +426,7 @@ const GpsMap = () => {
         teamMapInstance.current = new mapCtor(teamMapRef.current, {
           center: { lat: 19.4326, lng: -99.1332 },
           zoom: 12,
-          ...(googleMapsMapId ? { mapId: googleMapsMapId } : {}),
+          ...mapIdOpts,
           zoomControl: false,
           mapTypeControl: false,
           fullscreenControl: false,
@@ -431,6 +448,7 @@ const GpsMap = () => {
       teamMarkersRef.current.clear();
       myMapInstance.current = null;
       teamMapInstance.current = null;
+      markerLibraryRef.current = null;
       setMapCtor(null);
       setMapsReady(false);
     };
@@ -438,15 +456,14 @@ const GpsMap = () => {
 
   useEffect(() => {
     if (!myMapInstance.current || !myLocation || !window.google?.maps) return;
-    const mapsLib = window.google.maps as any;
     const lat = toNumber(myLocation.latitud);
     const lng = toNumber(myLocation.longitud);
     if (lat === null || lng === null) return;
     const markerKey = 'me';
     const marker = myMarkersRef.current.get(markerKey);
     if (!marker) {
-      const nextMarker = createMapMarker(mapsLib, myMapInstance.current as unknown, { lat, lng }, 'Yo');
-      myMarkersRef.current.set(markerKey, nextMarker);
+      const nextMarker = createMapMarker(myMapInstance.current as unknown, { lat, lng }, 'Yo');
+      if (nextMarker) myMarkersRef.current.set(markerKey, nextMarker);
     } else {
       setMapMarkerPosition(marker, { lat, lng });
     }
@@ -455,18 +472,20 @@ const GpsMap = () => {
 
   useEffect(() => {
     if (!teamMapInstance.current || !window.google?.maps) return;
-    const mapsLib = window.google.maps as any;
     const activeKeys = new Set<string>();
+    const points: { lat: number; lng: number }[] = [];
+
     teamLocations.forEach((location) => {
       const lat = toNumber(location.latitud);
       const lng = toNumber(location.longitud);
       if (lat === null || lng === null) return;
-      const key = String(location.usuarioId);
+      points.push({ lat, lng });
+      const key = String(location.usuarioId ?? location.id);
       activeKeys.add(key);
       const existing = teamMarkersRef.current.get(key);
       if (!existing) {
-        const marker = createMapMarker(mapsLib, teamMapInstance.current, { lat, lng }, getInitials(location.usuario?.nombre));
-        teamMarkersRef.current.set(key, marker);
+        const marker = createMapMarker(teamMapInstance.current, { lat, lng }, getInitials(location.usuario?.nombre));
+        if (marker) teamMarkersRef.current.set(key, marker);
       } else {
         setMapMarkerPosition(existing, { lat, lng });
       }
@@ -479,13 +498,17 @@ const GpsMap = () => {
       }
     });
 
-    if (teamLocations.length && teamMapInstance.current) {
-      const first = teamLocations[0];
-      const lat = toNumber(first.latitud);
-      const lng = toNumber(first.longitud);
-      if (lat !== null && lng !== null) {
-        teamMapInstance.current.setCenter({ lat, lng });
-      }
+    const map = teamMapInstance.current;
+    if (!map || points.length === 0) return;
+
+    if (points.length === 1) {
+      map.setCenter(points[0]);
+      if (typeof map.setZoom === 'function') map.setZoom(14);
+    } else {
+      const gmaps = window.google.maps as unknown as { LatLngBounds: new () => { extend: (p: { lat: number; lng: number }) => void } };
+      const bounds = new gmaps.LatLngBounds();
+      points.forEach((p) => bounds.extend(p));
+      map.fitBounds(bounds);
     }
   }, [teamLocations]);
 

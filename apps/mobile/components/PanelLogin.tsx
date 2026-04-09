@@ -15,9 +15,11 @@ type PanelLoginProps = {
   requiredPermission?: string;
   title?: string;
   subtitle?: string;
+  /** Aviso informativo (p. ej. acceso denegado a un panel antes de iniciar sesión). */
+  accessNotice?: string;
 };
 
-export default function PanelLogin({ redirectTo, requiredPermission, title, subtitle }: PanelLoginProps) {
+export default function PanelLogin({ redirectTo, requiredPermission, title, subtitle, accessNotice }: PanelLoginProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -637,6 +639,17 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
           line-height: 1.45;
         }
 
+        .access-notice {
+          margin-bottom: 14px;
+          padding: 12px 14px;
+          border-radius: var(--radius-sm);
+          border: 1px solid color-mix(in srgb, var(--primary) 42%, var(--border));
+          background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+          color: var(--text-primary);
+          font-size: 0.87rem;
+          line-height: 1.45;
+        }
+
         .footer {
           margin-top: 22px;
           padding-top: 0;
@@ -917,6 +930,11 @@ export default function PanelLogin({ redirectTo, requiredPermission, title, subt
       <div className="login-container">
         <div className="login-card">
           <div className="login-shell">
+          {accessNotice ? (
+            <div className="access-notice" role="status">
+              {accessNotice}
+            </div>
+          ) : null}
           <div className="logo-container">
             <div className="hero-kicker">
               <span className="hero-kicker-dot" aria-hidden="true"></span>
