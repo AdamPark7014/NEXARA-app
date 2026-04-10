@@ -202,9 +202,16 @@ export default function ContabilidadLayout({ children }: { children: React.React
           <div className={consoleStyles.sidebarName}>{userName}</div>
           <div className={consoleStyles.sidebarEmail}>{userEmail}</div>
           <div className={consoleStyles.sidebarMeta}>
-            <span className={consoleStyles.rolePill}>{userRole}</span>
-            {isSuperAdmin && <span className={consoleStyles.levelPill}>Superadmin</span>}
-            {!isSuperAdmin && isAdmin && <span className={consoleStyles.levelPill}>Admin</span>}
+            {isSuperAdmin ? (
+              <span className={consoleStyles.levelPill}>Superadmin</span>
+            ) : (
+              <>
+                <span className={consoleStyles.rolePill}>{userRole}</span>
+                {isAdmin && userRole !== 'Admin' && (
+                  <span className={consoleStyles.levelPill}>Admin</span>
+                )}
+              </>
+            )}
           </div>
         </div>
 

@@ -15,7 +15,7 @@ if (!jwtSecret) {
     PrismaModule,
     JwtModule.register({
       secret: jwtSecret,
-      signOptions: { expiresIn: '4h' },
+      signOptions: { expiresIn: process.env.JWT_EXPIRES_IN || '4h' },
     }),
   ],
   controllers: [AuthController],

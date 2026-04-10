@@ -2,10 +2,14 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
+import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 
 @Injectable()
 export class QualityService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationHierarchy: NotificationHierarchyService,
+  ) {}
 
   // ── Quality Inspections ───────────────────────────────────────────
   private async generateInspNumber(): Promise<string> {
@@ -109,7 +113,7 @@ export class QualityService {
     preventiveAction?: string;
   }, userId: number) {
     const ncrNumber = await this.generateNCRNumber();
-    return this.prisma.nonConformanceReport.create({
+    const created = await this.prisma.nonConformanceReport.create({
       data: {
         ncrNumber,
         inspectionId: dto.inspectionId ?? null,
@@ -124,6 +128,10 @@ export class QualityService {
       },
       include: { inspection: true, reportedBy: { select: { id: true, nombre: true } } },
     });
+    void this.notificationHierarchy
+      .notifyQualityNcrCreated(userId, created.id, created.ncrNumber, created.title, created.severity)
+      .catch(() => undefined);
+    return created;
   }
 
   async listNCRs(filters?: { status?: string; severity?: string }, query?: PaginationQueryDto) {

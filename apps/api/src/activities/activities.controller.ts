@@ -177,8 +177,10 @@ export class ActivitiesController {
   update(
     @Param('id') id: string,
     @Body() updateActivityDto: UpdateActivityDto,
+    @CurrentUser() user: any,
   ) {
-    return this.activitiesService.update(+id, updateActivityDto);
+    const actor = user?.id ? { id: user.id, nombre: user.nombre } : undefined;
+    return this.activitiesService.update(+id, updateActivityDto, actor);
   }
 
   @Delete(':id')

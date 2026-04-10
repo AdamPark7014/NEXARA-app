@@ -48,14 +48,14 @@ export class ProductionController {
 
   @Patch(':id/start')
   @RBAC({ permissions: [PERMISSIONS.PRODUCTION_MANAGE] })
-  start(@Param('id', ParseIntPipe) id: number) {
-    return this.svc.startProductionOrder(id);
+  start(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.svc.startProductionOrder(id, user.id);
   }
 
   @Patch(':id/complete')
   @RBAC({ permissions: [PERMISSIONS.PRODUCTION_MANAGE] })
-  complete(@Param('id', ParseIntPipe) id: number, @Body('producedQty') producedQty: number) {
-    return this.svc.completeProductionOrder(id, producedQty);
+  complete(@Param('id', ParseIntPipe) id: number, @Body('producedQty') producedQty: number, @CurrentUser() user: any) {
+    return this.svc.completeProductionOrder(id, producedQty, user.id);
   }
 
   @Post(':id/logs')

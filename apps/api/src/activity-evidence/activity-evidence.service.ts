@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { saveBase64Photo } from '../common/file-upload.util';
 import { ActivitiesService } from '../activities/activities.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
+import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
@@ -14,7 +15,27 @@ export class ActivityEvidenceService {
   constructor(
     private prisma: PrismaService,
     private activitiesService: ActivitiesService,
+    private notificationHierarchy: NotificationHierarchyService,
   ) {}
+
+  private async notifyEvidenceReadyForReview(activityId: number) {
+    try {
+      const activity = await this.prisma.activity.findUnique({
+        where: { id: activityId },
+        include: { responsable: { select: { id: true, nombre: true } } },
+      });
+      if (!activity?.responsable) return;
+      await this.notificationHierarchy.notifyEvidenceSubmitted(
+        activity.responsableId,
+        activityId,
+        activity.titulo || '',
+        activity.responsable.nombre || 'Usuario',
+        activity.anNumber,
+      );
+    } catch {
+      /* no bloquear flujo de evidencias */
+    }
+  }
 
   private mapReviewStatus(reviewStatus: string | null | undefined) {
     if (reviewStatus === 'APPROVED') return 'Aprobada';
@@ -353,6 +374,8 @@ export class ActivityEvidenceService {
         fechaFinalizacion: new Date(),
       },
     });
+
+    void this.notifyEvidenceReadyForReview(activityId);
 
     return updated;
   }
@@ -1024,6 +1047,28 @@ export class ActivityEvidenceService {
       },
     });
 
+    try {
+      const activity = await this.prisma.activity.findUnique({
+        where: { id: activityId },
+        select: { responsableId: true, titulo: true },
+      });
+      const reviewer = await this.prisma.user.findUnique({
+        where: { id: reviewerId },
+        select: { nombre: true },
+      });
+      if (activity && reviewer?.nombre) {
+        await this.notificationHierarchy.notifyEvidenceReview(
+          activity.responsableId,
+          activityId,
+          activity.titulo || '',
+          'approved',
+          reviewer.nombre,
+        );
+      }
+    } catch {
+      /* seguir */
+    }
+
     return updated;
   }
 
@@ -1073,6 +1118,29 @@ export class ActivityEvidenceService {
         estatus: 'Rechazada',
       },
     });
+
+    try {
+      const activity = await this.prisma.activity.findUnique({
+        where: { id: activityId },
+        select: { responsableId: true, titulo: true },
+      });
+      const reviewer = await this.prisma.user.findUnique({
+        where: { id: reviewerId },
+        select: { nombre: true },
+      });
+      if (activity && reviewer?.nombre) {
+        await this.notificationHierarchy.notifyEvidenceReview(
+          activity.responsableId,
+          activityId,
+          activity.titulo || '',
+          'rejected',
+          reviewer.nombre,
+          notes,
+        );
+      }
+    } catch {
+      /* seguir */
+    }
 
     return updated;
   }
@@ -1188,6 +1256,10 @@ export class ActivityEvidenceService {
         estatus: 'Pendiente',
       },
     });
+
+    if (step === 'EXIT_PHOTO' && updateData.status === 'COMPLETED') {
+      void this.notifyEvidenceReadyForReview(activityId);
+    }
 
     return updated;
   }

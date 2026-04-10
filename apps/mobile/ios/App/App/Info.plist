@@ -59,5 +59,7 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>Nexara muestra alertas de operación, compras, actividades y mensajes del equipo aunque no estés dentro de la app.</string>
 </dict>
 </plist>

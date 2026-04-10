@@ -9,14 +9,22 @@
 .consoleMain {
 	flex: 1;
 	min-width: 0;
+	width: 100%;
+	max-width: 100%;
 	display: flex;
 	flex-direction: column;
+	align-items: stretch;
 	gap: 14px;
+	box-sizing: border-box;
 }
 
 .consoleTopbar {
 	display: grid;
 	gap: 10px;
+	width: 100%;
+	max-width: 100%;
+	min-width: 0;
+	box-sizing: border-box;
 	padding: 14px 16px;
 	border: 1px solid color-mix(in srgb, var(--primary) 22%, transparent);
 	border-radius: 16px;
@@ -746,6 +754,32 @@
 		left: max(6px, env(safe-area-inset-left));
 		right: max(6px, env(safe-area-inset-right));
 		max-height: calc(100dvh - 62px - env(safe-area-inset-top));
+	}
+}
+
+/* Barra “panel corporativo”: ancho completo del contenido en escritorio; más compacta en móvil */
+@media (min-width: 901px) {
+	.consoleTopbar {
+		width: 100%;
+		max-width: none;
+		padding: 14px clamp(18px, 2vw, 28px);
+		border-radius: clamp(14px, 1vw, 18px);
+	}
+}
+
+@media (max-width: 900px) {
+	.consoleTopbar {
+		width: 100%;
+		max-width: 100%;
+		padding: 12px 14px;
+		border-radius: 12px;
+	}
+}
+
+@media (max-width: 640px) {
+	.consoleTopbar {
+		padding: 10px 12px;
+		border-radius: 11px;
 	}
 }
 

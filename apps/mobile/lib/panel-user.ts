@@ -67,6 +67,10 @@ export const getRoleLabel = (user: PanelUser | null | undefined) => {
 
   if (role.includes("vended")) return "Vendedor";
 
+  if (/panel/i.test(roleRaw) && /venta/i.test(roleRaw)) {
+    return "Vendedor";
+  }
+
   if (roleRaw) {
     return roleRaw
       .split(/[_\s-]+/)

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import styles from "../console/console.module.css";
 import Sidebar from "../console/Sidebar";
 import NotificationCenter from "@/components/NotificationCenter";
+import { isCapacitorNative } from "@/lib/capacitor-env";
 import { useUser } from "@/components/UserContext";
 import { setActivePanel, type PanelKey } from "@/lib/panel-routing";
 
@@ -42,7 +43,9 @@ export default function DynamicPanelLayout({ children }: { children: React.React
     <div className={styles.consoleLayout}>
       <Sidebar />
       <main className={styles.consoleMain}>
-        <NotificationCenter position="top-right" maxNotifications={5} autoCloseTime={6000} />
+        {!isCapacitorNative() && (
+          <NotificationCenter position="top-right" maxNotifications={5} autoCloseTime={6000} />
+        )}
         {children}
       </main>
     </div>

@@ -162,6 +162,15 @@ const nextConfig = {
 
     return [
       {
+        // Service worker: sin caché agresiva para que los clientes reciban actualizaciones;
+        // en producción el sitio debe ser HTTPS (requisito del navegador para SW y push).
+        source: '/sw.js',
+        headers: [
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+          { key: 'Service-Worker-Allowed', value: '/' },
+        ],
+      },
+      {
         source: '/:path*',
         headers: [
           { key: 'X-Frame-Options', value: 'DENY' },

@@ -3,6 +3,7 @@ import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { useUser } from './UserContext';
 import { io, Socket } from 'socket.io-client';
 import { getSocketBaseUrl } from '@/lib/api-base';
+import { showBrowserHeadsUpNotification } from '@/lib/browser-notifications';
 import styles from './NotificationCenter.module.css';
 
 interface Notification {
@@ -47,6 +48,9 @@ const getCategoryIcon = (category: string): string => {
     quotes: '💼',
     orders: '📦',
     projects: '📊',
+    sales: '💼',
+    erp: '🏭',
+    confirmations: '✅',
     general: '📢',
   };
   return icons[category] || '📬';
@@ -72,6 +76,9 @@ const getCategoryClass = (category: string): string => {
   if (key === 'quotes') return styles.catQuotes;
   if (key === 'orders') return styles.catOrders;
   if (key === 'projects') return styles.catProjects;
+  if (key === 'sales') return styles.catSales;
+  if (key === 'erp') return styles.catErp;
+  if (key === 'confirmations') return styles.catConfirmations;
   return styles.catGeneral;
 };
 
@@ -111,17 +118,6 @@ const formatDateTime = (isoDate: string) =>
     minute: '2-digit',
   });
 
-const trySystemNotification = (title: string, body: string, tag: string) => {
-  if (typeof window === 'undefined' || !('Notification' in window)) return;
-  const Sys = window.Notification;
-  if (Sys.permission !== 'granted') return;
-  try {
-    new Sys(title, { body, tag });
-  } catch {
-    /* ignore */
-  }
-};
-
 const NotificationCenter: React.FC<NotificationCenterProps> = ({
   position = 'top-right',
   maxNotifications = 5,
@@ -141,6 +137,22 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const notificationTimers = useRef<Map<number, NodeJS.Timeout>>(new Map());
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+
+  const webPushBannerMode =
+    process.env.NEXT_PUBLIC_WEB_PUSH_CONSENT_MODE?.trim().toLowerCase() === 'banner' &&
+    !!process.env.NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY?.trim();
+
+  const [pushBannerSnoozed, setPushBannerSnoozed] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const readSnooze = () =>
+      setPushBannerSnoozed(sessionStorage.getItem('nexara_web_push_snooze_v1') === '1');
+    readSnooze();
+    const onSnooze = () => readSnooze();
+    window.addEventListener('nexara-web-push-snooze', onSnooze);
+    return () => window.removeEventListener('nexara-web-push-snooze', onSnooze);
+  }, []);
 
   useEffect(() => {
     if (!mirrorToSystemNotifications || typeof window === 'undefined') return;
@@ -205,11 +217,13 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
       setUnreadCount(prev => (notification.isRead ? prev : prev + 1));
 
       if (mirrorToSystemNotifications) {
-        trySystemNotification(
-          notification.title,
-          notification.message,
-          `nexara-notification-${notification.id}`,
-        );
+        void showBrowserHeadsUpNotification({
+          title: notification.title,
+          body: notification.message,
+          tag: `nexara-notification-${notification.id}`,
+          url: notification.relatedUrl,
+          priority: notification.priority,
+        });
       }
 
       // Auto cerrar notificación
@@ -459,7 +473,9 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
             </button>
           </div>
 
-          {mirrorToSystemNotifications && sysNotifyPermission === 'default' && (
+          {mirrorToSystemNotifications &&
+            sysNotifyPermission === 'default' &&
+            !(webPushBannerMode && !pushBannerSnoozed) && (
             <div className={styles.systemNotifyRow}>
               <button
                 type="button"
@@ -468,11 +484,19 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
                   if (!('Notification' in window)) return;
                   const next = await window.Notification.requestPermission();
                   setSysNotifyPermission(next);
+                  if (next === 'granted' && process.env.NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY?.trim()) {
+                    sessionStorage.removeItem('nexara_web_push_snooze_v1');
+                    window.dispatchEvent(new Event('nexara-web-push-consent'));
+                  }
                 }}
               >
-                Activar avisos del sistema
+                {webPushBannerMode ? 'Permitir notificaciones (NEXARA)' : 'Activar avisos del sistema'}
               </button>
-              <span className={styles.systemNotifyHint}>Recibe alertas aunque cambies de pestaña (navegador).</span>
+              <span className={styles.systemNotifyHint}>
+                {webPushBannerMode
+                  ? 'Mismo permiso del navegador que el aviso inferior: alertas en vivo y, si aplica, con la pestaña cerrada.'
+                  : 'Recibe alertas aunque cambies de pestaña (navegador).'}
+              </span>
             </div>
           )}
 

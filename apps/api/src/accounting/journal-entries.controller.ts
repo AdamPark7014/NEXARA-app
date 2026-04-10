@@ -32,8 +32,8 @@ export class JournalEntriesController {
   @Patch(':id/post')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACCOUNTING_POST] })
-  post(@Param('id') id: string) {
-    return this.service.postJournalEntry(+id);
+  post(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.service.postJournalEntry(+id, user.id);
   }
 
   @Post(':id/reverse')

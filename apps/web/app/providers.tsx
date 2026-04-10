@@ -10,6 +10,9 @@ if (typeof window !== "undefined") {
 import LoginWelcomeBanner from "../components/LoginWelcomeBanner";
 import OfflineNetworkBanner from "../components/OfflineNetworkBanner";
 import OfflineQueueFlusher from "../components/OfflineQueueFlusher";
+import ServiceWorkerHeadsUpPrep from "../components/ServiceWorkerHeadsUpPrep";
+import WebAppBadgeSync from "../components/WebAppBadgeSync";
+import WebPushConsentBanner from "../components/WebPushConsentBanner";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -17,6 +20,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       <ThemeProvider>
         <OfflineNetworkBanner />
         <OfflineQueueFlusher />
+        <ServiceWorkerHeadsUpPrep />
+        <WebAppBadgeSync />
+        <WebPushConsentBanner />
         <LoginWelcomeBanner />
         {children}
       </ThemeProvider>

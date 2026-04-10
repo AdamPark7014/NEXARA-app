@@ -4,9 +4,10 @@ import { ActivityEvidenceController } from './activity-evidence.controller';
 import { CoreModule } from '../common/core.module';
 import { PrismaModule } from '../prisma/prisma.module.js';
 import { ActivitiesModule } from '../activities/activities.module.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
 
 @Module({
-  imports: [CoreModule, PrismaModule, ActivitiesModule],
+  imports: [CoreModule, PrismaModule, ActivitiesModule, NotificationsModule],
   controllers: [ActivityEvidenceController],
   providers: [ActivityEvidenceService],
   exports: [ActivityEvidenceService],

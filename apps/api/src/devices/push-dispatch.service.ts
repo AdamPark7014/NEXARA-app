@@ -7,6 +7,12 @@ export type PushPayload = {
   title: string;
   body: string;
   relatedUrl?: string | null;
+  /** Alta prioridad: FCM high, Web Push JSON, cliente puede usar requireInteraction en SW. */
+  priority?: 'high' | 'normal' | 'low';
+  /** Tag estable para reemplazar notificaciones en bandeja (p. ej. nexara-123). */
+  tag?: string;
+  /** ID de fila Notification para dedupe / trazabilidad en cliente. */
+  notificationId?: number;
 };
 
 @Injectable()
@@ -54,10 +60,17 @@ export class PushDispatchService {
   async sendToUser(userId: number, payload: PushPayload): Promise<void> {
     const rows = await this.prisma.userPushEndpoint.findMany({ where: { userId } });
 
+    const priority = payload.priority || 'normal';
+    const tag = payload.tag || (payload.notificationId ? `nexara-${payload.notificationId}` : `nexara-${userId}-${Date.now()}`);
+    const nid = payload.notificationId != null ? String(payload.notificationId) : '';
+
     const data: Record<string, string> = {
       title: payload.title,
       body: payload.body,
       url: payload.relatedUrl || '',
+      priority,
+      tag,
+      nexara_notification_id: nid,
     };
 
     const fcmOk = this.tryInitFirebase();
@@ -73,9 +86,21 @@ export class PushDispatchService {
               title: payload.title,
               body: payload.body,
               url: data.url,
+              priority,
+              tag,
+              nexara_notification_id: nid,
             },
-            android: { priority: 'high' },
-            apns: { payload: { aps: { sound: 'default' } } },
+            android: {
+              priority: priority === 'high' ? 'high' : 'normal',
+            },
+            apns: {
+              payload: {
+                aps: {
+                  sound: 'default',
+                  ...(priority === 'high' ? { contentAvailable: true } : {}),
+                },
+              },
+            },
           });
         } catch (e) {
           this.logger.warn(

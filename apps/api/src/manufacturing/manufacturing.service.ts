@@ -2,10 +2,14 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
+import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 
 @Injectable()
 export class ManufacturingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationHierarchy: NotificationHierarchyService,
+  ) {}
 
   // Bill of Materials
   async createBOM(dto: {
@@ -119,7 +123,7 @@ export class ManufacturingService {
     notes?: string;
   }, userId: number) {
     const orderNumber = await this.generateProdNumber();
-    return this.prisma.productionOrder.create({
+    const created = await this.prisma.productionOrder.create({
       data: {
         orderNumber,
         productId: dto.productId,
@@ -133,6 +137,10 @@ export class ManufacturingService {
       },
       include: { product: true, bom: { include: { components: true } } },
     });
+    void this.notificationHierarchy
+      .notifyProductionOrderCreated(userId, created.id, created.orderNumber, created.product.name)
+      .catch(() => undefined);
+    return created;
   }
 
   async listProductionOrders(filters?: { status?: string }, query?: PaginationQueryDto) {
@@ -158,22 +166,44 @@ export class ManufacturingService {
     return order;
   }
 
-  async startProductionOrder(id: number) {
-    return this.prisma.productionOrder.update({
+  async startProductionOrder(id: number, actorId: number) {
+    const updated = await this.prisma.productionOrder.update({
       where: { id },
       data: { status: 'IN_PROGRESS', actualStartDate: new Date() },
+      include: { product: true },
     });
+    void this.notificationHierarchy
+      .notifyProductionOrderStatusChanged(
+        actorId,
+        updated.id,
+        updated.orderNumber,
+        updated.product.name,
+        'En proceso',
+      )
+      .catch(() => undefined);
+    return updated;
   }
 
-  async completeProductionOrder(id: number, completedQty: number) {
-    return this.prisma.productionOrder.update({
+  async completeProductionOrder(id: number, completedQty: number, actorId: number) {
+    const updated = await this.prisma.productionOrder.update({
       where: { id },
       data: {
         status: 'COMPLETED',
         actualEndDate: new Date(),
         completedQty: new Prisma.Decimal(completedQty),
       },
+      include: { product: true },
     });
+    void this.notificationHierarchy
+      .notifyProductionOrderStatusChanged(
+        actorId,
+        updated.id,
+        updated.orderNumber,
+        updated.product.name,
+        'Completada',
+      )
+      .catch(() => undefined);
+    return updated;
   }
 
   // Production Logs
@@ -187,7 +217,7 @@ export class ManufacturingService {
     quantityScrapped?: number;
     notes?: string;
   }, userId: number) {
-    return this.prisma.productionLog.create({
+    const log = await this.prisma.productionLog.create({
       data: {
         productionOrderId: dto.productionOrderId,
         workCenterId: dto.workCenterId,
@@ -200,6 +230,16 @@ export class ManufacturingService {
         operatorId: userId,
       },
     });
+    const order = await this.prisma.productionOrder.findUnique({
+      where: { id: dto.productionOrderId },
+      select: { orderNumber: true },
+    });
+    if (order) {
+      void this.notificationHierarchy
+        .notifyProductionLogRecorded(userId, dto.productionOrderId, order.orderNumber, dto.operationName.trim())
+        .catch(() => undefined);
+    }
+    return log;
   }
 
   async listProductionLogs(productionOrderId: number) {

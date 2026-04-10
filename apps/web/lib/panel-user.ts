@@ -66,6 +66,11 @@ export const getRoleLabel = (user: PanelUser | null | undefined) => {
 
   if (role.includes("vended")) return "Vendedor";
 
+  // Roles de catálogo tipo "Panel ventas" — mostrar como vendedor, no como nombre del módulo
+  if (/panel/i.test(roleRaw) && /venta/i.test(roleRaw)) {
+    return "Vendedor";
+  }
+
   if (roleRaw) {
     return roleRaw
       .split(/[_\s-]+/)

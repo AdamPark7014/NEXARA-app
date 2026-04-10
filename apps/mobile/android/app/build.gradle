@@ -1,5 +1,10 @@
 apply plugin: 'com.android.application'
 
+// Salida de Gradle fuera de app/build (OneDrive/antivirus suelen bloquear intermediates ahí).
+def nexaraAppBuildDir = new File(rootProject.projectDir, "nexara-gradle-out/app")
+nexaraAppBuildDir.mkdirs()
+buildDir = nexaraAppBuildDir
+
 def keystorePropertiesFile = rootProject.file("key.properties")
 def keystoreProperties = new Properties()
 if (keystorePropertiesFile.exists()) {

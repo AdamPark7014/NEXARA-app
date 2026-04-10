@@ -2,10 +2,14 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
+import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 
 @Injectable()
 export class AccountingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationHierarchy: NotificationHierarchyService,
+  ) {}
 
   private readonly satPaymentFormValues = new Set([
     'FP01', 'FP02', 'FP03', 'FP04', 'FP05', 'FP06', 'FP08', 'FP12', 'FP13', 'FP14',
@@ -236,7 +240,7 @@ export class AccountingService {
     return entry;
   }
 
-  async postJournalEntry(id: number) {
+  async postJournalEntry(id: number, postedByUserId: number) {
     const entry = await this.prisma.journalEntry.findUnique({ where: { id }, include: { lines: true, fiscalPeriod: true } });
     if (!entry) throw new NotFoundException('Asiento no encontrado');
     if (entry.status === 'POSTED') throw new BadRequestException('Ya está contabilizado');
@@ -258,11 +262,16 @@ export class AccountingService {
       }
     }
 
-    return this.prisma.journalEntry.update({
+    const updated = await this.prisma.journalEntry.update({
       where: { id },
       data: { status: 'POSTED', postedAt: new Date() },
       include: { lines: { include: { debitAccount: true, creditAccount: true } } },
     });
+    const desc = entry.description?.trim() || 'Sin descripción';
+    void this.notificationHierarchy
+      .notifyJournalEntryPosted(postedByUserId, updated.id, entry.entryNumber, desc)
+      .catch(() => undefined);
+    return updated;
   }
 
   async reverseJournalEntry(id: number, userId: number) {
@@ -485,7 +494,7 @@ export class AccountingService {
     const retentions = items.reduce((s, i) => s + i.isrRet + i.ivaRet, 0);
     const totalAmount = subtotal - totalDiscount + taxAmount - retentions;
 
-    return this.prisma.invoice.create({
+    const invoice = await this.prisma.invoice.create({
       data: {
         invoiceNumber,
         type: dto.type as any,
@@ -540,6 +549,14 @@ export class AccountingService {
       },
       include: { items: true, client: true, supplier: true },
     });
+    const totalHint = `${invoice.currency} ${Number(invoice.totalAmount).toLocaleString('es-MX', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+    void this.notificationHierarchy
+      .notifyInvoiceCreated(userId, invoice.id, invoice.invoiceNumber, totalHint)
+      .catch(() => undefined);
+    return invoice;
   }
 
   async listInvoices(filters?: { type?: string; status?: string; from?: string; to?: string }, query?: PaginationQueryDto) {
@@ -727,6 +744,13 @@ export class AccountingService {
       return [createdPayment] as const;
     });
 
+    const amountLabel = `${invoice.currency} ${dto.amount.toLocaleString('es-MX', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+    void this.notificationHierarchy
+      .notifyPaymentRegistered(userId, payment.id, invoice.invoiceNumber, amountLabel)
+      .catch(() => undefined);
     return payment;
   }
 

@@ -291,11 +291,14 @@ export class UsersService {
     }
   }
 
+  /** Cuentas que no deben aparecer en la página pública "Nosotros / equipo" (ej. solo panel ventas). */
+  private readonly excludedPublicTeamEmails = ['vendedor@nexara.com.mx', ...this.superAdminEmails];
+
   async findPublicTeam(limit = 12) {
     const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(24, Math.trunc(limit))) : 12;
     return this.prisma['user'].findMany({
       where: {
-        email: { notIn: this.superAdminEmails },
+        email: { notIn: this.excludedPublicTeamEmails },
       },
       select: {
         id: true,

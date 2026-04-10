@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useUser } from "@/components/UserContext";
-import { getAvatarSrc, getRoleLabel } from "@/lib/panel-user";
+import { getAvatarSrc, getRoleLabel, isSalesManagerUser } from "@/lib/panel-user";
+import { getSalesScope } from "@/lib/sales-scope";
 import { getSalesVendorStats, type SalesVendorStats } from "@/lib/sales-api";
 
 const formatMoney = (value: number) =>
@@ -13,22 +15,88 @@ const formatMoney = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value || 0);
 
-export default function VentasMyProfileMobilePage() {
+function aggregateTeamStats(rows: SalesVendorStats[]): SalesVendorStats | null {
+  if (!rows.length) return null;
+  let revenue = 0;
+  let opportunities = 0;
+  let projects = 0;
+  let perfSum = 0;
+  for (const r of rows) {
+    revenue += r.revenue || 0;
+    opportunities += r.opportunities || 0;
+    projects += r.projects || 0;
+    perfSum += r.performance || 0;
+  }
+  const n = rows.length;
+  return {
+    userId: 0,
+    userName: "Todos los vendedores",
+    revenue,
+    opportunities,
+    projects,
+    margin: 0,
+    conversionRate: 0,
+    performance: n ? Math.round(perfSum / n) : 0,
+  };
+}
+
+function sellerAvatarUrl(name: string) {
+  const seed = encodeURIComponent(name.trim() || "Vendedor");
+  return `https://ui-avatars.com/api/?name=${seed}&background=0D8ABC&color=fff&size=128`;
+}
+
+function VentasMyProfileMobileContent() {
   const { user } = useUser();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const qs = searchParams?.toString() || "";
+  const scope = useMemo(() => getSalesScope(user, qs ? `?${qs}` : ""), [user, qs]);
+
+  const inPrefixedVentasPath = Boolean(pathname && pathname.startsWith("/ventas"));
+  const resolveVentasHref = (href: string) => {
+    if (!href.startsWith("/")) return href;
+    if (href === "/paneles" || href === "/login") return href;
+    if (href === "/ventas" || href.startsWith("/ventas/")) return href;
+    return inPrefixedVentasPath ? `/ventas${href}` : href;
+  };
+
   const [stats, setStats] = useState<SalesVendorStats | null>(null);
   const [loading, setLoading] = useState(false);
+  const [viewKind, setViewKind] = useState<"self" | "team" | "seller">("self");
 
   const roleLabel = getRoleLabel(user);
-  const avatarSrc = getAvatarSrc(user);
+  const canManage = isSalesManagerUser(user);
+  const myId = user?.id ? Number(user.id) : 0;
 
   useEffect(() => {
     const load = async () => {
-      if (!user?.token || !user?.id) return;
+      if (!user?.token) return;
       setLoading(true);
       try {
         const all = await getSalesVendorStats(user.token, "month");
-        const mine = all.find((v) => Number(v.userId) === Number(user.id)) || null;
-        setStats(mine);
+        const sellerRows =
+          user?.isSuperAdmin && myId ? all.filter((v) => Number(v.userId) !== myId) : all;
+
+        if (canManage) {
+          const oid = scope.ownerId;
+          if (oid) {
+            const row = sellerRows.find((v) => Number(v.userId) === Number(oid));
+            if (row) {
+              setStats(row);
+              setViewKind("seller");
+            } else {
+              setStats(aggregateTeamStats(sellerRows));
+              setViewKind("team");
+            }
+          } else {
+            setStats(aggregateTeamStats(sellerRows));
+            setViewKind("team");
+          }
+        } else {
+          const mine = sellerRows.find((v) => Number(v.userId) === myId) || null;
+          setStats(mine);
+          setViewKind("self");
+        }
       } catch {
         setStats(null);
       } finally {
@@ -36,7 +104,23 @@ export default function VentasMyProfileMobilePage() {
       }
     };
     void load();
-  }, [user?.token, user?.id]);
+  }, [user?.token, user?.id, user?.isSuperAdmin, canManage, scope.ownerId, myId]);
+
+  const ownerQs = scope.ownerId ? `?ownerId=${scope.ownerId}` : "";
+
+  const displayName =
+    viewKind === "team"
+      ? "Equipo comercial"
+      : viewKind === "seller" && stats?.userName
+        ? stats.userName
+        : user?.nombre || "Perfil";
+
+  const displayAvatar =
+    viewKind === "team"
+      ? sellerAvatarUrl("Equipo")
+      : viewKind === "seller" && stats?.userName
+        ? sellerAvatarUrl(stats.userName)
+        : getAvatarSrc(user);
 
   const kpis = useMemo(() => {
     return [
@@ -46,6 +130,13 @@ export default function VentasMyProfileMobilePage() {
       { label: "Performance", value: stats ? `${stats.performance}%` : loading ? "…" : "—" },
     ];
   }, [stats, loading]);
+
+  const indicatorsTitle =
+    viewKind === "team"
+      ? "Indicadores del equipo"
+      : viewKind === "seller"
+        ? "Indicadores del vendedor"
+        : "Indicadores";
 
   if (!user) return null;
 
@@ -75,24 +166,56 @@ export default function VentasMyProfileMobilePage() {
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={avatarSrc} alt={user.nombre} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <img src={displayAvatar} alt={displayName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
         <div style={{ minWidth: 0 }}>
-          <h2 style={{ margin: 0, fontSize: "1.05rem", letterSpacing: "-0.02em" }}>{user.nombre}</h2>
+          <h2 style={{ margin: 0, fontSize: "1.05rem", letterSpacing: "-0.02em" }}>{displayName}</h2>
+          {canManage && viewKind === "team" && (
+            <p style={{ margin: "6px 0 0", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+              Supervisor: {user.nombre}
+            </p>
+          )}
+          {canManage && viewKind === "seller" && stats?.userName && (
+            <p style={{ margin: "6px 0 0", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+              Vista supervisión · {stats.userName}
+            </p>
+          )}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
-            <span style={{ padding: "6px 10px", borderRadius: 999, border: "1px solid var(--border)", background: "var(--surface-clean)", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-              {roleLabel}
-            </span>
-            <span style={{ padding: "6px 10px", borderRadius: 999, border: "1px solid var(--border)", background: "var(--surface-clean)", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-              {user.department || "Ventas"}
-            </span>
+            {canManage && viewKind === "seller" ? (
+              <>
+                <span style={{ padding: "6px 10px", borderRadius: 999, border: "1px solid var(--border)", background: "var(--surface-clean)", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                  Vendedor
+                </span>
+                <span style={{ padding: "6px 10px", borderRadius: 999, border: "1px solid var(--border)", background: "var(--surface-clean)", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                  Ventas
+                </span>
+              </>
+            ) : canManage && viewKind === "team" ? (
+              <>
+                <span style={{ padding: "6px 10px", borderRadius: 999, border: "1px solid var(--border)", background: "var(--surface-clean)", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                  {roleLabel}
+                </span>
+                <span style={{ padding: "6px 10px", borderRadius: 999, border: "1px solid var(--border)", background: "var(--surface-clean)", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                  Vista equipo
+                </span>
+              </>
+            ) : (
+              <>
+                <span style={{ padding: "6px 10px", borderRadius: 999, border: "1px solid var(--border)", background: "var(--surface-clean)", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                  {roleLabel}
+                </span>
+                <span style={{ padding: "6px 10px", borderRadius: 999, border: "1px solid var(--border)", background: "var(--surface-clean)", fontSize: "0.78rem", color: "var(--text-secondary)" }}>
+                  {user.department || "Ventas"}
+                </span>
+              </>
+            )}
           </div>
         </div>
       </section>
 
       <section style={{ padding: 12, borderRadius: 16, border: "1px solid var(--border)", background: "var(--surface)", boxShadow: "var(--elev-1)" }}>
         <p style={{ margin: "0 0 10px", fontSize: "0.8rem", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--text-tertiary)" }}>
-          Indicadores
+          {indicatorsTitle}
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
           {kpis.map((kpi) => (
@@ -109,16 +232,16 @@ export default function VentasMyProfileMobilePage() {
           Acciones rápidas
         </p>
         <div style={{ display: "grid", gap: 8 }}>
-          <Link href="/oportunidades" style={{ padding: "10px 12px", borderRadius: 14, border: "1px solid var(--border)", background: "var(--surface-clean)", textDecoration: "none", color: "var(--foreground)" }}>
+          <Link href={`${resolveVentasHref("/oportunidades")}${ownerQs}`} style={{ padding: "10px 12px", borderRadius: 14, border: "1px solid var(--border)", background: "var(--surface-clean)", textDecoration: "none", color: "var(--foreground)" }}>
             Pipeline de oportunidades
           </Link>
-          <Link href="/leads" style={{ padding: "10px 12px", borderRadius: 14, border: "1px solid var(--border)", background: "var(--surface-clean)", textDecoration: "none", color: "var(--foreground)" }}>
+          <Link href={`${resolveVentasHref("/leads")}${ownerQs}`} style={{ padding: "10px 12px", borderRadius: 14, border: "1px solid var(--border)", background: "var(--surface-clean)", textDecoration: "none", color: "var(--foreground)" }}>
             Leads
           </Link>
-          <Link href="/clientes" style={{ padding: "10px 12px", borderRadius: 14, border: "1px solid var(--border)", background: "var(--surface-clean)", textDecoration: "none", color: "var(--foreground)" }}>
+          <Link href={`${resolveVentasHref("/clientes")}${ownerQs}`} style={{ padding: "10px 12px", borderRadius: 14, border: "1px solid var(--border)", background: "var(--surface-clean)", textDecoration: "none", color: "var(--foreground)" }}>
             Clientes
           </Link>
-          <Link href="/cotizaciones" style={{ padding: "10px 12px", borderRadius: 14, border: "1px solid var(--border)", background: "var(--surface-clean)", textDecoration: "none", color: "var(--foreground)" }}>
+          <Link href={`${resolveVentasHref("/cotizaciones")}${ownerQs}`} style={{ padding: "10px 12px", borderRadius: 14, border: "1px solid var(--border)", background: "var(--surface-clean)", textDecoration: "none", color: "var(--foreground)" }}>
             Cotizaciones
           </Link>
         </div>
@@ -127,3 +250,10 @@ export default function VentasMyProfileMobilePage() {
   );
 }
 
+export default function VentasMyProfileMobilePage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 16 }}>Cargando perfil…</div>}>
+      <VentasMyProfileMobileContent />
+    </Suspense>
+  );
+}

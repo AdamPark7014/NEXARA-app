@@ -26,6 +26,11 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
   const [isNarrowShell, setIsNarrowShell] = useState(false);
   const showCompactBottomNav = useCompactBottomNav();
   const [vendorStats, setVendorStats] = useState<SalesVendorStats[]>([]);
+  const normalizedUserId = user?.id ? Number(user.id) : undefined;
+  const filteredVendorStats =
+    canManageSellers && user?.isSuperAdmin && normalizedUserId
+      ? vendorStats.filter((v) => v.userId !== normalizedUserId)
+      : vendorStats;
   const selectedOwnerId =
     typeof window === "undefined"
       ? undefined
@@ -41,7 +46,7 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
   };
 
   const selectedVendorName = canManageSellers && selectedOwnerId
-    ? vendorStats.find((v) => v.userId === selectedOwnerId)?.userName
+    ? filteredVendorStats.find((v) => v.userId === selectedOwnerId)?.userName
     : undefined;
 
   const withOwnerFilter = (href: string, ownerId?: number) => {
@@ -53,6 +58,7 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
   const quickLinks = useMemo(
     () => [
       ...(canManageSellers ? [{ label: "Gestión Vendedores", href: resolveVentasHref("/gestion-vendedores") }] : []),
+      ...(canManageSellers ? [{ label: "Resumen equipo", href: resolveVentasHref("/my-profile") }] : []),
       ...(!canManageSellers ? [{ label: "Mi perfil", href: resolveVentasHref("/my-profile") }] : []),
       { label: "Dashboard", href: resolveVentasHref("/dashboard") },
       { label: "Leads", href: resolveVentasHref("/leads") },
@@ -187,7 +193,7 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
                     <div style={{ fontSize: 12, opacity: 0.85 }}>Vista global del equipo</div>
                   </div>
                 </Link>
-                {vendorStats.map((vendor) => (
+                {filteredVendorStats.map((vendor) => (
                   <Link key={vendor.userId} href={withOwnerFilter(pathname || resolveVentasHref("/dashboard"), vendor.userId)} style={{ textDecoration: "none" }}>
                     <div
                       style={{
@@ -198,13 +204,14 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
                       }}
                     >
                       <div style={{ fontWeight: 700 }}>{vendor.userName}</div>
+                      <div style={{ fontSize: 12, opacity: 0.85 }}>Vendedor</div>
                       <div style={{ fontSize: 12, opacity: 0.85 }}>Oportunidades: {vendor.opportunities}</div>
                       <div style={{ fontSize: 12, opacity: 0.85 }}>Proyectos: {vendor.projects}</div>
                       <div style={{ fontSize: 12, opacity: 0.85 }}>Performance: {vendor.performance}%</div>
                     </div>
                   </Link>
                 ))}
-                {vendorStats.length === 0 && (
+                {filteredVendorStats.length === 0 && (
                   <div style={{ fontSize: 12, opacity: 0.8 }}>No hay métricas por vendedor disponibles.</div>
                 )}
               </div>

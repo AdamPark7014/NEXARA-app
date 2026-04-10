@@ -3,6 +3,7 @@ import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { useUser } from './UserContext';
 import { io, Socket } from 'socket.io-client';
 import { getSocketBaseUrl } from '@/lib/api-base';
+import { showBrowserHeadsUpNotification } from '@/lib/browser-notifications';
 import styles from './NotificationCenter.module.css';
 
 interface Notification {
@@ -46,6 +47,9 @@ const getCategoryIcon = (category: string): string => {
     quotes: '💼',
     orders: '📦',
     projects: '📊',
+    sales: '💼',
+    erp: '🏭',
+    confirmations: '✅',
     general: '📢',
   };
   return icons[category] || '📬';
@@ -71,6 +75,9 @@ const getCategoryClass = (category: string): string => {
   if (key === 'quotes') return styles.catQuotes;
   if (key === 'orders') return styles.catOrders;
   if (key === 'projects') return styles.catProjects;
+  if (key === 'sales') return styles.catSales;
+  if (key === 'erp') return styles.catErp;
+  if (key === 'confirmations') return styles.catConfirmations;
   return styles.catGeneral;
 };
 
@@ -109,17 +116,6 @@ const formatDateTime = (isoDate: string) =>
     hour: '2-digit',
     minute: '2-digit',
   });
-
-const trySystemNotification = (title: string, body: string, tag: string) => {
-  if (typeof window === 'undefined' || !('Notification' in window)) return;
-  const Sys = window.Notification;
-  if (Sys.permission !== 'granted') return;
-  try {
-    new Sys(title, { body, tag });
-  } catch {
-    /* ignore */
-  }
-};
 
 const NotificationCenter: React.FC<NotificationCenterProps> = ({
   position = 'top-right',
@@ -212,11 +208,13 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
       setUnreadCount(prev => (notification.isRead ? prev : prev + 1));
 
       if (mirrorToSystemNotifications) {
-        trySystemNotification(
-          notification.title,
-          notification.message,
-          `nexara-notification-${notification.id}`,
-        );
+        void showBrowserHeadsUpNotification({
+          title: notification.title,
+          body: notification.message,
+          tag: `nexara-notification-${notification.id}`,
+          url: notification.relatedUrl,
+          priority: notification.priority,
+        });
       }
 
       // Auto cerrar notificación

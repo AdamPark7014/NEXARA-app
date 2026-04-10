@@ -14,6 +14,15 @@ dist/
 .env
 .env.*
 apps/*/.env
+# Plantillas de ejemplo (sí se versionan)
+!.env.example
+!apps/web/.env.example
+!apps/api/.env.example
+!apps/mobile/android/key.properties.example
+
+# Android release signing (no versionar secretos)
+apps/mobile/android/key.properties
+apps/mobile/android/nexara-gradle-out/
 
 # Logs
 npm-debug.log*

@@ -2,10 +2,14 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
+import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 
 @Injectable()
 export class ProcurementService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationHierarchy: NotificationHierarchyService,
+  ) {}
 
   // ── Purchase Requisitions ─────────────────────────────────────────
   private async generateReqNumber(): Promise<string> {
@@ -22,7 +26,7 @@ export class ProcurementService {
     items: Array<{ productId?: number; description: string; quantity: number; estimatedCost?: number; notes?: string }>;
   }, userId: number) {
     const reqNumber = await this.generateReqNumber();
-    return this.prisma.purchaseRequisition.create({
+    const created = await this.prisma.purchaseRequisition.create({
       data: {
         reqNumber,
         title: dto.title.trim(),
@@ -43,6 +47,10 @@ export class ProcurementService {
       },
       include: { items: true, requestedBy: { select: { id: true, nombre: true } } },
     });
+    void this.notificationHierarchy
+      .notifyPurchaseRequisitionCreated(userId, created.id, created.reqNumber, created.title)
+      .catch(() => undefined);
+    return created;
   }
 
   async listRequisitions(filters?: { status?: string; departmentId?: number }, query?: PaginationQueryDto) {
@@ -70,17 +78,27 @@ export class ProcurementService {
   }
 
   async approveRequisition(id: number, userId: number) {
-    return this.prisma.purchaseRequisition.update({
+    const before = await this.getRequisition(id);
+    const updated = await this.prisma.purchaseRequisition.update({
       where: { id },
       data: { status: 'APPROVED', approvedById: userId, approvedAt: new Date() },
     });
+    void this.notificationHierarchy
+      .notifyPurchaseRequisitionApproved(userId, before.requestedById, id, before.reqNumber, before.title)
+      .catch(() => undefined);
+    return updated;
   }
 
   async rejectRequisition(id: number, userId: number, reason: string) {
-    return this.prisma.purchaseRequisition.update({
+    const before = await this.getRequisition(id);
+    const updated = await this.prisma.purchaseRequisition.update({
       where: { id },
       data: { status: 'REJECTED', approvedById: userId, approvedAt: new Date(), rejectionReason: reason.trim() },
     });
+    void this.notificationHierarchy
+      .notifyPurchaseRequisitionRejected(userId, before.requestedById, id, before.reqNumber, before.title, reason.trim())
+      .catch(() => undefined);
+    return updated;
   }
 
   // ── Purchase Orders ───────────────────────────────────────────────
@@ -148,7 +166,7 @@ export class ProcurementService {
     const subtotal = dto.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
     const taxAmount = dto.items.reduce((s, i) => s + i.quantity * i.unitPrice * ((i.taxRate || 0) / 100), 0);
 
-    return this.prisma.purchaseOrder.create({
+    const created = await this.prisma.purchaseOrder.create({
       data: {
         poNumber,
         supplierId: supplierId!,
@@ -176,6 +194,11 @@ export class ProcurementService {
       },
       include: { items: true, supplier: true },
     });
+    const supplierName = created.supplier?.name?.trim() || 'Proveedor';
+    void this.notificationHierarchy
+      .notifyPurchaseOrderCreated(userId, created.id, created.poNumber, supplierName)
+      .catch(() => undefined);
+    return created;
   }
 
   async listPurchaseOrders(filters?: { status?: string; supplierId?: number }, query?: PaginationQueryDto) {
@@ -203,10 +226,15 @@ export class ProcurementService {
   }
 
   async approvePurchaseOrder(id: number, userId: number) {
-    return this.prisma.purchaseOrder.update({
+    const po = await this.getPurchaseOrder(id);
+    const updated = await this.prisma.purchaseOrder.update({
       where: { id },
       data: { status: 'CONFIRMED', approvedById: userId, approvedAt: new Date() },
     });
+    void this.notificationHierarchy
+      .notifyPurchaseOrderApproved(userId, po.createdById ?? null, id, po.poNumber)
+      .catch(() => undefined);
+    return updated;
   }
 
   // ── Goods Receipts ────────────────────────────────────────────────
@@ -262,6 +290,23 @@ export class ProcurementService {
         where: { id: dto.purchaseOrderId },
         data: { status: allReceived ? 'RECEIVED' : someReceived ? 'PARTIALLY_RECEIVED' : undefined },
       });
+    }
+
+    const poMeta = await this.prisma.purchaseOrder.findUnique({
+      where: { id: dto.purchaseOrderId },
+      select: { poNumber: true, createdById: true },
+    });
+    if (poMeta) {
+      void this.notificationHierarchy
+        .notifyGoodsReceiptPosted(
+          userId,
+          receipt.id,
+          receipt.receiptNumber,
+          poMeta.poNumber,
+          dto.purchaseOrderId,
+          poMeta.createdById ?? null,
+        )
+        .catch(() => undefined);
     }
 
     return receipt;
