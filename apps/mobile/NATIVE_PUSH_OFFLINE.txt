@@ -10,8 +10,15 @@ NEXARA — APK, push y modo offline (referencia rápida)
 - En Firebase → Cloud Messaging, habilita API legacy si aplica a tu flujo.
 - En el servidor: variable FIREBASE_SERVICE_ACCOUNT_JSON (JSON de cuenta de servicio) para enviar desde la API.
 
-2) Sincronizar Capacitor
-------------------------
+2) Dependencias nativas (Capacitor 8)
+---------------------------------------
+- `@capacitor/push-notifications` — token FCM/APNs → API `/devices/push-token`.
+- `@capacitor/local-notifications` — en **primer plano**, cada push entrante se programa como notificación **local** (cabecera / bandeja del sistema, como WhatsApp). En segundo plano sigue actuando el payload `notification` de FCM.
+Tras `npm install` en apps/mobile:
+  npx cap sync
+
+2b) Sincronizar Capacitor
+-------------------------
 Desde apps/mobile:
   npm run cap:sync
 o build completo:
@@ -39,7 +46,7 @@ Info.plist: UIBackgroundModes incluye "remote-notification" (Capacitor suele añ
 - Parche global `window.fetch` (installOfflineFetchGlobal en providers): mutaciones JSON al API pasan por la cola; excluye login, public-analytics, POST público a contact-messages, cotizaciones/public, newsletter/subscribe; no encola FormData/URLSearchParams/Blob/stream.
 - Portal sucursal: envío con archivos (FormData) muestra error claro si no hay red; evento nexara-portal-session-changed al iniciar/cerrar sesión sucursal (banner).
 - Pantallas cableadas: Asistencia (marcaje), flujo de evidencias (pasos JSON), portal cliente Tickets (mutaciones JSON: perfil, solicitudes, feedback). En apps/web el mismo portal Tickets + cola/banner comparten lógica equivalente.
-- En consola nativa, el centro de notificaciones refresca la lista al recibir push en primer plano (evento nexara-native-push).
+- En shell **nativo** (APK) no hay campana in-app en consola/ventas: las alertas son del **sistema** (push + duplicado local en primer plano). El evento `nexara-native-push` sigue disponible por si alguna pantalla quiere refrescar datos.
 - Banner superior: estado red + operaciones pendientes.
 - Sesión "degradada": si el JWT venció pero no hay red, se muestra el perfil hasta que haya internet (luego se pide login si sigue vencido).
 

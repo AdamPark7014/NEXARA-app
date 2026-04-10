@@ -1,10 +1,14 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
+import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 
 @Injectable()
 export class WarehouseService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationHierarchy: NotificationHierarchyService,
+  ) {}
 
   // ── Warehouses ────────────────────────────────────────────────────
   async createWarehouse(dto: { code: string; name: string; address?: string; city?: string; state?: string; managerId?: number }) {
@@ -159,6 +163,11 @@ export class WarehouseService {
     if (dto.toWarehouseId) {
       await this.upsertStockLevel(dto.productId, dto.toWarehouseId, dto.quantity, dto.unitCost || 0);
     }
+
+    const productLabel = movement.product?.name?.trim() || movement.product?.sku?.trim() || `Producto #${dto.productId}`;
+    void this.notificationHierarchy
+      .notifyStockMovementPosted(userId, movement.id, movement.movementNumber, productLabel, dto.type)
+      .catch(() => undefined);
 
     return movement;
   }

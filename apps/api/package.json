@@ -14,7 +14,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:status": "prisma migrate status",
     "prisma:deploy": "prisma migrate deploy",
-    "prisma:seed": "prisma db seed"
+    "prisma:seed": "prisma db seed",
+    "generate:vapid": "web-push generate-vapid-keys"
   },
   "dependencies": {
     "@nestjs/cli": "^10.0.0",

@@ -441,12 +441,36 @@ export class ActivitiesService {
     return { pdf, reportUrl };
   }
 
-  async update(id: number, updateActivityDto: UpdateActivityDto) {
+  async update(
+    id: number,
+    updateActivityDto: UpdateActivityDto,
+    actor?: { id: number; nombre?: string },
+  ) {
+    const prev = await this.prisma['activity'].findUnique({
+      where: { id },
+      select: { estatus: true, responsableId: true, anNumber: true, titulo: true },
+    });
+
     const updatedActivity = await this.prisma['activity'].update({
       where: { id },
       data: updateActivityDto,
       include: { responsable: { select: { nombre: true, id: true } } },
     });
+
+    if (actor?.id && prev && updateActivityDto.estatus !== undefined) {
+      const nextStatus = String(updateActivityDto.estatus);
+      const prevStatus = String(prev.estatus || '');
+      if (/finalizada/i.test(nextStatus) && !/finalizada/i.test(prevStatus)) {
+        const label =
+          (updatedActivity.anNumber && String(updatedActivity.anNumber).trim()) ||
+          (updatedActivity.titulo && String(updatedActivity.titulo).trim()) ||
+          `Actividad ${id}`;
+        const actorName = String(actor.nombre || 'Usuario').trim() || 'Usuario';
+        void this.notificationHierarchy
+          .notifyActivityMarkedFinished(actor.id, id, label, actorName, updatedActivity.responsableId)
+          .catch(() => undefined);
+      }
+    }
 
     return updatedActivity;
   }

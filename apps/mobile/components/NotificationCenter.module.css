@@ -300,6 +300,9 @@
 .catQuotes      { --cat-bg: color-mix(in srgb, var(--surface) 85%, #5ab4ff 15%); --cat-text: #2a8edf; }
 .catOrders      { --cat-bg: color-mix(in srgb, var(--surface) 85%, #82b8e0 15%); --cat-text: #4a88be; }
 .catProjects    { --cat-bg: color-mix(in srgb, var(--surface) 85%, #72b2d8 15%); --cat-text: #3a82b8; }
+.catSales       { --cat-bg: color-mix(in srgb, var(--surface) 85%, #5ec4a8 15%); --cat-text: #2a9d7a; }
+.catErp         { --cat-bg: color-mix(in srgb, var(--surface) 85%, #a78bfa 15%); --cat-text: #6d28d9; }
+.catConfirmations { --cat-bg: color-mix(in srgb, var(--surface) 85%, #8fd96b 15%); --cat-text: #4a9a32; }
 .catGeneral     { --cat-bg: color-mix(in srgb, var(--surface) 88%, var(--primary) 12%); --cat-text: var(--primary); }
 
 .itemRow {
@@ -696,6 +699,9 @@
 .catQuotes { --cat-bg: rgba(28, 63, 97, 0.88); --cat-text: #9fd0ff; }
 .catOrders { --cat-bg: rgba(30, 55, 80, 0.88); --cat-text: #b8d2ea; }
 .catProjects { --cat-bg: rgba(34, 66, 90, 0.88); --cat-text: #a9cae5; }
+.catSales { --cat-bg: rgba(24, 72, 58, 0.88); --cat-text: #9fe8d2; }
+.catErp { --cat-bg: rgba(52, 36, 88, 0.9); --cat-text: #ddd6fe; }
+.catConfirmations { --cat-bg: rgba(36, 72, 40, 0.88); --cat-text: #c5f2b0; }
 .catGeneral { --cat-bg: rgba(20, 45, 81, 0.88); --cat-text: #a9cae5; }
 
 .itemRow {

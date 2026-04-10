@@ -7,7 +7,8 @@ import { PushDispatchService } from '../devices/push-dispatch.service.js';
 
 export interface INotificationPayload {
   userId: number;
-  type: NotificationType;
+  /** Incluye valores de enum nuevos antes de `prisma generate` en CI / Windows con EPERM. */
+  type: NotificationType | string;
   category: string;
   title: string;
   message: string;
@@ -78,9 +79,10 @@ export class NotificationsService {
     }
 
     return this.prisma.notification.findMany({
-      where: isSalesAdmin
-        ? { userId: { in: sellerIds } }
-        : { userId },
+      where: {
+        ...(isSalesAdmin ? { userId: { in: sellerIds } } : { userId }),
+        NOT: { category: 'security' },
+      },
       include: {
         triggerUser: {
           select: {
@@ -221,7 +223,7 @@ export class NotificationsService {
       const notification = await this.prisma.notification.create({
         data: {
           userId: payload.userId,
-          type: payload.type,
+          type: payload.type as NotificationType,
           category: payload.category || 'general',
           title: payload.title,
           message: payload.message,
@@ -256,6 +258,9 @@ export class NotificationsService {
           title: payload.title,
           body: payload.message,
           relatedUrl: payload.relatedUrl,
+          priority: payload.priority || 'normal',
+          notificationId: notification.id,
+          tag: `nexara-${notification.id}`,
         })
         .catch((err) => this.logger.warn(`Push dispatch: ${err instanceof Error ? err.message : err}`));
 

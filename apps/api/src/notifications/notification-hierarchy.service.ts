@@ -9,6 +9,8 @@ import { PrismaService } from '../prisma/prisma.service';
 @Injectable()
 export class NotificationHierarchyService {
   private readonly logger = new Logger(NotificationHierarchyService.name);
+  /** Correos con visión global (equivalente a “superadmin” de plataforma). */
+  private readonly platformSuperEmails = ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'];
 
   constructor(
     private readonly notificationsService: NotificationsService,
@@ -232,24 +234,52 @@ export class NotificationHierarchyService {
   }
 
   /**
-   * Notificar evidencia subida
+   * Revisores de evidencias: superadmins de plataforma, admins de consola, rol con acceso evidencias, y supervisores de depto.
+   */
+  private async getEvidenceReviewerUserIds(excludeUserId?: number): Promise<number[]> {
+    const protectedEmails = ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'];
+    const rows = await this.prisma.user.findMany({
+      where: {
+        ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
+        OR: [
+          { email: { in: protectedEmails } },
+          { role: { accesoConsoleAdmin: true } },
+          { role: { accesoEvidencias: true } },
+        ],
+      },
+      select: { id: true },
+    });
+    return [...new Set(rows.map((r) => r.id))];
+  }
+
+  /**
+   * Flujo de evidencias completado (listo para revisión administrativa)
    */
   async notifyEvidenceSubmitted(
-    userId: number,
+    submitterUserId: number,
     activityId: number,
     activityTitle: string,
     submitterName: string,
+    anNumber?: string | null,
   ) {
     try {
-      const supervisors = await this.getSupervisors(userId);
+      const ref = (anNumber && String(anNumber).trim()) || `ID ${activityId}`;
+      const titleAct = (activityTitle && String(activityTitle).trim()) || `Actividad ${ref}`;
+      const message = `${submitterName} completó el flujo de evidencias de "${titleAct}" (${ref}). Entra a revisarla.`;
 
-      for (const supervisor of supervisors) {
+      const recipientIds = new Set(await this.getEvidenceReviewerUserIds(submitterUserId));
+      for (const sup of await this.getSupervisors(submitterUserId)) {
+        recipientIds.add(sup.id);
+      }
+
+      for (const uid of recipientIds) {
         await this.notificationsService.createNotification({
-          userId: supervisor.id,
+          userId: uid,
           type: 'EVIDENCE_SUBMITTED',
           category: 'evidences',
-          title: '📸 Nueva evidencia subida',
-          message: `${submitterName} subió evidencia para "${activityTitle}"`,
+          title: '📋 Evidencia lista para revisión',
+          message,
+          triggerUserId: submitterUserId,
           relatedEntityId: activityId,
           entityType: 'Activity',
           relatedUrl: `/console/evidences?activityId=${activityId}`,
@@ -262,27 +292,34 @@ export class NotificationHierarchyService {
   }
 
   /**
-   * Notificar aprobación/rechazo de evidencia
+   * Notificar aprobación/rechazo de evidencia al responsable de la actividad
    */
   async notifyEvidenceReview(
-    userId: number,
+    responsableUserId: number,
     activityId: number,
+    activityTitle: string,
     status: 'approved' | 'rejected',
     reviewerName: string,
+    notes?: string,
   ) {
     try {
       const type = status === 'approved' ? 'EVIDENCE_APPROVED' : 'EVIDENCE_REJECTED';
       const title = status === 'approved' ? '✅ Evidencia aprobada' : '❌ Evidencia rechazada';
+      const base = (activityTitle && String(activityTitle).trim()) || `Actividad ${activityId}`;
+      const message =
+        status === 'approved'
+          ? `${reviewerName} aprobó la evidencia de "${base}".`
+          : `${reviewerName} rechazó la evidencia de "${base}".${notes ? ` Observaciones: ${notes}` : ''}`;
 
       await this.notificationsService.createNotification({
-        userId,
+        userId: responsableUserId,
         type,
         category: 'evidences',
         title,
-        message: `Tu evidencia ha sido ${status === 'approved' ? 'aprobada' : 'rechazada'} por ${reviewerName}`,
+        message,
         relatedEntityId: activityId,
         entityType: 'Activity',
-        relatedUrl: `/console/evidences?activityId=${activityId}`,
+        relatedUrl: `/console/my-evidences?activityId=${activityId}`,
         priority: status === 'rejected' ? 'high' : 'normal',
       });
     } catch (error) {
@@ -605,6 +642,812 @@ export class NotificationHierarchyService {
       });
     } catch (error) {
       this.logger.error(`Error notifying vehicle rejected:`, error);
+    }
+  }
+
+  /**
+   * Quién debe recibir el “feed operativo” cuando alguien hace un movimiento:
+   * - Todos los usuarios con rol consola admin (excepto el actor).
+   * - Cuentas de plataforma (gerencia/developer) por si no están en ese rol.
+   * - Si el actor no es admin de consola: supervisores de su departamento.
+   */
+  async getOperationalOversightRecipientIds(actorId: number): Promise<number[]> {
+    const actor = await this.prisma.user.findUnique({
+      where: { id: actorId },
+      include: { role: true },
+    });
+    if (!actor) return [];
+    const isConsoleAdmin = Boolean((actor.role as { accesoConsoleAdmin?: boolean })?.accesoConsoleAdmin);
+
+    const ids = new Set<number>();
+
+    const admins = await this.prisma.user.findMany({
+      where: { role: { accesoConsoleAdmin: true }, NOT: { id: actorId } },
+      select: { id: true },
+    });
+    admins.forEach((u) => ids.add(u.id));
+
+    const platformRows = await this.prisma.user.findMany({
+      where: {
+        email: { in: this.platformSuperEmails.map((e) => e.toLowerCase()) },
+        NOT: { id: actorId },
+      },
+      select: { id: true },
+    });
+    platformRows.forEach((u) => ids.add(u.id));
+
+    if (!isConsoleAdmin) {
+      const supervisors = await this.getSupervisors(actorId);
+      supervisors.forEach((s) => {
+        if (s.id !== actorId) ids.add(s.id);
+      });
+    }
+
+    return [...ids];
+  }
+
+  async notifySalesClientCreated(actorId: number, clientId: number, clientName: string, actorName: string) {
+    try {
+      const recipients = await this.getOperationalOversightRecipientIds(actorId);
+      const msg = `${actorName} registró el cliente comercial «${clientName}».`;
+      for (const uid of recipients) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'SALES_CLIENT_CREATED',
+          category: 'sales',
+          title: 'Nuevo cliente (ventas)',
+          message: msg,
+          triggerUserId: actorId,
+          relatedEntityId: clientId,
+          entityType: 'SalesClient',
+          relatedUrl: `/clientes?clientId=${clientId}`,
+        });
+      }
+      await this.notificationsService.createNotification({
+        userId: actorId,
+        type: 'USER_ACTION_CONFIRMED',
+        category: 'confirmations',
+        title: 'Cliente registrado',
+        message: `«${clientName}» se guardó correctamente en tu cartera.`,
+        relatedEntityId: clientId,
+        entityType: 'SalesClient',
+        relatedUrl: `/clientes?clientId=${clientId}`,
+      });
+    } catch (error) {
+      this.logger.error('notifySalesClientCreated', error);
+    }
+  }
+
+  async notifySalesLeadCreated(actorId: number, leadId: number, label: string, actorName: string) {
+    try {
+      const recipients = await this.getOperationalOversightRecipientIds(actorId);
+      const msg = `${actorName} creó el lead «${label}».`;
+      for (const uid of recipients) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'SALES_LEAD_CREATED',
+          category: 'sales',
+          title: 'Nuevo lead (ventas)',
+          message: msg,
+          triggerUserId: actorId,
+          relatedEntityId: leadId,
+          entityType: 'SalesLead',
+          relatedUrl: `/leads?leadId=${leadId}`,
+        });
+      }
+      await this.notificationsService.createNotification({
+        userId: actorId,
+        type: 'USER_ACTION_CONFIRMED',
+        category: 'confirmations',
+        title: 'Lead creado',
+        message: `«${label}» quedó registrado.`,
+        relatedEntityId: leadId,
+        entityType: 'SalesLead',
+        relatedUrl: `/leads?leadId=${leadId}`,
+      });
+    } catch (error) {
+      this.logger.error('notifySalesLeadCreated', error);
+    }
+  }
+
+  async notifySalesOpportunityCreated(actorId: number, opportunityId: number, title: string, actorName: string) {
+    try {
+      const recipients = await this.getOperationalOversightRecipientIds(actorId);
+      const msg = `${actorName} abrió la oportunidad «${title}».`;
+      for (const uid of recipients) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'SALES_OPPORTUNITY_CREATED',
+          category: 'sales',
+          title: 'Nueva oportunidad',
+          message: msg,
+          triggerUserId: actorId,
+          relatedEntityId: opportunityId,
+          entityType: 'SalesOpportunity',
+          relatedUrl: `/oportunidades?opportunityId=${opportunityId}`,
+        });
+      }
+      await this.notificationsService.createNotification({
+        userId: actorId,
+        type: 'USER_ACTION_CONFIRMED',
+        category: 'confirmations',
+        title: 'Oportunidad creada',
+        message: `«${title}» quedó en tu embudo.`,
+        relatedEntityId: opportunityId,
+        entityType: 'SalesOpportunity',
+        relatedUrl: `/oportunidades?opportunityId=${opportunityId}`,
+      });
+    } catch (error) {
+      this.logger.error('notifySalesOpportunityCreated', error);
+    }
+  }
+
+  async notifySalesOpportunityStageChanged(
+    actorId: number,
+    opportunityId: number,
+    title: string,
+    prevStage: string,
+    newStage: string,
+    actorName: string,
+  ) {
+    if (prevStage === newStage) return;
+    try {
+      const recipients = await this.getOperationalOversightRecipientIds(actorId);
+      const msg = `${actorName} movió «${title}» de ${prevStage} → ${newStage}.`;
+      for (const uid of recipients) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'SALES_OPPORTUNITY_STAGE_CHANGED',
+          category: 'sales',
+          title: 'Pipeline actualizado',
+          message: msg,
+          triggerUserId: actorId,
+          relatedEntityId: opportunityId,
+          entityType: 'SalesOpportunity',
+          relatedUrl: `/oportunidades?opportunityId=${opportunityId}`,
+        });
+      }
+      await this.notificationsService.createNotification({
+        userId: actorId,
+        type: 'USER_ACTION_CONFIRMED',
+        category: 'confirmations',
+        title: 'Etapa actualizada',
+        message: `«${title}» ahora está en ${newStage}.`,
+        relatedEntityId: opportunityId,
+        entityType: 'SalesOpportunity',
+        relatedUrl: `/oportunidades?opportunityId=${opportunityId}`,
+      });
+    } catch (error) {
+      this.logger.error('notifySalesOpportunityStageChanged', error);
+    }
+  }
+
+  /**
+   * Actividad pasó a estatus finalizada: dirección recibe aviso; el responsable (o el mismo actor) recibe cierre amable.
+   */
+  async notifyActivityMarkedFinished(
+    actorId: number,
+    activityId: number,
+    activityLabel: string,
+    actorName: string,
+    responsableId: number,
+  ) {
+    try {
+      const recipients = await this.getOperationalOversightRecipientIds(actorId);
+      const oversightMsg = `${actorName} marcó como finalizada la actividad «${activityLabel}».`;
+      for (const uid of recipients) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'ACTIVITY_COMPLETED',
+          category: 'activities',
+          title: 'Actividad finalizada',
+          message: oversightMsg,
+          triggerUserId: actorId,
+          relatedEntityId: activityId,
+          entityType: 'Activity',
+          relatedUrl: `/console/activities?id=${activityId}`,
+        });
+      }
+
+      if (responsableId === actorId) {
+        await this.notificationsService.createNotification({
+          userId: actorId,
+          type: 'USER_ACTION_CONFIRMED',
+          category: 'confirmations',
+          title: 'Actividad completada',
+          message: `Marcaste «${activityLabel}» como finalizada.`,
+          relatedEntityId: activityId,
+          entityType: 'Activity',
+          relatedUrl: `/console/my-evidences?activityId=${activityId}`,
+        });
+      } else {
+        await this.notificationsService.createNotification({
+          userId: responsableId,
+          type: 'ACTIVITY_COMPLETED',
+          category: 'activities',
+          title: 'Tu actividad fue cerrada',
+          message: `${actorName} marcó como finalizada «${activityLabel}».`,
+          triggerUserId: actorId,
+          relatedEntityId: activityId,
+          entityType: 'Activity',
+          relatedUrl: `/console/my-evidences?activityId=${activityId}`,
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyActivityMarkedFinished', error);
+    }
+  }
+
+  private async resolveActorName(actorId: number): Promise<string> {
+    const u = await this.prisma.user.findUnique({ where: { id: actorId }, select: { nombre: true } });
+    const n = u?.nombre?.trim();
+    return n && n.length > 0 ? n : 'Usuario';
+  }
+
+  async notifyPurchaseRequisitionCreated(actorId: number, requisitionId: number, reqNumber: string, title: string) {
+    const actorName = await this.resolveActorName(actorId);
+    try {
+      const recipients = await this.getOperationalOversightRecipientIds(actorId);
+      const msg = `${actorName} creó la requisición ${reqNumber}: «${title}».`;
+      for (const uid of recipients) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'PURCHASE_REQUISITION_CREATED',
+          category: 'erp',
+          title: 'Nueva requisición de compra',
+          message: msg,
+          triggerUserId: actorId,
+          relatedEntityId: requisitionId,
+          entityType: 'PurchaseRequisition',
+          relatedUrl: `/console/procurement?tab=requisitions&id=${requisitionId}`,
+        });
+      }
+      await this.notificationsService.createNotification({
+        userId: actorId,
+        type: 'USER_ACTION_CONFIRMED',
+        category: 'confirmations',
+        title: 'Requisición registrada',
+        message: `${reqNumber} quedó creada.`,
+        relatedEntityId: requisitionId,
+        entityType: 'PurchaseRequisition',
+        relatedUrl: `/console/procurement?tab=requisitions&id=${requisitionId}`,
+      });
+    } catch (error) {
+      this.logger.error('notifyPurchaseRequisitionCreated', error);
+    }
+  }
+
+  async notifyPurchaseRequisitionApproved(
+    approverId: number,
+    requesterId: number,
+    requisitionId: number,
+    reqNumber: string,
+    title: string,
+  ) {
+    const approverName = await this.resolveActorName(approverId);
+    try {
+      const oversight = await this.getOperationalOversightRecipientIds(approverId);
+      const msg = `${approverName} aprobó la requisición ${reqNumber}: «${title}».`;
+      for (const uid of oversight) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'PURCHASE_REQUISITION_APPROVED',
+          category: 'erp',
+          title: 'Requisición aprobada',
+          message: msg,
+          triggerUserId: approverId,
+          relatedEntityId: requisitionId,
+          entityType: 'PurchaseRequisition',
+          relatedUrl: `/console/procurement?tab=requisitions&id=${requisitionId}`,
+        });
+      }
+      if (requesterId && requesterId !== approverId) {
+        await this.notificationsService.createNotification({
+          userId: requesterId,
+          type: 'PURCHASE_REQUISITION_APPROVED',
+          category: 'confirmations',
+          title: 'Tu requisición fue aprobada',
+          message: `${approverName} aprobó ${reqNumber} («${title}»).`,
+          triggerUserId: approverId,
+          relatedEntityId: requisitionId,
+          entityType: 'PurchaseRequisition',
+          relatedUrl: `/console/procurement?tab=requisitions&id=${requisitionId}`,
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyPurchaseRequisitionApproved', error);
+    }
+  }
+
+  async notifyPurchaseRequisitionRejected(
+    approverId: number,
+    requesterId: number,
+    requisitionId: number,
+    reqNumber: string,
+    title: string,
+    reason: string,
+  ) {
+    const approverName = await this.resolveActorName(approverId);
+    try {
+      const oversight = await this.getOperationalOversightRecipientIds(approverId);
+      const msg = `${approverName} rechazó la requisición ${reqNumber}: «${title}». ${reason}`;
+      for (const uid of oversight) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'PURCHASE_REQUISITION_REJECTED',
+          category: 'erp',
+          title: 'Requisición rechazada',
+          message: msg,
+          triggerUserId: approverId,
+          relatedEntityId: requisitionId,
+          entityType: 'PurchaseRequisition',
+          relatedUrl: `/console/procurement?tab=requisitions&id=${requisitionId}`,
+          priority: 'high',
+        });
+      }
+      if (requesterId && requesterId !== approverId) {
+        await this.notificationsService.createNotification({
+          userId: requesterId,
+          type: 'PURCHASE_REQUISITION_REJECTED',
+          category: 'confirmations',
+          title: 'Requisición rechazada',
+          message: `${approverName} rechazó ${reqNumber}. ${reason}`,
+          triggerUserId: approverId,
+          relatedEntityId: requisitionId,
+          entityType: 'PurchaseRequisition',
+          relatedUrl: `/console/procurement?tab=requisitions&id=${requisitionId}`,
+          priority: 'high',
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyPurchaseRequisitionRejected', error);
+    }
+  }
+
+  async notifyPurchaseOrderCreated(actorId: number, purchaseOrderId: number, poNumber: string, supplierName: string) {
+    const actorName = await this.resolveActorName(actorId);
+    try {
+      const recipients = await this.getOperationalOversightRecipientIds(actorId);
+      const msg = `${actorName} generó la orden ${poNumber} (proveedor: ${supplierName}).`;
+      for (const uid of recipients) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'PURCHASE_ORDER_CREATED',
+          category: 'erp',
+          title: 'Nueva orden de compra',
+          message: msg,
+          triggerUserId: actorId,
+          relatedEntityId: purchaseOrderId,
+          entityType: 'PurchaseOrder',
+          relatedUrl: `/console/procurement?tab=orders&id=${purchaseOrderId}`,
+        });
+      }
+      await this.notificationsService.createNotification({
+        userId: actorId,
+        type: 'USER_ACTION_CONFIRMED',
+        category: 'confirmations',
+        title: 'Orden de compra creada',
+        message: `${poNumber} quedó registrada.`,
+        relatedEntityId: purchaseOrderId,
+        entityType: 'PurchaseOrder',
+        relatedUrl: `/console/procurement?tab=orders&id=${purchaseOrderId}`,
+      });
+    } catch (error) {
+      this.logger.error('notifyPurchaseOrderCreated', error);
+    }
+  }
+
+  async notifyPurchaseOrderApproved(approverId: number, notifyUserId: number | null, purchaseOrderId: number, poNumber: string) {
+    const approverName = await this.resolveActorName(approverId);
+    try {
+      const oversight = await this.getOperationalOversightRecipientIds(approverId);
+      const msg = `${approverName} confirmó la orden de compra ${poNumber}.`;
+      for (const uid of oversight) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'PURCHASE_ORDER_APPROVED',
+          category: 'erp',
+          title: 'Orden de compra confirmada',
+          message: msg,
+          triggerUserId: approverId,
+          relatedEntityId: purchaseOrderId,
+          entityType: 'PurchaseOrder',
+          relatedUrl: `/console/procurement?tab=orders&id=${purchaseOrderId}`,
+        });
+      }
+      if (notifyUserId && notifyUserId !== approverId) {
+        await this.notificationsService.createNotification({
+          userId: notifyUserId,
+          type: 'PURCHASE_ORDER_APPROVED',
+          category: 'confirmations',
+          title: 'OC confirmada',
+          message: `${approverName} confirmó ${poNumber}.`,
+          triggerUserId: approverId,
+          relatedEntityId: purchaseOrderId,
+          entityType: 'PurchaseOrder',
+          relatedUrl: `/console/procurement?tab=orders&id=${purchaseOrderId}`,
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyPurchaseOrderApproved', error);
+    }
+  }
+
+  async notifyGoodsReceiptPosted(
+    actorId: number,
+    receiptId: number,
+    receiptNumber: string,
+    poNumber: string,
+    purchaseOrderId: number,
+    notifyCreatorId: number | null,
+  ) {
+    const actorName = await this.resolveActorName(actorId);
+    try {
+      const oversight = await this.getOperationalOversightRecipientIds(actorId);
+      const msg = `${actorName} registró recepción ${receiptNumber} para la OC ${poNumber}.`;
+      for (const uid of oversight) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'GOODS_RECEIPT_POSTED',
+          category: 'erp',
+          title: 'Recepción de mercancía',
+          message: msg,
+          triggerUserId: actorId,
+          relatedEntityId: receiptId,
+          entityType: 'GoodsReceipt',
+          relatedUrl: `/console/procurement?tab=receipts&poId=${purchaseOrderId}`,
+        });
+      }
+      await this.notificationsService.createNotification({
+        userId: actorId,
+        type: 'USER_ACTION_CONFIRMED',
+        category: 'confirmations',
+        title: 'Recepción guardada',
+        message: `${receiptNumber} registrada para ${poNumber}.`,
+        relatedEntityId: receiptId,
+        entityType: 'GoodsReceipt',
+        relatedUrl: `/console/procurement?tab=receipts&poId=${purchaseOrderId}`,
+      });
+      if (notifyCreatorId && notifyCreatorId !== actorId) {
+        await this.notificationsService.createNotification({
+          userId: notifyCreatorId,
+          type: 'GOODS_RECEIPT_POSTED',
+          category: 'erp',
+          title: 'Recepción en tu OC',
+          message: `${actorName} registró ${receiptNumber} en ${poNumber}.`,
+          triggerUserId: actorId,
+          relatedEntityId: receiptId,
+          entityType: 'GoodsReceipt',
+          relatedUrl: `/console/procurement?tab=receipts&poId=${purchaseOrderId}`,
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyGoodsReceiptPosted', error);
+    }
+  }
+
+  async notifyStockMovementPosted(actorId: number, movementId: number, movementNumber: string, productLabel: string, type: string) {
+    const actorName = await this.resolveActorName(actorId);
+    try {
+      const recipients = await this.getOperationalOversightRecipientIds(actorId);
+      const msg = `${actorName} registró movimiento ${movementNumber} (${type}) — ${productLabel}.`;
+      for (const uid of recipients) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'STOCK_MOVEMENT_POSTED',
+          category: 'erp',
+          title: 'Movimiento de inventario',
+          message: msg,
+          triggerUserId: actorId,
+          relatedEntityId: movementId,
+          entityType: 'StockMovement',
+          relatedUrl: `/console/stock?movementId=${movementId}`,
+        });
+      }
+      await this.notificationsService.createNotification({
+        userId: actorId,
+        type: 'USER_ACTION_CONFIRMED',
+        category: 'confirmations',
+        title: 'Movimiento registrado',
+        message: `${movementNumber} guardado.`,
+        relatedEntityId: movementId,
+        entityType: 'StockMovement',
+        relatedUrl: `/console/stock?movementId=${movementId}`,
+      });
+    } catch (error) {
+      this.logger.error('notifyStockMovementPosted', error);
+    }
+  }
+
+  async notifyQualityNcrCreated(actorId: number, ncrId: number, ncrNumber: string, title: string, severity: string) {
+    const actorName = await this.resolveActorName(actorId);
+    try {
+      const recipients = await this.getOperationalOversightRecipientIds(actorId);
+      const msg = `${actorName} abrió ${ncrNumber} (${severity}): «${title}».`;
+      for (const uid of recipients) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'QUALITY_NCR_CREATED',
+          category: 'erp',
+          title: 'Nuevo NCR',
+          message: msg,
+          triggerUserId: actorId,
+          relatedEntityId: ncrId,
+          entityType: 'NonConformanceReport',
+          relatedUrl: `/console/quality?tab=ncr&id=${ncrId}`,
+          priority: severity === 'CRITICAL' ? 'high' : 'normal',
+        });
+      }
+      await this.notificationsService.createNotification({
+        userId: actorId,
+        type: 'USER_ACTION_CONFIRMED',
+        category: 'confirmations',
+        title: 'NCR registrado',
+        message: `${ncrNumber} quedó creado.`,
+        relatedEntityId: ncrId,
+        entityType: 'NonConformanceReport',
+        relatedUrl: `/console/quality?tab=ncr&id=${ncrId}`,
+      });
+    } catch (error) {
+      this.logger.error('notifyQualityNcrCreated', error);
+    }
+  }
+
+  async notifyProductionOrderCreated(actorId: number, orderId: number, orderNumber: string, productName: string) {
+    const actorName = await this.resolveActorName(actorId);
+    try {
+      const recipients = await this.getOperationalOversightRecipientIds(actorId);
+      const msg = `${actorName} creó la orden de producción ${orderNumber} (${productName}).`;
+      for (const uid of recipients) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'PRODUCTION_ORDER_CREATED',
+          category: 'erp',
+          title: 'Nueva orden de producción',
+          message: msg,
+          triggerUserId: actorId,
+          relatedEntityId: orderId,
+          entityType: 'ProductionOrder',
+          relatedUrl: `/console/manufacturing/production?id=${orderId}`,
+        });
+      }
+      await this.notificationsService.createNotification({
+        userId: actorId,
+        type: 'USER_ACTION_CONFIRMED',
+        category: 'confirmations',
+        title: 'OP creada',
+        message: `${orderNumber} registrada.`,
+        relatedEntityId: orderId,
+        entityType: 'ProductionOrder',
+        relatedUrl: `/console/manufacturing/production?id=${orderId}`,
+      });
+    } catch (error) {
+      this.logger.error('notifyProductionOrderCreated', error);
+    }
+  }
+
+  async notifyProductionOrderStatusChanged(
+    actorId: number,
+    orderId: number,
+    orderNumber: string,
+    productName: string,
+    newStatusLabel: string,
+  ) {
+    const actorName = await this.resolveActorName(actorId);
+    try {
+      const recipients = await this.getOperationalOversightRecipientIds(actorId);
+      const msg = `${actorName} cambió ${orderNumber} (${productName}) → ${newStatusLabel}.`;
+      for (const uid of recipients) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'PRODUCTION_ORDER_STATUS_CHANGED',
+          category: 'erp',
+          title: 'Producción actualizada',
+          message: msg,
+          triggerUserId: actorId,
+          relatedEntityId: orderId,
+          entityType: 'ProductionOrder',
+          relatedUrl: `/console/manufacturing/production?id=${orderId}`,
+        });
+      }
+      await this.notificationsService.createNotification({
+        userId: actorId,
+        type: 'USER_ACTION_CONFIRMED',
+        category: 'confirmations',
+        title: 'Estado de OP',
+        message: `${orderNumber}: ${newStatusLabel}.`,
+        relatedEntityId: orderId,
+        entityType: 'ProductionOrder',
+        relatedUrl: `/console/manufacturing/production?id=${orderId}`,
+      });
+    } catch (error) {
+      this.logger.error('notifyProductionOrderStatusChanged', error);
+    }
+  }
+
+  async notifyProductionLogRecorded(actorId: number, orderId: number, orderNumber: string, operationName: string) {
+    const actorName = await this.resolveActorName(actorId);
+    try {
+      const recipients = await this.getOperationalOversightRecipientIds(actorId);
+      const msg = `${actorName} registró bitácora en ${orderNumber}: ${operationName}.`;
+      for (const uid of recipients) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'PRODUCTION_LOG_RECORDED',
+          category: 'erp',
+          title: 'Bitácora de producción',
+          message: msg,
+          triggerUserId: actorId,
+          relatedEntityId: orderId,
+          entityType: 'ProductionOrder',
+          relatedUrl: `/console/manufacturing/production?id=${orderId}`,
+        });
+      }
+      await this.notificationsService.createNotification({
+        userId: actorId,
+        type: 'USER_ACTION_CONFIRMED',
+        category: 'confirmations',
+        title: 'Registro guardado',
+        message: `Bitácora «${operationName}» en ${orderNumber}.`,
+        relatedEntityId: orderId,
+        entityType: 'ProductionOrder',
+        relatedUrl: `/console/manufacturing/production?id=${orderId}`,
+      });
+    } catch (error) {
+      this.logger.error('notifyProductionLogRecorded', error);
+    }
+  }
+
+  async notifyJournalEntryPosted(actorId: number, entryId: number, entryNumber: string, description: string) {
+    const actorName = await this.resolveActorName(actorId);
+    try {
+      const recipients = await this.getOperationalOversightRecipientIds(actorId);
+      const msg = `${actorName} contabilizó el asiento ${entryNumber}: ${description.slice(0, 120)}${description.length > 120 ? '…' : ''}`;
+      for (const uid of recipients) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'JOURNAL_ENTRY_POSTED',
+          category: 'erp',
+          title: 'Asiento contabilizado',
+          message: msg,
+          triggerUserId: actorId,
+          relatedEntityId: entryId,
+          entityType: 'JournalEntry',
+          relatedUrl: `/console/accounting/journal?id=${entryId}`,
+          priority: 'high',
+        });
+      }
+      await this.notificationsService.createNotification({
+        userId: actorId,
+        type: 'USER_ACTION_CONFIRMED',
+        category: 'confirmations',
+        title: 'Asiento publicado',
+        message: `${entryNumber} quedó en libros.`,
+        relatedEntityId: entryId,
+        entityType: 'JournalEntry',
+        relatedUrl: `/console/accounting/journal?id=${entryId}`,
+      });
+    } catch (error) {
+      this.logger.error('notifyJournalEntryPosted', error);
+    }
+  }
+
+  async notifyInvoiceCreated(actorId: number, invoiceId: number, invoiceNumber: string, totalHint: string) {
+    const actorName = await this.resolveActorName(actorId);
+    try {
+      const recipients = await this.getOperationalOversightRecipientIds(actorId);
+      const msg = `${actorName} creó la factura ${invoiceNumber} (${totalHint}).`;
+      for (const uid of recipients) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'INVOICE_CREATED',
+          category: 'erp',
+          title: 'Nueva factura',
+          message: msg,
+          triggerUserId: actorId,
+          relatedEntityId: invoiceId,
+          entityType: 'Invoice',
+          relatedUrl: `/console/invoicing?id=${invoiceId}`,
+        });
+      }
+      await this.notificationsService.createNotification({
+        userId: actorId,
+        type: 'USER_ACTION_CONFIRMED',
+        category: 'confirmations',
+        title: 'Factura creada',
+        message: `${invoiceNumber} registrada.`,
+        relatedEntityId: invoiceId,
+        entityType: 'Invoice',
+        relatedUrl: `/console/invoicing?id=${invoiceId}`,
+      });
+    } catch (error) {
+      this.logger.error('notifyInvoiceCreated', error);
+    }
+  }
+
+  async notifyPaymentRegistered(actorId: number, paymentId: number, invoiceNumber: string, amountLabel: string) {
+    const actorName = await this.resolveActorName(actorId);
+    try {
+      const recipients = await this.getOperationalOversightRecipientIds(actorId);
+      const msg = `${actorName} registró pago ${amountLabel} sobre factura ${invoiceNumber}.`;
+      for (const uid of recipients) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'PAYMENT_REGISTERED',
+          category: 'erp',
+          title: 'Pago registrado',
+          message: msg,
+          triggerUserId: actorId,
+          relatedEntityId: paymentId,
+          entityType: 'Payment',
+          relatedUrl: `/console/invoicing?invoiceRef=${encodeURIComponent(invoiceNumber)}`,
+        });
+      }
+      await this.notificationsService.createNotification({
+        userId: actorId,
+        type: 'USER_ACTION_CONFIRMED',
+        category: 'confirmations',
+        title: 'Pago guardado',
+        message: `${amountLabel} aplicado a ${invoiceNumber}.`,
+        relatedEntityId: paymentId,
+        entityType: 'Payment',
+        relatedUrl: `/console/invoicing?invoiceRef=${encodeURIComponent(invoiceNumber)}`,
+      });
+    } catch (error) {
+      this.logger.error('notifyPaymentRegistered', error);
+    }
+  }
+
+  async notifyMaintenanceWorkOrderCreated(
+    actorId: number,
+    workOrderId: number,
+    orderNumber: string,
+    title: string,
+    assignedToId: number | null,
+  ) {
+    const actorName = await this.resolveActorName(actorId);
+    try {
+      const recipients = await this.getOperationalOversightRecipientIds(actorId);
+      const msg = `${actorName} abrió OT ${orderNumber}: «${title}».`;
+      for (const uid of recipients) {
+        await this.notificationsService.createNotification({
+          userId: uid,
+          type: 'MAINTENANCE_WORK_ORDER_CREATED',
+          category: 'erp',
+          title: 'Nueva orden de mantenimiento',
+          message: msg,
+          triggerUserId: actorId,
+          relatedEntityId: workOrderId,
+          entityType: 'MaintenanceOrder',
+          relatedUrl: `/console/maintenance?woId=${workOrderId}`,
+        });
+      }
+      await this.notificationsService.createNotification({
+        userId: actorId,
+        type: 'USER_ACTION_CONFIRMED',
+        category: 'confirmations',
+        title: 'OT creada',
+        message: `${orderNumber} registrada.`,
+        relatedEntityId: workOrderId,
+        entityType: 'MaintenanceOrder',
+        relatedUrl: `/console/maintenance?woId=${workOrderId}`,
+      });
+      if (assignedToId && assignedToId !== actorId) {
+        await this.notificationsService.createNotification({
+          userId: assignedToId,
+          type: 'MAINTENANCE_WORK_ORDER_CREATED',
+          category: 'erp',
+          title: 'OT asignada a ti',
+          message: `${actorName} te asignó ${orderNumber}: «${title}».`,
+          triggerUserId: actorId,
+          relatedEntityId: workOrderId,
+          entityType: 'MaintenanceOrder',
+          relatedUrl: `/console/maintenance?woId=${workOrderId}`,
+          priority: 'high',
+        });
+      }
+    } catch (error) {
+      this.logger.error('notifyMaintenanceWorkOrderCreated', error);
     }
   }
 }

@@ -1,10 +1,6 @@
-# Copia a key.properties (no versionar). Ejemplo:
-# storeFile=../nexara-release.keystore
-# storePassword=***
-# keyAlias=nexara
-# keyPassword=***
-
-storeFile=ruta/absoluta/o/relativa/nexara-release.keystore
-storePassword=cambiar
+# Copiar a key.properties (no versionar). Keystore junto a app/build.gradle:
+#   apps/mobile/android/app/tu-release.jks
+storePassword=
+keyPassword=
 keyAlias=nexara
-keyPassword=cambiar
+storeFile=nexara-release.jks

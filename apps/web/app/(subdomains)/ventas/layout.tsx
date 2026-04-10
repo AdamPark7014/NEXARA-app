@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import VentasSidebar from "./VentasSidebar";
 import styles from "./layout.module.css";
 import { useUser } from "@/components/UserContext";
+import ConsoleWebPushRegister from "@/components/ConsoleWebPushRegister";
+import NotificationCenter from "@/components/NotificationCenter";
 import { getRoleLabel, isSalesManagerUser } from "@/lib/panel-user";
 import { getSalesVendorStats, type SalesVendorStats } from "@/lib/sales-api";
 
@@ -39,6 +41,7 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
 
   const quickLinks = [
     ...(canManageSellers ? [{ label: "Gestión Vendedores", href: "/gestion-vendedores" }] : []),
+    ...(canManageSellers ? [{ label: "Resumen equipo", href: "/my-profile" }] : []),
     ...(!canManageSellers ? [{ label: "Mi perfil", href: "/my-profile" }] : []),
     { label: "Dashboard", href: "/dashboard" },
     { label: "Leads", href: "/leads" },
@@ -83,6 +86,7 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
 
   return (
     <div className={styles.salesRoot}>
+      <ConsoleWebPushRegister />
       <VentasSidebar />
       <main className={styles.salesMain}>
         <section className={styles.salesWorkspace}>
@@ -105,6 +109,13 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
                 </span>
               )}
               <span className={styles.salesWorkspacePill}>{workspaceDateLabel}</span>
+              <NotificationCenter
+                inlineTrigger
+                position="bottom-right"
+                maxNotifications={5}
+                autoCloseTime={6000}
+                mirrorToSystemNotifications
+              />
             </div>
           </div>
 
@@ -131,6 +142,7 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
                 {filteredVendorStats.map((vendor) => (
                   <Link key={vendor.userId} href={withOwnerFilter(pathname || "/dashboard", vendor.userId)} className={`${styles.vendorCard} ${selectedOwnerId === vendor.userId ? styles.vendorCardActive : ""}`}>
                     <div className={styles.vendorCardName}>{vendor.userName}</div>
+                    <div className={styles.vendorCardMeta}>Vendedor</div>
                     <div className={styles.vendorCardMeta}>Oportunidades: {vendor.opportunities}</div>
                     <div className={styles.vendorCardMeta}>Proyectos: {vendor.projects}</div>
                     <div className={styles.vendorCardMeta}>Performance: {vendor.performance}%</div>

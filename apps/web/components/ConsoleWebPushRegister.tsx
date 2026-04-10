@@ -22,14 +22,27 @@ export default function ConsoleWebPushRegister() {
   const tried = useRef(false);
 
   useEffect(() => {
+    tried.current = false;
     const vapidPublic = process.env.NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY?.trim();
-    if (!user?.token || !vapidPublic || tried.current) return;
+    if (!user?.token || !vapidPublic) return;
     if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
 
-    tried.current = true;
+    const consentMode = process.env.NEXT_PUBLIC_WEB_PUSH_CONSENT_MODE?.trim().toLowerCase();
 
-    (async () => {
+    const run = async () => {
+      if (tried.current) return;
       try {
+        if (typeof Notification !== "undefined") {
+          if (Notification.permission === "denied") return;
+          if (Notification.permission === "default") {
+            if (consentMode === "banner") return;
+            const perm = await Notification.requestPermission();
+            if (perm !== "granted") return;
+          }
+        }
+
+        tried.current = true;
+
         const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
         const existing = await reg.pushManager.getSubscription();
         const sub =
@@ -52,7 +65,18 @@ export default function ConsoleWebPushRegister() {
       } catch {
         tried.current = false;
       }
-    })();
+    };
+
+    if (consentMode === "banner") {
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        void run();
+      }
+      const onConsent = () => void run();
+      window.addEventListener("nexara-web-push-consent", onConsent);
+      return () => window.removeEventListener("nexara-web-push-consent", onConsent);
+    }
+
+    void run();
   }, [user?.token]);
 
   return null;

@@ -383,9 +383,16 @@ export default function Sidebar() {
           <div className={styles.sidebarName}>{user.nombre}</div>
           <div className={styles.sidebarEmail}>{user.email}</div>
           <div className={styles.sidebarMeta}>
-            <span className={styles.rolePill}>{userRoleLabel}</span>
-            {user.isSuperAdmin && <span className={styles.levelPill}>Superadmin</span>}
-            {!user.isSuperAdmin && isAdmin && <span className={styles.levelPill}>Admin</span>}
+            {user.isSuperAdmin ? (
+              <span className={styles.levelPill}>Superadmin</span>
+            ) : (
+              <>
+                <span className={styles.rolePill}>{userRoleLabel}</span>
+                {isAdmin && userRoleLabel !== 'Admin' && (
+                  <span className={styles.levelPill}>Admin</span>
+                )}
+              </>
+            )}
           </div>
         </div>
         {groupsToRender.map((group) => (

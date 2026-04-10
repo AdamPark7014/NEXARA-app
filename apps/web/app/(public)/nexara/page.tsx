@@ -62,7 +62,6 @@ const valores = [
 ];
 
 const expertosFallback = [
-  { name: "Ing. Karina Martinez Flores", role: "Vendedora" },
   { name: "Ing. Alejandro Gonzales Bustamante", role: "Ingeniero de Sistemas" },
   { name: "Ing. Carolina Juarez Alvarez", role: "Ingeniera encargada de soporte" },
   { name: "Ing. Karen Elizalde Sarmiento", role: "Encargado de Ventas" },

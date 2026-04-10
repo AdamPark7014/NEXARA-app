@@ -18,6 +18,7 @@ import { CreateSalesProjectDto } from './dto/create-sales-project.dto.js';
 import { UpdateSalesProjectDto } from './dto/update-sales-project.dto.js';
 import { CreateOrderTemplateDto } from './dto/create-order-template.dto.js';
 import { UpdateOrderTemplateDto } from './dto/update-order-template.dto.js';
+import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 
 @Injectable()
 export class VentasService {
@@ -25,6 +26,7 @@ export class VentasService {
     private readonly prisma: PrismaService,
     private readonly cotizacionesService: CotizacionesService,
     private readonly pdfGeneratorService: PdfGeneratorService,
+    private readonly notificationHierarchy: NotificationHierarchyService,
   ) {}
 
   private isSuperAdminUser(user?: any) {
@@ -235,7 +237,7 @@ export class VentasService {
 
   async createClient(dto: CreateSalesClientDto, user?: any) {
     const ownerId = this.resolveOwnerForWrite(dto.ownerId, user);
-    return this.prisma.salesClient.create({
+    const created = await this.prisma.salesClient.create({
       data: {
         name: dto.name,
         legalName: dto.legalName || null,
@@ -252,6 +254,13 @@ export class VentasService {
       },
       include: { documents: true, opportunities: true },
     });
+    if (user?.id) {
+      const actorName = String(user.nombre || 'Usuario').trim() || 'Usuario';
+      void this.notificationHierarchy
+        .notifySalesClientCreated(user.id, created.id, created.name, actorName)
+        .catch(() => undefined);
+    }
+    return created;
   }
 
   async listClients(user?: any, ownerId?: number, query?: PaginationQueryDto) {
@@ -331,7 +340,7 @@ export class VentasService {
 
   async createLead(dto: CreateSalesLeadDto, user?: any) {
     const ownerId = this.resolveOwnerForWrite(dto.ownerId, user);
-    return this.prisma.salesLead.create({
+    const created = await this.prisma.salesLead.create({
       data: {
         name: dto.name || null,
         company: dto.company || null,
@@ -346,6 +355,17 @@ export class VentasService {
         ownerId,
       },
     });
+    if (user?.id) {
+      const label =
+        (created.company && String(created.company).trim()) ||
+        (created.name && String(created.name).trim()) ||
+        `Lead #${created.id}`;
+      const actorName = String(user.nombre || 'Usuario').trim() || 'Usuario';
+      void this.notificationHierarchy
+        .notifySalesLeadCreated(user.id, created.id, label, actorName)
+        .catch(() => undefined);
+    }
+    return created;
   }
 
   async listLeads(user?: any, ownerId?: number, query?: PaginationQueryDto) {
@@ -405,7 +425,7 @@ export class VentasService {
     const stage = dto.stage || 'DISCOVERY';
     const expectedCloseDate = this.normalizeDateTimeInput(dto.expectedCloseDate, 'expectedCloseDate');
     this.validateNextActionPlan(stage, dto.description, expectedCloseDate);
-    return this.prisma.salesOpportunity.create({
+    const created = await this.prisma.salesOpportunity.create({
       data: {
         title: dto.title,
         description: dto.description || null,
@@ -419,6 +439,13 @@ export class VentasService {
       },
       include: { client: true, lead: true },
     });
+    if (user?.id) {
+      const actorName = String(user.nombre || 'Usuario').trim() || 'Usuario';
+      void this.notificationHierarchy
+        .notifySalesOpportunityCreated(user.id, created.id, created.title, actorName)
+        .catch(() => undefined);
+    }
+    return created;
   }
 
   async listOpportunities(user?: any, ownerId?: number, query?: PaginationQueryDto) {
@@ -458,7 +485,7 @@ export class VentasService {
     const mergedExpectedCloseDate = normalizedExpectedCloseDate ?? existing.expectedCloseDate;
     this.validateNextActionPlan(mergedStage, mergedDescription, mergedExpectedCloseDate);
 
-    return this.prisma.salesOpportunity.update({
+    const updated = await this.prisma.salesOpportunity.update({
       where: { id },
       data: {
         title: dto.title,
@@ -474,6 +501,22 @@ export class VentasService {
       },
       include: { client: true, lead: true, notes: true, evidences: true, quotes: true },
     });
+
+    if (user?.id && dto.stage !== undefined && dto.stage !== existing.stage) {
+      const actorName = String(user.nombre || 'Usuario').trim() || 'Usuario';
+      void this.notificationHierarchy
+        .notifySalesOpportunityStageChanged(
+          user.id,
+          updated.id,
+          updated.title,
+          String(existing.stage),
+          String(updated.stage),
+          actorName,
+        )
+        .catch(() => undefined);
+    }
+
+    return updated;
   }
 
   async deleteOpportunity(id: number, user?: any) {

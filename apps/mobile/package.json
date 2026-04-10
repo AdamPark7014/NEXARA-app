@@ -19,7 +19,10 @@
     "cap:sync": "npx cap sync",
     "cap:android": "npx cap open android",
     "cap:ios": "npx cap open ios",
-    "cap:build": "npm run build:capacitor && npx cap sync"
+    "cap:build": "npm run build:capacitor && npx cap sync",
+    "android:sync": "npx cap sync android",
+    "android:apk:release": "npm run android:sync && node scripts/android-gradle.cjs assembleRelease",
+    "android:bundle:release": "npm run android:sync && node scripts/android-gradle.cjs bundleRelease"
   },
   "dependencies": {
     "@capacitor/android": "^8.2.0",
@@ -28,6 +31,7 @@
     "@capacitor/core": "^8.2.0",
     "@capacitor/haptics": "^8.0.1",
     "@capacitor/ios": "^8.2.0",
+    "@capacitor/local-notifications": "^8.0.0",
     "@capacitor/push-notifications": "^8.0.1",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",

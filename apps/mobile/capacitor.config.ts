@@ -34,6 +34,9 @@ const config: CapacitorConfig = {
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],
     },
+    LocalNotifications: {
+      iconColor: '#0d9488',
+    },
   },
   android: {
     minWebViewVersion: 80,

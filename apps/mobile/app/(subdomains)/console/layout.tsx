@@ -160,13 +160,13 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
               <span className={styles.consoleViewMeta}>{viewSubtitle}</span>
             </div>
             <div className={styles.consoleTopbarActions}>
-              {nativeShell === null ? null : (
+              {nativeShell === null || nativeShell ? null : (
                 <NotificationCenter
                   inlineTrigger
                   position="top-right"
                   maxNotifications={5}
                   autoCloseTime={6000}
-                  mirrorToSystemNotifications={!nativeShell}
+                  mirrorToSystemNotifications
                 />
               )}
             </div>

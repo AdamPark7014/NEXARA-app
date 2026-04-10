@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
+import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 
 @Injectable()
 export class MaintenanceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationHierarchy: NotificationHierarchyService,
+  ) {}
 
   // ── Assets ────────────────────────────────────────────────────────
   async createAsset(dto: {
@@ -123,7 +127,7 @@ export class MaintenanceService {
     plannedDate: string;
   }, userId: number) {
     const orderNumber = await this.generateWONumber();
-    return this.prisma.maintenanceOrder.create({
+    const wo = await this.prisma.maintenanceOrder.create({
       data: {
         orderNumber,
         assetId: dto.assetId,
@@ -138,6 +142,10 @@ export class MaintenanceService {
       },
       include: { asset: true, assignedTo: { select: { id: true, nombre: true } } },
     });
+    void this.notificationHierarchy
+      .notifyMaintenanceWorkOrderCreated(userId, wo.id, wo.orderNumber, wo.title, wo.assignedToId)
+      .catch(() => undefined);
+    return wo;
   }
 
   async listWorkOrders(filters?: { status?: string; assetId?: number; assignedToId?: number }) {
