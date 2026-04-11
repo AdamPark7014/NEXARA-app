@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { useTheme } from "@/components/ThemeContext";
 import BottomNav from "@/components/BottomNav";
-import { getApiAssetOrigin } from "@/lib/api-base";
+import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
 import { getAccessiblePanels } from "@/lib/panel-routing";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
 import BranchesForm from "@/components/BranchesForm";
@@ -191,9 +191,7 @@ export default function ClientTicketsPage() {
     dueAt: "",
   });
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
   const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
   const getAssetUrl = (url?: string | null) => {
     if (!url) return "";
     const raw = url.trim();
@@ -351,8 +349,6 @@ export default function ClientTicketsPage() {
     }
     return `https://static-maps.yandex.ru/1.x/?ll=${lng},${lat}&size=650,420&z=15&l=map&pt=${lng},${lat},pm2rdm`;
   };
-  const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, "");
-
   // Marcar como mounted después del primer render en el cliente
   useEffect(() => {
     setMounted(true);
@@ -1867,7 +1863,6 @@ export default function ClientTicketsPage() {
           {activeTab === "inventarios" && session?.token && (
             <TicketsInventoryManager
               token={session.token}
-              apiUrl={API_URL}
               mode="client"
               branches={branches.map((branch) => ({
                 id: branch.id,
@@ -1918,7 +1913,6 @@ export default function ClientTicketsPage() {
                     onBranchSaved={handleBranchSaved}
                     clientLogoUrl={clientAvatarUrl || null}
                     companyLogoUrl={clientAvatarUrl || null}
-                    apiUrl={API_URL}
                   />
                 )}
               </div>

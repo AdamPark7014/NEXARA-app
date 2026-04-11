@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
-import { getSocketBaseUrl } from '@/lib/api-base';
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import styles from './GpsMap.module.css';
 
 const GOOGLE_MAPS_SCRIPT_ID = 'google-maps-script';
@@ -51,8 +51,6 @@ const GpsMap = () => {
   /** Resultado de `importLibrary('marker')` — obligatorio si el mapa usa `mapId` (Advanced Markers). */
   const markerLibraryRef = useRef<{ AdvancedMarkerElement?: new (opts: object) => any } | null>(null);
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
   const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
   const googleMapsMapId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || '';
 

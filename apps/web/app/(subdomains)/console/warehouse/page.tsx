@@ -1,11 +1,10 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import HelpTab from "@/components/HelpTab";
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 interface Warehouse {
   id: number;
@@ -33,7 +32,7 @@ export default function WarehousePage() {
   const loadData = useCallback(() => {
     if (!user?.token) return;
     setLoading(true);
-    fetch(`${API_URL}/warehouse`, {
+    fetch(buildApiUrl(`warehouse`), {
       headers: { Authorization: `Bearer ${user.token}` },
     })
       .then((r) => r.json())
@@ -48,7 +47,7 @@ export default function WarehousePage() {
     if (!form.code.trim() || !form.name.trim()) return;
     setSaving(true);
     try {
-      const res = await fetch(`${API_URL}/warehouse`, {
+      const res = await fetch(buildApiUrl(`warehouse`), {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${user?.token}` },
         body: JSON.stringify({

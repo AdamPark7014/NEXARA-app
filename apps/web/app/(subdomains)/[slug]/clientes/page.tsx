@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
+import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import styles from "./page.module.css";
 
@@ -50,15 +51,10 @@ export default function VentasClientesPage() {
     notes: "",
   });
 
-  const apiUrl = useMemo(() => {
-    const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
-    return base.replace(/[/.]+$/, "");
-  }, []);
-
   const getAssetUrl = (url?: string | null) => {
     if (!url) return "";
     if (url.startsWith("http")) return url;
-    const base = apiUrl.replace(/\/+api\/?$/, "");
+    const base = getApiAssetOrigin();
     return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
   };
 
@@ -67,7 +63,7 @@ export default function VentasClientesPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${apiUrl}/ventas/clientes`, {
+      const res = await fetch(buildApiUrl("ventas/clientes"), {
         headers: { Authorization: `Bearer ${user.token}` },
       });
       if (!res.ok) throw new Error("No se pudieron cargar los clientes");
@@ -98,7 +94,7 @@ export default function VentasClientesPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${apiUrl}/ventas/clientes`, {
+      const res = await fetch(buildApiUrl("ventas/clientes"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -174,7 +170,7 @@ export default function VentasClientesPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${apiUrl}/ventas/clientes/${selectedClientId}/documentos`, {
+      const res = await fetch(buildApiUrl(`ventas/clientes/${selectedClientId}/documentos`), {
         method: "POST",
         headers: { Authorization: `Bearer ${user.token}` },
         body: formData,

@@ -1,21 +1,11 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import React, { useEffect, useState } from "react";
 import UserForm from "./UserForm";
 import { useUser } from '@/components/UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import { resolveUserAvatarUrl } from '@/lib/user-avatar';
 import { openExternalUrl } from "@/lib/open-external-url";
-
-let API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-// Normaliza la URL base para evitar dobles / o .
-API_URL = API_URL.replace(/[\/.]+$/, '');
-
-function buildApiUrl(path: string) {
-  // Quita cualquier slash inicial del path
-  path = path.replace(/^\/+/, '');
-  // Asegura que la URL final sea correcta
-  return `${API_URL}/${path}`;
-}
 
 export type User = {
   id: number;

@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useUser } from './UserContext';
 import styles from './ToolUserKitPanel.module.css';
@@ -53,8 +54,6 @@ const ToolUserKitPanel: React.FC = () => {
   const [resolutionFineAmount, setResolutionFineAmount] = useState<string>('500');
   const [resolvingSubmit, setResolvingSubmit] = useState(false);
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 900px)');
@@ -80,7 +79,7 @@ const ToolUserKitPanel: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [user?.token, API_URL]);
+  }, [user?.token]);
 
   const fetchAssignableUsers = useCallback(async () => {
     if (!user?.token) return;
@@ -101,7 +100,7 @@ const ToolUserKitPanel: React.FC = () => {
     } catch {
       setUsers(user?.id ? [{ id: user.id, nombre: user.nombre || 'Mi usuario', email: user.email || '' }] : []);
     }
-  }, [user?.token, user?.id, user?.nombre, user?.email, API_URL]);
+  }, [user?.token, user?.id, user?.nombre, user?.email]);
 
   const searchInventory = useCallback(async (rawQuery: string) => {
     const query = rawQuery.trim();
@@ -123,7 +122,7 @@ const ToolUserKitPanel: React.FC = () => {
     } catch {
       setInventoryOptions([]);
     }
-  }, [user?.token, API_URL]);
+  }, [user?.token]);
 
   useEffect(() => {
     fetchRows();
@@ -146,7 +145,7 @@ const ToolUserKitPanel: React.FC = () => {
   useEffect(() => {
     if (!user?.token) return;
 
-    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -172,7 +171,7 @@ const ToolUserKitPanel: React.FC = () => {
       if (refreshTimer) clearTimeout(refreshTimer);
       socket.disconnect();
     };
-  }, [user?.token, API_URL, inventoryQuery, fetchRows, fetchAssignableUsers, searchInventory]);
+  }, [user?.token, inventoryQuery, fetchRows, fetchAssignableUsers, searchInventory]);
 
   const groupedByUser = useMemo(() => {
     const map = new Map<number, { user: UserKitRow['user']; rows: UserKitRow[] }>();

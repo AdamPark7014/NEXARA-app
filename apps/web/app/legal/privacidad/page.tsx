@@ -1,3 +1,11 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Aviso de privacidad",
+  alternates: { canonical: "/legal/privacidad" },
+  robots: { index: true, follow: true },
+};
+
 export default function PrivacidadPage() {
   const mailHref = "mailto:ventas@nexara.com.mx";
   return (

@@ -30,7 +30,16 @@ export default function robots(): MetadataRoute.Robots {
       },
       {
         userAgent: "Googlebot",
-        allow: ["/", "/nexara", "/servicios", "/soluciones", "/proyectos", "/contacto", "/legal/"],
+        allow: [
+          "/",
+          "/servicios",
+          "/soluciones",
+          "/proyectos",
+          "/contacto",
+          "/cobertura",
+          "/Nexara-Ingenieros",
+          "/legal/",
+        ],
         disallow: ["/console/", "/tickets/", "/ventas/", "/contabilidad/", "/web/"],
       },
       {

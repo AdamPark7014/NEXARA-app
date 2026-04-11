@@ -1,11 +1,10 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
 import HelpTab from '@/components/HelpTab';
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 export default function BankingPage() {
   const { user } = useUser();
@@ -22,7 +21,7 @@ export default function BankingPage() {
 
   useEffect(() => {
     if (!user?.token) return;
-    fetch(`${API_URL}/accounting/banking/accounts`, { headers })
+    fetch(buildApiUrl(`accounting/banking/accounts`), { headers })
       .then((r) => r.json())
       .then((d) => setBankAccounts(Array.isArray(d) ? d : d.data || []))
       .catch(() => {})
@@ -33,8 +32,8 @@ export default function BankingPage() {
     setSelectedAccount(accountId);
     setLoadingTx(true);
     Promise.all([
-      fetch(`${API_URL}/accounting/banking/accounts/${accountId}/summary`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/accounting/banking/accounts/${accountId}/transactions`, { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`accounting/banking/accounts/${accountId}/summary`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`accounting/banking/accounts/${accountId}/transactions`), { headers }).then((r) => r.json()),
     ])
       .then(([sum, txs]) => {
         setSummary(sum);
@@ -46,7 +45,7 @@ export default function BankingPage() {
 
   const searchSpei = () => {
     if (!speiSearch.trim()) return;
-    fetch(`${API_URL}/accounting/banking/spei/${encodeURIComponent(speiSearch.trim())}`, { headers })
+    fetch(buildApiUrl(`accounting/banking/spei/${encodeURIComponent(speiSearch.trim())}`), { headers })
       .then((r) => r.ok ? r.json() : null)
       .then(setSpeiResult)
       .catch(() => setSpeiResult(null));

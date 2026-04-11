@@ -2,7 +2,7 @@
 
 import React, { useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
-import { buildApiUrl, getApiBase } from "@/lib/api-base";
+import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
 
 type NewsletterSubscriber = {
   id: number;
@@ -36,7 +36,6 @@ type NewsFormState = {
   publishedAt: string;
 };
 
-const API_URL = getApiBase();
 const MAX_GALLERY_IMAGES = 8;
 
 const INITIAL_FORM: NewsFormState = {
@@ -71,10 +70,11 @@ const normalizeNewsImageUrl = (imageUrl?: string | null) => {
   if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
     return imageUrl;
   }
+  const origin = getApiAssetOrigin();
   if (imageUrl.startsWith("/")) {
-    return `${API_URL}${imageUrl}`;
+    return `${origin}${imageUrl}`;
   }
-  return `${API_URL}/${imageUrl}`;
+  return `${origin}/${imageUrl}`;
 };
 
 export default function NoticiasPanel() {

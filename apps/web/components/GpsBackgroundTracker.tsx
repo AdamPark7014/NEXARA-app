@@ -1,5 +1,6 @@
 "use client";
 
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useRef } from "react";
 import { useUser } from "@/components/UserContext";
 
@@ -11,9 +12,6 @@ export default function GpsBackgroundTracker() {
   const lastSentRef = useRef<number>(0);
   const consentEnabledRef = useRef<boolean>(false);
   const tokenRef = useRef<string | null>(null);
-
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
 
   const stopTracking = () => {
     if (watchIdRef.current !== null && navigator.geolocation) {

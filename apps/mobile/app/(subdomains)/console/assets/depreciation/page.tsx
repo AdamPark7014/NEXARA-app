@@ -1,11 +1,10 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
 import HelpTab from '../../../../../components/HelpTab';
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 export default function DepreciationPage() {
   const { user } = useUser();
@@ -14,7 +13,7 @@ export default function DepreciationPage() {
 
   useEffect(() => {
     if (!user?.token) return;
-    fetch(`${API_URL}/maintenance/assets/depreciation/summary`, {
+    fetch(buildApiUrl(`maintenance/assets/depreciation/summary`), {
       headers: { Authorization: `Bearer ${user.token}` },
     })
       .then((r) => r.json())

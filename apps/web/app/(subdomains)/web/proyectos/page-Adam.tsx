@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import styles from "./page.module.css";
-import { buildApiUrl, getApiBase, getSocketBaseUrl } from "@/lib/api-base";
+import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
 
 type Project = {
   id: number;
@@ -36,20 +36,19 @@ type ProjectForm = {
   gallery: string[];
 };
 
-const API_URL = getApiBase();
-
 const normalizeImageUrl = (imageUrl?: string | null) => {
   if (!imageUrl) return undefined;
   if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
     return imageUrl;
   }
+  const origin = getApiAssetOrigin();
   if (imageUrl.startsWith("/")) {
     if (imageUrl.startsWith("/projects/image/")) {
-      return `${API_URL}${imageUrl}`;
+      return `${origin}${imageUrl}`;
     }
     return imageUrl;
   }
-  return `${API_URL}/projects/image/${imageUrl}`;
+  return `${origin}/projects/image/${imageUrl}`;
 };
 
 const emptyForm: ProjectForm = {

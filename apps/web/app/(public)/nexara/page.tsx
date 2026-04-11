@@ -21,11 +21,11 @@ export const metadata: Metadata = {
     "consultoria tecnologica",
   ],
   alternates: {
-    canonical: "/nexara",
+    canonical: "/",
   },
   openGraph: {
     type: "website",
-    url: `${siteUrl}/nexara`,
+    url: siteUrl,
     title: "Nexara | Sobre Nosotros",
     description: "Equipo de integracion tecnologica orientado a continuidad operativa y resultados medibles.",
     images: [{ url: "/logo-nexara.png", width: 1200, height: 630, alt: "Nexara" }],

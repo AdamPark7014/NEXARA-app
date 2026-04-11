@@ -1,5 +1,6 @@
 "use client";
 
+import { buildApiUrl } from "@/lib/api-base";
 import React, { useEffect, useMemo, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import styles from "./page.module.css";
@@ -13,12 +14,6 @@ type VehiclePenalty = {
   solicitante?: { nombre: string } | null;
   vehiculo?: { nombre?: string | null; placas?: string | null } | null;
 };
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(
-  /[\/.]+$/,
-  ""
-);
-const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("es-MX", {

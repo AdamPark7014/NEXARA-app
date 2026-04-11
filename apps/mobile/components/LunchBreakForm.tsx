@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { useLunchBreakNotifications } from '@/lib/notifications';
+import { buildApiUrl, getSocketBaseUrl } from '@/lib/api-base';
 import styles from './LunchBreakForm.module.css';
 
 interface LunchBreakFormProps {
@@ -27,9 +28,6 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
 
   const stopCamera = () => {
     if (streamRef.current) {
@@ -119,38 +117,51 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
     setError(null);
 
     try {
-      // Convertir blob a base64
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64Photo = reader.result as string;
+      const base64Photo = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result;
+          if (typeof result === 'string') resolve(result);
+          else reject(new Error('No se pudo leer la foto'));
+        };
+        reader.onerror = () => reject(new Error('No se pudo leer la foto'));
+        reader.readAsDataURL(photo);
+      });
 
-        const endpoint = isCheckin ? buildApiUrl('lunch-breaks/checkin') : buildApiUrl('lunch-breaks/checkout');
-        const bodyKey = isCheckin ? 'checkinPhotoUrl' : 'checkoutPhotoUrl';
-        const timeKey = isCheckin ? 'checkinTime' : 'checkoutTime';
+      const endpoint = isCheckin ? buildApiUrl('lunch-breaks/checkin') : buildApiUrl('lunch-breaks/checkout');
+      const bodyKey = isCheckin ? 'checkinPhotoUrl' : 'checkoutPhotoUrl';
+      const timeKey = isCheckin ? 'checkinTime' : 'checkoutTime';
 
-        const res = await fetch(endpoint, {
-          method: isCheckin ? 'POST' : 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${user.token}`,
-          },
-          body: JSON.stringify({
-            [timeKey]: new Date().toISOString(),
-            [bodyKey]: base64Photo,
-          }),
-        });
+      const res = await fetch(endpoint, {
+        method: isCheckin ? 'POST' : 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${user.token}`,
+        },
+        body: JSON.stringify({
+          [timeKey]: new Date().toISOString(),
+          [bodyKey]: base64Photo,
+        }),
+      });
 
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.message || 'Error al registrar hora de comida');
+      if (!res.ok) {
+        const text = await res.text();
+        let msg = 'Error al registrar hora de comida';
+        try {
+          const data = JSON.parse(text) as { message?: string | string[] };
+          if (Array.isArray(data?.message) && data.message[0]) msg = String(data.message[0]);
+          else if (typeof data?.message === 'string' && data.message.trim()) msg = data.message;
+          else if (text?.trim()) msg = text.trim().slice(0, 240);
+        } catch {
+          if (text?.trim()) msg = text.trim().slice(0, 240);
         }
+        throw new Error(msg);
+      }
 
-        setStep('camera');
-        setPhoto(null);
-        setPhotoPreview(null);
-        if (onSuccess) onSuccess();
-      };
-      reader.readAsDataURL(photo);
+      setStep('camera');
+      setPhoto(null);
+      setPhotoPreview(null);
+      if (onSuccess) onSuccess();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
@@ -171,7 +182,7 @@ const LunchBreakForm: React.FC<LunchBreakFormProps> = ({ onSuccess, isCheckin = 
   React.useEffect(() => {
     if (!user) return;
 
-    const socketUrl = (process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, {
       auth: { token: user.token },
       transports: ['websocket', 'polling'],

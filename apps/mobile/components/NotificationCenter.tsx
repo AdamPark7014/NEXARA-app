@@ -2,7 +2,7 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { useUser } from './UserContext';
 import { io, Socket } from 'socket.io-client';
-import { getSocketBaseUrl } from '@/lib/api-base';
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import { showBrowserHeadsUpNotification } from '@/lib/browser-notifications';
 import styles from './NotificationCenter.module.css';
 
@@ -133,11 +133,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const bellButtonRef = useRef<HTMLButtonElement | null>(null);
   const sidePanelRef = useRef<HTMLDivElement | null>(null);
   const socketRef = useRef<Socket | null>(null);
-  const notificationTimers = useRef<Map<number, NodeJS.Timeout>>(new Map());
-
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-
-  useEffect(() => {
+  const notificationTimers = useRef<Map<number, NodeJS.Timeout>>(new Map());  useEffect(() => {
     if (!mirrorToSystemNotifications || typeof window === 'undefined') return;
     if (!('Notification' in window)) {
       setSysNotifyPermission('unsupported');
@@ -149,7 +145,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
   const fetchNotifications = useCallback(async () => {
     if (!user?.token) return;
     try {
-      const response = await fetch(`${API_URL}/notifications?limit=10`, {
+      const response = await fetch(buildApiUrl(`notifications?limit=10`), {
         headers: { Authorization: `Bearer ${user.token}` },
       });
       const data = await response.json();
@@ -162,7 +158,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
     } catch (error) {
       console.error('Error fetching notifications:', error);
     }
-  }, [user?.token, API_URL]);
+  }, [user?.token]);
 
   useEffect(() => {
     const onNativePush = () => {
@@ -271,7 +267,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
   const handleMarkAsRead = async (notificationId: number) => {
     try {
-      await fetch(`${API_URL}/notifications/${notificationId}/read`, {
+      await fetch(buildApiUrl(`notifications/${notificationId}/read`), {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${user?.token}` },
       });
@@ -284,7 +280,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
   const handleMarkAllAsRead = async () => {
     try {
-      await fetch(`${API_URL}/notifications/read/all`, {
+      await fetch(buildApiUrl(`notifications/read/all`), {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${user?.token}` },
       });
@@ -297,7 +293,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
   const handleDeleteNotification = async (notificationId: number) => {
     try {
-      await fetch(`${API_URL}/notifications/${notificationId}`, {
+      await fetch(buildApiUrl(`notifications/${notificationId}`), {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${user?.token}` },
       });

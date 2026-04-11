@@ -1,12 +1,11 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState, useCallback } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import HelpTab from '@/components/HelpTab';
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { useMemo } from "react";
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 const emptyReqForm = () => ({
   title: "",
@@ -54,10 +53,10 @@ export default function ProcurementPage() {
     const headers = { Authorization: `Bearer ${user.token}` };
     setLoading(true);
     Promise.all([
-      fetch(`${API_URL}/procurement/requisitions`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/procurement/purchase-orders`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/procurement/purchase-orders/suppliers`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/warehouse`, { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`procurement/requisitions`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`procurement/purchase-orders`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`procurement/purchase-orders/suppliers`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`warehouse`), { headers }).then((r) => r.json()),
     ])
       .then(([req, ord, sup, wh]) => {
         setRequisitions(Array.isArray(req) ? req : req.data || []);
@@ -92,7 +91,7 @@ export default function ProcurementPage() {
     const warehouseTag = reqWarehouseId ? `[WH:${reqWarehouseId}]` : "";
     setSaving(true);
     try {
-      const res = await fetch(`${API_URL}/procurement/requisitions`, {
+      const res = await fetch(buildApiUrl(`procurement/requisitions`), {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${user?.token}` },
         body: JSON.stringify({
@@ -141,7 +140,7 @@ export default function ProcurementPage() {
     const warehouseTag = selectedWarehouse ? `[WH:${selectedWarehouse.id}] ${selectedWarehouse.code} - ${selectedWarehouse.name}` : "";
     setSaving(true);
     try {
-      const res = await fetch(`${API_URL}/procurement/purchase-orders`, {
+      const res = await fetch(buildApiUrl(`procurement/purchase-orders`), {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${user?.token}` },
         body: JSON.stringify({
@@ -173,7 +172,7 @@ export default function ProcurementPage() {
     if (!supplierForm.name.trim()) return;
     setSaving(true);
     try {
-      const res = await fetch(`${API_URL}/procurement/purchase-orders/suppliers`, {
+      const res = await fetch(buildApiUrl(`procurement/purchase-orders/suppliers`), {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${user?.token}` },
         body: JSON.stringify({
@@ -198,7 +197,7 @@ export default function ProcurementPage() {
     if (!confirm("¿Aprobar esta requisición?")) return;
     setActionLoading(id);
     try {
-      await fetch(`${API_URL}/procurement/requisitions/${id}/approve`, {
+      await fetch(buildApiUrl(`procurement/requisitions/${id}/approve`), {
         method: "PATCH",
         headers: { Authorization: `Bearer ${user?.token}` },
       });
@@ -211,7 +210,7 @@ export default function ProcurementPage() {
     if (reason === null) return;
     setActionLoading(id);
     try {
-      await fetch(`${API_URL}/procurement/requisitions/${id}/reject`, {
+      await fetch(buildApiUrl(`procurement/requisitions/${id}/reject`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${user?.token}` },
         body: JSON.stringify({ reason }),

@@ -1,5 +1,6 @@
 "use client";
 
+import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
 import React, { useEffect, useMemo, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import { openExternalUrl } from "@/lib/open-external-url";
@@ -55,9 +56,7 @@ export default function ContabilidadPagos() {
   const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
-  const assetBaseUrl = API_URL.replace(/\/+api\/?$/, "");
+  const assetBaseUrl = getApiAssetOrigin();
 
   const fetchPayments = async () => {
     if (!user?.token) return;

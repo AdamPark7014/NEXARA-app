@@ -1,5 +1,6 @@
 "use client";
 
+import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
 import React, { useEffect, useMemo, useState } from "react";
 import styles from "./page.module.css";
 
@@ -17,12 +18,6 @@ type ClientForm = {
   description: string;
 };
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(
-  /[\/.]+$/,
-  ""
-);
-const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
-
 const emptyForm: ClientForm = {
   name: "",
   description: "",
@@ -33,10 +28,11 @@ const normalizeClientImageUrl = (imageUrl?: string | null) => {
   if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
     return imageUrl;
   }
+  const assetOrigin = getApiAssetOrigin();
   if (imageUrl.startsWith("/")) {
-    return `${API_URL}${imageUrl}`;
+    return `${assetOrigin}${imageUrl}`;
   }
-  return `${API_URL}/clients/image/${imageUrl}`;
+  return `${assetOrigin}/clients/image/${imageUrl}`;
 };
 
 const formatDate = (value?: string | null) =>

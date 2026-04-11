@@ -1,11 +1,10 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
 import HelpTab from '@/components/HelpTab';
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: "Borrador", SENT: "Enviada", PAID: "Pagada", PARTIALLY_PAID: "Pago parcial",
@@ -67,11 +66,11 @@ export default function InvoicingPage() {
     if (!user?.token) return;
     setLoading(true);
     Promise.all([
-      fetch(`${API_URL}/accounting/invoices/dashboard`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/accounting/invoices`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/accounting/invoices/overdue`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/accounting/banking/accounts`, { headers }).then((r) => r.ok ? r.json() : []),
-      fetch(`${API_URL}/accounting/invoices/issuer-profile`, { headers }).then((r) => r.ok ? r.json() : null),
+      fetch(buildApiUrl(`accounting/invoices/dashboard`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`accounting/invoices`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`accounting/invoices/overdue`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`accounting/banking/accounts`), { headers }).then((r) => r.ok ? r.json() : []),
+      fetch(buildApiUrl(`accounting/invoices/issuer-profile`), { headers }).then((r) => r.ok ? r.json() : null),
     ])
       .then(([dash, inv, ov, accounts, issuer]) => {
         setDashboard(dash);
@@ -111,7 +110,7 @@ export default function InvoicingPage() {
 
     setSaving(true);
     try {
-      const res = await fetch(`${API_URL}/accounting/invoices`, {
+      const res = await fetch(buildApiUrl(`accounting/invoices`), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${user.token}`,
@@ -165,7 +164,7 @@ export default function InvoicingPage() {
   };
 
   const loadDetail = (id: number) => {
-    fetch(`${API_URL}/accounting/invoices/${id}`, { headers })
+    fetch(buildApiUrl(`accounting/invoices/${id}`), { headers })
       .then((r) => r.json())
       .then(setSelected)
       .catch(() => {});
@@ -183,7 +182,7 @@ export default function InvoicingPage() {
 
     setSaving(true);
     try {
-      const res = await fetch(`${API_URL}/accounting/invoices/${selected.id}/payments`, {
+      const res = await fetch(buildApiUrl(`accounting/invoices/${selected.id}/payments`), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${user.token}`,
@@ -239,7 +238,7 @@ export default function InvoicingPage() {
 
     setSaving(true);
     try {
-      const res = await fetch(`${API_URL}/accounting/invoices/${invoice.id}`, {
+      const res = await fetch(buildApiUrl(`accounting/invoices/${invoice.id}`), {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${user.token}` },
       });

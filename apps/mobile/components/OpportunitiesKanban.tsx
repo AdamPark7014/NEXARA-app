@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
+import { buildApiUrl, getSocketBaseUrl } from '@/lib/api-base';
 import styles from './OpportunitiesKanban.module.css';
 
 interface KanbanOpportunity {
@@ -16,7 +17,6 @@ interface KanbanOpportunity {
 }
 
 interface OpportunitiesKanbanProps {
-  apiUrl: string;
   ownerId?: number;
   onUpdateStage?: (opportunityId: number, newStage: string) => Promise<void>;
   onSelectOpportunity?: (opportunity: KanbanOpportunity) => void;
@@ -33,7 +33,6 @@ const STAGES = [
 ];
 
 export default function OpportunitiesKanban({
-  apiUrl,
   ownerId,
   onUpdateStage,
   onSelectOpportunity,
@@ -64,7 +63,7 @@ export default function OpportunitiesKanban({
     setError(null);
     try {
       const query = ownerId ? `?ownerId=${ownerId}` : '';
-      const res = await fetch(`${apiUrl}/ventas/oportunidades${query}`, {
+      const res = await fetch(buildApiUrl(`ventas/oportunidades${query}`), {
         headers: { Authorization: `Bearer ${user.token}` },
       });
       if (!res.ok) throw new Error('Error al cargar oportunidades');
@@ -89,7 +88,7 @@ export default function OpportunitiesKanban({
     } finally {
       setLoading(false);
     }
-  }, [ownerId, user?.token, apiUrl]);
+  }, [ownerId, user?.token]);
 
   useEffect(() => {
     fetchOpportunities();
@@ -98,7 +97,7 @@ export default function OpportunitiesKanban({
   useEffect(() => {
     if (!user?.token) return;
 
-    const socketUrl = apiUrl.replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -120,7 +119,7 @@ export default function OpportunitiesKanban({
       if (refreshTimer) clearTimeout(refreshTimer);
       socket.disconnect();
     };
-  }, [user?.token, apiUrl, fetchOpportunities]);
+  }, [user?.token, fetchOpportunities]);
 
   useEffect(() => {
     setNowMs(Date.now());
@@ -153,7 +152,7 @@ export default function OpportunitiesKanban({
       } else {
         // Default API call
         const res = await fetch(
-          `${apiUrl}/ventas/oportunidades/${opportunity.id}`,
+          buildApiUrl(`ventas/oportunidades/${opportunity.id}`),
           {
             method: 'PATCH',
             headers: {

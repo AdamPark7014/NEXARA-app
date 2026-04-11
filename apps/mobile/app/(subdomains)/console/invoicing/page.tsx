@@ -1,11 +1,10 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
 import HelpTab from '../../../../components/HelpTab';
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: "Borrador", SENT: "Enviada", PAID: "Pagada", PARTIALLY_PAID: "Pago parcial",
@@ -29,9 +28,9 @@ export default function InvoicingPage() {
   useEffect(() => {
     if (!user?.token) return;
     Promise.all([
-      fetch(`${API_URL}/accounting/invoices/dashboard`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/accounting/invoices`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/accounting/invoices/overdue`, { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`accounting/invoices/dashboard`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`accounting/invoices`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`accounting/invoices/overdue`), { headers }).then((r) => r.json()),
     ])
       .then(([dash, inv, ov]) => {
         setDashboard(dash);
@@ -43,7 +42,7 @@ export default function InvoicingPage() {
   }, [user?.token]);
 
   const loadDetail = (id: number) => {
-    fetch(`${API_URL}/accounting/invoices/${id}`, { headers })
+    fetch(buildApiUrl(`accounting/invoices/${id}`), { headers })
       .then((r) => r.json())
       .then(setSelected)
       .catch(() => {});

@@ -1,5 +1,6 @@
 "use client";
 
+import { buildApiUrl } from "@/lib/api-base";
 import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
 import { useUser } from "@/components/UserContext";
@@ -50,12 +51,6 @@ type Project = {
   budgetUsed?: string | number | null;
   createdAt?: string | null;
 };
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(
-  /[\/.]+$/,
-  ""
-);
-const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("es-MX", {

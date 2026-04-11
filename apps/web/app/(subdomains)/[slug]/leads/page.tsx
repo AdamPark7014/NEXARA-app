@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { buildApiUrl } from "@/lib/api-base";
+import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import styles from "./page.module.css";
 
@@ -32,17 +33,12 @@ export default function VentasLeadsPage() {
     notes: "",
   });
 
-  const apiUrl = useMemo(() => {
-    const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
-    return base.replace(/[/.]+$/, "");
-  }, []);
-
   const fetchLeads = async () => {
     if (!user?.token) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${apiUrl}/ventas/leads`, {
+      const res = await fetch(buildApiUrl("ventas/leads"), {
         headers: { Authorization: `Bearer ${user.token}` },
       });
       if (!res.ok) throw new Error("No se pudieron cargar los leads");
@@ -69,7 +65,7 @@ export default function VentasLeadsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${apiUrl}/ventas/leads`, {
+      const res = await fetch(buildApiUrl("ventas/leads"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

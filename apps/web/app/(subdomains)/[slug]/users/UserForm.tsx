@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import React, { useEffect, useRef, useState } from "react";
 import Cropper from "react-easy-crop";
 import Slider from "@mui/material/Slider";
@@ -88,9 +89,6 @@ export default function UserForm({
 }) {
   const { user } = useUser();
   const searchParams = useSearchParams();
-  let API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-  API_URL = API_URL.replace(/[\/.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
   
   const getFullImageUrl = (url: string | undefined) => resolveUserAvatarUrl(url);
 

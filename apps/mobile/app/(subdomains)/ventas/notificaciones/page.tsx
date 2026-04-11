@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { buildApiUrl } from "@/lib/api-base";
+import { useEffect, useState } from 'react';
 import { useUser } from '@/components/UserContext';
 import { hasAnyPermission, PERMISSIONS } from '@/lib/permissions';
 import styles from './page.module.css';
@@ -52,15 +53,10 @@ export default function VentasNotificationsPage() {
   const canAccessSalesPanel = hasAnyPermission(user, [PERMISSIONS.PANEL_VENTAS, PERMISSIONS.SALES_VIEW]);
   const isSalesAdminOrSuperAdmin = Boolean(user?.isSuperAdmin) || hasAnyPermission(user, [PERMISSIONS.CONSOLE_ADMIN]);
 
-  const apiUrl = useMemo(() => {
-    const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-    return base.replace(/[/.]+$/, '');
-  }, []);
-
   const fetchNotifications = async () => {
     if (!user?.token) return;
     try {
-      const res = await fetch(`${apiUrl}/ventas/reportes/notificaciones?limit=50`, {
+      const res = await fetch(buildApiUrl('ventas/reportes/notificaciones?limit=50'), {
         headers: { Authorization: `Bearer ${user.token}` },
       });
       if (res.ok) {
@@ -77,11 +73,11 @@ export default function VentasNotificationsPage() {
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
-  }, [user?.token, apiUrl]);
+  }, [user?.token]);
 
   const handleMarkAsRead = async (notificationId: number) => {
     if (!user?.token) return;
-    await fetch(`${apiUrl}/ventas/reportes/notificaciones/${notificationId}/read`, {
+    await fetch(buildApiUrl(`ventas/reportes/notificaciones/${notificationId}/read`), {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${user.token}` },
     });
@@ -90,7 +86,7 @@ export default function VentasNotificationsPage() {
 
   const handleMarkAllAsRead = async () => {
     if (!user?.token) return;
-    await fetch(`${apiUrl}/ventas/reportes/notificaciones/read/all`, {
+    await fetch(buildApiUrl('ventas/reportes/notificaciones/read/all'), {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${user.token}` },
     });
@@ -99,7 +95,7 @@ export default function VentasNotificationsPage() {
 
   const handleDelete = async (notificationId: number) => {
     if (!user?.token) return;
-    await fetch(`${apiUrl}/ventas/reportes/notificaciones/${notificationId}`, {
+    await fetch(buildApiUrl(`ventas/reportes/notificaciones/${notificationId}`), {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${user.token}` },
     });

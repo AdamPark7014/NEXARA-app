@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useUser } from './UserContext';
 import { revokeObjectUrlLater, triggerBlobDownload } from '@/lib/file-download';
@@ -113,9 +114,6 @@ const MyProfileForm: React.FC = () => {
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
-
   const normalizedDocs = useMemo(() => {
     const map = new Map<string, DocumentItem>();
     documents.forEach((doc) => {
@@ -181,7 +179,7 @@ const MyProfileForm: React.FC = () => {
   useEffect(() => {
     if (!user?.token) return;
 
-    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -203,7 +201,7 @@ const MyProfileForm: React.FC = () => {
       if (refreshTimer) clearTimeout(refreshTimer);
       socket.disconnect();
     };
-  }, [user?.token, API_URL, loadProfile]);
+  }, [user?.token, loadProfile]);
 
   const handleChange = (field: keyof ProfileForm, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));

@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
+import { useCallback, useEffect, useState } from 'react';
 import { useUser } from '@/components/UserContext';
 import styles from './OrderTemplatesManager.module.css';
 import { io, Socket } from 'socket.io-client';
@@ -134,11 +135,6 @@ const mergeSections = (incoming?: Partial<TemplateSections> | null): TemplateSec
 export default function OrderTemplatesManager() {
   const { user } = useUser();
 
-  const apiUrl = useMemo(() => {
-    const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-    return base.replace(/[/.]+$/, '');
-  }, []);
-
   const [templates, setTemplates] = useState<OrderTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -153,7 +149,7 @@ export default function OrderTemplatesManager() {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch(`${apiUrl}/ventas/order-templates`, {
+      const res = await fetch(buildApiUrl("ventas/order-templates"), {
         headers: { Authorization: `Bearer ${user.token}` },
       });
       const payload = await res.json();
@@ -164,7 +160,7 @@ export default function OrderTemplatesManager() {
     } finally {
       setLoading(false);
     }
-  }, [apiUrl, user?.token]);
+  }, [user?.token]);
 
   useEffect(() => {
     if (!user?.token) return;
@@ -174,7 +170,7 @@ export default function OrderTemplatesManager() {
   useEffect(() => {
     if (!user?.token) return;
 
-    const socketUrl = apiUrl.replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -196,7 +192,7 @@ export default function OrderTemplatesManager() {
       if (refreshTimer) clearTimeout(refreshTimer);
       socket.disconnect();
     };
-  }, [apiUrl, user?.token, fetchTemplates]);
+  }, [user?.token, fetchTemplates]);
 
   const onFormChange = (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
@@ -263,8 +259,8 @@ export default function OrderTemplatesManager() {
       setError(null);
       const method = editingId ? 'PATCH' : 'POST';
       const url = editingId
-        ? `${apiUrl}/ventas/order-templates/${editingId}`
-        : `${apiUrl}/ventas/order-templates`;
+        ? buildApiUrl(`ventas/order-templates/${editingId}`)
+        : buildApiUrl("ventas/order-templates");
 
       const res = await fetch(url, {
         method,
@@ -293,7 +289,7 @@ export default function OrderTemplatesManager() {
     if (!user?.token) return;
     if (!window.confirm('¿Eliminar esta plantilla?')) return;
     try {
-      const res = await fetch(`${apiUrl}/ventas/order-templates/${id}`, {
+      const res = await fetch(buildApiUrl(`ventas/order-templates/${id}`), {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${user.token}` },
       });
@@ -309,7 +305,7 @@ export default function OrderTemplatesManager() {
   const setAsDefault = async (id: number) => {
     if (!user?.token) return;
     try {
-      const res = await fetch(`${apiUrl}/ventas/order-templates/${id}/set-default`, {
+      const res = await fetch(buildApiUrl(`ventas/order-templates/${id}/set-default`), {
         method: 'POST',
         headers: { Authorization: `Bearer ${user.token}` },
       });

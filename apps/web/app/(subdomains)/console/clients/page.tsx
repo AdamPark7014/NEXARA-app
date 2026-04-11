@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
 import React, { useEffect, useRef, useState } from 'react';
 import { RoleGuard } from '@/components/RoleGuard';
 import { PERMISSIONS } from '@/lib/permissions';
@@ -37,8 +38,6 @@ export default function ClientsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const editLogoInputRef = useRef<HTMLInputElement>(null);
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
   const getLogoUrl = (logoPath?: string) => {
     if (!logoPath) return null;
     // Si ya tiene el dominio completo, devolverlo tal cual
@@ -46,7 +45,7 @@ export default function ClientsPage() {
       return logoPath;
     }
     // Construir URL completa - el logo está en /uploads/clients que se sirve desde la raíz
-    const baseUrl = API_URL.replace(/\/api\/?$/, '');
+    const baseUrl = getApiAssetOrigin();
     // Asegurar que logoPath comience con /
     const normalizedPath = logoPath.startsWith('/') ? logoPath : `/${logoPath}`;
     return `${baseUrl}${normalizedPath}`;

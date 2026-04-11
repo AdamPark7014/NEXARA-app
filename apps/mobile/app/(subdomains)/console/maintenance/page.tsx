@@ -1,11 +1,10 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
 import HelpTab from '../../../../components/HelpTab';
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 export default function MaintenancePage() {
   const { user } = useUser();
@@ -18,8 +17,8 @@ export default function MaintenancePage() {
     if (!user?.token) return;
     const headers = { Authorization: `Bearer ${user.token}` };
     Promise.all([
-      fetch(`${API_URL}/maintenance/work-orders`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/maintenance/assets/schedules/overdue`, { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`maintenance/work-orders`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`maintenance/assets/schedules/overdue`), { headers }).then((r) => r.json()),
     ])
       .then(([wo, ov]) => {
         setOrders(Array.isArray(wo) ? wo : wo.data || []);

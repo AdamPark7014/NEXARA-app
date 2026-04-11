@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
@@ -71,11 +72,6 @@ const FinesTable: React.FC<FinesTableProps> = ({
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [MOBILE_BREAKPOINT]);
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(
-    /[\/.]+$/,
-    ''
-  );
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
 
   // Cargar usuarios disponibles
   useEffect(() => {
@@ -181,7 +177,7 @@ const FinesTable: React.FC<FinesTableProps> = ({
   useEffect(() => {
     if (!user?.token) return;
 
-    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -203,7 +199,7 @@ const FinesTable: React.FC<FinesTableProps> = ({
       if (refreshTimer) clearTimeout(refreshTimer);
       socket.disconnect();
     };
-  }, [user?.token, API_URL, tipoFiltro, usuarioFiltro, estatusPago]);
+  }, [user?.token, tipoFiltro, usuarioFiltro, estatusPago]);
 
   useEffect(() => {
     if (onRefresh) {

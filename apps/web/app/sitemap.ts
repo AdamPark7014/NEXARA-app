@@ -14,12 +14,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 1,
     },
     {
-      url: `${baseUrl}/nexara`,
-      lastModified: now,
-      changeFrequency: "weekly",
-      priority: 0.92,
-    },
-    {
       url: `${baseUrl}/servicios`,
       lastModified: now,
       changeFrequency: "weekly",
@@ -54,12 +48,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: now,
       changeFrequency: "monthly",
       priority: 0.72,
-    },
-    {
-      url: `${baseUrl}/cotizaciones`,
-      lastModified: now,
-      changeFrequency: "monthly",
-      priority: 0.7,
     },
     {
       url: `${baseUrl}/legal/privacidad`,

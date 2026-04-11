@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import React, { useEffect, useState } from 'react';
 import { RoleGuard } from '@/components/RoleGuard';
 import { PERMISSIONS } from '@/lib/permissions';
@@ -8,8 +9,6 @@ export default function ClientsPage() {
   const { user } = useUser();
   const [clients, setClients] = useState<any[]>([]);
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
 
   const fetchClients = () => {
     if (!user?.token) return;

@@ -1,3 +1,11 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Uso de marca",
+  alternates: { canonical: "/legal/marca" },
+  robots: { index: true, follow: true },
+};
+
 export default function MarcaPage() {
   return (
     <main

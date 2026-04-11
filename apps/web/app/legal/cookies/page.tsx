@@ -1,3 +1,11 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Política de cookies",
+  alternates: { canonical: "/legal/cookies" },
+  robots: { index: true, follow: true },
+};
+
 export default function CookiesPage() {
   return (
     <main style={{ maxWidth: 900, margin: "0 auto", padding: "clamp(20px, 6vw, 48px) clamp(14px, 4vw, 20px)", color: "var(--text-primary)" }}>

@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useEffect, useState, useCallback } from 'react';
 import { useUser } from './UserContext';
 import styles from './ToolMyKitPanel.module.css';
@@ -33,9 +34,6 @@ const ToolMyKitPanel: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
-
   const fetchKit = useCallback(async () => {
     if (!user?.token) return;
     setLoading(true);
@@ -53,7 +51,7 @@ const ToolMyKitPanel: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [user?.token, API_URL]);
+  }, [user?.token]);
 
   useEffect(() => {
     fetchKit();
@@ -62,7 +60,7 @@ const ToolMyKitPanel: React.FC = () => {
   useEffect(() => {
     if (!user?.token) return;
 
-    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -84,7 +82,7 @@ const ToolMyKitPanel: React.FC = () => {
       if (refreshTimer) clearTimeout(refreshTimer);
       socket.disconnect();
     };
-  }, [user?.token, API_URL, fetchKit]);
+  }, [user?.token, fetchKit]);
 
   const reportIncident = async (assignmentId: number) => {
     if (!user?.token) return;

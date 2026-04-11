@@ -1,5 +1,6 @@
 "use client";
 
+import { buildApiUrl } from "@/lib/api-base";
 import React, { useEffect, useMemo, useState } from "react";
 import ContabilidadViaticTable from "./ContabilidadViaticTable";
 import { useUser } from "@/components/UserContext";
@@ -19,12 +20,6 @@ type Viatic = {
   montoSolicitado?: number | null;
   estatusPago?: string | null;
 };
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(
-  /[\/.]+$/,
-  ""
-);
-const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("es-MX", {

@@ -1,11 +1,10 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
 import HelpTab from "@/components/HelpTab";
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 export default function SafetyPage() {
   const { user } = useUser();
@@ -26,9 +25,9 @@ export default function SafetyPage() {
     setLoading(true);
     const headers = { Authorization: `Bearer ${user.token}` };
     Promise.all([
-      fetch(`${API_URL}/safety/incidents`, { headers }).then(r => r.json()),
-      fetch(`${API_URL}/safety/permits`, { headers }).then(r => r.json()),
-      fetch(`${API_URL}/safety/training`, { headers }).then(r => r.json()),
+      fetch(buildApiUrl(`safety/incidents`), { headers }).then(r => r.json()),
+      fetch(buildApiUrl(`safety/permits`), { headers }).then(r => r.json()),
+      fetch(buildApiUrl(`safety/training`), { headers }).then(r => r.json()),
     ])
       .then(([inc, per, tr]) => {
         setIncidents(Array.isArray(inc) ? inc : inc.data || []);
@@ -43,7 +42,7 @@ export default function SafetyPage() {
     if (!user?.token || !incidentForm.type) return;
     setSavingIncident(true);
     try {
-      const res = await fetch(`${API_URL}/safety/incidents`, {
+      const res = await fetch(buildApiUrl(`safety/incidents`), {
         method: "POST",
         headers: { Authorization: `Bearer ${user.token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ ...incidentForm, occurredAt: new Date() }),
@@ -64,7 +63,7 @@ export default function SafetyPage() {
     try {
       const validUntil = new Date();
       validUntil.setDate(validUntil.getDate() + permitForm.validDays);
-      const res = await fetch(`${API_URL}/safety/permits`, {
+      const res = await fetch(buildApiUrl(`safety/permits`), {
         method: "POST",
         headers: { Authorization: `Bearer ${user.token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ ...permitForm, validUntil }),

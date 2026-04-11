@@ -310,7 +310,7 @@ export default function ListUsers() {
   return (
     <>
       <div style={tableWrapStyle}>
-        <table className="table">
+        <table className="usersTable">
           <colgroup>
             <col style={{ width: "82px" }} />
             <col style={{ width: "27%" }} />
@@ -395,7 +395,11 @@ export default function ListUsers() {
       {showModal && editing && (
         <div className="editModalOverlay" role="dialog" aria-modal="true">
           <div className="editModal">
-            <button onClick={() => setShowModal(false)} className="editModalClose" aria-label="Cerrar">✕</button>
+            <button type="button" onClick={() => setShowModal(false)} className="editModalClose" aria-label="Cerrar">✕</button>
+            <div className="editModalHead">
+              <h2 className="editModalTitle">Editar usuario</h2>
+              <p className="editModalSub">{editing.nombre}</p>
+            </div>
             <UserForm
               initialUser={editing}
               onUserCreated={() => {
@@ -405,6 +409,7 @@ export default function ListUsers() {
               }}
               onUserUpdated={handleUpdate}
               isEdit
+              showHeader={false}
             />
           </div>
         </div>
@@ -750,42 +755,112 @@ export default function ListUsers() {
           inset: 0;
           background: rgba(4, 10, 20, 0.75);
           display: flex;
-          align-items: center;
+          align-items: flex-end;
           justify-content: center;
           z-index: 1000;
-          padding: clamp(12px, 3vw, 24px);
+          padding: 0;
+          padding-bottom: env(safe-area-inset-bottom, 0px);
+          overscroll-behavior: contain;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        @media (min-width: 640px) {
+          .editModalOverlay {
+            align-items: center;
+            padding: clamp(12px, 3vw, 24px);
+            padding-bottom: max(clamp(12px, 3vw, 24px), env(safe-area-inset-bottom, 0px));
+          }
         }
 
         .editModal {
           position: relative;
-          width: min(760px, 94vw);
-          max-height: 90vh;
+          width: 100%;
+          max-width: min(760px, 100vw);
+          max-height: min(92dvh, 90vh);
           overflow: auto;
+          overflow-x: hidden;
           background: var(--surface);
-          padding: 28px 28px 32px;
-          border-radius: 20px;
+          padding: 20px 18px calc(22px + env(safe-area-inset-bottom, 0px));
+          border-radius: 20px 20px 0 0;
           border: 1px solid rgba(255, 255, 255, 0.08);
-          box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45);
+          border-bottom: none;
+          box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        @media (min-width: 640px) {
+          .editModal {
+            width: min(760px, 94vw);
+            max-height: min(90dvh, 88vh);
+            border-radius: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 28px 28px 32px;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45);
+          }
+        }
+
+        .editModalHead {
+          padding-right: 48px;
+          margin-bottom: 14px;
+        }
+
+        .editModalTitle {
+          margin: 0 0 4px;
+          font-size: 1.15rem;
+          font-weight: 750;
+          color: var(--foreground);
+          line-height: 1.25;
+        }
+
+        .editModalSub {
+          margin: 0;
+          font-size: 0.82rem;
+          color: var(--text-secondary);
+          overflow-wrap: anywhere;
+        }
+
+        @media (min-width: 640px) {
+          .editModalTitle {
+            font-size: 1.35rem;
+          }
         }
 
         .editModalClose {
           position: absolute;
-          top: 14px;
-          right: 14px;
+          top: max(12px, env(safe-area-inset-top, 0px));
+          right: max(12px, env(safe-area-inset-right, 0px));
           border: none;
           background: rgba(255, 255, 255, 0.08);
           color: var(--text-secondary);
-          border-radius: 10px;
-          width: 32px;
-          height: 32px;
+          border-radius: 12px;
+          width: 44px;
+          height: 44px;
+          min-width: 44px;
+          min-height: 44px;
           cursor: pointer;
-          font-size: 16px;
+          font-size: 18px;
+          line-height: 1;
+          display: grid;
+          place-items: center;
           transition: color 0.2s ease, background 0.2s ease;
+          touch-action: manipulation;
+          -webkit-tap-highlight-color: transparent;
         }
 
         .editModalClose:hover {
           color: var(--text-primary);
           background: rgba(255, 255, 255, 0.16);
+        }
+
+        @media (min-width: 640px) {
+          .editModalClose {
+            top: 14px;
+            right: 14px;
+            width: 36px;
+            height: 36px;
+            min-width: 36px;
+            min-height: 36px;
+            font-size: 16px;
+          }
         }
 
         .profileModalOverlay {
@@ -974,11 +1049,6 @@ export default function ListUsers() {
           .usersTable thead th,
           .usersTable tbody td {
             padding: 9px 8px;
-          }
-
-          .editModal {
-            width: 94vw;
-            padding: 20px 18px 26px;
           }
 
           .profileModal {

@@ -1,5 +1,6 @@
 "use client";
 
+import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
 import React, { useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
 
@@ -35,11 +36,6 @@ type NewsFormState = {
   publishedAt: string;
 };
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(
-  /[\/.]+$/,
-  ""
-);
-const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
 const MAX_GALLERY_IMAGES = 8;
 
 const INITIAL_FORM: NewsFormState = {
@@ -74,10 +70,11 @@ const normalizeNewsImageUrl = (imageUrl?: string | null) => {
   if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
     return imageUrl;
   }
+  const assetOrigin = getApiAssetOrigin();
   if (imageUrl.startsWith("/")) {
-    return `${API_URL}${imageUrl}`;
+    return `${assetOrigin}${imageUrl}`;
   }
-  return `${API_URL}/${imageUrl}`;
+  return `${assetOrigin}/${imageUrl}`;
 };
 
 export default function NoticiasPanel() {

@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { RoleGuard } from "@/components/RoleGuard";
@@ -6,8 +7,6 @@ import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
 
 const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false });
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 export default function ProcurementDashboardPage() {
   const { user } = useUser();
@@ -31,7 +30,7 @@ export default function ProcurementDashboardPage() {
     if (fromDate) params.append("fromDate", fromDate);
     if (toDate) params.append("toDate", toDate);
     
-    fetch(`${API_URL}/procurement/purchase-orders/dashboard?${params.toString()}`, {
+    fetch(buildApiUrl(`procurement/purchase-orders/dashboard?${params.toString()}`), {
       headers: { Authorization: `Bearer ${user.token}` },
     })
       .then((r) => r.json())
@@ -56,7 +55,7 @@ export default function ProcurementDashboardPage() {
       if (fromDate) params.append("fromDate", fromDate);
       if (toDate) params.append("toDate", toDate);
 
-      const res = await fetch(`${API_URL}/procurement/purchase-orders/dashboard/pdf?${params.toString()}`, {
+      const res = await fetch(buildApiUrl(`procurement/purchase-orders/dashboard/pdf?${params.toString()}`), {
         headers: { Authorization: `Bearer ${user.token}` },
       });
 

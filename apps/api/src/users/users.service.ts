@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
@@ -66,14 +67,21 @@ export class UsersService {
     });
   }
 
-  private async resolveEmployeeNumber(employeeNumber: string | undefined, fallbackId: number, excludeUserId?: number) {
+  private async resolveEmployeeNumber(
+    employeeNumber: string | undefined,
+    fallbackId: number,
+    excludeUserId?: number,
+    opts?: { tx?: Prisma.TransactionClient; skipClear?: boolean },
+  ) {
     const normalized = this.normalizeEmployeeNumber(employeeNumber) || this.formatEmployeeNumberFromId(fallbackId);
 
-    // Keep protected superadmin users without employee numbers so they never
-    // consume values from the operational employee numbering sequence.
-    await this.clearEmployeeNumberForProtectedUsers();
+    if (!opts?.skipClear) {
+      await this.clearEmployeeNumberForProtectedUsers();
+    }
 
-    const existing = await this.prisma['user'].findFirst({
+    const userDelegate = opts?.tx?.user ?? this.prisma.user;
+
+    const existing = await userDelegate.findFirst({
       where: {
         employeeNumber: normalized,
         email: { notIn: this.superAdminEmails },
@@ -91,6 +99,20 @@ export class UsersService {
     }
 
     return normalized;
+  }
+
+  private mapUserUniqueConstraintError(e: Prisma.PrismaClientKnownRequestError): BadRequestException | null {
+    if (e.code !== 'P2002') return null;
+    const raw = e.meta?.target as string | string[] | undefined;
+    const parts = Array.isArray(raw) ? raw : raw != null ? [String(raw)] : [];
+    const joined = parts.join(' ').toLowerCase();
+    if (joined.includes('email')) {
+      return new BadRequestException('Este correo electrónico ya está registrado.');
+    }
+    if (joined.includes('employeenumber') || joined.includes('employee_number')) {
+      return new BadRequestException('Ese número de empleado ya está en uso.');
+    }
+    return new BadRequestException('Ya existe un registro duplicado; revisa el correo o el número de empleado.');
   }
 
   async getNextEmployeeNumber() {
@@ -189,27 +211,61 @@ export class UsersService {
     const roleId = await this.resolveRoleId(createUserDto.roleId);
     const departmentId = await this.resolveDepartmentId(createUserDto.departmentId);
     if (!departmentId) throw new BadRequestException('Departamento requerido');
-    const createdUser = await this.prisma['user'].create({
-      data: {
-        nombre: createUserDto.nombre,
-        email: createUserDto.email,
-        roleId,
-        departmentId,
-        avatarUrl: createUserDto.avatarUrl,
-        passwordHash: hash,
-      },
-    });
+    const emailNorm = createUserDto.email.trim().toLowerCase();
 
-    if (this.isProtectedSuperAdminEmail(createdUser.email)) {
-      return this.withEmployeeNumber(createdUser);
+    const emailDup = await this.prisma.user.findFirst({
+      where: { email: { equals: emailNorm, mode: 'insensitive' } },
+      select: { id: true, nombre: true, email: true },
+    });
+    if (emailDup) {
+      throw new BadRequestException(`El correo ya está registrado (${emailDup.nombre || emailDup.email}).`);
     }
 
-    const employeeNumber = await this.resolveEmployeeNumber(createUserDto.employeeNumber, createdUser.id, createdUser.id);
-    const updatedUser = await this.prisma['user'].update({
-      where: { id: createdUser.id },
-      data: { employeeNumber },
-    });
-    return this.withEmployeeNumber(updatedUser);
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const dupInTx = await tx.user.findFirst({
+          where: { email: { equals: emailNorm, mode: 'insensitive' } },
+          select: { id: true },
+        });
+        if (dupInTx) {
+          throw new BadRequestException('El correo ya está registrado.');
+        }
+
+        const createdUser = await tx.user.create({
+          data: {
+            nombre: createUserDto.nombre,
+            email: emailNorm,
+            roleId,
+            departmentId,
+            avatarUrl: createUserDto.avatarUrl,
+            passwordHash: hash,
+          },
+        });
+
+        if (this.isProtectedSuperAdminEmail(createdUser.email)) {
+          return this.withEmployeeNumber(createdUser);
+        }
+
+        const employeeNumber = await this.resolveEmployeeNumber(
+          createUserDto.employeeNumber,
+          createdUser.id,
+          createdUser.id,
+          { tx, skipClear: true },
+        );
+        const updatedUser = await tx.user.update({
+          where: { id: createdUser.id },
+          data: { employeeNumber },
+        });
+        return this.withEmployeeNumber(updatedUser);
+      });
+    } catch (e) {
+      if (e instanceof BadRequestException) throw e;
+      if (e instanceof Prisma.PrismaClientKnownRequestError) {
+        const mapped = this.mapUserUniqueConstraintError(e);
+        if (mapped) throw mapped;
+      }
+      throw e;
+    }
   }
 
 

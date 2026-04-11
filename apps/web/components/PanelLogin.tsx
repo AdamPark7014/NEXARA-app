@@ -1,5 +1,6 @@
 "use client";
 
+import { getSocketBaseUrl, buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -29,7 +30,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
   const router = useRouter();
 
   useEffect(() => {
-    const socketUrl = (process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['websocket', 'polling'] });
 
     let clearErrorTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -59,7 +60,6 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
     setIsLoading(true);
     try {
       const deviceHeaders = await getDeviceIdentityHeaders();
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
       const payload = {
         email,
         password,
@@ -77,14 +77,14 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
       };
 
       if (mode === "tickets") {
-        const clientAttempt = await loginToEndpoint(`${API_URL}/client-auth/login`);
+        const clientAttempt = await loginToEndpoint(buildApiUrl("client-auth/login"));
         if (clientAttempt.res.ok) {
           onClientLogin?.(clientAttempt.data);
           if (!onClientLogin) router.replace(redirectTo);
           return;
         }
 
-        const branchAttempt = await loginToEndpoint(`${API_URL}/branch-auth/login`);
+        const branchAttempt = await loginToEndpoint(buildApiUrl("branch-auth/login"));
         if (branchAttempt.res.ok) {
           onBranchLogin?.(branchAttempt.data);
           if (!onBranchLogin) router.replace(redirectTo);
@@ -100,11 +100,12 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         );
       }
 
-      const endpoint = mode === "client"
-        ? `${API_URL}/client-auth/login`
-        : mode === "branch"
-          ? `${API_URL}/branch-auth/login`
-          : `${API_URL}/auth/login`;
+      const endpoint =
+        mode === "client"
+          ? buildApiUrl("client-auth/login")
+          : mode === "branch"
+            ? buildApiUrl("branch-auth/login")
+            : buildApiUrl("auth/login");
       const { res, data } = await loginToEndpoint(endpoint);
       if (!res.ok) throw new Error(data.message || data.error || "Credenciales incorrectas");
 

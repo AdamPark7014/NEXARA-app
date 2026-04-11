@@ -13,7 +13,7 @@ import {
   type SalesProjectDetail,
   type SalesProjectOrder,
 } from "@/lib/sales-api";
-import { getApiBase } from "@/lib/api-base";
+import { getApiAssetOrigin } from "@/lib/api-base";
 import styles from "./page.module.css";
 
 type SalesProject = SalesProjectDetail;
@@ -22,7 +22,6 @@ export default function VentasProyectosPage() {
   const { user } = useUser();
   const router = useRouter();
   const scope = getSalesScope(user, typeof window === "undefined" ? "" : window.location.search);
-  const apiOrigin = getApiBase().replace(/\/+api\/?$/, "");
   const [projects, setProjects] = useState<SalesProject[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -137,9 +136,10 @@ export default function VentasProyectosPage() {
     }
     try {
       const link = document.createElement("a");
+      const assetBase = getApiAssetOrigin().replace(/\/+$/, "");
       link.href = order.orderPdfUrl.startsWith("http")
         ? order.orderPdfUrl
-        : `${apiOrigin}${order.orderPdfUrl.startsWith("/") ? "" : "/"}${order.orderPdfUrl}`;
+        : `${assetBase}${order.orderPdfUrl.startsWith("/") ? "" : "/"}${order.orderPdfUrl}`;
       link.download = `orden-${order.orderId}.pdf`;
       document.body.appendChild(link);
       link.click();

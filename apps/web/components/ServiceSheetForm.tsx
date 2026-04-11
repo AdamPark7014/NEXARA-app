@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useUser } from './UserContext';
 import PDFViewer from './PDFViewer';
@@ -37,8 +38,6 @@ export default function ServiceSheetForm() {
   const [showPdfViewer, setShowPdfViewer] = useState(false);
   const pdfModalRef = useRef<HTMLDivElement | null>(null);
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
 
   const loadActivities = useCallback(async () => {
     if (!user?.token) return;
@@ -60,7 +59,7 @@ export default function ServiceSheetForm() {
   useEffect(() => {
     if (!user?.token) return;
 
-    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -82,7 +81,7 @@ export default function ServiceSheetForm() {
       if (refreshTimer) clearTimeout(refreshTimer);
       socket.disconnect();
     };
-  }, [user?.token, loadActivities, API_URL]);
+  }, [user?.token, loadActivities]);
 
   const handleSave = async () => {
     if (!user?.token || !activityId) return;

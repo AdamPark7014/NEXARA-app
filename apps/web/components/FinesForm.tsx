@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useEffect, useState, useCallback } from 'react';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
@@ -87,8 +88,6 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
   const [success, setSuccess] = useState<string | null>(null);
   const [permisoSi, setPermisoSi] = useState(false);
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
 
   const loadUsers = useCallback(async () => {
     if (!user?.token || !permisoSi) return;
@@ -140,7 +139,7 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
     } catch {
       setUsuarios([]);
     }
-  }, [user?.token, user, permisoSi, API_URL]);
+  }, [user?.token, user, permisoSi]);
 
   // Verificar permisos - Admin y SuperAdmin pueden crear multas
   useEffect(() => {
@@ -158,7 +157,7 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
   useEffect(() => {
     if (!user?.token || !permisoSi) return;
 
-    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -180,7 +179,7 @@ const FinesForm: React.FC<FineFormProps> = ({ onFineCreated }) => {
       if (refreshTimer) clearTimeout(refreshTimer);
       socket.disconnect();
     };
-  }, [user?.token, permisoSi, API_URL, loadUsers]);
+  }, [user?.token, permisoSi, loadUsers]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

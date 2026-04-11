@@ -1,4 +1,5 @@
-import { BadRequestException, Controller, Post, Body, Get, Param, Patch, Delete, UseGuards } from '@nestjs/common';
+import { BadRequestException, ConflictException, Controller, Post, Body, Get, Param, Patch, Delete, UseGuards } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateRoleDto } from './dto/create-role.dto.js';
 import { UpdateRoleDto } from './dto/update-role.dto.js';
@@ -50,8 +51,31 @@ export class RolesController {
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ROLES_MANAGE] })
   async create(@Body() createRoleDto: CreateRoleDto) {
-    const data = this.sanitizeRolePayload(createRoleDto);
-    return this.prisma.role.create({ data });
+    const data = { ...this.sanitizeRolePayload(createRoleDto) };
+    const name = String(data.nombre || '').trim();
+    if (!name) {
+      throw new BadRequestException('Nombre de rol requerido');
+    }
+    data.nombre = name;
+
+    const existing = await this.prisma.role.findFirst({
+      where: { nombre: { equals: name, mode: 'insensitive' } },
+      select: { id: true, nombre: true },
+    });
+    if (existing) {
+      throw new ConflictException(
+        `Ya existe un rol llamado "${existing.nombre}". Asigna ese rol o elige otro nombre.`,
+      );
+    }
+
+    try {
+      return await this.prisma.role.create({ data });
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        throw new ConflictException('Ya existe un rol con ese nombre.');
+      }
+      throw e;
+    }
   }
 
   @Get()

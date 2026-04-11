@@ -5,7 +5,7 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import PanelLogin from "@/components/PanelLogin";
 import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLocationPicker";
 import TicketsInventoryManager from "@/components/TicketsInventoryManager";
-import { getApiAssetOrigin } from "@/lib/api-base";
+import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
 import { useTheme } from "@/components/ThemeContext";
 import consoleStyles from "../../console/console.module.css";
 import styles from "../tickets.module.css";
@@ -136,8 +136,6 @@ export default function BranchTicketsPage() {
   const params = useParams();
   const branchSlug = Array.isArray(params?.branch) ? params.branch[0] : (params?.branch as string | undefined);
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
   const getAssetUrl = (url?: string | null) => {
     if (!url) return "";
     const raw = url.trim();
@@ -852,7 +850,6 @@ export default function BranchTicketsPage() {
           {activeTab === "inventories" && session?.token && (
             <TicketsInventoryManager
               token={session.token}
-              apiUrl={API_URL}
               mode="branch"
               fixedBranch={{
                 id: session.branch.id,

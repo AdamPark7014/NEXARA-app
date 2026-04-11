@@ -1,5 +1,6 @@
 "use client";
 
+import { buildApiUrl } from "@/lib/api-base";
 import React, { useEffect, useMemo, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import styles from "./page.module.css";
@@ -44,12 +45,6 @@ type WorkProject = {
   payroll?: WorkProjectPayroll[];
   logs?: WorkProjectLog[];
 };
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(
-  /[\/.]+$/,
-  ""
-);
-const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
 
 const formatDate = (value?: string | null) =>
   value ? new Date(value).toLocaleDateString("es-MX") : "";

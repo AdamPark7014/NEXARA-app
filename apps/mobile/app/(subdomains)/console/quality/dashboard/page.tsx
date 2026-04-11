@@ -1,11 +1,10 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
 import HelpTab from "@/components/HelpTab";
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 export default function QualityDashboardPage() {
   const { user } = useUser();
@@ -14,7 +13,7 @@ export default function QualityDashboardPage() {
 
   useEffect(() => {
     if (!user?.token) return;
-    fetch(`${API_URL}/quality/ncr/dashboard`, {
+    fetch(buildApiUrl(`quality/ncr/dashboard`), {
       headers: { Authorization: `Bearer ${user.token}` },
     })
       .then((r) => r.json())

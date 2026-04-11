@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
@@ -34,7 +35,6 @@ interface ToolRenewalsTableProps {
 
 const ToolRenewalsTable: React.FC<ToolRenewalsTableProps> = ({ refreshTrigger = 0 }) => {
   const { user } = useUser();
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const [renewals, setRenewals] = useState<ToolRenewal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +48,7 @@ const ToolRenewalsTable: React.FC<ToolRenewalsTableProps> = ({ refreshTrigger = 
     if (!user) return;
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/tool-requests/renewals/pending`, {
+      const res = await fetch(buildApiUrl(`tool-requests/renewals/pending`), {
         headers: { Authorization: `Bearer ${user.token}` },
       });
       if (!res.ok) throw new Error('Error al cargar renovaciones');
@@ -69,7 +69,7 @@ const ToolRenewalsTable: React.FC<ToolRenewalsTableProps> = ({ refreshTrigger = 
   useEffect(() => {
     if (!user?.token) return;
 
-    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -91,7 +91,7 @@ const ToolRenewalsTable: React.FC<ToolRenewalsTableProps> = ({ refreshTrigger = 
       if (refreshTimer) clearTimeout(refreshTimer);
       socket.disconnect();
     };
-  }, [user?.token, API_URL, refreshTrigger]);
+  }, [user?.token, refreshTrigger]);
 
   const filteredRenewals = statusFilter === 'all'
     ? renewals
@@ -135,9 +135,9 @@ const ToolRenewalsTable: React.FC<ToolRenewalsTableProps> = ({ refreshTrigger = 
       let body = {};
 
       if (actionType === 'approve') {
-        endpoint = `${API_URL}/tool-requests/renewals/${selectedRenewalId}/approve`;
+        endpoint = buildApiUrl(`tool-requests/renewals/${selectedRenewalId}/approve`);
       } else {
-        endpoint = `${API_URL}/tool-requests/renewals/${selectedRenewalId}/reject`;
+        endpoint = buildApiUrl(`tool-requests/renewals/${selectedRenewalId}/reject`);
         body = { reason: rejectionReason };
       }
 

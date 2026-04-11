@@ -9,7 +9,7 @@ import {
   type SalesClient,
   type SalesClientDocument,
 } from "@/lib/sales-api";
-import { getApiBase } from "@/lib/api-base";
+import { getApiAssetOrigin } from "@/lib/api-base";
 import { getSalesScope } from "@/lib/sales-scope";
 import styles from "./page.module.css";
 
@@ -35,8 +35,6 @@ export default function VentasClientesPage() {
     status: "Activo",
     notes: "",
   });
-  const apiBase = getApiBase().replace(/\/+api\/?$/, "");
-
   const fetchClients = async () => {
     if (!user?.token) return;
     setLoading(true);
@@ -262,7 +260,8 @@ export default function VentasClientesPage() {
   function getAssetUrl(url?: string | null) {
     if (!url) return "";
     if (url.startsWith("http")) return url;
-    return `${apiBase}${url.startsWith("/") ? "" : "/"}${url}`;
+    const base = getApiAssetOrigin().replace(/\/+$/, "");
+    return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
   }
 }
 

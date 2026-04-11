@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useUser } from './UserContext';
 import styles from './ProjectCostTracker.module.css';
 import { io, Socket } from 'socket.io-client';
+import { getSocketBaseUrl } from '@/lib/api-base';
 
 interface ProjectCosts {
   costProducts: number;
@@ -74,9 +75,7 @@ export default function ProjectCostTracker({
   useEffect(() => {
     if (!token) return;
 
-    const socketUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api')
-      .replace(/[\/.]+$/, '')
-      .replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 

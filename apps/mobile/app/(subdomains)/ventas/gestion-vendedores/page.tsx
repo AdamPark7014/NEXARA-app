@@ -12,7 +12,7 @@ import {
   type SalesMetrics,
   type SalesVendorStats,
 } from "@/lib/sales-api";
-
+import { buildApiUrl } from "@/lib/api-base";
 
 type AttendanceEvent = { type: string; timestamp: string };
 
@@ -121,19 +121,17 @@ export default function VentasGestionVendedoresPage() {
       }
 
       setLoading(true);
-      setError(null);
-      const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[/.]+$/, "");
-      const { from, to } = getRangeForPeriod(period);
+      setError(null);      const { from, to } = getRangeForPeriod(period);
 
       try {
         const [metricsData, vendorData, cockpitData, attendanceRes, projectsRes] = await Promise.all([
           getSalesMetrics(user.token, period),
           getSalesVendorStats(user.token, period),
           getSalesManagerCockpit(user.token, period),
-          fetch(`${API_URL}/attendance/hierarchy/range?from=${from}&to=${to}`, {
+          fetch(buildApiUrl(`attendance/hierarchy/range?from=${from}&to=${to}`), {
             headers: { Authorization: `Bearer ${user.token}` },
           }),
-          fetch(`${API_URL}/operational-projects`, {
+          fetch(buildApiUrl(`operational-projects`), {
             headers: { Authorization: `Bearer ${user.token}` },
           }),
         ]);

@@ -1,11 +1,10 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
 import HelpTab from "@/components/HelpTab";
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 export default function ProductionSchedulePage() {
   const { user } = useUser();
@@ -25,9 +24,9 @@ export default function ProductionSchedulePage() {
     const q = params.toString();
     setLoading(true);
     Promise.all([
-      fetch(`${API_URL}/manufacturing/production/schedule${q ? `?${q}` : ""}`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/manufacturing/production/dashboard`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/manufacturing/production/work-center-utilization${q ? `?${q}` : ""}`, { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`manufacturing/production/schedule${q ? `?${q}` : ""}`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`manufacturing/production/dashboard`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`manufacturing/production/work-center-utilization${q ? `?${q}` : ""}`), { headers }).then((r) => r.json()),
     ])
       .then(([sched, dash, util]) => {
         setOrders(Array.isArray(sched) ? sched : sched.data || []);

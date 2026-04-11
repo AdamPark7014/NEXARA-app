@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useUser } from './UserContext';
 import styles from './ToolRequestForm.module.css';
@@ -18,8 +19,6 @@ interface InventoryOption {
 
 const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
   const { user } = useUser();
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
   const [toolName, setToolName] = useState('');
   const [model, setModel] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
@@ -72,7 +71,7 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
     } finally {
       setInventoryLoading(false);
     }
-  }, [user?.token, API_URL]);
+  }, [user?.token]);
 
   const applyPhotoFile = (type: 'general' | 'specifications', file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -131,7 +130,7 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
   useEffect(() => {
     if (!user?.token) return;
 
-    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -155,7 +154,7 @@ const ToolRequestForm: React.FC<ToolRequestFormProps> = ({ onSuccess }) => {
       if (refreshTimer) clearTimeout(refreshTimer);
       socket.disconnect();
     };
-  }, [user?.token, API_URL, inventoryQuery, searchInventory]);
+  }, [user?.token, inventoryQuery, searchInventory]);
 
   const validate = () => {
     if (!toolName || toolName.length < 3) {

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { buildApiUrl } from "@/lib/api-base";
+import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import { Bar, BarChart, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from "recharts";
 import styles from "./page.module.css";
@@ -39,11 +40,6 @@ export default function EquipoComparativaPage() {
   const [viewMode, setViewMode] = useState<"team" | "individual">("team");
   const [selectedSeller, setSelectedSeller] = useState<number | null>(null);
 
-  const apiUrl = useMemo(() => {
-    const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
-    return base.replace(/[\/\.]+$/, "");
-  }, []);
-
   useEffect(() => {
     const fetchComparison = async () => {
       if (!user?.token) return;
@@ -53,7 +49,7 @@ export default function EquipoComparativaPage() {
         // Simulating an endpoint: GET /ventas/analytics/team-comparison
         // This would need to be implemented in backend
         const query = `?start=${new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString()}&end=${new Date().toISOString()}`;
-        const res = await fetch(`${apiUrl}/ventas/reportes/resumen${query}`, {
+        const res = await fetch(buildApiUrl(`ventas/reportes/resumen${query}`), {
           headers: { Authorization: `Bearer ${user.token}` },
         });
         if (!res.ok) throw new Error("No se pudo cargar la comparativa");
@@ -61,8 +57,8 @@ export default function EquipoComparativaPage() {
 
         // Fetch all leads and opportunities to build seller metrics
         const [leadsRes, oppsRes] = await Promise.all([
-          fetch(`${apiUrl}/ventas/leads`, { headers: { Authorization: `Bearer ${user.token}` } }),
-          fetch(`${apiUrl}/ventas/oportunidades`, { headers: { Authorization: `Bearer ${user.token}` } }),
+          fetch(buildApiUrl("ventas/leads"), { headers: { Authorization: `Bearer ${user.token}` } }),
+          fetch(buildApiUrl("ventas/oportunidades"), { headers: { Authorization: `Bearer ${user.token}` } }),
         ]);
 
         const leads = await leadsRes.json().catch(() => []);
@@ -129,7 +125,7 @@ export default function EquipoComparativaPage() {
     };
 
     fetchComparison();
-  }, [user?.token, apiUrl]);
+  }, [user?.token]);
 
   const chartData =
     viewMode === "team"

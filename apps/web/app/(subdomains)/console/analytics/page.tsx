@@ -1,11 +1,10 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import HelpTab from '@/components/HelpTab';
 import { PERMISSIONS } from "@/lib/permissions";
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
   ok:      { bg: "rgba(34,197,94,0.12)",  text: "#16a34a", dot: "#22c55e" },
@@ -35,8 +34,8 @@ export default function AnalyticsPage() {
     if (!user?.token) return;
     const headers = { Authorization: `Bearer ${user.token}` };
     Promise.all([
-      fetch(`${API_URL}/analytics/dashboard`, { headers }).then((r) => r.json()).catch(() => null),
-      fetch(`${API_URL}/analytics/kpi/computed`, { headers }).then((r) => r.json()).catch(() => []),
+      fetch(buildApiUrl(`analytics/dashboard`), { headers }).then((r) => r.json()).catch(() => null),
+      fetch(buildApiUrl(`analytics/kpi/computed`), { headers }).then((r) => r.json()).catch(() => []),
     ])
       .then(([dash, computed]) => {
         setDashboard(dash);

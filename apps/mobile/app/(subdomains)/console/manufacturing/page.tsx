@@ -1,11 +1,10 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import HelpTab from "@/components/HelpTab";
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 export default function ManufacturingPage() {
   const { user } = useUser();
@@ -44,8 +43,8 @@ export default function ManufacturingPage() {
     const headers = { Authorization: `Bearer ${user.token}` };
     setLoading(true);
     Promise.all([
-      fetch(`${API_URL}/manufacturing/bom`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/manufacturing/bom/work-centers/all`, { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`manufacturing/bom`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`manufacturing/bom/work-centers/all`), { headers }).then((r) => r.json()),
     ])
       .then(([b, wc]) => {
         setBoms(Array.isArray(b) ? b : b.data || []);
@@ -68,7 +67,7 @@ export default function ManufacturingPage() {
     }
     setSaving(true);
     try {
-      const res = await fetch(`${API_URL}/manufacturing/bom`, {
+      const res = await fetch(buildApiUrl(`manufacturing/bom`), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -115,7 +114,7 @@ export default function ManufacturingPage() {
     }
     setSaving(true);
     try {
-      const res = await fetch(`${API_URL}/manufacturing/bom/work-centers`, {
+      const res = await fetch(buildApiUrl(`manufacturing/bom/work-centers`), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

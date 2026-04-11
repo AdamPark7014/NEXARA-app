@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import ProjectCostTracker from "@/components/ProjectCostTracker";
@@ -45,17 +46,12 @@ export default function VentasProyectosPage() {
     status: "PLANNED",
   });
 
-  const apiUrl = useMemo(() => {
-    const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
-    return base.replace(/[/.]+$/, "");
-  }, []);
-
   const fetchProjects = async () => {
     if (!user?.token) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${apiUrl}/ventas/proyectos`, {
+      const res = await fetch(buildApiUrl("ventas/proyectos"), {
         headers: { Authorization: `Bearer ${user.token}` },
       });
       if (!res.ok) throw new Error("No se pudieron cargar los proyectos");
@@ -66,7 +62,7 @@ export default function VentasProyectosPage() {
       const newOrders: { [key: number]: SalesProjectOrder } = {};
       for (const project of data) {
         try {
-          const orderRes = await fetch(`${apiUrl}/ventas/proyectos/${project.id}/orden`, {
+          const orderRes = await fetch(buildApiUrl(`ventas/proyectos/${project.id}/orden`), {
             headers: { Authorization: `Bearer ${user.token}` },
           });
           if (orderRes.ok) {
@@ -117,7 +113,7 @@ export default function VentasProyectosPage() {
         costOperativo: form.costOperativo,
         status: form.status,
       };
-      const res = await fetch(`${apiUrl}/ventas/proyectos`, {
+      const res = await fetch(buildApiUrl("ventas/proyectos"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -148,7 +144,7 @@ export default function VentasProyectosPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${apiUrl}/ventas/proyectos/${projectId}/close`, {
+      const res = await fetch(buildApiUrl(`ventas/proyectos/${projectId}/close`), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -175,7 +171,10 @@ export default function VentasProyectosPage() {
     }
     try {
       const link = document.createElement("a");
-      link.href = `${apiUrl}${order.orderPdfUrl}`;
+      const assetBase = getApiAssetOrigin().replace(/\/+$/, "");
+      link.href = order.orderPdfUrl.startsWith("http")
+        ? order.orderPdfUrl
+        : `${assetBase}${order.orderPdfUrl.startsWith("/") ? "" : "/"}${order.orderPdfUrl}`;
       link.download = `orden-${order.orderId}.pdf`;
       document.body.appendChild(link);
       link.click();

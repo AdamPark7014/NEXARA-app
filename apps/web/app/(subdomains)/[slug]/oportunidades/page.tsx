@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
+import { useState } from "react";
 import { useUser } from "@/components/UserContext";
 import OpportunitiesKanban from "@/components/OpportunitiesKanban";
 import styles from "./page.module.css";
@@ -56,15 +57,10 @@ export default function VentasOportunidadesPage() {
   });
   const [viewMode, setViewMode] = useState<'kanban' | 'table'>('kanban');
 
-  const apiUrl = useMemo(() => {
-    const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
-    return base.replace(/[/.]+$/, "");
-  }, []);
-
   const getAssetUrl = (url?: string | null) => {
     if (!url) return "";
     if (url.startsWith("http")) return url;
-    const base = apiUrl.replace(/\/+api\/?$/, "");
+    const base = getApiAssetOrigin().replace(/\/+$/, "");
     return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
   };
 
@@ -73,7 +69,7 @@ export default function VentasOportunidadesPage() {
     
     setLoading(true);
     try {
-      await fetch(`${apiUrl}/ventas/oportunidades/${id}/notas`, {
+      await fetch(buildApiUrl(`ventas/oportunidades/${id}/notas`), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -84,7 +80,7 @@ export default function VentasOportunidadesPage() {
       setNoteDraft("");
       // Fetch updated opportunity if detail view
       if (selectedOpportunity && selectedOpportunity.id === id) {
-        const res = await fetch(`${apiUrl}/ventas/oportunidades/${id}`, {
+        const res = await fetch(buildApiUrl(`ventas/oportunidades/${id}`), {
           headers: { Authorization: `Bearer ${user.token}` },
         });
         if (res.ok) {
@@ -112,7 +108,7 @@ export default function VentasOportunidadesPage() {
         ...form,
         expectedCloseDate: form.expectedCloseDate || undefined,
       };
-      const res = await fetch(`${apiUrl}/ventas/oportunidades`, {
+      const res = await fetch(buildApiUrl("ventas/oportunidades"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -140,7 +136,7 @@ export default function VentasOportunidadesPage() {
   const handleUpdateStage = async (opportunityId: number, newStage: string) => {
     if (!user?.token) return;
     try {
-      const res = await fetch(`${apiUrl}/ventas/oportunidades/${opportunityId}`, {
+      const res = await fetch(buildApiUrl(`ventas/oportunidades/${opportunityId}`), {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -159,7 +155,7 @@ export default function VentasOportunidadesPage() {
     
     // Fetch full opportunity details
     try {
-      const res = await fetch(`${apiUrl}/ventas/oportunidades/${opp.id}`, {
+      const res = await fetch(buildApiUrl(`ventas/oportunidades/${opp.id}`), {
         headers: { Authorization: `Bearer ${user.token}` },
       });
       if (res.ok) {
@@ -197,7 +193,6 @@ export default function VentasOportunidadesPage() {
 
       {viewMode === 'kanban' ? (
         <OpportunitiesKanban 
-          apiUrl={apiUrl}
           onUpdateStage={handleUpdateStage}
           onSelectOpportunity={handleSelectOpportunity}
         />

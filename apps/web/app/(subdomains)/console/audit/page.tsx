@@ -1,11 +1,10 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState, useMemo } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import HelpTab from '@/components/HelpTab';
 import { PERMISSIONS } from "@/lib/permissions";
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 const ACTION_COLORS: Record<string, string> = {
   CREATE: "var(--success)", UPDATE: "var(--warning)", DELETE: "var(--danger)", LOGIN: "var(--primary)",
@@ -20,7 +19,7 @@ export default function AuditPage() {
 
   useEffect(() => {
     if (!user?.token) return;
-    fetch(`${API_URL}/audit`, {
+    fetch(buildApiUrl(`audit`), {
       headers: { Authorization: `Bearer ${user.token}` },
     })
       .then((r) => r.json())

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useUser } from "@/components/UserContext";
 import OpportunitiesKanban from "@/components/OpportunitiesKanban";
-import { getApiBase } from "@/lib/api-base";
 import { getSalesScope } from "@/lib/sales-scope";
 import {
   addSalesOpportunityNote,
@@ -24,7 +23,6 @@ type OpportunityQuote = SalesOpportunityQuote;
 
 export default function VentasOportunidadesPage() {
   const { user } = useUser();
-  const apiUrl = getApiBase();
   const scope = getSalesScope(user, typeof window === "undefined" ? "" : window.location.search);
   const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -153,7 +151,6 @@ export default function VentasOportunidadesPage() {
 
       {viewMode === 'kanban' ? (
         <OpportunitiesKanban 
-          apiUrl={apiUrl}
           ownerId={scope.ownerId}
           onUpdateStage={handleUpdateStage}
           onSelectOpportunity={handleSelectOpportunity}

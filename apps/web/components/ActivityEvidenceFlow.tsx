@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useEffect, useRef, useState } from 'react';
 import { useUser } from './UserContext';
 import styles from './ActivityEvidenceFlow.module.css';
@@ -84,9 +85,6 @@ const ActivityEvidenceFlow = () => {
   const [pdfDragging, setPdfDragging] = useState(false);
   const [requestedActivityId, setRequestedActivityId] = useState<number | null>(null);
   const inventoryFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
-
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/\.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
 
   const isCorrection = flowData?.reviewStatus === 'REJECTED';
   const selectedActivity = actividades.find((activity) => activity.id === Number(selectedActivityId || flowData?.activityId));
@@ -216,7 +214,7 @@ const ActivityEvidenceFlow = () => {
   useEffect(() => {
     if (!user?.token || !selectedActivityId) return;
 
-    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -238,7 +236,7 @@ const ActivityEvidenceFlow = () => {
       if (refreshTimer) clearTimeout(refreshTimer);
       socket.disconnect();
     };
-  }, [user?.token, API_URL, selectedActivityId]);
+  }, [user?.token, selectedActivityId]);
 
   // Capturar foto desde cámara
   const capturePhoto = async (): Promise<string> => {
@@ -304,7 +302,7 @@ const ActivityEvidenceFlow = () => {
       }
     }
 
-    const base = API_URL.replace(/\/+api\/?$/, '');
+    const base = getApiAssetOrigin();
     const normalizedPath = raw
       .replace(/\\+/g, '/')
       .replace(/^https?:\/\/[^/]+/i, '')

@@ -1,5 +1,6 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import { buildApiUrl } from "@/lib/api-base";
+import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useUser } from '@/components/UserContext';
 import styles from './page.module.css';
@@ -53,11 +54,6 @@ export default function ProjectExpensesPage() {
   const { user } = useUser();
   const projectId = Number(params?.id);
 
-  const apiUrl = useMemo(() => {
-    const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-    return base.replace(/[/.]+$/, '');
-  }, []);
-
   const [loading, setLoading] = useState(true);
   const [expenses, setExpenses] = useState<ProjectExpense | null>(null);
   const [viaticos, setViáticos] = useState<Viatico[]>([]);
@@ -75,10 +71,10 @@ export default function ProjectExpensesPage() {
     try {
       setLoading(true);
       const [expensesRes, viaticosRes] = await Promise.all([
-        fetch(`${apiUrl}/ventas/proyectos/${projectId}/expenses`, {
+        fetch(buildApiUrl(`ventas/proyectos/${projectId}/expenses`), {
           headers: { Authorization: `Bearer ${user?.token}` },
         }),
-        fetch(`${apiUrl}/ventas/proyectos/${projectId}/viaticos`, {
+        fetch(buildApiUrl(`ventas/proyectos/${projectId}/viaticos`), {
           headers: { Authorization: `Bearer ${user?.token}` },
         }),
       ]);
@@ -98,7 +94,7 @@ export default function ProjectExpensesPage() {
 
   const fetchAvailableViáticos = async () => {
     try {
-      const res = await fetch(`${apiUrl}/viaticos?projectId=null`, {
+      const res = await fetch(buildApiUrl('viaticos?projectId=null'), {
         headers: { Authorization: `Bearer ${user?.token}` },
       });
       if (res.ok) {
@@ -113,7 +109,7 @@ export default function ProjectExpensesPage() {
     if (selectedViáticos.length === 0) return;
     try {
       setAssignLoading(true);
-      const res = await fetch(`${apiUrl}/ventas/proyectos/${projectId}/viaticos/assign`, {
+      const res = await fetch(buildApiUrl(`ventas/proyectos/${projectId}/viaticos/assign`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -135,7 +131,7 @@ export default function ProjectExpensesPage() {
 
   const handleRemoveViatico = async (viaticId: number) => {
     try {
-      const res = await fetch(`${apiUrl}/ventas/proyectos/viaticos/${viaticId}/unassign`, {
+      const res = await fetch(buildApiUrl(`ventas/proyectos/viaticos/${viaticId}/unassign`), {
         method: 'POST',
         headers: { Authorization: `Bearer ${user?.token}` },
       });

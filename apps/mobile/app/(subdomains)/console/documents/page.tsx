@@ -1,11 +1,10 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
 import HelpTab from '@/components/HelpTab';
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 export default function DocumentsPage() {
   const { user } = useUser();
@@ -24,8 +23,8 @@ export default function DocumentsPage() {
     if (!user?.token) return;
     const headers = { Authorization: `Bearer ${user.token}` };
     Promise.all([
-      fetch(`${API_URL}/documents`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/documents/categories`, { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`documents`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`documents/categories`), { headers }).then((r) => r.json()),
     ])
       .then(([docs, cats]) => {
         setDocuments(Array.isArray(docs) ? docs : docs.data || []);
@@ -39,7 +38,7 @@ export default function DocumentsPage() {
     if (!user?.token || !docForm.title) return;
     setSavingDoc(true);
     try {
-      const res = await fetch(`${API_URL}/documents`, {
+      const res = await fetch(buildApiUrl(`documents`), {
         method: "POST",
         headers: { Authorization: `Bearer ${user.token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ ...docForm, status: "DRAFT" }),
@@ -58,7 +57,7 @@ export default function DocumentsPage() {
     if (!user?.token || !catForm.name) return;
     setSavingCat(true);
     try {
-      const res = await fetch(`${API_URL}/documents/categories`, {
+      const res = await fetch(buildApiUrl(`documents/categories`), {
         method: "POST",
         headers: { Authorization: `Bearer ${user.token}`, "Content-Type": "application/json" },
         body: JSON.stringify(catForm),

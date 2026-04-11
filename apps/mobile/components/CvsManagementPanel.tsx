@@ -1,5 +1,6 @@
 "use client";
 
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { io, Socket } from 'socket.io-client';
@@ -69,8 +70,7 @@ const STAGE_ORDER: CvRow["stage"][] = [
   "SUPERADMIN_REJECTED",
 ];
 
-const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
-const toApi = (path: string) => `${apiBase}/${path.replace(/^\/+/, "")}`;
+const toApi = (path: string) => buildApiUrl(path);
 
 export default function CvsManagementPanel() {
   const { user } = useUser();
@@ -184,7 +184,7 @@ export default function CvsManagementPanel() {
   useEffect(() => {
     if (!user?.token) return;
 
-    const socketUrl = apiBase.replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 

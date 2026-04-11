@@ -1,14 +1,12 @@
 "use client";
 
+import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
 import HelpTab from '@/components/HelpTab';
 import React, { useEffect, useState } from 'react';
 import { RoleGuard } from '../../../../components/RoleGuard';
 import { useUser } from '../../../../components/UserContext';
 import { triggerBlobDownload } from '@/lib/file-download';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
 
 interface ServiceSheet {
   id: number;
@@ -50,10 +48,10 @@ export default function ServiceSheetsPage() {
       ? 'Solo registros del personal de tu departamento.'
       : 'Solo actividades donde eres el responsable.';
 
-  const assetBaseUrl = API_URL.replace(/\/+api\/?$/, '');
   const getAssetUrl = (raw?: string | null) => {
     if (!raw) return '';
     if (/^https?:\/\//i.test(raw)) return raw;
+    const assetBaseUrl = getApiAssetOrigin();
     return `${assetBaseUrl}${raw.startsWith('/') ? raw : `/${raw}`}`;
   };
 

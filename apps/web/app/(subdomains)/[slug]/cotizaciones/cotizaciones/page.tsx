@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { buildApiUrl } from "@/lib/api-base";
+import { useEffect, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import QuoteGenerator from "@/components/QuoteGenerator";
 import styles from "./page.module.css";
@@ -34,17 +35,12 @@ export default function VentasCotizacionesPage() {
   const [linkModal, setLinkModal] = useState<LinkState | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
-  const apiUrl = useMemo(() => {
-    const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
-    return base.replace(/[/.]+$/, "");
-  }, []);
-
   const fetchCotizaciones = async () => {
     if (!user?.token) return;
     setLoading(true);
     setError(null);
     try {
-      const url = new URL(`${apiUrl}/ventas/cotizaciones`);
+      const url = new URL(buildApiUrl("ventas/cotizaciones"));
       if (searchClient) url.searchParams.append("clientName", searchClient);
       if (filterStatus) url.searchParams.append("status", filterStatus);
 
@@ -78,7 +74,7 @@ export default function VentasCotizacionesPage() {
     setError(null);
     try {
       const res = await fetch(
-        `${apiUrl}/ventas/cotizaciones/${linkModal.cotizacionId}/link/${Number(linkModal.opportunityId)}`,
+        buildApiUrl(`ventas/cotizaciones/${linkModal.cotizacionId}/link/${Number(linkModal.opportunityId)}`),
         {
           method: "POST",
           headers: {
@@ -104,7 +100,7 @@ export default function VentasCotizacionesPage() {
 
   const handleDownloadPdf = (cotizacionId: number) => {
     const link = document.createElement("a");
-    link.href = `${apiUrl}/cotizaciones/${cotizacionId}/pdf`;
+    link.href = buildApiUrl(`cotizaciones/${cotizacionId}/pdf`);
     link.download = `cotizacion-${cotizacionId}.pdf`;
     document.body.appendChild(link);
     link.click();

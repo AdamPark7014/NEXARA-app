@@ -380,10 +380,16 @@ export default function UserForm({
       const getErrorMessage = async (res: Response, fallback: string) => {
         try {
           const data = await res.json();
-          return data?.message || fallback;
+          if (Array.isArray(data?.message) && data.message.length) {
+            return String(data.message[0]);
+          }
+          if (typeof data?.message === 'string' && data.message.trim()) {
+            return data.message;
+          }
         } catch {
-          return fallback;
+          // non-JSON body
         }
+        return fallback;
       };
 
       const fetchRoleByName = async () => {
@@ -419,9 +425,19 @@ export default function UserForm({
             },
             body: JSON.stringify(rolePayload),
           });
-          if (!roleRes.ok) throw new Error(await getErrorMessage(roleRes, 'Error al crear el rol'));
-          const roleData = await roleRes.json();
-          roleId = roleData.id;
+          if (roleRes.ok) {
+            const roleData = await roleRes.json();
+            roleId = roleData.id;
+          } else if (roleRes.status === 409) {
+            const again = await fetchRoleByName();
+            if (again?.id) {
+              roleId = again.id;
+            } else {
+              throw new Error(await getErrorMessage(roleRes, 'Ya existe un rol con ese nombre.'));
+            }
+          } else {
+            throw new Error(await getErrorMessage(roleRes, 'Error al crear el rol'));
+          }
         }
       }
       if (!roleId) {
@@ -936,7 +952,7 @@ export default function UserForm({
           font-size: 14px;
         }
 
-        @media (max-width: 600px) {
+        @media (max-width: 720px) {
           .formGrid {
             grid-template-columns: 1fr;
             gap: 10px;

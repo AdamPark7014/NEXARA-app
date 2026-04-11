@@ -1,10 +1,9 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 function deriveStatus(i: any): string {
   if (i.isComplete) return "COMPLETED";
@@ -32,9 +31,9 @@ export default function WorkflowPage() {
     const headers = { Authorization: `Bearer ${user.token}` };
     setLoading(true);
     Promise.all([
-      fetch(`${API_URL}/workflow/definitions`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/workflow/instances`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/workflow/instances/pending`, { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`workflow/definitions`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`workflow/instances`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`workflow/instances/pending`), { headers }).then((r) => r.json()),
     ])
       .then(([defs, inst, pend]) => {
         setDefinitions(Array.isArray(defs) ? defs : defs.data || []);
@@ -51,7 +50,7 @@ export default function WorkflowPage() {
     if (!formName.trim() || !formEntity.trim() || formSteps.some(s => !s.name.trim())) return;
     setSaving(true);
     try {
-      const res = await fetch(`${API_URL}/workflow/definitions`, {
+      const res = await fetch(buildApiUrl(`workflow/definitions`), {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${user?.token}` },
         body: JSON.stringify({
@@ -75,7 +74,7 @@ export default function WorkflowPage() {
   };
 
   const handleApprove = async (instanceId: number, decision: "APPROVED" | "REJECTED") => {
-    await fetch(`${API_URL}/workflow/instances/${instanceId}/approve`, {
+    await fetch(buildApiUrl(`workflow/instances/${instanceId}/approve`), {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${user?.token}` },
       body: JSON.stringify({ decision }),

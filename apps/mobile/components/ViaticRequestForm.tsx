@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
@@ -7,9 +8,7 @@ import { openExternalUrl } from '@/lib/open-external-url';
 
 
 const ViaticRequestForm = ({ actividadId }: { actividadId: number }) => {
-  const { user } = useUser();
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-  const [monto, setMonto] = useState('');
+  const { user } = useUser();  const [monto, setMonto] = useState('');
   const [razon, setRazon] = useState('');
   const [ticket, setTicket] = useState<File | null>(null);
   const [ticketPreview, setTicketPreview] = useState<{ url: string; kind: 'image' | 'pdf' } | null>(null);
@@ -26,7 +25,7 @@ const ViaticRequestForm = ({ actividadId }: { actividadId: number }) => {
   useEffect(() => {
     if (!user) return;
 
-    const socketUrl = (process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, {
       auth: { token: user.token },
       transports: ['websocket', 'polling'],
@@ -93,7 +92,7 @@ const ViaticRequestForm = ({ actividadId }: { actividadId: number }) => {
       formData.append('ticket', ticket!);
       formData.append('actividadId', String(actividadId));
       formData.append('usuarioId', String(user.id));
-      const res = await fetch(`${API_URL}/viatics`, {
+      const res = await fetch(buildApiUrl(`viatics`), {
         method: 'POST',
         headers: { Authorization: `Bearer ${user.token}` },
         body: formData,
