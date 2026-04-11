@@ -11,6 +11,7 @@ import { CreateProjectDto } from './dto/create-project.dto.js';
 import { UpdateProjectDto } from './dto/update-project.dto.js';
 import { promises as fs } from 'fs';
 import * as path from 'path';
+import PDFDocument from 'pdfkit';
 
 interface MulterFile {
   fieldname: string;
@@ -206,6 +207,198 @@ export class ProjectsService {
     });
 
     return removed;
+  }
+
+  async buildCatalogPdf(): Promise<Buffer> {
+    const projects = await this.db.project.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const doc = new PDFDocument({
+      size: 'A4',
+      margin: 48,
+      info: {
+        Title: 'CV Empresarial de Proyectos',
+        Author: 'Nexara',
+      },
+    });
+
+    const chunks: Uint8Array[] = [];
+    const pdfBufferPromise = new Promise<Buffer>((resolve, reject) => {
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', (error) => reject(error));
+    });
+
+    const pageWidth = doc.page.width;
+    const pageHeight = doc.page.height;
+    const margin = 36;
+    const cardWidth = pageWidth - margin * 2;
+
+    doc.save();
+    doc.rect(0, 0, pageWidth, 120).fill('#0d4d82');
+    doc.rect(0, 0, pageWidth, 64).fill('#2f8ec8');
+    doc.restore();
+
+    doc
+      .fillColor('#ffffff')
+      .fontSize(26)
+      .text('CV Empresarial de Proyectos', margin, 40, { align: 'left' })
+      .fontSize(11)
+      .text(`Generado: ${new Date().toLocaleString('es-MX')}`)
+      .text(`Total de proyectos: ${projects.length}`);
+
+    doc.y = 138;
+
+    if (!projects.length) {
+      doc
+        .fontSize(12)
+        .fillColor('#22303e')
+        .text('No hay proyectos registrados para incluir en este documento.');
+      doc.end();
+      return pdfBufferPromise;
+    }
+
+    for (let index = 0; index < projects.length; index += 1) {
+      const project = projects[index];
+      const cardHeight = 310;
+      if (doc.y + cardHeight > pageHeight - margin) {
+        doc.addPage();
+        doc.y = margin;
+      }
+
+      const x = margin;
+      const y = doc.y;
+
+      doc.save();
+      doc.roundedRect(x, y, cardWidth, cardHeight, 12).fill('#f7fbff');
+      doc.roundedRect(x, y, cardWidth, 50, 12).fill('#1b5f9e');
+      doc.restore();
+
+      doc
+        .fillColor('#ffffff')
+        .fontSize(15)
+        .text(`${index + 1}. ${project.title}`, x + 14, y + 16, { width: cardWidth - 28 });
+
+      doc
+        .fillColor('#2b4b67')
+        .fontSize(10)
+        .text(`Sector: ${project.sector}`, x + 14, y + 60)
+        .text(`Slug: ${project.slug}`)
+        .text(`Creado: ${project.createdAt.toLocaleDateString('es-MX')}`);
+
+      const mediaY = y + 126;
+      const mainImageX = x + 14;
+      const mainImageWidth = 300;
+      const mainImageHeight = 150;
+      const galleryX = mainImageX + mainImageWidth + 10;
+      const thumbGap = 6;
+      const thumbSize = 72;
+
+      await this.drawProjectImage(
+        doc,
+        project.mainImage || undefined,
+        mainImageX,
+        mediaY,
+        mainImageWidth,
+        mainImageHeight,
+      );
+
+      const galleryList = (project.gallery || []).slice(0, 4);
+      for (let g = 0; g < 4; g += 1) {
+        const gx = galleryX + (g % 2) * (thumbSize + thumbGap);
+        const gy = mediaY + Math.floor(g / 2) * (thumbSize + thumbGap);
+        await this.drawProjectImage(doc, galleryList[g], gx, gy, thumbSize, thumbSize);
+      }
+
+      doc
+        .fillColor('#243749')
+        .fontSize(10)
+        .text(project.summary || 'Sin resumen', x + 14, y + 282, {
+          width: cardWidth - 28,
+          lineGap: 2,
+        });
+
+      const metaY = y + 236;
+      doc
+        .fillColor('#2f4f67')
+        .fontSize(10)
+        .text(`Impacto: ${project.impact || 'No especificado'}`, galleryX, metaY, {
+          width: cardWidth - (galleryX - x) - 14,
+          lineGap: 2,
+        })
+        .text(`Servicios: ${(project.services || []).join(', ') || 'No especificados'}`, {
+          width: cardWidth - (galleryX - x) - 14,
+          lineGap: 2,
+        });
+
+      doc.y = y + cardHeight + 14;
+    }
+
+    doc.end();
+    return pdfBufferPromise;
+  }
+
+  private async drawProjectImage(
+    doc: InstanceType<typeof PDFDocument>,
+    imageUrl: string | undefined,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ) {
+    doc
+      .save()
+      .roundedRect(x, y, width, height, 8)
+      .fill('#e9f2f8')
+      .stroke('#c7d8e6')
+      .restore();
+
+    const imagePath = await this.resolveProjectImagePath(imageUrl);
+    if (imagePath) {
+      try {
+        doc.image(imagePath, x, y, { fit: [width, height], align: 'center', valign: 'center' });
+        return;
+      } catch {
+        // fallback to placeholder
+      }
+    }
+
+    doc
+      .fillColor('#6a8298')
+      .fontSize(9)
+      .text('Imagen de proyecto', x + 10, y + height / 2 - 5, {
+        width: width - 20,
+        align: 'center',
+      });
+  }
+
+  private async resolveProjectImagePath(imageUrl?: string) {
+    if (!imageUrl) return null;
+
+    if (imageUrl.startsWith('/projects/image/')) {
+      const filename = imageUrl.split('/').pop();
+      if (!filename) return null;
+      const uploadPath = path.resolve(process.cwd(), './uploads/projects', filename);
+      try {
+        await fs.access(uploadPath);
+        return uploadPath;
+      } catch {
+        return null;
+      }
+    }
+
+    if (imageUrl.startsWith('/')) {
+      const publicPath = path.resolve(process.cwd(), './apps/web/public', imageUrl.slice(1));
+      try {
+        await fs.access(publicPath);
+        return publicPath;
+      } catch {
+        return null;
+      }
+    }
+
+    return null;
   }
 
   private normalizePayload(dto: Partial<CreateProjectDto>) {

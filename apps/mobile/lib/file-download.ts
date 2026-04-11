@@ -74,7 +74,18 @@ async function nativeCapacitorSave(blob: Blob, fileName: string): Promise<boolea
     }
     return false;
   } catch (e) {
-    console.warn("[download] Capacitor Filesystem/Share no disponible:", e);
+    console.warn("[file-download] Capacitor Filesystem/Share no disponible:", e);
+    return false;
+  }
+}
+
+/** WebView a veces no muestra el sheet de compartir para PDF; abrir el blob suele funcionar con gesto de usuario. */
+function tryOpenBlobInSystemViewer(objectUrl: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const w = window.open(objectUrl, "_blank", "noopener,noreferrer");
+    return Boolean(w);
+  } catch {
     return false;
   }
 }
@@ -88,9 +99,13 @@ async function blobFromUrl(fileUrl: string, authToken?: string): Promise<Blob | 
     const headers: Record<string, string> = {};
     if (authToken) headers.Authorization = `Bearer ${authToken}`;
     const res = await fetch(fileUrl, { credentials: "include", headers });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn("[file-download] fetch blob falló:", res.status, fileUrl.slice(0, 120));
+      return null;
+    }
     return await res.blob();
-  } catch {
+  } catch (e) {
+    console.warn("[file-download] fetch blob error:", e instanceof Error ? e.message : e, fileUrl.slice(0, 120));
     return null;
   }
 }
@@ -159,6 +174,12 @@ export async function triggerFileDownload(
       }
       const result = await tryNavigatorShareFile(toShare, fileName);
       if (result === "shared" || result === "aborted") return;
+      const previewUrl = URL.createObjectURL(toShare);
+      if (isCapacitorNative() && tryOpenBlobInSystemViewer(previewUrl)) {
+        revokeObjectUrlLater(previewUrl, 300_000);
+        return;
+      }
+      URL.revokeObjectURL(previewUrl);
     }
   }
 
@@ -173,7 +194,11 @@ export async function triggerBlobDownload(
   fileName: string,
   options: Pick<DownloadOptions, "preferOpenOnMobile" | "mimeType"> = {},
 ): Promise<void> {
-  if (typeof window === "undefined" || !blob?.size) return;
+  if (typeof window === "undefined") return;
+  if (!blob?.size) {
+    console.warn("[file-download] triggerBlobDownload: blob vacío", fileName);
+    return;
+  }
   const { preferOpenOnMobile = true, mimeType } = options;
   const typed =
     mimeType && (!blob.type || blob.type === "application/octet-stream")
@@ -191,9 +216,21 @@ export async function triggerBlobDownload(
     }
     const result = await tryNavigatorShareFile(typed, fileName);
     if (result === "shared" || result === "aborted") return;
+    if (isCapacitorNative()) {
+      const previewUrl = URL.createObjectURL(typed);
+      if (tryOpenBlobInSystemViewer(previewUrl)) {
+        revokeObjectUrlLater(previewUrl, 300_000);
+        return;
+      }
+      URL.revokeObjectURL(previewUrl);
+    }
   }
 
   const objectUrl = URL.createObjectURL(typed);
+  if (isCapacitorNative() && tryOpenBlobInSystemViewer(objectUrl)) {
+    revokeObjectUrlLater(objectUrl, 300_000);
+    return;
+  }
   try {
     fallbackAnchorDownload(objectUrl, fileName);
   } finally {

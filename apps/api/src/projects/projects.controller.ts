@@ -72,6 +72,17 @@ export class ProjectsController {
     return this.projectsService.findAll(query);
   }
 
+  @Get('catalog-pdf/download')
+  async downloadCatalogPdf(@Res() res: Response) {
+    const pdfBuffer = await this.projectsService.buildCatalogPdf();
+    const filename = `cv-empresarial-proyectos-${new Date().toISOString().slice(0, 10)}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length.toString());
+    res.send(pdfBuffer);
+  }
+
   @Get('image/:filename')
   async getImage(@Param('filename') filename: string, @Res() res: Response) {
     try {
