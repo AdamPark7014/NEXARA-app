@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import consoleStyles from "../console/console.module.css";
 import styles from "./VentasSidebar.module.css";
 import { useUser } from "@/components/UserContext";
 import { useTheme } from "@/components/ThemeContext";
 import { useState, useMemo, useEffect } from "react";
 import { getAvatarSrc, getRoleLabel, isSalesManagerUser } from "@/lib/panel-user";
 import { hapticTap } from "@/lib/haptics";
+import { PANEL_DRAWER_BREAKPOINT_PX } from "@/lib/panel-drawer-breakpoint";
 
 interface MenuItem {
   label: string;
@@ -43,48 +45,40 @@ const sectionOrder = [
 interface VentasSidebarProps {
   mobileOpen?: boolean;
   onMobileClose?: () => void;
-  /** Accesos tipo barra inferior cuando el ancho es tablet (sin bottom nav). */
   shortcutStrip?: { icon: string; label: string; href: string }[];
 }
 
 export default function VentasSidebar({ mobileOpen, onMobileClose, shortcutStrip }: VentasSidebarProps = {}) {
-  const MOBILE_BREAKPOINT = 768;
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useUser();
   const { darkMode, toggleDarkMode } = useTheme();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [brandLogoSrc, setBrandLogoSrc] = useState("/icon.png");
 
   useEffect(() => {
-    if (typeof mobileOpen === 'boolean' && mobileOpen !== isMenuOpen) {
+    if (typeof mobileOpen === "boolean") {
       setIsMenuOpen(mobileOpen);
     }
   }, [mobileOpen]);
 
-  const [navQuery, setNavQuery] = useState("");
-
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT);
+    const checkMobile = () => setIsMobile(window.innerWidth <= PANEL_DRAWER_BREAKPOINT_PX);
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
-  }, [MOBILE_BREAKPOINT]);
-
-  useEffect(() => {
-    if (!isMobile) return;
-    if (!isMenuOpen) return;
-  }, [isMenuOpen, isMobile]);
+  }, []);
 
   useEffect(() => {
     if (!isMobile) return;
     setIsMenuOpen(false);
-  }, [pathname, isMobile]);
+    onMobileClose?.();
+  }, [pathname, isMobile, onMobileClose]);
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && isMenuOpen) setIsMenuOpen(false);
+      if (event.key === "Escape" && isMenuOpen) closeMenu();
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
@@ -129,7 +123,7 @@ export default function VentasSidebar({ mobileOpen, onMobileClose, shortcutStrip
     return pathname === resolved || pathname.startsWith(`${resolved}/`);
   };
 
-  const showExpandedContent = sidebarOpen || isMobile;
+  const [navQuery, setNavQuery] = useState("");
 
   const groupedItems = useMemo(() => {
     const items = [...menuItems];
@@ -159,203 +153,181 @@ export default function VentasSidebar({ mobileOpen, onMobileClose, shortcutStrip
     const groups: { [key: string]: MenuItem[] } = {};
     filteredItems.forEach((item) => {
       const section = item.section || "Principal";
-      if (!groups[section]) {
-        groups[section] = [];
-      }
+      if (!groups[section]) groups[section] = [];
       groups[section].push(item);
     });
 
     return sectionOrder
       .filter((section) => groups[section]?.length)
-      .reduce((acc, section) => {
-        acc[section] = groups[section];
-        return acc;
-      }, {} as { [key: string]: MenuItem[] });
+      .reduce(
+        (acc, section) => {
+          acc[section] = groups[section];
+          return acc;
+        },
+        {} as { [key: string]: MenuItem[] },
+      );
   }, [canManageSellers, navQuery]);
 
   if (!user) return null;
 
   return (
-    <aside
-      className={`${styles.ventasSidebar} ${sidebarOpen ? styles.sidebarOpen : styles.sidebarCollapsed}`}
-      data-mobile={isMobile ? "true" : "false"}
-      data-open={isMenuOpen ? "true" : "false"}
-    >
-      {/* Header con Logo */}
-      <div className={styles.sidebarHeader}>
-        <div className={styles.logoContainer}>
-          <img src="/logo-nexara.png" alt="NEXARA Logo" className={styles.logoIcon} />
-          {showExpandedContent && <h2 className={styles.logoText}>NEXARA</h2>}
-        </div>
-        {isMobile ? (
-          <button
-            type="button"
-            className={styles.hamburgerButton}
-            onClick={() => {
-              void hapticTap("light");
-              setIsMenuOpen((prev) => !prev);
-            }}
-            aria-label={isMenuOpen ? "Cerrar menú" : "Abrir menú"}
-            aria-expanded={isMenuOpen}
-            aria-controls="ventas-sidebar-menu"
-            data-open={isMenuOpen ? "true" : "false"}
-          >
-            <span className={styles.hamburgerLine}></span>
-            <span className={styles.hamburgerLine}></span>
-            <span className={styles.hamburgerLine}></span>
-          </button>
-        ) : (
-          <button
-            className={styles.toggleBtn}
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            title={sidebarOpen ? "Contraer" : "Expandir"}
-            aria-label="Toggle sidebar"
-          >
-            <span className={styles.toggleGlyph} aria-hidden="true">
-              {sidebarOpen ? "◀" : "▶"}
-            </span>
-          </button>
-        )}
-      </div>
-
+    <>
       {isMobile && isMenuOpen && (
         <div
-          className={styles.sidebarOverlay}
+          className={consoleStyles.sidebarOverlay}
           onClick={closeMenu}
           role="presentation"
+          aria-label="Cerrar menú"
         />
       )}
-
-      {(!isMobile || isMenuOpen) && (
-      <div
-        className={styles.sidebarContent}
-        id="ventas-sidebar-menu"
-        data-open={isMobile && isMenuOpen ? "true" : undefined}
+      <aside
+        className={consoleStyles.sidebar}
+        data-mobile={isMobile ? "true" : "false"}
+        data-open={isMenuOpen ? "true" : "false"}
       >
-
-      {/* User Info Card */}
-      {showExpandedContent && (
-        <div className={styles.userCard}>
-          <div className={styles.userAvatar}>
+        <div className={consoleStyles.sidebarHeader}>
+          <div className={consoleStyles.sidebarLogo}>
             <img
-              src={userAvatarSrc}
-              alt={user?.isSuperAdmin ? "NEXARA" : user.nombre}
-              style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+              src={brandLogoSrc}
+              alt="NEXARA"
+              className={consoleStyles.brandLogo}
+              onError={() => setBrandLogoSrc("/icon.png")}
             />
+            <span className={consoleStyles.brandMark}>NEXARA</span>
+            {isMobile && <span className={consoleStyles.brandSub}>Ventas</span>}
           </div>
-          <div className={styles.userInfo}>
-            <p className={styles.userName}>{user.nombre}</p>
-            <p className={styles.userRole}>{userRoleLabel}</p>
-          </div>
-        </div>
-      )}
-
-      {shortcutStrip && shortcutStrip.length > 0 && showExpandedContent && (
-        <div className={styles.shortcutStrip} role="navigation" aria-label="Accesos rápidos">
-          {shortcutStrip.map((s) => (
-            <Link
-              key={s.href}
-              href={s.href}
-              className={styles.shortcutChip}
-              onClick={closeMenu}
+          {isMobile && isMenuOpen && (
+            <button type="button" className={consoleStyles.mobileCloseButton} onClick={closeMenu} aria-label="Cerrar menú">
+              <span aria-hidden="true">✕</span>
+            </button>
+          )}
+          {isMobile && !isMenuOpen && (
+            <button
+              type="button"
+              className={consoleStyles.hamburgerButton}
+              onClick={() => {
+                void hapticTap("light");
+                setIsMenuOpen(true);
+              }}
+              aria-label="Abrir menú"
+              aria-expanded={isMenuOpen}
+              aria-controls="ventas-sidebar-menu"
+              data-open="false"
             >
-              <span aria-hidden="true">{s.icon}</span>
-              <span>{s.label}</span>
-            </Link>
-          ))}
-        </div>
-      )}
-
-      {showExpandedContent && (
-        <div className={styles.navSearchWrap}>
-          <input
-            className={styles.navSearchInput}
-            placeholder="Buscar sección o módulo"
-            value={navQuery}
-            onChange={(event) => setNavQuery(event.target.value)}
-          />
-          {navQuery && (
-            <button type="button" className={styles.navSearchClear} onClick={() => setNavQuery("")}>Limpiar</button>
+              <span className={consoleStyles.hamburgerLine} />
+              <span className={consoleStyles.hamburgerLine} />
+              <span className={consoleStyles.hamburgerLine} />
+            </button>
           )}
         </div>
-      )}
 
-      {/* Navigation */}
-      <nav className={styles.navContainer}>
-        {Object.entries(groupedItems).map(([section, items]) => (
-          <div key={section} className={styles.navSection}>
-            {showExpandedContent && <div className={styles.sectionTitle}>{section}</div>}
-            <ul className={styles.navList}>
-              {items.map((item) => {
-                const active = isActive(item.href);
-                return (
-                  <li key={item.href} className={styles.navListItem}>
-                    <Link
-                      href={withOwnerFilter(resolveVentasHref(item.href))}
-                      className={`${styles.navLink} ${active ? styles.navLinkActive : ""}`}
-                      title={item.label}
-                      aria-current={active ? "page" : undefined}
-                      onClick={closeMenu}
-                    >
-                      <span className={styles.navIcon}>{item.icon}</span>
-                      {showExpandedContent && (
-                        <div className={styles.navContent}>
-                          <span className={styles.navLabel}>{item.label}</span>
-                          {item.description && (
-                            <span className={styles.navDescription}>{item.description}</span>
-                          )}
-                        </div>
-                      )}
-                      <span className={styles.navIndicator} />
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+        {(!isMobile || isMenuOpen) && (
+          <div className={consoleStyles.sidebarContent} id="ventas-sidebar-menu" data-open={isMobile && isMenuOpen ? "true" : undefined}>
+            <div className={consoleStyles.sidebarUser}>
+              <div className={consoleStyles.superadminAvatarWrap}>
+                <img
+                  className={consoleStyles.avatarImage}
+                  src={userAvatarSrc}
+                  alt={user?.isSuperAdmin ? "NEXARA" : user.nombre}
+                  loading="lazy"
+                />
+              </div>
+              <div className={consoleStyles.sidebarName}>{user.nombre}</div>
+              <div className={consoleStyles.sidebarEmail}>{user.email}</div>
+              <div className={consoleStyles.sidebarMeta}>
+                <span className={consoleStyles.rolePill}>{userRoleLabel}</span>
+              </div>
+            </div>
+
+            {shortcutStrip && shortcutStrip.length > 0 && (
+              <div className={styles.shortcutStrip} role="navigation" aria-label="Accesos rápidos">
+                {shortcutStrip.map((s) => (
+                  <Link key={s.href} href={s.href} className={styles.shortcutChip} onClick={closeMenu}>
+                    <span aria-hidden="true">{s.icon}</span>
+                    <span>{s.label}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+
+            <div className={styles.navSearchWrap}>
+              <input
+                className={styles.navSearchInput}
+                placeholder="Buscar sección o módulo"
+                value={navQuery}
+                onChange={(event) => setNavQuery(event.target.value)}
+              />
+              {navQuery ? (
+                <button type="button" className={styles.navSearchClear} onClick={() => setNavQuery("")}>
+                  Limpiar
+                </button>
+              ) : null}
+            </div>
+
+            <nav className={styles.navContainer} aria-label="Navegación ventas">
+              {Object.entries(groupedItems).map(([section, items]) => (
+                <div key={section} className={styles.navSection}>
+                  <div className={consoleStyles.menuTitle}>{section}</div>
+                  <ul className={consoleStyles.sidebarMenu}>
+                    {items.map((item) => {
+                      const active = isActive(item.href);
+                      return (
+                        <li key={item.href} className={consoleStyles.sidebarMenuItem}>
+                          <Link
+                            href={withOwnerFilter(resolveVentasHref(item.href))}
+                            className={
+                              active
+                                ? `${consoleStyles.menuLink} ${consoleStyles.menuButton} ${consoleStyles.active}`
+                                : `${consoleStyles.menuLink} ${consoleStyles.menuButton}`
+                            }
+                            title={item.description}
+                            aria-current={active ? "page" : undefined}
+                            onClick={closeMenu}
+                          >
+                            <span className={consoleStyles.menuLinkIcon} aria-hidden="true">
+                              {item.icon}
+                            </span>
+                            <span className={consoleStyles.menuLinkText}>{item.label}</span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
+
+              {Object.keys(groupedItems).length === 0 && (
+                <div className={styles.navEmpty}>No hay resultados para la búsqueda actual.</div>
+              )}
+            </nav>
+
+            <div className={consoleStyles.sidebarFooter}>
+              <div className={consoleStyles.sidebarFooterActions}>
+                <Link href="/paneles" className={consoleStyles.menuLink} onClick={closeMenu}>
+                  Cambiar panel
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void hapticTap("medium");
+                    toggleDarkMode();
+                  }}
+                  className={consoleStyles.themeSwitcher}
+                  aria-label={darkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+                >
+                  <span className={consoleStyles.themeIcon} aria-hidden="true">
+                    ●
+                  </span>
+                  <span className={consoleStyles.themeLabel}>{darkMode ? "Vista oscura" : "Vista clara"}</span>
+                </button>
+                <button type="button" onClick={handleLogout} className={consoleStyles.logoutButton} aria-label="Cerrar sesión">
+                  Cerrar sesión
+                </button>
+              </div>
+            </div>
           </div>
-        ))}
-
-        {showExpandedContent && Object.keys(groupedItems).length === 0 && (
-          <div className={styles.navEmpty}>No hay resultados para la búsqueda actual.</div>
         )}
-      </nav>
-
-      {/* Botón de tema */}
-      <div className={styles.themeSection}>
-        <button
-          onClick={toggleDarkMode}
-          className={styles.themeButton}
-          data-collapsed={showExpandedContent ? 'false' : 'true'}
-          aria-label={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-        >
-          <span className={styles.themeIcon}>{darkMode ? '🌙' : '☀️'}</span>
-          {showExpandedContent && <span>{darkMode ? 'Modo Oscuro' : 'Modo Claro'}</span>}
-        </button>
-
-        <button
-          onClick={handleLogout}
-          className={styles.themeButton}
-          data-collapsed={showExpandedContent ? 'false' : 'true'}
-          aria-label="Cerrar sesión"
-        >
-          <span className={styles.themeIcon}>⎋</span>
-          {showExpandedContent && <span>Cerrar sesión</span>}
-        </button>
-      </div>
-
-      {/* Footer */}
-      <div className={styles.sidebarFooter}>
-        {showExpandedContent ? (
-          <>
-            <div className={styles.statusIndicator} />
-            <span className={styles.statusText}>En línea</span>
-          </>
-        ) : (
-          <div className={styles.statusIndicatorSmall} />
-        )}
-      </div>
-      </div>
-      )}
-    </aside>
+      </aside>
+    </>
   );
 }
