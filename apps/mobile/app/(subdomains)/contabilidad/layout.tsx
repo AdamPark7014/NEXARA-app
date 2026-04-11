@@ -15,9 +15,9 @@ import BottomNav from "@/components/BottomNav";
 import PageTransition from "@/components/PageTransition";
 import { hapticTap } from "@/lib/haptics";
 import { useCompactBottomNav } from "@/lib/use-compact-bottom-nav";
+import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
 
 export default function ContabilidadLayout({ children }: { children: React.ReactNode }) {
-  const MOBILE_BREAKPOINT = 980;
   const pathname = usePathname();
   const router = useRouter();
   const { darkMode, toggleDarkMode } = useTheme();
@@ -110,7 +110,7 @@ export default function ContabilidadLayout({ children }: { children: React.React
 
   useEffect(() => {
     const handleResize = () => {
-      const mobile = window.innerWidth <= MOBILE_BREAKPOINT;
+      const mobile = isPanelDrawerViewport(window.innerWidth);
       setIsMobile(mobile);
       if (!mobile) {
         setMobileMenuOpen(false);
@@ -120,7 +120,7 @@ export default function ContabilidadLayout({ children }: { children: React.React
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [MOBILE_BREAKPOINT]);
+  }, []);
 
   useEffect(() => {
     if (!isMobile) {
@@ -196,24 +196,45 @@ export default function ContabilidadLayout({ children }: { children: React.React
         </button>
       </header>
 
-      {isMobile && mobileMenuOpen && (
-        <button
-          type="button"
-          className={styles.mobileBackdrop}
+      {isMobile && mobileMenuOpen ? (
+        <div
+          className={consoleStyles.sidebarOverlay}
+          role="presentation"
           onClick={() => setMobileMenuOpen(false)}
-          aria-label="Cerrar menú"
         />
-      )}
+      ) : null}
 
       <aside
-        id="conta-mobile-menu"
-        className={`${consoleStyles.sidebar} ${styles.contaSidebar} ${isMobile && mobileMenuOpen ? styles.contaSidebarOpen : ""}`}
+        className={consoleStyles.sidebar}
+        data-mobile={isMobile ? "true" : "false"}
+        data-open={mobileMenuOpen ? "true" : "false"}
       >
-        <div className={consoleStyles.sidebarLogo}>
-          <span className={consoleStyles.brandMark}>NEXARA</span>
-          <span className={consoleStyles.brandSub}>Contabilidad</span>
+        <div className={consoleStyles.sidebarHeader}>
+          <div className={consoleStyles.sidebarLogo}>
+            <span className={consoleStyles.brandMark}>NEXARA</span>
+            <span className={consoleStyles.brandSub}>Contabilidad</span>
+          </div>
+          {isMobile && mobileMenuOpen ? (
+            <button
+              type="button"
+              className={consoleStyles.mobileCloseButton}
+              onClick={() => {
+                void hapticTap("light");
+                setMobileMenuOpen(false);
+              }}
+              aria-label="Cerrar menú"
+            >
+              <span aria-hidden="true">✕</span>
+            </button>
+          ) : null}
         </div>
 
+        {(!isMobile || mobileMenuOpen) && (
+        <div
+          className={consoleStyles.sidebarContent}
+          id="conta-mobile-menu"
+          data-open={isMobile && mobileMenuOpen ? "true" : undefined}
+        >
         {isMobile && !showCompactBottomNav && (
           <div className={styles.contaSidebarShortcuts} role="navigation" aria-label="Accesos rápidos">
             {contaBottomShortcuts.map((item) => {
@@ -331,6 +352,8 @@ export default function ContabilidadLayout({ children }: { children: React.React
             </button>
           </li>
         </ul>
+        </div>
+        )}
       </aside>
       <main
         className={`${consoleStyles.consoleMain} ${styles.contaMain} ${isMobile && showCompactBottomNav ? styles.contaMainPadForBottomNav : ""}`}

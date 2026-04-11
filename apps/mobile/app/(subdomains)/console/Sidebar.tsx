@@ -9,6 +9,7 @@ import { hasAnyPermission, hasPermission, PERMISSIONS } from "@/lib/permissions"
 import { getAvatarSrc, getRoleLabel, isPlatformAdmin } from "@/lib/panel-user";
 import { useEffect, useState } from "react";
 import { hapticTap } from "@/lib/haptics";
+import { PANEL_DRAWER_BREAKPOINT_PX } from "@/lib/panel-drawer-breakpoint";
 
 interface SidebarProps {
   mobileOpen?: boolean;
@@ -32,7 +33,6 @@ type MenuGroup = {
 const DEFAULT_OPEN_GROUP_IDS: string[] = ["employee", "operations", "people"];
 
 export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}) {
-  const MOBILE_BREAKPOINT = 900;
   const pathname = usePathname();
   const { user, logout } = useUser();
   const { darkMode, toggleDarkMode } = useTheme();
@@ -52,12 +52,12 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT);
+      setIsMobile(window.innerWidth <= PANEL_DRAWER_BREAKPOINT_PX);
     };
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
-  }, [MOBILE_BREAKPOINT]);
+  }, []);
 
   useEffect(() => {
     if (isMobile) {

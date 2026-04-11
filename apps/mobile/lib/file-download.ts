@@ -67,10 +67,10 @@ async function nativeCapacitorSave(blob: Blob, fileName: string): Promise<boolea
           await shareWithTimeout(Share, { title: safeName, url: uri, dialogTitle }, 15_000);
           return true;
         } catch (second) {
-          console.warn("[download] Share (url) falló:", second);
+          console.warn("[file-download] Share (url) falló:", second);
         }
       }
-      console.warn("[download] Share (files) falló:", first);
+      console.warn("[file-download] Share (files) falló:", first);
     }
     return false;
   } catch (e) {

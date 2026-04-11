@@ -13,6 +13,7 @@ import { setActivePanel } from "@/lib/panel-routing";
 import { useUser } from "@/components/UserContext";
 import { isPlatformAdmin } from "@/lib/panel-user";
 import { useCompactBottomNav } from "@/lib/use-compact-bottom-nav";
+import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
 
 const formatConsoleTitle = (pathname: string) => {
   const normalized = pathname.replace(/^\/+/, "").split("?")[0];
@@ -122,7 +123,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   }, [isIngeniero, isSuperAdmin, isAdmin, inPrefixedConsolePath, drawerOpen]);
 
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth <= 900);
+    const onResize = () => setIsMobile(isPanelDrawerViewport(window.innerWidth));
     onResize();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);

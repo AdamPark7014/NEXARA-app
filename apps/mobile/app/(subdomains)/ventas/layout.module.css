@@ -1,8 +1,9 @@
+/* Usa `consoleLayout` en el mismo nodo: solo tema y ancho; flex/padding los define consola */
 .salesRoot {
-  min-height: 100vh;
-  display: flex;
-  gap: var(--panel-gap);
-  padding: var(--panel-padding-y) var(--panel-padding-x);
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
   background: var(--background);
   color: var(--foreground);
 }
@@ -14,13 +15,10 @@
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   padding: var(--panel-padding-y) var(--panel-padding-x);
+  padding-bottom: var(--console-bottom-nav-clearance, calc(76px + 32px + env(safe-area-inset-bottom, 0px)));
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--surface-clean);
-}
-
-.salesMainPadForBottomNav {
-  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important;
 }
 
 .salesWorkspace {
@@ -144,10 +142,9 @@
   color: var(--text-secondary);
 }
 
-@media (max-width: 960px) {
+@media (max-width: 900px) {
   .salesRoot {
     flex-direction: column;
-    padding: 0;
     gap: 0;
   }
 
@@ -156,23 +153,28 @@
     border-left: 0;
     border-right: 0;
     overflow-y: visible;
-    padding: 14px 12px 16px;
+    padding: 12px 10px 14px;
+    padding-bottom: var(--console-bottom-nav-clearance, calc(76px + 32px + env(safe-area-inset-bottom, 0px)));
   }
 
   .salesWorkspaceHeader {
     padding: 10px;
+    position: sticky;
+    top: 0;
+    z-index: 32;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    background: color-mix(in srgb, var(--surface) 90%, transparent);
   }
 
   .salesWorkspaceTitle {
-    font-size: 1.26rem;
+    font-size: clamp(1.05rem, 4.2vw, 1.22rem);
   }
 
   .salesWorkspaceSubtitle {
     font-size: 0.86rem;
   }
-}
 
-@media (max-width: 768px) {
   .salesWorkspaceMeta {
     width: 100%;
   }
@@ -186,23 +188,6 @@
     margin: 40px 10px 0;
     padding: 18px;
     border-radius: var(--radius-md);
-  }
-}
-
-@media (max-width: 768px) {
-  .salesMain {
-    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 8px) !important;
-  }
-}
-
-@media (max-width: 768px) {
-  .salesWorkspaceHeader {
-    position: sticky;
-    top: 0;
-    z-index: 32;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    background: color-mix(in srgb, var(--surface) 90%, transparent);
   }
 
   .salesQuickLinks {

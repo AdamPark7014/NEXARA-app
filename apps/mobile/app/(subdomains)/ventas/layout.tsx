@@ -13,8 +13,8 @@ import { getRoleLabel, isSalesManagerUser } from "@/lib/panel-user";
 import { getSalesVendorStats, type SalesVendorStats } from "@/lib/sales-api";
 import { hapticTap } from "@/lib/haptics";
 import { useCompactBottomNav } from "@/lib/use-compact-bottom-nav";
-
-const VENTAS_MOBILE_BREAKPOINT = 768;
+import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
+import consoleStyles from "../console/console.module.css";
 
 export default function VentasLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -95,7 +95,7 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
   }, []);
 
   useEffect(() => {
-    const update = () => setIsNarrowShell(window.innerWidth <= VENTAS_MOBILE_BREAKPOINT);
+    const update = () => setIsNarrowShell(isPanelDrawerViewport(window.innerWidth));
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
@@ -125,14 +125,14 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
   }
 
   return (
-    <div className={styles.salesRoot}>
+    <div className={`${consoleStyles.consoleLayout} ${styles.salesRoot}`}>
       <VentasSidebar
         mobileOpen={drawerOpen}
         onMobileClose={() => setDrawerOpen(false)}
         shortcutStrip={isNarrowShell && !showCompactBottomNav ? ventasShortcutStrip : undefined}
       />
       <main
-        className={`${styles.salesMain} ${isNarrowShell && showCompactBottomNav ? styles.salesMainPadForBottomNav : ""}`}
+        className={styles.salesMain}
       >
         <section className={styles.salesWorkspace}>
           <div className={styles.salesWorkspaceHeader}>
