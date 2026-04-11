@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import React, { useMemo, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { PERMISSIONS } from "@/lib/permissions";
@@ -164,9 +165,6 @@ export default function CotizacionesPage() {
   const [publicToken, setPublicToken] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
 
   const updateMeta = (field: keyof QuoteMeta, value: string) => {
     setMeta((prev) => ({ ...prev, [field]: value }));

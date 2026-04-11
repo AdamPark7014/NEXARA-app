@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
@@ -135,10 +136,7 @@ const ActivitiesTable: React.FC = () => {
   const [ticketRequests, setTicketRequests] = useState<ClientTicketRequest[]>([]);
   const [pendingRequestId, setPendingRequestId] = useState<number | null>(null);
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
   const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
-  const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, '');
   const getAssetUrl = (url?: string | null) => {
     if (!url) return '';
     const raw = url.trim();
@@ -156,7 +154,7 @@ const ActivitiesTable: React.FC = () => {
       }
     }
 
-    const base = API_URL.replace(/\/+api\/?$/, '');
+    const base = getApiAssetOrigin();
     let normalizedPath = raw
       .replace(/\\+/g, '/')
       .replace(/^https?:\/\/[^/]+/i, '');

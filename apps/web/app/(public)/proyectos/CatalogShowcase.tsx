@@ -1,8 +1,6 @@
 import Image from "next/image";
 import styles from "./page.module.css";
-import { getApiBase } from "@/lib/api-base";
-
-const API_URL = getApiBase();
+import { getApiAssetOrigin } from "@/lib/api-base";
 
 export type CatalogShowcaseProject = {
   id: number;
@@ -24,11 +22,12 @@ function normalizeProjectImageUrl(imageUrl?: string | null): string {
   if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
     return imageUrl;
   }
+  const origin = getApiAssetOrigin();
   if (imageUrl.startsWith("/")) {
-    if (imageUrl.startsWith("/projects/image/")) return `${API_URL}${imageUrl}`;
+    if (imageUrl.startsWith("/projects/image/")) return `${origin}${imageUrl}`;
     return imageUrl;
   }
-  return `${API_URL}/projects/image/${imageUrl}`;
+  return `${origin}/projects/image/${imageUrl}`;
 }
 
 type CatalogShowcaseProps = {

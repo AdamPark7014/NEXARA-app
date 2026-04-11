@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
 import React, { useEffect, useMemo, useState } from 'react';
 import { RoleGuard } from '@/components/RoleGuard';
 import { PERMISSIONS } from '@/lib/permissions';
@@ -121,13 +122,10 @@ export function ClientTicketsPanel({ embedded = false }: { embedded?: boolean })
   const [inventories, setInventories] = useState<InventorySnapshot[]>([]);
   const [branchFilter, setBranchFilter] = useState<string>('all');
   const [inventoryStatusFilter, setInventoryStatusFilter] = useState<string>('all');
-
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
   const getAssetUrl = (url?: string | null) => {
     if (!url) return '';
     if (url.startsWith('http')) return url;
-    const base = API_URL.replace(/\/+api\/?$/, '');
+    const base = getApiAssetOrigin();
     return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
   };
 

@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
@@ -52,8 +53,6 @@ const ToolInventoryPanel: React.FC = () => {
   const [replacementSerialPhotoPreview, setReplacementSerialPhotoPreview] = useState<string | null>(null);
   const [replacing, setReplacing] = useState(false);
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 900px)');
@@ -147,7 +146,7 @@ const ToolInventoryPanel: React.FC = () => {
   useEffect(() => {
     if (!user?.token) return;
 
-    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -169,7 +168,7 @@ const ToolInventoryPanel: React.FC = () => {
       if (refreshTimer) clearTimeout(refreshTimer);
       socket.disconnect();
     };
-  }, [user?.token, API_URL, query, includeRetired]);
+  }, [user?.token, query, includeRetired]);
 
   const createItem = async (e: React.FormEvent) => {
     e.preventDefault();

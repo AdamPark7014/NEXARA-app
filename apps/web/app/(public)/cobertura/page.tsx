@@ -5,7 +5,7 @@ import Image from "next/image";
 import ContactFormToggle from "../../components/ContactFormToggle";
 import styles from "../../page.module.css";
 import corporateStyles from "../landing-corporate.module.css";
-import { buildApiUrl, getApiBase } from "@/lib/api-base";
+import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
 import { MX_ADMIN1_PATHS } from "../mxAdmin1Paths";
 
 interface Client {
@@ -25,10 +25,7 @@ const normalizeClient = (value: unknown): Client => {
   };
 };
 
-const API_URL = getApiBase();
-
-// Función para normalizar URLs de imágenes
-// Convierte filenames y rutas relativas a URLs completas del API
+// Función para normalizar URLs de imágenes (origen de assets / uploads)
 const normalizeImageUrl = (imageUrl?: string): string | undefined => {
   if (!imageUrl || imageUrl.trim() === "") return undefined;
   
@@ -37,13 +34,12 @@ const normalizeImageUrl = (imageUrl?: string): string | undefined => {
     return imageUrl;
   }
   
-  // Si es una ruta relativa del API (/clients/image/...) o un filename simple
-  // Anteponer el API_URL
+  const origin = getApiAssetOrigin();
   if (imageUrl.startsWith("/")) {
-    return `${API_URL}${imageUrl}`;
+    return `${origin}${imageUrl}`;
   }
   
-  return `${API_URL}/clients/image/${imageUrl}`;
+  return `${origin}/clients/image/${imageUrl}`;
 };
 
 const enterpriseMetrics = [

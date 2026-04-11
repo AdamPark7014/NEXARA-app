@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import styles from "./page.module.css";
-import { buildApiUrl, getApiBase, getSocketBaseUrl } from "@/lib/api-base";
+import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
 
 type Project = {
   id: number;
@@ -34,20 +34,19 @@ type ProjectForm = {
   gallery: string[];
 };
 
-const API_URL = getApiBase();
-
 const normalizeImageUrl = (imageUrl?: string | null) => {
   if (!imageUrl) return undefined;
   if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
     return imageUrl;
   }
+  const origin = getApiAssetOrigin();
   if (imageUrl.startsWith("/")) {
     if (imageUrl.startsWith("/projects/image/")) {
-      return `${API_URL}${imageUrl}`;
+      return `${origin}${imageUrl}`;
     }
     return imageUrl;
   }
-  return `${API_URL}/projects/image/${imageUrl}`;
+  return `${origin}/projects/image/${imageUrl}`;
 };
 
 const emptyForm: ProjectForm = {
@@ -75,6 +74,7 @@ export default function ProyectosWeb() {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [brokenCardThumbs, setBrokenCardThumbs] = useState<Record<number, boolean>>({});
   const selectedIdRef = useRef<number | null>(null);
   const mainInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
@@ -446,7 +446,24 @@ export default function ProyectosWeb() {
                 className={`${styles.listCard} ${selectedId === project.id ? styles.activeCard : ""}`}
                 onClick={() => handleSelect(project)}
               >
-                <div>
+                <div className={styles.cardThumbWrap}>
+                  {project.mainImage && !brokenCardThumbs[project.id] ? (
+                    <img
+                      className={styles.cardThumbImg}
+                      src={normalizeImageUrl(project.mainImage) || ""}
+                      alt=""
+                      loading="lazy"
+                      onError={() =>
+                        setBrokenCardThumbs((prev) => ({ ...prev, [project.id]: true }))
+                      }
+                    />
+                  ) : (
+                    <div className={styles.cardThumbFallback} aria-hidden>
+                      {(project.sector || "PR").slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div className={styles.cardBody}>
                   <p className={styles.cardTag}>{project.sector}</p>
                   <h3>{project.title}</h3>
                   <p className={styles.cardSummary}>{project.summary}</p>

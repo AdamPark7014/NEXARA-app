@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useCallback, useEffect, useState } from 'react';
 import { useUser } from './UserContext';
 import styles from './EvidenceUploader.module.css';
@@ -23,9 +24,6 @@ const EvidenceUploader = ({ actividadId }: { actividadId?: number }) => {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/\.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
-
   const fetchActivities = useCallback(() => {
     if (!user?.token || actividadId) return;
     fetch(buildApiUrl('activities'), {
@@ -43,7 +41,7 @@ const EvidenceUploader = ({ actividadId }: { actividadId?: number }) => {
   useEffect(() => {
     if (!user?.token || actividadId) return;
 
-    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -65,7 +63,7 @@ const EvidenceUploader = ({ actividadId }: { actividadId?: number }) => {
       if (refreshTimer) clearTimeout(refreshTimer);
       socket.disconnect();
     };
-  }, [API_URL, user?.token, actividadId, fetchActivities]);
+  }, [user?.token, actividadId, fetchActivities]);
 
   useEffect(() => () => {
     files.forEach((entry) => URL.revokeObjectURL(entry.url));

@@ -1,12 +1,10 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import React, { useEffect, useState } from 'react';
 import { RoleGuard } from '../../../../components/RoleGuard';
 import { useUser } from '../../../../components/UserContext';
 import { triggerBlobDownload } from '@/lib/file-download';
 import { PERMISSIONS } from '@/lib/permissions';
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
 
 interface ServiceClient {
   id: number;

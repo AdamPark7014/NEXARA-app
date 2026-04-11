@@ -1,11 +1,10 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
 import HelpTab from "@/components/HelpTab";
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 export default function BankingPage() {
   const { user } = useUser();
@@ -49,11 +48,11 @@ export default function BankingPage() {
     setLoadingTx(true);
     setLoadError("");
     Promise.all([
-      fetch(`${API_URL}/accounting/banking/accounts/${accountId}/summary`, { headers }).then((r) => {
+      fetch(buildApiUrl(`accounting/banking/accounts/${accountId}/summary`), { headers }).then((r) => {
         if (!r.ok) throw new Error('No se pudo cargar el resumen bancario.');
         return r.json();
       }),
-      fetch(`${API_URL}/accounting/banking/accounts/${accountId}/transactions`, { headers }).then((r) => {
+      fetch(buildApiUrl(`accounting/banking/accounts/${accountId}/transactions`), { headers }).then((r) => {
         if (!r.ok) throw new Error('No se pudieron cargar los movimientos de la cuenta.');
         return r.json();
       }),
@@ -73,7 +72,7 @@ export default function BankingPage() {
   const fetchAccounts = async (autoLoad = true, preferredAccountId?: number) => {
     if (!user?.token) return;
     setLoadError("");
-    const res = await fetch(`${API_URL}/accounting/banking/accounts`, { headers });
+    const res = await fetch(buildApiUrl("accounting/banking/accounts"), { headers });
     if (!res.ok) {
       throw new Error(`No se pudo cargar cuentas bancarias (HTTP ${res.status}).`);
     }
@@ -121,7 +120,7 @@ export default function BankingPage() {
 
   const searchSpei = () => {
     if (!speiSearch.trim()) return;
-    fetch(`${API_URL}/accounting/banking/spei/${encodeURIComponent(speiSearch.trim())}`, { headers })
+    fetch(buildApiUrl(`accounting/banking/spei/${encodeURIComponent(speiSearch.trim())}`), { headers })
       .then((r) => r.ok ? r.json() : null)
       .then(setSpeiResult)
       .catch(() => setSpeiResult(null));
@@ -139,7 +138,7 @@ export default function BankingPage() {
 
     setSaving(true);
     try {
-      const res = await fetch(`${API_URL}/accounting/banking/accounts`, {
+      const res = await fetch(buildApiUrl("accounting/banking/accounts"), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${user.token}`,
@@ -171,7 +170,7 @@ export default function BankingPage() {
 
     setSaving(true);
     try {
-      const res = await fetch(`${API_URL}/accounting/banking/accounts/${selectedAccount}/transactions/import`, {
+      const res = await fetch(buildApiUrl(`accounting/banking/accounts/${selectedAccount}/transactions/import`), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${user.token}`,

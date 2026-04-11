@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useUser } from './UserContext';
@@ -54,8 +55,6 @@ const AttendanceForm = () => {
   const gpsWatchIdRef = useRef<number | null>(null);
   const gpsLastSentRef = useRef<number>(0);
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
   const STORAGE_KEY = user?.id ? `nexara_attendance_timer_${user.id}` : 'nexara_attendance_timer_guest';
 
   // Cargar timer persistente al montar y recuperar de localStorage (user-specific)
@@ -371,7 +370,7 @@ const AttendanceForm = () => {
   useEffect(() => {
     if (!user?.token) return;
 
-    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -393,7 +392,7 @@ const AttendanceForm = () => {
       if (refreshTimer) clearTimeout(refreshTimer);
       socket.disconnect();
     };
-  }, [user?.token, API_URL, refreshSelectedDateAttendance]);
+  }, [user?.token, refreshSelectedDateAttendance]);
 
   useEffect(() => {
     return () => {

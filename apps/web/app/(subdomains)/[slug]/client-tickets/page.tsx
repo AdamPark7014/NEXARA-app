@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
 import React, { useEffect, useMemo, useState } from 'react';
 import { RoleGuard } from '@/components/RoleGuard';
 import { PERMISSIONS } from '@/lib/permissions';
@@ -104,12 +105,10 @@ export default function ClientTicketsPage() {
   const [loading, setLoading] = useState(true);
   const [feedbackFilter, setFeedbackFilter] = useState<'all' | 'with' | 'without'>('all');
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
   const getAssetUrl = (url?: string | null) => {
     if (!url) return '';
     if (url.startsWith('http')) return url;
-    const base = API_URL.replace(/\/+api\/?$/, '');
+    const base = getApiAssetOrigin();
     return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
   };
 

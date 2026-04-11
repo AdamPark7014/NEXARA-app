@@ -1,11 +1,10 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import HelpTab from '@/components/HelpTab';
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 export default function AccountingPage() {
   const { user } = useUser();
@@ -34,9 +33,9 @@ export default function AccountingPage() {
     const headers = { Authorization: `Bearer ${user.token}` };
     setLoading(true);
     Promise.all([
-      fetch(`${API_URL}/accounting/accounts`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/accounting/journal-entries`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/accounting/accounts/fiscal-periods`, { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`accounting/accounts`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`accounting/journal-entries`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`accounting/accounts/fiscal-periods`), { headers }).then((r) => r.json()),
     ])
       .then(([acc, je, fp]) => {
         setAccounts(Array.isArray(acc) ? acc : acc.data || []);
@@ -61,7 +60,7 @@ export default function AccountingPage() {
 
     setSaving(true);
     try {
-      const res = await fetch(`${API_URL}/accounting/accounts`, {
+      const res = await fetch(buildApiUrl(`accounting/accounts`), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${user.token}`,
@@ -96,7 +95,7 @@ export default function AccountingPage() {
 
     setSaving(true);
     try {
-      const res = await fetch(`${API_URL}/accounting/accounts/fiscal-periods`, {
+      const res = await fetch(buildApiUrl(`accounting/accounts/fiscal-periods`), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${user.token}`,

@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState } from 'react';
+import { getSocketBaseUrl } from '@/lib/api-base';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
@@ -11,7 +12,7 @@ function BackupRestorePanel() {
   useEffect(() => {
     if (!user) return;
 
-    const socketUrl = (process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, {
       auth: { token: user.token },
       transports: ['websocket', 'polling'],

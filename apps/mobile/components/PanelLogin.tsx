@@ -6,7 +6,7 @@ import { io, Socket } from "socket.io-client";
 import { useUser } from "./UserContext";
 import { hasPermission, PERMISSIONS } from "../lib/permissions";
 import { getDeviceIdentityHeaders } from "@/lib/device-identity";
-import { getApiBaseCandidates, getSocketBaseUrl } from "@/lib/api-base";
+import { getSocketBaseUrl, getApiBaseCandidates } from "@/lib/api-base";
 import { getAccessiblePanels, setActivePanel } from "@/lib/panel-routing";
 import { getSavedAccounts, saveAccount, removeSavedAccount, getPassword, type SavedAccount } from "@/lib/saved-accounts";
 

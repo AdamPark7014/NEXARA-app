@@ -1,11 +1,10 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import HelpTab from '@/components/HelpTab';
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 export default function QualityPage() {
   const { user } = useUser();
@@ -45,8 +44,8 @@ export default function QualityPage() {
     const headers = { Authorization: `Bearer ${user.token}` };
     setLoading(true);
     Promise.all([
-      fetch(`${API_URL}/quality/inspections`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/quality/ncr`, { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`quality/inspections`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`quality/ncr`), { headers }).then((r) => r.json()),
     ])
       .then(([ins, nc]) => {
         setInspections(Array.isArray(ins) ? ins : ins.data || []);
@@ -87,7 +86,7 @@ export default function QualityPage() {
     }
     setSaving(true);
     try {
-      const res = await fetch(`${API_URL}/quality/inspections`, {
+      const res = await fetch(buildApiUrl(`quality/inspections`), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -123,7 +122,7 @@ export default function QualityPage() {
     }
     setSaving(true);
     try {
-      const res = await fetch(`${API_URL}/quality/ncr`, {
+      const res = await fetch(buildApiUrl(`quality/ncr`), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

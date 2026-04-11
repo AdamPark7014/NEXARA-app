@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { buildApiUrl } from "@/lib/api-base";
+import { useEffect, useState } from 'react';
 import { useUser } from '@/components/UserContext';
 import styles from './page.module.css';
 
@@ -30,15 +31,10 @@ export default function VentasNotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
-  const apiUrl = useMemo(() => {
-    const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-    return base.replace(/[/.]+$/, '');
-  }, []);
-
   const fetchNotifications = async () => {
     if (!user?.token) return;
     try {
-      const res = await fetch(`${apiUrl}/notifications?limit=50`, {
+      const res = await fetch(buildApiUrl("notifications?limit=50"), {
         headers: { Authorization: `Bearer ${user.token}` },
       });
       if (res.ok) {
@@ -55,11 +51,11 @@ export default function VentasNotificationsPage() {
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
-  }, [user?.token, apiUrl]);
+  }, [user?.token]);
 
   const handleMarkAsRead = async (notificationId: number) => {
     if (!user?.token) return;
-    await fetch(`${apiUrl}/notifications/${notificationId}/read`, {
+    await fetch(buildApiUrl(`notifications/${notificationId}/read`), {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${user.token}` },
     });
@@ -68,7 +64,7 @@ export default function VentasNotificationsPage() {
 
   const handleMarkAllAsRead = async () => {
     if (!user?.token) return;
-    await fetch(`${apiUrl}/notifications/read/all`, {
+    await fetch(buildApiUrl("notifications/read/all"), {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${user.token}` },
     });
@@ -77,7 +73,7 @@ export default function VentasNotificationsPage() {
 
   const handleDelete = async (notificationId: number) => {
     if (!user?.token) return;
-    await fetch(`${apiUrl}/notifications/${notificationId}`, {
+    await fetch(buildApiUrl(`notifications/${notificationId}`), {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${user.token}` },
     });

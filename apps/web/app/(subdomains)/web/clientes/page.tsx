@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import styles from "./page.module.css";
-import { buildApiUrl, getApiBase } from "@/lib/api-base";
+import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
 
 type Client = {
   id: number;
@@ -18,8 +18,6 @@ type ClientForm = {
   description: string;
 };
 
-const API_URL = getApiBase();
-
 const emptyForm: ClientForm = {
   name: "",
   description: "",
@@ -30,10 +28,11 @@ const normalizeClientImageUrl = (imageUrl?: string | null) => {
   if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
     return imageUrl;
   }
+  const origin = getApiAssetOrigin();
   if (imageUrl.startsWith("/")) {
-    return `${API_URL}${imageUrl}`;
+    return `${origin}${imageUrl}`;
   }
-  return `${API_URL}/clients/image/${imageUrl}`;
+  return `${origin}/clients/image/${imageUrl}`;
 };
 
 const formatDate = (value?: string | null) =>

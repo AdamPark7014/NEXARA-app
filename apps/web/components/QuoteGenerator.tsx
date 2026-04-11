@@ -6,6 +6,7 @@ import PDFViewer from './PDFViewer';
 import styles from './QuoteGenerator.module.css';
 import { io, Socket } from 'socket.io-client';
 import { triggerBlobDownload } from '@/lib/file-download';
+import { getSocketBaseUrl } from '@/lib/api-base';
 
 interface Quote {
   id: number;
@@ -100,9 +101,7 @@ export default function QuoteGenerator({ onQuoteGenerated }: QuoteGeneratorProps
   useEffect(() => {
     if (!token) return;
 
-    const socketUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api')
-      .replace(/[\/.]+$/, '')
-      .replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 

@@ -4,8 +4,7 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import HelpTab from "@/components/HelpTab";
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/\.]+$/, "");
+import { buildApiUrl } from "@/lib/api-base";
 
 const emptyMov = () => ({ type: "IN", productId: "", warehouseId: "", quantity: 1, unitCost: "", reference: "", notes: "" });
 
@@ -52,13 +51,14 @@ export default function StockPage() {
     if (!user?.token) return;
     const headers = { Authorization: `Bearer ${user.token}` };
     const warehouseParam = warehouseFilterId ? `warehouseId=${warehouseFilterId}` : "";
-    const withQuery = (path: string) => `${API_URL}${path}${warehouseParam ? (path.includes("?") ? "&" : "?") + warehouseParam : ""}`;
+    const stockPath = (resource: "levels" | "movements") =>
+      warehouseParam ? `stock/${resource}?${warehouseParam}` : `stock/${resource}`;
     setLoading(true);
     Promise.all([
-      fetch(withQuery(`/stock/levels`), { headers }).then((r) => r.json()),
-      fetch(withQuery(`/stock/movements`), { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/stock/alerts/low-stock`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/warehouse`, { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(stockPath("levels")), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(stockPath("movements")), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`stock/alerts/low-stock`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`warehouse`), { headers }).then((r) => r.json()),
     ])
       .then(([l, m, a, w]) => {
         setLevels(Array.isArray(l) ? l : l.data || []);
@@ -102,7 +102,7 @@ export default function StockPage() {
     if (!movForm.productId || !movForm.warehouseId || !movForm.quantity) return;
     setSaving(true);
     try {
-      const res = await fetch(`${API_URL}/stock/movements`, {
+      const res = await fetch(buildApiUrl(`stock/movements`), {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${user?.token}` },
         body: JSON.stringify({

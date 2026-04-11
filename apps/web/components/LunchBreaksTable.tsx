@@ -2,6 +2,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
+import { buildApiUrl, getSocketBaseUrl } from '@/lib/api-base';
+import { appendLunchBreakDayRangeQuery } from '@/lib/lunch-break-date-range';
+import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import styles from './LunchBreaksTable.module.css';
 
 interface LunchBreak {
@@ -31,31 +34,34 @@ const LunchBreaksTable: React.FC = () => {
   const [expandedPhotoUrl, setExpandedPhotoUrl] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState('');
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
-  const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, '');
-
   const fetchLunchBreaks = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     try {
-      // Usar endpoint correspondiente según el rol
-      const isAdmin = user.permissions?.includes('attendance.manage') || user.isSuperAdmin;
+      const isAdmin = hasPermission(user, PERMISSIONS.ATTENDANCE_MANAGE);
       const baseEndpoint = isAdmin ? 'lunch-breaks/users' : 'lunch-breaks/my-breaks';
       let endpoint = buildApiUrl(baseEndpoint);
-      
       if (dateFilter) {
-        const date = new Date(dateFilter);
-        const startDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-        const endDate = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
-        endpoint += `?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`;
+        endpoint = appendLunchBreakDayRangeQuery(endpoint, dateFilter);
       }
 
       const res = await fetch(endpoint, {
         headers: { Authorization: `Bearer ${user.token}` },
       });
 
-      if (!res.ok) throw new Error('Error al cargar horas de comida');
+      if (!res.ok) {
+        const text = await res.text();
+        let msg = `Error al cargar horas de comida (${res.status})`;
+        try {
+          const j = JSON.parse(text) as { message?: string | string[] };
+          if (Array.isArray(j?.message) && j.message[0]) msg = String(j.message[0]);
+          else if (typeof j?.message === 'string' && j.message.trim()) msg = j.message;
+          else if (text?.trim()) msg = text.trim().slice(0, 240);
+        } catch {
+          if (text?.trim()) msg = text.trim().slice(0, 240);
+        }
+        throw new Error(msg);
+      }
       const data = await res.json();
       setLunchBreaks(Array.isArray(data) ? data : []);
       setError(null);

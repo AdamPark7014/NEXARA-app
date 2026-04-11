@@ -1,7 +1,7 @@
 import Image from "next/image";
 import type { Metadata } from "next";
 import styles from "./page.module.css";
-import { buildApiUrl, getApiBase } from "@/lib/api-base";
+import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
 import CatalogShowcase from "./CatalogShowcase";
 import { PROYECTOS_SECTOR_COVERS } from "./proyectosSectorCovers";
 import ExternalLinkButton from "@/components/ExternalLinkButton";
@@ -75,18 +75,17 @@ type SectorTemplate = {
   group: "main" | "other";
 };
 
-const API_URL = getApiBase();
-
 const normalizeImageUrl = (imageUrl?: string | null) => {
   if (!imageUrl) return "/soluciones/rect-a.jpg";
   if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
     return imageUrl;
   }
+  const origin = getApiAssetOrigin();
   if (imageUrl.startsWith("/")) {
-    if (imageUrl.startsWith("/projects/image/")) return `${API_URL}${imageUrl}`;
+    if (imageUrl.startsWith("/projects/image/")) return `${origin}${imageUrl}`;
     return imageUrl;
   }
-  return `${API_URL}/projects/image/${imageUrl}`;
+  return `${origin}/projects/image/${imageUrl}`;
 };
 
 const getProjects = async (): Promise<Project[]> => {
@@ -330,7 +329,7 @@ export default async function ProjectsPage() {
             y sectores atendidos para orientar compra e implementación con criterio empresarial.
           </p>
         </div>
-        <ExternalLinkButton href={`${API_URL}/projects/catalog-pdf/download`} className={styles.pdfButton}>
+        <ExternalLinkButton href={buildApiUrl("projects/catalog-pdf/download")} className={styles.pdfButton}>
           Descargar PDF completo
         </ExternalLinkButton>
       </header>
@@ -372,7 +371,7 @@ export default async function ProjectsPage() {
           Solicitar asesoría para mi sector
         </a>
         <ExternalLinkButton
-          href={`${API_URL}/projects/catalog-pdf/download`}
+          href={buildApiUrl("projects/catalog-pdf/download")}
           data-track-conversion="projects_catalog_pdf"
           className={styles.pdfButton}
         >

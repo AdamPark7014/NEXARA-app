@@ -44,9 +44,6 @@ export const metadata: Metadata = {
   creator: "NEXARA",
   publisher: "NEXARA",
   applicationName: "NEXARA",
-  alternates: {
-    canonical: "/",
-  },
   icons: {
     icon: "/favicon.ico",
     shortcut: "/favicon.ico",

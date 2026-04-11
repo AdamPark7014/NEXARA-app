@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { RoleGuard } from "@/components/RoleGuard";
@@ -8,8 +9,6 @@ import HelpTab from "@/components/HelpTab";
 import { triggerBlobDownload, triggerFileDownload } from "@/lib/file-download";
 
 const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false });
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 export default function FinancialReportsPage() {
   const { user } = useUser();
@@ -41,9 +40,9 @@ export default function FinancialReportsPage() {
 
     setLoading(true);
     Promise.all([
-      fetch(`${API_URL}/accounting/accounts/trial-balance`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/accounting/accounts/income-statement?${incomeParams.toString()}`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/accounting/accounts/balance-sheet?${balanceParams.toString()}`, { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`accounting/accounts/trial-balance`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`accounting/accounts/income-statement?${incomeParams.toString()}`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`accounting/accounts/balance-sheet?${balanceParams.toString()}`), { headers }).then((r) => r.json()),
     ])
       .then(([trial, income, balance]) => {
         setTrialBalance(Array.isArray(trial) ? trial : []);
@@ -63,7 +62,7 @@ export default function FinancialReportsPage() {
       if (toDate) params.append("toDate", toDate);
       if (asOfDate) params.append("asOfDate", asOfDate);
 
-      const res = await fetch(`${API_URL}/accounting/accounts/reports/pdf?${params.toString()}`, {
+      const res = await fetch(buildApiUrl(`accounting/accounts/reports/pdf?${params.toString()}`), {
         headers: { Authorization: `Bearer ${user.token}` },
       });
 

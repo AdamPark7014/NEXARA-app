@@ -1,5 +1,6 @@
 "use client";
 
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { io, Socket } from "socket.io-client";
@@ -65,13 +66,7 @@ type DetailFilter = {
   anchor: string;
 };
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(
-  /[\/.]+$/,
-  ""
-);
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
-const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
-const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, "");
 
 const getStaticMapPreviewUrl = (lat: number, lng: number) => {
   if (GOOGLE_MAPS_API_KEY) {

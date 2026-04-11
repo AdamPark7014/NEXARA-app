@@ -1,5 +1,6 @@
 "use client";
 
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useMemo, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
@@ -21,9 +22,6 @@ type ProjectItem = {
   engineers?: Array<{ id: number; engineer: { id: number; nombre: string; email?: string } }>;
   activities?: Array<{ id: number }>;
 };
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
-const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
 
 export default function ConsoleProjectsPage() {
   const { user } = useUser();

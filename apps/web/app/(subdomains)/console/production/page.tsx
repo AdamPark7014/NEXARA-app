@@ -1,11 +1,10 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState, useMemo } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import HelpTab from "@/components/HelpTab";
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 const STATUS_LABELS: Record<string, string> = {
   PLANNED: "Planificada", IN_PROGRESS: "En progreso", COMPLETED: "Completada",
@@ -36,8 +35,8 @@ export default function ProductionPage() {
     setLoading(true);
     const headers = { Authorization: `Bearer ${user.token}` };
     Promise.all([
-      fetch(`${API_URL}/manufacturing/production`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/manufacturing/bom`, { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`manufacturing/production`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`manufacturing/bom`), { headers }).then((r) => r.json()),
     ])
       .then(([d, b]) => {
         setOrders(Array.isArray(d) ? d : d.data || []);
@@ -60,7 +59,7 @@ export default function ProductionPage() {
     }
     setSaving(true);
     try {
-      const res = await fetch(`${API_URL}/manufacturing/production`, {
+      const res = await fetch(buildApiUrl(`manufacturing/production`), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -89,7 +88,7 @@ export default function ProductionPage() {
   const startOrder = async (id: number) => {
     if (!canManage) return;
     try {
-      const res = await fetch(`${API_URL}/manufacturing/production/${id}/start`, {
+      const res = await fetch(buildApiUrl(`manufacturing/production/${id}/start`), {
         method: "PATCH",
         headers: { Authorization: `Bearer ${user?.token}` },
       });
@@ -105,7 +104,7 @@ export default function ProductionPage() {
     const producedQty = Number(window.prompt("Cantidad producida final", "0") || "0");
     if (!producedQty) return;
     try {
-      const res = await fetch(`${API_URL}/manufacturing/production/${id}/complete`, {
+      const res = await fetch(buildApiUrl(`manufacturing/production/${id}/complete`), {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

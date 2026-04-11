@@ -18,15 +18,14 @@ import {
 } from '@/lib/sales-api';
 import styles from './SalesReportsDashboard.module.css';
 import { triggerBlobDownload, triggerFileDownload } from '@/lib/file-download';
+import { buildApiUrl, getSocketBaseUrl } from '@/lib/api-base';
 
 interface SalesReportsDashboardProps {
-  apiUrl: string;
   period?: 'week' | 'month' | 'year';
   onPeriodChange?: (period: 'week' | 'month' | 'year') => void;
 }
 
 export default function SalesReportsDashboard({
-  apiUrl,
   period = 'month',
   onPeriodChange,
 }: SalesReportsDashboardProps) {
@@ -90,9 +89,7 @@ export default function SalesReportsDashboard({
   useEffect(() => {
     if (!user?.token) return;
 
-    const socketUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api')
-      .replace(/[\/.]+$/, '')
-      .replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -145,7 +142,7 @@ export default function SalesReportsDashboard({
       // Build logo URL with nexara.com.mx domain
       const logoUrl = 'https://nexara.com.mx/logo-nexara.png';
 
-      const res = await fetch(`${apiUrl}/ventas/reportes/generar-pdf`, {
+      const res = await fetch(buildApiUrl("ventas/reportes/generar-pdf"), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

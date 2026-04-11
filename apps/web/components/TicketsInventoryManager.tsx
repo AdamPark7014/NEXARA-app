@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { io, Socket } from 'socket.io-client';
+import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
 
 type BranchOption = { id: number; name: string; branchNumber?: string | null };
 
@@ -41,7 +42,6 @@ type InventorySnapshot = {
 
 type Props = {
   token: string;
-  apiUrl: string;
   mode: "branch" | "client";
   fixedBranch?: BranchOption;
   branches?: BranchOption[];
@@ -78,7 +78,7 @@ const emptyItem = (): InventoryItemDraft => ({
   maintenanceComments: "",
 });
 
-export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBranch, branches = [] }: Props) {
+export default function TicketsInventoryManager({ token, mode, fixedBranch, branches = [] }: Props) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,11 +108,10 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
   const editorRef = useRef<HTMLDivElement | null>(null);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
 
-  const buildApiUrl = (path: string) => `${apiUrl}/${path.replace(/^\/+/, "")}`;
   const getAssetUrl = (url?: string | null) => {
     if (!url) return "";
     if (url.startsWith("http")) return url;
-    const base = apiUrl.replace(/\/+api\/?$/, "");
+    const base = getApiAssetOrigin().replace(/\/+$/, "");
     return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
   };
 
@@ -335,14 +334,14 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
     } finally {
       setLoading(false);
     }
-  }, [mode, activeBranchId, token, apiUrl, statusFilter, originFilter, fromDate, toDate, branchQuery]);
+  }, [mode, activeBranchId, token, statusFilter, originFilter, fromDate, toDate, branchQuery]);
 
   useEffect(() => {
     fetchInventories();
   }, [fetchInventories]);
 
   useEffect(() => {
-    const socketUrl = apiUrl.replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -364,7 +363,7 @@ export default function TicketsInventoryManager({ token, apiUrl, mode, fixedBran
       if (refreshTimer) clearTimeout(refreshTimer);
       socket.disconnect();
     };
-  }, [apiUrl, fetchInventories]);
+  }, [fetchInventories]);
 
   useEffect(() => {
     if (mode === "client" && !selectedBranchId && branches.length > 0) {

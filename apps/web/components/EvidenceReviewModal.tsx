@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
@@ -24,9 +25,6 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
-
   const steps = [
     { value: 'ENTRY_PHOTO', label: '📸 Paso 1: Foto de Entrada' },
     { value: 'EVIDENCE_PHOTOS', label: '📷 Paso 2: Fotos de Evidencia' },
@@ -38,7 +36,7 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
   useEffect(() => {
     if (!user) return;
 
-    const socketUrl = (process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, {
       auth: { token: user.token },
       transports: ['websocket', 'polling'],

@@ -1,3 +1,11 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Términos y condiciones",
+  alternates: { canonical: "/legal/terminos" },
+  robots: { index: true, follow: true },
+};
+
 export default function TerminosPage() {
   const mailHref = "mailto:ventas@nexara.com.mx";
   return (

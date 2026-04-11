@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useRef, useState, useEffect } from 'react';
 import { useUser } from './UserContext';
 import styles from './ClientCreationForm.module.css';
@@ -54,8 +55,6 @@ export default function ClientCreationForm({ onClientCreated }: ClientCreationFo
     password?: string;
   } | null>(null);
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
 
   useEffect(() => {
     if (!clientLogo) {
@@ -70,7 +69,7 @@ export default function ClientCreationForm({ onClientCreated }: ClientCreationFo
   useEffect(() => {
     if (!user?.token) return;
 
-    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -92,7 +91,7 @@ export default function ClientCreationForm({ onClientCreated }: ClientCreationFo
       if (refreshTimer) clearTimeout(refreshTimer);
       socket.disconnect();
     };
-  }, [user?.token, API_URL, onClientCreated]);
+  }, [user?.token, onClientCreated]);
 
   const handleLogoSelect = (file?: File | null) => {
     if (!file) return;

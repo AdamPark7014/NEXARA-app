@@ -217,9 +217,14 @@ export function middleware(request: NextRequest) {
       subdomain = hostParts[0];
     }
   } else if (isWildcard) {
-    // En producción: extraer subdominio (primera parte antes de nexara.com.mx)
-    if (hostParts.length >= 3) {
-      // Si tiene 3+ partes: consola.nexara.com.mx
+    // *.nexara.com.mx tiene al menos 4 etiquetas (ej. consola.nexara.com.mx).
+    // nexara.com.mx (3) es el dominio raíz, no un subdominio llamado "nexara".
+    const isComMx =
+      hostParts.length >= 2 &&
+      hostParts[hostParts.length - 2] === "com" &&
+      hostParts[hostParts.length - 1] === "mx";
+    const minPartsForSubdomain = isComMx ? 4 : 3;
+    if (hostParts.length >= minPartsForSubdomain) {
       const potential = hostParts[0];
       if (potential && potential !== 'www') {
         subdomain = potential;
@@ -227,8 +232,10 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  const isMappedPanelSubdomain = Boolean(subdomain && SUBDOMAIN_MAP[subdomain]);
+
   // Si detectamos un subdominio conocido, reescribir a ruta específica
-  if (subdomain && SUBDOMAIN_MAP[subdomain]) {
+  if (isMappedPanelSubdomain && subdomain) {
     const internalSlug = SUBDOMAIN_MAP[subdomain];
     const pathname = request.nextUrl.pathname;
     const isAlreadyScopedPath = (() => {
@@ -272,6 +279,17 @@ export function middleware(request: NextRequest) {
     
     const response = applySecurityHeaders(NextResponse.rewrite(url));
     return applyNoStoreForHtml(request, response);
+  }
+
+  // URL legacy: consolidar en / (canonical del sitio público)
+  if (
+    (request.method === 'GET' || request.method === 'HEAD') &&
+    request.nextUrl.pathname === '/nexara' &&
+    !isMappedPanelSubdomain
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/';
+    return applySecurityHeaders(NextResponse.redirect(url, 308));
   }
 
   // Dominio principal: reescribir / para servir /nexara/page.tsx sin cambiar URL

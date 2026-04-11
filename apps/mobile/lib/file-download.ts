@@ -16,6 +16,69 @@ export type DownloadOptions = {
 
 type ShareAttempt = "shared" | "aborted" | "unsupported";
 
+async function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      const base64 = result.split(",")[1];
+      if (base64) resolve(base64);
+      else reject(new Error("blobToBase64: empty result"));
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function shareWithTimeout(
+  shareMod: { share: (opts: Record<string, unknown>) => Promise<unknown> },
+  payload: { title: string; files?: string[]; url?: string; dialogTitle?: string },
+  ms: number,
+): Promise<void> {
+  await Promise.race([
+    shareMod.share(payload),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("share-timeout")), ms),
+    ),
+  ]);
+}
+
+/**
+ * En Capacitor nativo: escribe el blob en el directorio caché y abre el menú compartir
+ * del sistema operativo (Filesystem + Share). No depende de HTTP/HTTPS ni permisos de almacenamiento.
+ */
+async function nativeCapacitorSave(blob: Blob, fileName: string): Promise<boolean> {
+  try {
+    const { Capacitor } = await import("@capacitor/core");
+    const { Filesystem, Directory } = await import("@capacitor/filesystem");
+    const { Share } = await import("@capacitor/share");
+    const base64 = await blobToBase64(blob);
+    const safeName = fileName.replace(/[<>:"/\\|?*]/g, "_");
+    await Filesystem.writeFile({ path: safeName, data: base64, directory: Directory.Cache });
+    const { uri } = await Filesystem.getUri({ directory: Directory.Cache, path: safeName });
+    const dialogTitle = "Guardar o compartir";
+
+    try {
+      await shareWithTimeout(Share, { title: safeName, files: [uri], dialogTitle }, 15_000);
+      return true;
+    } catch (first) {
+      if (Capacitor.getPlatform() === "android") {
+        try {
+          await shareWithTimeout(Share, { title: safeName, url: uri, dialogTitle }, 15_000);
+          return true;
+        } catch (second) {
+          console.warn("[download] Share (url) falló:", second);
+        }
+      }
+      console.warn("[download] Share (files) falló:", first);
+    }
+    return false;
+  } catch (e) {
+    console.warn("[download] Capacitor Filesystem/Share no disponible:", e);
+    return false;
+  }
+}
+
 async function blobFromUrl(fileUrl: string, authToken?: string): Promise<Blob | null> {
   try {
     if (fileUrl.startsWith("blob:") || fileUrl.startsWith("data:")) {
@@ -43,7 +106,13 @@ async function tryNavigatorShareFile(blob: Blob, fileName: string): Promise<Shar
     if (typeof navigator.canShare === "function" && !navigator.canShare(data)) {
       return "unsupported";
     }
-    await navigator.share(data);
+    // Añadir timeout: navigator.share puede colgarse indefinidamente en WebViews de Capacitor
+    await Promise.race([
+      navigator.share(data),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("share-timeout")), 8_000),
+      ),
+    ]);
     return "shared";
   } catch (e) {
     if ((e as Error).name === "AbortError") return "aborted";
@@ -83,6 +152,11 @@ export async function triggerFileDownload(
         mimeType && (!blob.type || blob.type === "application/octet-stream")
           ? new Blob([blob], { type: mimeType })
           : blob;
+      // En APK nativa: Filesystem + Share nativo (evita el cuelgue de navigator.share en WebView)
+      if (isCapacitorNative()) {
+        const saved = await nativeCapacitorSave(toShare, fileName);
+        if (saved) return;
+      }
       const result = await tryNavigatorShareFile(toShare, fileName);
       if (result === "shared" || result === "aborted") return;
     }
@@ -110,6 +184,11 @@ export async function triggerBlobDownload(
     isCapacitorNative() || (preferOpenOnMobile && isLikelyMobileDevice());
 
   if (nativeOrMobile) {
+    // En APK nativa: Filesystem + Share nativo (evita el cuelgue de navigator.share en WebView)
+    if (isCapacitorNative()) {
+      const saved = await nativeCapacitorSave(typed, fileName);
+      if (saved) return;
+    }
     const result = await tryNavigatorShareFile(typed, fileName);
     if (result === "shared" || result === "aborted") return;
   }

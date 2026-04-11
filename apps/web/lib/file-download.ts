@@ -43,7 +43,12 @@ async function tryNavigatorShareFile(blob: Blob, fileName: string): Promise<Shar
     if (typeof navigator.canShare === "function" && !navigator.canShare(data)) {
       return "unsupported";
     }
-    await navigator.share(data);
+    await Promise.race([
+      navigator.share(data),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("share-timeout")), 8_000),
+      ),
+    ]);
     return "shared";
   } catch (e) {
     if ((e as Error).name === "AbortError") return "aborted";

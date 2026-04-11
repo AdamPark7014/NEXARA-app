@@ -1,12 +1,11 @@
 "use client";
 
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useMemo, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import HelpTab from "@/components/HelpTab";
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 type HrTab = "request-leave" | "my-leaves" | "my-reviews" | "manage-leaves" | "manage-reviews" | "create-review";
 
@@ -77,8 +76,8 @@ export default function HrPage() {
     setLoading(true);
     setError("");
     try {
-      const leavesUrl = new URL(`${API_URL}/hr/leaves`);
-      const reviewsUrl = new URL(`${API_URL}/hr/reviews`);
+      const leavesUrl = new URL(buildApiUrl(`hr/leaves`));
+      const reviewsUrl = new URL(buildApiUrl(`hr/reviews`));
 
       if (!canManage && user.id) {
         leavesUrl.searchParams.set("userId", String(user.id));
@@ -88,9 +87,9 @@ export default function HrPage() {
       const [lv, rv, db, usersResponse] = await Promise.all([
         fetch(leavesUrl.toString(), { headers: authHeaders }).then((r) => r.json()),
         fetch(reviewsUrl.toString(), { headers: authHeaders }).then((r) => r.json()),
-        fetch(`${API_URL}/hr/dashboard`, { headers: authHeaders }).then((r) => r.json()),
+        fetch(buildApiUrl(`hr/dashboard`), { headers: authHeaders }).then((r) => r.json()),
         canCreateReview
-          ? fetch(`${API_URL}/users`, { headers: authHeaders }).then((r) => r.json())
+          ? fetch(buildApiUrl(`users`), { headers: authHeaders }).then((r) => r.json())
           : Promise.resolve([]),
       ]);
 
@@ -175,7 +174,7 @@ export default function HrPage() {
     setSaving(true);
     setError("");
     try {
-      const response = await fetch(`${API_URL}/hr/leaves`, {
+      const response = await fetch(buildApiUrl(`hr/leaves`), {
         method: "POST",
         headers: { ...authHeaders, "Content-Type": "application/json" },
         body: JSON.stringify(leaveForm),
@@ -207,7 +206,7 @@ export default function HrPage() {
         goals: reviewForm.goals,
         comments: reviewForm.comments,
       };
-      const response = await fetch(`${API_URL}/hr/reviews`, {
+      const response = await fetch(buildApiUrl(`hr/reviews`), {
         method: "POST",
         headers: { ...authHeaders, "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -234,7 +233,7 @@ export default function HrPage() {
 
   const approveLeave = async (id: number) => {
     if (!user?.token || !canApproveLeave) return;
-    const response = await fetch(`${API_URL}/hr/leaves/${id}/approve`, {
+    const response = await fetch(buildApiUrl(`hr/leaves/${id}/approve`), {
       method: "PATCH",
       headers: authHeaders,
     });
@@ -244,7 +243,7 @@ export default function HrPage() {
   const rejectLeave = async (id: number) => {
     if (!user?.token || !canApproveLeave) return;
     const reason = window.prompt("Motivo de rechazo:", "") || "";
-    const response = await fetch(`${API_URL}/hr/leaves/${id}/reject`, {
+    const response = await fetch(buildApiUrl(`hr/leaves/${id}/reject`), {
       method: "PATCH",
       headers: { ...authHeaders, "Content-Type": "application/json" },
       body: JSON.stringify({ rejectionReason: reason }),
@@ -254,7 +253,7 @@ export default function HrPage() {
 
   const submitReview = async (id: number) => {
     if (!user?.token || !canManage) return;
-    const response = await fetch(`${API_URL}/hr/reviews/${id}/submit`, {
+    const response = await fetch(buildApiUrl(`hr/reviews/${id}/submit`), {
       method: "PATCH",
       headers: authHeaders,
     });
@@ -263,7 +262,7 @@ export default function HrPage() {
 
   const acknowledgeReview = async (id: number) => {
     if (!user?.token) return;
-    const response = await fetch(`${API_URL}/hr/reviews/${id}/acknowledge`, {
+    const response = await fetch(buildApiUrl(`hr/reviews/${id}/acknowledge`), {
       method: "PATCH",
       headers: authHeaders,
     });

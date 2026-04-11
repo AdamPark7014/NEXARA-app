@@ -1,3 +1,4 @@
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -40,10 +41,6 @@ type AttendanceRange = {
   totalUsers?: number;
   users?: AttendanceRangeUser[];
 };
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
-const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, '');
 
 const toLocalDateInput = (date: Date) => date.toLocaleDateString('sv-SE');
 

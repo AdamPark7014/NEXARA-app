@@ -4,7 +4,7 @@ import { io, Socket } from "socket.io-client";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { useTheme } from "@/components/ThemeContext";
-import { getApiAssetOrigin } from "@/lib/api-base";
+import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
 import { getAccessiblePanels } from "@/lib/panel-routing";
 import BranchesForm, { Branch } from "../../../../components/BranchesForm";
 import consoleStyles from "../../console/console.module.css";
@@ -49,9 +49,6 @@ export default function MyBranchesPage() {
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, "")}`;
-  const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, "");
 
   const getAssetUrl = (url?: string | null) => {
     if (!url) return "";
@@ -368,7 +365,6 @@ export default function MyBranchesPage() {
             onBranchSaved={() => fetchProfile(session.token)}
             clientLogoUrl={clientAvatarUrl || null}
             companyLogoUrl={clientAvatarUrl || null}
-            apiUrl={API_URL}
           />
 
           {/* Stats Card */}

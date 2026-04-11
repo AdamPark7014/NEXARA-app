@@ -135,6 +135,9 @@ export const buildApiUrl = (path: string) => {
   return `${base}/${path.replace(/^\/+/, "")}`;
 };
 
+/** Trailing slashes removed; use for legacy `${API_URL}/path` or pass paths through {@link buildApiUrl}. */
+export const getApiBaseTrimmed = () => getApiBase().replace(/[\/.]+$/, "");
+
 export const getApiAssetOrigin = () => {
   const envAssetOrigin = process.env.NEXT_PUBLIC_API_ASSET_ORIGIN;
   const envBase = process.env.NEXT_PUBLIC_API_URL;

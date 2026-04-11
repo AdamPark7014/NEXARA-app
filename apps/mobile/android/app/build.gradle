@@ -1,7 +1,10 @@
 apply plugin: 'com.android.application'
 
-// Salida de Gradle fuera de app/build (OneDrive/antivirus suelen bloquear intermediates ahí).
-def nexaraAppBuildDir = new File(rootProject.projectDir, "nexara-gradle-out/app")
+// Salida de Gradle fuera del workspace (OneDrive/antivirus suelen bloquear intermediates ahí).
+def localAppData = System.getenv("LOCALAPPDATA")
+def nexaraAppBuildDir = localAppData
+    ? new File(localAppData, "NexaraGradleOut/app")
+    : new File(rootProject.projectDir, "nexara-gradle-out/app")
 nexaraAppBuildDir.mkdirs()
 buildDir = nexaraAppBuildDir
 

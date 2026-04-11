@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
@@ -133,13 +134,6 @@ const AttendanceHierarchyStats: React.FC = () => {
     return filtered.reduce((max, item) =>
       item.timestamp > max.timestamp ? item : max
     );
-  };
-
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
-
-  const getSocketBaseUrl = () => {
-    return API_URL.replace(/\/+api\/?$/, '');
   };
 
   const updatePaymentDraft = (

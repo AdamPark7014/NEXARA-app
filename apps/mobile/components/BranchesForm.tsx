@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import ClientLocationPicker, { ClientLocationValue } from './ClientLocationPicker';
 import styles from './BranchesForm.module.css';
 import { io, Socket } from 'socket.io-client';
-import { getApiAssetOrigin } from '@/lib/api-base';
+import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from '@/lib/api-base';
 
 export type Branch = {
   id: number;
@@ -46,7 +46,6 @@ interface BranchesFormProps {
   onBranchSaved: () => void;
   clientLogoUrl?: string | null;
   companyLogoUrl?: string | null;
-  apiUrl: string;
 }
 
 const BranchesForm: React.FC<BranchesFormProps> = ({
@@ -55,7 +54,6 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
   onBranchSaved,
   clientLogoUrl,
   companyLogoUrl,
-  apiUrl,
 }) => {
   const [editingBranchId, setEditingBranchId] = useState<number | null>(null);
   const [branchDraft, setBranchDraft] = useState<BranchDraftType>({
@@ -99,7 +97,7 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
   useEffect(() => {
     if (!token) return;
 
-    const socketUrl = apiUrl.replace(/[\/.]+$/, '').replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -121,7 +119,7 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
       if (refreshTimer) clearTimeout(refreshTimer);
       socket.disconnect();
     };
-  }, [token, apiUrl, onBranchSaved]);
+  }, [token, onBranchSaved]);
 
   const getAssetUrl = (url?: string | null) => {
     if (!url) return '';
@@ -249,8 +247,8 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
       if (branchDraft.portalPassword) formData.append('portalPassword', branchDraft.portalPassword);
       if (logoFile) formData.append('logo', logoFile);
 
-      const endpoint = editingBranchId ? `client-portal/branches/${editingBranchId}` : 'client-portal/branches';
-      const res = await fetch(apiUrl.replace(/[\/.]+$/, '') + '/' + endpoint.replace(/^\/+/, ''), {
+      const endpoint = editingBranchId ? `client-portal/branches/${editingBranchId}` : "client-portal/branches";
+      const res = await fetch(buildApiUrl(endpoint), {
         method: editingBranchId ? 'PUT' : 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
@@ -277,7 +275,7 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
     setError(null);
 
     try {
-      const res = await fetch(apiUrl.replace(/[\/.]+$/, '') + '/client-portal/branches/' + id, {
+      const res = await fetch(buildApiUrl(`client-portal/branches/${id}`), {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });

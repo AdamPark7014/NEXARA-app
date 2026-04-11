@@ -1,11 +1,10 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
 import HelpTab from "@/components/HelpTab";
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 interface KpiCard {
   name: string;
@@ -75,8 +74,8 @@ export default function AnalyticsPage() {
     if (!user?.token) return;
     const headers = { Authorization: `Bearer ${user.token}` };
     Promise.all([
-      fetch(`${API_URL}/analytics/dashboard`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/analytics/kpi`, { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`analytics/dashboard`), { headers }).then((r) => r.json()),
+      fetch(buildApiUrl(`analytics/kpi`), { headers }).then((r) => r.json()),
     ])
       .then(([dash, kpi]) => {
         setDashboard(dash);
@@ -93,7 +92,7 @@ export default function AnalyticsPage() {
     try {
       const periodStart = getPeriodStart(kpiForm.period);
       const periodEnd = new Date();
-      const res = await fetch(`${API_URL}/analytics/kpi`, {
+      const res = await fetch(buildApiUrl(`analytics/kpi`), {
         method: "POST",
         headers: { Authorization: `Bearer ${user.token}`, "Content-Type": "application/json" },
         body: JSON.stringify({

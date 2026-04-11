@@ -10,7 +10,9 @@ export async function createUser(formData: FormData, token?: string) {
     let message = "Error al crear usuario";
     try {
       const data = await res.json();
-      if (typeof data?.message === "string" && data.message.trim()) {
+      if (Array.isArray(data?.message) && data.message.length) {
+        message = String(data.message[0]);
+      } else if (typeof data?.message === "string" && data.message.trim()) {
         message = data.message;
       }
     } catch {

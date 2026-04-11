@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
@@ -39,9 +40,6 @@ const MyToolsTable: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
-  const getSocketBaseUrl = () => API_URL.replace(/\/+api\/?$/, '');
 
   const fetchTools = async () => {
     if (!user) return;

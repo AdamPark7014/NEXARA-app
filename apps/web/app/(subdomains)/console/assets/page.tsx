@@ -1,11 +1,10 @@
 "use client";
+import { buildApiUrl } from "@/lib/api-base";
 import { useEffect, useState, useMemo } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
 import HelpTab from '@/components/HelpTab';
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api").replace(/[\/.]+$/, "");
 
 const STATUS_LABELS: Record<string, string> = {
   OPERATIONAL: "Operativo", UNDER_MAINTENANCE: "En mantenimiento",
@@ -25,7 +24,7 @@ export default function AssetsPage() {
 
   useEffect(() => {
     if (!user?.token) return;
-    fetch(`${API_URL}/maintenance/assets`, {
+    fetch(buildApiUrl(`maintenance/assets`), {
       headers: { Authorization: `Bearer ${user.token}` },
     })
       .then((r) => r.json())

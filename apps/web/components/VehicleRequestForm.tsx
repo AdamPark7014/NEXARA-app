@@ -1,4 +1,5 @@
 "use client";
+import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useEffect, useState, useCallback } from 'react';
 import { useUser } from './UserContext';
 import styles from './VehicleRequestForm.module.css';
@@ -29,8 +30,6 @@ const VehicleRequestForm: React.FC<VehicleRequestFormProps> = ({ actividadId }) 
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api').replace(/[\/.]+$/, '');
-  const buildApiUrl = (path: string) => `${API_URL}/${path.replace(/^\/+/, '')}`;
   const extractList = <T,>(payload: unknown): T[] => {
     if (Array.isArray(payload)) return payload as T[];
     if (payload && typeof payload === 'object' && Array.isArray((payload as { data?: unknown[] }).data)) {
@@ -50,7 +49,7 @@ const VehicleRequestForm: React.FC<VehicleRequestFormProps> = ({ actividadId }) 
     } catch {
       setVehicles([]);
     }
-  }, [user?.token, API_URL]);
+  }, [user?.token]);
 
   const fetchActivities = useCallback(async () => {
     if (!user?.token || actividadId) return;
@@ -63,7 +62,7 @@ const VehicleRequestForm: React.FC<VehicleRequestFormProps> = ({ actividadId }) 
     } catch {
       setActividades([]);
     }
-  }, [user?.token, actividadId, API_URL]);
+  }, [user?.token, actividadId]);
 
   useEffect(() => {
     fetchVehicles();
@@ -76,7 +75,7 @@ const VehicleRequestForm: React.FC<VehicleRequestFormProps> = ({ actividadId }) 
   useEffect(() => {
     if (!user?.token) return;
 
-    const socketUrl = API_URL.replace(/\/+api\/?$/, '');
+    const socketUrl = getSocketBaseUrl();
     const socket: Socket = io(socketUrl, { transports: ['polling', 'websocket'] });
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -99,7 +98,7 @@ const VehicleRequestForm: React.FC<VehicleRequestFormProps> = ({ actividadId }) 
       if (refreshTimer) clearTimeout(refreshTimer);
       socket.disconnect();
     };
-  }, [user?.token, API_URL, fetchVehicles, fetchActivities]);
+  }, [user?.token, fetchVehicles, fetchActivities]);
 
   const validate = () => {
     const actividadFinal = actividadId || actividadSeleccionada;
