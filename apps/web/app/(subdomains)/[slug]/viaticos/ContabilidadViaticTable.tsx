@@ -8,6 +8,7 @@ import ExcelDownloadModal from "@/components/ExcelDownloadModal";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import styles from "./ContabilidadViaticTable.module.css";
 import { openExternalUrl } from "@/lib/open-external-url";
+import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
 
 type Viatic = {
   id: number;
@@ -45,7 +46,7 @@ const ContabilidadViaticTable = () => {
   const [excelPreparing, setExcelPreparing] = useState(false);
 
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 900);
+    const handleResize = () => setIsMobile(isPanelDrawerViewport(window.innerWidth));
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);

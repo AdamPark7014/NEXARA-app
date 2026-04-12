@@ -11,6 +11,7 @@ import consoleStyles from "../../console/console.module.css";
 import styles from "../tickets.module.css";
 import { openExternalUrl } from "@/lib/open-external-url";
 import { isCapacitorNative } from "@/lib/capacitor-env";
+import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
 
 const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false });
 
@@ -300,7 +301,7 @@ export default function BranchTicketsPage() {
   }, [session?.token]);
 
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth <= 900);
+    const onResize = () => setIsMobile(isPanelDrawerViewport(window.innerWidth));
     onResize();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);

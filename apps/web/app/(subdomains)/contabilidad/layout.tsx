@@ -8,11 +8,11 @@ import { useTheme } from "@/components/ThemeContext";
 import { useUser } from "@/components/UserContext";
 import { canAccessContabilidadPanel, getAvatarSrc, getRoleLabel, isPlatformAdmin } from "@/lib/panel-user";
 import { isCapacitorNative } from "@/lib/capacitor-env";
+import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
 import consoleStyles from "../console/console.module.css";
 import styles from "./layout.module.css";
 
 export default function ContabilidadLayout({ children }: { children: React.ReactNode }) {
-  const MOBILE_BREAKPOINT = 980;
   const pathname = usePathname();
   const router = useRouter();
   const { darkMode, toggleDarkMode } = useTheme();
@@ -85,7 +85,7 @@ export default function ContabilidadLayout({ children }: { children: React.React
 
   useEffect(() => {
     const handleResize = () => {
-      const mobile = window.innerWidth <= MOBILE_BREAKPOINT;
+      const mobile = isPanelDrawerViewport(window.innerWidth);
       setIsMobile(mobile);
       if (!mobile) {
         setMobileMenuOpen(false);
@@ -95,7 +95,7 @@ export default function ContabilidadLayout({ children }: { children: React.React
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [MOBILE_BREAKPOINT]);
+  }, []);
 
   useEffect(() => {
     if (!isMobile) {
@@ -146,124 +146,150 @@ export default function ContabilidadLayout({ children }: { children: React.React
 
   return (
     <div className={`${consoleStyles.consoleLayout} ${styles.contaRoot}`}>
-      <header className={styles.mobileTopbar}>
-        <div className={`${styles.mobileBrand} ${consoleStyles.sidebarLogo}`}>
-          <img src="/logo-nexara.png" alt="NEXARA" className={styles.mobileBrandLogo} />
-          <div className={styles.mobileBrandText}>
-            <span className={consoleStyles.brandMark}>NEXARA</span>
-            <span className={consoleStyles.brandSub}>Contabilidad</span>
+      {isMobile && (
+        <header className={styles.mobileTopbar}>
+          <div className={`${styles.mobileBrand} ${consoleStyles.sidebarLogo}`}>
+            <img src="/logo-nexara.png" alt="NEXARA" className={styles.mobileBrandLogo} />
+            <div className={styles.mobileBrandText}>
+              <span className={consoleStyles.brandMark}>NEXARA</span>
+              <span className={consoleStyles.brandSub}>Contabilidad</span>
+            </div>
           </div>
-        </div>
-        <button
-          type="button"
-          className={consoleStyles.hamburgerButton}
-          onClick={() => setMobileMenuOpen((prev) => !prev)}
-          aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
-          aria-expanded={mobileMenuOpen}
-          aria-controls="conta-mobile-menu"
-          data-open={mobileMenuOpen ? "true" : "false"}
-        >
-          <span className={consoleStyles.hamburgerLine}></span>
-          <span className={consoleStyles.hamburgerLine}></span>
-          <span className={consoleStyles.hamburgerLine}></span>
-        </button>
-      </header>
+          <button
+            type="button"
+            className={consoleStyles.hamburgerButton}
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
+            aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="conta-sidebar-menu"
+            data-open={mobileMenuOpen ? "true" : "false"}
+          >
+            <span className={consoleStyles.hamburgerLine}></span>
+            <span className={consoleStyles.hamburgerLine}></span>
+            <span className={consoleStyles.hamburgerLine}></span>
+          </button>
+        </header>
+      )}
 
       {isMobile && mobileMenuOpen && (
-        <button
-          type="button"
-          className={styles.mobileBackdrop}
+        <div
+          role="presentation"
+          className={consoleStyles.sidebarOverlay}
           onClick={() => setMobileMenuOpen(false)}
-          aria-label="Cerrar menú"
         />
       )}
 
       {(!isMobile || mobileMenuOpen) && (
-      <aside
-        id="conta-mobile-menu"
-        className={`${consoleStyles.sidebar} ${styles.contaSidebar} ${mobileMenuOpen ? styles.contaSidebarOpen : ""}`}
-      >
-        <div className={consoleStyles.sidebarLogo}>
-          <span className={consoleStyles.brandMark}>NEXARA</span>
-          <span className={consoleStyles.brandSub}>Contabilidad</span>
-        </div>
-
-        <div className={consoleStyles.sidebarUser}>
-          <div className={consoleStyles.sidebarAvatar}>
-            <Image
-              className={`${consoleStyles.avatarImage} ${isSuperAdmin ? consoleStyles.avatarImageLogo : ""}`}
-              src={userAvatarSrc}
-              alt={isSuperAdmin ? "NEXARA" : userName}
-              width={64}
-              height={64}
-              unoptimized
-            />
-          </div>
-          <div className={consoleStyles.sidebarName}>{userName}</div>
-          <div className={consoleStyles.sidebarEmail}>{userEmail}</div>
-          <div className={consoleStyles.sidebarMeta}>
-            {isSuperAdmin ? (
-              <span className={consoleStyles.levelPill}>Superadmin</span>
-            ) : (
-              <>
-                <span className={consoleStyles.rolePill}>{userRole}</span>
-                {isAdmin && userRole !== 'Admin' && (
-                  <span className={consoleStyles.levelPill}>Admin</span>
-                )}
-              </>
+        <aside
+          className={consoleStyles.sidebar}
+          data-mobile={isMobile ? "true" : "false"}
+          data-open={mobileMenuOpen ? "true" : "false"}
+        >
+          <div className={consoleStyles.sidebarHeader}>
+            <div className={consoleStyles.sidebarLogo}>
+              <span className={consoleStyles.brandMark}>NEXARA</span>
+              <span className={consoleStyles.brandSub}>Contabilidad</span>
+            </div>
+            {isMobile && (
+              <button
+                type="button"
+                className={styles.drawerClose}
+                onClick={() => setMobileMenuOpen(false)}
+                aria-label="Cerrar menú"
+              >
+                ×
+              </button>
             )}
           </div>
-        </div>
 
-        {navGroups.map((group, groupIndex) => (
-          <div key={group.title}>
-            <div className={consoleStyles.menuTitle}>{group.title}</div>
-            <ul className={consoleStyles.sidebarMenu}>
-              {group.items.map((item, index) => {
-                const itemPath = item.href.replace(/\/+$/, "");
-                const isActive = itemPath === currentPath;
-                return (
-                  <li key={item.href} className={consoleStyles.sidebarMenuItem} style={{ animationDelay: `${0.08 + (groupIndex * 0.12) + index * 0.05}s` }}>
-                    <Link
-                      href={item.href}
-                      className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${isActive ? consoleStyles.active : ""}`}
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <span className={consoleStyles.menuLinkIcon} aria-hidden="true">{item.icon}</span>
-                      <span className={consoleStyles.menuLinkText}>{item.label}</span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+          <div
+            id="conta-sidebar-menu"
+            className={consoleStyles.sidebarContent}
+            data-open={isMobile && mobileMenuOpen ? "true" : undefined}
+          >
+              <div className={consoleStyles.sidebarUser}>
+                <div className={consoleStyles.sidebarAvatar}>
+                  <Image
+                    className={`${consoleStyles.avatarImage} ${isSuperAdmin ? consoleStyles.avatarImageLogo : ""}`}
+                    src={userAvatarSrc}
+                    alt={isSuperAdmin ? "NEXARA" : userName}
+                    width={64}
+                    height={64}
+                    unoptimized
+                  />
+                </div>
+                <div className={consoleStyles.sidebarName}>{userName}</div>
+                <div className={consoleStyles.sidebarEmail}>{userEmail}</div>
+                <div className={consoleStyles.sidebarMeta}>
+                  {isSuperAdmin ? (
+                    <span className={consoleStyles.levelPill}>Superadmin</span>
+                  ) : (
+                    <>
+                      <span className={consoleStyles.rolePill}>{userRole}</span>
+                      {isAdmin && userRole !== "Admin" && (
+                        <span className={consoleStyles.levelPill}>Admin</span>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {navGroups.map((group, groupIndex) => (
+                <div key={group.title}>
+                  <div className={consoleStyles.menuTitle}>{group.title}</div>
+                  <ul className={consoleStyles.sidebarMenu}>
+                    {group.items.map((item, index) => {
+                      const itemPath = item.href.replace(/\/+$/, "");
+                      const isActive = itemPath === currentPath;
+                      return (
+                        <li
+                          key={item.href}
+                          className={consoleStyles.sidebarMenuItem}
+                          style={{ animationDelay: `${0.08 + groupIndex * 0.12 + index * 0.05}s` }}
+                        >
+                          <Link
+                            href={item.href}
+                            className={`${consoleStyles.menuLink} ${consoleStyles.menuButton} ${isActive ? consoleStyles.active : ""}`}
+                            onClick={() => setMobileMenuOpen(false)}
+                          >
+                            <span className={consoleStyles.menuLinkIcon} aria-hidden="true">
+                              {item.icon}
+                            </span>
+                            <span className={consoleStyles.menuLinkText}>{item.label}</span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
+
+              <div className={consoleStyles.menuTitle}>Cuenta y sesión</div>
+              <ul className={consoleStyles.sidebarMenu}>
+                <li className={consoleStyles.sidebarMenuItem}>
+                  <button
+                    type="button"
+                    className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
+                    onClick={toggleDarkMode}
+                    aria-label={darkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+                  >
+                    {darkMode ? "Cambiar a vista clara" : "Cambiar a vista oscura"}
+                  </button>
+                </li>
+
+                <li className={consoleStyles.sidebarMenuItem}>
+                  <button
+                    type="button"
+                    className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
+                    onClick={handleLogout}
+                    aria-label="Cerrar sesión"
+                  >
+                    Cerrar sesión
+                  </button>
+                </li>
+              </ul>
           </div>
-        ))}
-
-        <div className={consoleStyles.menuTitle}>Cuenta y sesión</div>
-        <ul className={consoleStyles.sidebarMenu}>
-          <li className={consoleStyles.sidebarMenuItem}>
-            <button
-              type="button"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
-              onClick={toggleDarkMode}
-              aria-label={darkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-            >
-              {darkMode ? "Cambiar a vista clara" : "Cambiar a vista oscura"}
-            </button>
-          </li>
-
-          <li className={consoleStyles.sidebarMenuItem}>
-            <button
-              type="button"
-              className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
-              onClick={handleLogout}
-              aria-label="Cerrar sesión"
-            >
-              Cerrar sesión
-            </button>
-          </li>
-        </ul>
-      </aside>
+        </aside>
       )}
       <main className={`${consoleStyles.consoleMain} ${styles.contaMain}`}>
         <section className={styles.workspaceShell}>

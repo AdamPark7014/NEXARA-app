@@ -8,9 +8,9 @@ import Image from "next/image";
 import { hasAnyPermission, hasPermission, PERMISSIONS } from '@/lib/permissions';
 import { getAvatarSrc, getRoleLabel, isPlatformAdmin } from '@/lib/panel-user';
 import { useState, useEffect } from "react";
+import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
 
 export default function Sidebar() {
-  const MOBILE_BREAKPOINT = 900;
   const pathname = usePathname();
   const { user, logout } = useUser();
   const { darkMode, toggleDarkMode } = useTheme();
@@ -20,15 +20,14 @@ export default function Sidebar() {
   const [mobileOpenGroups, setMobileOpenGroups] = useState<string[]>([]);
   const [brandLogoSrc, setBrandLogoSrc] = useState("/icon.png");
 
-  // Detectar si es móvil
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT);
+      setIsMobile(isPanelDrawerViewport(window.innerWidth));
     };
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
-  }, [MOBILE_BREAKPOINT]);
+  }, []);
 
   useEffect(() => {
     if (isMobile) {

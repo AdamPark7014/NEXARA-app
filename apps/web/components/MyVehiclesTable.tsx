@@ -5,6 +5,7 @@ import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import styles from './MyVehiclesTable.module.css';
 import { openExternalUrl } from '@/lib/open-external-url';
+import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
 
 interface VehicleRequest {
   id: number;
@@ -35,7 +36,7 @@ const MyVehiclesTable: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth <= 900);
+    const checkMobile = () => setIsMobile(isPanelDrawerViewport(window.innerWidth));
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import VentasSidebar from "./VentasSidebar";
+import consoleStyles from "../console/console.module.css";
 import styles from "./layout.module.css";
 import { useUser } from "@/components/UserContext";
 import ConsoleWebPushRegister from "@/components/ConsoleWebPushRegister";
@@ -85,7 +86,7 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
   }
 
   return (
-    <div className={styles.salesRoot}>
+    <div className={`${consoleStyles.consoleLayout} ${styles.salesRoot}`}>
       <ConsoleWebPushRegister />
       <VentasSidebar />
       <main className={styles.salesMain}>

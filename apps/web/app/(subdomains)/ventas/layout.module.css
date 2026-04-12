@@ -1,8 +1,5 @@
 .salesRoot {
-  min-height: 100vh;
-  display: flex;
-  gap: var(--panel-gap);
-  padding: var(--panel-padding-y) var(--panel-padding-x);
+  align-items: flex-start;
   background: var(--background);
   color: var(--foreground);
 }
@@ -153,10 +150,9 @@
   color: var(--text-secondary);
 }
 
-@media (max-width: 960px) {
+@media (max-width: 900px) {
   .salesRoot {
     flex-direction: column;
-    padding: 0;
     gap: 0;
   }
 
@@ -180,7 +176,7 @@
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .salesWorkspaceMeta {
     width: 100%;
   }

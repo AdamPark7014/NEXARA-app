@@ -9,6 +9,7 @@ import { getAccessiblePanels } from "@/lib/panel-routing";
 import BranchesForm, { Branch } from "../../../../components/BranchesForm";
 import consoleStyles from "../../console/console.module.css";
 import styles from "../tickets.module.css";
+import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
 
 type ClientSession = {
   token: string;
@@ -113,7 +114,7 @@ export default function MyBranchesPage() {
   }, [canAccessTicketsPanel, mounted, router, session, user]);
 
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth <= 900);
+    const onResize = () => setIsMobile(isPanelDrawerViewport(window.innerWidth));
     onResize();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
