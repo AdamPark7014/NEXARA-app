@@ -6,6 +6,8 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
 import HelpTab from "@/components/HelpTab";
+import PdfGenerationOverlay from "@/components/PdfGenerationOverlay";
+import { fetchBlobWithProgress } from "@/lib/fetch-blob-with-progress";
 import { triggerBlobDownload, triggerFileDownload } from "@/lib/file-download";
 
 const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false });
@@ -18,6 +20,7 @@ export default function FinancialReportsPage() {
   const [balanceSheet, setBalanceSheet] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [pdfGenProgress, setPdfGenProgress] = useState(0);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
   const [showPdfModal, setShowPdfModal] = useState(false);
@@ -41,24 +44,26 @@ export default function FinancialReportsPage() {
 
   const handleViewPdf = async () => {
     if (!user?.token) return;
+    setPdfGenProgress(0);
     setGeneratingPdf(true);
     try {
       const today = new Date().toISOString().slice(0, 10);
       const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
       const params = new URLSearchParams({ fromDate: monthAgo, toDate: today, asOfDate: today });
-      const res = await fetch(buildApiUrl(`accounting/accounts/reports/pdf?${params.toString()}`), {
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-      if (res.ok) {
-        const blob = await res.blob();
-        const arrayBuffer = await blob.arrayBuffer();
-        setPdfData(new Uint8Array(arrayBuffer));
-        if (pdfUrl) URL.revokeObjectURL(pdfUrl);
-        setPdfUrl(URL.createObjectURL(blob));
-        setShowPdfModal(true);
-      }
+      const blob = await fetchBlobWithProgress(
+        buildApiUrl(`accounting/accounts/reports/pdf?${params.toString()}`),
+        { headers: { Authorization: `Bearer ${user.token}` } },
+        setPdfGenProgress,
+      );
+      const arrayBuffer = await blob.arrayBuffer();
+      setPdfData(new Uint8Array(arrayBuffer));
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+      setPdfUrl(URL.createObjectURL(blob));
+      setShowPdfModal(true);
     } catch {}
-    finally { setGeneratingPdf(false); }
+    finally {
+      setGeneratingPdf(false);
+    }
   };
 
   const handleDownloadPdf = () => {
@@ -87,6 +92,7 @@ export default function FinancialReportsPage() {
 
   return (
     <RoleGuard anyPermissions={[PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE]}>
+      <PdfGenerationOverlay open={generatingPdf} progress={pdfGenProgress} title="Generando PDF de reportes…" />
       <div style={{ display: "grid", gap: 24 }}>
         <HelpTab module="accounting-reports" user={user} />
         <div className="card" style={{ padding: 16 }}>

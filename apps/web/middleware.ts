@@ -268,6 +268,12 @@ export function middleware(request: NextRequest) {
       const response = applySecurityHeaders(NextResponse.next());
       return applyNoStoreForHtml(request, response);
     }
+
+    // Hub de selección de paneles vive en /paneles (grupo (auth)), no bajo /<slug>/…
+    if (pathname === "/paneles" || pathname === "/paneles/") {
+      const response = applySecurityHeaders(NextResponse.next());
+      return applyNoStoreForHtml(request, response);
+    }
     
     // Reescribir a /<slug><pathname>
     // Ejemplo: consola.localhost/ → /console/

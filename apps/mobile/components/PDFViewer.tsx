@@ -41,15 +41,19 @@ export default function PDFViewer({
     useDynamicHeight && height ? { height } : undefined;
 
   const handleDownload = async () => {
-    if (pdfData?.length) {
-      const blob = new Blob([new Uint8Array(pdfData)], { type: "application/pdf" });
-      await triggerBlobDownload(blob, fileName, { mimeType: "application/pdf" });
-      return;
+    try {
+      if (pdfData?.length) {
+        const blob = new Blob([new Uint8Array(pdfData)], { type: "application/pdf" });
+        await triggerBlobDownload(blob, fileName, { mimeType: "application/pdf" });
+        return;
+      }
+      await triggerFileDownload(pdfUrl, fileName, {
+        preferOpenOnMobile: true,
+        mimeType: "application/pdf",
+      });
+    } catch (e) {
+      console.error("[PDFViewer] Descargar PDF:", e);
     }
-    await triggerFileDownload(pdfUrl, fileName, {
-      preferOpenOnMobile: true,
-      mimeType: "application/pdf",
-    });
   };
 
   const handleOpenExternal = async (e: React.MouseEvent) => {

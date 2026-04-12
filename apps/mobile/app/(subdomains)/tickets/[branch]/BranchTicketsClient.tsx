@@ -11,6 +11,8 @@ import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLo
 import TicketsInventoryManager from "@/components/TicketsInventoryManager";
 import consoleStyles from "../../console/console.module.css";
 import styles from "../tickets.module.css";
+import PdfGenerationOverlay from "@/components/PdfGenerationOverlay";
+import { fetchBlobWithProgress } from "@/lib/fetch-blob-with-progress";
 import { triggerBlobDownload } from "@/lib/file-download";
 import { openExternalUrl } from "@/lib/open-external-url";
 import { isCapacitorNative } from "@/lib/capacitor-env";
@@ -108,6 +110,7 @@ export default function BranchTicketsPage() {
   });
   const [toDate, setToDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [pdfGenProgress, setPdfGenProgress] = useState(0);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
   const [showPdfModal, setShowPdfModal] = useState(false);
@@ -400,24 +403,24 @@ export default function BranchTicketsPage() {
 
   const handleViewPdf = async () => {
     if (!session?.token) return;
+    setPdfGenProgress(0);
     setGeneratingPdf(true);
     try {
       const params = new URLSearchParams();
       if (fromDate) params.append("start", `${fromDate}T00:00:00.000Z`);
       if (toDate) params.append("end", `${toDate}T23:59:59.999Z`);
-      const res = await fetch(buildApiUrl(`branch-portal/report?${params.toString()}`), {
-        headers: { Authorization: `Bearer ${session.token}` },
-      });
-      if (!res.ok) {
-        setError("No se pudo generar el reporte PDF");
-        return;
-      }
-      const blob = await res.blob();
+      const blob = await fetchBlobWithProgress(
+        buildApiUrl(`branch-portal/report?${params.toString()}`),
+        { headers: { Authorization: `Bearer ${session.token}` } },
+        setPdfGenProgress,
+      );
       const arrayBuffer = await blob.arrayBuffer();
       setPdfData(new Uint8Array(arrayBuffer));
       if (pdfUrl) URL.revokeObjectURL(pdfUrl);
       setPdfUrl(URL.createObjectURL(blob));
       setShowPdfModal(true);
+    } catch {
+      setError("No se pudo generar el reporte PDF");
     } finally {
       setGeneratingPdf(false);
     }
@@ -587,6 +590,7 @@ export default function BranchTicketsPage() {
 
   return (
     <div className={`${consoleStyles.consoleLayout} ${styles.ticketsConsole}`}>
+      <PdfGenerationOverlay open={generatingPdf} progress={pdfGenProgress} title="Generando reporte de tickets (PDF)…" />
       {isMobile && mobileMenuOpen && (
         <div
           className={consoleStyles.sidebarOverlay}

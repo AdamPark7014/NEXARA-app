@@ -1,10 +1,12 @@
 "use client";
 import { buildApiUrl } from "@/lib/api-base";
+import { fetchBlobWithProgress } from "@/lib/fetch-blob-with-progress";
 import { useEffect, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { RoleGuard } from "@/components/RoleGuard";
 import { useUser } from "@/components/UserContext";
 import { PERMISSIONS } from "@/lib/permissions";
+import PdfGenerationOverlay from "@/components/PdfGenerationOverlay";
 
 const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false });
 
@@ -13,6 +15,7 @@ export default function ProcurementDashboardPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [pdfGenProgress, setPdfGenProgress] = useState(0);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
   const [showPdfModal, setShowPdfModal] = useState(false);
@@ -49,24 +52,24 @@ export default function ProcurementDashboardPage() {
 
   const handleViewPdf = async () => {
     if (!user?.token) return;
+    setPdfGenProgress(0);
     setGeneratingPdf(true);
     try {
       const params = new URLSearchParams();
       if (fromDate) params.append("fromDate", fromDate);
       if (toDate) params.append("toDate", toDate);
 
-      const res = await fetch(buildApiUrl(`procurement/purchase-orders/dashboard/pdf?${params.toString()}`), {
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
+      const blob = await fetchBlobWithProgress(
+        buildApiUrl(`procurement/purchase-orders/dashboard/pdf?${params.toString()}`),
+        { headers: { Authorization: `Bearer ${user.token}` } },
+        setPdfGenProgress,
+      );
 
-      if (res.ok) {
-        const blob = await res.blob();
-        const arrayBuffer = await blob.arrayBuffer();
-        setPdfData(new Uint8Array(arrayBuffer));
-        if (pdfUrl) URL.revokeObjectURL(pdfUrl);
-        setPdfUrl(URL.createObjectURL(blob));
-        setShowPdfModal(true);
-      }
+      const arrayBuffer = await blob.arrayBuffer();
+      setPdfData(new Uint8Array(arrayBuffer));
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+      setPdfUrl(URL.createObjectURL(blob));
+      setShowPdfModal(true);
     } catch (error) {
       console.error("Error generando PDF:", error);
     } finally {
@@ -85,6 +88,7 @@ export default function ProcurementDashboardPage() {
 
   return (
     <RoleGuard anyPermissions={[PERMISSIONS.PROCUREMENT_VIEW, PERMISSIONS.PROCUREMENT_MANAGE]}>
+      <PdfGenerationOverlay open={generatingPdf} progress={pdfGenProgress} title="Generando PDF de compras…" />
       <div style={{ display: "grid", gap: 24 }}>
         <div className="card" style={{ padding: 16 }}>
           <h1 style={{ color: "var(--primary)", marginBottom: 8 }}>📦 Dashboard de Compras</h1>
