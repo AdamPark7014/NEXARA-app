@@ -19,6 +19,7 @@ import { openExternalUrl } from "@/lib/open-external-url";
 import { isCapacitorNative } from "@/lib/capacitor-env";
 import { fetchWithOfflineQueue, isQueuedResponse } from "@/lib/fetch-offline";
 import { useCompactBottomNav } from "@/lib/use-compact-bottom-nav";
+import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
 
 const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false });
 
@@ -398,7 +399,7 @@ export default function ClientTicketsPage() {
   }, [canAccessTicketsPanel, mounted, router, session, user]);
 
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth <= 900);
+    const onResize = () => setIsMobile(isPanelDrawerViewport(window.innerWidth));
     onResize();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);

@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import consoleStyles from "../console/console.module.css";
 import styles from "./VentasSidebar.module.css";
 import { useUser } from "@/components/UserContext";
 import { useTheme } from "@/components/ThemeContext";
 import { useState, useMemo, useEffect } from "react";
 import { getAvatarSrc, getRoleLabel, isSalesManagerUser } from "@/lib/panel-user";
+import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
 
 interface MenuItem {
   label: string;
@@ -40,7 +42,6 @@ const sectionOrder = [
 ];
 
 export default function VentasSidebar() {
-  const MOBILE_BREAKPOINT = 768;
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useUser();
@@ -51,11 +52,11 @@ export default function VentasSidebar() {
   const [navQuery, setNavQuery] = useState("");
 
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT);
+    const checkMobile = () => setIsMobile(isPanelDrawerViewport(window.innerWidth));
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
-  }, [MOBILE_BREAKPOINT]);
+  }, []);
 
   useEffect(() => {
     if (!isMobile) return;
@@ -165,16 +166,16 @@ export default function VentasSidebar() {
         {isMobile ? (
           <button
             type="button"
-            className={styles.hamburgerButton}
+            className={consoleStyles.hamburgerButton}
             onClick={() => setIsMenuOpen((prev) => !prev)}
             aria-label={isMenuOpen ? "Cerrar menú" : "Abrir menú"}
             aria-expanded={isMenuOpen}
             aria-controls="ventas-sidebar-menu"
             data-open={isMenuOpen ? "true" : "false"}
           >
-            <span className={styles.hamburgerLine}></span>
-            <span className={styles.hamburgerLine}></span>
-            <span className={styles.hamburgerLine}></span>
+            <span className={consoleStyles.hamburgerLine}></span>
+            <span className={consoleStyles.hamburgerLine}></span>
+            <span className={consoleStyles.hamburgerLine}></span>
           </button>
         ) : (
           <button
@@ -192,7 +193,7 @@ export default function VentasSidebar() {
 
       {isMobile && isMenuOpen && (
         <div
-          className={styles.sidebarOverlay}
+          className={consoleStyles.sidebarOverlay}
           onClick={closeMenu}
           role="presentation"
         />

@@ -9,6 +9,7 @@ import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { canViewContabilidadTarget } from "@/lib/contabilidad-visibility";
 import { triggerBlobDownload } from "@/lib/file-download";
 import { openExternalUrl } from "@/lib/open-external-url";
+import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
 import styles from "./ContabilidadViaticTable.module.css";
 
 type Viatic = {
@@ -54,7 +55,7 @@ const ContabilidadViaticTable = () => {
   const [excelPreparing, setExcelPreparing] = useState(false);
 
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 900);
+    const handleResize = () => setIsMobile(isPanelDrawerViewport(window.innerWidth));
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);

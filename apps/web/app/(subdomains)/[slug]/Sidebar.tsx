@@ -8,6 +8,7 @@ import Image from "next/image";
 import { hasAnyPermission, hasPermission, PERMISSIONS } from '@/lib/permissions';
 import { getAvatarSrc, getRoleLabel, isPlatformAdmin } from '@/lib/panel-user';
 import { useEffect, useState } from "react";
+import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -18,7 +19,7 @@ export default function Sidebar() {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth <= 900);
+    const checkMobile = () => setIsMobile(isPanelDrawerViewport(window.innerWidth));
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);

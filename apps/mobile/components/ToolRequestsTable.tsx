@@ -1,5 +1,6 @@
 "use client";
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
+import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
 import React, { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
@@ -36,7 +37,7 @@ const ToolRequestsTable: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 900);
+    const handleResize = () => setIsMobile(isPanelDrawerViewport(window.innerWidth));
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);

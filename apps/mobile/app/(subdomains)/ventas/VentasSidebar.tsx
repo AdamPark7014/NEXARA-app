@@ -9,7 +9,7 @@ import { useTheme } from "@/components/ThemeContext";
 import { useState, useMemo, useEffect } from "react";
 import { getAvatarSrc, getRoleLabel, isSalesManagerUser } from "@/lib/panel-user";
 import { hapticTap } from "@/lib/haptics";
-import { PANEL_DRAWER_BREAKPOINT_PX } from "@/lib/panel-drawer-breakpoint";
+import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
 
 interface MenuItem {
   label: string;
@@ -64,7 +64,7 @@ export default function VentasSidebar({ mobileOpen, onMobileClose, shortcutStrip
   }, [mobileOpen]);
 
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth <= PANEL_DRAWER_BREAKPOINT_PX);
+    const checkMobile = () => setIsMobile(isPanelDrawerViewport(window.innerWidth));
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
