@@ -1,0 +1,153 @@
+name: nexara
+
+services:
+  db:
+    image: postgres:16
+    container_name: nexara-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - nexara-postgres-data:/var/lib/postgresql/data
+    networks:
+      - internal
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.api
+    container_name: nexara-api
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+      WEB_URL: ${WEB_URL}
+      PUBLIC_WEB_URL: ${WEB_URL}
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${FIREBASE_SERVICE_ACCOUNT_JSON}
+      WEB_PUSH_VAPID_PUBLIC_KEY: ${WEB_PUSH_VAPID_PUBLIC_KEY}
+      WEB_PUSH_VAPID_PRIVATE_KEY: ${WEB_PUSH_VAPID_PRIVATE_KEY}
+      WEB_PUSH_CONTACT: ${WEB_PUSH_CONTACT}
+      BREVO_API_KEY: ${BREVO_API_KEY}
+      BREVO_SENDER_EMAIL: ${BREVO_SENDER_EMAIL}
+      BREVO_SENDER_NAME: ${BREVO_SENDER_NAME}
+      BREVO_NEWSLETTER_LIST_ID: ${BREVO_NEWSLETTER_LIST_ID}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_SECURE: ${SMTP_SECURE}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+    volumes:
+      - ../uploads:/app/uploads
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.nexara-api.rule=Host(`${API_DOMAIN}`)
+      - traefik.http.routers.nexara-api.entrypoints=websecure
+      - traefik.http.routers.nexara-api.tls.certresolver=letsencrypt
+      - traefik.http.services.nexara-api.loadbalancer.server.port=3001
+    networks:
+      - internal
+      - proxy
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.web
+      args:
+        NEXT_PUBLIC_API_URL: ${WEB_NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_SOCKET_URL: ${WEB_NEXT_PUBLIC_SOCKET_URL}
+        NEXT_PUBLIC_BASE_URL: ${WEB_NEXT_PUBLIC_BASE_URL}
+        NEXT_PUBLIC_API_ASSET_ORIGIN: ${WEB_NEXT_PUBLIC_API_ASSET_ORIGIN}
+        NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API: ${WEB_NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API}
+        NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${WEB_NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+        NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID: ${WEB_NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID}
+        NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY: ${WEB_NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY}
+        NEXT_PUBLIC_WEB_PUSH_CONSENT_MODE: ${WEB_NEXT_PUBLIC_WEB_PUSH_CONSENT_MODE}
+        NEXT_PUBLIC_GA_MEASUREMENT_ID: ${WEB_NEXT_PUBLIC_GA_MEASUREMENT_ID}
+        NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: ${WEB_NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION}
+        NEXT_PUBLIC_BING_SITE_VERIFICATION: ${WEB_NEXT_PUBLIC_BING_SITE_VERIFICATION}
+        NEXT_PUBLIC_CONTACT_PHONE: ${WEB_NEXT_PUBLIC_CONTACT_PHONE}
+        NEXT_PUBLIC_CONTACT_EMAIL: ${WEB_NEXT_PUBLIC_CONTACT_EMAIL}
+        NEXT_PUBLIC_CITY: ${WEB_NEXT_PUBLIC_CITY}
+        NEXT_PUBLIC_STATE: ${WEB_NEXT_PUBLIC_STATE}
+    container_name: nexara-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${WEB_NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_SOCKET_URL: ${WEB_NEXT_PUBLIC_SOCKET_URL}
+      NEXT_PUBLIC_BASE_URL: ${WEB_NEXT_PUBLIC_BASE_URL}
+      NEXT_PUBLIC_API_ASSET_ORIGIN: ${WEB_NEXT_PUBLIC_API_ASSET_ORIGIN}
+      NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API: ${WEB_NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API}
+      NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${WEB_NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+      NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID: ${WEB_NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID}
+      NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY: ${WEB_NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY}
+      NEXT_PUBLIC_WEB_PUSH_CONSENT_MODE: ${WEB_NEXT_PUBLIC_WEB_PUSH_CONSENT_MODE}
+      NEXT_PUBLIC_GA_MEASUREMENT_ID: ${WEB_NEXT_PUBLIC_GA_MEASUREMENT_ID}
+      NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: ${WEB_NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION}
+      NEXT_PUBLIC_BING_SITE_VERIFICATION: ${WEB_NEXT_PUBLIC_BING_SITE_VERIFICATION}
+      NEXT_PUBLIC_CONTACT_PHONE: ${WEB_NEXT_PUBLIC_CONTACT_PHONE}
+      NEXT_PUBLIC_CONTACT_EMAIL: ${WEB_NEXT_PUBLIC_CONTACT_EMAIL}
+      NEXT_PUBLIC_CITY: ${WEB_NEXT_PUBLIC_CITY}
+      NEXT_PUBLIC_STATE: ${WEB_NEXT_PUBLIC_STATE}
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.nexara-web.rule=Host(`${WEB_DOMAIN}`) || Host(`www.${WEB_DOMAIN}`)
+      - traefik.http.routers.nexara-web.entrypoints=websecure
+      - traefik.http.routers.nexara-web.tls.certresolver=letsencrypt
+      - traefik.http.services.nexara-web.loadbalancer.server.port=3000
+    networks:
+      - internal
+      - proxy
+
+  mobile:
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.mobile
+      args:
+        NEXT_PUBLIC_API_URL: ${MOBILE_NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_SOCKET_URL: ${MOBILE_NEXT_PUBLIC_SOCKET_URL}
+        NEXT_PUBLIC_BASE_URL: ${MOBILE_NEXT_PUBLIC_BASE_URL}
+        NEXT_PUBLIC_API_ASSET_ORIGIN: ${MOBILE_NEXT_PUBLIC_API_ASSET_ORIGIN}
+        NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API: ${MOBILE_NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API}
+        NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${MOBILE_NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+        NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID: ${MOBILE_NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID}
+    container_name: nexara-mobile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${MOBILE_NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_SOCKET_URL: ${MOBILE_NEXT_PUBLIC_SOCKET_URL}
+      NEXT_PUBLIC_BASE_URL: ${MOBILE_NEXT_PUBLIC_BASE_URL}
+      NEXT_PUBLIC_API_ASSET_ORIGIN: ${MOBILE_NEXT_PUBLIC_API_ASSET_ORIGIN}
+      NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API: ${MOBILE_NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API}
+      NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${MOBILE_NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+      NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID: ${MOBILE_NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID}
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.nexara-mobile.rule=Host(`${MOBILE_DOMAIN}`)
+      - traefik.http.routers.nexara-mobile.entrypoints=websecure
+      - traefik.http.routers.nexara-mobile.tls.certresolver=letsencrypt
+      - traefik.http.services.nexara-mobile.loadbalancer.server.port=3002
+    networks:
+      - internal
+      - proxy
+
+volumes:
+  nexara-postgres-data:
+
+networks:
+  internal:
+  proxy:
+    external: true

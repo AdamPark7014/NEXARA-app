@@ -1,0 +1,30 @@
+FROM node:20-slim AS deps
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/web/package.json apps/web/package.json
+COPY apps/mobile/package.json apps/mobile/package.json
+
+RUN npm ci
+
+FROM deps AS build
+WORKDIR /app
+COPY . .
+RUN npm run prisma:generate --workspace=apps/api
+RUN npm run build --workspace=apps/api
+
+FROM node:20-slim AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3001
+
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/apps/api/package.json ./apps/api/package.json
+COPY --from=build /app/apps/api/dist ./apps/api/dist
+COPY --from=build /app/apps/api/prisma ./apps/api/prisma
+
+RUN mkdir -p /app/uploads
+
+EXPOSE 3001
+CMD ["node", "apps/api/dist/main.js"]
