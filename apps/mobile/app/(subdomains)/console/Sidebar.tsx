@@ -357,7 +357,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps = {}
           <div className={styles.sidebarUser}>
             <div className={styles.superadminAvatarWrap}>
               <img
-                className={`${styles.avatarImage} ${user.isSuperAdmin ? styles.avatarImageLogo : ""}`}
+                className={`${styles.avatarImage}${user.isSuperAdmin ? ` ${styles.avatarImageLogo}` : ""}`}
                 src={user.isSuperAdmin ? "/logo-nexara.png" : avatarUrl}
                 alt={user.isSuperAdmin ? "NEXARA" : user.nombre}
                 loading="lazy"

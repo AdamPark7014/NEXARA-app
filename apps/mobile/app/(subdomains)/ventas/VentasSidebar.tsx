@@ -6,7 +6,7 @@ import consoleStyles from "../console/console.module.css";
 import styles from "./VentasSidebar.module.css";
 import { useUser } from "@/components/UserContext";
 import { useTheme } from "@/components/ThemeContext";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { getAvatarSrc, getRoleLabel, isSalesManagerUser } from "@/lib/panel-user";
 import { hapticTap } from "@/lib/haptics";
 import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
@@ -63,6 +63,11 @@ export default function VentasSidebar({ mobileOpen, onMobileClose, shortcutStrip
     }
   }, [mobileOpen]);
 
+  const onMobileCloseRef = useRef(onMobileClose);
+  useEffect(() => {
+    onMobileCloseRef.current = onMobileClose;
+  });
+
   useEffect(() => {
     const checkMobile = () => setIsMobile(isPanelDrawerViewport(window.innerWidth));
     checkMobile();
@@ -73,8 +78,8 @@ export default function VentasSidebar({ mobileOpen, onMobileClose, shortcutStrip
   useEffect(() => {
     if (!isMobile) return;
     setIsMenuOpen(false);
-    onMobileClose?.();
-  }, [pathname, isMobile, onMobileClose]);
+    onMobileCloseRef.current?.();
+  }, [pathname, isMobile]);
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {

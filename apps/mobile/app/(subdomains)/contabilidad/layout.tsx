@@ -1,7 +1,6 @@
 ﻿"use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import React, { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "@/components/ThemeContext";
@@ -209,8 +208,9 @@ export default function ContabilidadLayout({ children }: { children: React.React
         data-mobile={isMobile ? "true" : "false"}
         data-open={mobileMenuOpen ? "true" : "false"}
       >
-        <div className={consoleStyles.sidebarHeader}>
+        <div className={`${consoleStyles.sidebarHeader} ${styles.contaDrawerSidebarHeader}`}>
           <div className={consoleStyles.sidebarLogo}>
+            <img src="/logo-nexara.png" alt="" className={consoleStyles.brandLogo} width={32} height={32} />
             <span className={consoleStyles.brandMark}>NEXARA</span>
             <span className={consoleStyles.brandSub}>Contabilidad</span>
           </div>
@@ -258,20 +258,19 @@ export default function ContabilidadLayout({ children }: { children: React.React
           </div>
         )}
 
-        <div className={consoleStyles.sidebarUser}>
-          <div className={consoleStyles.sidebarAvatar}>
-            <Image
-              className={`${consoleStyles.avatarImage} ${isSuperAdmin ? consoleStyles.avatarImageLogo : ""}`}
+        <div className={styles.contaDrawerProfile}>
+          <div className={styles.contaDrawerAvatar}>
+            <img
               src={userAvatarSrc}
               alt={isSuperAdmin ? "NEXARA" : userName}
-              width={64}
-              height={64}
-              unoptimized
+              className={isSuperAdmin ? styles.contaDrawerAvatarLogo : undefined}
+              loading="lazy"
+              decoding="async"
             />
           </div>
-          <div className={consoleStyles.sidebarName}>{userName}</div>
-          <div className={consoleStyles.sidebarEmail}>{userEmail}</div>
-          <div className={consoleStyles.sidebarMeta}>
+          <div className={styles.contaDrawerProfileName}>{userName}</div>
+          <div className={styles.contaDrawerProfileEmail}>{userEmail}</div>
+          <div className={styles.contaDrawerProfileMeta}>
             {isSuperAdmin ? (
               <span className={consoleStyles.levelPill}>Superadmin</span>
             ) : (
