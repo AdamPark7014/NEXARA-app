@@ -17,6 +17,8 @@ import {
   type SalesVendorStats,
 } from '@/lib/sales-api';
 import { triggerBlobDownload, triggerFileDownload } from '@/lib/file-download';
+import { fetchBlobWithProgress } from '@/lib/fetch-blob-with-progress';
+import PdfGenerationOverlay from '@/components/PdfGenerationOverlay';
 import { buildApiUrl, getSocketBaseUrl } from '@/lib/api-base';
 import styles from './SalesReportsDashboard.module.css';
 
@@ -40,6 +42,7 @@ export default function SalesReportsDashboard({
   const [currentPeriod, setCurrentPeriod] = useState<'week' | 'month' | 'year'>(period);
   const [periodLabel, setPeriodLabel] = useState('');
   const [generatePdfLoading, setGeneratePdfLoading] = useState(false);
+  const [pdfGenProgress, setPdfGenProgress] = useState(0);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
   const [showPdfViewer, setShowPdfViewer] = useState(false);
@@ -137,27 +140,29 @@ export default function SalesReportsDashboard({
 
   const handleGeneratePdf = async () => {
     if (!user?.token || !metrics) return;
+    setPdfGenProgress(0);
     setGeneratePdfLoading(true);
     try {
       // Build logo URL with nexara.com.mx domain
       const logoUrl = 'https://nexara.com.mx/logo-nexara.png';
 
-      const res = await fetch(buildApiUrl("ventas/reportes/generar-pdf"), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${user.token}`,
+      const blob = await fetchBlobWithProgress(
+        buildApiUrl("ventas/reportes/generar-pdf"),
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${user.token}`,
+          },
+          body: JSON.stringify({
+            period: currentPeriod,
+            includeVendorStats: true,
+            logoUrl,
+          }),
         },
-        body: JSON.stringify({
-          period: currentPeriod,
-          includeVendorStats: true,
-          logoUrl,
-        }),
-      });
+        setPdfGenProgress,
+      );
 
-      if (!res.ok) throw new Error('Error al generar PDF');
-
-      const blob = await res.blob();
       const arrayBuffer = await blob.arrayBuffer();
       setPdfData(new Uint8Array(arrayBuffer));
 
@@ -273,6 +278,7 @@ export default function SalesReportsDashboard({
 
   return (
     <div className={styles.dashboardContainer}>
+      <PdfGenerationOverlay open={generatePdfLoading} progress={pdfGenProgress} title="Generando reporte de ventas (PDF)…" />
       <div className={styles.header}>
         <div>
           <h2 className={styles.title}>Reportes de Ventas</h2>

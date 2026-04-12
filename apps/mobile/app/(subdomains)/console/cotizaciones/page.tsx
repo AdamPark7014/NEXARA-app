@@ -4,6 +4,8 @@ import React, { useMemo, useState } from "react";
 import { RoleGuard } from "@/components/RoleGuard";
 import { PERMISSIONS } from "@/lib/permissions";
 import { useUser } from "@/components/UserContext";
+import PdfGenerationOverlay from "@/components/PdfGenerationOverlay";
+import { fetchBlobWithProgress } from "@/lib/fetch-blob-with-progress";
 import { triggerBlobDownload } from "@/lib/file-download";
 
 type QuoteItem = {
@@ -166,6 +168,8 @@ export default function CotizacionesPage() {
   const [publicToken, setPublicToken] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [exportPdfLoading, setExportPdfLoading] = useState(false);
+  const [exportPdfProgress, setExportPdfProgress] = useState(0);
 
   const updateMeta = (field: keyof QuoteMeta, value: string) => {
     setMeta((prev) => ({ ...prev, [field]: value }));
@@ -329,17 +333,22 @@ export default function CotizacionesPage() {
   const handleExport = async () => {
     const saved = await handleSave();
     if (!saved || !user?.token) return;
-    const res = await fetch(buildApiUrl(`cotizaciones/${saved.id}/pdf`), {
-      headers: { Authorization: `Bearer ${user.token}` },
-    });
-    if (!res.ok) {
+    setExportPdfProgress(0);
+    setExportPdfLoading(true);
+    try {
+      const blob = await fetchBlobWithProgress(
+        buildApiUrl(`cotizaciones/${saved.id}/pdf`),
+        { headers: { Authorization: `Bearer ${user.token}` } },
+        setExportPdfProgress,
+      );
+      void triggerBlobDownload(blob, `cotizacion-${saved.quoteNumber || saved.id}.pdf`, {
+        mimeType: "application/pdf",
+      });
+    } catch {
       setSaveMessage("No se pudo exportar el PDF.");
-      return;
+    } finally {
+      setExportPdfLoading(false);
     }
-    const blob = await res.blob();
-    void triggerBlobDownload(blob, `cotizacion-${saved.quoteNumber || saved.id}.pdf`, {
-      mimeType: "application/pdf",
-    });
   };
 
   const handleSend = async () => {
@@ -370,6 +379,7 @@ export default function CotizacionesPage() {
 
   return (
     <RoleGuard permissions={[PERMISSIONS.COTIZACIONES_ACCESS]}>
+      <PdfGenerationOverlay open={exportPdfLoading} progress={exportPdfProgress} title="Generando PDF de cotización…" />
       <section className="quoteShell">
         <header className="quoteHeader">
           <div>
@@ -381,7 +391,9 @@ export default function CotizacionesPage() {
             <div className={`statusPill ${status}`}>{status === "draft" ? "Borrador" : status === "sent" ? "Enviada" : "Aprobada"}</div>
             <button className="ghostButton" type="button" onClick={() => setStatus("draft")}>Reiniciar</button>
             <button className="ghostButton" type="button" onClick={handleSave} disabled={isSaving}>Guardar</button>
-            <button className="ghostButton" type="button" onClick={handleExport} disabled={isSaving}>Exportar PDF</button>
+            <button className="ghostButton" type="button" onClick={handleExport} disabled={isSaving || exportPdfLoading}>
+              {exportPdfLoading ? "Generando PDF…" : "Exportar PDF"}
+            </button>
             <button className="primaryButton" type="button" onClick={handleSend} disabled={isSaving}>Enviar</button>
           </div>
         </header>

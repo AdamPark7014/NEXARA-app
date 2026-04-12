@@ -3,6 +3,8 @@ import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useUser } from './UserContext';
 import { triggerBlobDownload, triggerFileDownload } from '@/lib/file-download';
+import { fetchBlobWithProgress } from '@/lib/fetch-blob-with-progress';
+import PdfGenerationOverlay from '@/components/PdfGenerationOverlay';
 import PDFViewer from './PDFViewer';
 import styles from './ServiceSheetForm.module.css';
 import { io, Socket } from 'socket.io-client';
@@ -36,6 +38,8 @@ export default function ServiceSheetForm() {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
   const [showPdfViewer, setShowPdfViewer] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [pdfGenProgress, setPdfGenProgress] = useState(0);
   const pdfModalRef = useRef<HTMLDivElement | null>(null);
 
   const loadActivities = useCallback(async () => {
@@ -135,20 +139,26 @@ export default function ServiceSheetForm() {
 
   const handlePdf = async () => {
     if (!user?.token || !activityId) return;
-    const res = await fetch(buildApiUrl(`service-sheets/${activityId}/pdf`), {
-      headers: { Authorization: `Bearer ${user.token}` },
-    });
-    if (!res.ok) {
+    setPdfGenProgress(0);
+    setGeneratingPdf(true);
+    setMessage(null);
+    try {
+      const blob = await fetchBlobWithProgress(
+        buildApiUrl(`service-sheets/${activityId}/pdf`),
+        { headers: { Authorization: `Bearer ${user.token}` } },
+        setPdfGenProgress,
+      );
+      const arrayBuffer = await blob.arrayBuffer();
+      setPdfData(new Uint8Array(arrayBuffer));
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+      const url = URL.createObjectURL(blob);
+      setPdfUrl(url);
+      setShowPdfViewer(true);
+    } catch {
       setMessage('No se pudo generar el PDF');
-      return;
+    } finally {
+      setGeneratingPdf(false);
     }
-    const blob = await res.blob();
-    const arrayBuffer = await blob.arrayBuffer();
-    setPdfData(new Uint8Array(arrayBuffer));
-    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
-    const url = URL.createObjectURL(blob);
-    setPdfUrl(url);
-    setShowPdfViewer(true);
   };
 
   const handleDownloadPdf = () => {
@@ -223,6 +233,7 @@ export default function ServiceSheetForm() {
 
   return (
     <div className={`card ${styles.formCard}`}>
+      <PdfGenerationOverlay open={generatingPdf} progress={pdfGenProgress} title="Generando hoja de servicio (PDF)…" />
       <h2 className={styles.title}>Hoja de servicio</h2>
       <div className={styles.subtitle}>Llena los datos para generar el PDF del ticket.</div>
       <select className="input" aria-label="Seleccionar actividad" value={activityId} onChange={(e) => setActivityId(e.target.value ? Number(e.target.value) : '')}>
@@ -347,7 +358,9 @@ export default function ServiceSheetForm() {
       </div>
       <div className={styles.formActions}>
         <button className="button-primary" type="button" onClick={handleSave}>Guardar hoja</button>
-        <button className="button-secondary" type="button" onClick={handlePdf}>Ver PDF</button>
+        <button className="button-secondary" type="button" onClick={handlePdf} disabled={generatingPdf}>
+          {generatingPdf ? "Generando…" : "Ver PDF"}
+        </button>
         {message && <span className={message.startsWith('No') ? styles.messageError : styles.messageSuccess}>{message}</span>}
       </div>
 

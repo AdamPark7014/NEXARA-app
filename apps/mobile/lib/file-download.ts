@@ -16,23 +16,30 @@ export type DownloadOptions = {
 
 type ShareAttempt = "shared" | "aborted" | "unsupported";
 
-async function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result as string;
-      const base64 = result.split(",")[1];
-      if (base64) resolve(base64);
-      else reject(new Error("blobToBase64: empty result"));
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
+/**
+ * Base64 para Filesystem.writeFile (nativo) sin readAsDataURL:
+ * menos memoria que data:...;base64, y cede el hilo para no congelar el visor PDF.
+ */
+async function blobToBase64ForFilesystem(blob: Blob): Promise<string> {
+  const buffer = await blob.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  const parts: string[] = [];
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const end = Math.min(i + chunkSize, bytes.length);
+    const slice = bytes.subarray(i, end);
+    parts.push(String.fromCharCode.apply(null, slice as unknown as number[]));
+    if (i > 0 && i % (chunkSize * 6) === 0) {
+      await new Promise((r) => setTimeout(r, 0));
+    }
+  }
+  await new Promise((r) => setTimeout(r, 0));
+  return btoa(parts.join(""));
 }
 
 async function shareWithTimeout(
   shareMod: { share: (opts: Record<string, unknown>) => Promise<unknown> },
-  payload: { title: string; files?: string[]; url?: string; dialogTitle?: string },
+  payload: { title: string; files?: string[]; url?: string; dialogTitle?: string; text?: string },
   ms: number,
 ): Promise<void> {
   await Promise.race([
@@ -43,35 +50,85 @@ async function shareWithTimeout(
   ]);
 }
 
+function writeResultUri(wr: unknown): string | null {
+  if (wr && typeof wr === "object" && "uri" in wr) {
+    const u = (wr as { uri?: unknown }).uri;
+    if (typeof u === "string" && u.length > 0) return u;
+  }
+  return null;
+}
+
 /**
- * En Capacitor nativo: escribe el blob en el directorio caché y abre el menú compartir
- * del sistema operativo (Filesystem + Share). No depende de HTTP/HTTPS ni permisos de almacenamiento.
+ * En Capacitor nativo: escribe el blob en caché (o caché externa) y abre el sheet de compartir.
+ * Evita navigator.share en el WebView con PDF (suele colgarse o no hacer nada).
  */
 async function nativeCapacitorSave(blob: Blob, fileName: string): Promise<boolean> {
   try {
     const { Capacitor } = await import("@capacitor/core");
     const { Filesystem, Directory } = await import("@capacitor/filesystem");
     const { Share } = await import("@capacitor/share");
-    const base64 = await blobToBase64(blob);
-    const safeName = fileName.replace(/[<>:"/\\|?*]/g, "_");
-    await Filesystem.writeFile({ path: safeName, data: base64, directory: Directory.Cache });
-    const { uri } = await Filesystem.getUri({ directory: Directory.Cache, path: safeName });
+    const base64 = await blobToBase64ForFilesystem(blob);
+    const safeSegment = fileName.replace(/[<>:"/\\|?*]/g, "_").slice(0, 160);
+    const path = `nexara_${Date.now()}_${safeSegment || "archivo.bin"}`;
     const dialogTitle = "Guardar o compartir";
 
-    try {
-      await shareWithTimeout(Share, { title: safeName, files: [uri], dialogTitle }, 15_000);
-      return true;
-    } catch (first) {
-      if (Capacitor.getPlatform() === "android") {
-        try {
-          await shareWithTimeout(Share, { title: safeName, url: uri, dialogTitle }, 15_000);
-          return true;
-        } catch (second) {
-          console.warn("[file-download] Share (url) falló:", second);
+    const directories =
+      Capacitor.getPlatform() === "android"
+        ? [Directory.ExternalCache, Directory.Cache]
+        : [Directory.Cache, Directory.ExternalCache];
+
+    for (const directory of directories) {
+      let uri: string | null = null;
+      try {
+        const wr = await Filesystem.writeFile({ path, data: base64, directory });
+        uri = writeResultUri(wr);
+        if (!uri) {
+          const got = await Filesystem.getUri({ directory, path });
+          uri = got.uri;
+        }
+      } catch (writeErr) {
+        console.warn("[file-download] writeFile omitido en directorio", directory, writeErr);
+        continue;
+      }
+
+      if (!uri) continue;
+
+      try {
+        await shareWithTimeout(
+          Share,
+          {
+            title: safeSegment,
+            files: [uri],
+            dialogTitle,
+            text: safeSegment,
+          },
+          22_000,
+        );
+        return true;
+      } catch (first) {
+        if (Capacitor.getPlatform() === "android") {
+          try {
+            await shareWithTimeout(
+              Share,
+              { title: safeSegment, url: uri, dialogTitle, text: safeSegment },
+              22_000,
+            );
+            return true;
+          } catch (second) {
+            console.warn("[file-download] Share (url) falló:", second);
+          }
+        } else {
+          console.warn("[file-download] Share (files) falló:", first);
         }
       }
-      console.warn("[file-download] Share (files) falló:", first);
+
+      try {
+        await Filesystem.deleteFile({ path, directory });
+      } catch {
+        /* ignore */
+      }
     }
+
     return false;
   } catch (e) {
     console.warn("[file-download] Capacitor Filesystem/Share no disponible:", e);
@@ -121,7 +178,6 @@ async function tryNavigatorShareFile(blob: Blob, fileName: string): Promise<Shar
     if (typeof navigator.canShare === "function" && !navigator.canShare(data)) {
       return "unsupported";
     }
-    // Añadir timeout: navigator.share puede colgarse indefinidamente en WebViews de Capacitor
     await Promise.race([
       navigator.share(data),
       new Promise<never>((_, reject) =>
@@ -147,7 +203,7 @@ function fallbackAnchorDownload(fileUrl: string, fileName: string): void {
 
 /**
  * Descarga o abre el selector nativo (iOS Archivos / Android compartir) para guardar el archivo.
- * En Capacitor o móvil, prioriza `navigator.share` con `File` cuando el sistema lo permite.
+ * En app Capacitor: Filesystem + Share nativos; no usar Web Share API en el WebView (especialmente con PDF).
  */
 export async function triggerFileDownload(
   fileUrl: string,
@@ -167,13 +223,13 @@ export async function triggerFileDownload(
         mimeType && (!blob.type || blob.type === "application/octet-stream")
           ? new Blob([blob], { type: mimeType })
           : blob;
-      // En APK nativa: Filesystem + Share nativo (evita el cuelgue de navigator.share en WebView)
       if (isCapacitorNative()) {
         const saved = await nativeCapacitorSave(toShare, fileName);
         if (saved) return;
+      } else {
+        const result = await tryNavigatorShareFile(toShare, fileName);
+        if (result === "shared" || result === "aborted") return;
       }
-      const result = await tryNavigatorShareFile(toShare, fileName);
-      if (result === "shared" || result === "aborted") return;
       const previewUrl = URL.createObjectURL(toShare);
       if (isCapacitorNative() && tryOpenBlobInSystemViewer(previewUrl)) {
         revokeObjectUrlLater(previewUrl, 300_000);
@@ -209,13 +265,14 @@ export async function triggerBlobDownload(
     isCapacitorNative() || (preferOpenOnMobile && isLikelyMobileDevice());
 
   if (nativeOrMobile) {
-    // En APK nativa: Filesystem + Share nativo (evita el cuelgue de navigator.share en WebView)
     if (isCapacitorNative()) {
+      await new Promise((r) => setTimeout(r, 0));
       const saved = await nativeCapacitorSave(typed, fileName);
       if (saved) return;
+    } else {
+      const result = await tryNavigatorShareFile(typed, fileName);
+      if (result === "shared" || result === "aborted") return;
     }
-    const result = await tryNavigatorShareFile(typed, fileName);
-    if (result === "shared" || result === "aborted") return;
     if (isCapacitorNative()) {
       const previewUrl = URL.createObjectURL(typed);
       if (tryOpenBlobInSystemViewer(previewUrl)) {

@@ -5,6 +5,8 @@ import HelpTab from '@/components/HelpTab';
 import React, { useEffect, useState } from 'react';
 import { RoleGuard } from '../../../../components/RoleGuard';
 import { useUser } from '../../../../components/UserContext';
+import PdfGenerationOverlay from '@/components/PdfGenerationOverlay';
+import { fetchBlobWithProgress } from '@/lib/fetch-blob-with-progress';
 import { triggerBlobDownload } from '@/lib/file-download';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 
@@ -34,6 +36,9 @@ export default function ServiceSheetsPage() {
   const [previewUrl, setPreviewUrl] = useState('');
   const [previewTitle, setPreviewTitle] = useState('');
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewPdfProgress, setPreviewPdfProgress] = useState(0);
+  const [downloadPdfLoading, setDownloadPdfLoading] = useState(false);
+  const [downloadPdfProgress, setDownloadPdfProgress] = useState(0);
 
   const isSuperAdmin = Boolean(user?.isSuperAdmin);
   const isConsoleAdmin = hasPermission(user, PERMISSIONS.CONSOLE_ADMIN);
@@ -83,15 +88,21 @@ export default function ServiceSheetsPage() {
   }, [user?.token]);
 
   const handleDownloadPdf = async (activityId: number) => {
+    if (!user?.token) return;
+    setDownloadPdfProgress(0);
+    setDownloadPdfLoading(true);
     try {
-      const res = await fetch(buildApiUrl(`service-sheets/${activityId}/pdf`), {
-        headers: { Authorization: `Bearer ${user?.token}` },
-      });
-      if (res.ok) {
-        const blob = await res.blob();
-        void triggerBlobDownload(blob, `hoja-servicio-${activityId}.pdf`, { mimeType: "application/pdf" });
-      }
-    } catch { /* ignore */ }
+      const blob = await fetchBlobWithProgress(
+        buildApiUrl(`service-sheets/${activityId}/pdf`),
+        { headers: { Authorization: `Bearer ${user.token}` } },
+        setDownloadPdfProgress,
+      );
+      void triggerBlobDownload(blob, `hoja-servicio-${activityId}.pdf`, { mimeType: "application/pdf" });
+    } catch {
+      /* ignore */
+    } finally {
+      setDownloadPdfLoading(false);
+    }
   };
 
   const handlePreviewPdf = async (sheet: ServiceSheet) => {
@@ -108,14 +119,15 @@ export default function ServiceSheetsPage() {
       return;
     }
 
+    setPreviewPdfProgress(0);
     setPreviewLoading(true);
     setPreviewUrl('');
     try {
-      const res = await fetch(buildApiUrl(`service-sheets/${sheet.activityId}/pdf`), {
-        headers: { Authorization: `Bearer ${user?.token}` },
-      });
-      if (!res.ok) return;
-      const blob = await res.blob();
+      const blob = await fetchBlobWithProgress(
+        buildApiUrl(`service-sheets/${sheet.activityId}/pdf`),
+        { headers: { Authorization: `Bearer ${user?.token}` } },
+        setPreviewPdfProgress,
+      );
       const blobUrl = URL.createObjectURL(blob);
       setPreviewUrl(blobUrl);
     } catch {
@@ -138,6 +150,7 @@ export default function ServiceSheetsPage() {
 
   return (
     <RoleGuard permissions={[PERMISSIONS.CONSOLE_ACCESS]}>
+      <PdfGenerationOverlay open={downloadPdfLoading} progress={downloadPdfProgress} title="Descargando PDF de hoja de servicio…" />
       <div style={{ display: 'grid', gap: 24 }}>
         <HelpTab module="service-sheets" user={user} />
         <div className="card" style={{ padding: 14 }}>
@@ -299,7 +312,12 @@ export default function ServiceSheetsPage() {
               </div>
               <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', background: '#0b1626' }}>
                 {previewLoading ? (
-                  <div style={{ padding: 16 }}>Generando PDF...</div>
+                  <PdfGenerationOverlay
+                    open
+                    progress={previewPdfProgress}
+                    title="Generando vista previa del PDF…"
+                    variant="inline"
+                  />
                 ) : previewUrl ? (
                   <iframe title="Vista previa hoja de servicio" src={previewUrl} style={{ width: '100%', height: '100%', border: 'none' }} />
                 ) : (
