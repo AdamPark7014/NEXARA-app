@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import VentasSidebar from "./VentasSidebar";
@@ -23,6 +23,7 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
   const roleLabel = getRoleLabel(user);
   const [workspaceDateLabel, setWorkspaceDateLabel] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const closeVentasDrawer = useCallback(() => setDrawerOpen(false), []);
   const [isNarrowShell, setIsNarrowShell] = useState(false);
   const showCompactBottomNav = useCompactBottomNav();
   const [vendorStats, setVendorStats] = useState<SalesVendorStats[]>([]);
@@ -128,7 +129,7 @@ export default function VentasLayout({ children }: { children: React.ReactNode }
     <div className={`${consoleStyles.consoleLayout} ${styles.salesRoot}`}>
       <VentasSidebar
         mobileOpen={drawerOpen}
-        onMobileClose={() => setDrawerOpen(false)}
+        onMobileClose={closeVentasDrawer}
         shortcutStrip={isNarrowShell && !showCompactBottomNav ? ventasShortcutStrip : undefined}
       />
       <main

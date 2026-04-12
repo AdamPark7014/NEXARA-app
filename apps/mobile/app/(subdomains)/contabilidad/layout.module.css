@@ -66,6 +66,28 @@
   .workspaceContent :global([class*="panel"]) {
     box-shadow: 0 10px 20px color-mix(in srgb, var(--shadow) 30%, transparent);
   }
+
+  .contaRoot aside[data-mobile="true"] {
+    border-top: none;
+    border-color: color-mix(in srgb, var(--border-color, var(--border)) 88%, transparent);
+  }
+
+  /* El bloque minificado redefine .mobileBrand a grid y rompe logo + texto en fila */
+  .mobileBrand {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 10px !important;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .mobileBrandText {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+    text-align: left;
+  }
 }
 
 /* ERP — workspace principal (alineado con web) */
@@ -141,4 +163,82 @@
   border-color: color-mix(in srgb, var(--primary) 45%, transparent);
   background: color-mix(in srgb, var(--primary) 22%, var(--surface));
   color: var(--foreground);
+}
+
+/* Drawer: evita franja azul arriba y caja de perfil a todo el ancho + rectángulo del next/image */
+.contaDrawerSidebarHeader {
+  background: var(--surface) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color, var(--border)) 72%, transparent) !important;
+  padding-top: max(0.55rem, env(safe-area-inset-top, 0px)) !important;
+}
+
+.contaDrawerProfile {
+  align-self: center;
+  width: min(100%, 252px);
+  box-sizing: border-box;
+  display: grid;
+  justify-items: center;
+  gap: 0.32rem;
+  padding: 12px 14px 14px;
+  margin: 6px auto 10px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-2) 46%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--border-color, var(--border)) 76%, transparent);
+}
+
+.contaDrawerAvatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid color-mix(in srgb, var(--border-color, var(--border)) 82%, transparent);
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.contaDrawerAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+.contaDrawerAvatar img.contaDrawerAvatarLogo {
+  object-fit: contain;
+  padding: 9px;
+  box-sizing: border-box;
+  background: var(--surface);
+}
+
+.contaDrawerProfileName {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--foreground);
+  text-align: center;
+  line-height: 1.25;
+}
+
+.contaDrawerProfileEmail {
+  font-size: 0.74rem;
+  color: var(--text-tertiary);
+  text-align: center;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+
+.contaDrawerProfileMeta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-top: 0.08rem;
+}
+
+:global(body.dark) .contaDrawerProfile {
+  background: color-mix(in srgb, var(--surface-2) 36%, var(--surface));
+  border-color: color-mix(in srgb, var(--border) 70%, transparent);
 }

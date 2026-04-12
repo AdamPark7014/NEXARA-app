@@ -9,13 +9,15 @@ import { useUser } from "@/components/UserContext";
 import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
 import consoleStyles from "../console/console.module.css";
 import styles from "./layout.module.css";
-import { getAvatarSrc, getRoleLabel } from "@/lib/panel-user";
+import { getAvatarSrc, getRoleLabel, isPlatformAdmin } from "@/lib/panel-user";
 
 export default function WebPanelLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { darkMode, toggleDarkMode } = useTheme();
   const { user } = useUser();
   const userAvatarSrc = getAvatarSrc(user);
+  const userRoleLabel = getRoleLabel(user);
+  const isAdmin = isPlatformAdmin(user);
   const currentPath = pathname ? pathname.replace(/\/+$/, "") : "";
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -62,6 +64,7 @@ export default function WebPanelLayout({ children }: { children: React.ReactNode
       {isMobile && (
         <header className={styles.webMobileTopbar}>
           <div className={`${styles.webMobileBrand} ${consoleStyles.sidebarLogo}`}>
+            <img src="/logo-nexara.png" alt="" className={consoleStyles.brandLogo} width={32} height={32} />
             <span className={consoleStyles.brandMark}>NEXARA</span>
             <span className={consoleStyles.brandSub}>Panel Web</span>
           </div>
@@ -97,6 +100,7 @@ export default function WebPanelLayout({ children }: { children: React.ReactNode
         >
           <div className={consoleStyles.sidebarHeader}>
             <div className={consoleStyles.sidebarLogo}>
+              <img src="/logo-nexara.png" alt="" className={consoleStyles.brandLogo} width={32} height={32} />
               <span className={consoleStyles.brandMark}>NEXARA</span>
               <span className={consoleStyles.brandSub}>Panel Web</span>
             </div>
@@ -120,19 +124,29 @@ export default function WebPanelLayout({ children }: { children: React.ReactNode
             <div className={consoleStyles.sidebarUser}>
               <div className={consoleStyles.sidebarAvatar}>
                 <Image
-                  className={consoleStyles.avatarImage}
+                  className={`${consoleStyles.avatarImage}${user?.isSuperAdmin ? ` ${consoleStyles.avatarImageLogo}` : ""}`}
                   src={userAvatarSrc}
                   alt={user?.isSuperAdmin ? "NEXARA" : user?.nombre || "Usuario"}
-                  width={64}
-                  height={64}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  width={70}
+                  height={70}
+                  sizes="70px"
+                  loading="lazy"
                   unoptimized
                 />
               </div>
               <div className={consoleStyles.sidebarName}>{user?.nombre || "Usuario Web"}</div>
               <div className={consoleStyles.sidebarEmail}>{user?.email || "panel@nexara.com.mx"}</div>
               <div className={consoleStyles.sidebarMeta}>
-                <span className={consoleStyles.rolePill}>{getRoleLabel(user)}</span>
+                {user?.isSuperAdmin ? (
+                  <span className={consoleStyles.levelPill}>Superadmin</span>
+                ) : (
+                  <>
+                    <span className={consoleStyles.rolePill}>{userRoleLabel}</span>
+                    {isAdmin && userRoleLabel !== "Admin" && (
+                      <span className={consoleStyles.levelPill}>Admin</span>
+                    )}
+                  </>
+                )}
               </div>
             </div>
 
@@ -161,6 +175,15 @@ export default function WebPanelLayout({ children }: { children: React.ReactNode
 
             <div className={consoleStyles.menuTitle}>Cuenta</div>
             <ul className={consoleStyles.sidebarMenu}>
+              <li className={consoleStyles.sidebarMenuItem}>
+                <Link
+                  href="/paneles"
+                  className={`${consoleStyles.menuLink} ${consoleStyles.menuButton}`}
+                  onClick={closeMenu}
+                >
+                  Cambiar panel
+                </Link>
+              </li>
               <li className={consoleStyles.sidebarMenuItem}>
                 <button
                   type="button"

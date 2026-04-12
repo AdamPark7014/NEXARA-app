@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
-import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "@/components/ThemeContext";
 import { useUser } from "@/components/UserContext";
 import { setActivePanel } from "@/lib/panel-routing";
-import { getAvatarSrc, getRoleLabel } from "@/lib/panel-user";
+import { getAvatarSrc, getRoleLabel, isPlatformAdmin } from "@/lib/panel-user";
 import { useCompactBottomNav } from "@/lib/use-compact-bottom-nav";
 import BottomNav from "@/components/BottomNav";
 import { hapticTap } from "@/lib/haptics";
@@ -24,6 +23,7 @@ export default function WebPanelLayout({ children }: { children: React.ReactNode
   const currentPath = pathname ? pathname.replace(/\/+$/, "") : "";
   const userRoleLabel = getRoleLabel(user);
   const userAvatarSrc = getAvatarSrc(user);
+  const isAdmin = isPlatformAdmin(user);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isMobileShell, setIsMobileShell] = useState(false);
   const showCompactBottomNav = useCompactBottomNav();
@@ -78,9 +78,12 @@ export default function WebPanelLayout({ children }: { children: React.ReactNode
     <div className={styles.webPanelRoot}>
       {isMobileShell && (
         <header className={styles.webMobileTopbar}>
-          <div className={styles.webMobileBrand}>
-            <span className={styles.brandMark}>NEXARA</span>
-            <span className={styles.brandSub}>Panel Web</span>
+          <div className={`${styles.webDrawerHeader} ${styles.webDrawerHeaderInTopbar}`}>
+            <img src="/logo-nexara.png" alt="" className={styles.webDrawerHeaderLogo} width={36} height={36} />
+            <div className={styles.webDrawerHeaderTitles}>
+              <span className={styles.brandMark}>NEXARA</span>
+              <span className={styles.brandSub}>Panel Web</span>
+            </div>
           </div>
           <button
             type="button"
@@ -113,11 +116,13 @@ export default function WebPanelLayout({ children }: { children: React.ReactNode
         id="web-panel-sidebar"
         className={`${styles.webPanelSidebar} ${isMobileShell ? styles.webPanelSidebarDrawer : ""} ${isMobileShell && drawerOpen ? styles.webPanelSidebarDrawerOpen : ""}`}
       >
-        <div className={styles.webPanelBrand}>
-          <div className={styles.brandMark}>NEXARA</div>
-          <div className={styles.brandSub}>Panel Web</div>
+        <div className={styles.webDrawerHeader}>
+          <img src="/logo-nexara.png" alt="NEXARA" className={styles.webDrawerHeaderLogo} width={36} height={36} />
+          <div className={styles.webDrawerHeaderTitles}>
+            <div className={styles.brandMark}>NEXARA</div>
+            <div className={styles.brandSub}>Panel Web</div>
+          </div>
         </div>
-        <div className={styles.webPanelDivider} />
         <div className={styles.webPanelMenuTitle}>Menú principal</div>
 
         {isMobileShell && !showCompactBottomNav && (
@@ -140,20 +145,32 @@ export default function WebPanelLayout({ children }: { children: React.ReactNode
           </div>
         )}
 
-        <div className={styles.webPanelUser}>
-          <div style={{ width: 44, height: 44, borderRadius: "50%", overflow: "hidden", marginBottom: 8 }}>
-            <Image
-              src={userAvatarSrc}
-              alt={user?.isSuperAdmin ? "NEXARA" : user?.nombre || "Usuario"}
-              width={44}
-              height={44}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              unoptimized
-            />
+        <div className={styles.webPanelUserShell}>
+          <div className={styles.webDrawerProfile}>
+            <div className={styles.webDrawerAvatar}>
+              <img
+                src={userAvatarSrc}
+                alt={user?.isSuperAdmin ? "NEXARA" : user?.nombre || "Usuario"}
+                className={user?.isSuperAdmin ? styles.webDrawerAvatarLogo : undefined}
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+            <div className={styles.webDrawerProfileName}>{user?.nombre || "Usuario Web"}</div>
+            <div className={styles.webDrawerProfileEmail}>{user?.email || "panel@nexara.com.mx"}</div>
+            <div className={styles.webDrawerProfileMeta}>
+              {user?.isSuperAdmin ? (
+                <span className={consoleStyles.levelPill}>Superadmin</span>
+              ) : (
+                <>
+                  <span className={consoleStyles.rolePill}>{userRoleLabel}</span>
+                  {isAdmin && userRoleLabel !== "Admin" && (
+                    <span className={consoleStyles.levelPill}>Admin</span>
+                  )}
+                </>
+              )}
+            </div>
           </div>
-          <div className={styles.webPanelUserName}>{user?.nombre || "Usuario Web"}</div>
-          <div className={styles.webPanelUserEmail}>{user?.email || "panel@nexara.com.mx"}</div>
-          <div className={styles.webPanelUserEmail}>{userRoleLabel}</div>
         </div>
         <div className={styles.webPanelNavShell}>
           <nav className={styles.webPanelNav}>
