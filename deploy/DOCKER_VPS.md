@@ -78,6 +78,19 @@ cd /var/www/nexara-app
 docker compose --env-file deploy/.env.nexara -f deploy/docker-compose.nexara.yml exec api npm run prisma:deploy --workspace=apps/api
 ```
 
+Si `nexara-api` está en **restarting** (crash-loop), `exec` falla. Usa un contenedor one-off (misma imagen y env):
+
+```bash
+docker compose --env-file deploy/.env.nexara -f deploy/docker-compose.nexara.yml run --rm -T api npm run prisma:deploy --workspace=apps/api
+```
+
+Diagnóstico rápido del API:
+
+```bash
+docker inspect -f 'Status={{.State.Status}} Exit={{.State.ExitCode}}' nexara-api
+docker logs nexara-api --tail 150
+```
+
 Opcional seed:
 
 ```bash
