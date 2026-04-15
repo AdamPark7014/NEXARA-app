@@ -107,7 +107,19 @@ docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --remove-orphans 
 
 if [[ "$RUN_MIGRATE" == true ]]; then
   echo "Running Prisma migrate deploy..."
-  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec api npm run prisma:deploy --workspace=apps/api
+  # Usar `run --rm` en lugar de `exec`: si nexara-api está en crash-loop (restarting),
+  # `exec` falla; un contenedor one-off con la misma imagen y env sí puede aplicar migraciones.
+  if ! docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" run --rm -T api \
+    npm run prisma:deploy --workspace=apps/api; then
+    echo ""
+    echo "ERROR: migrate deploy falló. Estado del contenedor API:"
+    docker inspect -f 'Status={{.State.Status}} Exit={{.State.ExitCode}} Error={{.State.Error}}' nexara-api 2>/dev/null || true
+    echo "Últimas líneas de log (nexara-api):"
+    docker logs nexara-api --tail 120 2>&1 || true
+    echo ""
+    echo "Revisa DATABASE_URL en deploy/.env.nexara, que la DB esté arriba, y JWT_SECRET."
+    exit 1
+  fi
 fi
 
 if [[ "$RUN_PRUNE" == true ]]; then
