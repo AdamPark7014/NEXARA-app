@@ -19,6 +19,11 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3001
 
+# Prisma (migrate) y engines nativos necesitan OpenSSL en imágenes slim
+RUN apt-get update -y \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
 # Raíz: dependencias hoisted del monorepo
 COPY --from=build /app/node_modules ./node_modules
 # apps/api: aquí npm deja deps solo del workspace (p. ej. @nestjs/terminus); sin esto el API crashea al arrancar
@@ -26,6 +31,9 @@ COPY --from=build /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=build /app/apps/api/package.json ./apps/api/package.json
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/prisma ./apps/api/prisma
+
+# Fallar el build si Terminus no está (evita imagen “verde” que crashea al arrancar)
+RUN test -d node_modules/@nestjs/terminus || test -d apps/api/node_modules/@nestjs/terminus
 
 RUN mkdir -p /app/uploads
 
