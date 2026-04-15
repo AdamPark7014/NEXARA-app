@@ -274,6 +274,12 @@ export function middleware(request: NextRequest) {
       const response = applySecurityHeaders(NextResponse.next());
       return applyNoStoreForHtml(request, response);
     }
+
+    // Login vive en la ruta global /(auth)/login -> /login, no bajo /console/login, etc.
+    if (pathname === "/login" || pathname === "/login/") {
+      const response = applySecurityHeaders(NextResponse.next());
+      return applyNoStoreForHtml(request, response);
+    }
     
     // Reescribir a /<slug><pathname>
     // Ejemplo: consola.localhost/ → /console/
