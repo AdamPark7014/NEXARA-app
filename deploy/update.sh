@@ -109,8 +109,9 @@ if [[ "$RUN_MIGRATE" == true ]]; then
   echo "Running Prisma migrate deploy..."
   # Usar `run --rm` en lugar de `exec`: si nexara-api está en crash-loop (restarting),
   # `exec` falla; un contenedor one-off con la misma imagen y env sí puede aplicar migraciones.
+  # Sin package.json raíz en la imagen API: migrar desde apps/api con npx prisma
   if ! docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" run --rm -T api \
-    npm run prisma:deploy --workspace=apps/api; then
+    sh -c "cd apps/api && npx prisma migrate deploy"; then
     echo ""
     echo "ERROR: migrate deploy falló. Estado del contenedor API:"
     docker inspect -f 'Status={{.State.Status}} Exit={{.State.ExitCode}} Error={{.State.Error}}' nexara-api 2>/dev/null || true

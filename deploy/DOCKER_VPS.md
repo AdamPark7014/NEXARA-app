@@ -81,8 +81,10 @@ docker compose --env-file deploy/.env.nexara -f deploy/docker-compose.nexara.yml
 Si `nexara-api` está en **restarting** (crash-loop), `exec` falla. Usa un contenedor one-off (misma imagen y env):
 
 ```bash
-docker compose --env-file deploy/.env.nexara -f deploy/docker-compose.nexara.yml run --rm -T api npm run prisma:deploy --workspace=apps/api
+docker compose --env-file deploy/.env.nexara -f deploy/docker-compose.nexara.yml run --rm -T api sh -c "cd apps/api && npx prisma migrate deploy"
 ```
+
+(La imagen API no incluye el `package.json` del monorepo raíz; las migraciones deben ejecutarse desde `apps/api` con `npx prisma`.)
 
 Diagnóstico rápido del API:
 
