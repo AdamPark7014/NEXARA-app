@@ -59,6 +59,7 @@ const buildDefaultAllowedHostPatterns = (): RegExp[] => {
     /^127\.0\.0\.1(?::\d+)?$/i,
     /^nexara\.com\.mx(?::\d+)?$/i,
     /^www\.nexara\.com\.mx(?::\d+)?$/i,
+    /^app\.nexara\.com\.mx(?::\d+)?$/i,
     ...allowedIpHosts.map((host) => new RegExp(`^${host}(?::\\d+)?$`, 'i')),
     new RegExp(`^(${subdomainAlternation})\\.localhost(?::\\d+)?$`, 'i'),
     new RegExp(`^(${subdomainAlternation})\\.nexara\\.com\\.mx(?::\\d+)?$`, 'i'),
