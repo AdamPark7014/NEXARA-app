@@ -1,7 +1,6 @@
 "use client";
 
-import { buildApiUrl } from "@/lib/api-base";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useUser } from "@/components/UserContext";
 import { Bar, BarChart, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, Pie, PieChart } from "recharts";
 import styles from "./page.module.css";
@@ -26,6 +25,11 @@ export default function VentasCrecimientoPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const apiUrl = useMemo(() => {
+    const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
+    return base.replace(/[\/\.]+$/, "");
+  }, []);
+
   useEffect(() => {
     if (!user?.token) return;
     const fetchMetrics = async () => {
@@ -33,13 +37,13 @@ export default function VentasCrecimientoPage() {
       setError(null);
       try {
         const query = `?start=${new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString()}&end=${new Date().toISOString()}`;
-        const res = await fetch(buildApiUrl(`ventas/reportes/resumen${query}`), {
+        const res = await fetch(`${apiUrl}/ventas/reportes/resumen${query}`, {
           headers: { Authorization: `Bearer ${user.token}` },
         });
         if (!res.ok) throw new Error("No se pudo cargar los datos");
         const summary = await res.json();
 
-        const projectsRes = await fetch(buildApiUrl("ventas/proyectos"), {
+        const projectsRes = await fetch(`${apiUrl}/ventas/proyectos`, {
           headers: { Authorization: `Bearer ${user.token}` },
         });
         const projects = await projectsRes.json().catch(() => []);
@@ -77,7 +81,7 @@ export default function VentasCrecimientoPage() {
       }
     };
     fetchMetrics();
-  }, [user?.token]);
+  }, [user?.token, apiUrl]);
 
   const palette = ["#1F6BBA", "#19B36B", "#FF9F40", "#EF5350", "#8E7CF7"];
 

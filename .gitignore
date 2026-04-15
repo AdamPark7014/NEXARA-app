@@ -57,3 +57,8 @@ coverage/
 # Uploads and temp
 uploads/
 temp/
+
+# Android nativo (apps/mobile-native) — salidas de Gradle; no versionar
+apps/mobile-native/android/**/build/
+apps/mobile-native/android/.gradle/
+apps/mobile-native/android/local.properties

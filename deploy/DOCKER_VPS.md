@@ -26,15 +26,13 @@ Crea registros A apuntando a la IP del VPS:
 ## 3) Levantar proxy global (una sola vez para todo el VPS)
 
 ```bash
-cd /opt
-sudo mkdir -p proxy
-sudo chown -R $USER:$USER /opt/proxy
+cd /var/www/nexara-app
 ```
 
-Copia el contenido de `infra/proxy` a `/opt/proxy` y luego:
+Copia el contenido de `infra/proxy` a tu carpeta de deploy y luego:
 
 ```bash
-cd /opt/proxy
+cd /var/www/nexara-app/infra/proxy
 cp .env.example .env
 mkdir -p letsencrypt
 touch letsencrypt/acme.json
@@ -45,9 +43,9 @@ docker compose up -d
 ## 4) Desplegar Nexara
 
 ```bash
-cd /opt
-git clone <tu-repo-nexara-url> nexara
-cd nexara/deploy
+cd /var/www
+git clone <tu-repo-nexara-url> nexara-app
+cd nexara-app/deploy
 cp .env.nexara.example .env.nexara
 ```
 
@@ -59,12 +57,24 @@ Levanta stack:
 docker compose --env-file .env.nexara -f docker-compose.nexara.yml up -d --build
 ```
 
+Para actualizaciones con menos uso de RAM (build secuencial, sin limpiar cache en cada deploy):
+
+```bash
+cd /var/www/nexara-app
+chmod +x deploy/update.sh
+./deploy/update.sh --with-migrate
+```
+
+Antes de levantar los contenedores, `update.sh` ejecuta `deploy/stop-legacy-host.sh`: detiene y elimina apps **PM2** con nombres típicos (`nexara-api`, `web`, etc.) y apaga unidades **systemd** conocidas (`nexara-api.service`, …) si existían. Así no quedan dos backends (Docker + Node en el host) detrás del mismo dominio.
+
+- Para saltar esa limpieza (p. ej. otro proyecto en PM2 con nombre genérico): `./deploy/update.sh --with-migrate --no-stop-legacy`
+
 ## 5) Migraciones Prisma
 
 Al primer despliegue (y cuando cambie schema):
 
 ```bash
-cd /opt/nexara
+cd /var/www/nexara-app
 docker compose --env-file deploy/.env.nexara -f deploy/docker-compose.nexara.yml exec api npm run prisma:deploy --workspace=apps/api
 ```
 
@@ -94,11 +104,21 @@ docker compose --env-file deploy/.env.nexara -f deploy/docker-compose.nexara.yml
 # Ver logs API
 docker compose --env-file deploy/.env.nexara -f deploy/docker-compose.nexara.yml logs -f api
 
-# Rebuild + restart
-docker compose --env-file deploy/.env.nexara -f deploy/docker-compose.nexara.yml up -d --build
+# Update recomendado (incremental)
+./deploy/update.sh --with-migrate
+
+# Forzar rebuild completo cuando sea necesario
+./deploy/update.sh --force-all --with-migrate
+
+# Limpieza moderada (imagenes/cache viejas)
+./deploy/update.sh --with-prune
 
 # Reiniciar solo web
 docker compose --env-file deploy/.env.nexara -f deploy/docker-compose.nexara.yml restart web
+
+# No usar scripts legacy PM2 (ya redirigen a Docker)
+# bash deploy.sh
+# bash update-server.sh
 ```
 
 ## 8) Recomendaciones de produccion
@@ -107,3 +127,4 @@ docker compose --env-file deploy/.env.nexara -f deploy/docker-compose.nexara.yml
 - Guarda backups de volumen Postgres.
 - Si usas Spaces/R2 para archivos, evita depender de disco local.
 - Activa firewall (UFW): permitir solo 22, 80, 443.
+- Evita `docker system prune -a` en cada deploy; usa limpieza moderada con `--with-prune` solo cuando haga falta.
