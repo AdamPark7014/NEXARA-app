@@ -42,6 +42,25 @@ docker compose up -d
 
 ## 4) Desplegar Nexara
 
+### Si `git pull` dice que `deploy/update.sh` (u otro) tiene cambios locales
+
+Eso impide traer el `Dockerfile` nuevo y el servidor sigue construyendo imagen vieja (sin `apps/api/node_modules` → sigue fallando `@nestjs/terminus`).
+
+Descarta solo ese archivo y vuelve a tirar de `main` (ajusta la ruta si tu repo no es `nexara-app`):
+
+```bash
+cd /var/www/nexara-app
+git checkout -- deploy/update.sh
+git pull --ff-only origin main
+```
+
+(O guarda tus cambios: `git stash push -m "servidor" -- deploy/update.sh` y luego `git pull`.)
+
+### Rutas de `docker compose` (evitar `deploy/deploy/...`)
+
+- Desde la **raíz del repo** (`/var/www/nexara-app`): usa `--env-file deploy/.env.nexara` y `-f deploy/docker-compose.nexara.yml`.
+- Desde la carpeta **`deploy/`**: usa `--env-file .env.nexara` y **`-f docker-compose.nexara.yml`** (sin prefijo `deploy/`).
+
 ```bash
 cd /var/www
 git clone <tu-repo-nexara-url> nexara-app
