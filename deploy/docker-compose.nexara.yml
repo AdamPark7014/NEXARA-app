@@ -136,7 +136,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy
-      - traefik.http.routers.nexara-mobile.rule=Host(`${MOBILE_DOMAIN}`)
+      - traefik.http.routers.nexara-mobile.rule=Host(`${MOBILE_DOMAIN}`) || Host(`consola.nexara.com.mx`) || Host(`console.nexara.com.mx`) || Host(`ventas.nexara.com.mx`) || Host(`contabilidad.nexara.com.mx`) || Host(`tickets.nexara.com.mx`) || Host(`web.nexara.com.mx`)
       - traefik.http.routers.nexara-mobile.entrypoints=websecure
       - traefik.http.routers.nexara-mobile.tls.certresolver=letsencrypt
       - traefik.http.services.nexara-mobile.loadbalancer.server.port=3002
