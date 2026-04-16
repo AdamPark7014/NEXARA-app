@@ -130,13 +130,13 @@ const nextConfig = {
       fallback: [
         {
           source: '/api/:path*',
-          destination: 'http://localhost:3001/api/:path*',
+          destination: 'http://api:3001/api/:path*',
         },
       // Proxy de uploads: el navegador no accede al puerto 3001 directamente,
       // Next.js lo resuelve internamente desde localhost.
         {
           source: '/uploads/:path*',
-          destination: 'http://localhost:3001/uploads/:path*',
+          destination: 'http://api:3001/uploads/:path*',
         },
       ],
     };
