@@ -4,6 +4,7 @@ const path = require("path");
 const rootDir = path.resolve(__dirname, "..");
 const mode = (process.argv[2] || "root").toLowerCase();
 const forceSharedCache = process.env.CLEAR_SHARED_CACHE === "true" || process.env.CLEAR_SHARED_TURBO_CACHE === "true";
+const skipNextCache = process.env.CLEAR_SKIP_NEXT_CACHE === "true";
 
 const RETRYABLE_ERROR_CODES = new Set(["EBUSY", "EPERM", "ENOTEMPTY", "EMFILE", "ENFILE"]);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -12,17 +13,16 @@ const dirsByMode = {
   root: [
     ".turbo",
     ...(forceSharedCache ? ["node_modules/.cache"] : []),
-    "apps/web/.next",
-    "apps/mobile/.next",
+    ...(skipNextCache ? [] : ["apps/web/.next", "apps/mobile/.next"]),
     "apps/web/node_modules/.cache",
     "apps/mobile/node_modules/.cache",
   ],
   web: [
-    "apps/web/.next",
+    ...(skipNextCache ? [] : ["apps/web/.next"]),
     "apps/web/node_modules/.cache",
   ],
   mobile: [
-    "apps/mobile/.next",
+    ...(skipNextCache ? [] : ["apps/mobile/.next"]),
     "apps/mobile/node_modules/.cache",
   ],
   api: [
@@ -76,6 +76,9 @@ const removeDir = async (relativePath) => {
 
 const run = async () => {
   console.log(`[cache-clean] mode: ${mode}`);
+  if (skipNextCache) {
+    console.log("[cache-clean] skipping Next .next cleanup (CLEAR_SKIP_NEXT_CACHE=true)");
+  }
   if (mode === "root" && !forceSharedCache) {
     console.log("[cache-clean] shared node_modules/.cache was NOT removed (set CLEAR_SHARED_CACHE=true to force)");
   }

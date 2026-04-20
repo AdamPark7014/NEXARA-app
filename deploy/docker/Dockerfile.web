@@ -11,6 +11,7 @@ RUN --mount=type=cache,target=/root/.npm npm ci --prefer-offline --no-audit
 FROM deps AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV CLEAR_SKIP_NEXT_CACHE=true
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_SOCKET_URL
 ARG NEXT_PUBLIC_BASE_URL
