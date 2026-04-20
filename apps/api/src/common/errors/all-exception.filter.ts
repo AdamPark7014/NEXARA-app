@@ -12,6 +12,19 @@ import { Request, Response } from 'express';
 export class AllExceptionsFilter implements ExceptionFilter {
   constructor(private readonly logger: any) {}
 
+  private isExpectedNoise404(pathname: string, method: string): boolean {
+    if (method === 'POST' && pathname === '/') {
+      return true;
+    }
+
+    return (
+      pathname === '/' ||
+      pathname === '/robots.txt' ||
+      pathname === '/favicon.ico' ||
+      pathname === '/appsettings.Production.json'
+    );
+  }
+
   private sanitizeValue(value: unknown): unknown {
     const sensitiveKeys = new Set([
       'password',
@@ -66,8 +79,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       details = { stack: exception.stack };
     }
 
-    // Log error with context
-    this.logger.error('API Exception', {
+    const payload = {
       timestamp: new Date().toISOString(),
       path: request.url,
       method: request.method,
@@ -79,7 +91,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
       body: this.sanitizeValue(request.body),
       query: this.sanitizeValue(request.query),
       params: this.sanitizeValue(request.params),
-    });
+    };
+
+    // Keep expected public internet probes out of error-level noise.
+    if (status === 404 && this.isExpectedNoise404(request.url, request.method)) {
+      this.logger.warn('API Not Found (noise)', payload);
+    } else {
+      this.logger.error('API Exception', payload);
+    }
 
     // Suggest possible solutions for common errors
     const suggestions = suggestErrorSolutions(status, errorCode, message, details);

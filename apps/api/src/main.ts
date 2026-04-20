@@ -60,6 +60,23 @@ async function bootstrap() {
     next();
   });
 
+  // Handle common internet probe paths early to reduce noisy exception logs.
+  httpServer.all('/', (_request: express.Request, response: express.Response) => {
+    response.status(404).json({ statusCode: 404, message: 'Not Found' });
+  });
+
+  httpServer.get('/robots.txt', (_request: express.Request, response: express.Response) => {
+    response.type('text/plain').status(200).send('User-agent: *\nDisallow: /\n');
+  });
+
+  httpServer.get('/favicon.ico', (_request: express.Request, response: express.Response) => {
+    response.status(204).end();
+  });
+
+  httpServer.get('/appsettings.Production.json', (_request: express.Request, response: express.Response) => {
+    response.status(404).json({ statusCode: 404, message: 'Not Found' });
+  });
+
   const maxConcurrentRequests = readPositiveIntEnv('MAX_CONCURRENT_REQUESTS', 5000);
   let activeRequests = 0;
 
