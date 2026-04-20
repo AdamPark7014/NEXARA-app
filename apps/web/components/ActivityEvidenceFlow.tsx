@@ -13,6 +13,14 @@ interface ActivityOption {
   workType?: 'ISSUE' | 'PREVENTIVE_INVENTORY';
 }
 
+const normalizeActivitiesPayload = (data: unknown): ActivityOption[] => {
+  if (Array.isArray(data)) return data as ActivityOption[];
+  if (data && typeof data === 'object' && Array.isArray((data as { data?: unknown }).data)) {
+    return (data as { data: ActivityOption[] }).data;
+  }
+  return [];
+};
+
 interface EvidenceFlowData {
   activityId: number;
   step: 'ENTRY_PHOTO' | 'EVIDENCE_PHOTOS' | 'SERVICE_SHEET_PDF' | 'SERVICE_SHEET_DATA' | 'EXIT_PHOTO' | 'COMPLETED';
@@ -106,16 +114,28 @@ const ActivityEvidenceFlow = () => {
     fetch(buildApiUrl('activities?scope=mine'), {
       headers: { Authorization: `Bearer ${user.token}` },
     })
-      .then((res) => res.ok ? res.json() : [])
+      .then(async (res) => {
+        if (!res.ok) {
+          if (res.status === 401 || res.status === 403) {
+            throw new Error('No tienes permisos para consultar tus actividades.');
+          }
+          throw new Error('No se pudieron cargar tus actividades.');
+        }
+        return res.json();
+      })
       .then((data) => {
-        const rows = Array.isArray(data) ? data : [];
+        const rows = normalizeActivitiesPayload(data);
         const available = rows.filter((activity: ActivityOption) => {
           const status = (activity?.estatus || '').trim().toLowerCase();
           return status !== 'aprobada';
         });
         setActividades(available);
+        setError(null);
       })
-      .catch(() => setActividades([]));
+      .catch((err) => {
+        setActividades([]);
+        setError(err instanceof Error ? err.message : 'No se pudieron cargar tus actividades.');
+      });
   }, [user?.token]);
 
   useEffect(() => {

@@ -26,28 +26,32 @@ export class ActivitiesService {
 
 
   private async generateNextAnNumber(): Promise<string> {
-    const activities = await this.prisma['activity'].findMany({
-      select: { anNumber: true },
-    });
+    const [latestNumericAn] = await this.prisma.$queryRaw<Array<{ anNumber: string }>>`
+      SELECT "anNumber"
+      FROM "Activity"
+      WHERE "anNumber" ~ '\\d+$'
+      ORDER BY CAST(substring("anNumber" FROM '(\\d+)$') AS INTEGER) DESC
+      LIMIT 1
+    `;
 
-    let maxNumber = 0;
-    let prefix = 'AN-';
-    let padLength = 4;
-
-    for (const activity of activities) {
-      if (!activity.anNumber) continue;
-      const match = activity.anNumber.match(/^(.*?)(\d+)$/);
-      if (!match) continue;
-      const numeric = Number(match[2]);
-      if (Number.isNaN(numeric)) continue;
-      if (numeric >= maxNumber) {
-        maxNumber = numeric;
-        prefix = match[1] || 'AN-';
-        padLength = match[2].length || padLength;
-      }
+    if (!latestNumericAn?.anNumber) {
+      return 'AN-0001';
     }
 
-    const next = maxNumber + 1;
+    const match = latestNumericAn.anNumber.match(/^(.*?)(\d+)$/);
+    if (!match) {
+      return 'AN-0001';
+    }
+
+    const prefix = match[1] || 'AN-';
+    const currentNumber = Number(match[2]);
+    const padLength = match[2].length || 4;
+
+    if (Number.isNaN(currentNumber)) {
+      return 'AN-0001';
+    }
+
+    const next = currentNumber + 1;
     return `${prefix}${String(next).padStart(padLength, '0')}`;
   }
 

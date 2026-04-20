@@ -6,7 +6,7 @@ COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY apps/mobile/package.json apps/mobile/package.json
 
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci --prefer-offline --no-audit
 
 FROM deps AS build
 WORKDIR /app
@@ -26,7 +26,7 @@ ENV NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API=${NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API}
 ENV NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
 ENV NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID=${NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID}
 COPY . .
-RUN npm run build --workspace=apps/mobile
+RUN --mount=type=cache,target=/app/apps/mobile/.next/cache npm run build --workspace=apps/mobile
 
 FROM node:22-slim AS runner
 WORKDIR /app
