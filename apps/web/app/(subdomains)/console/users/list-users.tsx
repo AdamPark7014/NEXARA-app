@@ -176,6 +176,12 @@ export default function ListUsers() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.token]);
 
+  useEffect(() => {
+    if (!Object.keys(brokenAvatarIds).length) return;
+    const retryTimer = window.setTimeout(() => setBrokenAvatarIds({}), 10000);
+    return () => window.clearTimeout(retryTimer);
+  }, [brokenAvatarIds]);
+
   if (loading) return (
     <div style={{ textAlign: 'center', padding: '52px 0', color: 'var(--text-secondary)', fontSize: 14, opacity: 0.75 }}>
       Cargando usuarios…
