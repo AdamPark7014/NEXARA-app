@@ -11,6 +11,8 @@ RUN_MIGRATE=false
 RUN_PRUNE=false
 SKIP_PULL=false
 STOP_LEGACY=true
+AUTO_PRUNE_ON_HIGH_DISK=true
+HIGH_DISK_THRESHOLD=85
 
 for arg in "$@"; do
   case "$arg" in
@@ -19,9 +21,10 @@ for arg in "$@"; do
     --with-prune) RUN_PRUNE=true ;;
     --no-pull) SKIP_PULL=true ;;
     --no-stop-legacy) STOP_LEGACY=false ;;
+    --no-auto-prune) AUTO_PRUNE_ON_HIGH_DISK=false ;;
     *)
       echo "Unknown option: $arg"
-      echo "Usage: ./deploy/update.sh [--force-all] [--with-migrate] [--with-prune] [--no-pull] [--no-stop-legacy]"
+      echo "Usage: ./deploy/update.sh [--force-all] [--with-migrate] [--with-prune] [--no-pull] [--no-stop-legacy] [--no-auto-prune]"
       exit 1
       ;;
   esac
@@ -154,6 +157,16 @@ if [[ "$RUN_PRUNE" == true ]]; then
   echo "Pruning old images/build cache (7 days old only)..."
   docker image prune -f --filter "until=168h"
   docker builder prune -f --filter "unused-for=168h"
+fi
+
+if [[ "$AUTO_PRUNE_ON_HIGH_DISK" == true ]]; then
+  ROOT_USE_PCT="$(df -P / | awk 'NR==2 {gsub("%", "", $5); print $5}')"
+  if [[ -n "$ROOT_USE_PCT" ]] && (( ROOT_USE_PCT >= HIGH_DISK_THRESHOLD )); then
+    echo "Root filesystem at ${ROOT_USE_PCT}% (>= ${HIGH_DISK_THRESHOLD}%). Running safe Docker auto-prune..."
+    # Keep currently running images/containers untouched and trim only dangling image refs + excess build cache.
+    docker image prune -f || true
+    docker builder prune -f --keep-storage 2GB || true
+  fi
 fi
 
 echo "Done. Service status:"
