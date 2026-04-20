@@ -21,6 +21,8 @@ const DEFAULT_ALLOWED_IP_HOSTS = ['138.197.42.104', '10.17.0.5'];
 const DEFAULT_ALLOWED_HOST_PATTERNS: RegExp[] = [
   /^localhost(?::\d+)?$/i,
   /^127\.0\.0\.1(?::\d+)?$/i,
+  /^api(?::\d+)?$/i,
+  /^nexara-api(?::\d+)?$/i,
   /^nexara\.com\.mx(?::\d+)?$/i,
   /^www\.nexara\.com\.mx(?::\d+)?$/i,
   ...DEFAULT_ALLOWED_IP_HOSTS.map((host) => new RegExp(`^${escapeRegex(host)}(?::\\d+)?$`, 'i')),
