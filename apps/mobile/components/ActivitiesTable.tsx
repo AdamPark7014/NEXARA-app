@@ -245,6 +245,7 @@ const ActivitiesTable: React.FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const [nextAn, setNextAn] = useState<string>('');
+  const [nextAnLoaded, setNextAnLoaded] = useState(false);
   const [showOtroModal, setShowOtroModal] = useState(false);
   const [otroModalInput, setOtroModalInput] = useState('');
   const [newActivity, setNewActivity] = useState({
@@ -313,13 +314,22 @@ const ActivitiesTable: React.FC = () => {
   };
 
   const fetchNextAn = () => {
-    if (!user?.token || !hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE)) return;
+    if (!user?.token || !hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE)) {
+      setNextAn('');
+      setNextAnLoaded(true);
+      return;
+    }
+    setNextAnLoaded(false);
     fetch(buildApiUrl('activities/next-an'), {
       headers: { Authorization: `Bearer ${user.token}` },
     })
-      .then((res) => res.ok ? res.json() : null)
-      .then((data) => setNextAn(data?.next || ''))
-      .catch(() => setNextAn(''));
+      .then(async (res) => {
+        if (!res.ok) throw new Error('No se pudo calcular el siguiente AN');
+        return res.json();
+      })
+      .then((data) => setNextAn(typeof data?.next === 'string' ? data.next : ''))
+      .catch(() => setNextAn(''))
+      .finally(() => setNextAnLoaded(true));
   };
 
   const normalizeText = (value?: string | null) => (value || '').toLowerCase().trim();
@@ -740,11 +750,11 @@ const ActivitiesTable: React.FC = () => {
                 <h3 className="activities-subtitle">Asignar actividad</h3>
                 <div className="activities-helper">Solo llena lo esencial y crea rápido. Puedes abrir opciones avanzadas cuando lo necesites.</div>
               </div>
-              <div className="activities-helper">AN sugerido: {nextAn || 'Calculando...'}</div>
+              <div className="activities-helper">AN sugerido: {nextAn || (nextAnLoaded ? 'No disponible' : 'Calculando...')}</div>
             </div>
 
             <div className={`activities-form-primary-grid ${isMobile ? 'is-mobile' : ''}`}>
-              <input className="input" placeholder="AN (auto)" value={nextAn || 'Calculando...'} disabled />
+              <input className="input" placeholder="AN (auto)" value={nextAn || (nextAnLoaded ? 'No disponible' : 'Calculando...')} disabled />
               <input className="input" placeholder="Título *" value={newActivity.titulo} onChange={(e) => setNewActivity({ ...newActivity, titulo: e.target.value })} />
               <select className="input" value={newActivity.activityType} onChange={(e) => setNewActivity({ ...newActivity, activityType: e.target.value as 'CLIENT' | 'INTERNAL', ticketType: 'PREVENTIVO', workType: 'ISSUE' })}>
                 <option value="CLIENT">Actividad para Cliente</option>

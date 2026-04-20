@@ -77,7 +77,34 @@ elif [[ -n "$OLD_REV" && -n "$NEW_REV" && "$OLD_REV" != "$NEW_REV" ]]; then
     build_mobile=true
   fi
 else
-  echo "No new git revision detected. Running safe restart without rebuild."
+  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    LOCAL_CHANGED="$(git status --porcelain --untracked-files=no | awk '{print $2}')"
+    if [[ -n "$LOCAL_CHANGED" ]]; then
+      echo "No new git revision detected. Found local changes; rebuilding only affected services."
+
+      if echo "$LOCAL_CHANGED" | grep -Eq '^(package.json|package-lock.json|\.dockerignore|deploy/docker/|deploy/docker-compose\.nexara\.yml|shared/)'; then
+        build_api=true
+        build_web=true
+        build_mobile=true
+      fi
+
+      if echo "$LOCAL_CHANGED" | grep -Eq '^apps/api/'; then
+        build_api=true
+      fi
+
+      if echo "$LOCAL_CHANGED" | grep -Eq '^apps/web/'; then
+        build_web=true
+      fi
+
+      if echo "$LOCAL_CHANGED" | grep -Eq '^apps/mobile/'; then
+        build_mobile=true
+      fi
+    else
+      echo "No new git revision detected and no local changes. Running safe restart without rebuild."
+    fi
+  else
+    echo "No git metadata available. Running safe restart without rebuild."
+  fi
 fi
 
 cd "$SCRIPT_DIR"

@@ -11,6 +11,14 @@ interface ActivityOption {
   titulo?: string;
 }
 
+const normalizeActivitiesPayload = (data: unknown): ActivityOption[] => {
+  if (Array.isArray(data)) return data as ActivityOption[];
+  if (data && typeof data === 'object' && Array.isArray((data as { data?: unknown }).data)) {
+    return (data as { data: ActivityOption[] }).data;
+  }
+  return [];
+};
+
 const EvidenceUploader = ({ actividadId }: { actividadId?: number }) => {
   const { user } = useUser();
   const [files, setFiles] = useState<{ file: File; url: string; kind: 'image' | 'pdf' }[]>([]);
@@ -29,8 +37,8 @@ const EvidenceUploader = ({ actividadId }: { actividadId?: number }) => {
     fetch(buildApiUrl('activities'), {
       headers: { Authorization: `Bearer ${user.token}` },
     })
-      .then((res) => res.ok ? res.json() : [])
-      .then((data) => setActividades(Array.isArray(data) ? data : []))
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => setActividades(normalizeActivitiesPayload(data)))
       .catch(() => setActividades([]));
   }, [user?.token, actividadId]);
 

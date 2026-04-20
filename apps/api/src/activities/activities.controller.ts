@@ -132,7 +132,7 @@ export class ActivitiesController {
 
   @Get()
   @UseGuards(RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_VIEW] })
+  @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
   async findAll(
     @CurrentUser() user: any,
     @Query() query: PaginationQueryDto,
@@ -155,7 +155,7 @@ export class ActivitiesController {
 
   @Get(':id')
   @UseGuards(RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_VIEW] })
+  @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
   findOne(@Param('id') id: string) {
     return this.activitiesService.findOne(+id);
   }
