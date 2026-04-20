@@ -247,6 +247,7 @@ export function middleware(request: NextRequest) {
       pathname.startsWith('/_next/') ||
       pathname === '/api' ||
       pathname.startsWith('/api/') ||
+      pathname.startsWith('/uploads/') ||
       pathname === '/socket.io' ||
       pathname.startsWith('/socket.io/')
     ) {
