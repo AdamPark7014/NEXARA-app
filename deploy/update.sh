@@ -110,6 +110,23 @@ else
   fi
 fi
 
+# If image tags were removed by prune, force-build missing service images
+# so `up --no-build` does not fail with "No such image".
+if ! docker image inspect nexara-api:latest >/dev/null 2>&1; then
+  echo "Image missing: nexara-api:latest -> forcing api rebuild"
+  build_api=true
+fi
+
+if ! docker image inspect nexara-web:latest >/dev/null 2>&1; then
+  echo "Image missing: nexara-web:latest -> forcing web rebuild"
+  build_web=true
+fi
+
+if ! docker image inspect nexara-mobile:latest >/dev/null 2>&1; then
+  echo "Image missing: nexara-mobile:latest -> forcing mobile rebuild"
+  build_mobile=true
+fi
+
 cd "$SCRIPT_DIR"
 
 if [[ "$STOP_LEGACY" == true ]]; then
