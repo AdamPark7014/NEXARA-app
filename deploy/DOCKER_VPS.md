@@ -84,6 +84,12 @@ chmod +x deploy/update.sh
 ./deploy/update.sh --with-migrate
 ```
 
+Tambien puedes usar el wrapper corto:
+
+```bash
+./deploy/nexara.sh up
+```
+
 Antes de levantar los contenedores, `update.sh` ejecuta `deploy/stop-legacy-host.sh`: detiene y elimina apps **PM2** con nombres típicos (`nexara-api`, `web`, etc.) y apaga unidades **systemd** conocidas (`nexara-api.service`, …) si existían. Así no quedan dos backends (Docker + Node en el host) detrás del mismo dominio.
 
 - Para saltar esa limpieza (p. ej. otro proyecto en PM2 con nombre genérico): `./deploy/update.sh --with-migrate --no-stop-legacy`
@@ -132,23 +138,36 @@ Regla clave: solo un Traefik global por VPS.
 ## 7) Comandos utiles
 
 ```bash
-# Ver servicios
-docker compose --env-file deploy/.env.nexara -f deploy/docker-compose.nexara.yml ps
-
-# Ver logs API
-docker compose --env-file deploy/.env.nexara -f deploy/docker-compose.nexara.yml logs -f api
-
 # Update recomendado (incremental)
-./deploy/update.sh --with-migrate
+./deploy/nexara.sh up
 
-# Forzar rebuild completo cuando sea necesario
-./deploy/update.sh --force-all --with-migrate
+# Update sin git pull
+./deploy/nexara.sh up:fast
 
-# Limpieza moderada (imagenes/cache viejas)
-./deploy/update.sh --with-prune
+# Forzar rebuild completo
+./deploy/nexara.sh rebuild
 
-# Reiniciar solo web
-docker compose --env-file deploy/.env.nexara -f deploy/docker-compose.nexara.yml restart web
+# Ver servicios
+./deploy/nexara.sh ps
+
+# Ver logs api/web/db
+./deploy/nexara.sh logs
+
+# Reiniciar api+web
+./deploy/nexara.sh restart
+
+# Migraciones Prisma one-off
+./deploy/nexara.sh migrate
+
+# Apagar stack
+./deploy/nexara.sh down
+
+# Validar compose + env
+./deploy/nexara.sh validate
+
+# Alternativa npm scripts (si prefieres npm run)
+npm run deploy:up
+npm run deploy:logs
 
 # No usar scripts legacy PM2 (ya redirigen a Docker)
 # bash deploy.sh

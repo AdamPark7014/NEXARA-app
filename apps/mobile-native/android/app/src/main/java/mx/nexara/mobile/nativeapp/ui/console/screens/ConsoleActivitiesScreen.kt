@@ -33,6 +33,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.ActivityDto
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
+import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
 
 data class ActivitiesUiState(
     val isLoading: Boolean = true,
@@ -46,10 +47,19 @@ class ConsoleActivitiesViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _state = MutableStateFlow(ActivitiesUiState())
     val state: StateFlow<ActivitiesUiState> = _state
+    private var activeScope: String? = null
+
+    init {
+        refreshOnModels(
+            models = setOf("Activity", "ActivityEvidence", "ServiceSheet"),
+            refresh = { refresh(scope = activeScope) },
+        )
+    }
 
     fun setQuery(value: String) = _state.update { it.copy(query = value) }
 
     fun refresh(scope: String? = null) {
+        activeScope = scope
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
             try {

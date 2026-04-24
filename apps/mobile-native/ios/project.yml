@@ -1,0 +1,42 @@
+name: NexaraApp
+options:
+  bundleIdPrefix: mx.nexara.mobile
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+
+targets:
+  NexaraApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: NexaraApp
+      - path: Resources/Assets.xcassets
+    info:
+      path: Resources/Info.plist
+      properties:
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        ITSAppUsesNonExemptEncryption: false
+    entitlements:
+      path: Resources/NexaraApp.entitlements
+      properties:
+        aps-environment: development
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: mx.nexara.mobile.NexaraApp
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_ENTITLEMENTS: Resources/NexaraApp.entitlements
+    # Dependencias Firebase se agregan en Xcode vía Swift Package Manager:
+    #   File > Add Packages > https://github.com/firebase/firebase-ios-sdk
+    #   Agregar: FirebaseMessaging, FirebaseAnalytics.
+    # Google Maps iOS NO es necesario: usamos MapKit nativo (sin key).

@@ -33,6 +33,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.VisibleUserDto
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
+import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
 
 data class UsersUiState(
     val isLoading: Boolean = true,
@@ -46,6 +47,13 @@ class ConsoleUsersViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _state = MutableStateFlow(UsersUiState())
     val state: StateFlow<UsersUiState> = _state
+
+    init {
+        refreshOnModels(
+            models = setOf("User", "Role", "Department"),
+            refresh = ::refresh,
+        )
+    }
 
     fun setQuery(value: String) = _state.update { it.copy(query = value) }
 

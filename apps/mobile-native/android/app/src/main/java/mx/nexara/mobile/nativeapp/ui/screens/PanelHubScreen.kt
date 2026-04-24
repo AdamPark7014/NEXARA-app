@@ -14,6 +14,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -28,6 +29,11 @@ fun PanelHubScreen(
     onLogout: () -> Unit,
     contentPadding: PaddingValues = PaddingValues(20.dp),
     onOpenConsole: () -> Unit = {},
+    onOpenTickets: () -> Unit = {},
+    onOpenVentas: () -> Unit = {},
+    onOpenContabilidad: () -> Unit = {},
+    onOpenWeb: () -> Unit = {},
+    onOpenNotifications: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val repo = remember(context) { AuthRepository(context) }
@@ -37,6 +43,8 @@ fun PanelHubScreen(
             role = user?.role ?: "",
             permissions = user?.permissions ?: emptyList(),
             isSuperAdmin = user?.isSuperAdmin ?: false,
+            isClient = user?.isClient ?: false,
+            isBranchUser = user?.isBranchUser ?: false,
         )
     }
 
@@ -92,12 +100,17 @@ fun PanelHubScreen(
                             Spacer(modifier = Modifier.height(10.dp))
                             Button(
                                 onClick = {
-                                    if (panel.key == "console") {
-                                        onOpenConsole()
+                                    when (panel.key) {
+                                        "console" -> onOpenConsole()
+                                        "tickets" -> onOpenTickets()
+                                        "ventas" -> onOpenVentas()
+                                        "contabilidad" -> onOpenContabilidad()
+                                        "web" -> onOpenWeb()
                                     }
                                 },
-                                enabled = panel.key == "console",
-                            ) { Text(if (panel.key == "console") "Abrir" else "Próximamente") }
+                            ) {
+                                Text("Abrir")
+                            }
                         }
                     }
                 }
@@ -105,6 +118,11 @@ fun PanelHubScreen(
         }
 
         Spacer(modifier = Modifier.height(18.dp))
+        OutlinedButton(
+            onClick = onOpenNotifications,
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("Notificaciones") }
+        Spacer(modifier = Modifier.height(10.dp))
         Button(
             onClick = {
                 repo.logout()
@@ -180,8 +198,14 @@ private fun hasPermission(perms: List<String>, required: String, isSuperAdmin: B
     return perms.contains(required)
 }
 
-private fun getAccessiblePanels(role: String, permissions: List<String>, isSuperAdmin: Boolean): List<PanelOption> {
-    if (isClientOrBranchAccount(role, permissions)) {
+private fun getAccessiblePanels(
+    role: String,
+    permissions: List<String>,
+    isSuperAdmin: Boolean,
+    isClient: Boolean,
+    isBranchUser: Boolean,
+): List<PanelOption> {
+    if (isClient || isBranchUser || isClientOrBranchAccount(role, permissions)) {
         return PANEL_ORDER.filter { it.key == "tickets" }
     }
     if (isSuperAdmin) {

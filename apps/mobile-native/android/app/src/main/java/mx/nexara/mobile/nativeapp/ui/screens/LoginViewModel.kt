@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.AuthRepository
+import mx.nexara.mobile.nativeapp.push.PushRegistration
 
 data class LoginUiState(
     val email: String = "",
@@ -38,6 +39,7 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
                 withContext(Dispatchers.IO) {
                     repo.login(snapshot.email.trim(), snapshot.password)
                 }
+                PushRegistration.registerCurrentDeviceAsync(getApplication<Application>().applicationContext)
                 _state.update { it.copy(isLoading = false, error = null) }
                 onLoggedIn()
             } catch (e: Exception) {

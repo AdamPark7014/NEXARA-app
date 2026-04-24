@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">Nexara</string>
-    <string name="title_activity_main">Nexara</string>
-    <string name="package_name">mx.nexara.mobile</string>
-    <string name="custom_url_scheme">mx.nexara.mobile</string>
-</resources>

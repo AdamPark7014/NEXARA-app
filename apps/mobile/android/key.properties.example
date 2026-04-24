@@ -1,6 +1,0 @@
-# Copiar a key.properties (no versionar). Keystore junto a app/build.gradle:
-#   apps/mobile/android/app/tu-release.jks
-storePassword=
-keyPassword=
-keyAlias=nexara
-storeFile=nexara-release.jks

@@ -8,6 +8,7 @@ import okhttp3.Request
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
+import retrofit2.converter.scalars.ScalarsConverterFactory
 import java.util.concurrent.TimeUnit
 
 object ApiClient {
@@ -41,6 +42,7 @@ object ApiClient {
     private fun retrofit(client: OkHttpClient): Retrofit = Retrofit.Builder()
         .baseUrl(BuildConfig.API_BASE_URL.trimEnd('/') + "/")
         .client(client)
+        .addConverterFactory(ScalarsConverterFactory.create())
         .addConverterFactory(MoshiConverterFactory.create(moshi))
         .build()
 
@@ -49,5 +51,6 @@ object ApiClient {
     fun authed(tokenProvider: () -> String?): Retrofit = retrofit(httpClient(tokenProvider))
 
     val auth: AuthApi = retrofitNoAuth.create(AuthApi::class.java)
+    val portalAuth: PortalAuthApi = retrofitNoAuth.create(PortalAuthApi::class.java)
 }
 

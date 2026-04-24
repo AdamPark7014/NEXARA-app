@@ -9,11 +9,17 @@ import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.ui.screens.LoginScreen
 import mx.nexara.mobile.nativeapp.ui.screens.PanelHubScreen
 import androidx.compose.ui.platform.LocalContext
+import mx.nexara.mobile.nativeapp.ui.tickets.TicketsNavHost
 
 private object Routes {
     const val Login = "login"
     const val Panels = "panels"
     const val Console = "console"
+    const val Tickets = "tickets"
+    const val Ventas = "ventas"
+    const val Contabilidad = "contabilidad"
+    const val Web = "web"
+    const val Notifications = "notifications"
 }
 
 @Composable
@@ -51,6 +57,25 @@ fun NexaraApp() {
                         launchSingleTop = true
                     }
                 },
+                onOpenTickets = {
+                    navController.navigate(Routes.Tickets) {
+                        launchSingleTop = true
+                    }
+                },
+                onOpenVentas = {
+                    navController.navigate(Routes.Ventas) { launchSingleTop = true }
+                },
+                onOpenContabilidad = {
+                    navController.navigate(Routes.Contabilidad) { launchSingleTop = true }
+                },
+                onOpenWeb = {
+                    navController.navigate(Routes.Web) { launchSingleTop = true }
+                },
+                onOpenNotifications = {
+                    navController.navigate(Routes.Notifications) {
+                        launchSingleTop = true
+                    }
+                },
             )
         }
 
@@ -62,6 +87,54 @@ fun NexaraApp() {
                         launchSingleTop = true
                     }
                 }
+            )
+        }
+
+        composable(Routes.Tickets) {
+            TicketsNavHost(
+                onExitToPanels = {
+                    navController.navigate(Routes.Panels) {
+                        popUpTo(Routes.Tickets) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
+            )
+        }
+
+        composable(Routes.Notifications) {
+            mx.nexara.mobile.nativeapp.ui.shared.NotificationsScreen(
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.Ventas) {
+            mx.nexara.mobile.nativeapp.ui.ventas.VentasNavHost(
+                onExitToPanels = {
+                    navController.navigate(Routes.Panels) {
+                        popUpTo(Routes.Ventas) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
+            )
+        }
+        composable(Routes.Contabilidad) {
+            mx.nexara.mobile.nativeapp.ui.contabilidad.ContabilidadNavHost(
+                onExitToPanels = {
+                    navController.navigate(Routes.Panels) {
+                        popUpTo(Routes.Contabilidad) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
+            )
+        }
+        composable(Routes.Web) {
+            mx.nexara.mobile.nativeapp.ui.web.WebNavHost(
+                onExitToPanels = {
+                    navController.navigate(Routes.Panels) {
+                        popUpTo(Routes.Web) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
             )
         }
     }

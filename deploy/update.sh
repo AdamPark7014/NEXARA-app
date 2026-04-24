@@ -53,19 +53,18 @@ fi
 
 build_api=false
 build_web=false
-build_mobile=false
+# build_mobile eliminado: apps/mobile descontinuada (app nativa en apps/mobile-native).
 
 if [[ "$FORCE_ALL" == true ]]; then
   build_api=true
   build_web=true
-  build_mobile=true
+  # build_mobile desactivado: apps/mobile descontinuada (app nativa)
 elif [[ -n "$OLD_REV" && -n "$NEW_REV" && "$OLD_REV" != "$NEW_REV" ]]; then
   CHANGED="$(git diff --name-only "$OLD_REV" "$NEW_REV")"
 
   if echo "$CHANGED" | grep -Eq '^(package.json|package-lock.json|\.dockerignore|deploy/docker/|deploy/docker-compose\.nexara\.yml|shared/)'; then
     build_api=true
     build_web=true
-    build_mobile=true
   fi
 
   if echo "$CHANGED" | grep -Eq '^apps/api/'; then
@@ -76,9 +75,7 @@ elif [[ -n "$OLD_REV" && -n "$NEW_REV" && "$OLD_REV" != "$NEW_REV" ]]; then
     build_web=true
   fi
 
-  if echo "$CHANGED" | grep -Eq '^apps/mobile/'; then
-    build_mobile=true
-  fi
+  # apps/mobile deprecado: cambios ahí ya no forzan rebuild.
 else
   if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     LOCAL_CHANGED="$(git status --porcelain --untracked-files=no | awk '{print $2}')"
@@ -88,7 +85,6 @@ else
       if echo "$LOCAL_CHANGED" | grep -Eq '^(package.json|package-lock.json|\.dockerignore|deploy/docker/|deploy/docker-compose\.nexara\.yml|shared/)'; then
         build_api=true
         build_web=true
-        build_mobile=true
       fi
 
       if echo "$LOCAL_CHANGED" | grep -Eq '^apps/api/'; then
@@ -97,10 +93,6 @@ else
 
       if echo "$LOCAL_CHANGED" | grep -Eq '^apps/web/'; then
         build_web=true
-      fi
-
-      if echo "$LOCAL_CHANGED" | grep -Eq '^apps/mobile/'; then
-        build_mobile=true
       fi
     else
       echo "No new git revision detected and no local changes. Running safe restart without rebuild."
@@ -122,10 +114,7 @@ if ! docker image inspect nexara-web:latest >/dev/null 2>&1; then
   build_web=true
 fi
 
-if ! docker image inspect nexara-mobile:latest >/dev/null 2>&1; then
-  echo "Image missing: nexara-mobile:latest -> forcing mobile rebuild"
-  build_mobile=true
-fi
+# nexara-mobile image removed: app móvil ahora es nativa (apps/mobile-native).
 
 cd "$SCRIPT_DIR"
 
@@ -143,14 +132,11 @@ if [[ "$build_web" == true ]]; then
   DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build web
 fi
 
-if [[ "$build_mobile" == true ]]; then
-  echo "Building mobile image..."
-  DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build mobile
-fi
+# build mobile omitido: servicio deprecado.
 
 echo "Starting services..."
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --remove-orphans db
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --remove-orphans --no-build api web mobile
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --remove-orphans --no-build api web
 
 if [[ "$RUN_MIGRATE" == true ]]; then
   echo "Running Prisma migrate deploy..."

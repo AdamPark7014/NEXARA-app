@@ -110,40 +110,6 @@ services:
       - internal
       - proxy
 
-  mobile:
-    build:
-      context: ..
-      dockerfile: deploy/docker/Dockerfile.mobile
-      args:
-        NEXT_PUBLIC_API_URL: ${MOBILE_NEXT_PUBLIC_API_URL}
-        NEXT_PUBLIC_SOCKET_URL: ${MOBILE_NEXT_PUBLIC_SOCKET_URL}
-        NEXT_PUBLIC_BASE_URL: ${MOBILE_NEXT_PUBLIC_BASE_URL}
-        NEXT_PUBLIC_API_ASSET_ORIGIN: ${MOBILE_NEXT_PUBLIC_API_ASSET_ORIGIN}
-        NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API: ${MOBILE_NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API}
-        NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${MOBILE_NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
-        NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID: ${MOBILE_NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID}
-    container_name: nexara-mobile
-    restart: unless-stopped
-    environment:
-      NODE_ENV: production
-      NEXT_PUBLIC_API_URL: ${MOBILE_NEXT_PUBLIC_API_URL}
-      NEXT_PUBLIC_SOCKET_URL: ${MOBILE_NEXT_PUBLIC_SOCKET_URL}
-      NEXT_PUBLIC_BASE_URL: ${MOBILE_NEXT_PUBLIC_BASE_URL}
-      NEXT_PUBLIC_API_ASSET_ORIGIN: ${MOBILE_NEXT_PUBLIC_API_ASSET_ORIGIN}
-      NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API: ${MOBILE_NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API}
-      NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${MOBILE_NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
-      NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID: ${MOBILE_NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID}
-    labels:
-      - traefik.enable=true
-      - traefik.docker.network=proxy
-      - traefik.http.routers.nexara-mobile.rule=Host(`${MOBILE_DOMAIN}`)
-      - traefik.http.routers.nexara-mobile.entrypoints=websecure
-      - traefik.http.routers.nexara-mobile.tls.certresolver=letsencrypt
-      - traefik.http.services.nexara-mobile.loadbalancer.server.port=3002
-    networks:
-      - internal
-      - proxy
-
 volumes:
   nexara-postgres-data:
 

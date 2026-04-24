@@ -129,6 +129,35 @@ export class BranchPortalController {
     });
   }
 
+  @Get('tickets/:id')
+  async ticket(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number) {
+    const branch = await this.prisma['serviceClientBranch'].findFirst({
+      where: { id: user.branchId, clientId: user.clientId },
+      select: { name: true, branchNumber: true },
+    });
+
+    const branchScope: any[] = [
+      { clientTicketRequest: { is: { branchId: user.branchId } } },
+    ];
+
+    if (branch?.branchNumber) {
+      branchScope.push({ branchNumber: branch.branchNumber });
+    }
+
+    if (branch?.name) {
+      branchScope.push({ branchName: branch.name });
+    }
+
+    return this.prisma['activity'].findFirst({
+      where: {
+        id,
+        clientId: user.clientId,
+        OR: branchScope,
+      },
+      include: { responsable: true, evidencias: true, serviceSheet: true, activityEvidence: true },
+    });
+  }
+
   @Get('tickets/:id/report')
   async ticketReport(
     @CurrentUser() user: any,
