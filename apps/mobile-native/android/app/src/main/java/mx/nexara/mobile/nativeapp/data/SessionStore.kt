@@ -13,6 +13,10 @@ data class SessionUser(
     val token: String,
     val permissions: List<String> = emptyList(),
     val isSuperAdmin: Boolean = false,
+    val isClient: Boolean = false,
+    val isBranchUser: Boolean = false,
+    val clientId: Long? = null,
+    val branchId: Long? = null,
 )
 
 class SessionStore(context: Context) {
@@ -37,6 +41,10 @@ class SessionStore(context: Context) {
         val department = prefs.getString("department", "") ?: ""
         val perms = prefs.getString("permissions_csv", "")?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList()
         val isSuperAdmin = prefs.getBoolean("is_super_admin", false)
+        val isClient = prefs.getBoolean("is_client", false)
+        val isBranchUser = prefs.getBoolean("is_branch_user", false)
+        val clientId = prefs.getLong("client_id", 0L).takeIf { it > 0L }
+        val branchId = prefs.getLong("branch_id", 0L).takeIf { it > 0L }
         return SessionUser(
             id = id,
             nombre = nombre,
@@ -46,6 +54,10 @@ class SessionStore(context: Context) {
             token = token,
             permissions = perms,
             isSuperAdmin = isSuperAdmin,
+            isClient = isClient,
+            isBranchUser = isBranchUser,
+            clientId = clientId,
+            branchId = branchId,
         )
     }
 
@@ -59,6 +71,10 @@ class SessionStore(context: Context) {
             .putString("token", user.token)
             .putString("permissions_csv", user.permissions.joinToString(","))
             .putBoolean("is_super_admin", user.isSuperAdmin)
+            .putBoolean("is_client", user.isClient)
+            .putBoolean("is_branch_user", user.isBranchUser)
+            .putLong("client_id", user.clientId ?: 0L)
+            .putLong("branch_id", user.branchId ?: 0L)
             .apply()
     }
 

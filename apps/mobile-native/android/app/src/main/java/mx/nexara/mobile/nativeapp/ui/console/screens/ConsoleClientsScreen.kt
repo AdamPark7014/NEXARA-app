@@ -50,6 +50,7 @@ import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.ActivityDetailedDto
 import mx.nexara.mobile.nativeapp.data.api.InventorySnapshotDto
 import mx.nexara.mobile.nativeapp.data.api.ServiceClientDto
+import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
 import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.ui.util.downloadAuthedToCache
@@ -148,6 +149,23 @@ class ConsoleClientsViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ConsoleRepository(app.applicationContext)
     private val _state = MutableStateFlow(ConsoleClientsUiState())
     val state: StateFlow<ConsoleClientsUiState> = _state
+    private var activeDataTab: Int = 0
+
+    init {
+        refreshOnModels(
+            models = setOf(
+                "ServiceClient",
+                "ServiceClientBranch",
+                "Activity",
+                "ClientTicketRequest",
+                "InventorySnapshot",
+                "InventoryItem",
+            ),
+            refresh = {
+                if (activeDataTab == 0) refreshAll() else refreshTicketsData()
+            },
+        )
+    }
 
     fun setTab(i: Int) = _state.update { it.copy(activeTab = i) }
     fun setExpandedClient(id: Long?) = _state.update { it.copy(expandedClientId = id) }
@@ -199,6 +217,7 @@ class ConsoleClientsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun refreshAll() {
+        activeDataTab = 0
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
             try {
@@ -211,6 +230,7 @@ class ConsoleClientsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun refreshTicketsData() {
+        activeDataTab = 1
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
             try {

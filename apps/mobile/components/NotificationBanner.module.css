@@ -1,1 +1,0 @@
-.banner {  position: fixed;  top: 0;  left: 0;  right: 0;  background: var(--primary);  color: var(--surface);  padding: 12px;  text-align: center;  z-index: 1000;  font-weight: 600;  letter-spacing: 1px;  box-shadow: 0 2px 8px var(--shadow);}

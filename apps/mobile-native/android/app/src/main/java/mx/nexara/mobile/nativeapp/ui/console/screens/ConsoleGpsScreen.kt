@@ -37,6 +37,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.GpsLocationDto
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
+import mx.nexara.mobile.nativeapp.ui.common.MapPin
+import mx.nexara.mobile.nativeapp.ui.common.NexaraMap
 import mx.nexara.mobile.nativeapp.ui.util.openExternalUrl
 
 data class GpsUiState(
@@ -144,6 +146,27 @@ fun ConsoleGpsScreen(
         val all = buildList {
             state.myLocation?.let { add(it) }
             addAll(state.team)
+        }
+
+        val pins = all.mapNotNull { loc ->
+            val lat = loc.latitud.toString().toDoubleOrNull() ?: return@mapNotNull null
+            val lng = loc.longitud.toString().toDoubleOrNull() ?: return@mapNotNull null
+            MapPin(
+                id = loc.usuarioId.toString(),
+                lat = lat,
+                lng = lng,
+                title = loc.usuario?.nombre ?: "Usuario ${loc.usuarioId}",
+                snippet = "$lat, $lng",
+            )
+        }
+
+        if (pins.isNotEmpty()) {
+            NexaraMap(
+                pins = pins,
+                modifier = Modifier.fillMaxWidth().height(260.dp),
+                height = 260.dp,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
         }
 
         LazyColumn(

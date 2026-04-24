@@ -31,10 +31,17 @@ import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleToolMyKitScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleToolRenewalsScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleToolsScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleToolsKitsUsersScreen
+import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleSettingsScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleUsersScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleViaticsScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleVehiclesScreen
+import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleMoreScreen
+import mx.nexara.mobile.nativeapp.ui.console.screens.MyProfileScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.PlaceholderScreen
+import mx.nexara.mobile.nativeapp.ui.catalog.ModuleCatalog
+import mx.nexara.mobile.nativeapp.ui.console.screens.userCanManageSystemSettings
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.unit.dp
 
 private object ConsoleRoutes {
     const val Dashboard = "console/dashboard"
@@ -55,6 +62,10 @@ private object ConsoleRoutes {
     const val Users = "console/users"
     const val Attendance = "console/attendance"
     const val Settings = "console/settings"
+    const val More = "console/more"
+    const val MyProfile = "console/my-profile"
+    const val ModulePattern = "console/m/{key}"
+    fun module(key: String) = "console/m/$key"
 }
 
 data class ConsoleNavItem(
@@ -74,9 +85,13 @@ fun ConsoleNavHost(
     val roleLower = (user?.role ?: "").lowercase()
     val isSuperAdmin = user?.isSuperAdmin == true
     val isIngeniero = !isSuperAdmin && roleLower.contains("ingenier")
+    val canManageSettings = userCanManageSystemSettings(
+        isSuperAdmin = isSuperAdmin,
+        permissions = user?.permissions ?: emptyList(),
+    )
 
     val navController = rememberNavController()
-    val items = remember(isIngeniero, isSuperAdmin) {
+    val items = remember(isIngeniero, isSuperAdmin, canManageSettings) {
         buildList {
             add(ConsoleNavItem(ConsoleRoutes.Dashboard, "Inicio", "📊"))
             if (isIngeniero) {
@@ -106,7 +121,10 @@ fun ConsoleNavHost(
                 add(ConsoleNavItem(ConsoleRoutes.Users, "Usuarios", "🧑‍💼"))
             }
             add(ConsoleNavItem(ConsoleRoutes.Attendance, "Asistencia", "🕒"))
-            add(ConsoleNavItem(ConsoleRoutes.Settings, "Ajustes", "⚙️"))
+            if (canManageSettings) {
+                add(ConsoleNavItem(ConsoleRoutes.Settings, "Ajustes", "⚙️"))
+            }
+            add(ConsoleNavItem(ConsoleRoutes.More, "Más", "🧭"))
         }
     }
 
@@ -125,7 +143,9 @@ fun ConsoleNavHost(
             ConsoleRoutes.Tools -> "Herramientas"
             ConsoleRoutes.Users -> "Gestión de usuarios"
             ConsoleRoutes.Attendance -> "Asistencia y jornadas"
-            ConsoleRoutes.Settings -> "Configuración del sistema"
+            ConsoleRoutes.Settings -> "Ajustes del sistema"
+            ConsoleRoutes.More -> "Todos los módulos"
+            ConsoleRoutes.MyProfile -> "Mi perfil"
             else -> "Consola"
         }
     }
@@ -221,11 +241,98 @@ fun ConsoleNavHost(
                 ConsoleAttendanceScreen()
             }
             composable(ConsoleRoutes.Settings) {
+                ConsoleSettingsScreen(onExitToPanels = onExitToPanels)
+            }
+            composable(ConsoleRoutes.More) {
+                ConsoleMoreScreen(
+                    onOpenModule = { m ->
+                        val target = when (m.key) {
+                            "dashboard" -> ConsoleRoutes.Dashboard
+                            "activities" -> ConsoleRoutes.Activities
+                            "my-activities" -> ConsoleRoutes.MyActivities
+                            "evidences" -> ConsoleRoutes.Evidences
+                            "my-evidences" -> ConsoleRoutes.MyEvidences
+                            "viatics" -> ConsoleRoutes.Viatics
+                            "vehicles" -> ConsoleRoutes.Vehicles
+                            "gps" -> ConsoleRoutes.Gps
+                            "tools" -> ConsoleRoutes.Tools
+                            "clients" -> ConsoleRoutes.Clients
+                            "projects" -> ConsoleRoutes.Projects
+                            "users" -> ConsoleRoutes.Users
+                            "attendance" -> ConsoleRoutes.Attendance
+                            "settings" -> ConsoleRoutes.Settings
+                            "my-profile" -> ConsoleRoutes.MyProfile
+                            else -> ConsoleRoutes.module(m.key)
+                        }
+                        navController.navigate(target) { launchSingleTop = true }
+                    }
+                )
+            }
+            composable(ConsoleRoutes.MyProfile) {
+                MyProfileScreen()
+            }
+            composable(ConsoleRoutes.ModulePattern) { backStack ->
+                val key = backStack.arguments?.getString("key").orEmpty()
+                val m = ModuleCatalog.console.firstOrNull { it.key == key }
+                // Despachar a pantallas nativas ya implementadas para este módulo.
+                val handled: @androidx.compose.runtime.Composable () -> Unit = when (key) {
+                    "news" -> { { mx.nexara.mobile.nativeapp.ui.modules.NewsModuleScreen() } }
+                    "contact-messages" -> { { mx.nexara.mobile.nativeapp.ui.modules.ContactMessagesModuleScreen() } }
+                    "newsletter" -> { { mx.nexara.mobile.nativeapp.ui.modules.NewsletterModuleScreen() } }
+                    "audit" -> { { mx.nexara.mobile.nativeapp.ui.modules.AuditModuleScreen() } }
+                    "analytics" -> { { mx.nexara.mobile.nativeapp.ui.modules.AnalyticsModuleScreen() } }
+                    "expenses" -> { { mx.nexara.mobile.nativeapp.ui.modules.ExpensesModuleScreen() } }
+                    "fines" -> { { mx.nexara.mobile.nativeapp.ui.modules.FinesModuleScreen() } }
+                    "employee-payments" -> { { mx.nexara.mobile.nativeapp.ui.modules.EmployeePaymentsModuleScreen() } }
+                    "cotizaciones" -> { { mx.nexara.mobile.nativeapp.ui.modules.CotizacionesModuleScreen() } }
+                    "lunch-breaks" -> { { mx.nexara.mobile.nativeapp.ui.modules.LunchBreaksModuleScreen() } }
+                    "my-lunch-breaks" -> { { mx.nexara.mobile.nativeapp.ui.modules.MyLunchBreaksModuleScreen(
+                        currentUserId = authRepo.loadSession()?.id,
+                    ) } }
+                    "documents" -> { { mx.nexara.mobile.nativeapp.ui.modules.DocumentsModuleScreen() } }
+                    "accounting" -> { { mx.nexara.mobile.nativeapp.ui.modules.AccountingModuleScreen() } }
+                    "invoicing" -> { { mx.nexara.mobile.nativeapp.ui.modules.InvoicingModuleScreen() } }
+                    "banking" -> { { mx.nexara.mobile.nativeapp.ui.modules.BankingModuleScreen() } }
+                    "workflow" -> { { mx.nexara.mobile.nativeapp.ui.modules.WorkflowModuleScreen() } }
+                    "my-viatics" -> { { mx.nexara.mobile.nativeapp.ui.modules.MyViaticsScreen() } }
+                    "my-vehicles" -> { { mx.nexara.mobile.nativeapp.ui.modules.MyVehiclesScreen() } }
+                    "my-preferences" -> { { mx.nexara.mobile.nativeapp.ui.modules.MyPreferencesScreen() } }
+                    "service-clients" -> { { mx.nexara.mobile.nativeapp.ui.modules.ServiceClientsModuleScreen() } }
+                    "work-projects" -> { { mx.nexara.mobile.nativeapp.ui.modules.WorkProjectsModuleScreen() } }
+                    "hr" -> { { mx.nexara.mobile.nativeapp.ui.modules.HrModuleScreen() } }
+                    "safety" -> { { mx.nexara.mobile.nativeapp.ui.modules.SafetyModuleScreen() } }
+                    "warehouse" -> { { mx.nexara.mobile.nativeapp.ui.modules.WarehouseModuleScreen() } }
+                    "stock" -> { { mx.nexara.mobile.nativeapp.ui.modules.StockModuleScreen() } }
+                    "procurement" -> { { mx.nexara.mobile.nativeapp.ui.modules.ProcurementModuleScreen() } }
+                    "manufacturing" -> { { mx.nexara.mobile.nativeapp.ui.modules.ManufacturingModuleScreen() } }
+                    "production" -> { { mx.nexara.mobile.nativeapp.ui.modules.ProductionModuleScreen() } }
+                    "maintenance" -> { { mx.nexara.mobile.nativeapp.ui.modules.MaintenanceModuleScreen() } }
+                    "assets" -> { { mx.nexara.mobile.nativeapp.ui.modules.AssetsModuleScreen() } }
+                    "quality" -> { { mx.nexara.mobile.nativeapp.ui.modules.QualityModuleScreen() } }
+                    "service-sheets" -> { { mx.nexara.mobile.nativeapp.ui.modules.ServiceSheetsModuleScreen() } }
+                    "cvs" -> { { mx.nexara.mobile.nativeapp.ui.modules.CvsModuleScreen() } }
+                    "client-tickets" -> { { mx.nexara.mobile.nativeapp.ui.modules.ClientTicketsModuleScreen() } }
+                    "gestion-vendedores" -> { { mx.nexara.mobile.nativeapp.ui.modules.ClientTicketsModuleScreen() } }
+                    else -> { {} }
+                }
+                if (key in setOf(
+                        "news","contact-messages","newsletter","audit","analytics","expenses",
+                        "fines","employee-payments","cotizaciones","lunch-breaks","my-lunch-breaks",
+                        "documents","accounting","invoicing","banking","workflow","my-viatics",
+                        "my-vehicles","my-preferences","service-clients","work-projects",
+                        "hr","safety","warehouse","stock","procurement","manufacturing","production",
+                        "maintenance","assets","quality","service-sheets","cvs","client-tickets",
+                        "gestion-vendedores",
+                    )) {
+                    handled()
+                    return@composable
+                }
                 PlaceholderScreen(
-                    title = "Ajustes",
-                    subtitle = "Migración en progreso",
-                    primaryActionText = "Salir a paneles",
-                    onPrimaryAction = onExitToPanels,
+                    title = m?.label ?: "Módulo",
+                    subtitle = (m?.webPath ?: "") + "\n\nImplementación nativa pendiente.",
+                    contentPadding = PaddingValues(20.dp),
+                    primaryActionText = "Volver",
+                    onPrimaryAction = { navController.popBackStack() },
                 )
             }
         }

@@ -35,6 +35,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.ActivityEvidenceRowDto
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
+import mx.nexara.mobile.nativeapp.data.realtime.refreshOnModels
 import mx.nexara.mobile.nativeapp.ui.util.openExternalUrl
 
 data class EvidencesUiState(
@@ -49,10 +50,19 @@ class ConsoleEvidencesViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _state = MutableStateFlow(EvidencesUiState())
     val state: StateFlow<EvidencesUiState> = _state
+    private var activeMode: String = "admin"
+
+    init {
+        refreshOnModels(
+            models = setOf("ActivityEvidence", "ServiceSheet", "Activity"),
+            refresh = { refresh(mode = activeMode) },
+        )
+    }
 
     fun setQuery(value: String) = _state.update { it.copy(query = value) }
 
     fun refresh(mode: String) {
+        activeMode = mode
         _state.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
             try {

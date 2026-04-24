@@ -323,6 +323,21 @@ interface ConsoleApi {
         @Path("id") projectId: Long,
         @Path("engineerId") engineerId: Long,
     ): okhttp3.ResponseBody
+
+    // ── System settings (console.admin) ─────────────────────────────────────
+
+    @GET("settings")
+    suspend fun getSettings(): List<SystemSettingDto>
+
+    @retrofit2.http.PUT("settings")
+    suspend fun upsertSetting(
+        @retrofit2.http.Body body: UpsertSettingBody,
+    ): SystemSettingDto
+
+    @retrofit2.http.DELETE("settings/{key}")
+    suspend fun deleteSetting(
+        @Path("key") key: String,
+    ): okhttp3.ResponseBody
 }
 
 data class CreateOperationalProjectRequest(
@@ -760,5 +775,22 @@ data class ToolRenewalDto(
 
 data class ToolRenewalRejectRequest(
     val reason: String,
+)
+
+data class SystemSettingDto(
+    val id: Int,
+    val key: String,
+    val value: String,
+    val category: String,
+    val label: String? = null,
+    val createdAt: String? = null,
+    val updatedAt: String? = null,
+)
+
+data class UpsertSettingBody(
+    val key: String,
+    val value: String,
+    val category: String,
+    val label: String? = null,
 )
 

@@ -258,5 +258,21 @@ class ConsoleRepository(context: Context) {
 
     suspend fun removeProjectEngineer(projectId: Long, engineerId: Long) =
         api.removeOperationalProjectEngineer(projectId = projectId, engineerId = engineerId)
+
+    suspend fun settingsList() = api.getSettings()
+
+    suspend fun settingsUpsert(key: String, value: String, category: String, label: String?) =
+        api.upsertSetting(
+            mx.nexara.mobile.nativeapp.data.api.UpsertSettingBody(
+                key = key,
+                value = value,
+                category = category,
+                label = label?.takeIf { it.isNotBlank() },
+            ),
+        )
+
+    suspend fun settingsDelete(key: String) {
+        api.deleteSetting(key)
+    }
 }
 

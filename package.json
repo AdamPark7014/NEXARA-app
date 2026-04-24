@@ -3,8 +3,7 @@
   "private": true,
   "workspaces": [
     "apps/api",
-    "apps/web",
-    "apps/mobile"
+    "apps/web"
   ],
   "devDependencies": {
     "@types/express": "^5.0.6",
@@ -14,29 +13,34 @@
     "turbo": "^1.13.0"
   },
   "scripts": {
-    "dev": "turbo run dev --parallel --filter=api --filter=web --filter=mobile-web",
-    "dev:all": "turbo run dev --parallel --filter=api --filter=web --filter=mobile-web",
+    "dev": "turbo run dev --parallel --filter=api --filter=web",
+    "dev:all": "turbo run dev --parallel --filter=api --filter=web",
     "dev:web": "npm run dev --workspace=apps/web",
     "dev:api": "npm run dev --workspace=apps/api",
-    "dev:mobile": "npm run dev --workspace=apps/mobile",
     "clean:cache": "node scripts/clear-build-cache.js root",
     "prebuild": "npm run clean:cache",
-    "build": "turbo run build --concurrency=1 --filter=api --filter=web --filter=mobile-web",
-    "build:parallel": "turbo run build --filter=api --filter=web --filter=mobile-web",
+    "build": "turbo run build --concurrency=1 --filter=api --filter=web",
+    "build:parallel": "turbo run build --filter=api --filter=web",
     "build:api": "npm run build --workspace=apps/api",
     "build:web": "npm run build --workspace=apps/web",
-    "build:mobile": "npm run build --workspace=apps/mobile",
     "build:web:lowmem": "npm run build:lowmem --workspace=apps/web",
-    "mobile:cap:sync": "npm run -w apps/mobile cap:build:shell",
-    "mobile:cap:sync:prod": "npm run -w apps/mobile cap:build:prod",
-    "mobile:cap:android": "npm run -w apps/mobile cap:android:prod",
-    "mobile:cap:ios": "npm run -w apps/mobile cap:ios:prod",
-    "build:server": "npm run clean:cache && npm run build:api && npm run build:web && npm run build:mobile",
-    "build:server:lowmem": "npm run clean:cache && npm run build:api && npm run build:web:lowmem && npm run build:mobile",
+    "build:server": "npm run clean:cache && npm run build:api && npm run build:web",
+    "build:server:lowmem": "npm run clean:cache && npm run build:api && npm run build:web:lowmem",
     "start": "turbo run start",
     "local:setup": "npm run prisma:generate --workspace=apps/api && npm run prisma:deploy --workspace=apps/api && npm run prisma:seed --workspace=apps/api",
     "local:status": "npm run prisma:status --workspace=apps/api",
-    "local:dev": "turbo run dev --parallel"
+    "local:dev": "turbo run dev --parallel",
+    "deploy:up": "bash deploy/nexara.sh up",
+    "deploy:up:fast": "bash deploy/nexara.sh up:fast",
+    "deploy:rebuild": "bash deploy/nexara.sh rebuild",
+    "deploy:ps": "bash deploy/nexara.sh ps",
+    "deploy:logs": "bash deploy/nexara.sh logs",
+    "deploy:restart": "bash deploy/nexara.sh restart",
+    "deploy:down": "bash deploy/nexara.sh down",
+    "deploy:migrate": "bash deploy/nexara.sh migrate",
+    "deploy:validate": "bash deploy/nexara.sh validate",
+    "apk:install": "pwsh -ExecutionPolicy Bypass -File scripts/install-apk-windows.ps1",
+    "apk:build-install": "pwsh -ExecutionPolicy Bypass -File scripts/install-apk-windows.ps1 -Build"
   },
   "dependencies": {
     "@nestjs/jwt": "^10.0.0",
