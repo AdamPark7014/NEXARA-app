@@ -22,7 +22,7 @@ import { ActivitiesService } from './activities.service.js';
 import { UsersService } from '../users/users.service.js';
 import { CreateActivityDto } from './dto/create-activity.dto.js';
 import { UpdateActivityDto } from './dto/update-activity.dto.js';
-import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
+import { GetActivitiesQueryDto } from './dto/get-activities-query.dto.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
 import { ExcelImportService } from '../common/excel-import.service.js';
@@ -135,9 +135,10 @@ export class ActivitiesController {
   @RBAC({ anyPermissions: [PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
   async findAll(
     @CurrentUser() user: any,
-    @Query() query: PaginationQueryDto,
-    @Query('scope') scope?: string,
+    @Query() query: GetActivitiesQueryDto,
   ) {
+    const { scope } = query;
+
     if (scope === 'mine') {
       return this.activitiesService.findByResponsible(user.id);
     }
