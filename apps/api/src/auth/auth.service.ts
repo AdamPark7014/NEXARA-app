@@ -241,6 +241,29 @@ export class AuthService {
     return Array.from(new Set(permissions));
   }
 
+  private mapSessionUser(user: any, permissions: string[], isSuperAdmin: boolean, loginDevice?: string) {
+    return {
+      id: user.id,
+      nombre: user.nombre,
+      email: user.email,
+      role: user.role?.nombre ?? '',
+      roleId: user.roleId,
+      roleFlags: {
+        accesoConsole: Boolean(user.role?.accesoConsole),
+        accesoConsoleAdmin: Boolean(user.role?.accesoConsoleAdmin),
+        accesoGestionCvs: Boolean(user.role?.accesoGestionCvs),
+        accesoPanelVentas: Boolean(user.role?.accesoPanelVentas),
+        accesoCotizaciones: Boolean(user.role?.accesoCotizaciones),
+      },
+      department: user.department?.nombre ?? '',
+      departmentId: user.departmentId,
+      permissions,
+      isSuperAdmin,
+      avatarUrl: user.avatarUrl,
+      ...(loginDevice ? { loginDevice } : {}),
+    };
+  }
+
   private async createLoginNotification(userId: number, detectedDevice: string) {
     const baseData = {
       userId,
@@ -323,26 +346,22 @@ export class AuthService {
       access_token: this.jwtService.sign(payload),
       loginDevice: detectedDevice,
       loginGreeting: `Hola ${user.nombre}, bienvenido de nuevo. Accediste desde ${detectedDevice}.`,
-      user: {
-        id: user.id,
-        nombre: user.nombre,
-        email: user.email,
-        role: user.role?.nombre ?? '',
-        roleId: user.roleId,
-        roleFlags: {
-          accesoConsole: Boolean(user.role?.accesoConsole),
-          accesoConsoleAdmin: Boolean(user.role?.accesoConsoleAdmin),
-          accesoGestionCvs: Boolean(user.role?.accesoGestionCvs),
-          accesoPanelVentas: Boolean(user.role?.accesoPanelVentas),
-          accesoCotizaciones: Boolean(user.role?.accesoCotizaciones),
-        },
-        department: user.department?.nombre ?? '',
-        departmentId: user.departmentId,
-        permissions,
-        isSuperAdmin,
-        avatarUrl: user.avatarUrl,
-        loginDevice: detectedDevice,
-      },
+      user: this.mapSessionUser(user, permissions, isSuperAdmin, detectedDevice),
     };
+  }
+
+  async getProfile(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true, department: true },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Usuario inactivo o inexistente');
+    }
+
+    const isSuperAdmin = this.isSuperAdmin(user.email);
+    const permissions = this.buildPermissions(user.role, isSuperAdmin);
+    return this.mapSessionUser(user, permissions, isSuperAdmin);
   }
 }

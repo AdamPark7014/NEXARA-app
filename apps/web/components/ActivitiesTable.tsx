@@ -234,7 +234,7 @@ const ActivitiesTable: React.FC = () => {
       .finally(() => setLoading(false));
   };
 
-  const [assignableUsers, setAssignableUsers] = useState<{ id: number; nombre: string; role?: { nombre: string } }[]>([]);
+  const [assignableUsers, setAssignableUsers] = useState<{ id: number; nombre: string; email?: string; role?: { nombre: string } }[]>([]);
   const [clients, setClients] = useState<{ id: number; name: string; logoUrl?: string | null }[]>([]);
   const [operationalProjects, setOperationalProjects] = useState<{ id: number; title: string; status: string; client: { id: number; name: string } }[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
@@ -783,7 +783,7 @@ const ActivitiesTable: React.FC = () => {
                 <option value="">Responsable</option>
                 {assignableUsers.map((u) => (
                   <option key={u.id} value={u.id}>
-                    {u.nombre} {u.role?.nombre ? `(${u.role?.nombre})` : ''}
+                    {u.nombre}{u.email ? ` - ${u.email}` : ''}{u.role?.nombre ? ` (${u.role?.nombre})` : ''}
                   </option>
                 ))}
               </select>
