@@ -22,6 +22,14 @@ const normalizeSocketOrigin = (baseUrl: string) => {
 };
 
 export const getApiBase = () => {
+  // Server-side: use internal Docker network URL if set (avoids hairpin NAT through Traefik)
+  if (typeof window === "undefined") {
+    const internalUrl = process.env.API_INTERNAL_URL;
+    if (internalUrl && internalUrl.trim()) {
+      return ensureApiBase(internalUrl.trim());
+    }
+  }
+
   const envBase = process.env.NEXT_PUBLIC_API_URL;
 
   if (typeof window !== "undefined" && window.location?.origin) {

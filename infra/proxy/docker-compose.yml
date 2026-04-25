@@ -6,6 +6,7 @@ services:
     command:
       - --api.dashboard=true
       - --providers.docker=true
+      - --providers.docker.network=proxy
       - --providers.docker.exposedbydefault=false
       - --entrypoints.web.address=:80
       - --entrypoints.web.http.redirections.entryPoint.to=websecure
