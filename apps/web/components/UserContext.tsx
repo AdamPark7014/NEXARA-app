@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { clearActivePanel } from '@/lib/panel-routing';
 import { isCapacitorNative } from '@/lib/capacitor-env';
+import { buildApiUrl } from '@/lib/api-base';
 
 export interface User {
 	id: number;
@@ -157,6 +158,46 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 	const [isContextReady, setIsContextReady] = useState(false);
 
 	useEffect(() => {
+		let cancelled = false;
+
+		const syncProfile = async (storedUser: User) => {
+			try {
+				const response = await fetch(buildApiUrl('auth/profile'), {
+					headers: { Authorization: `Bearer ${storedUser.token}` },
+					cache: 'no-store',
+				});
+
+				if (cancelled) return;
+
+				if (response.status === 401 || response.status === 403) {
+					safePersistUser(null);
+					setUser(null);
+					return;
+				}
+
+				if (!response.ok) return;
+
+				const profile = await response.json();
+				if (cancelled) return;
+
+				const normalizedProfile = normalizeUser({
+					...profile,
+					token: storedUser.token,
+					loginDevice: storedUser.loginDevice,
+				});
+
+				if (normalizedProfile) {
+					setUser((prev) => {
+						if (!prev) return normalizedProfile;
+						if (prev.token !== storedUser.token) return prev;
+						return normalizedProfile;
+					});
+				}
+			} catch {
+				// Keep local session user if profile sync fails transiently.
+			}
+		};
+
 		const storedUser = safeGetStoredUser();
 		const online = typeof navigator !== "undefined" && navigator.onLine;
 		if (storedUser) {
@@ -168,9 +209,16 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 				}
 			} else {
 				setUser(storedUser);
+				if (online) {
+					void syncProfile(storedUser);
+				}
 			}
 		}
 		setIsContextReady(true);
+
+		return () => {
+			cancelled = true;
+		};
 	}, []);
 
 	useEffect(() => {
