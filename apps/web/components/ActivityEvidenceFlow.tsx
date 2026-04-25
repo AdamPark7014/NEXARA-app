@@ -10,6 +10,8 @@ interface ActivityOption {
   anNumber: string;
   titulo?: string;
   estatus?: string;
+  responsableId?: number;
+  responsable?: { id?: number };
   workType?: 'ISSUE' | 'PREVENTIVE_INVENTORY';
 }
 
@@ -111,31 +113,48 @@ const ActivityEvidenceFlow = () => {
   // Cargar actividades
   useEffect(() => {
     if (!user?.token) return;
-    fetch(buildApiUrl('activities?scope=mine'), {
-      headers: { Authorization: `Bearer ${user.token}` },
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          if (res.status === 401 || res.status === 403) {
+    const loadActivities = async () => {
+      try {
+        const mineRes = await fetch(buildApiUrl('activities?scope=mine'), {
+          headers: { Authorization: `Bearer ${user.token}` },
+        });
+
+        if (!mineRes.ok) {
+          if (mineRes.status === 401 || mineRes.status === 403) {
             throw new Error('No tienes permisos para consultar tus actividades.');
           }
           throw new Error('No se pudieron cargar tus actividades.');
         }
-        return res.json();
-      })
-      .then((data) => {
-        const rows = normalizeActivitiesPayload(data);
+
+        const mineData = await mineRes.json();
+        let rows = normalizeActivitiesPayload(mineData);
+
+        // Fallback when scope=mine returns empty but user has assigned activities.
+        if (rows.length === 0 && user?.id) {
+          const allRes = await fetch(buildApiUrl('activities'), {
+            headers: { Authorization: `Bearer ${user.token}` },
+          });
+          const allData = allRes.ok ? await allRes.json().catch(() => null) : null;
+          const allRows = normalizeActivitiesPayload(allData);
+          rows = allRows.filter((activity) => {
+            const responsibleId = activity.responsable?.id ?? activity.responsableId;
+            return Number(responsibleId) === Number(user.id);
+          });
+        }
+
         const available = rows.filter((activity: ActivityOption) => {
           const status = (activity?.estatus || '').trim().toLowerCase();
           return status !== 'aprobada';
         });
         setActividades(available);
         setError(null);
-      })
-      .catch((err) => {
+      } catch (err) {
         setActividades([]);
         setError(err instanceof Error ? err.message : 'No se pudieron cargar tus actividades.');
-      });
+      }
+    };
+
+    void loadActivities();
   }, [user?.token]);
 
   useEffect(() => {

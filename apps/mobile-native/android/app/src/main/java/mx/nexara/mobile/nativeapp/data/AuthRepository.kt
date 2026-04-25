@@ -37,6 +37,7 @@ class AuthRepository(
                 isBranchUser = false,
                 clientId = null,
                 branchId = null,
+                avatarUrl = dto.avatarUrl,
             )
 
             sessionStore.save(user)
@@ -99,6 +100,8 @@ class AuthRepository(
     }
 
     fun loadSession(): SessionUser? = sessionStore.load()
+
+    fun quickProfiles(): List<QuickProfile> = sessionStore.loadQuickProfiles()
 
     fun token(): String? = sessionStore.load()?.token
 

@@ -47,6 +47,8 @@ private fun freshCameraOutputUri(context: Context): Uri {
 fun MediaPickerBar(
     onPicked: (List<CapturedMedia>) -> Unit,
     modifier: Modifier = Modifier,
+    allowCamera: Boolean = true,
+    allowGallery: Boolean = true,
     allowDocuments: Boolean = true,
 ) {
     val context = LocalContext.current
@@ -81,25 +83,29 @@ fun MediaPickerBar(
         modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        OutlinedButton(
-            onClick = {
-                val uri = freshCameraOutputUri(context)
-                if (uri != Uri.EMPTY) {
-                    pendingCameraUri = uri
-                    cameraLauncher.launch(uri)
-                }
-            },
-        ) { Text("📷 Cámara") }
+        if (allowCamera) {
+            OutlinedButton(
+                onClick = {
+                    val uri = freshCameraOutputUri(context)
+                    if (uri != Uri.EMPTY) {
+                        pendingCameraUri = uri
+                        cameraLauncher.launch(uri)
+                    }
+                },
+            ) { Text("📷 Cámara") }
+        }
 
-        OutlinedButton(
-            onClick = {
-                photoPicker.launch(
-                    androidx.activity.result.PickVisualMediaRequest(
-                        ActivityResultContracts.PickVisualMedia.ImageAndVideo
+        if (allowGallery) {
+            OutlinedButton(
+                onClick = {
+                    photoPicker.launch(
+                        androidx.activity.result.PickVisualMediaRequest(
+                            ActivityResultContracts.PickVisualMedia.ImageAndVideo
+                        )
                     )
-                )
-            },
-        ) { Text("🖼 Galería") }
+                },
+            ) { Text("🖼 Galería") }
+        }
 
         if (allowDocuments) {
             OutlinedButton(

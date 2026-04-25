@@ -17,6 +17,14 @@ data class SessionUser(
     val isBranchUser: Boolean = false,
     val clientId: Long? = null,
     val branchId: Long? = null,
+    val avatarUrl: String? = null,
+)
+
+data class QuickProfile(
+    val id: Long,
+    val nombre: String,
+    val email: String,
+    val role: String,
 )
 
 class SessionStore(context: Context) {
@@ -58,6 +66,7 @@ class SessionStore(context: Context) {
             isBranchUser = isBranchUser,
             clientId = clientId,
             branchId = branchId,
+            avatarUrl = prefs.getString("avatar_url", null),
         )
     }
 
@@ -75,11 +84,71 @@ class SessionStore(context: Context) {
             .putBoolean("is_branch_user", user.isBranchUser)
             .putLong("client_id", user.clientId ?: 0L)
             .putLong("branch_id", user.branchId ?: 0L)
+            .putString("avatar_url", user.avatarUrl)
             .apply()
+
+        saveQuickProfile(user)
+    }
+
+    fun loadQuickProfiles(): List<QuickProfile> {
+        val raw = prefs.getString("quick_profiles_csv", "")?.trim().orEmpty()
+        if (raw.isBlank()) return emptyList()
+
+        return raw
+            .split("||")
+            .mapNotNull { item ->
+                val parts = item.split("|", limit = 4)
+                if (parts.size < 4) return@mapNotNull null
+                val id = parts[0].toLongOrNull() ?: return@mapNotNull null
+                QuickProfile(
+                    id = id,
+                    nombre = parts[1],
+                    email = parts[2],
+                    role = parts[3],
+                )
+            }
+    }
+
+    private fun saveQuickProfile(user: SessionUser) {
+        val current = loadQuickProfiles().toMutableList()
+        current.removeAll { it.email.equals(user.email, ignoreCase = true) }
+        current.add(
+            0,
+            QuickProfile(
+                id = user.id,
+                nombre = user.nombre,
+                email = user.email,
+                role = user.role,
+            ),
+        )
+
+        val encoded = current
+            .take(5)
+            .joinToString("||") {
+                listOf(it.id.toString(), it.nombre, it.email, it.role)
+                    .joinToString("|") { part ->
+                        part.replace("|", " ").replace("||", " ")
+                    }
+            }
+
+        prefs.edit().putString("quick_profiles_csv", encoded).apply()
     }
 
     fun clear() {
-        prefs.edit().clear().apply()
+        prefs.edit()
+            .remove("id")
+            .remove("nombre")
+            .remove("email")
+            .remove("role")
+            .remove("department")
+            .remove("token")
+            .remove("permissions_csv")
+            .remove("is_super_admin")
+            .remove("is_client")
+            .remove("is_branch_user")
+            .remove("client_id")
+            .remove("branch_id")
+            .apply()
     }
 }
 

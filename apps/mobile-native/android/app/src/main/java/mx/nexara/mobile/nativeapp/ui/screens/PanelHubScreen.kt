@@ -1,16 +1,24 @@
 package mx.nexara.mobile.nativeapp.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -20,7 +28,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 
@@ -48,88 +60,162 @@ fun PanelHubScreen(
         )
     }
 
-    Column(
+    val slate = Color(0xFF0F172A)
+    val sub = Color(0xFF64748B)
+    val teal = Color(0xFF0D9488)
+
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding),
-        verticalArrangement = Arrangement.Top,
-        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text(
-            text = "Paneles",
-            style = MaterialTheme.typography.headlineMedium,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = if (user != null) "Hola, ${user.nombre.ifBlank { user.email }}." else "Sesión no encontrada.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        if (panels.isEmpty()) {
-            Text(
-                text = "No hay paneles disponibles para tu cuenta.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            LazyColumn(
+        item {
+            Card(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                elevation = CardDefaults.cardElevation(0.dp),
             ) {
-                items(panels) { panel ->
-                    Card(
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(Color(0xFFE6FFFA), Color(0xFFF8FAFC)),
+                            ),
+                        )
+                        .padding(16.dp),
+                ) {
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                        ),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "${panel.icon}  ${panel.name}",
-                                style = MaterialTheme.typography.titleMedium,
+                                text = "Panel corporativo",
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                color = sub,
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = panel.description,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                text = user?.nombre?.ifBlank { user.email } ?: "Sin sesión",
+                                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                                color = slate,
                             )
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Button(
-                                onClick = {
-                                    when (panel.key) {
-                                        "console" -> onOpenConsole()
-                                        "tickets" -> onOpenTickets()
-                                        "ventas" -> onOpenVentas()
-                                        "contabilidad" -> onOpenContabilidad()
-                                        "web" -> onOpenWeb()
-                                    }
-                                },
-                            ) {
-                                Text("Abrir")
+                            if (!user?.email.isNullOrBlank()) {
+                                Text(
+                                    text = user!!.email,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = sub,
+                                )
                             }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(46.dp)
+                                .clip(CircleShape)
+                                .background(teal),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = user?.nombre?.firstOrNull()?.uppercase() ?: "N",
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                            )
                         }
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
-        OutlinedButton(
-            onClick = onOpenNotifications,
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Notificaciones") }
-        Spacer(modifier = Modifier.height(10.dp))
-        Button(
-            onClick = {
-                repo.logout()
-                onLogout()
-            },
-        ) {
-            Text("Cerrar sesión")
+        if (panels.isEmpty()) {
+            item {
+                Text(
+                    text = "No hay paneles disponibles para tu cuenta.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = sub,
+                )
+            }
+        } else {
+            items(panels, key = { it.key }) { panel ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(1.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0xFFCCFBF1)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(panel.icon)
+                        }
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = panel.name,
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = slate,
+                            )
+                            Text(
+                                text = panel.description,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = sub,
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                when (panel.key) {
+                                    "console" -> onOpenConsole()
+                                    "tickets" -> onOpenTickets()
+                                    "ventas" -> onOpenVentas()
+                                    "contabilidad" -> onOpenContabilidad()
+                                    "web" -> onOpenWeb()
+                                }
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = teal, contentColor = Color.White),
+                        ) {
+                            Text("Abrir")
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = onOpenNotifications,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+            ) {
+                Text("Notificaciones")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = {
+                    repo.logout()
+                    onLogout()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626), contentColor = Color.White),
+            ) {
+                Text("Cerrar sesión", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold))
+            }
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
@@ -182,23 +268,30 @@ private val CLIENT_OR_BRANCH_PERMISSION_PREFIXES = listOf(
     "client-tickets.",
 )
 
+private fun normalizePerms(perms: List<String>): Set<String> {
+    return perms.map { it.trim().lowercase().replace('_', '.').replace('-', '.') }.toSet()
+}
+
 private fun isClientOrBranchAccount(role: String, permissions: List<String>): Boolean {
     val byRole = Regex("(cliente|client|sucursal|branch)", RegexOption.IGNORE_CASE).containsMatchIn(role)
-    val byPermPrefix = permissions.any { p -> CLIENT_OR_BRANCH_PERMISSION_PREFIXES.any { prefix -> p.startsWith(prefix) } }
+    val byPermPrefix = permissions.any { p ->
+        val normalized = p.trim().lowercase()
+        CLIENT_OR_BRANCH_PERMISSION_PREFIXES.any { prefix -> normalized.startsWith(prefix) }
+    }
     return byRole || byPermPrefix
 }
 
-private fun hasAnyPermission(perms: List<String>, required: List<String>, isSuperAdmin: Boolean): Boolean {
+private fun hasAnyPermission(perms: Set<String>, required: List<String>, isSuperAdmin: Boolean): Boolean {
     if (isSuperAdmin) return true
     return required.any { perms.contains(it) }
 }
 
-private fun hasPermission(perms: List<String>, required: String, isSuperAdmin: Boolean): Boolean {
+private fun hasPermission(perms: Set<String>, required: String, isSuperAdmin: Boolean): Boolean {
     if (isSuperAdmin) return true
     return perms.contains(required)
 }
 
-private fun getAccessiblePanels(
+fun getAccessiblePanels(
     role: String,
     permissions: List<String>,
     isSuperAdmin: Boolean,
@@ -212,25 +305,26 @@ private fun getAccessiblePanels(
         return PANEL_ORDER.filter { it.key != "tickets" }
     }
 
+    val normalized = normalizePerms(permissions)
+
     val accessMap = mapOf(
         "console" to hasAnyPermission(
-            permissions,
-            listOf("console.access", "console.admin", "users.manage"),
+            normalized,
+            listOf("console.access", "console.admin", "users.manage", "console_access", "console_admin"),
             isSuperAdmin,
         ),
         "ventas" to hasAnyPermission(
-            permissions,
+            normalized,
             listOf("panel.ventas", "sales.view", "sales.manage", "sales.reports.view"),
             isSuperAdmin,
         ),
         "contabilidad" to hasAnyPermission(
-            permissions,
+            normalized,
             listOf("contabilidad.view", "contabilidad.manage"),
             isSuperAdmin,
         ),
-        "web" to hasPermission(permissions, "panel.web", isSuperAdmin),
+        "web" to hasPermission(normalized, "panel.web", isSuperAdmin),
         "tickets" to false,
     )
     return PANEL_ORDER.filter { accessMap[it.key] == true }
 }
-

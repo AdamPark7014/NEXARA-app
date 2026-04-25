@@ -43,6 +43,14 @@ export default function PanelHubPage() {
   const panels = useMemo(() => getAccessiblePanels(user), [user]);
 
   useEffect(() => {
+    if (!isContextReady || !user) return;
+    if (panels.length !== 1) return;
+    const onlyPanel = panels[0];
+    setActivePanel(onlyPanel.key);
+    router.replace(onlyPanel.entryPath);
+  }, [isContextReady, user, panels, router]);
+
+  useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, []);
@@ -57,6 +65,10 @@ export default function PanelHubPage() {
   }, [panels, query]);
 
   if (!user) {
+    return null;
+  }
+
+  if (panels.length === 1) {
     return null;
   }
 

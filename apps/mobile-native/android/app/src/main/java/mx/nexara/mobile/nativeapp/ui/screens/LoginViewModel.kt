@@ -10,11 +10,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.AuthRepository
+import mx.nexara.mobile.nativeapp.data.QuickProfile
 import mx.nexara.mobile.nativeapp.push.PushRegistration
 
 data class LoginUiState(
     val email: String = "",
     val password: String = "",
+    val quickProfiles: List<QuickProfile> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
 )
@@ -22,11 +24,23 @@ data class LoginUiState(
 class LoginViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = AuthRepository(app.applicationContext)
 
-    private val _state = MutableStateFlow(LoginUiState())
+    private val _state = MutableStateFlow(
+        LoginUiState(
+            quickProfiles = repo.quickProfiles(),
+        ),
+    )
     val state: StateFlow<LoginUiState> = _state
 
     fun setEmail(value: String) = _state.update { it.copy(email = value, error = null) }
     fun setPassword(value: String) = _state.update { it.copy(password = value, error = null) }
+    fun selectQuickProfile(profile: QuickProfile) {
+        _state.update {
+            it.copy(
+                email = profile.email,
+                error = null,
+            )
+        }
+    }
 
     fun submit(onLoggedIn: () -> Unit) {
         val snapshot = _state.value
@@ -40,7 +54,13 @@ class LoginViewModel(app: Application) : AndroidViewModel(app) {
                     repo.login(snapshot.email.trim(), snapshot.password)
                 }
                 PushRegistration.registerCurrentDeviceAsync(getApplication<Application>().applicationContext)
-                _state.update { it.copy(isLoading = false, error = null) }
+                _state.update {
+                    it.copy(
+                        isLoading = false,
+                        error = null,
+                        quickProfiles = repo.quickProfiles(),
+                    )
+                }
                 onLoggedIn()
             } catch (e: Exception) {
                 val msg = e.message?.takeIf { it.isNotBlank() } ?: "No se pudo iniciar sesión"

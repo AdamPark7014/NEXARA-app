@@ -1,18 +1,33 @@
 package mx.nexara.mobile.nativeapp.ui.console
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -39,9 +54,6 @@ import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleMoreScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.MyProfileScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.PlaceholderScreen
 import mx.nexara.mobile.nativeapp.ui.catalog.ModuleCatalog
-import mx.nexara.mobile.nativeapp.ui.console.screens.userCanManageSystemSettings
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.ui.unit.dp
 
 private object ConsoleRoutes {
     const val Dashboard = "console/dashboard"
@@ -74,58 +86,90 @@ data class ConsoleNavItem(
     val iconText: String,
 )
 
+private fun routeForModuleKey(key: String): String {
+    return when (key) {
+        "dashboard" -> ConsoleRoutes.Dashboard
+        "activities" -> ConsoleRoutes.Activities
+        "my-activities" -> ConsoleRoutes.MyActivities
+        "evidences" -> ConsoleRoutes.Evidences
+        "my-evidences" -> ConsoleRoutes.MyEvidences
+        "viatics" -> ConsoleRoutes.Viatics
+        "vehicles" -> ConsoleRoutes.Vehicles
+        "gps" -> ConsoleRoutes.Gps
+        "tools" -> ConsoleRoutes.Tools
+        "clients" -> ConsoleRoutes.Clients
+        "projects" -> ConsoleRoutes.Projects
+        "users" -> ConsoleRoutes.Users
+        "attendance" -> ConsoleRoutes.Attendance
+        "settings" -> ConsoleRoutes.Settings
+        "my-profile" -> ConsoleRoutes.MyProfile
+        else -> ConsoleRoutes.module(key)
+    }
+}
+
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun ConsoleNavHost(
     onExitToPanels: () -> Unit,
+    onLogout: () -> Unit = onExitToPanels,
 ) {
     val context = LocalContext.current
     val authRepo = remember(context) { AuthRepository(context) }
+    var showLogoutDialog by remember { mutableStateOf(false) }
     val user = authRepo.loadSession()
     val roleLower = (user?.role ?: "").lowercase()
     val isSuperAdmin = user?.isSuperAdmin == true
-    val isIngeniero = !isSuperAdmin && roleLower.contains("ingenier")
-    val canManageSettings = userCanManageSystemSettings(
-        isSuperAdmin = isSuperAdmin,
-        permissions = user?.permissions ?: emptyList(),
-    )
-
+    val isAdmin = !isSuperAdmin && (user?.permissions ?: emptyList()).contains("console.admin")
+    val isIngeniero = !isSuperAdmin && !isAdmin && roleLower.contains("ingenier")
     val navController = rememberNavController()
-    val items = remember(isIngeniero, isSuperAdmin, canManageSettings) {
+
+    val visibleModules = remember(user) {
+        ModuleCatalog.console.filter { canAccessConsoleModule(user, it) }
+    }
+    val visibleRoutes = remember(visibleModules) {
+        visibleModules.map { routeForModuleKey(it.key) }.toSet()
+    }
+    val sidebarGroups = remember(user) { consoleSidebarGroups(user) }
+
+    // Máximo 5 tabs: módulos principales visibles + "Más".
+    val items = remember(isIngeniero, isSuperAdmin, isAdmin, visibleRoutes) {
+        fun isVisible(route: String) = visibleRoutes.contains(route)
+
         buildList {
-            add(ConsoleNavItem(ConsoleRoutes.Dashboard, "Inicio", "📊"))
-            if (isIngeniero) {
-                add(ConsoleNavItem(ConsoleRoutes.MyActivities, "Mis act.", "📋"))
-                add(ConsoleNavItem(ConsoleRoutes.MyEvidences, "Evidencias", "📸"))
-                add(ConsoleNavItem(ConsoleRoutes.Gps, "GPS", "🗺️"))
-                add(ConsoleNavItem(ConsoleRoutes.Tools, "Tools", "🧰"))
-            } else if (isSuperAdmin) {
-                add(ConsoleNavItem(ConsoleRoutes.Activities, "Operación", "🗂️"))
-                add(ConsoleNavItem(ConsoleRoutes.Evidences, "Evidencias", "📸"))
-                add(ConsoleNavItem(ConsoleRoutes.Viatics, "Viáticos", "💼"))
-                add(ConsoleNavItem(ConsoleRoutes.Vehicles, "Vehículos", "🚗"))
-                add(ConsoleNavItem(ConsoleRoutes.Gps, "GPS", "🗺️"))
-                add(ConsoleNavItem(ConsoleRoutes.Tools, "Tools", "🧰"))
-                add(ConsoleNavItem(ConsoleRoutes.Clients, "Clientes", "🤝"))
-                add(ConsoleNavItem(ConsoleRoutes.Projects, "Proyectos", "🧩"))
-                add(ConsoleNavItem(ConsoleRoutes.Users, "Usuarios", "🧑‍💼"))
-            } else {
-                add(ConsoleNavItem(ConsoleRoutes.Activities, "Operación", "🗂️"))
-                add(ConsoleNavItem(ConsoleRoutes.Evidences, "Evidencias", "📸"))
-                add(ConsoleNavItem(ConsoleRoutes.Viatics, "Viáticos", "💼"))
-                add(ConsoleNavItem(ConsoleRoutes.Vehicles, "Vehículos", "🚗"))
-                add(ConsoleNavItem(ConsoleRoutes.Gps, "GPS", "🗺️"))
-                add(ConsoleNavItem(ConsoleRoutes.Tools, "Tools", "🧰"))
-                add(ConsoleNavItem(ConsoleRoutes.Clients, "Clientes", "🤝"))
-                add(ConsoleNavItem(ConsoleRoutes.Projects, "Proyectos", "🧩"))
-                add(ConsoleNavItem(ConsoleRoutes.Users, "Usuarios", "🧑‍💼"))
+            if (isVisible(ConsoleRoutes.Dashboard)) {
+                add(ConsoleNavItem(ConsoleRoutes.Dashboard, "Inicio", "📊"))
             }
-            add(ConsoleNavItem(ConsoleRoutes.Attendance, "Asistencia", "🕒"))
-            if (canManageSettings) {
-                add(ConsoleNavItem(ConsoleRoutes.Settings, "Ajustes", "⚙️"))
+
+            if (isSuperAdmin || isAdmin) {
+                if (isVisible(ConsoleRoutes.Activities)) add(ConsoleNavItem(ConsoleRoutes.Activities, "Operación", "🗂️"))
+                if (isVisible(ConsoleRoutes.Evidences)) add(ConsoleNavItem(ConsoleRoutes.Evidences, "Evidencias", "📸"))
+                if (isVisible(ConsoleRoutes.Attendance)) add(ConsoleNavItem(ConsoleRoutes.Attendance, "Asistencia", "🕒"))
+            } else if (isIngeniero) {
+                if (isVisible(ConsoleRoutes.MyActivities)) add(ConsoleNavItem(ConsoleRoutes.MyActivities, "Mis act.", "📋"))
+                if (isVisible(ConsoleRoutes.MyEvidences)) add(ConsoleNavItem(ConsoleRoutes.MyEvidences, "Mis evid.", "📸"))
+                if (isVisible(ConsoleRoutes.Attendance)) {
+                    add(ConsoleNavItem(ConsoleRoutes.Attendance, "Asistencia", "🕒"))
+                } else if (isVisible(ConsoleRoutes.Gps)) {
+                    add(ConsoleNavItem(ConsoleRoutes.Gps, "GPS", "🗺️"))
+                }
+            } else {
+                if (isVisible(ConsoleRoutes.MyActivities)) add(ConsoleNavItem(ConsoleRoutes.MyActivities, "Mis act.", "📋"))
+                if (isVisible(ConsoleRoutes.MyEvidences)) add(ConsoleNavItem(ConsoleRoutes.MyEvidences, "Mis evid.", "📸"))
+                if (isVisible(ConsoleRoutes.Attendance)) {
+                    add(ConsoleNavItem(ConsoleRoutes.Attendance, "Asistencia", "🕒"))
+                } else if (isVisible(ConsoleRoutes.Gps)) {
+                    add(ConsoleNavItem(ConsoleRoutes.Gps, "GPS", "🗺️"))
+                }
+            }
+
+            if (isEmpty()) {
+                add(ConsoleNavItem(ConsoleRoutes.Dashboard, "Inicio", "📊"))
             }
             add(ConsoleNavItem(ConsoleRoutes.More, "Más", "🧭"))
         }
+    }
+    val startRoute = remember(items) {
+        items.firstOrNull { it.route != ConsoleRoutes.More }?.route ?: ConsoleRoutes.More
     }
 
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -146,16 +190,30 @@ fun ConsoleNavHost(
             ConsoleRoutes.Settings -> "Ajustes del sistema"
             ConsoleRoutes.More -> "Todos los módulos"
             ConsoleRoutes.MyProfile -> "Mi perfil"
-            else -> "Consola"
+            ConsoleRoutes.ModulePattern -> {
+                val key = backStackEntry?.arguments?.getString("key").orEmpty()
+                ModuleCatalog.console.firstOrNull { it.key == key }?.label ?: "Módulo"
+            }
+            else -> "NEXARA"
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(currentTitle) },
+                title = { Text(currentTitle, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)) },
                 actions = {
-                    // TODO: notificaciones, perfil, etc.
+                    FilledTonalButton(
+                        onClick = { showLogoutDialog = true },
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = Color(0xFFFFE4E6),
+                            contentColor = Color(0xFFDC2626),
+                        ),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                        modifier = androidx.compose.ui.Modifier.padding(end = 8.dp).size(width = 100.dp, height = 34.dp),
+                    ) {
+                        Text("Salir", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
+                    }
                 }
             )
         },
@@ -181,22 +239,26 @@ fun ConsoleNavHost(
     ) { inner ->
         NavHost(
             navController = navController,
-            startDestination = ConsoleRoutes.Dashboard,
+            startDestination = startRoute,
             modifier = Modifier.padding(inner),
         ) {
             composable(ConsoleRoutes.Dashboard) {
                 ConsoleDashboardScreen()
             }
             composable(ConsoleRoutes.Activities) {
-                ConsoleActivitiesScreen(title = "Actividades", scope = null)
+                // Combined view: admins see team + personal; normal users see only personal
+                ConsoleActivitiesScreen(title = "Actividades")
             }
             composable(ConsoleRoutes.MyActivities) {
-                ConsoleActivitiesScreen(title = "Mis actividades", scope = "mine")
+                // My-activities route: shows only personal section (non-admin users)
+                ConsoleActivitiesScreen(title = "Mis actividades")
             }
             composable(ConsoleRoutes.Evidences) {
-                ConsoleEvidencesScreen(mode = "admin")
+                // Combined view: admins see team review + personal; normal users see only personal
+                ConsoleEvidencesScreen(mode = "combined")
             }
             composable(ConsoleRoutes.MyEvidences) {
+                // Dedicated personal evidences route
                 ConsoleEvidencesScreen(mode = "user")
             }
             composable(ConsoleRoutes.Viatics) {
@@ -245,27 +307,19 @@ fun ConsoleNavHost(
             }
             composable(ConsoleRoutes.More) {
                 ConsoleMoreScreen(
+                    modules = visibleModules,
+                    groups = sidebarGroups,
+                    userName = user?.nombre,
+                    userEmail = user?.email,
+                    userRoleLabel = if (user?.isSuperAdmin == true) "Super Administrador" else user?.role,
+                    userAvatarUrl = user?.avatarUrl,
+                    isSuperAdmin = user?.isSuperAdmin == true,
                     onOpenModule = { m ->
-                        val target = when (m.key) {
-                            "dashboard" -> ConsoleRoutes.Dashboard
-                            "activities" -> ConsoleRoutes.Activities
-                            "my-activities" -> ConsoleRoutes.MyActivities
-                            "evidences" -> ConsoleRoutes.Evidences
-                            "my-evidences" -> ConsoleRoutes.MyEvidences
-                            "viatics" -> ConsoleRoutes.Viatics
-                            "vehicles" -> ConsoleRoutes.Vehicles
-                            "gps" -> ConsoleRoutes.Gps
-                            "tools" -> ConsoleRoutes.Tools
-                            "clients" -> ConsoleRoutes.Clients
-                            "projects" -> ConsoleRoutes.Projects
-                            "users" -> ConsoleRoutes.Users
-                            "attendance" -> ConsoleRoutes.Attendance
-                            "settings" -> ConsoleRoutes.Settings
-                            "my-profile" -> ConsoleRoutes.MyProfile
-                            else -> ConsoleRoutes.module(m.key)
-                        }
+                        val target = routeForModuleKey(m.key)
                         navController.navigate(target) { launchSingleTop = true }
-                    }
+                    },
+                    onExitToPanels = onExitToPanels,
+                    onLogout = { showLogoutDialog = true },
                 )
             }
             composable(ConsoleRoutes.MyProfile) {
@@ -336,6 +390,24 @@ fun ConsoleNavHost(
                 )
             }
         }
+    }
+
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = { Text("Cerrar sesión") },
+            text = { Text("¿Deseas cerrar tu sesión actual?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showLogoutDialog = false
+                    authRepo.logout()
+                    onLogout()
+                }) { Text("Cerrar sesión") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialog = false }) { Text("Cancelar") }
+            },
+        )
     }
 }
 
