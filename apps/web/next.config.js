@@ -125,16 +125,19 @@ const nextConfig = {
   // El middleware se encarga de la reescritura de URLs
   
   async rewrites() {
+    // Use environment variable for API internal URL, with fallback for Docker hostname
+    const apiUrl = process.env.API_INTERNAL_URL || 'http://nexara-api:3001';
+    
     return {
       fallback: [
         {
           source: '/api/:path*',
-          destination: 'http://api:3001/api/:path*',
+          destination: `${apiUrl}/api/:path*`,
         },
         // Proxy de uploads: el navegador no accede al puerto 3001 directamente.
         {
           source: '/uploads/:path*',
-          destination: 'http://api:3001/uploads/:path*',
+          destination: `${apiUrl}/uploads/:path*`,
         },
       ],
     };
