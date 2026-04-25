@@ -99,6 +99,7 @@ services:
       NEXT_PUBLIC_CONTACT_EMAIL: ${WEB_NEXT_PUBLIC_CONTACT_EMAIL}
       NEXT_PUBLIC_CITY: ${WEB_NEXT_PUBLIC_CITY}
       NEXT_PUBLIC_STATE: ${WEB_NEXT_PUBLIC_STATE}
+      API_INTERNAL_URL: http://nexara-api:3001/api
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy
