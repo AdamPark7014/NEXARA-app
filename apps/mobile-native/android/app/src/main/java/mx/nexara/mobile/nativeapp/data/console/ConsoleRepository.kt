@@ -40,9 +40,58 @@ class ConsoleRepository(context: Context) {
             api.getAttendanceRange(from = from, to = to)
         }
 
+    suspend fun attendanceCurrent() = api.getAttendanceCurrent()
+
+    suspend fun attendanceCheckIn(type: String, lat: Double? = null, lng: Double? = null) =
+        api.postAttendance(
+            mx.nexara.mobile.nativeapp.data.api.AttendanceRegisterRequest(
+                type = type,
+                timestamp = java.time.Instant.now().toString(),
+                latitude = lat,
+                longitude = lng,
+            )
+        )
+
     suspend fun evidencesMyHistory() = api.getMyEvidenceHistory()
 
     suspend fun evidencesReviewHistory() = api.getEvidenceReviewHistory()
+
+    suspend fun evidenceByActivity(activityId: Long) = api.getActivityEvidence(activityId)
+
+    suspend fun evidenceEntryPhoto(activityId: Long, photoUrl: String, lat: Double, lng: Double) =
+        api.postEvidenceEntryPhoto(
+            activityId = activityId,
+            body = mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePhotoStepRequest(
+                photoUrl = photoUrl,
+                latitude = lat,
+                longitude = lng,
+            ),
+        )
+
+    suspend fun evidencePhotos(activityId: Long, photoUrls: List<String>) =
+        api.postEvidencePhotos(
+            activityId = activityId,
+            body = mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePhotosStepRequest(photoUrls = photoUrls),
+        )
+
+    suspend fun evidenceServiceSheetPdf(activityId: Long, pdfUrl: String) =
+        api.postEvidenceServiceSheetPdf(
+            activityId = activityId,
+            body = mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePdfStepRequest(pdfUrl = pdfUrl),
+        )
+
+    suspend fun evidenceServiceSheetData(activityId: Long, data: Any) =
+        api.postEvidenceServiceSheetData(activityId = activityId, body = data)
+
+    suspend fun evidenceExitPhoto(activityId: Long, photoUrl: String, lat: Double, lng: Double) =
+        api.postEvidenceExitPhoto(
+            activityId = activityId,
+            body = mx.nexara.mobile.nativeapp.data.api.ActivityEvidencePhotoStepRequest(
+                photoUrl = photoUrl,
+                latitude = lat,
+                longitude = lng,
+            ),
+        )
 
     suspend fun viaticsFetch() = api.getViatics()
 
@@ -221,6 +270,11 @@ class ConsoleRepository(context: Context) {
         api.patchInventoryStatus(inventoryId = inventoryId, body = mx.nexara.mobile.nativeapp.data.api.InventoryStatusPatchRequest(status = status))
 
     suspend fun adminTicketReportPdf(activityId: Long) = api.getAdminTicketReport(activityId = activityId)
+
+    suspend fun myTicketReportPdf(activityId: Long) = api.getMyTicketReport(activityId = activityId)
+
+    suspend fun evidenceHistoryReportPdf(from: String? = null, to: String? = null) =
+        api.getMyEvidenceHistoryReport(from = from, to = to)
 
     // ── Projects ─────────────────────────────────────────────────────────────
 

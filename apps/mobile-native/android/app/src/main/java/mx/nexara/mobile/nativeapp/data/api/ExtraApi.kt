@@ -1,6 +1,9 @@
 package mx.nexara.mobile.nativeapp.data.api
 
+import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Query
 
 // ── News ──────────────────────────────────────────────────────────────────
@@ -133,11 +136,26 @@ data class EmployeePaymentDto(
 data class LunchBreakDto(
     val id: Long,
     val userId: Long? = null,
-    val startTime: String? = null,
-    val endTime: String? = null,
-    val durationMinutes: Int? = null,
     val date: String? = null,
+    val checkinTime: String? = null,
+    val checkoutTime: String? = null,
+    val status: String? = null,
+    val isCheckinLate: Boolean? = null,
+    val isCheckoutLate: Boolean? = null,
+    val notes: String? = null,
+    val checkinPhotoUrl: String? = null,
+    val checkoutPhotoUrl: String? = null,
     val user: SimpleUserDto? = null,
+)
+
+data class LunchCheckinRequest(
+    val checkinTime: String,
+    val checkinPhotoUrl: String? = null,
+)
+
+data class LunchCheckoutRequest(
+    val checkoutTime: String,
+    val checkoutPhotoUrl: String? = null,
 )
 
 // ── Cotizaciones (quotes) ─────────────────────────────────────────────────
@@ -261,6 +279,18 @@ interface ExtraApi {
     // Lunch breaks
     @GET("lunch-breaks")
     suspend fun getLunchBreaksRaw(): okhttp3.ResponseBody
+
+    @GET("lunch-breaks/my-breaks")
+    suspend fun getMyLunchBreaksRaw(): okhttp3.ResponseBody
+
+    @GET("lunch-breaks/users")
+    suspend fun getUsersLunchBreaksRaw(): okhttp3.ResponseBody
+
+    @POST("lunch-breaks/checkin")
+    suspend fun postLunchCheckin(@Body body: LunchCheckinRequest): okhttp3.ResponseBody
+
+    @PUT("lunch-breaks/checkout")
+    suspend fun putLunchCheckout(@Body body: LunchCheckoutRequest): okhttp3.ResponseBody
 
     // Documents
     @GET("documents")

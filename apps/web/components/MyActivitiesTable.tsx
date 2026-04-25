@@ -28,8 +28,9 @@ interface Activity {
   fechaInicio?: string;
   fechaMaxima?: string;
   fechaEntregaEsperada?: string;
-  creador?: { nombre: string };
-  responsable?: { nombre: string };
+  creador?: { id?: number; nombre: string };
+  responsableId?: number;
+  responsable?: { id?: number; nombre: string };
   activityEvidence?: {
     id: number;
     status: string;
@@ -86,7 +87,22 @@ const MyActivitiesTable: React.FC = () => {
         headers: { Authorization: `Bearer ${user.token}` },
       });
       const mineData = mineRes.ok ? await mineRes.json().catch(() => null) : null;
-      setActivities(normalizeActivitiesPayload(mineData));
+      let mineRows = normalizeActivitiesPayload(mineData);
+
+      // Some environments return empty for scope=mine; fallback to local filtering.
+      if (mineRows.length === 0 && user?.id) {
+        const allRes = await fetch(buildApiUrl('activities'), {
+          headers: { Authorization: `Bearer ${user.token}` },
+        });
+        const allData = allRes.ok ? await allRes.json().catch(() => null) : null;
+        const allRows = normalizeActivitiesPayload(allData);
+        mineRows = allRows.filter((activity) => {
+          const responsibleId = activity.responsable?.id ?? activity.responsableId;
+          return Number(responsibleId) === Number(user.id);
+        });
+      }
+
+      setActivities(mineRows);
     } catch {
       setActivities([]);
     } finally {
@@ -220,6 +236,7 @@ const MyActivitiesTable: React.FC = () => {
           activity.branchCity,
           activity.branchState,
           activity.branchAddress,
+          activity.creador?.nombre,
           activity.responsable?.nombre,
           activity.ticketType,
           activity.prioridad,
@@ -298,6 +315,8 @@ const MyActivitiesTable: React.FC = () => {
                   <th>Sucursal</th>
                   <th>Tipo</th>
                   <th>Estatus</th>
+                  <th>Asignó</th>
+                  <th>Asignada a</th>
                   <th>Prioridad</th>
                   <th>Evidencias</th>
                   {isAdmin && <th>Acciones</th>}
@@ -323,6 +342,8 @@ const MyActivitiesTable: React.FC = () => {
                       <td>{[a.branchName, a.branchCity, a.branchState].filter(Boolean).join(', ') || '-'}</td>
                       <td>{a.ticketType === 'OTRO' && a.ticketTypeCustom ? `Otro: ${a.ticketTypeCustom}` : (a.ticketType || '-')}</td>
                       <td><span className={`badge ${getActivityStatusClassName(a)}`}>{getDisplayActivityStatus(a)}</span></td>
+                      <td>{a.creador?.nombre || '-'}</td>
+                      <td>{a.responsable?.nombre || '-'}</td>
                       <td>{a.prioridad}</td>
                       <td>
                         <div className={styles.evidenceCol}>
@@ -448,6 +469,14 @@ const MyActivitiesTable: React.FC = () => {
 
                     {/* Info Grid */}
                     <div className={styles.mobileInfoGrid}>
+                      <div>
+                        <div className={styles.mobileInfoLabel}>Asignó</div>
+                        <div className={styles.mobileInfoValue}>{a.creador?.nombre || '-'}</div>
+                      </div>
+                      <div>
+                        <div className={styles.mobileInfoLabel}>Asignada a</div>
+                        <div className={styles.mobileInfoValue}>{a.responsable?.nombre || '-'}</div>
+                      </div>
                       <div>
                         <div className={styles.mobileInfoLabel}>Sucursal</div>
                         <div className={styles.mobileInfoValue}>{[a.branchName, a.branchCity].filter(Boolean).join(', ') || '-'}</div>

@@ -1,7 +1,7 @@
 <resources>
     <color name="nexara_primary">#FF0D9488</color>
     <color name="nexara_primary_dark">#FF0F766E</color>
-    <color name="ic_launcher_background">#FF0D9488</color>
+    <color name="ic_launcher_background">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="black">#FF000000</color>
 </resources>

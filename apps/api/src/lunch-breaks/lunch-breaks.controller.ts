@@ -10,6 +10,22 @@ import { CreateLunchBreakDto, UpdateLunchBreakDto } from './dto/lunch-break.dto.
 export class LunchBreaksController {
   constructor(private readonly lunchBreaksService: LunchBreaksService) {}
 
+  // Root endpoint: admins ven todo, usuarios ven sus propios registros
+  @Get()
+  @RBAC({ permissions: [PERMISSIONS.ATTENDANCE_VIEW] })
+  async getLunchBreaks(
+    @CurrentUser() user: any,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const start = startDate ? new Date(startDate) : undefined;
+    const end = endDate ? new Date(endDate) : undefined;
+    if (user.isSuperAdmin || user.permissions?.includes(PERMISSIONS.ATTENDANCE_MANAGE)) {
+      return this.lunchBreaksService.getAllLunchBreaks(start, end);
+    }
+    return this.lunchBreaksService.getUserLunchBreaks(user.id, start, end);
+  }
+
   // Registrar entrada a comida (solo usuarios no admin, todos excepto superadmin)
   @Post('checkin')
   @RBAC({ permissions: [PERMISSIONS.ATTENDANCE_VIEW] })

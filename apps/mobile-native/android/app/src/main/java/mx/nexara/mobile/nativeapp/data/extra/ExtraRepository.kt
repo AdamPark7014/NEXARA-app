@@ -18,6 +18,8 @@ import mx.nexara.mobile.nativeapp.data.api.FineDto
 import mx.nexara.mobile.nativeapp.data.api.InvoiceDto
 import mx.nexara.mobile.nativeapp.data.api.JournalEntryDto
 import mx.nexara.mobile.nativeapp.data.api.LunchBreakDto
+import mx.nexara.mobile.nativeapp.data.api.LunchCheckinRequest
+import mx.nexara.mobile.nativeapp.data.api.LunchCheckoutRequest
 import mx.nexara.mobile.nativeapp.data.api.NewsPostDto
 import mx.nexara.mobile.nativeapp.data.api.NewsletterSubscriberDto
 import mx.nexara.mobile.nativeapp.data.api.WorkflowStepDto
@@ -85,6 +87,12 @@ class ExtraRepository(context: Context) {
     suspend fun employeePayments(): List<EmployeePaymentDto> = parseList(api.getEmployeePaymentsRaw())
     suspend fun cotizaciones(): List<CotizacionDto> = parseList(api.getCotizacionesRaw())
     suspend fun lunchBreaks(): List<LunchBreakDto> = parseList(api.getLunchBreaksRaw())
+    suspend fun myLunchBreaks(): List<LunchBreakDto> = parseList(api.getMyLunchBreaksRaw())
+    suspend fun usersLunchBreaks(): List<LunchBreakDto> = parseList(api.getUsersLunchBreaksRaw())
+    suspend fun lunchCheckin(checkinTime: String, photoDataUrl: String?): String =
+        api.postLunchCheckin(LunchCheckinRequest(checkinTime = checkinTime, checkinPhotoUrl = photoDataUrl)).string()
+    suspend fun lunchCheckout(checkoutTime: String, photoDataUrl: String?): String =
+        api.putLunchCheckout(LunchCheckoutRequest(checkoutTime = checkoutTime, checkoutPhotoUrl = photoDataUrl)).string()
     suspend fun documents(): List<DocumentDto> = parseList(api.getDocumentsRaw())
     suspend fun journalEntries(): List<JournalEntryDto> = parseList(api.getJournalEntriesRaw())
     suspend fun invoices(): List<InvoiceDto> = parseList(api.getInvoicesRaw())

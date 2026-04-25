@@ -32,6 +32,7 @@ data class ActivityDto(
     val fechaAsignacion: String? = null,
     val fechaInicio: String? = null,
     val fechaFinalizacion: String? = null,
+    val creador: SimpleUserDto? = null,
     val responsableId: Long? = null,
     val responsable: SimpleUserDto? = null,
 )
@@ -74,6 +75,30 @@ data class AttendanceRangeDto(
     val users: List<AttendanceRangeUserDto>? = null,
 )
 
+data class AttendanceCurrentDto(
+    val id: Long? = null,
+    val userId: Long? = null,
+    val date: String? = null,
+    val checkIn: String? = null,
+    val checkOut: String? = null,
+    val totalMinutes: Int? = null,
+    val isOpen: Boolean? = null,
+)
+
+data class AttendanceRegisterRequest(
+    val type: String, // "entrada" | "salida"
+    val timestamp: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+)
+
+data class AttendanceRegisterResponse(
+    val id: Long? = null,
+    val type: String? = null,
+    val timestamp: String? = null,
+    val message: String? = null,
+)
+
 /**
  * Endpoints usados por Console/Dashboard en apps/mobile.
  * BaseURL ya incluye /api.
@@ -105,6 +130,19 @@ interface ConsoleApi {
         @Query("to") to: String,
     ): AttendanceRangeDto
 
+    @GET("attendance/current")
+    suspend fun getAttendanceCurrent(): AttendanceCurrentDto
+
+    @GET("attendance/day")
+    suspend fun getAttendanceDay(
+        @Query("date") date: String? = null,
+    ): AttendanceDayDto
+
+    @retrofit2.http.POST("attendance")
+    suspend fun postAttendance(
+        @retrofit2.http.Body body: AttendanceRegisterRequest,
+    ): AttendanceRegisterResponse
+
     // ── Evidences (Activity Evidence) ─────────────────────────────────────────
 
     @GET("activity-evidence/history")
@@ -123,6 +161,41 @@ interface ConsoleApi {
     suspend fun getMyTicketReport(
         @retrofit2.http.Path("activityId") activityId: Long,
     ): okhttp3.ResponseBody
+
+    @GET("activity-evidence/{activityId}")
+    suspend fun getActivityEvidence(
+        @retrofit2.http.Path("activityId") activityId: Long,
+    ): ActivityEvidenceDetailDto
+
+    @retrofit2.http.POST("activity-evidence/{activityId}/entry-photo")
+    suspend fun postEvidenceEntryPhoto(
+        @retrofit2.http.Path("activityId") activityId: Long,
+        @retrofit2.http.Body body: ActivityEvidencePhotoStepRequest,
+    ): ActivityEvidenceDetailDto
+
+    @retrofit2.http.POST("activity-evidence/{activityId}/evidence-photos")
+    suspend fun postEvidencePhotos(
+        @retrofit2.http.Path("activityId") activityId: Long,
+        @retrofit2.http.Body body: ActivityEvidencePhotosStepRequest,
+    ): ActivityEvidenceDetailDto
+
+    @retrofit2.http.POST("activity-evidence/{activityId}/service-sheet-pdf")
+    suspend fun postEvidenceServiceSheetPdf(
+        @retrofit2.http.Path("activityId") activityId: Long,
+        @retrofit2.http.Body body: ActivityEvidencePdfStepRequest,
+    ): ActivityEvidenceDetailDto
+
+    @retrofit2.http.POST("activity-evidence/{activityId}/service-sheet-data")
+    suspend fun postEvidenceServiceSheetData(
+        @retrofit2.http.Path("activityId") activityId: Long,
+        @retrofit2.http.Body body: Any,
+    ): ActivityEvidenceDetailDto
+
+    @retrofit2.http.POST("activity-evidence/{activityId}/exit-photo")
+    suspend fun postEvidenceExitPhoto(
+        @retrofit2.http.Path("activityId") activityId: Long,
+        @retrofit2.http.Body body: ActivityEvidencePhotoStepRequest,
+    ): ActivityEvidenceDetailDto
 
     @GET("activities/{activityId}/report")
     suspend fun getAdminTicketReport(
@@ -574,6 +647,38 @@ data class ActivityEvidenceRowDto(
     val actividad: ActivityEvidenceActivityDto? = null,
     val user: SimpleUserDto? = null,
     val aprobadoPor: SimpleUserDto? = null,
+)
+
+data class ActivityEvidenceDetailDto(
+    val id: Long,
+    val activityId: Long,
+    val status: String,
+    val reviewStatus: String? = null,
+    val rejectedStep: String? = null,
+    val reviewNotes: String? = null,
+    val entryPhotoUrl: String? = null,
+    val entryLatitude: Double? = null,
+    val entryLongitude: Double? = null,
+    val evidencePhotos: List<String>? = null,
+    val serviceSheetPdfUrl: String? = null,
+    val serviceSheetData: Any? = null,
+    val exitPhotoUrl: String? = null,
+    val exitLatitude: Double? = null,
+    val exitLongitude: Double? = null,
+)
+
+data class ActivityEvidencePhotoStepRequest(
+    val photoUrl: String,
+    val latitude: Double,
+    val longitude: Double,
+)
+
+data class ActivityEvidencePhotosStepRequest(
+    val photoUrls: List<String>,
+)
+
+data class ActivityEvidencePdfStepRequest(
+    val pdfUrl: String,
 )
 
 data class VehicleControlDto(

@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -36,6 +37,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.GpsLocationDto
+import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
 import mx.nexara.mobile.nativeapp.ui.common.MapPin
 import mx.nexara.mobile.nativeapp.ui.common.NexaraMap
@@ -93,6 +95,12 @@ fun ConsoleGpsScreen(
     val vm: ConsoleGpsViewModel = viewModel()
     val state by vm.state.collectAsState()
 
+    val authRepo = remember(context) { AuthRepository(context) }
+    val user = remember(authRepo) { authRepo.loadSession() }
+    val isSuperAdmin = user?.isSuperAdmin == true
+    val isAdmin = !isSuperAdmin && (user?.permissions ?: emptyList()).contains("console.admin")
+    val isOwnerView = isSuperAdmin || isAdmin
+
     if (state.isLoading && state.error == null && state.myLocation == null) vm.refresh()
 
     val hasPerm =
@@ -105,7 +113,10 @@ fun ConsoleGpsScreen(
             .padding(contentPadding),
         verticalArrangement = Arrangement.Top,
     ) {
-        Text("GPS", style = MaterialTheme.typography.titleLarge)
+        Text(
+            if (isOwnerView) "Monitoreo GPS del equipo" else "GPS",
+            style = MaterialTheme.typography.titleLarge,
+        )
         Spacer(modifier = Modifier.height(10.dp))
 
         if (state.isLoading) {
@@ -119,33 +130,48 @@ fun ConsoleGpsScreen(
             return@Column
         }
 
-        if (!hasPerm) {
-            Text(
-                "Falta permiso de ubicación. Actívalo para enviar tu GPS.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            Button(
-                onClick = {
-                    val fused = LocationServices.getFusedLocationProviderClient(context)
-                    fused.lastLocation.addOnSuccessListener { loc ->
-                        if (loc != null) {
-                            val speedKmh = if (loc.hasSpeed()) (loc.speed.toDouble() * 3.6) else null
-                            vm.postNow(loc.latitude, loc.longitude, speedKmh)
+        // Solo personal operativo (no super/admin) tiene la opción de enviar su propia ubicación.
+        if (!isOwnerView) {
+            if (!hasPerm) {
+                Text(
+                    "Falta permiso de ubicación. Actívalo para enviar tu GPS.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Button(
+                    onClick = {
+                        val fused = LocationServices.getFusedLocationProviderClient(context)
+                        fused.lastLocation.addOnSuccessListener { loc ->
+                            if (loc != null) {
+                                val speedKmh = if (loc.hasSpeed()) (loc.speed.toDouble() * 3.6) else null
+                                vm.postNow(loc.latitude, loc.longitude, speedKmh)
+                            }
                         }
-                    }
-                },
-                enabled = !state.posting,
-            ) {
-                Text(if (state.posting) "Enviando..." else "Enviar mi ubicación ahora")
+                    },
+                    enabled = !state.posting,
+                ) {
+                    Text(if (state.posting) "Enviando..." else "Enviar mi ubicación ahora")
+                }
             }
+            Spacer(modifier = Modifier.height(12.dp))
+        } else {
+            Button(onClick = { vm.refresh() }, enabled = !state.isLoading) {
+                Text("Actualizar ubicaciones")
+            }
+            Spacer(modifier = Modifier.height(12.dp))
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        val all = buildList {
-            state.myLocation?.let { add(it) }
-            addAll(state.team)
+        // Para super/admin priorizamos el equipo; para otros, su ubicación + equipo si tienen.
+        val all = if (isOwnerView) {
+            buildList {
+                addAll(state.team)
+                state.myLocation?.let { add(it) }
+            }
+        } else {
+            buildList {
+                state.myLocation?.let { add(it) }
+                addAll(state.team)
+            }
         }
 
         val pins = all.mapNotNull { loc ->
@@ -160,13 +186,21 @@ fun ConsoleGpsScreen(
             )
         }
 
-        if (pins.isNotEmpty()) {
-            NexaraMap(
-                pins = pins,
-                modifier = Modifier.fillMaxWidth().height(260.dp),
-                height = 260.dp,
+        // Mapa siempre visible (centro por defecto cuando aún no hay datos).
+        NexaraMap(
+            pins = pins,
+            modifier = Modifier.fillMaxWidth().height(280.dp),
+            height = 280.dp,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        if (all.isEmpty()) {
+            Text(
+                if (isOwnerView)
+                    "Aún no hay ubicaciones reportadas por el equipo."
+                else "Aún no has enviado tu ubicación.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(modifier = Modifier.height(12.dp))
         }
 
         LazyColumn(
