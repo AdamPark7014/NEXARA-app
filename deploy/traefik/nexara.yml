@@ -1,0 +1,39 @@
+http:
+  routers:
+    # Console/Admin Dashboard
+    console:
+      rule: 'Host(`consola.nexara.com.mx`) || Host(`console.nexara.com.mx`) || Host(`app.nexara.com.mx`)'
+      entryPoints:
+        - websecure
+      service: nexara-web
+      tls:
+        certResolver: letsencrypt
+
+    # Public website
+    public:
+      rule: 'Host(`web.nexara.com.mx`) || Host(`nexara.com.mx`) || Host(`www.nexara.com.mx`)'
+      entryPoints:
+        - websecure
+      service: nexara-web
+      tls:
+        certResolver: letsencrypt
+
+    # API backend
+    api:
+      rule: 'Host(`api.nexara.com.mx`)'
+      entryPoints:
+        - websecure
+      service: nexara-api
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    nexara-web:
+      loadBalancer:
+        servers:
+          - url: 'http://nexara-web:3000'
+
+    nexara-api:
+      loadBalancer:
+        servers:
+          - url: 'http://nexara-api:3001'
