@@ -116,11 +116,14 @@ export default function ServiciosPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceSchema) }}
       />
 
-      <header className={styles.hero} data-reveal="soft">
+      <header className={styles.hero} data-reveal="soft" data-nx-grain>
+        <div className={styles.heroAura} aria-hidden />
         <div className={styles.heroSplit}>
           <div className={styles.heroCopy}>
-            <p className={styles.kicker}>SERVICIOS PROFESIONALES NEXARA</p>
-            <h1 className={styles.pageTitle}>Servicios Nexara</h1>
+            <span data-nx-eyebrow>Servicios Profesionales</span>
+            <h1 className={styles.pageTitle}>
+              Tecnología que <em className={styles.pageTitleAccent}>sostiene tu operación</em>
+            </h1>
             <p className={styles.pageLead}>
               Construimos operaciones tecnológicas robustas para organizaciones que requieren continuidad,
               control y crecimiento sostenible.

@@ -320,10 +320,13 @@ export default async function ProjectsPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(catalogSchema) }}
       />
-      <header className={styles.hero} data-reveal="soft">
-        <div>
-          <p className={styles.kicker}>PORTAFOLIO TECNOLÓGICO</p>
-          <h1 className={styles.heroTitle}>Sectores donde ya generamos impacto real</h1>
+      <header className={styles.hero} data-reveal="soft" data-nx-grain>
+        <div className={styles.heroAura} aria-hidden />
+        <div className={styles.heroCopy}>
+          <span data-nx-eyebrow>Portafolio Tecnológico</span>
+          <h1 className={styles.heroTitle}>
+            Sectores donde ya <em className={styles.heroTitleAccent}>generamos impacto</em>
+          </h1>
           <p className={styles.heroText}>
             Arriba encontrarás casos publicados con detalle e imágenes; más abajo, líneas de solución
             y sectores atendidos para orientar compra e implementación con criterio empresarial.

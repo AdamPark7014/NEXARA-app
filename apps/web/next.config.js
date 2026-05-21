@@ -132,7 +132,7 @@ const nextConfig = {
       fallback: [
         {
           source: '/api/:path*',
-          destination: `${apiUrl}/api/:path*`,
+          destination: `${apiUrl}/:path*`,
         },
         // Proxy de uploads: el navegador no accede al puerto 3001 directamente.
         {

@@ -3,8 +3,30 @@ import "./utilities.scss";
 import "./ecosystem.scss";
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
+import { Space_Grotesk, Inter_Tight, Manrope } from "next/font/google";
 import ClientLayout from "./ClientLayout";
 import Providers from "./providers";
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["400", "500", "600", "700"],
+  variable: "--nx-font-display",
+});
+
+const interTight = Inter_Tight({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["400", "500", "600", "700"],
+  variable: "--nx-font-ui",
+});
+
+const manrope = Manrope({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--nx-font-body",
+});
 
 const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
 const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "";
@@ -167,7 +189,11 @@ export default function RootLayout({
   };
 
   return (
-    <html lang="es-MX" suppressHydrationWarning>
+    <html
+      lang="es-MX"
+      suppressHydrationWarning
+      className={`${spaceGrotesk.variable} ${interTight.variable} ${manrope.variable}`}
+    >
       <body suppressHydrationWarning>
         {/* Organization structured data */}
         <script

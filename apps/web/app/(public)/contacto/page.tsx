@@ -70,14 +70,31 @@ export default function ContactoPage() {
       aria-label="Página de contacto"
     >
       {/* Hero Section */}
-      <section className={styles.hero} data-reveal="soft">
+      <section className={styles.hero} data-reveal="soft" data-nx-grain>
+        <div className={styles.heroAura} aria-hidden />
         <div className={styles.heroContent}>
-          <p className={styles.heroKicker}>NEXARA CONTACT CENTER</p>
-          <h1 className={styles.heroTitle}>Contáctanos</h1>
+          <span data-nx-eyebrow>Nexara Contact Center</span>
+          <h1 className={styles.heroTitle}>
+            Hablemos de tu <em className={styles.heroTitleAccent}>próximo proyecto</em>
+          </h1>
           <p className={styles.heroSubtitle}>
             Estamos listos para ayudarte a impulsar tu proyecto tecnológico.
             Cuanto más contexto nos compartas, más precisa será nuestra propuesta.
           </p>
+          <dl className={styles.heroFacts} aria-label="Indicadores de respuesta">
+            <div className={styles.heroFact}>
+              <dt>Respuesta</dt>
+              <dd>&lt; 24h</dd>
+            </div>
+            <div className={styles.heroFact}>
+              <dt>Cobertura</dt>
+              <dd>Nacional</dd>
+            </div>
+            <div className={styles.heroFact}>
+              <dt>Atención</dt>
+              <dd>Lun · Vie</dd>
+            </div>
+          </dl>
         </div>
       </section>
 

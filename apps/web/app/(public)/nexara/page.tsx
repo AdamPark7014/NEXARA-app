@@ -217,10 +217,14 @@ export default async function NexaraPage() {
           </article>
         </section>
 
-        <header className={styles.hero} data-reveal="soft">
+        <header className={styles.hero} data-reveal="soft" data-nx-grain>
+          <div className={styles.heroAura} aria-hidden />
           <div className={styles.heroContent}>
-            <p className={styles.kicker}>NEXARA INGENIEROS</p>
-            <h1 className={styles.pageTitle}>Convertimos infraestructura en ventaja operativa</h1>
+            <span data-nx-eyebrow>Nexara Ingenieros</span>
+            <h1 className={styles.pageTitle}>
+              Convertimos infraestructura en{" "}
+              <em className={styles.pageTitleAccent}>ventaja operativa</em>
+            </h1>
             <p className={styles.pageLead}>
               Somos un equipo de integración tecnológica que conecta estrategia, ejecución y
               continuidad para organizaciones que no pueden detener su operación.
@@ -228,6 +232,7 @@ export default async function NexaraPage() {
             <div className={styles.heroActions}>
               <Link href="/contacto" data-track-conversion="about_primary_cta" className={styles.primaryCta}>
                 Hablar con un especialista
+                <span aria-hidden className={styles.ctaArrow}>→</span>
               </Link>
               <Link href="/proyectos" data-track-conversion="about_projects_cta" className={styles.secondaryCta}>
                 Ver casos publicados

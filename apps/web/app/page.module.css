@@ -5129,23 +5129,29 @@ button.secondary {
   --clean-shadow: 0 10px 24px color-mix(in srgb, var(--shadow) 62%, transparent);
 }
 
+/* ============================================================
+   NEXARA · Cobertura (/cobertura)
+   Color de marca dominante: SKY BLUE #6EC5D8 + acento TEAL
+   ============================================================ */
 .coverageMapSection {
   width: 100%;
   max-width: var(--content-max);
-  margin: 20px auto 0;
-  padding: clamp(18px, 2.6vw, 34px);
-  border-radius: 24px;
-  border: 1px solid color-mix(in srgb, var(--primary) 28%, transparent);
+  margin: 32px auto 0;
+  padding: clamp(32px, 4vw, 56px);
+  border-radius: var(--nx-radius-2xl);
+  border: 1px solid color-mix(in srgb, var(--nx-skyblue, var(--primary)) 38%, transparent);
   background:
-    radial-gradient(circle at 18% -18%, color-mix(in srgb, var(--primary) 20%, transparent), transparent 56%),
-    radial-gradient(circle at 92% 6%, color-mix(in srgb, var(--secondary) 18%, transparent), transparent 60%),
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 86%, #050c12), color-mix(in srgb, var(--background) 86%, #050c12));
-  box-shadow: 0 18px 44px color-mix(in srgb, var(--shadow) 70%, transparent);
+    radial-gradient(ellipse 60% 65% at 18% -18%, color-mix(in srgb, var(--nx-skyblue, var(--primary)) 30%, transparent), transparent 58%),
+    radial-gradient(ellipse 60% 65% at 92% 6%, color-mix(in srgb, var(--nx-teal, var(--secondary)) 28%, transparent), transparent 60%),
+    radial-gradient(ellipse 70% 55% at 50% 100%, color-mix(in srgb, var(--nx-magenta, var(--secondary)) 22%, transparent), transparent 55%),
+    linear-gradient(180deg, rgba(8, 14, 22, 0.97), rgba(4, 8, 14, 0.99));
+  box-shadow: var(--nx-shadow-xl), var(--nx-glow-skyblue);
   display: grid;
-  gap: clamp(16px, 2vw, 22px);
+  gap: clamp(20px, 2.6vw, 32px);
   scroll-margin-top: calc(var(--header-offset) + 14px);
   position: relative;
   overflow: hidden;
+  font-family: var(--nx-font-body);
 }
 
 .coverageMapSection::before {
@@ -5153,10 +5159,10 @@ button.secondary {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.14;
+  opacity: 0.16;
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--primary) 28%, transparent) 1px, transparent 1px),
-    linear-gradient(color-mix(in srgb, var(--primary) 22%, transparent) 1px, transparent 1px);
+    linear-gradient(90deg, color-mix(in srgb, var(--nx-skyblue, var(--primary)) 36%, transparent) 1px, transparent 1px),
+    linear-gradient(color-mix(in srgb, var(--nx-skyblue, var(--primary)) 28%, transparent) 1px, transparent 1px);
   background-size: 64px 64px;
   mask-image: radial-gradient(ellipse 70% 55% at 52% 30%, black 18%, transparent 74%);
 }
@@ -5176,45 +5182,59 @@ button.secondary {
 }
 
 .coverageChevrons {
-  width: 74px;
+  width: 78px;
   height: 18px;
   background:
     repeating-linear-gradient(
       135deg,
-      color-mix(in srgb, var(--primary) 70%, transparent) 0 8px,
+      color-mix(in srgb, var(--nx-skyblue, var(--primary)) 78%, transparent) 0 8px,
       transparent 8px 16px
     );
   border-radius: 999px;
-  opacity: 0.95;
+  opacity: 0.96;
 }
 
 .coverageTitle {
   margin: 0;
-  font-size: clamp(1.45rem, 3.2vw, 2.45rem);
-  letter-spacing: 0.22em;
+  font-family: var(--nx-font-hero);
+  font-size: var(--nx-text-4xl);
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  font-weight: 900;
-  color: color-mix(in srgb, var(--primary) 82%, #eafffb);
-  line-height: 1.05;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.02;
+  background: linear-gradient(120deg,
+    var(--nx-skyblue) 0%,
+    var(--nx-teal) 50%,
+    var(--nx-skyblue-soft) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 4px 20px color-mix(in srgb, var(--nx-skyblue) 28%, transparent));
 }
 
 .coverageTitleRule {
   height: 2px;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--primary) 80%, transparent), transparent);
+  background: linear-gradient(90deg, var(--nx-skyblue) 0%, var(--nx-teal) 60%, transparent 100%);
   border-radius: 999px;
 }
 
 .coverageSubtitle {
   margin: 0;
   width: fit-content;
-  padding: 10px 14px;
-  border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--primary) 30%, rgba(255, 255, 255, 0.12));
-  background: rgba(0, 0, 0, 0.22);
-  color: rgba(234, 244, 255, 0.92);
-  font-weight: 900;
-  letter-spacing: 0.14em;
+  padding: 12px 22px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--nx-skyblue, var(--primary)) 45%, rgba(255, 255, 255, 0.12));
+  background: color-mix(in srgb, var(--nx-skyblue, var(--primary)) 16%, rgba(0, 0, 0, 0.32));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #fff;
+  font-family: var(--nx-font-ui);
+  font-weight: 600;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
+  font-size: var(--nx-text-xs);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--nx-skyblue) 22%, transparent);
 }
 
 .coverageGrid {
@@ -5228,29 +5248,72 @@ button.secondary {
 }
 
 .coverageList {
-  border: 1px solid color-mix(in srgb, var(--primary) 22%, rgba(255, 255, 255, 0.08));
-  border-radius: 16px;
-  background: color-mix(in srgb, rgba(0, 0, 0, 0.38) 80%, transparent);
-  padding: 14px 14px 12px;
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.25);
+  position: relative;
+  border: 1px solid color-mix(in srgb, var(--nx-skyblue, var(--primary)) 30%, rgba(255, 255, 255, 0.08));
+  border-radius: var(--nx-radius-xl);
+  background: linear-gradient(160deg,
+    color-mix(in srgb, var(--nx-skyblue) 10%, rgba(0, 0, 0, 0.42)),
+    color-mix(in srgb, var(--nx-teal) 6%, rgba(0, 0, 0, 0.52)));
+  backdrop-filter: var(--nx-glass-blur);
+  -webkit-backdrop-filter: var(--nx-glass-blur);
+  padding: 22px 22px 20px;
+  box-shadow: var(--nx-shadow-md);
+  transition:
+    border-color var(--nx-motion-base) var(--nx-ease-out),
+    box-shadow var(--nx-motion-base) var(--nx-ease-out);
+}
+
+.coverageList::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--nx-skyblue), var(--nx-teal));
+  border-radius: var(--nx-radius-xl) var(--nx-radius-xl) 0 0;
+  opacity: 0.85;
+}
+
+.coverageList:hover {
+  border-color: color-mix(in srgb, var(--nx-skyblue) 65%, transparent);
+  box-shadow: var(--nx-shadow-lg), var(--nx-glow-skyblue);
 }
 
 .coverageOl {
   margin: 0;
-  padding-left: 18px;
+  padding-left: 22px;
   display: grid;
-  gap: 8px;
-  color: rgba(234, 244, 255, 0.86);
-  font-size: 0.84rem;
-  line-height: 1.35;
+  gap: 12px;
+  font-family: var(--nx-font-body);
+  color: color-mix(in srgb, var(--nx-skyblue-soft) 32%, #e6eaf2);
+  font-size: var(--nx-text-sm);
+  line-height: 1.45;
+}
+
+.coverageOl li {
+  transition: color var(--nx-motion-fast) var(--nx-ease-out);
+}
+
+.coverageOl li:hover {
+  color: #fff;
+}
+
+.coverageOl li::marker {
+  color: var(--nx-skyblue);
+  font-family: var(--nx-font-numbers);
+  font-weight: 700;
 }
 
 .coverageMapCard {
-  border: 1px solid color-mix(in srgb, var(--primary) 24%, rgba(255, 255, 255, 0.1));
-  border-radius: 18px;
-  background: rgba(0, 0, 0, 0.22);
-  padding: 14px;
-  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.35);
+  position: relative;
+  border: 1px solid color-mix(in srgb, var(--nx-skyblue, var(--primary)) 36%, rgba(255, 255, 255, 0.1));
+  border-radius: var(--nx-radius-xl);
+  background: linear-gradient(160deg,
+    color-mix(in srgb, var(--nx-skyblue) 10%, rgba(0, 0, 0, 0.34)),
+    color-mix(in srgb, var(--nx-teal) 8%, rgba(0, 0, 0, 0.42)));
+  padding: 20px;
+  box-shadow: var(--nx-shadow-lg), var(--nx-glow-skyblue);
 }
 
 .coverageMapInner {
@@ -5266,10 +5329,10 @@ button.secondary {
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(800px 420px at 50% 10%, rgba(0, 168, 150, 0.22), transparent 55%),
-    radial-gradient(900px 520px at 20% 90%, rgba(21, 169, 157, 0.14), transparent 60%);
+    radial-gradient(800px 420px at 50% 10%, color-mix(in srgb, var(--nx-skyblue) 32%, transparent), transparent 56%),
+    radial-gradient(900px 520px at 20% 90%, color-mix(in srgb, var(--nx-teal) 22%, transparent), transparent 60%);
   mix-blend-mode: screen;
-  opacity: 0.55;
+  opacity: 0.6;
 }
 
 .coverageMexicoSvg {
@@ -5305,9 +5368,9 @@ button.secondary {
 }
 
 .mxPinBody {
-  fill: rgba(8, 16, 28, 0.78);
-  stroke: color-mix(in srgb, var(--primary) 82%, #5eead4);
-  stroke-width: 3.25;
+  fill: rgba(8, 16, 28, 0.82);
+  stroke: var(--nx-skyblue);
+  stroke-width: 3.4;
   stroke-linejoin: round;
 }
 
@@ -5337,62 +5400,115 @@ button.secondary {
 }
 
 .coverageStatement {
-  margin: 0;
+  margin: 0 auto;
   text-align: center;
-  color: rgba(234, 244, 255, 0.82);
-  line-height: 1.55;
-  font-weight: 650;
+  font-family: var(--nx-font-body);
+  color: color-mix(in srgb, var(--nx-skyblue-soft) 32%, #e6eaf2);
+  line-height: 1.62;
+  font-weight: 400;
+  font-size: var(--nx-text-lg);
+  max-width: 66ch;
+  text-wrap: pretty;
 }
 
 .coverageSupport {
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
 .coverageSupportTitle {
   margin: 0;
   text-align: center;
-  font-weight: 900;
+  font-family: var(--nx-font-section);
+  font-weight: 500;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--primary) 82%, #eafffb);
+  color: #fff;
+  font-size: clamp(1rem, 1.6vw, 1.25rem);
+}
+
+.coverageSupportTitle::after {
+  content: "";
+  display: block;
+  width: 60px;
+  height: 2px;
+  margin: 10px auto 0;
+  background: linear-gradient(90deg, var(--nx-skyblue), var(--nx-teal));
+  border-radius: 999px;
 }
 
 .coverageMetrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 18px;
 }
 
 .coverageMetric {
-  border-radius: 16px;
-  border: 1px solid color-mix(in srgb, var(--primary) 22%, rgba(255, 255, 255, 0.1));
-  background: rgba(0, 0, 0, 0.22);
-  padding: 14px 12px 12px;
+  position: relative;
+  border-radius: var(--nx-radius-xl);
+  border: 1px solid color-mix(in srgb, var(--nx-skyblue, var(--primary)) 30%, rgba(255, 255, 255, 0.1));
+  background: linear-gradient(160deg,
+    color-mix(in srgb, var(--nx-skyblue) 12%, rgba(0, 0, 0, 0.34)),
+    color-mix(in srgb, var(--nx-teal) 8%, rgba(0, 0, 0, 0.46)));
+  backdrop-filter: var(--nx-glass-blur);
+  -webkit-backdrop-filter: var(--nx-glass-blur);
+  padding: 22px 18px 20px;
   text-align: center;
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--nx-shadow-md);
   display: grid;
-  gap: 6px;
+  gap: 8px;
+  overflow: hidden;
+  transition:
+    transform var(--nx-motion-base) var(--nx-ease-out),
+    border-color var(--nx-motion-base) var(--nx-ease-out),
+    box-shadow var(--nx-motion-base) var(--nx-ease-out);
+}
+
+.coverageMetric::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--nx-skyblue), transparent);
+  opacity: 0.85;
+}
+
+.coverageMetric:hover {
+  transform: translateY(-4px);
+  border-color: color-mix(in srgb, var(--nx-skyblue) 75%, transparent);
+  box-shadow: var(--nx-shadow-lg), var(--nx-glow-skyblue);
 }
 
 .coverageMetric strong {
-  font-size: 1.35rem;
-  letter-spacing: -0.02em;
-  color: #eaf4ff;
+  font-family: var(--nx-font-numbers);
+  font-size: var(--nx-text-4xl);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #fff;
+  line-height: 0.95;
+  background: linear-gradient(120deg, #fff 0%, var(--nx-skyblue-soft) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .coverageMetric span {
-  font-weight: 900;
-  letter-spacing: 0.12em;
+  font-family: var(--nx-font-ui);
+  font-weight: 600;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--primary) 80%, #eafffb);
-  font-size: 0.78rem;
+  color: var(--nx-skyblue);
+  font-size: var(--nx-text-xs);
 }
 
 .coverageMetric small {
-  color: rgba(234, 244, 255, 0.76);
-  font-size: 0.82rem;
-  line-height: 1.35;
+  font-family: var(--nx-font-body);
+  color: color-mix(in srgb, var(--nx-skyblue-soft) 28%, #cdd5e0);
+  font-size: var(--nx-text-sm);
+  line-height: 1.45;
 }
 
 @media (max-width: 980px) {
