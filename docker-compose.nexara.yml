@@ -33,12 +33,12 @@ services:
       - traefik.enable=true
       - traefik.http.services.nexara.loadbalancer.server.port=3000
       # Console subdomains
-      - traefik.http.routers.console.rule=Host(`consola.nexara.com.mx`,`console.nexara.com.mx`,`app.nexara.com.mx`)
+      - traefik.http.routers.console.rule=Host(`consola.nexara.com.mx`) || Host(`console.nexara.com.mx`) || Host(`app.nexara.com.mx`)
       - traefik.http.routers.console.entrypoints=websecure
       - traefik.http.routers.console.tls.certresolver=letsencrypt
       - traefik.http.routers.console.service=nexara
       # Public subdomains
-      - traefik.http.routers.public.rule=Host(`web.nexara.com.mx`,`nexara.com.mx`,`www.nexara.com.mx`)
+      - traefik.http.routers.public.rule=Host(`web.nexara.com.mx`) || Host(`nexara.com.mx`) || Host(`www.nexara.com.mx`)
       - traefik.http.routers.public.entrypoints=websecure
       - traefik.http.routers.public.tls.certresolver=letsencrypt
       - traefik.http.routers.public.service=nexara
