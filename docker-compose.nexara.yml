@@ -31,16 +31,17 @@ services:
       - proxy
     labels:
       - traefik.enable=true
-      # Main console subdomain
-      - traefik.http.routers.nexara-web.rule=Host(`consola.nexara.com.mx`,`console.nexara.com.mx`,`app.nexara.com.mx`)
-      - traefik.http.routers.nexara-web.entrypoints=websecure
-      - traefik.http.routers.nexara-web.tls.certresolver=letsencrypt
-      - traefik.http.services.nexara-web.loadbalancer.server.port=3000
-      # Public site subdomains
-      - traefik.http.routers.nexara-public-web.rule=Host(`web.nexara.com.mx`,`nexara.com.mx`,`www.nexara.com.mx`)
-      - traefik.http.routers.nexara-public-web.entrypoints=websecure
-      - traefik.http.routers.nexara-public-web.tls.certresolver=letsencrypt
-      - traefik.http.services.nexara-public-web.loadbalancer.server.port=3000
+      - traefik.http.services.nexara.loadbalancer.server.port=3000
+      # Console subdomains
+      - traefik.http.routers.console.rule=Host(`consola.nexara.com.mx`,`console.nexara.com.mx`,`app.nexara.com.mx`)
+      - traefik.http.routers.console.entrypoints=websecure
+      - traefik.http.routers.console.tls.certresolver=letsencrypt
+      - traefik.http.routers.console.service=nexara
+      # Public subdomains
+      - traefik.http.routers.public.rule=Host(`web.nexara.com.mx`,`nexara.com.mx`,`www.nexara.com.mx`)
+      - traefik.http.routers.public.entrypoints=websecure
+      - traefik.http.routers.public.tls.certresolver=letsencrypt
+      - traefik.http.routers.public.service=nexara
 
   nexara-db:
     image: postgres:16
