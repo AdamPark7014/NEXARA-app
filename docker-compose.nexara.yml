@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   nexara-api:
     image: nexara-api:latest
@@ -61,8 +59,8 @@ services:
 
 networks:
   nexara_internal:
+    external: true
     name: nexara_internal
-    driver: bridge
   proxy:
     external: true
     name: proxy
