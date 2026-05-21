@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  nexara-api:
+    image: nexara-api:latest
+    container_name: nexara-api
+    restart: unless-stopped
+    expose:
+      - 3001
+    environment:
+      - DATABASE_URL=postgresql://nexara:Nx@r4_Secure_2024!@nexara-db:5432/nexara?schema=public
+      - NODE_ENV=production
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key}
+    depends_on:
+      - nexara-db
+    networks:
+      - nexara_internal
+      - proxy
+    labels:
+      - traefik.enable=false
+
+  nexara-web:
+    image: nexara-web:latest
+    container_name: nexara-web
+    restart: unless-stopped
+    expose:
+      - 3000
+    environment:
+      - NEXT_PUBLIC_API_URL=http://api.nexara.com.mx
+      - NEXT_PUBLIC_BASE_URL=http://consola.nexara.com.mx
+    networks:
+      - nexara_internal
+      - proxy
+    labels:
+      - traefik.enable=true
+      # Main console subdomain
+      - traefik.http.routers.nexara-web.rule=Host(`consola.nexara.com.mx`,`console.nexara.com.mx`,`app.nexara.com.mx`)
+      - traefik.http.routers.nexara-web.entrypoints=websecure
+      - traefik.http.routers.nexara-web.tls.certresolver=letsencrypt
+      - traefik.http.services.nexara-web.loadbalancer.server.port=3000
+      # Public site subdomains
+      - traefik.http.routers.nexara-public-web.rule=Host(`web.nexara.com.mx`,`nexara.com.mx`,`www.nexara.com.mx`)
+      - traefik.http.routers.nexara-public-web.entrypoints=websecure
+      - traefik.http.routers.nexara-public-web.tls.certresolver=letsencrypt
+      - traefik.http.services.nexara-public-web.loadbalancer.server.port=3000
+
+  nexara-db:
+    image: postgres:16
+    container_name: nexara-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=nexara
+      - POSTGRES_PASSWORD=Nx@r4_Secure_2024!
+      - POSTGRES_DB=nexara
+    volumes:
+      - nexara-db-data:/var/lib/postgresql/data
+    networks:
+      - nexara_internal
+    labels:
+      - traefik.enable=false
+
+networks:
+  nexara_internal:
+    name: nexara_internal
+    driver: bridge
+  proxy:
+    external: true
+    name: proxy
+
+volumes:
+  nexara-db-data:
+    name: nexara-db-data
