@@ -54,13 +54,17 @@ export default function WebPanelLayout({ children }: { children: React.ReactNode
   }, [pathname]);
 
   if (pathname && pathname.includes("/login")) {
-    return <main className={styles.webPanelMain}>{children}</main>;
+    return (
+      <main className={styles.webPanelMain} data-nx-panel="web">
+        {children}
+      </main>
+    );
   }
 
   const closeMenu = () => setMobileMenuOpen(false);
 
   return (
-    <div className={`${consoleStyles.consoleLayout} ${styles.webPanelShell}`}>
+    <div className={`${consoleStyles.consoleLayout} ${styles.webPanelShell}`} data-nx-panel="web">
       {isMobile && (
         <header className={styles.webMobileTopbar}>
           <div className={`${styles.webMobileBrand} ${consoleStyles.sidebarLogo}`}>

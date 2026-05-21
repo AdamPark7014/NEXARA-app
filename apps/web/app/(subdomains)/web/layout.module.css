@@ -1,46 +1,84 @@
-/* Shell panel web: consoleLayout + webPanelShell */
+/* ============================================================
+   NEXARA · Web Panel Shell — premium edition
+   Usa los tokens premium globales + paleta de marca scoped
+   con [data-nx-panel="web"] definida en globals.scss.
+   ============================================================ */
 .webPanelShell {
-  --control-height: 40px;
-  --control-padding-y: 0.54rem;
-  --control-padding-x: 0.7rem;
-  --table-cell-y: 0.66rem;
-  --table-cell-x: 0.72rem;
-  background: var(--background);
-}
-
-:global(body.light) .webPanelShell {
-  background: linear-gradient(180deg, #f3f8ff 0%, #edf5ff 100%);
-}
-
-:global(body.dark) .webPanelShell {
-  background: linear-gradient(180deg, #0b1627 0%, #111f35 100%);
+  --control-height: 42px;
+  --control-padding-y: 0.62rem;
+  --control-padding-x: 0.78rem;
+  --table-cell-y: 0.7rem;
+  --table-cell-x: 0.78rem;
+  background: var(--pw-shell-bg, var(--background));
+  min-height: 100vh;
 }
 
 .webPanelMain {
   flex: 1;
   min-width: 0;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--surface) 94%, transparent),
-    color-mix(in srgb, var(--surface-2) 88%, transparent)
-  );
-  border: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
-  box-shadow: 0 14px 30px rgba(8, 28, 50, 0.12);
-  color: var(--foreground);
+  position: relative;
+  isolation: isolate;
+  color: var(--pw-text, var(--foreground));
+  font-family: var(--nx-font-body, var(--font-base));
+  background: transparent;
   padding: var(--panel-padding-y) var(--panel-padding-x);
-  border-radius: 16px;
+  border-radius: var(--nx-radius-2xl);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(18px, 2.4vw, 28px);
 }
 
+/* Tie-in con el sidebar teal: aura sutil emanando del lado izquierdo */
+.webPanelMain::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    radial-gradient(ellipse 52% 32% at -2% 12%, color-mix(in srgb, var(--nx-teal) 12%, transparent), transparent 65%),
+    radial-gradient(ellipse 48% 30% at 102% 92%, color-mix(in srgb, var(--nx-orange) 9%, transparent), transparent 70%);
+  opacity: 0.85;
+  animation: pw-shell-breathe 14s ease-in-out infinite;
+}
+
+body.dark .webPanelMain::before {
+  background:
+    radial-gradient(ellipse 52% 32% at -2% 12%, color-mix(in srgb, var(--nx-teal) 18%, transparent), transparent 65%),
+    radial-gradient(ellipse 48% 30% at 102% 92%, color-mix(in srgb, var(--nx-maroon) 22%, transparent), transparent 70%);
+}
+
+@keyframes pw-shell-breathe {
+  0%, 100% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .webPanelMain::before {
+    animation: none;
+  }
+}
+
+/* ====================== Mobile top bar ====================== */
 .webMobileTopbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px 16px;
+  padding: 14px 18px;
   width: 100%;
   box-sizing: border-box;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  background: color-mix(in srgb, var(--surface) 94%, var(--background));
+  border-bottom: 1px solid var(--pw-line, var(--border));
+  background: color-mix(in srgb, var(--pw-surface, var(--surface)) 94%, transparent);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
   position: sticky;
   top: 0;
   z-index: 12003;
@@ -58,44 +96,89 @@
   border: none;
   background: transparent;
   color: inherit;
-  font-size: 1.35rem;
+  font-size: 1.4rem;
   line-height: 1;
   cursor: pointer;
   border-radius: 10px;
-  padding: 4px 10px;
+  padding: 4px 12px;
+  transition: background var(--nx-motion-fast) var(--nx-ease-out);
 }
 
 .drawerClose:hover {
-  background: color-mix(in srgb, var(--foreground) 8%, transparent);
+  background: color-mix(in srgb, var(--nx-teal) 12%, transparent);
 }
 
+/* ====================== Footer strip ====================== */
 .webPanelFooterStrip {
   margin-top: auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 12px;
-  color: var(--text-tertiary);
-  padding: 10px 0 0;
-  border-top: 1px solid var(--border);
+  gap: 12px;
+  font-size: var(--nx-text-xs);
+  font-family: var(--nx-font-ui);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--pw-text-soft, var(--text-tertiary));
+  padding: 14px 4px 6px;
+  border-top: 1px solid var(--pw-divider, var(--border));
+  font-weight: 600;
 }
 
 .webPanelFooterStrip strong {
-  color: var(--primary);
+  position: relative;
+  padding-left: 16px;
+  color: var(--nx-teal-soft, var(--primary));
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
 
+.webPanelFooterStrip strong::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--nx-teal);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--nx-teal) 22%, transparent);
+  animation: pw-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes pw-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--nx-teal) 22%, transparent);
+  }
+  50% {
+    opacity: 0.65;
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--nx-teal) 14%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .webPanelFooterStrip strong::before {
+    animation: none;
+  }
+}
+
+/* ====================== Responsive ====================== */
 @media (max-width: 900px) {
   .webPanelMain {
-    padding: 14px 12px 18px;
+    padding: 16px 14px 22px;
+    border-radius: var(--nx-radius-xl);
   }
 }
 
 @media (max-width: 640px) {
   .webPanelMain {
-    padding: 12px 8px 16px;
+    padding: 14px 10px 20px;
+    border-radius: var(--nx-radius-lg);
   }
 
   .webMobileTopbar {
-    padding: 10px 12px;
+    padding: 10px 14px;
   }
 }

@@ -2,6 +2,42 @@
   --font-base: "Manrope", "Segoe UI", "Inter", "Helvetica Neue", sans-serif;
   --font-heading: "Space Grotesk", "Manrope", "Segoe UI", sans-serif;
 
+  /* ============================================================
+     NEXARA · Brand Manual Tokens (Paleta + Tipografías oficiales)
+     Estos tokens son globales (additive) pero las redefiniciones
+     visuales se aplican únicamente al sitio público vía
+     `.public-friendly` para no afectar a los subdominios.
+     ============================================================ */
+  --nx-orange: #f08a1e;
+  --nx-orange-strong: #d77713;
+  --nx-orange-soft: #fbb15c;
+  --nx-teal: #10a183;
+  --nx-teal-strong: #0b7d65;
+  --nx-teal-soft: #4dc2a9;
+  --nx-skyblue: #6ec5d8;
+  --nx-skyblue-strong: #46aabf;
+  --nx-skyblue-soft: #a4dde9;
+  --nx-magenta: #a85299;
+  --nx-magenta-strong: #843f78;
+  --nx-magenta-soft: #c97cbd;
+  --nx-maroon: #531318;
+  --nx-maroon-strong: #3b0c0f;
+  --nx-maroon-soft: #82242a;
+  --nx-ink: #0d0f12;
+  --nx-paper: #f6f4ef;
+
+  /* Tipografías por uso (manual de marca).
+     Las variables base --nx-font-display / --nx-font-ui / --nx-font-body
+     son inyectadas por next/font en <html className="..."> (Space Grotesk,
+     Inter Tight, Manrope). Aquí solo declaramos los alias semánticos. */
+  --nx-font-hero: var(--nx-font-display, "Space Grotesk", "Manrope", "Segoe UI", sans-serif); /* H1 Bold */
+  --nx-font-section: var(--nx-font-display, "Space Grotesk", "Manrope", "Segoe UI", sans-serif); /* H2 Medium */
+  --nx-font-subtitle: var(--nx-font-display, "Space Grotesk", "Manrope", "Segoe UI", sans-serif); /* H3 Medium */
+  --nx-font-nav: var(--nx-font-ui, "Inter Tight", "Inter", "Segoe UI", sans-serif); /* Navbar Medium */
+  --nx-font-cta: var(--nx-font-ui, "Inter Tight", "Inter", "Segoe UI", sans-serif); /* Botones CTA Semibold */
+  --nx-font-numbers: var(--nx-font-display, "Space Grotesk", "Manrope", "Segoe UI", sans-serif); /* Métricas Bold */
+  --nx-font-footer: var(--nx-font-ui, "Inter Tight", "Inter", "Segoe UI", sans-serif); /* Footer Regular */
+
   --radius-sm: 12px;
   --radius-md: 16px;
   --radius-lg: 24px;
@@ -39,6 +75,59 @@
   --motion-fast: 0.18s;
   --motion-base: 0.28s;
   --motion-slow: 0.44s;
+
+  /* ============================================================
+     NEXARA · Premium design tokens (neutrales, sin tema)
+     Disponibles globalmente: sitio público, panel web,
+     subdominios — sin reescribir colores semánticos.
+     ============================================================ */
+  --nx-radius-md: 16px;
+  --nx-radius-lg: 22px;
+  --nx-radius-xl: 28px;
+  --nx-radius-2xl: 34px;
+
+  --nx-shadow-xs: 0 2px 4px rgba(0, 0, 0, 0.18), 0 1px 2px rgba(0, 0, 0, 0.12);
+  --nx-shadow-sm:
+    0 4px 8px rgba(0, 0, 0, 0.18),
+    0 2px 4px rgba(0, 0, 0, 0.12);
+  --nx-shadow-md:
+    0 8px 18px rgba(0, 0, 0, 0.24),
+    0 4px 8px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --nx-shadow-lg:
+    0 18px 38px rgba(0, 0, 0, 0.32),
+    0 8px 16px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --nx-shadow-xl:
+    0 28px 64px rgba(0, 0, 0, 0.4),
+    0 14px 28px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+
+  --nx-glow-teal: 0 20px 48px color-mix(in srgb, var(--nx-teal) 38%, transparent);
+  --nx-glow-orange: 0 20px 48px color-mix(in srgb, var(--nx-orange) 38%, transparent);
+  --nx-glow-magenta: 0 20px 48px color-mix(in srgb, var(--nx-magenta) 38%, transparent);
+  --nx-glow-skyblue: 0 20px 48px color-mix(in srgb, var(--nx-skyblue) 38%, transparent);
+  --nx-glow-maroon: 0 20px 48px color-mix(in srgb, var(--nx-maroon) 50%, transparent);
+
+  --nx-glass-blur: blur(18px) saturate(140%);
+  --nx-hairline: 1px solid rgba(255, 255, 255, 0.08);
+  --nx-hairline-strong: 1px solid rgba(255, 255, 255, 0.14);
+
+  --nx-text-xs: clamp(0.72rem, 0.7rem + 0.1vw, 0.78rem);
+  --nx-text-sm: clamp(0.84rem, 0.82rem + 0.1vw, 0.92rem);
+  --nx-text-base: clamp(0.96rem, 0.94rem + 0.15vw, 1.06rem);
+  --nx-text-lg: clamp(1.06rem, 1rem + 0.3vw, 1.2rem);
+  --nx-text-xl: clamp(1.2rem, 1.1rem + 0.5vw, 1.45rem);
+  --nx-text-2xl: clamp(1.42rem, 1.2rem + 0.9vw, 1.85rem);
+  --nx-text-3xl: clamp(1.8rem, 1.4rem + 1.6vw, 2.45rem);
+  --nx-text-4xl: clamp(2.25rem, 1.6rem + 2.4vw, 3.25rem);
+  --nx-text-5xl: clamp(2.8rem, 2rem + 3.2vw, 4.25rem);
+
+  --nx-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --nx-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --nx-motion-fast: 180ms;
+  --nx-motion-base: 280ms;
+  --nx-motion-slow: 480ms;
 }
 
 * {
@@ -684,5 +773,444 @@ textarea:disabled {
     padding-block: 0.82rem;
     padding-inline: 0.9rem;
   }
+}
+
+/* ============================================================
+   NEXARA · Public site brand layer (premium edition)
+   Aplicado solo al sitio público (.public-friendly). Reescribe
+   tokens semánticos para alinear con la paleta del manual de
+   marca SIN afectar ningún subdominio.
+   ============================================================ */
+.public-friendly {
+  /* Paleta semántica reasignada a los colores oficiales */
+  --primary: var(--nx-teal);
+  --primary-strong: var(--nx-teal-strong);
+  --secondary: var(--nx-skyblue);
+  --accent: var(--nx-orange);
+  --accent-strong: var(--nx-orange-strong);
+  --support: var(--nx-skyblue);
+  --highlight: var(--nx-magenta);
+  --deep: var(--nx-maroon);
+
+  /* Tipografías globales del manual aplicadas al sitio público */
+  --font-base: var(--nx-font-body, "Manrope", "Inter", "Segoe UI", sans-serif);
+  --font-heading: var(--nx-font-display, "Space Grotesk", "Manrope", "Segoe UI", sans-serif);
+
+  /* === Premium gradients (mesh + linear) === */
+  --nx-gradient-hero: linear-gradient(135deg, var(--nx-teal) 0%, var(--nx-skyblue) 100%);
+  --nx-gradient-warm: linear-gradient(135deg, var(--nx-orange) 0%, var(--nx-maroon) 100%);
+  --nx-gradient-cool: linear-gradient(135deg, var(--nx-skyblue) 0%, var(--nx-teal) 100%);
+  --nx-gradient-creative: linear-gradient(135deg, var(--nx-magenta) 0%, var(--nx-maroon) 100%);
+  --nx-gradient-spectrum: linear-gradient(120deg,
+    var(--nx-teal) 0%,
+    var(--nx-skyblue) 30%,
+    var(--nx-orange) 65%,
+    var(--nx-magenta) 100%);
+
+  /* Aliases brand-tinted (mantenidos para compatibilidad pública) */
+  --nx-shadow-soft: 0 12px 28px color-mix(in srgb, var(--nx-maroon) 22%, transparent);
+  --nx-shadow-glow: 0 18px 44px color-mix(in srgb, var(--nx-teal) 28%, transparent);
+
+  --nx-surface-deep: rgba(8, 12, 18, 0.96);
+  --nx-surface-elevated: rgba(14, 18, 26, 0.92);
+  --nx-surface-glass: color-mix(in srgb, var(--nx-maroon) 8%, rgba(16, 22, 32, 0.78));
+
+  --nx-section-gap: clamp(48px, 7vw, 96px);
+}
+
+/* === Selección y scrollbar premium en sitio público === */
+.public-friendly ::selection {
+  background: color-mix(in srgb, var(--nx-orange) 32%, transparent);
+  color: #fff;
+}
+
+.public-friendly {
+  scrollbar-color: color-mix(in srgb, var(--nx-teal) 40%, transparent) transparent;
+}
+
+/* === Decorative utility: textura sutil de grano para hero/heros === */
+.public-friendly [data-nx-grain] {
+  position: relative;
+  isolation: isolate;
+}
+
+.public-friendly [data-nx-grain]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    rgba(255, 255, 255, 0.04) 1px,
+    transparent 0
+  );
+  background-size: 3px 3px;
+  opacity: 0.5;
+  mix-blend-mode: overlay;
+  border-radius: inherit;
+}
+
+/* === Decorative utility: badge premium === */
+.public-friendly [data-nx-eyebrow] {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: var(--nx-hairline-strong);
+  background: color-mix(in srgb, var(--nx-orange) 14%, rgba(0, 0, 0, 0.3));
+  font-family: var(--nx-font-ui);
+  font-size: var(--nx-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.public-friendly [data-nx-eyebrow]::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  transform: rotate(45deg);
+  background: var(--nx-orange);
+}
+
+/* Tipografía base del sitio público: aplicar la jerarquía oficial */
+.public-friendly :where(h1) {
+  font-family: var(--nx-font-hero);
+  font-weight: 700; /* Bold (Hero) */
+  letter-spacing: -0.02em;
+}
+
+.public-friendly :where(h2) {
+  font-family: var(--nx-font-section);
+  font-weight: 500; /* Medium (Títulos de sección) */
+  letter-spacing: -0.012em;
+}
+
+.public-friendly :where(h3) {
+  font-family: var(--nx-font-subtitle);
+  font-weight: 500; /* Medium (Subtítulos) */
+  letter-spacing: -0.008em;
+}
+
+.public-friendly :where(p, li, label, dd, dt, blockquote, figcaption) {
+  font-family: var(--nx-font-body);
+  font-weight: 400;
+}
+
+/* CTAs (Inter Tight Semibold) */
+.public-friendly :where(
+  a[class*="cta" i],
+  a[class*="Cta" i],
+  button[class*="cta" i],
+  button[class*="Cta" i],
+  a[class*="primaryCta"],
+  a[class*="secondaryCta"],
+  button[class*="submit" i],
+  [class*="Button" i],
+  [class*="button" i]
+) {
+  font-family: var(--nx-font-cta);
+  font-weight: 600; /* Semibold */
+  letter-spacing: 0.005em;
+}
+
+/* Métricas y números grandes (Space Grotesk Bold) */
+.public-friendly :where(
+  [class*="metric" i] strong,
+  [class*="Metric" i] strong,
+  [class*="stat" i] strong,
+  [class*="Stat" i] strong,
+  [class*="number" i],
+  [class*="Number" i]
+) {
+  font-family: var(--nx-font-numbers);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Footer (Inter Tight Regular) */
+.public-friendly footer,
+.public-friendly [class*="footer" i],
+.public-friendly [class*="Footer" i] {
+  font-family: var(--nx-font-footer);
+  font-weight: 400;
+}
+
+/* ============================================================
+   NEXARA · Web panel premium layer (web.nexara.com.mx)
+   Aplicado solo al panel `web/*` vía [data-nx-panel="web"].
+   No reescribe colores semánticos globales; solo añade
+   superficies premium, tipografías de marca y tokens locales.
+   ============================================================ */
+[data-nx-panel="web"] {
+  /* Tipografías de marca dentro del panel */
+  --panel-font-family: var(--nx-font-body, "Manrope", "Inter", "Segoe UI", sans-serif);
+
+  /* Aliases locales que las hojas de cada módulo consumen.
+     Se ajustan según tema claro/oscuro. */
+  --pw-accent: var(--nx-teal);
+  --pw-accent-strong: var(--nx-teal-strong);
+  --pw-accent-soft: var(--nx-teal-soft);
+  --pw-warm: var(--nx-orange);
+  --pw-cool: var(--nx-skyblue);
+  --pw-deep: var(--nx-maroon);
+  --pw-radius: var(--nx-radius-xl);
+  --pw-radius-sm: var(--nx-radius-md);
+  --pw-radius-lg: var(--nx-radius-2xl);
+  --pw-ease: var(--nx-ease-out);
+  --pw-spring: var(--nx-ease-spring);
+}
+
+/* Light theme: superficie nieve, líneas teal de marca, contraste WCAG AA */
+body.light [data-nx-panel="web"] {
+  --pw-surface: #ffffff;
+  --pw-surface-2: #f6faf9;
+  --pw-surface-3: #ecf3f0;
+  --pw-text: #0c1a26;
+  --pw-text-strong: #061018;
+  --pw-text-muted: #3c5266;
+  --pw-text-soft: #607589;
+  --pw-text-on-accent: #ffffff;
+  --pw-accent-text: #0b7d65; /* teal-strong para texto sobre fondo claro */
+  --pw-accent-tint: color-mix(in srgb, var(--nx-teal) 10%, transparent);
+  --pw-accent-tint-strong: color-mix(in srgb, var(--nx-teal) 16%, transparent);
+  --pw-line: color-mix(in srgb, var(--nx-teal) 24%, rgba(12, 71, 69, 0.18));
+  --pw-line-soft: color-mix(in srgb, var(--nx-teal) 12%, rgba(12, 71, 69, 0.08));
+  --pw-line-bold: color-mix(in srgb, var(--nx-teal) 42%, rgba(12, 71, 69, 0.28));
+  --pw-shell-bg:
+    radial-gradient(ellipse 72% 58% at 0% 0%, color-mix(in srgb, var(--nx-teal) 10%, transparent), transparent 60%),
+    radial-gradient(ellipse 68% 56% at 100% 100%, color-mix(in srgb, var(--nx-orange) 8%, transparent), transparent 65%),
+    linear-gradient(180deg, #f4f8f6 0%, #ebf2ef 100%);
+  --pw-card-bg: linear-gradient(168deg, #ffffff 0%, #fbfdfc 100%);
+  --pw-card-bg-soft: color-mix(in srgb, var(--nx-teal) 4%, #ffffff);
+  --pw-card-bg-deep: linear-gradient(168deg, #fbfdfc 0%, color-mix(in srgb, var(--nx-teal) 5%, #f4f8f6) 100%);
+  --pw-input-bg: #ffffff;
+  --pw-input-bg-focus: #fafefd;
+  --pw-card-shadow:
+    0 1px 2px rgba(8, 24, 38, 0.05),
+    0 10px 28px rgba(8, 32, 48, 0.09);
+  --pw-card-shadow-hover:
+    0 2px 6px rgba(8, 24, 38, 0.08),
+    0 22px 48px rgba(8, 32, 48, 0.14);
+  --pw-card-shadow-pop:
+    0 4px 10px rgba(8, 24, 38, 0.1),
+    0 30px 60px rgba(8, 32, 48, 0.18);
+  --pw-divider: color-mix(in srgb, var(--nx-teal) 14%, rgba(12, 71, 69, 0.1));
+  --pw-divider-dashed: color-mix(in srgb, var(--nx-teal) 22%, rgba(12, 71, 69, 0.14));
+  --pw-focus-ring: 0 0 0 3px color-mix(in srgb, var(--nx-teal) 28%, transparent);
+  --pw-glow-hover: 0 16px 38px color-mix(in srgb, var(--nx-teal) 22%, transparent);
+  --pw-selection-bg: color-mix(in srgb, var(--nx-teal) 26%, transparent);
+  --pw-selection-fg: #061018;
+  --pw-scrollbar-thumb: color-mix(in srgb, var(--nx-teal) 38%, transparent);
+  --pw-scrollbar-thumb-hover: color-mix(in srgb, var(--nx-teal) 60%, transparent);
+}
+
+/* Dark theme: superficie ink con tinte teal, brand-on-dark, contraste cálido */
+body.dark [data-nx-panel="web"] {
+  --pw-surface: #0d1620;
+  --pw-surface-2: #11202d;
+  --pw-surface-3: #16293a;
+  --pw-text: #eaf4ff;
+  --pw-text-strong: #ffffff;
+  --pw-text-muted: #c1d2e1;
+  --pw-text-soft: #93a7b9;
+  --pw-text-on-accent: #061018;
+  --pw-accent-text: var(--nx-teal-soft);
+  --pw-accent-tint: color-mix(in srgb, var(--nx-teal) 14%, transparent);
+  --pw-accent-tint-strong: color-mix(in srgb, var(--nx-teal) 22%, transparent);
+  --pw-line: color-mix(in srgb, var(--nx-teal) 28%, rgba(255, 255, 255, 0.1));
+  --pw-line-soft: color-mix(in srgb, var(--nx-teal) 14%, rgba(255, 255, 255, 0.06));
+  --pw-line-bold: color-mix(in srgb, var(--nx-teal) 48%, rgba(255, 255, 255, 0.18));
+  --pw-shell-bg:
+    radial-gradient(ellipse 62% 52% at 0% 0%, color-mix(in srgb, var(--nx-teal) 16%, transparent), transparent 60%),
+    radial-gradient(ellipse 62% 52% at 100% 100%, color-mix(in srgb, var(--nx-maroon) 22%, transparent), transparent 65%),
+    linear-gradient(180deg, #060e16 0%, #0a141e 100%);
+  --pw-card-bg: linear-gradient(170deg,
+    color-mix(in srgb, var(--nx-teal) 8%, rgba(14, 22, 32, 0.96)),
+    rgba(8, 14, 22, 0.98));
+  --pw-card-bg-soft: linear-gradient(170deg,
+    color-mix(in srgb, var(--nx-teal) 12%, rgba(14, 22, 32, 0.92)),
+    rgba(10, 16, 24, 0.96));
+  --pw-card-bg-deep: linear-gradient(170deg,
+    color-mix(in srgb, var(--nx-maroon) 12%, rgba(10, 16, 26, 0.98)),
+    rgba(6, 10, 16, 0.99));
+  --pw-input-bg: color-mix(in srgb, var(--nx-teal) 6%, rgba(8, 14, 22, 0.9));
+  --pw-input-bg-focus: color-mix(in srgb, var(--nx-teal) 12%, rgba(8, 14, 22, 0.95));
+  --pw-card-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.32),
+    0 16px 36px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --pw-card-shadow-hover:
+    0 4px 10px rgba(0, 0, 0, 0.36),
+    0 24px 52px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --pw-card-shadow-pop:
+    0 6px 14px rgba(0, 0, 0, 0.42),
+    0 36px 80px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --pw-divider: color-mix(in srgb, var(--nx-teal) 20%, rgba(255, 255, 255, 0.08));
+  --pw-divider-dashed: color-mix(in srgb, var(--nx-teal) 28%, rgba(255, 255, 255, 0.1));
+  --pw-focus-ring: 0 0 0 3px color-mix(in srgb, var(--nx-teal) 38%, transparent);
+  --pw-glow-hover: 0 20px 48px color-mix(in srgb, var(--nx-teal) 28%, transparent);
+  --pw-selection-bg: color-mix(in srgb, var(--nx-teal) 36%, transparent);
+  --pw-selection-fg: #ffffff;
+  --pw-scrollbar-thumb: color-mix(in srgb, var(--nx-teal) 36%, transparent);
+  --pw-scrollbar-thumb-hover: color-mix(in srgb, var(--nx-teal) 56%, transparent);
+}
+
+/* ====== Utilidades panel — selección, scrollbar, focus, reveal ====== */
+[data-nx-panel="web"] ::selection {
+  background: var(--pw-selection-bg);
+  color: var(--pw-selection-fg);
+}
+
+[data-nx-panel="web"] {
+  scrollbar-width: thin;
+  scrollbar-color: var(--pw-scrollbar-thumb) transparent;
+}
+
+[data-nx-panel="web"] *::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+[data-nx-panel="web"] *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+[data-nx-panel="web"] *::-webkit-scrollbar-thumb {
+  background: var(--pw-scrollbar-thumb);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+[data-nx-panel="web"] *::-webkit-scrollbar-thumb:hover {
+  background: var(--pw-scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+
+[data-nx-panel="web"] :where(a, button, [role="button"], input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: var(--pw-focus-ring);
+  border-radius: 10px;
+}
+
+/* Reveal-on-load sutil para el contenido del panel */
+@keyframes pw-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+[data-nx-panel="web"] > main > * > * {
+  animation: pw-fade-up var(--nx-motion-slow) var(--nx-ease-out) both;
+}
+
+[data-nx-panel="web"] > main > * > *:nth-child(2) {
+  animation-delay: 70ms;
+}
+
+[data-nx-panel="web"] > main > * > *:nth-child(3) {
+  animation-delay: 140ms;
+}
+
+[data-nx-panel="web"] > main > * > *:nth-child(4) {
+  animation-delay: 210ms;
+}
+
+[data-nx-panel="web"] > main > * > *:nth-child(5) {
+  animation-delay: 280ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-nx-panel="web"] > main > * > * {
+    animation: none;
+  }
+}
+
+/* Tipografía base del panel: jerarquía premium con fuentes de marca */
+[data-nx-panel="web"] :where(h1) {
+  font-family: var(--nx-font-hero);
+  font-weight: 700;
+  letter-spacing: -0.022em;
+}
+
+[data-nx-panel="web"] :where(h2) {
+  font-family: var(--nx-font-section);
+  font-weight: 500;
+  letter-spacing: -0.014em;
+}
+
+[data-nx-panel="web"] :where(h3) {
+  font-family: var(--nx-font-subtitle);
+  font-weight: 500;
+  letter-spacing: -0.008em;
+}
+
+[data-nx-panel="web"] :where(p, li, label, dd, dt, small) {
+  font-family: var(--nx-font-body);
+}
+
+[data-nx-panel="web"] :where(
+  a[class*="utton" i],
+  button[class*="utton" i],
+  [class*="Cta" i],
+  [class*="cta" i]
+) {
+  font-family: var(--nx-font-cta);
+  font-weight: 600;
+  letter-spacing: 0.008em;
+}
+
+[data-nx-panel="web"] :where(
+  [class*="metric" i] strong,
+  [class*="Stat" i] strong,
+  [class*="number" i],
+  [class*="cardValue" i],
+  [class*="CardValue" i]
+) {
+  font-family: var(--nx-font-numbers);
+  font-weight: 700;
+  letter-spacing: -0.018em;
+}
+
+/* Eyebrow premium reutilizable dentro del panel */
+[data-nx-panel="web"] [data-nx-eyebrow] {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--pw-accent) 32%, var(--pw-line));
+  background: color-mix(in srgb, var(--pw-accent) 10%, transparent);
+  font-family: var(--nx-font-ui);
+  font-size: var(--nx-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--pw-accent-strong, var(--pw-accent));
+}
+
+body.dark [data-nx-panel="web"] [data-nx-eyebrow] {
+  color: color-mix(in srgb, var(--pw-accent-soft) 80%, #fff);
+}
+
+[data-nx-panel="web"] [data-nx-eyebrow]::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  transform: rotate(45deg);
+  background: var(--pw-accent);
 }
 
