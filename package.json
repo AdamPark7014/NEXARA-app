@@ -42,6 +42,9 @@
     "apk:install": "pwsh -ExecutionPolicy Bypass -File scripts/install-apk-windows.ps1",
     "apk:build-install": "pwsh -ExecutionPolicy Bypass -File scripts/install-apk-windows.ps1 -Build"
   },
+  "prisma": {
+    "seed": "node apps/api/prisma/seed.js"
+  },
   "dependencies": {
     "@nestjs/jwt": "^10.0.0",
     "@nestjs/platform-socket.io": "^10.0.0",
