@@ -26,12 +26,31 @@ http:
       service: dummy
 
     # HTTPS routes
+    # API backend (higher priority)
+    api:
+      rule: 'PathPrefix(`/api`)'
+      entryPoints:
+        - websecure
+      service: nexara-api
+      priority: 100
+      tls:
+        certResolver: letsencrypt
+
+    api-direct:
+      rule: 'Host(`api.nexara.com.mx`)'
+      entryPoints:
+        - websecure
+      service: nexara-api
+      tls:
+        certResolver: letsencrypt
+
     # Console/Admin Dashboard
     console:
       rule: 'Host(`consola.nexara.com.mx`) || Host(`console.nexara.com.mx`) || Host(`app.nexara.com.mx`)'
       entryPoints:
         - websecure
       service: nexara-web
+      priority: 10
       tls:
         certResolver: letsencrypt
 
@@ -41,15 +60,7 @@ http:
       entryPoints:
         - websecure
       service: nexara-web
-      tls:
-        certResolver: letsencrypt
-
-    # API backend
-    api:
-      rule: 'Host(`api.nexara.com.mx`)'
-      entryPoints:
-        - websecure
-      service: nexara-api
+      priority: 10
       tls:
         certResolver: letsencrypt
 
