@@ -1,6 +1,39 @@
 name: nexara
 
 services:
+  traefik:
+    image: traefik:v3.1
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - "--api.insecure=false"
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=proxy"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.email=admin@${WEB_DOMAIN}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--entrypoints.web.http.redirections.entrypoint.main=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./acme.json:/acme.json
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.dashboard.rule=Host(`traefik.${WEB_DOMAIN}`)
+      - traefik.http.routers.dashboard.entrypoints=websecure
+      - traefik.http.routers.dashboard.tls.certresolver=letsencrypt
+      - traefik.http.routers.dashboard.service=api@internal
+    networks:
+      - proxy
+
   db:
     image: postgres:16
     container_name: nexara-db
@@ -56,7 +89,7 @@ services:
       - traefik.enable=true
       - traefik.docker.network=proxy
       - traefik.http.routers.nexara-api.rule=Host(`${API_DOMAIN}`)
-      - traefik.http.routers.nexara-api.entrypoints=websecure
+      - traefik.http.routers.nexara-api.entrypoints=web,websecure
       - traefik.http.routers.nexara-api.tls.certresolver=letsencrypt
       - traefik.http.services.nexara-api.loadbalancer.server.port=3001
     networks:
@@ -109,7 +142,7 @@ services:
       - traefik.enable=true
       - traefik.docker.network=proxy
       - traefik.http.routers.nexara-web.rule=Host(`${WEB_DOMAIN}`) || Host(`www.${WEB_DOMAIN}`) || Host(`consola.nexara.com.mx`) || Host(`console.nexara.com.mx`) || Host(`ventas.nexara.com.mx`) || Host(`contabilidad.nexara.com.mx`) || Host(`tickets.nexara.com.mx`) || Host(`web.nexara.com.mx`)
-      - traefik.http.routers.nexara-web.entrypoints=websecure
+      - traefik.http.routers.nexara-web.entrypoints=web,websecure
       - traefik.http.routers.nexara-web.tls.certresolver=letsencrypt
       - traefik.http.services.nexara-web.loadbalancer.server.port=3000
     networks:
