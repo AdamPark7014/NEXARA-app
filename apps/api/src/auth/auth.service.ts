@@ -307,6 +307,7 @@ export class AuthService {
 
   async validateUser(email: string, password: string) {
     const normalizedEmail = email.trim();
+    console.log('[AUTH-DEBUG] validateUser email:', normalizedEmail);
     const user = await this.prisma.user.findFirst({
       where: {
         email: {
@@ -316,7 +317,15 @@ export class AuthService {
       },
       include: { role: true, department: true },
     });
-    if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+    console.log('[AUTH-DEBUG] Found user:', user?.email, user?.id);
+    if (!user) {
+      console.log('[AUTH-DEBUG] User not found');
+      throw new UnauthorizedException('Credenciales inválidas');
+    }
+    const isPasswordMatch = await bcrypt.compare(password, user.passwordHash);
+    console.log('[AUTH-DEBUG] Password match:', isPasswordMatch);
+    if (!isPasswordMatch) {
+      console.log('[AUTH-DEBUG] Password does not match');
       throw new UnauthorizedException('Credenciales inválidas');
     }
     return user;
