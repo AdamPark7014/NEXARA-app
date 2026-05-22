@@ -9,6 +9,11 @@ services:
       - DATABASE_URL=postgresql://nexara:Nx@r4_Secure_2024!@nexara-db:5432/nexara?schema=public
       - NODE_ENV=production
       - JWT_SECRET=${JWT_SECRET:-your-secret-key}
+      - HIKVISION_URL=${HIKVISION_URL:-http://hikcentral:54483}
+      - HIKVISION_PORT=${HIKVISION_PORT:-54483}
+      - HIKVISION_USERNAME=${HIKVISION_USERNAME:-admin}
+      - HIKVISION_PASSWORD=${HIKVISION_PASSWORD:-password}
+      - HIKVISION_TIMEOUT=${HIKVISION_TIMEOUT:-10000}
     depends_on:
       - nexara-db
     networks:

@@ -125,20 +125,34 @@ const nextConfig = {
   // El middleware se encarga de la reescritura de URLs
   
   async rewrites() {
-    // Use environment variable for API internal URL, with fallback for Docker hostname
-    const apiUrl = process.env.API_INTERNAL_URL || 'http://nexara-api:3001';
-    
+    // API_INTERNAL_URL puede venir como:
+    //   - http://nexara-api:3001        (sin /api)
+    //   - http://nexara-api:3001/api    (con /api, según docker-compose.nexara.yml)
+    // Tenemos que normalizarlo a un ORIGIN sin /api para que los rewrites no
+    // dupliquen el prefijo y terminen golpeando /api/api/... en el backend.
+    const rawApiUrl = (process.env.API_INTERNAL_URL || 'http://nexara-api:3001').trim();
+    const apiOrigin = rawApiUrl
+      .replace(/\/+$/, '')        // sin trailing slash
+      .replace(/\/api\/?$/, '');  // sin /api final
+    const apiRewrite = `${apiOrigin}/api/:path*`;
+    const uploadsRewrite = `${apiOrigin}/uploads/:path*`;
+
+    // Log diagnostico al arrancar Next.js. Se ve en `docker logs nexara-web` y
+    // ayuda a confirmar que el proxy interno apunta a donde debe.
+    if (process.env.NODE_ENV === 'production' || process.env.DEBUG_API_REWRITES === '1') {
+      // eslint-disable-next-line no-console
+      console.log('[nexara-web] API_INTERNAL_URL =', rawApiUrl);
+      // eslint-disable-next-line no-console
+      console.log('[nexara-web] rewrite /api/:path*    ->', apiRewrite);
+      // eslint-disable-next-line no-console
+      console.log('[nexara-web] rewrite /uploads/:path* ->', uploadsRewrite);
+    }
+
     return {
       fallback: [
-        {
-          source: '/api/:path*',
-          destination: `${apiUrl}/api/:path*`,
-        },
+        { source: '/api/:path*', destination: apiRewrite },
         // Proxy de uploads: el navegador no accede al puerto 3001 directamente.
-        {
-          source: '/uploads/:path*',
-          destination: `${apiUrl}/uploads/:path*`,
-        },
+        { source: '/uploads/:path*', destination: uploadsRewrite },
       ],
     };
   },
