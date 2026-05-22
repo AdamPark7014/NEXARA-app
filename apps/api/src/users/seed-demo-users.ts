@@ -206,51 +206,73 @@ const cleanupIdentityDuplicates = async (data: {
 };
 
 async function main() {
-  // Roles con permisos explícitos según requerimiento
-  const roleConsolaUsuario = await upsertRoleWithAccess('Consola Usuario', {
-    accesoConsole: true,
-  });
-  const rolePanelVentasSolo = await upsertRoleWithAccess('Panel Ventas', {
-    accesoPanelVentas: true,
-  });
-  const roleConsolaCotizaciones = await upsertRoleWithAccess('Consola + Cotizaciones', {
-    accesoConsole: true,
-    accesoCotizaciones: true,
-  });
-  const roleConsolaGestionCvs = await upsertRoleWithAccess('Consola + Gestion CVs', {
-    accesoConsole: true,
-    accesoGestionCvs: true,
-  });
-  const roleAdmin4Accesos = await upsertRoleWithAccess('Admin 4 Accesos', {
-    accesoConsole: true,
-    accesoConsoleAdmin: true,
-    accesoGestionUsuarios: true,
-    accesoContabilidad: true,
-  });
+  try {
+    console.log('[SEED] Iniciando seed-demo-users.ts...');
+    console.log('[SEED] DATABASE_URL:', process.env.DATABASE_URL || 'NO DEFINIDO');
+    
+    // Roles con permisos explícitos según requerimiento
+    console.log('[SEED] Creando roles...');
+    const roleConsolaUsuario = await upsertRoleWithAccess('Consola Usuario', {
+      accesoConsole: true,
+    });
+    console.log(`[SEED] ✓ Rol 'Consola Usuario' id=${roleConsolaUsuario.id}`);
+    
+    const rolePanelVentasSolo = await upsertRoleWithAccess('Panel Ventas', {
+      accesoPanelVentas: true,
+    });
+    console.log(`[SEED] ✓ Rol 'Panel Ventas' id=${rolePanelVentasSolo.id}`);
+    
+    const roleConsolaCotizaciones = await upsertRoleWithAccess('Consola + Cotizaciones', {
+      accesoConsole: true,
+      accesoCotizaciones: true,
+    });
+    console.log(`[SEED] ✓ Rol 'Consola + Cotizaciones' id=${roleConsolaCotizaciones.id}`);
+    
+    const roleConsolaGestionCvs = await upsertRoleWithAccess('Consola + Gestion CVs', {
+      accesoConsole: true,
+      accesoGestionCvs: true,
+    });
+    console.log(`[SEED] ✓ Rol 'Consola + Gestion CVs' id=${roleConsolaGestionCvs.id}`);
+    
+    const roleAdmin4Accesos = await upsertRoleWithAccess('Admin 4 Accesos', {
+      accesoConsole: true,
+      accesoConsoleAdmin: true,
+      accesoGestionUsuarios: true,
+      accesoContabilidad: true,
+    });
+    console.log(`[SEED] ✓ Rol 'Admin 4 Accesos' id=${roleAdmin4Accesos.id}`);
 
-  // Departamentos específicos según tabla operativa
-  const deptVentas = await prisma.department.upsert({
-    where: { nombre: 'Ventas' },
-    update: {},
-    create: { nombre: 'Ventas' },
-  });
-  const deptIngCampo = await prisma.department.upsert({
-    where: { nombre: 'Ingeniería de campo' },
-    update: {},
-    create: { nombre: 'Ingeniería de campo' },
-  });
-  const deptAdministracion = await prisma.department.upsert({
-    where: { nombre: 'Administración' },
-    update: {},
-    create: { nombre: 'Administración' },
-  });
-  const deptOperaciones = await prisma.department.upsert({
-    where: { nombre: 'Operaciones' },
-    update: {},
-    create: { nombre: 'Operaciones' },
-  });
+    // Departamentos específicos según tabla operativa
+    console.log('[SEED] Creando departamentos...');
+    const deptVentas = await prisma.department.upsert({
+      where: { nombre: 'Ventas' },
+      update: {},
+      create: { nombre: 'Ventas' },
+    });
+    console.log(`[SEED] ✓ Departamento 'Ventas' id=${deptVentas.id}`);
+    
+    const deptIngCampo = await prisma.department.upsert({
+      where: { nombre: 'Ingeniería de campo' },
+      update: {},
+      create: { nombre: 'Ingeniería de campo' },
+    });
+    console.log(`[SEED] ✓ Departamento 'Ingeniería de campo' id=${deptIngCampo.id}`);
+    
+    const deptAdministracion = await prisma.department.upsert({
+      where: { nombre: 'Administración' },
+      update: {},
+      create: { nombre: 'Administración' },
+    });
+    console.log(`[SEED] ✓ Departamento 'Administración' id=${deptAdministracion.id}`);
+    
+    const deptOperaciones = await prisma.department.upsert({
+      where: { nombre: 'Operaciones' },
+      update: {},
+      create: { nombre: 'Operaciones' },
+    });
+    console.log(`[SEED] ✓ Departamento 'Operaciones' id=${deptOperaciones.id}`);
 
-  // Actualizar o crear usuarios demo por email
+    // Actualizar o crear usuarios demo por email
 
   // Contraseñas memorizables, diferenciadas y con mayor dificultad para altos rangos
   const passCEO = 'NexaraCeo2026@12888';
@@ -266,6 +288,9 @@ async function main() {
   const passLizbeth = 'Lizeth@0098%nzrv';
 
   // Superadmins protegidos
+  console.log('[SEED] Creando usuarios...');
+  console.log(`[SEED] Usando roleAdmin4Accesos.id=${roleAdmin4Accesos.id}, deptAdministracion.id=${deptAdministracion.id}`);
+  
   const userGerencia = await syncUserByIdentity({
     nombre: 'Christian Del Pozo',
     email: 'gerencia@nexara.com.mx',
@@ -274,6 +299,8 @@ async function main() {
     departmentId: deptAdministracion.id,
     nameAliases: ['Christian Del Pozo', 'Christian'],
   });
+  console.log(`[SEED] ✓ Usuario 'gerencia@nexara.com.mx' id=${userGerencia.id}`);
+  
   const userDeveloper = await syncUserByIdentity({
     nombre: 'Adam Del Pozo',
     email: 'developer@nexara.com.mx',
@@ -282,6 +309,7 @@ async function main() {
     departmentId: deptAdministracion.id,
     nameAliases: ['Adam Del Pozo', 'Adam'],
   });
+  console.log(`[SEED] ✓ Usuario 'developer@nexara.com.mx' id=${userDeveloper.id}`);
 
   const userKaren = await syncUserByIdentity({
     nombre: 'Karen Elizalde Sarmiento',
@@ -291,6 +319,8 @@ async function main() {
     departmentId: deptVentas.id,
     nameAliases: ['Karen Elizalde Sarmiento', 'Karen'],
   });
+  console.log(`[SEED] ✓ Usuario 'ventas@nexara.com.mx' id=${userKaren.id}`);
+  
   const userCarolina = await syncUserByIdentity({
     nombre: 'Carolina Juarez Alvarez',
     email: 'soporte@nexara.com.mx',
@@ -299,6 +329,8 @@ async function main() {
     departmentId: deptIngCampo.id,
     nameAliases: ['Carolina Juarez Alvarez', 'Carolina'],
   });
+  console.log(`[SEED] ✓ Usuario 'soporte@nexara.com.mx' id=${userCarolina.id}`);
+  
   const userAlejandro = await syncUserByIdentity({
     nombre: 'Alejandro Gonzales Bustamante',
     email: 'operaciones@nexara.com.mx',
@@ -308,6 +340,8 @@ async function main() {
     emailAliases: ['sistemas@nexara.com.mx'],
     nameAliases: ['Alejandro Gonzales Bustamante', 'Alejandro Gonzales', 'Alejandro'],
   });
+  console.log(`[SEED] ✓ Usuario 'operaciones@nexara.com.mx' id=${userAlejandro.id}`);
+  
   const userKarina = await syncUserByIdentity({
     nombre: 'Karina Martinez Flores',
     email: 'vendedor@nexara.com.mx',
@@ -316,6 +350,8 @@ async function main() {
     departmentId: deptVentas.id,
     nameAliases: ['Karina Martinez Flores', 'Karina'],
   });
+  console.log(`[SEED] ✓ Usuario 'vendedor@nexara.com.mx' id=${userKarina.id}`);
+  
   const userJulio = await syncUserByIdentity({
     nombre: 'Julio Cesar Rivera Vazquez',
     email: 'julio.rivazquez@nexara.com.mx',
@@ -324,6 +360,8 @@ async function main() {
     departmentId: deptIngCampo.id,
     nameAliases: ['Julio Cesar Rivera Vazquez', 'Julio César Rivera Vázquez', 'Julio'],
   });
+  console.log(`[SEED] ✓ Usuario 'julio.rivazquez@nexara.com.mx' id=${userJulio.id}`);
+  
   const userDavid = await syncUserByIdentity({
     nombre: 'David Morales Zenon',
     email: 'david.morzenon@nexara.com.mx',
@@ -332,6 +370,8 @@ async function main() {
     departmentId: deptIngCampo.id,
     nameAliases: ['David Morales Zenon', 'David'],
   });
+  console.log(`[SEED] ✓ Usuario 'david.morzenon@nexara.com.mx' id=${userDavid.id}`);
+  
   const userIsrael = await syncUserByIdentity({
     nombre: 'Israel Ramos Lima',
     email: 'israel.ralima@nexara.com.mx',
@@ -340,6 +380,8 @@ async function main() {
     departmentId: deptIngCampo.id,
     nameAliases: ['Israel Ramos Lima', 'Israel'],
   });
+  console.log(`[SEED] ✓ Usuario 'israel.ralima@nexara.com.mx' id=${userIsrael.id}`);
+  
   const userLuis = await syncUserByIdentity({
     nombre: 'Luis Joel Aguilar',
     email: 'direccion.operaciones@nexara.com.mx',
@@ -348,6 +390,8 @@ async function main() {
     departmentId: deptOperaciones.id,
     nameAliases: ['Luis Joel Aguilar', 'Luis'],
   });
+  console.log(`[SEED] ✓ Usuario 'direccion.operaciones@nexara.com.mx' id=${userLuis.id}`);
+  
   const userLizeth = await syncUserByIdentity({
     nombre: 'Lizeth Antele Antonio',
     email: 'administracion@nexara.com.mx',
@@ -356,7 +400,9 @@ async function main() {
     departmentId: deptAdministracion.id,
     nameAliases: ['Lizeth Antele Antonio', 'Lizbeth Antele Antonio', 'Lizeth', 'Lizbeth'],
   });
+  console.log(`[SEED] ✓ Usuario 'administracion@nexara.com.mx' id=${userLizeth.id}`);
 
+  console.log('[SEED] Limpiando duplicados...');
   const duplicateCounts = await Promise.all([
     cleanupIdentityDuplicates({ targetUserId: userGerencia.id, email: 'gerencia@nexara.com.mx', nombre: 'Christian Del Pozo', nameAliases: ['Christian Del Pozo', 'Christian'] }),
     cleanupIdentityDuplicates({ targetUserId: userDeveloper.id, email: 'developer@nexara.com.mx', nombre: 'Adam Del Pozo', nameAliases: ['Adam Del Pozo', 'Adam'] }),
@@ -401,6 +447,11 @@ async function main() {
   console.log('Usuarios eliminados por limpieza de seed:', removedUsers.count);
   console.log('Duplicados eliminados por match de identidad:', duplicatesRemoved);
   console.log('Usuarios demo actualizados.');
+  console.log('[SEED] ✓ Seed completado exitosamente');
+  } catch (error) {
+    console.error('[SEED] ❌ Error en seed-demo-users:', error);
+    throw error;
+  }
 }
 
 main()
