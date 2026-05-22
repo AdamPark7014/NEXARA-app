@@ -253,6 +253,8 @@ async function main() {
   // Actualizar o crear usuarios demo por email
 
   // Contraseñas memorizables, diferenciadas y con mayor dificultad para altos rangos
+  const passCEO = 'NexaraCeo2026@12888';
+  const passDeveloper = 'Developer2026@Nexara';
   const passCOO = 'NexaraCoo2026!@';
   const passSoporte = 'NexaraSoporte2026!';
   const passOperaciones = 'NexaraSistemas2026!';
@@ -262,6 +264,25 @@ async function main() {
   const passIsrael = 'Israel@0269$74uB';
   const passLuis = 'NexaraLui2026!@';
   const passLizbeth = 'Lizeth@0098%nzrv';
+
+  // Superadmins protegidos
+  const userGerencia = await syncUserByIdentity({
+    nombre: 'Christian Del Pozo',
+    email: 'gerencia@nexara.com.mx',
+    passwordHash: await bcrypt.hash(passCEO, 10),
+    roleId: roleAdmin4Accesos.id,
+    departmentId: deptAdministracion.id,
+    nameAliases: ['Christian Del Pozo', 'Christian'],
+  });
+  const userDeveloper = await syncUserByIdentity({
+    nombre: 'Adam Del Pozo',
+    email: 'developer@nexara.com.mx',
+    passwordHash: await bcrypt.hash(passDeveloper, 10),
+    roleId: roleAdmin4Accesos.id,
+    departmentId: deptAdministracion.id,
+    nameAliases: ['Adam Del Pozo', 'Adam'],
+  });
+
   const userKaren = await syncUserByIdentity({
     nombre: 'Karen Elizalde Sarmiento',
     email: 'ventas@nexara.com.mx',
@@ -337,6 +358,8 @@ async function main() {
   });
 
   const duplicateCounts = await Promise.all([
+    cleanupIdentityDuplicates({ targetUserId: userGerencia.id, email: 'gerencia@nexara.com.mx', nombre: 'Christian Del Pozo', nameAliases: ['Christian Del Pozo', 'Christian'] }),
+    cleanupIdentityDuplicates({ targetUserId: userDeveloper.id, email: 'developer@nexara.com.mx', nombre: 'Adam Del Pozo', nameAliases: ['Adam Del Pozo', 'Adam'] }),
     cleanupIdentityDuplicates({ targetUserId: userKaren.id, email: 'ventas@nexara.com.mx', nombre: 'Karen Elizalde Sarmiento', nameAliases: ['Karen Elizalde Sarmiento', 'Karen'] }),
     cleanupIdentityDuplicates({ targetUserId: userCarolina.id, email: 'soporte@nexara.com.mx', nombre: 'Carolina Juarez Alvarez', nameAliases: ['Carolina Juarez Alvarez', 'Carolina'] }),
     cleanupIdentityDuplicates({ targetUserId: userAlejandro.id, email: 'operaciones@nexara.com.mx', emailAliases: ['sistemas@nexara.com.mx'], nombre: 'Alejandro Gonzales Bustamante', nameAliases: ['Alejandro Gonzales Bustamante', 'Alejandro Gonzales', 'Alejandro'] }),
@@ -364,6 +387,8 @@ async function main() {
   });
 
   console.log('Contraseñas asignadas:');
+  console.log('Christian Del Pozo (CEO/Gerencia):', passCEO);
+  console.log('Adam Del Pozo (Developer):', passDeveloper);
   console.log('Karen Elizalde Sarmiento (COO):', passCOO);
   console.log('Carolina Juarez Alvarez (Ingeniera de Soporte):', passSoporte);
   console.log('Alejandro Gonzales Bustamante (Ingeniero de Sistemas):', passOperaciones);
@@ -375,7 +400,6 @@ async function main() {
   console.log('Lizbeth Antele Antonio (Administracion):', passLizbeth);
   console.log('Usuarios eliminados por limpieza de seed:', removedUsers.count);
   console.log('Duplicados eliminados por match de identidad:', duplicatesRemoved);
-  console.log('Superadmins no modificados: gerencia@nexara.com.mx, developer@nexara.com.mx');
   console.log('Usuarios demo actualizados.');
 }
 
