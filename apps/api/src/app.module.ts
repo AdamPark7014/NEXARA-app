@@ -62,6 +62,7 @@ import { EmailModule } from './common/email/email.module.js';
 import { CronModule } from './common/cron/cron.module.js';
 import { HrModule } from './hr/hr.module.js';
 import { SearchModule } from './search/search.module.js';
+import { AccessControlModule } from './access-control/access-control.module';
 
 @Module({
   imports: [
@@ -121,6 +122,7 @@ import { SearchModule } from './search/search.module.js';
     CronModule,
     HrModule,
     SearchModule,
+    AccessControlModule,
   ],
   controllers: [AppController, ExcelExportController, ExcelImportController],
   providers: [

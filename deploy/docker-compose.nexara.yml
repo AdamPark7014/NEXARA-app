@@ -45,6 +45,11 @@ services:
       SMTP_PASS: ${SMTP_PASS}
       SMTP_FROM: ${SMTP_FROM}
       GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+      HIKVISION_URL: ${HIKVISION_URL:-http://hikcentral:54483}
+      HIKVISION_PORT: ${HIKVISION_PORT:-54483}
+      HIKVISION_USERNAME: ${HIKVISION_USERNAME:-admin}
+      HIKVISION_PASSWORD: ${HIKVISION_PASSWORD:-password}
+      HIKVISION_TIMEOUT: ${HIKVISION_TIMEOUT:-10000}
     volumes:
       - ../uploads:/app/uploads
     labels:
