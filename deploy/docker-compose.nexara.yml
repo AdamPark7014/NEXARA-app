@@ -144,7 +144,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy
-      - traefik.http.routers.nexara-web.rule=Host(`${WEB_DOMAIN}`) || Host(`www.${WEB_DOMAIN}`) || Host(`consola.nexara.com.mx`) || Host(`console.nexara.com.mx`) || Host(`ventas.nexara.com.mx`) || Host(`contabilidad.nexara.com.mx`) || Host(`tickets.nexara.com.mx`) || Host(`web.nexara.com.mx`)
+      - traefik.http.routers.nexara-web.rule=Host(`nexara.com.mx`) || Host(`consola.nexara.com.mx`) || Host(`console.nexara.com.mx`) || Host(`ventas.nexara.com.mx`) || Host(`contabilidad.nexara.com.mx`) || Host(`tickets.nexara.com.mx`) || Host(`web.nexara.com.mx`)
       - traefik.http.routers.nexara-web.entrypoints=web,websecure
       - traefik.http.routers.nexara-web.middlewares=https-redirect@docker
       - traefik.http.routers.nexara-web.tls.certresolver=letsencrypt
