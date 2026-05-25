@@ -121,6 +121,86 @@ http:
     # Frontends (Next.js). El middleware de Next mapea cada host
     # a su carpeta interna y redirige aliases → canónicos.
     # ───────────────────────────────────────────────────────────
+    core-frontend:
+      rule: 'Host(`core.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
+      entryPoints: [websecure]
+      service: nexara-web
+      priority: 20
+      tls:
+        certResolver: letsencrypt
+
+    sales-frontend:
+      rule: 'Host(`sales.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
+      entryPoints: [websecure]
+      service: nexara-web
+      priority: 20
+      tls:
+        certResolver: letsencrypt
+
+    ops-frontend:
+      rule: 'Host(`ops.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
+      entryPoints: [websecure]
+      service: nexara-web
+      priority: 20
+      tls:
+        certResolver: letsencrypt
+
+    finance-frontend:
+      rule: 'Host(`finance.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
+      entryPoints: [websecure]
+      service: nexara-web
+      priority: 20
+      tls:
+        certResolver: letsencrypt
+
+    studio-frontend:
+      rule: 'Host(`studio.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
+      entryPoints: [websecure]
+      service: nexara-web
+      priority: 20
+      tls:
+        certResolver: letsencrypt
+
+    portal-frontend:
+      rule: 'Host(`portal.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
+      entryPoints: [websecure]
+      service: nexara-web
+      priority: 20
+      tls:
+        certResolver: letsencrypt
+
+    support-frontend:
+      rule: 'Host(`support.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
+      entryPoints: [websecure]
+      service: nexara-web
+      priority: 20
+      tls:
+        certResolver: letsencrypt
+
+    noc-frontend:
+      rule: 'Host(`noc.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
+      entryPoints: [websecure]
+      service: nexara-web
+      priority: 20
+      tls:
+        certResolver: letsencrypt
+
+    people-frontend:
+      rule: 'Host(`people.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
+      entryPoints: [websecure]
+      service: nexara-web
+      priority: 20
+      tls:
+        certResolver: letsencrypt
+
+    lab-frontend:
+      rule: 'Host(`lab.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
+      entryPoints: [websecure]
+      service: nexara-web
+      priority: 20
+      tls:
+        certResolver: letsencrypt
+
     erp-frontends:
       rule: 'Host(`core.nexara.com.mx`,`consola.nexara.com.mx`,`console.nexara.com.mx`,`app.nexara.com.mx`,`sales.nexara.com.mx`,`ventas.nexara.com.mx`,`crm.nexara.com.mx`,`ops.nexara.com.mx`,`operacion.nexara.com.mx`,`finance.nexara.com.mx`,`contabilidad.nexara.com.mx`,`admin.nexara.com.mx`,`studio.nexara.com.mx`,`media.nexara.com.mx`,`web.nexara.com.mx`,`portal.nexara.com.mx`,`tickets.nexara.com.mx`,`support.nexara.com.mx`,`help.nexara.com.mx`,`noc.nexara.com.mx`,`monitor.nexara.com.mx`,`people.nexara.com.mx`,`rh.nexara.com.mx`,`hr.nexara.com.mx`,`lab.nexara.com.mx`,`dev.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
       entryPoints:
