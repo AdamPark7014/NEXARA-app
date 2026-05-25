@@ -77,7 +77,7 @@ http:
     # Socket.IO backend (real-time) en TODOS los subdominios del ERP
     # ───────────────────────────────────────────────────────────
     socket-io:
-      rule: 'HostRegexp(`{sub:(core|consola|console|app|sales|ventas|crm|ops|operacion|finance|contabilidad|admin|studio|media|web|portal|tickets|support|help|noc|monitor|people|rh|hr|lab|dev)}.nexara.com.mx`) && PathPrefix(`/socket.io`)'
+      rule: 'Host(`core.nexara.com.mx`,`consola.nexara.com.mx`,`console.nexara.com.mx`,`app.nexara.com.mx`,`sales.nexara.com.mx`,`ventas.nexara.com.mx`,`crm.nexara.com.mx`,`ops.nexara.com.mx`,`operacion.nexara.com.mx`,`finance.nexara.com.mx`,`contabilidad.nexara.com.mx`,`admin.nexara.com.mx`,`studio.nexara.com.mx`,`media.nexara.com.mx`,`web.nexara.com.mx`,`portal.nexara.com.mx`,`tickets.nexara.com.mx`,`support.nexara.com.mx`,`help.nexara.com.mx`,`noc.nexara.com.mx`,`monitor.nexara.com.mx`,`people.nexara.com.mx`,`rh.nexara.com.mx`,`hr.nexara.com.mx`,`lab.nexara.com.mx`,`dev.nexara.com.mx`) && PathPrefix(`/socket.io`)'
       entryPoints:
         - websecure
       service: nexara-api
@@ -101,7 +101,7 @@ http:
     # API backend bajo /api en todos los subdominios del ERP
     # ───────────────────────────────────────────────────────────
     api:
-      rule: 'HostRegexp(`{sub:(core|consola|console|app|sales|ventas|crm|ops|operacion|finance|contabilidad|admin|studio|media|web|portal|tickets|support|help|noc|monitor|people|rh|hr|lab|dev)}.nexara.com.mx`) && PathPrefix(`/api`)'
+      rule: 'Host(`core.nexara.com.mx`,`consola.nexara.com.mx`,`console.nexara.com.mx`,`app.nexara.com.mx`,`sales.nexara.com.mx`,`ventas.nexara.com.mx`,`crm.nexara.com.mx`,`ops.nexara.com.mx`,`operacion.nexara.com.mx`,`finance.nexara.com.mx`,`contabilidad.nexara.com.mx`,`admin.nexara.com.mx`,`studio.nexara.com.mx`,`media.nexara.com.mx`,`web.nexara.com.mx`,`portal.nexara.com.mx`,`tickets.nexara.com.mx`,`support.nexara.com.mx`,`help.nexara.com.mx`,`noc.nexara.com.mx`,`monitor.nexara.com.mx`,`people.nexara.com.mx`,`rh.nexara.com.mx`,`hr.nexara.com.mx`,`lab.nexara.com.mx`,`dev.nexara.com.mx`) && PathPrefix(`/api`)'
       entryPoints:
         - websecure
       service: nexara-api
@@ -122,7 +122,7 @@ http:
     # a su carpeta interna y redirige aliases → canónicos.
     # ───────────────────────────────────────────────────────────
     erp-frontends:
-      rule: 'HostRegexp(`{sub:(core|consola|console|app|sales|ventas|crm|ops|operacion|finance|contabilidad|admin|studio|media|web|portal|tickets|support|help|noc|monitor|people|rh|hr|lab|dev)}.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
+      rule: 'Host(`core.nexara.com.mx`,`consola.nexara.com.mx`,`console.nexara.com.mx`,`app.nexara.com.mx`,`sales.nexara.com.mx`,`ventas.nexara.com.mx`,`crm.nexara.com.mx`,`ops.nexara.com.mx`,`operacion.nexara.com.mx`,`finance.nexara.com.mx`,`contabilidad.nexara.com.mx`,`admin.nexara.com.mx`,`studio.nexara.com.mx`,`media.nexara.com.mx`,`web.nexara.com.mx`,`portal.nexara.com.mx`,`tickets.nexara.com.mx`,`support.nexara.com.mx`,`help.nexara.com.mx`,`noc.nexara.com.mx`,`monitor.nexara.com.mx`,`people.nexara.com.mx`,`rh.nexara.com.mx`,`hr.nexara.com.mx`,`lab.nexara.com.mx`,`dev.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
       entryPoints:
         - websecure
       service: nexara-web
