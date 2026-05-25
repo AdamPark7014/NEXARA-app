@@ -77,35 +77,7 @@ http:
     # Socket.IO backend (real-time) en TODOS los subdominios del ERP
     # ───────────────────────────────────────────────────────────
     socket-io:
-      rule: >-
-        (
-          Host(`core.nexara.com.mx`) ||
-          Host(`consola.nexara.com.mx`) ||
-          Host(`console.nexara.com.mx`) ||
-          Host(`app.nexara.com.mx`) ||
-          Host(`sales.nexara.com.mx`) ||
-          Host(`ventas.nexara.com.mx`) ||
-          Host(`crm.nexara.com.mx`) ||
-          Host(`ops.nexara.com.mx`) ||
-          Host(`operacion.nexara.com.mx`) ||
-          Host(`finance.nexara.com.mx`) ||
-          Host(`contabilidad.nexara.com.mx`) ||
-          Host(`admin.nexara.com.mx`) ||
-          Host(`studio.nexara.com.mx`) ||
-          Host(`media.nexara.com.mx`) ||
-          Host(`web.nexara.com.mx`) ||
-          Host(`portal.nexara.com.mx`) ||
-          Host(`tickets.nexara.com.mx`) ||
-          Host(`support.nexara.com.mx`) ||
-          Host(`help.nexara.com.mx`) ||
-          Host(`noc.nexara.com.mx`) ||
-          Host(`monitor.nexara.com.mx`) ||
-          Host(`people.nexara.com.mx`) ||
-          Host(`rh.nexara.com.mx`) ||
-          Host(`hr.nexara.com.mx`) ||
-          Host(`lab.nexara.com.mx`) ||
-          Host(`dev.nexara.com.mx`)
-        ) && PathPrefix(`/socket.io`)
+      rule: 'HostRegexp(`{sub:(core|consola|console|app|sales|ventas|crm|ops|operacion|finance|contabilidad|admin|studio|media|web|portal|tickets|support|help|noc|monitor|people|rh|hr|lab|dev)}.nexara.com.mx`) && PathPrefix(`/socket.io`)'
       entryPoints:
         - websecure
       service: nexara-api
@@ -129,35 +101,7 @@ http:
     # API backend bajo /api en todos los subdominios del ERP
     # ───────────────────────────────────────────────────────────
     api:
-      rule: >-
-        (
-          Host(`core.nexara.com.mx`) ||
-          Host(`consola.nexara.com.mx`) ||
-          Host(`console.nexara.com.mx`) ||
-          Host(`app.nexara.com.mx`) ||
-          Host(`sales.nexara.com.mx`) ||
-          Host(`ventas.nexara.com.mx`) ||
-          Host(`crm.nexara.com.mx`) ||
-          Host(`ops.nexara.com.mx`) ||
-          Host(`operacion.nexara.com.mx`) ||
-          Host(`finance.nexara.com.mx`) ||
-          Host(`contabilidad.nexara.com.mx`) ||
-          Host(`admin.nexara.com.mx`) ||
-          Host(`studio.nexara.com.mx`) ||
-          Host(`media.nexara.com.mx`) ||
-          Host(`web.nexara.com.mx`) ||
-          Host(`portal.nexara.com.mx`) ||
-          Host(`tickets.nexara.com.mx`) ||
-          Host(`support.nexara.com.mx`) ||
-          Host(`help.nexara.com.mx`) ||
-          Host(`noc.nexara.com.mx`) ||
-          Host(`monitor.nexara.com.mx`) ||
-          Host(`people.nexara.com.mx`) ||
-          Host(`rh.nexara.com.mx`) ||
-          Host(`hr.nexara.com.mx`) ||
-          Host(`lab.nexara.com.mx`) ||
-          Host(`dev.nexara.com.mx`)
-        ) && PathPrefix(`/api`)
+      rule: 'HostRegexp(`{sub:(core|consola|console|app|sales|ventas|crm|ops|operacion|finance|contabilidad|admin|studio|media|web|portal|tickets|support|help|noc|monitor|people|rh|hr|lab|dev)}.nexara.com.mx`) && PathPrefix(`/api`)'
       entryPoints:
         - websecure
       service: nexara-api
@@ -178,35 +122,7 @@ http:
     # a su carpeta interna y redirige aliases → canónicos.
     # ───────────────────────────────────────────────────────────
     erp-frontends:
-      rule: >-
-        (
-          Host(`core.nexara.com.mx`) ||
-          Host(`consola.nexara.com.mx`) ||
-          Host(`console.nexara.com.mx`) ||
-          Host(`app.nexara.com.mx`) ||
-          Host(`sales.nexara.com.mx`) ||
-          Host(`ventas.nexara.com.mx`) ||
-          Host(`crm.nexara.com.mx`) ||
-          Host(`ops.nexara.com.mx`) ||
-          Host(`operacion.nexara.com.mx`) ||
-          Host(`finance.nexara.com.mx`) ||
-          Host(`contabilidad.nexara.com.mx`) ||
-          Host(`admin.nexara.com.mx`) ||
-          Host(`studio.nexara.com.mx`) ||
-          Host(`media.nexara.com.mx`) ||
-          Host(`web.nexara.com.mx`) ||
-          Host(`portal.nexara.com.mx`) ||
-          Host(`tickets.nexara.com.mx`) ||
-          Host(`support.nexara.com.mx`) ||
-          Host(`help.nexara.com.mx`) ||
-          Host(`noc.nexara.com.mx`) ||
-          Host(`monitor.nexara.com.mx`) ||
-          Host(`people.nexara.com.mx`) ||
-          Host(`rh.nexara.com.mx`) ||
-          Host(`hr.nexara.com.mx`) ||
-          Host(`lab.nexara.com.mx`) ||
-          Host(`dev.nexara.com.mx`)
-        ) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)
+      rule: 'HostRegexp(`{sub:(core|consola|console|app|sales|ventas|crm|ops|operacion|finance|contabilidad|admin|studio|media|web|portal|tickets|support|help|noc|monitor|people|rh|hr|lab|dev)}.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
       entryPoints:
         - websecure
       service: nexara-web
@@ -216,7 +132,16 @@ http:
 
     # Sitio público
     public:
-      rule: 'Host(`nexara.com.mx`) || Host(`www.nexara.com.mx`)'
+      rule: 'Host(`nexara.com.mx`)'
+      entryPoints:
+        - websecure
+      service: nexara-web
+      priority: 10
+      tls:
+        certResolver: letsencrypt
+
+    public-www:
+      rule: 'Host(`www.nexara.com.mx`)'
       entryPoints:
         - websecure
       service: nexara-web
