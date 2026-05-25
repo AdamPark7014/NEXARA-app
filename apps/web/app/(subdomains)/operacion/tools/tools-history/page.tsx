@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import styles from "../../console.module.css";
+import styles from "../../../console/console.module.css";
 import { useUser } from "@/components/UserContext";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import HelpTab from '@/components/HelpTab';
