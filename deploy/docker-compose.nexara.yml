@@ -134,15 +134,7 @@ services:
       NEXT_PUBLIC_STATE: ${WEB_NEXT_PUBLIC_STATE}
       API_INTERNAL_URL: http://nexara-api:3001/api
     labels:
-      - traefik.enable=true
-      - traefik.docker.network=proxy
-      # Hosts canónicos nuevos + aliases legacy (todos van al mismo Next.js;
-      # el middleware redirige 308 alias → canónico).
-      - traefik.http.routers.nexara-web.rule=Host(`nexara.com.mx`) || Host(`www.nexara.com.mx`) || Host(`core.nexara.com.mx`) || Host(`sales.nexara.com.mx`) || Host(`ops.nexara.com.mx`) || Host(`finance.nexara.com.mx`) || Host(`studio.nexara.com.mx`) || Host(`portal.nexara.com.mx`) || Host(`support.nexara.com.mx`) || Host(`noc.nexara.com.mx`) || Host(`people.nexara.com.mx`) || Host(`lab.nexara.com.mx`) || Host(`consola.nexara.com.mx`) || Host(`console.nexara.com.mx`) || Host(`app.nexara.com.mx`) || Host(`ventas.nexara.com.mx`) || Host(`crm.nexara.com.mx`) || Host(`operacion.nexara.com.mx`) || Host(`contabilidad.nexara.com.mx`) || Host(`admin.nexara.com.mx`) || Host(`web.nexara.com.mx`) || Host(`media.nexara.com.mx`) || Host(`tickets.nexara.com.mx`) || Host(`help.nexara.com.mx`) || Host(`monitor.nexara.com.mx`) || Host(`rh.nexara.com.mx`) || Host(`hr.nexara.com.mx`) || Host(`dev.nexara.com.mx`)
-      - traefik.http.routers.nexara-web.entrypoints=web,websecure
-      - traefik.http.routers.nexara-web.middlewares=https-redirect@docker
-      - traefik.http.routers.nexara-web.tls.certresolver=letsencrypt
-      - traefik.http.services.nexara-web.loadbalancer.server.port=3000
+      - traefik.enable=false
     networks:
       - internal
       - proxy
