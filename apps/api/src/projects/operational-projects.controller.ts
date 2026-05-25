@@ -12,7 +12,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { OperationalProjectsService } from './operational-projects.service.js';
-import { CreateOperationalProjectDto, UpdateOperationalProjectDto, ProjectStatusChangeDto, AssignProjectEngineerDto } from './dto/create-operational-project.dto.js';
+import { CreateOperationalProjectDto, UpdateOperationalProjectDto, ProjectStatusChangeDto, AssignProjectEngineerDto, CreateProjectActivityDto } from './dto/create-operational-project.dto.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { PERMISSIONS } from '../common/permissions.js';
@@ -91,6 +91,26 @@ export class OperationalProjectsController {
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
   getActivities(@Param('id', ParseIntPipe) projectId: number) {
     return this.operationalProjectsService.getProjectActivities(projectId);
+  }
+
+  @Post(':id/activities')
+  @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
+  createActivity(
+    @Param('id', ParseIntPipe) projectId: number,
+    @Body() dto: CreateProjectActivityDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.operationalProjectsService.createProjectActivity(projectId, dto, user.id);
+  }
+
+  @Post(':id/activities/from-sites')
+  @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
+  createSiteActivities(
+    @Param('id', ParseIntPipe) projectId: number,
+    @Body() body: { responsableId?: number },
+    @CurrentUser() user: any,
+  ) {
+    return this.operationalProjectsService.createSiteActivities(projectId, user.id, body.responsableId);
   }
 
   @Get(':id/engineers-activity-count')

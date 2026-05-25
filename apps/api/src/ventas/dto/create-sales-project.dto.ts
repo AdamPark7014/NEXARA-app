@@ -1,5 +1,5 @@
-import { IsDateString, IsInt, IsNumber, IsOptional, IsString } from 'class-validator';
-import { SalesProjectStatus } from '@prisma/client';
+import { IsDateString, IsEnum, IsInt, IsNumber, IsOptional, IsString } from 'class-validator';
+import { SalesProjectStatus, ServiceProjectType } from '@prisma/client';
 
 export class CreateSalesProjectDto {
   @IsInt()
@@ -7,6 +7,18 @@ export class CreateSalesProjectDto {
 
   @IsString()
   name!: string;
+
+  @IsOptional()
+  @IsEnum(ServiceProjectType)
+  projectType?: ServiceProjectType;
+
+  @IsOptional()
+  @IsString()
+  scopeSummary?: string;
+
+  @IsOptional()
+  @IsInt()
+  siteCount?: number;
 
   @IsOptional()
   @IsNumber()

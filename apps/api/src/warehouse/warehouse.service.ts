@@ -127,7 +127,6 @@ export class WarehouseService {
     reference?: string;
     notes?: string;
     purchaseOrderId?: number;
-    productionOrderId?: number;
   }, userId: number) {
     if (dto.type === 'TRANSFER' && (!dto.fromWarehouseId || !dto.toWarehouseId)) {
       throw new BadRequestException('Transferencias requieren almacén origen y destino');
@@ -150,7 +149,6 @@ export class WarehouseService {
         reference: dto.reference?.trim() || null,
         notes: dto.notes?.trim() || null,
         purchaseOrderId: dto.purchaseOrderId ?? null,
-        productionOrderId: dto.productionOrderId ?? null,
         createdById: userId,
       },
       include: { product: true, fromWarehouse: true, toWarehouse: true },

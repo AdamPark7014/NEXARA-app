@@ -207,14 +207,6 @@ data class BankAccountDto(
     val currency: String? = null,
 )
 
-data class WorkflowStepDto(
-    val id: Long,
-    val name: String? = null,
-    val status: String? = null,
-    val assignedTo: String? = null,
-    val updatedAt: String? = null,
-)
-
 /**
  * Endpoints de módulos secundarios (news, contact-messages, newsletter, audit,
  * analytics, expenses, fines, employee-payments, cotizaciones, lunch-breaks,
@@ -308,10 +300,6 @@ interface ExtraApi {
     @GET("accounting/banking/accounts")
     suspend fun getBankAccountsRaw(): okhttp3.ResponseBody
 
-    // Workflow
-    @GET("workflow")
-    suspend fun getWorkflowRaw(): okhttp3.ResponseBody
-
     // HR
     @GET("hr/leaves")
     suspend fun getHrLeavesRaw(): okhttp3.ResponseBody
@@ -321,16 +309,6 @@ interface ExtraApi {
 
     @GET("hr/dashboard")
     suspend fun getHrDashboardRaw(): okhttp3.ResponseBody
-
-    // Safety
-    @GET("safety/incidents")
-    suspend fun getSafetyIncidentsRaw(): okhttp3.ResponseBody
-
-    @GET("safety/permits")
-    suspend fun getSafetyPermitsRaw(): okhttp3.ResponseBody
-
-    @GET("safety/training")
-    suspend fun getSafetyTrainingRaw(): okhttp3.ResponseBody
 
     // Warehouse / Stock
     @GET("warehouse")
@@ -352,26 +330,12 @@ interface ExtraApi {
     @GET("procurement/supplier-evaluations")
     suspend fun getSupplierEvaluationsRaw(): okhttp3.ResponseBody
 
-    // Manufacturing
-    @GET("manufacturing/production")
-    suspend fun getProductionRaw(): okhttp3.ResponseBody
-
-    @GET("manufacturing/bom")
-    suspend fun getBomRaw(): okhttp3.ResponseBody
-
     // Maintenance
     @GET("maintenance/assets")
     suspend fun getMaintenanceAssetsRaw(): okhttp3.ResponseBody
 
     @GET("maintenance/work-orders")
     suspend fun getWorkOrdersRaw(): okhttp3.ResponseBody
-
-    // Quality
-    @GET("quality/inspections")
-    suspend fun getInspectionsRaw(): okhttp3.ResponseBody
-
-    @GET("quality/ncr")
-    suspend fun getNcrRaw(): okhttp3.ResponseBody
 
     // Service sheets
     @GET("service-sheets")

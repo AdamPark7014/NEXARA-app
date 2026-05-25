@@ -5,9 +5,10 @@ import { OperationalProjectsController } from './operational-projects.controller
 import { OperationalProjectsService } from './operational-projects.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { RealtimeModule } from '../realtime/realtime.module';
+import { ActivitiesModule } from '../activities/activities.module';
 
 @Module({
-  imports: [PrismaModule, RealtimeModule],
+  imports: [PrismaModule, RealtimeModule, ActivitiesModule],
   controllers: [ProjectsController, OperationalProjectsController],
   providers: [ProjectsService, OperationalProjectsService],
 })

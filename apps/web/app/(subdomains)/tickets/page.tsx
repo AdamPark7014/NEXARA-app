@@ -41,6 +41,7 @@ type Ticket = {
   branchName?: string | null;
   branchCity?: string | null;
   branchState?: string | null;
+  project?: { id: number; title: string; status: string; projectType?: string | null } | null;
   responsable?: { nombre: string } | null;
   evidencias?: Array<{ id: number; archivoUrl: string; tipoEvidencia: string; latitud?: number | null; longitud?: number | null; subidoEn?: string | null }>;
   serviceSheet?: { pdfUrl?: string | null; managerName?: string | null; signedName?: string | null } | null;
@@ -123,6 +124,17 @@ type PendingFeedback = {
   fechaFinalizacion?: string | null;
 };
 
+type ClientProject = {
+  id: number;
+  title: string;
+  status: string;
+  activityCount: number;
+  completedActivities: number;
+  progressPercent: number;
+  siteCount?: number | null;
+  scopeSummary?: string | null;
+};
+
 export default function ClientTicketsPage() {
   const { darkMode, toggleDarkMode } = useTheme();
   // Inicializar sesión desde sessionStorage directamente
@@ -163,6 +175,8 @@ export default function ClientTicketsPage() {
   const [evidenceLoadErrors, setEvidenceLoadErrors] = useState<Record<string, boolean>>({});
   const [mapPreviewErrors, setMapPreviewErrors] = useState<Record<string, number>>({});
   const [pendingFeedback, setPendingFeedback] = useState<PendingFeedback[]>([]);
+  const [clientProjects, setClientProjects] = useState<ClientProject[]>([]);
+  const [selectedProjectFilter, setSelectedProjectFilter] = useState<string>("");
   const [feedbackDrafts, setFeedbackDrafts] = useState<Record<number, {
     rating: string;
     wasOnTime: string;
@@ -433,9 +447,15 @@ export default function ClientTicketsPage() {
       endDate = new Date(reportEnd);
     }
 
-    const query = startDate && endDate
-      ? `?start=${encodeURIComponent(startDate.toISOString())}&end=${encodeURIComponent(endDate.toISOString())}`
-      : "";
+    const params = new URLSearchParams();
+    if (startDate && endDate) {
+      params.set("start", startDate.toISOString());
+      params.set("end", endDate.toISOString());
+    }
+    if (selectedProjectFilter) {
+      params.set("projectId", selectedProjectFilter);
+    }
+    const query = params.toString() ? `?${params.toString()}` : "";
 
     const res = await fetch(buildApiUrl(`client-portal/tickets${query}`), {
       headers: { Authorization: `Bearer ${token}` },
@@ -532,6 +552,14 @@ export default function ClientTicketsPage() {
     setPendingFeedback(Array.isArray(data) ? data : []);
   };
 
+  const fetchClientProjects = async (token: string) => {
+    const res = await fetch(buildApiUrl("client-portal/projects"), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json().catch(() => []);
+    setClientProjects(Array.isArray(data) ? data : []);
+  };
+
   useEffect(() => {
     if (session?.token) {
       fetchTickets(session.token);
@@ -539,8 +567,9 @@ export default function ClientTicketsPage() {
       fetchBranches(session.token);
       fetchRequests(session.token);
       fetchPendingFeedback(session.token);
+      fetchClientProjects(session.token);
     }
-  }, [session?.token, reportRange, reportStart, reportEnd]);
+  }, [session?.token, reportRange, reportStart, reportEnd, selectedProjectFilter]);
 
   useEffect(() => {
     if (!session?.token) return undefined;
@@ -1240,6 +1269,27 @@ export default function ClientTicketsPage() {
                   </div>
                 </div>
               )}
+              {clientProjects.length > 0 && (
+                <div className={`card ${styles.cardPanel}`}>
+                  <p className={styles.sectionTitle}>Proyectos en curso</p>
+                  <p className={styles.sectionSubtitle}>Instalaciones y servicios activos en sus sucursales.</p>
+                  <div className={styles.listStack}>
+                    {clientProjects.map((p) => (
+                      <div key={p.id} className={styles.itemCard}>
+                        <div className={styles.itemHeader}>
+                          <strong>{p.title}</strong>
+                          <span className="badge">{p.progressPercent}%</span>
+                        </div>
+                        <div className={styles.mutedText}>
+                          {p.completedActivities}/{p.activityCount} OT completadas
+                          {p.siteCount ? ` · ${p.siteCount} sitio(s)` : ""}
+                        </div>
+                        {p.scopeSummary && <div className={styles.mutedText}>{p.scopeSummary}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className={`card ${styles.cardSoft}`}>
                 <div className={styles.itemHeader}>
                   <div>
@@ -1249,6 +1299,19 @@ export default function ClientTicketsPage() {
                   <div className={styles.mutedText}>{loading ? "Sincronizando..." : "Actualizado"}</div>
                 </div>
                 <div className={styles.grid200}>
+                  <div>
+                    <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Proyecto</label>
+                    <select
+                      className="input"
+                      value={selectedProjectFilter}
+                      onChange={(e) => setSelectedProjectFilter(e.target.value)}
+                    >
+                      <option value="">Todos los proyectos</option>
+                      {clientProjects.map((p) => (
+                        <option key={p.id} value={String(p.id)}>{p.title}</option>
+                      ))}
+                    </select>
+                  </div>
                   <div>
                     <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>Rango del reporte</label>
                     <select className="input" value={reportRange} onChange={(e) => setReportRange(e.target.value as typeof reportRange)}>
@@ -1314,6 +1377,9 @@ export default function ClientTicketsPage() {
                     <span className="badge">{ticket.estatus}</span>
                   </div>
                   <div className={styles.metaGrid}>
+                    {ticket.project?.title && (
+                      <span>Proyecto: {ticket.project.title}</span>
+                    )}
                     <span>{ticket.branchName || "-"} · {ticket.branchCity || "-"} {ticket.branchState || ""}</span>
                     <span>Tipo: {ticket.ticketType || "-"}</span>
                     <span>Atendio: {ticket.responsable?.nombre || "-"}</span>

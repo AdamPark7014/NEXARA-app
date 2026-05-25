@@ -1,7 +1,35 @@
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import {
+  ORG_ROLE_KEYS,
+  ORG_ROLE_BY_KEY,
+  ORG_ROLE_TEMPLATES,
+  type OrgRoleFlags,
+  type OrgRoleKey,
+} from '../common/org-roles';
 
 const prisma = new PrismaClient();
+
+/**
+ * Mapa de plantillas ERP a un nombre canónico de Role en BD.
+ * Cada usuario demo se asocia a una plantilla y obtiene los flags + nivelAutoridad
+ * de la jerarquía corporativa (CEO → Directores → Gerentes → Especialistas → Operativos).
+ */
+const ORG_ROLE_DB_NAME: Record<OrgRoleKey, string> = {
+  [ORG_ROLE_KEYS.CEO]: 'Dueño / CEO',
+  [ORG_ROLE_KEYS.DIRECTOR_ADMIN]: 'Director Administrativo',
+  [ORG_ROLE_KEYS.DIRECTOR_OPS]: 'Director Operativo',
+  [ORG_ROLE_KEYS.DIRECTOR_COMMERCIAL]: 'Director Comercial',
+  [ORG_ROLE_KEYS.SALES_MANAGER]: 'Gerente de Ventas',
+  [ORG_ROLE_KEYS.SALES_REP]: 'Ejecutivo de Ventas',
+  [ORG_ROLE_KEYS.PROJECT_MANAGER]: 'Jefe de Proyectos',
+  [ORG_ROLE_KEYS.SENIOR_ENGINEER]: 'Ingeniero Senior',
+  [ORG_ROLE_KEYS.FIELD_ENGINEER]: 'Ingeniero de Campo',
+  [ORG_ROLE_KEYS.DESIGNER]: 'Diseñador / Marketing',
+  [ORG_ROLE_KEYS.ADMIN_STAFF]: 'Personal Administrativo',
+  [ORG_ROLE_KEYS.ACCOUNTANT]: 'Contador',
+  [ORG_ROLE_KEYS.HR_SPECIALIST]: 'Especialista RRHH',
+};
 
 const upsertUser = async (data: {
   nombre: string;
@@ -32,83 +60,15 @@ const normalizeIdentity = (value: string) =>
 
 const PROTECTED_EMAILS = new Set(['gerencia@nexara.com.mx', 'developer@nexara.com.mx']);
 
-const buildRoleAccess = (overrides: Partial<{
-  accesoConsole: boolean;
-  accesoConsoleAdmin: boolean;
-  accesoActividades: boolean;
-  accesoEvidencias: boolean;
-  accesoViaticos: boolean;
-  accesoVehiculos: boolean;
-  accesoAsistencia: boolean;
-  accesoGps: boolean;
-  accesoGestionUsuarios: boolean;
-  accesoGestionTienda: boolean;
-  accesoGestionWeb: boolean;
-  accesoGestionCvs: boolean;
-  accesoPanelVentas: boolean;
-  accesoContabilidad: boolean;
-  accesoCotizaciones: boolean;
-  accesoInventario: boolean;
-  accesoCompras: boolean;
-  accesoManufactura: boolean;
-  accesoCalidad: boolean;
-  accesoMantenimiento: boolean;
-  accesoSeguridad: boolean;
-  accesoDocumentos: boolean;
-  accesoWorkflow: boolean;
-  accesoAuditoria: boolean;
-  accesoBI: boolean;
-  accesoBanca: boolean;
-  accesoMultas: boolean;
-  accesoClientes: boolean;
-  accesoLunchBreaks: boolean;
-}>) => ({
-  nivelAutoridad: 0,
-  accesoConsole: false,
-  accesoConsoleAdmin: false,
-  accesoActividades: false,
-  accesoEvidencias: false,
-  accesoViaticos: false,
-  accesoVehiculos: false,
-  accesoAsistencia: false,
-  accesoGps: false,
-  accesoGestionUsuarios: false,
-  accesoGestionTienda: false,
-  accesoGestionWeb: false,
-  accesoGestionCvs: false,
-  accesoPanelVentas: false,
-  accesoContabilidad: false,
-  accesoCotizaciones: false,
-  accesoInventario: false,
-  accesoCompras: false,
-  accesoManufactura: false,
-  accesoCalidad: false,
-  accesoMantenimiento: false,
-  accesoSeguridad: false,
-  accesoDocumentos: false,
-  accesoWorkflow: false,
-  accesoAuditoria: false,
-  accesoBI: false,
-  accesoBanca: false,
-  accesoMultas: false,
-  accesoClientes: false,
-  accesoLunchBreaks: false,
-  ...overrides,
-});
-
-const upsertRoleWithAccess = async (
-  nombre: string,
-  access: Parameters<typeof buildRoleAccess>[0],
-) => {
-  const payload = buildRoleAccess(access);
-  return prisma.role.upsert({
-    where: { nombre },
-    update: payload,
-    create: {
-      nombre,
-      ...payload,
-    },
-  });
+const flagsToRolePayload = (key: OrgRoleKey) => {
+  const template = ORG_ROLE_BY_KEY[key];
+  if (!template) throw new Error(`Plantilla ERP no encontrada: ${key}`);
+  return {
+    nombre: ORG_ROLE_DB_NAME[key],
+    orgRoleKey: key,
+    nivelAutoridad: template.nivelAutoridad,
+    ...(template.flags as unknown as Partial<OrgRoleFlags>),
+  };
 };
 
 const syncUserByIdentity = async (data: {
@@ -205,249 +165,258 @@ const cleanupIdentityDuplicates = async (data: {
   return deleted.count;
 };
 
+/**
+ * Crea/actualiza un Role por plantilla ERP y devuelve su id.
+ * Llave única: nombre (definido en ORG_ROLE_DB_NAME).
+ */
+const upsertOrgRole = async (key: OrgRoleKey) => {
+  const payload = flagsToRolePayload(key);
+  return prisma.role.upsert({
+    where: { nombre: payload.nombre },
+    update: payload,
+    create: payload,
+  });
+};
+
+const seedAllOrgRoleTemplates = async () => {
+  console.log('[SEED] Upserting ERP org role templates (jerarquía completa)...');
+  for (const template of ORG_ROLE_TEMPLATES) {
+    await upsertOrgRole(template.orgRoleKey);
+  }
+  console.log(`[SEED] ✓ ${ORG_ROLE_TEMPLATES.length} plantillas org ERP`);
+};
+
 async function main() {
   try {
     console.log('[SEED] Iniciando seed-demo-users.ts...');
     console.log('[SEED] DATABASE_URL:', process.env.DATABASE_URL || 'NO DEFINIDO');
-    
-    // Roles con permisos explícitos según requerimiento
-    console.log('[SEED] Creando roles...');
-    const roleConsolaUsuario = await upsertRoleWithAccess('Consola Usuario', {
-      accesoConsole: true,
+
+    await seedAllOrgRoleTemplates();
+
+    // ── Roles ERP referenciados por usuarios demo ────────────────────────
+    const roleCEO = await upsertOrgRole(ORG_ROLE_KEYS.CEO);
+    const roleDirectorAdmin = await upsertOrgRole(ORG_ROLE_KEYS.DIRECTOR_ADMIN);
+    const roleDirectorOps = await upsertOrgRole(ORG_ROLE_KEYS.DIRECTOR_OPS);
+    const roleDirectorCommercial = await upsertOrgRole(ORG_ROLE_KEYS.DIRECTOR_COMMERCIAL);
+    const roleSalesRep = await upsertOrgRole(ORG_ROLE_KEYS.SALES_REP);
+    const roleProjectManager = await upsertOrgRole(ORG_ROLE_KEYS.PROJECT_MANAGER);
+    const roleSeniorEngineer = await upsertOrgRole(ORG_ROLE_KEYS.SENIOR_ENGINEER);
+    const roleFieldEngineer = await upsertOrgRole(ORG_ROLE_KEYS.FIELD_ENGINEER);
+
+    console.log('[SEED] ✓ Roles ERP referenciados por usuarios demo creados');
+
+    // ── Departamentos corporativos ───────────────────────────────────────
+    const departmentDefs = [
+      'Dirección General',
+      'Ventas',
+      'Ingeniería de campo',
+      'Administración',
+      'Operaciones',
+      'Marketing',
+    ];
+
+    const departments: Record<string, { id: number }> = {};
+    for (const nombre of departmentDefs) {
+      const dept = await prisma.department.upsert({
+        where: { nombre },
+        update: {},
+        create: { nombre },
+      });
+      departments[nombre] = dept;
+    }
+    console.log(`[SEED] ✓ ${departmentDefs.length} departamentos corporativos`);
+
+    // ── Passwords memorizables por jerarquía ─────────────────────────────
+    const passCEO = 'NexaraCeo2026@12888';
+    const passDeveloper = 'Developer2026@Nexara';
+    const passCOO = 'NexaraCoo2026!@';
+    const passSoporte = 'NexaraSoporte2026!';
+    const passOperaciones = 'NexaraSistemas2026!';
+    const passVendedor = 'vendedor2026@!';
+    const passJulio = 'Julio@006Pr7NHv';
+    const passDavid = 'David@005Q6txCt';
+    const passIsrael = 'Israel@0269$74uB';
+    const passLuis = 'NexaraLui2026!@';
+    const passLizbeth = 'Lizeth@0098%nzrv';
+
+    console.log('[SEED] Creando/sincronizando usuarios con jerarquía ERP...');
+
+    // ── EJECUTIVO — Dueño / CEO ──────────────────────────────────────────
+    const userGerencia = await syncUserByIdentity({
+      nombre: 'Christian Del Pozo',
+      email: 'gerencia@nexara.com.mx',
+      passwordHash: await bcrypt.hash(passCEO, 10),
+      roleId: roleCEO.id,
+      departmentId: departments['Dirección General'].id,
+      nameAliases: ['Christian Del Pozo', 'Christian'],
     });
-    console.log(`[SEED] ✓ Rol 'Consola Usuario' id=${roleConsolaUsuario.id}`);
-    
-    const rolePanelVentasSolo = await upsertRoleWithAccess('Panel Ventas', {
-      accesoPanelVentas: true,
+    console.log(`[SEED] ✓ CEO: ${userGerencia.email} (id=${userGerencia.id})`);
+
+    // Developer mantiene acceso ejecutivo total (superadmin de facto).
+    const userDeveloper = await syncUserByIdentity({
+      nombre: 'Adam Del Pozo',
+      email: 'developer@nexara.com.mx',
+      passwordHash: await bcrypt.hash(passDeveloper, 10),
+      roleId: roleCEO.id,
+      departmentId: departments['Dirección General'].id,
+      nameAliases: ['Adam Del Pozo', 'Adam'],
     });
-    console.log(`[SEED] ✓ Rol 'Panel Ventas' id=${rolePanelVentasSolo.id}`);
-    
-    const roleConsolaCotizaciones = await upsertRoleWithAccess('Consola + Cotizaciones', {
-      accesoConsole: true,
-      accesoCotizaciones: true,
+    console.log(`[SEED] ✓ Developer/CEO: ${userDeveloper.email} (id=${userDeveloper.id})`);
+
+    // ── DIRECCIÓN — Administración ──────────────────────────────────────
+    const userLizeth = await syncUserByIdentity({
+      nombre: 'Lizeth Antele Antonio',
+      email: 'administracion@nexara.com.mx',
+      passwordHash: await bcrypt.hash(passLizbeth, 10),
+      roleId: roleDirectorAdmin.id,
+      departmentId: departments['Administración'].id,
+      nameAliases: ['Lizeth Antele Antonio', 'Lizbeth Antele Antonio', 'Lizeth', 'Lizbeth'],
     });
-    console.log(`[SEED] ✓ Rol 'Consola + Cotizaciones' id=${roleConsolaCotizaciones.id}`);
-    
-    const roleConsolaGestionCvs = await upsertRoleWithAccess('Consola + Gestion CVs', {
-      accesoConsole: true,
-      accesoGestionCvs: true,
+    console.log(`[SEED] ✓ Director Admin: ${userLizeth.email} (id=${userLizeth.id})`);
+
+    // ── DIRECCIÓN — Operaciones ─────────────────────────────────────────
+    const userLuis = await syncUserByIdentity({
+      nombre: 'Luis Joel Aguilar',
+      email: 'direccion.operaciones@nexara.com.mx',
+      passwordHash: await bcrypt.hash(passLuis, 10),
+      roleId: roleDirectorOps.id,
+      departmentId: departments['Operaciones'].id,
+      nameAliases: ['Luis Joel Aguilar', 'Luis'],
     });
-    console.log(`[SEED] ✓ Rol 'Consola + Gestion CVs' id=${roleConsolaGestionCvs.id}`);
-    
-    const roleAdmin4Accesos = await upsertRoleWithAccess('Admin 4 Accesos', {
-      accesoConsole: true,
-      accesoConsoleAdmin: true,
-      accesoGestionUsuarios: true,
-      accesoContabilidad: true,
+    console.log(`[SEED] ✓ Director Operativo: ${userLuis.email} (id=${userLuis.id})`);
+
+    // ── DIRECCIÓN — Comercial (Karen lidera ventas) ─────────────────────
+    const userKaren = await syncUserByIdentity({
+      nombre: 'Karen Elizalde Sarmiento',
+      email: 'ventas@nexara.com.mx',
+      passwordHash: await bcrypt.hash(passCOO, 10),
+      roleId: roleDirectorCommercial.id,
+      departmentId: departments['Ventas'].id,
+      nameAliases: ['Karen Elizalde Sarmiento', 'Karen'],
     });
-    console.log(`[SEED] ✓ Rol 'Admin 4 Accesos' id=${roleAdmin4Accesos.id}`);
+    console.log(`[SEED] ✓ Director Comercial: ${userKaren.email} (id=${userKaren.id})`);
 
-    // Departamentos específicos según tabla operativa
-    console.log('[SEED] Creando departamentos...');
-    const deptVentas = await prisma.department.upsert({
-      where: { nombre: 'Ventas' },
-      update: {},
-      create: { nombre: 'Ventas' },
+    // ── JEFE DE PROYECTOS (sistemas/operaciones) ────────────────────────
+    const userAlejandro = await syncUserByIdentity({
+      nombre: 'Alejandro Gonzales Bustamante',
+      email: 'operaciones@nexara.com.mx',
+      passwordHash: await bcrypt.hash(passOperaciones, 10),
+      roleId: roleProjectManager.id,
+      departmentId: departments['Operaciones'].id,
+      emailAliases: ['sistemas@nexara.com.mx'],
+      nameAliases: ['Alejandro Gonzales Bustamante', 'Alejandro Gonzales', 'Alejandro'],
     });
-    console.log(`[SEED] ✓ Departamento 'Ventas' id=${deptVentas.id}`);
-    
-    const deptIngCampo = await prisma.department.upsert({
-      where: { nombre: 'Ingeniería de campo' },
-      update: {},
-      create: { nombre: 'Ingeniería de campo' },
+    console.log(`[SEED] ✓ Jefe Proyectos: ${userAlejandro.email} (id=${userAlejandro.id})`);
+
+    // ── INGENIERO SENIOR (soporte técnico) ──────────────────────────────
+    const userCarolina = await syncUserByIdentity({
+      nombre: 'Carolina Juarez Alvarez',
+      email: 'soporte@nexara.com.mx',
+      passwordHash: await bcrypt.hash(passSoporte, 10),
+      roleId: roleSeniorEngineer.id,
+      departmentId: departments['Ingeniería de campo'].id,
+      nameAliases: ['Carolina Juarez Alvarez', 'Carolina'],
     });
-    console.log(`[SEED] ✓ Departamento 'Ingeniería de campo' id=${deptIngCampo.id}`);
-    
-    const deptAdministracion = await prisma.department.upsert({
-      where: { nombre: 'Administración' },
-      update: {},
-      create: { nombre: 'Administración' },
+    console.log(`[SEED] ✓ Ingeniero Senior: ${userCarolina.email} (id=${userCarolina.id})`);
+
+    // ── EJECUTIVO DE VENTAS ─────────────────────────────────────────────
+    const userKarina = await syncUserByIdentity({
+      nombre: 'Karina Martinez Flores',
+      email: 'vendedor@nexara.com.mx',
+      passwordHash: await bcrypt.hash(passVendedor, 10),
+      roleId: roleSalesRep.id,
+      departmentId: departments['Ventas'].id,
+      nameAliases: ['Karina Martinez Flores', 'Karina'],
     });
-    console.log(`[SEED] ✓ Departamento 'Administración' id=${deptAdministracion.id}`);
-    
-    const deptOperaciones = await prisma.department.upsert({
-      where: { nombre: 'Operaciones' },
-      update: {},
-      create: { nombre: 'Operaciones' },
+    console.log(`[SEED] ✓ Ejecutivo Ventas: ${userKarina.email} (id=${userKarina.id})`);
+
+    // ── INGENIEROS DE CAMPO (instaladores IDC) ──────────────────────────
+    const userJulio = await syncUserByIdentity({
+      nombre: 'Julio Cesar Rivera Vazquez',
+      email: 'julio.rivazquez@nexara.com.mx',
+      passwordHash: await bcrypt.hash(passJulio, 10),
+      roleId: roleFieldEngineer.id,
+      departmentId: departments['Ingeniería de campo'].id,
+      nameAliases: ['Julio Cesar Rivera Vazquez', 'Julio César Rivera Vázquez', 'Julio'],
     });
-    console.log(`[SEED] ✓ Departamento 'Operaciones' id=${deptOperaciones.id}`);
+    console.log(`[SEED] ✓ Ingeniero Campo: ${userJulio.email} (id=${userJulio.id})`);
 
-    // Actualizar o crear usuarios demo por email
+    const userDavid = await syncUserByIdentity({
+      nombre: 'David Morales Zenon',
+      email: 'david.morzenon@nexara.com.mx',
+      passwordHash: await bcrypt.hash(passDavid, 10),
+      roleId: roleFieldEngineer.id,
+      departmentId: departments['Ingeniería de campo'].id,
+      nameAliases: ['David Morales Zenon', 'David'],
+    });
+    console.log(`[SEED] ✓ Ingeniero Campo: ${userDavid.email} (id=${userDavid.id})`);
 
-  // Contraseñas memorizables, diferenciadas y con mayor dificultad para altos rangos
-  const passCEO = 'NexaraCeo2026@12888';
-  const passDeveloper = 'Developer2026@Nexara';
-  const passCOO = 'NexaraCoo2026!@';
-  const passSoporte = 'NexaraSoporte2026!';
-  const passOperaciones = 'NexaraSistemas2026!';
-  const passVendedor = 'vendedor2026@!';
-  const passJulio = 'Julio@006Pr7NHv';
-  const passDavid = 'David@005Q6txCt';
-  const passIsrael = 'Israel@0269$74uB';
-  const passLuis = 'NexaraLui2026!@';
-  const passLizbeth = 'Lizeth@0098%nzrv';
+    const userIsrael = await syncUserByIdentity({
+      nombre: 'Israel Ramos Lima',
+      email: 'israel.ralima@nexara.com.mx',
+      passwordHash: await bcrypt.hash(passIsrael, 10),
+      roleId: roleFieldEngineer.id,
+      departmentId: departments['Ingeniería de campo'].id,
+      nameAliases: ['Israel Ramos Lima', 'Israel'],
+    });
+    console.log(`[SEED] ✓ Ingeniero Campo: ${userIsrael.email} (id=${userIsrael.id})`);
 
-  // Superadmins protegidos
-  console.log('[SEED] Creando usuarios...');
-  console.log(`[SEED] Usando roleAdmin4Accesos.id=${roleAdmin4Accesos.id}, deptAdministracion.id=${deptAdministracion.id}`);
-  
-  const userGerencia = await syncUserByIdentity({
-    nombre: 'Christian Del Pozo',
-    email: 'gerencia@nexara.com.mx',
-    passwordHash: await bcrypt.hash(passCEO, 10),
-    roleId: roleAdmin4Accesos.id,
-    departmentId: deptAdministracion.id,
-    nameAliases: ['Christian Del Pozo', 'Christian'],
-  });
-  console.log(`[SEED] ✓ Usuario 'gerencia@nexara.com.mx' id=${userGerencia.id}`);
-  
-  const userDeveloper = await syncUserByIdentity({
-    nombre: 'Adam Del Pozo',
-    email: 'developer@nexara.com.mx',
-    passwordHash: await bcrypt.hash(passDeveloper, 10),
-    roleId: roleAdmin4Accesos.id,
-    departmentId: deptAdministracion.id,
-    nameAliases: ['Adam Del Pozo', 'Adam'],
-  });
-  console.log(`[SEED] ✓ Usuario 'developer@nexara.com.mx' id=${userDeveloper.id}`);
+    // ── Limpieza de duplicados y aliases legacy ─────────────────────────
+    console.log('[SEED] Limpiando duplicados de identidad...');
+    const duplicateCounts = await Promise.all([
+      cleanupIdentityDuplicates({ targetUserId: userGerencia.id, email: 'gerencia@nexara.com.mx', nombre: 'Christian Del Pozo', nameAliases: ['Christian Del Pozo', 'Christian'] }),
+      cleanupIdentityDuplicates({ targetUserId: userDeveloper.id, email: 'developer@nexara.com.mx', nombre: 'Adam Del Pozo', nameAliases: ['Adam Del Pozo', 'Adam'] }),
+      cleanupIdentityDuplicates({ targetUserId: userKaren.id, email: 'ventas@nexara.com.mx', nombre: 'Karen Elizalde Sarmiento', nameAliases: ['Karen Elizalde Sarmiento', 'Karen'] }),
+      cleanupIdentityDuplicates({ targetUserId: userCarolina.id, email: 'soporte@nexara.com.mx', nombre: 'Carolina Juarez Alvarez', nameAliases: ['Carolina Juarez Alvarez', 'Carolina'] }),
+      cleanupIdentityDuplicates({ targetUserId: userAlejandro.id, email: 'operaciones@nexara.com.mx', emailAliases: ['sistemas@nexara.com.mx'], nombre: 'Alejandro Gonzales Bustamante', nameAliases: ['Alejandro Gonzales Bustamante', 'Alejandro Gonzales', 'Alejandro'] }),
+      cleanupIdentityDuplicates({ targetUserId: userKarina.id, email: 'vendedor@nexara.com.mx', nombre: 'Karina Martinez Flores', nameAliases: ['Karina Martinez Flores', 'Karina'] }),
+      cleanupIdentityDuplicates({ targetUserId: userJulio.id, email: 'julio.rivazquez@nexara.com.mx', nombre: 'Julio Cesar Rivera Vazquez', nameAliases: ['Julio Cesar Rivera Vazquez', 'Julio César Rivera Vázquez', 'Julio'] }),
+      cleanupIdentityDuplicates({ targetUserId: userDavid.id, email: 'david.morzenon@nexara.com.mx', nombre: 'David Morales Zenon', nameAliases: ['David Morales Zenon', 'David'] }),
+      cleanupIdentityDuplicates({ targetUserId: userIsrael.id, email: 'israel.ralima@nexara.com.mx', nombre: 'Israel Ramos Lima', nameAliases: ['Israel Ramos Lima', 'Israel'] }),
+      cleanupIdentityDuplicates({ targetUserId: userLuis.id, email: 'direccion.operaciones@nexara.com.mx', nombre: 'Luis Joel Aguilar', nameAliases: ['Luis Joel Aguilar', 'Luis'] }),
+      cleanupIdentityDuplicates({ targetUserId: userLizeth.id, email: 'administracion@nexara.com.mx', nombre: 'Lizeth Antele Antonio', nameAliases: ['Lizeth Antele Antonio', 'Lizbeth Antele Antonio', 'Lizeth', 'Lizbeth'] }),
+    ]);
+    const duplicatesRemoved = duplicateCounts.reduce((sum, count) => sum + count, 0);
 
-  const userKaren = await syncUserByIdentity({
-    nombre: 'Karen Elizalde Sarmiento',
-    email: 'ventas@nexara.com.mx',
-    passwordHash: await bcrypt.hash(passCOO, 10),
-    roleId: roleConsolaCotizaciones.id,
-    departmentId: deptVentas.id,
-    nameAliases: ['Karen Elizalde Sarmiento', 'Karen'],
-  });
-  console.log(`[SEED] ✓ Usuario 'ventas@nexara.com.mx' id=${userKaren.id}`);
-  
-  const userCarolina = await syncUserByIdentity({
-    nombre: 'Carolina Juarez Alvarez',
-    email: 'soporte@nexara.com.mx',
-    passwordHash: await bcrypt.hash(passSoporte, 10),
-    roleId: roleConsolaUsuario.id,
-    departmentId: deptIngCampo.id,
-    nameAliases: ['Carolina Juarez Alvarez', 'Carolina'],
-  });
-  console.log(`[SEED] ✓ Usuario 'soporte@nexara.com.mx' id=${userCarolina.id}`);
-  
-  const userAlejandro = await syncUserByIdentity({
-    nombre: 'Alejandro Gonzales Bustamante',
-    email: 'operaciones@nexara.com.mx',
-    passwordHash: await bcrypt.hash(passOperaciones, 10),
-    roleId: roleConsolaGestionCvs.id,
-    departmentId: deptIngCampo.id,
-    emailAliases: ['sistemas@nexara.com.mx'],
-    nameAliases: ['Alejandro Gonzales Bustamante', 'Alejandro Gonzales', 'Alejandro'],
-  });
-  console.log(`[SEED] ✓ Usuario 'operaciones@nexara.com.mx' id=${userAlejandro.id}`);
-  
-  const userKarina = await syncUserByIdentity({
-    nombre: 'Karina Martinez Flores',
-    email: 'vendedor@nexara.com.mx',
-    passwordHash: await bcrypt.hash(passVendedor, 10),
-    roleId: rolePanelVentasSolo.id,
-    departmentId: deptVentas.id,
-    nameAliases: ['Karina Martinez Flores', 'Karina'],
-  });
-  console.log(`[SEED] ✓ Usuario 'vendedor@nexara.com.mx' id=${userKarina.id}`);
-  
-  const userJulio = await syncUserByIdentity({
-    nombre: 'Julio Cesar Rivera Vazquez',
-    email: 'julio.rivazquez@nexara.com.mx',
-    passwordHash: await bcrypt.hash(passJulio, 10),
-    roleId: roleConsolaUsuario.id,
-    departmentId: deptIngCampo.id,
-    nameAliases: ['Julio Cesar Rivera Vazquez', 'Julio César Rivera Vázquez', 'Julio'],
-  });
-  console.log(`[SEED] ✓ Usuario 'julio.rivazquez@nexara.com.mx' id=${userJulio.id}`);
-  
-  const userDavid = await syncUserByIdentity({
-    nombre: 'David Morales Zenon',
-    email: 'david.morzenon@nexara.com.mx',
-    passwordHash: await bcrypt.hash(passDavid, 10),
-    roleId: roleConsolaUsuario.id,
-    departmentId: deptIngCampo.id,
-    nameAliases: ['David Morales Zenon', 'David'],
-  });
-  console.log(`[SEED] ✓ Usuario 'david.morzenon@nexara.com.mx' id=${userDavid.id}`);
-  
-  const userIsrael = await syncUserByIdentity({
-    nombre: 'Israel Ramos Lima',
-    email: 'israel.ralima@nexara.com.mx',
-    passwordHash: await bcrypt.hash(passIsrael, 10),
-    roleId: roleConsolaUsuario.id,
-    departmentId: deptIngCampo.id,
-    nameAliases: ['Israel Ramos Lima', 'Israel'],
-  });
-  console.log(`[SEED] ✓ Usuario 'israel.ralima@nexara.com.mx' id=${userIsrael.id}`);
-  
-  const userLuis = await syncUserByIdentity({
-    nombre: 'Luis Joel Aguilar',
-    email: 'direccion.operaciones@nexara.com.mx',
-    passwordHash: await bcrypt.hash(passLuis, 10),
-    roleId: roleAdmin4Accesos.id,
-    departmentId: deptOperaciones.id,
-    nameAliases: ['Luis Joel Aguilar', 'Luis'],
-  });
-  console.log(`[SEED] ✓ Usuario 'direccion.operaciones@nexara.com.mx' id=${userLuis.id}`);
-  
-  const userLizeth = await syncUserByIdentity({
-    nombre: 'Lizeth Antele Antonio',
-    email: 'administracion@nexara.com.mx',
-    passwordHash: await bcrypt.hash(passLizbeth, 10),
-    roleId: roleAdmin4Accesos.id,
-    departmentId: deptAdministracion.id,
-    nameAliases: ['Lizeth Antele Antonio', 'Lizbeth Antele Antonio', 'Lizeth', 'Lizbeth'],
-  });
-  console.log(`[SEED] ✓ Usuario 'administracion@nexara.com.mx' id=${userLizeth.id}`);
+    // Limpiar buzones de demo previos
+    const removedDemoEmails = [
+      'demo.panelweb@nexara.com.mx',
+      'demo.paneltienda@nexara.com.mx',
+      'demo.panelinterno@nexara.com.mx',
+      'sistemas@nexara.com.mx',
+    ];
+    const removedUsers = await prisma.user.deleteMany({
+      where: {
+        email: { in: removedDemoEmails },
+      },
+    });
 
-  console.log('[SEED] Limpiando duplicados...');
-  const duplicateCounts = await Promise.all([
-    cleanupIdentityDuplicates({ targetUserId: userGerencia.id, email: 'gerencia@nexara.com.mx', nombre: 'Christian Del Pozo', nameAliases: ['Christian Del Pozo', 'Christian'] }),
-    cleanupIdentityDuplicates({ targetUserId: userDeveloper.id, email: 'developer@nexara.com.mx', nombre: 'Adam Del Pozo', nameAliases: ['Adam Del Pozo', 'Adam'] }),
-    cleanupIdentityDuplicates({ targetUserId: userKaren.id, email: 'ventas@nexara.com.mx', nombre: 'Karen Elizalde Sarmiento', nameAliases: ['Karen Elizalde Sarmiento', 'Karen'] }),
-    cleanupIdentityDuplicates({ targetUserId: userCarolina.id, email: 'soporte@nexara.com.mx', nombre: 'Carolina Juarez Alvarez', nameAliases: ['Carolina Juarez Alvarez', 'Carolina'] }),
-    cleanupIdentityDuplicates({ targetUserId: userAlejandro.id, email: 'operaciones@nexara.com.mx', emailAliases: ['sistemas@nexara.com.mx'], nombre: 'Alejandro Gonzales Bustamante', nameAliases: ['Alejandro Gonzales Bustamante', 'Alejandro Gonzales', 'Alejandro'] }),
-    cleanupIdentityDuplicates({ targetUserId: userKarina.id, email: 'vendedor@nexara.com.mx', nombre: 'Karina Martinez Flores', nameAliases: ['Karina Martinez Flores', 'Karina'] }),
-    cleanupIdentityDuplicates({ targetUserId: userJulio.id, email: 'julio.rivazquez@nexara.com.mx', nombre: 'Julio Cesar Rivera Vazquez', nameAliases: ['Julio Cesar Rivera Vazquez', 'Julio César Rivera Vázquez', 'Julio'] }),
-    cleanupIdentityDuplicates({ targetUserId: userDavid.id, email: 'david.morzenon@nexara.com.mx', nombre: 'David Morales Zenon', nameAliases: ['David Morales Zenon', 'David'] }),
-    cleanupIdentityDuplicates({ targetUserId: userIsrael.id, email: 'israel.ralima@nexara.com.mx', nombre: 'Israel Ramos Lima', nameAliases: ['Israel Ramos Lima', 'Israel'] }),
-    cleanupIdentityDuplicates({ targetUserId: userLuis.id, email: 'direccion.operaciones@nexara.com.mx', nombre: 'Luis Joel Aguilar', nameAliases: ['Luis Joel Aguilar', 'Luis'] }),
-    cleanupIdentityDuplicates({ targetUserId: userLizeth.id, email: 'administracion@nexara.com.mx', nombre: 'Lizeth Antele Antonio', nameAliases: ['Lizeth Antele Antonio', 'Lizbeth Antele Antonio', 'Lizeth', 'Lizbeth'] }),
-  ]);
-
-  const duplicatesRemoved = duplicateCounts.reduce((sum, count) => sum + count, 0);
-
-  const removedDemoEmails = [
-    'demo.panelweb@nexara.com.mx',
-    'demo.paneltienda@nexara.com.mx',
-    'demo.panelinterno@nexara.com.mx',
-    'sistemas@nexara.com.mx',
-  ];
-
-  const removedUsers = await prisma.user.deleteMany({
-    where: {
-      email: { in: removedDemoEmails },
-    },
-  });
-
-  console.log('Contraseñas asignadas:');
-  console.log('Christian Del Pozo (CEO/Gerencia):', passCEO);
-  console.log('Adam Del Pozo (Developer):', passDeveloper);
-  console.log('Karen Elizalde Sarmiento (COO):', passCOO);
-  console.log('Carolina Juarez Alvarez (Ingeniera de Soporte):', passSoporte);
-  console.log('Alejandro Gonzales Bustamante (Ingeniero de Sistemas):', passOperaciones);
-  console.log('Karina Martinez Flores (Vendedora):', passVendedor);
-  console.log('Julio Cesar Rivera Vazquez (IDC/Instalador):', passJulio);
-  console.log('David Morales Zenon (IDC/Instalador):', passDavid);
-  console.log('Israel Ramos Lima (IDC/Instalador):', passIsrael);
-  console.log('Luis Joel Aguilar (Coordinador de Operaciones):', passLuis);
-  console.log('Lizbeth Antele Antonio (Administracion):', passLizbeth);
-  console.log('Usuarios eliminados por limpieza de seed:', removedUsers.count);
-  console.log('Duplicados eliminados por match de identidad:', duplicatesRemoved);
-  console.log('Usuarios demo actualizados.');
-  console.log('[SEED] ✓ Seed completado exitosamente');
+    // ── Resumen final con jerarquía visible ─────────────────────────────
+    console.log('');
+    console.log('═════════════════════════════════════════════════════════════');
+    console.log(' Jerarquía ERP — Usuarios demo NEXARA');
+    console.log('═════════════════════════════════════════════════════════════');
+    console.log(' 🏛️  EJECUTIVO');
+    console.log(`   • Christian Del Pozo (CEO):                ${passCEO}`);
+    console.log(`   • Adam Del Pozo (Developer/CEO):           ${passDeveloper}`);
+    console.log(' 🧭 DIRECCIÓN');
+    console.log(`   • Lizeth Antele (Director Admin):          ${passLizbeth}`);
+    console.log(`   • Luis Joel Aguilar (Director Ops):        ${passLuis}`);
+    console.log(`   • Karen Elizalde (Director Comercial):     ${passCOO}`);
+    console.log(' 🧩 MANDOS MEDIOS');
+    console.log(`   • Alejandro Gonzales (Jefe Proyectos):     ${passOperaciones}`);
+    console.log(' 🔧 ESPECIALISTAS');
+    console.log(`   • Carolina Juárez (Ingeniero Senior):      ${passSoporte}`);
+    console.log(' 💼 EQUIPO COMERCIAL');
+    console.log(`   • Karina Martínez (Ejecutivo Ventas):      ${passVendedor}`);
+    console.log(' 🛠️  CAMPO');
+    console.log(`   • Julio Rivera (Ingeniero Campo):          ${passJulio}`);
+    console.log(`   • David Morales (Ingeniero Campo):         ${passDavid}`);
+    console.log(`   • Israel Ramos (Ingeniero Campo):          ${passIsrael}`);
+    console.log('═════════════════════════════════════════════════════════════');
+    console.log(`Duplicados removidos:        ${duplicatesRemoved}`);
+    console.log(`Buzones demo legacy removidos: ${removedUsers.count}`);
+    console.log('[SEED] ✓ Seed completado exitosamente');
   } catch (error) {
     console.error('[SEED] ❌ Error en seed-demo-users:', error);
     throw error;
@@ -460,5 +429,3 @@ main()
     process.exit(1);
   })
   .finally(() => prisma.$disconnect());
-
-

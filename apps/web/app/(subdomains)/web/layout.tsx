@@ -24,6 +24,7 @@ export default function WebPanelLayout({ children }: { children: React.ReactNode
 
   const navItems = [
     { label: "Dashboard", href: "/dashboard" },
+    { label: "Inbox Marketing", href: "/inbox" },
     { label: "Clientes", href: "/clientes" },
     { label: "Proyectos", href: "/proyectos" },
     { label: "Contactos", href: "/contactos" },

@@ -74,6 +74,11 @@ export default function VentasDashboardPage() {
           <span>en seguimiento</span>
         </article>
         <article className={styles.metricCard}>
+          <p>Margen promedio</p>
+          <h2>{data ? money(data.stats.averageMargin) : "-"}</h2>
+          <span>por proyecto activo</span>
+        </article>
+        <article className={styles.metricCard}>
           <p>Clientes únicos</p>
           <h2>{data?.stats.clientCount || 0}</h2>
           <span>en cartera</span>

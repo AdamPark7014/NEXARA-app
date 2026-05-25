@@ -93,6 +93,17 @@ export default function BranchTicketsPage() {
   const [files, setFiles] = useState<{ file: File; url: string; kind: "image" | "pdf" }[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [branchProjects, setBranchProjects] = useState<Array<{
+    id: number;
+    title: string;
+    status: string;
+    projectType?: string | null;
+    scopeSummary?: string | null;
+    activityCount: number;
+    completedActivities: number;
+    progressPercent: number;
+    engineers: Array<{ id: number; nombre: string }>;
+  }>>([]);
   const [fromDate, setFromDate] = useState<string>(() => {
     const d = new Date();
     d.setDate(d.getDate() - 30);
@@ -355,6 +366,14 @@ export default function BranchTicketsPage() {
     setRequests(Array.isArray(data) ? data : []);
   };
 
+  const fetchBranchProjects = async (token: string) => {
+    const res = await fetch(buildApiUrl("branch-portal/projects"), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json().catch(() => []);
+    setBranchProjects(Array.isArray(data) ? data : []);
+  };
+
   const fetchTickets = async (token: string) => {
     const params = new URLSearchParams();
     if (fromDate) params.append("start", `${fromDate}T00:00:00.000Z`);
@@ -372,6 +391,7 @@ export default function BranchTicketsPage() {
     fetchProfile(session.token);
     fetchRequests(session.token);
     fetchTickets(session.token);
+    fetchBranchProjects(session.token);
   }, [session?.token, fromDate, toDate]);
 
   const handleViewPdf = async () => {
@@ -694,6 +714,42 @@ export default function BranchTicketsPage() {
 
           {activeTab === "tickets" && (
             <div className={styles.sectionStack}>
+              {branchProjects.length > 0 && (
+                <div className={`card ${styles.cardSoft}`}>
+                  <h3 style={{ marginTop: 0 }}>📁 Proyectos activos para tu sucursal</h3>
+                  <p style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 0 }}>
+                    Estos son los proyectos en los que nuestro equipo está trabajando para tu sucursal.
+                  </p>
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {branchProjects.map((p) => (
+                      <div key={p.id} className="card" style={{ padding: 14 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 700 }}>{p.title}</div>
+                            <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{p.projectType || "Proyecto"}</div>
+                            {p.scopeSummary && (
+                              <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 4 }}>{p.scopeSummary}</div>
+                            )}
+                          </div>
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ fontWeight: 700 }}>{p.progressPercent}%</div>
+                            <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+                              {p.completedActivities} / {p.activityCount} OT
+                            </div>
+                          </div>
+                        </div>
+                        {p.engineers.length > 0 && (
+                          <div style={{ marginTop: 8, fontSize: 12 }}>
+                            <strong>Ingenieros: </strong>
+                            {p.engineers.map((e) => e.nombre).join(", ")}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className={`card ${styles.cardSoft}`}>
                 <div className={styles.grid200}>
                   <div>

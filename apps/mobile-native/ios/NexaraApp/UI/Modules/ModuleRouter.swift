@@ -36,8 +36,8 @@ struct ModuleRouter {
             GenericListModuleView(title: "Clientes") { (await ExtraRepository.shared.clients()).map {
                 toRow($0, title: ["name","nombre","razonSocial"], subtitle: ["email","rfc"])
             } }
-        case (.console, "service-clients"), (.web, "clientes"), (.ventas, "clientes"):
-            GenericListModuleView(title: "Clientes de servicio") { (await ExtraRepository.shared.serviceClients()).map {
+        case (.web, "clientes"), (.ventas, "clientes"):
+            GenericListModuleView(title: "Clientes comerciales") { (await ExtraRepository.shared.serviceClients()).map {
                 toRow($0, title: ["name","nombre","razonSocial"], subtitle: ["email","rfc"])
             } }
         case (.console, "projects"):
@@ -77,7 +77,7 @@ struct ModuleRouter {
             GenericListModuleView(title: "Facturación") { (await ExtraRepository.shared.invoices()).map {
                 toRow($0, title: ["folio","invoiceNumber"], subtitle: ["clientName","cliente"], meta: ["total"])
             } }
-        case (.console, "banking"), (.contabilidad, "banking"), (.contabilidad, "capital"):
+        case (.console, "banking"), (.contabilidad, "banking"):
             GenericListModuleView(title: "Banca") { (await ExtraRepository.shared.bankAccounts()).map {
                 toRow($0, title: ["name","nombre","alias"], subtitle: ["bank","banco","accountNumber"], meta: ["balance","saldo"])
             } }
@@ -117,25 +117,9 @@ struct ModuleRouter {
             GenericListModuleView(title: "Compras · Requisiciones") { (await ExtraRepository.shared.requisitions()).map {
                 toRow($0, title: ["title","descripcion","folio"], subtitle: ["requestedBy","solicitante"])
             } }
-        case (.console, "production"), (.console, "manufacturing"):
-            GenericListModuleView(title: "Producción") { (await ExtraRepository.shared.production()).map {
-                toRow($0, title: ["orderNumber","productName","product"], subtitle: ["line","workCenter"])
-            } }
         case (.console, "maintenance"):
             GenericListModuleView(title: "Mantenimiento") { (await ExtraRepository.shared.workOrders()).map {
                 toRow($0, title: ["title","description","orderNumber"], subtitle: ["assetName","equipmentName"])
-            } }
-        case (.console, "quality"):
-            GenericListModuleView(title: "Calidad · Inspecciones") { (await ExtraRepository.shared.inspections()).map {
-                toRow($0, title: ["title","description","item"], subtitle: ["inspector"], meta: ["inspectedAt"])
-            } }
-        case (.console, "safety"):
-            GenericListModuleView(title: "Seguridad · Incidentes") { (await ExtraRepository.shared.safetyIncidents()).map {
-                toRow($0, title: ["title","description","type"], subtitle: ["location","area"])
-            } }
-        case (.console, "workflow"):
-            GenericListModuleView(title: "Flujos") { (await ExtraRepository.shared.workflow()).map {
-                toRow($0, title: ["name","nombre","title"], subtitle: ["description","descripcion"])
             } }
         case (.console, "service-sheets"):
             GenericListModuleView(title: "Hojas de servicio") { (await ExtraRepository.shared.serviceSheets()).map {

@@ -1,3 +1,11 @@
+import {
+  getOrgRoleLabel,
+  isFieldRole,
+  isSalesRole,
+  ORG_ROLE_KEYS,
+  resolveOrgRoleKey,
+  type OrgRoleKey,
+} from "@/lib/org-roles";
 import { hasAnyPermission, hasPermission, PERMISSIONS, type UserPermissions } from "@/lib/permissions";
 
 const CONTABILIDAD_ACCESS_PERMISSIONS = [
@@ -26,51 +34,79 @@ type PanelUser = UserPermissions & {
   avatarUrl?: string | null;
 };
 
+export const resolveUserOrgRoleKey = (user: PanelUser | null | undefined): OrgRoleKey | null => {
+  if (!user) return null;
+  return resolveOrgRoleKey(user.role, user.orgRoleKey);
+};
+
 export const isPlatformAdmin = (user: PanelUser | null | undefined) => {
   if (!user) return false;
   if (user.isSuperAdmin) return true;
+  const key = resolveUserOrgRoleKey(user);
+  if (key === ORG_ROLE_KEYS.CEO || key === ORG_ROLE_KEYS.DIRECTOR_ADMIN) return true;
   return hasPermission(user, PERMISSIONS.CONSOLE_ADMIN);
+};
+
+export const isOperationsDirector = (user: PanelUser | null | undefined) => {
+  const key = resolveUserOrgRoleKey(user);
+  return key === ORG_ROLE_KEYS.DIRECTOR_OPS || (user?.isSuperAdmin ?? false);
+};
+
+export const isCommercialDirector = (user: PanelUser | null | undefined) => {
+  const key = resolveUserOrgRoleKey(user);
+  return key === ORG_ROLE_KEYS.DIRECTOR_COMMERCIAL || (user?.isSuperAdmin ?? false);
 };
 
 export const isSalesManagerUser = (user: PanelUser | null | undefined) => {
   if (!user) return false;
-  return isPlatformAdmin(user);
+  if (isPlatformAdmin(user)) return true;
+  const key = resolveUserOrgRoleKey(user);
+  return key === ORG_ROLE_KEYS.SALES_MANAGER || key === ORG_ROLE_KEYS.DIRECTOR_COMMERCIAL;
+};
+
+export const isFieldUser = (user: PanelUser | null | undefined) => {
+  if (!user || user.isSuperAdmin) return false;
+  if (isPlatformAdmin(user)) return false;
+  const key = resolveUserOrgRoleKey(user);
+  if (key && isFieldRole(key)) return true;
+  return /ingenier/i.test(String(user.role || ""));
+};
+
+export const isSalesUser = (user: PanelUser | null | undefined) => {
+  if (!user) return false;
+  const key = resolveUserOrgRoleKey(user);
+  if (key && isSalesRole(key)) return true;
+  return hasAnyPermission(user, SALES_FLAVORED_PERMISSIONS);
 };
 
 export const canAccessContabilidadPanel = (user: PanelUser | null | undefined) => {
   if (!user) return false;
   if (user.isSuperAdmin) return true;
+  const key = resolveUserOrgRoleKey(user);
+  if (key === ORG_ROLE_KEYS.ACCOUNTANT || key === ORG_ROLE_KEYS.DIRECTOR_ADMIN) return true;
   if (hasPermission(user, PERMISSIONS.CONSOLE_ADMIN)) return true;
   return hasAnyPermission(user, CONTABILIDAD_ACCESS_PERMISSIONS);
 };
 
 const sanitizeRoleLabel = (value?: string | null) => {
-  const raw = String(value || '').trim();
-  if (!raw) return '';
-
-  // Legacy role names were persisted as "Rol · prefijoCorreo".
-  const withoutLegacySuffix = raw.split('·')[0]?.trim() || raw;
-
-  return withoutLegacySuffix
-    .replace(/\s+/g, ' ')
-    .trim();
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const withoutLegacySuffix = raw.split("·")[0]?.trim() || raw;
+  return withoutLegacySuffix.replace(/\s+/g, " ").trim();
 };
 
 export const getRoleLabel = (user: PanelUser | null | undefined) => {
   if (!user) return "Invitado";
-  if (user.isSuperAdmin) return "Superadmin";
-  if (isPlatformAdmin(user)) return "Admin";
+
+  const orgLabel = getOrgRoleLabel(user.role, user.orgRoleKey, user.isSuperAdmin);
+  if (orgLabel) return orgLabel;
 
   const roleRaw = sanitizeRoleLabel(user.role);
   const role = roleRaw.toLowerCase();
 
-  if (role.includes("vended")) return "Vendedor";
-
-  // Roles de catálogo tipo "Panel ventas" — mostrar como vendedor, no como nombre del módulo
-  if (/panel/i.test(roleRaw) && /venta/i.test(roleRaw)) {
-    return "Vendedor";
-  }
-
+  if (role.includes("vended")) return "Ejecutivo de Ventas";
+  if (/panel/i.test(roleRaw) && /venta/i.test(roleRaw)) return "Ejecutivo de Ventas";
+  if (role.includes("ingenier")) return "Ingeniero de Campo";
   if (roleRaw) {
     return roleRaw
       .split(/[_\s-]+/)
@@ -78,9 +114,8 @@ export const getRoleLabel = (user: PanelUser | null | undefined) => {
       .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
       .join(" ");
   }
-
-  if (hasAnyPermission(user, CONTABILIDAD_ACCESS_PERMISSIONS)) return "Contabilidad";
-  if (hasAnyPermission(user, SALES_FLAVORED_PERMISSIONS)) return "Vendedor";
+  if (hasAnyPermission(user, CONTABILIDAD_ACCESS_PERMISSIONS)) return "Contador";
+  if (hasAnyPermission(user, SALES_FLAVORED_PERMISSIONS)) return "Ejecutivo de Ventas";
   return "Colaborador";
 };
 

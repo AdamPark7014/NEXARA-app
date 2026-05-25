@@ -47,13 +47,9 @@ import { InventoriesModule } from './inventories/inventories.module.js';
 import { AccountingModule } from './accounting/accounting.module.js';
 import { WarehouseModule } from './warehouse/warehouse.module.js';
 import { ProcurementModule } from './procurement/procurement.module.js';
-import { ManufacturingModule } from './manufacturing/manufacturing.module.js';
-import { QualityModule } from './quality/quality.module.js';
 import { MaintenanceModule } from './maintenance/maintenance.module.js';
-import { WorkflowModule } from './workflow/workflow.module.js';
 import { AuditModule } from './audit/audit.module.js';
 import { AnalyticsModule } from './analytics/analytics.module.js';
-import { SafetyModule } from './safety/safety.module.js';
 import { DocumentsModule } from './documents/documents.module.js';
 import { HealthModule } from './health/health.module';
 import { SettingsModule } from './settings/settings.module';
@@ -62,7 +58,23 @@ import { EmailModule } from './common/email/email.module.js';
 import { CronModule } from './common/cron/cron.module.js';
 import { HrModule } from './hr/hr.module.js';
 import { SearchModule } from './search/search.module.js';
-import { AccessControlModule } from './access-control/access-control.module';
+import { CatalogModule } from './catalog/catalog.module.js';
+import { AccessControlModule } from './access-control/access-control.module.js';
+import { PacModule } from './pac/pac.module.js';
+import { MaintenanceContractsModule } from './maintenance-contracts/maintenance-contracts.module.js';
+import { TendersModule } from './tenders/tenders.module.js';
+import { CrmActivitiesModule } from './crm-activities/crm-activities.module.js';
+import { SalesTargetsModule } from './sales-targets/sales-targets.module.js';
+import { KbModule } from './kb/kb.module.js';
+import { CalendarModule } from './calendar/calendar.module.js';
+import { CompanyModule } from './company/company.module.js';
+import { MobileCrmModule } from './mobile-crm/mobile-crm.module.js';
+import { ExecutiveModule } from './executive/executive.module.js';
+import { WorkflowModule } from './workflow/workflow.module.js';
+import { SlaTrackerModule } from './sla-tracker/sla-tracker.module.js';
+import { ExportsModule } from './exports/exports.module.js';
+import { NocModule } from './noc/noc.module.js';
+import { LabModule } from './lab/lab.module.js';
 
 @Module({
   imports: [
@@ -103,17 +115,13 @@ import { AccessControlModule } from './access-control/access-control.module';
     LunchBreaksModule,
     CvsModule,
     InventoriesModule,
-    // ── ERP Industrial Modules ──
+    // ── ERP Servicios IT/CCTV — Backoffice ──
     AccountingModule,
     WarehouseModule,
     ProcurementModule,
-    ManufacturingModule,
-    QualityModule,
     MaintenanceModule,
-    WorkflowModule,
     AuditModule,
     AnalyticsModule,
-    SafetyModule,
     DocumentsModule,
     HealthModule,
     SettingsModule,
@@ -122,7 +130,23 @@ import { AccessControlModule } from './access-control/access-control.module';
     CronModule,
     HrModule,
     SearchModule,
+    CatalogModule,
     AccessControlModule,
+    PacModule,
+    MaintenanceContractsModule,
+    TendersModule,
+    CrmActivitiesModule,
+    SalesTargetsModule,
+    KbModule,
+    CalendarModule,
+    CompanyModule,
+    MobileCrmModule,
+    ExecutiveModule,
+    WorkflowModule,
+    SlaTrackerModule,
+    ExportsModule,
+    NocModule,
+    LabModule,
   ],
   controllers: [AppController, ExcelExportController, ExcelImportController],
   providers: [

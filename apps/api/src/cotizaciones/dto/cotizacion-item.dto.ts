@@ -2,6 +2,10 @@ import { IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator
 
 export class CotizacionItemDto {
   @IsOptional()
+  @IsInt()
+  productId?: number;
+
+  @IsOptional()
   @IsString()
   category?: string;
 

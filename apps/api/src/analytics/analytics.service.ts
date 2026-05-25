@@ -126,19 +126,13 @@ export class AnalyticsService {
       totalSales,
       totalExpenses,
       openPOs,
-      productionOrders,
       pendingMaintenanceOrders,
-      openNCRs,
-      activeWorkflows,
       lowStockCount,
     ] = await Promise.all([
       this.prisma.cotizacion.aggregate({ _sum: { total: true }, where: { status: 'APPROVED' } }).catch(() => ({ _sum: { total: null } })),
       this.prisma.expense.aggregate({ _sum: { montoSolicitado: true }, where: { estatusPago: 'Aprobado' } }).catch(() => ({ _sum: { montoSolicitado: null } })),
       this.prisma.purchaseOrder.count({ where: { status: { in: ['DRAFT', 'CONFIRMED', 'PARTIALLY_RECEIVED'] } } }).catch(() => 0),
-      this.prisma.productionOrder.count({ where: { status: { in: ['PLANNED', 'IN_PROGRESS'] } } }).catch(() => 0),
       this.prisma.maintenanceOrder.count({ where: { status: { in: ['PLANNED', 'IN_PROGRESS'] } } }).catch(() => 0),
-      this.prisma.nonConformanceReport.count({ where: { status: { in: ['OPEN', 'INVESTIGATING'] } } }).catch(() => 0),
-      this.prisma.workflowInstance.count({ where: { isComplete: false, isCancelled: false } }).catch(() => 0),
       this.prisma.stockLevel.count({ where: { quantity: { lte: this.prisma.stockLevel.fields?.reorderPoint as any || 0 } } }).catch(() => 0),
     ]);
 
@@ -146,10 +140,7 @@ export class AnalyticsService {
       revenue: totalSales._sum?.total ?? 0,
       expenses: totalExpenses._sum?.montoSolicitado ?? 0,
       openPurchaseOrders: openPOs,
-      activeProductionOrders: productionOrders,
       pendingMaintenanceOrders,
-      openNonConformances: openNCRs,
-      activeWorkflows,
       lowStockAlerts: lowStockCount,
     };
   }
@@ -180,16 +171,11 @@ export class AnalyticsService {
       attendanceToday,
       activitiesMonth,
       pendingActivities,
-      openIncidents,
-      activePermits,
-      expiredTrainings,
       pendingLeaves,
       pendingReviews,
       openPurchaseOrders,
       lowStock,
-      activeWorkflows,
       pendingDocApprovals,
-      openNCRs,
       pendingMaintenance,
       overdueMaintenance,
       cotizacionesMonth,
@@ -199,16 +185,11 @@ export class AnalyticsService {
       this.prisma.attendance.count({ where: { type: 'entrada', timestamp: { gte: startOfDay } } }).catch(() => 0),
       this.prisma.activity.count({ where: { fechaAsignacion: { gte: startOfMonth } } }).catch(() => 0),
       this.prisma.activity.count({ where: { estatus: { in: ['Pendiente', 'En Proceso'] } } }).catch(() => 0),
-      this.prisma.safetyIncident.count({ where: { status: { in: ['REPORTED', 'INVESTIGATING', 'CORRECTIVE_ACTION'] } } }).catch(() => 0),
-      this.prisma.workPermit.count({ where: { status: 'ACTIVE', validTo: { gte: now } } }).catch(() => 0),
-      this.prisma.trainingRecord.count({ where: { expirationDate: { lt: now } } }).catch(() => 0),
       this.prisma.leaveRequest.count({ where: { status: 'PENDING' } }).catch(() => 0),
       this.prisma.performanceReview.count({ where: { status: 'DRAFT' } }).catch(() => 0),
       this.prisma.purchaseOrder.count({ where: { status: { in: ['DRAFT', 'CONFIRMED', 'PARTIALLY_RECEIVED'] } } }).catch(() => 0),
       this.prisma.stockLevel.count({ where: { quantity: { lte: 5 } } }).catch(() => 0),
-      this.prisma.workflowInstance.count({ where: { isComplete: false, isCancelled: false } }).catch(() => 0),
       this.prisma.managedDocument.count({ where: { status: 'PENDING_APPROVAL' } }).catch(() => 0),
-      this.prisma.nonConformanceReport.count({ where: { status: { in: ['OPEN', 'INVESTIGATING'] } } }).catch(() => 0),
       this.prisma.maintenanceOrder.count({ where: { status: { in: ['PLANNED', 'IN_PROGRESS'] } } }).catch(() => 0),
       this.prisma.maintenanceOrder.count({ where: { status: 'PLANNED', plannedDate: { lt: now } } }).catch(() => 0),
       this.prisma.cotizacion.count({ where: { createdAt: { gte: startOfMonth } } }).catch(() => 0),
@@ -227,40 +208,257 @@ export class AnalyticsService {
       // Ventas
       { category: 'Ventas', name: 'Cotizaciones este mes', value: cotizacionesMonth, unit: 'cotizaciones', status: 'info' },
       { category: 'Ventas', name: 'Ventas aprobadas (mes)', value: approvedSales, unit: 'MXN', status: approvedSales > 0 ? 'ok' : 'warning' },
-      // Seguridad
-      { category: 'Seguridad', name: 'Incidentes abiertos', value: openIncidents, unit: 'incidentes', status: openIncidents > 0 ? 'danger' : 'ok' },
-      { category: 'Seguridad', name: 'Permisos de trabajo vigentes', value: activePermits, unit: 'permisos', status: 'info' },
-      { category: 'Seguridad', name: 'Capacitaciones vencidas', value: expiredTrainings, unit: 'registros', status: expiredTrainings > 0 ? 'warning' : 'ok' },
       // RH
       { category: 'Recursos Humanos', name: 'Permisos pendientes de aprobar', value: pendingLeaves, unit: 'solicitudes', status: pendingLeaves > 0 ? 'warning' : 'ok' },
       { category: 'Recursos Humanos', name: 'Revisiones de desempeño pendientes', value: pendingReviews, unit: 'revisiones', status: pendingReviews > 0 ? 'warning' : 'ok' },
       // Compras / Inventario
       { category: 'Compras & Stock', name: 'Órdenes de compra abiertas', value: openPurchaseOrders, unit: 'OC', status: 'info' },
       { category: 'Compras & Stock', name: 'Artículos con bajo stock', value: lowStock, unit: 'artículos', status: lowStock > 0 ? 'danger' : 'ok' },
-      // Documentos & Workflows
-      { category: 'Documentos & Flujos', name: 'Documentos por aprobar', value: pendingDocApprovals, unit: 'documentos', status: pendingDocApprovals > 0 ? 'warning' : 'ok' },
-      { category: 'Documentos & Flujos', name: 'Flujos de aprobación activos', value: activeWorkflows, unit: 'flujos', status: 'info' },
-      // Calidad & Mantenimiento
-      { category: 'Calidad & Mantenimiento', name: 'No conformidades abiertas', value: openNCRs, unit: 'NCR', status: openNCRs > 0 ? 'danger' : 'ok' },
-      { category: 'Calidad & Mantenimiento', name: 'Mantenimientos activos', value: pendingMaintenance, unit: 'órdenes', status: 'info' },
-      { category: 'Calidad & Mantenimiento', name: 'Mantenimientos vencidos', value: overdueMaintenance, unit: 'órdenes', status: overdueMaintenance > 0 ? 'danger' : 'ok' },
+      // Documentos
+      { category: 'Documentos', name: 'Documentos por aprobar', value: pendingDocApprovals, unit: 'documentos', status: pendingDocApprovals > 0 ? 'warning' : 'ok' },
+      // Mantenimiento de contratos
+      { category: 'Mantenimiento', name: 'Mantenimientos activos', value: pendingMaintenance, unit: 'órdenes', status: 'info' },
+      { category: 'Mantenimiento', name: 'Mantenimientos vencidos', value: overdueMaintenance, unit: 'órdenes', status: overdueMaintenance > 0 ? 'danger' : 'ok' },
     ];
   }
 
-  async getProductionEfficiency() {
-    const completed = await this.prisma.productionOrder.findMany({
-      where: { status: 'COMPLETED', actualEndDate: { not: null }, actualStartDate: { not: null } },
-      select: { plannedQty: true, completedQty: true, plannedStartDate: true, plannedEndDate: true, actualStartDate: true, actualEndDate: true },
-      take: 100,
-      orderBy: { actualEndDate: 'desc' },
+  // ────────────────────────────────────────────────────────────────────
+  // FASE 10 — BI EJECUTIVO (margen por tipo, ranking ingenieros, ROI cliente)
+  // ────────────────────────────────────────────────────────────────────
+
+  /** Margen promedio y volumen por tipo de proyecto de servicio. */
+  async getMarginByProjectType() {
+    const projects = await this.prisma.salesProject.findMany({
+      select: {
+        id: true,
+        name: true,
+        projectType: true,
+        budget: true,
+        costProducts: true,
+        costViaticos: true,
+        costOperativo: true,
+        status: true,
+      },
     });
 
-    return completed.map((o: any) => {
-      const yieldRate = Number(o.completedQty) / Number(o.plannedQty) * 100;
-      const plannedDays = (new Date(o.plannedEndDate).getTime() - new Date(o.plannedStartDate).getTime()) / 86400000;
-      const actualDays = (new Date(o.actualEndDate).getTime() - new Date(o.actualStartDate).getTime()) / 86400000;
-      const onTimeRate = actualDays <= plannedDays ? 100 : (plannedDays / actualDays) * 100;
-      return { yieldRate: +yieldRate.toFixed(1), onTimeRate: +onTimeRate.toFixed(1) };
+    const buckets = new Map<string, { count: number; budget: number; cost: number; margin: number; closed: number }>();
+    for (const p of projects) {
+      const key = String(p.projectType || 'OTRO');
+      const budget = Number(p.budget);
+      const cost = Number(p.costProducts) + Number(p.costViaticos) + Number(p.costOperativo);
+      const margin = budget - cost;
+      const current = buckets.get(key) || { count: 0, budget: 0, cost: 0, margin: 0, closed: 0 };
+      current.count += 1;
+      current.budget += budget;
+      current.cost += cost;
+      current.margin += margin;
+      if (p.status === 'CLOSED') current.closed += 1;
+      buckets.set(key, current);
+    }
+
+    return Array.from(buckets.entries())
+      .map(([projectType, values]) => ({
+        projectType,
+        ...values,
+        budget: Math.round(values.budget * 100) / 100,
+        cost: Math.round(values.cost * 100) / 100,
+        margin: Math.round(values.margin * 100) / 100,
+        marginPercent: values.budget > 0 ? +((values.margin / values.budget) * 100).toFixed(2) : 0,
+        avgMarginPerProject: values.count > 0 ? Math.round((values.margin / values.count) * 100) / 100 : 0,
+      }))
+      .sort((a, b) => b.margin - a.margin);
+  }
+
+  /** Ranking de ingenieros por OT cerradas, eficiencia y tiempo promedio. */
+  async getEngineerPerformanceRanking(limit = 20) {
+    const rows = await this.prisma.$queryRaw<Array<{
+      engineerId: number;
+      engineerName: string;
+      totalActivities: bigint;
+      completed: bigint;
+      avgEfficiency: number | null;
+      avgDurationMin: number | null;
+    }>>`
+      SELECT
+        u."id" AS "engineerId",
+        u."nombre" AS "engineerName",
+        COUNT(a."id")::bigint AS "totalActivities",
+        COUNT(*) FILTER (WHERE a."estatus" = 'Finalizado')::bigint AS "completed",
+        AVG(a."eficienciaScore")::float AS "avgEfficiency",
+        AVG(EXTRACT(EPOCH FROM (a."fechaFinalizacion" - a."fechaInicio")) / 60)::float AS "avgDurationMin"
+      FROM "Activity" a
+      INNER JOIN "User" u ON u."id" = a."responsableId"
+      WHERE a."fechaAsignacion" >= NOW() - INTERVAL '90 days'
+      GROUP BY u."id", u."nombre"
+      ORDER BY "completed" DESC, "avgEfficiency" DESC NULLS LAST
+      LIMIT ${limit}
+    `;
+
+    return rows.map((r) => {
+      const total = Number(r.totalActivities || 0n);
+      const completed = Number(r.completed || 0n);
+      return {
+        engineerId: r.engineerId,
+        engineerName: r.engineerName,
+        totalActivities: total,
+        completed,
+        completionRate: total > 0 ? +((completed / total) * 100).toFixed(1) : 0,
+        avgEfficiency: r.avgEfficiency != null ? +Number(r.avgEfficiency).toFixed(1) : null,
+        avgDurationMin: r.avgDurationMin != null ? +Number(r.avgDurationMin).toFixed(0) : null,
+      };
     });
+  }
+
+  /** ROI por cliente — ingreso facturado vs. costo operativo en últimos 12 meses. */
+  async getClientRoi(limit = 25) {
+    const since = new Date();
+    since.setMonth(since.getMonth() - 12);
+
+    const projects = await this.prisma.salesProject.findMany({
+      where: { createdAt: { gte: since } },
+      select: {
+        budget: true,
+        costProducts: true,
+        costViaticos: true,
+        costOperativo: true,
+        status: true,
+        opportunity: {
+          select: {
+            clientId: true,
+            client: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+
+    const buckets = new Map<number, {
+      clientId: number;
+      clientName: string;
+      projects: number;
+      revenue: number;
+      cost: number;
+      margin: number;
+      closed: number;
+    }>();
+
+    for (const p of projects) {
+      const client = p.opportunity?.client;
+      if (!client) continue;
+      const revenue = Number(p.budget);
+      const cost = Number(p.costProducts) + Number(p.costViaticos) + Number(p.costOperativo);
+      const margin = revenue - cost;
+      const current = buckets.get(client.id) || {
+        clientId: client.id,
+        clientName: client.name,
+        projects: 0,
+        revenue: 0,
+        cost: 0,
+        margin: 0,
+        closed: 0,
+      };
+      current.projects += 1;
+      current.revenue += revenue;
+      current.cost += cost;
+      current.margin += margin;
+      if (p.status === 'CLOSED') current.closed += 1;
+      buckets.set(client.id, current);
+    }
+
+    return Array.from(buckets.values())
+      .map((v) => ({
+        ...v,
+        revenue: Math.round(v.revenue * 100) / 100,
+        cost: Math.round(v.cost * 100) / 100,
+        margin: Math.round(v.margin * 100) / 100,
+        roi: v.cost > 0 ? +((v.margin / v.cost) * 100).toFixed(1) : 0,
+        marginPercent: v.revenue > 0 ? +((v.margin / v.revenue) * 100).toFixed(1) : 0,
+      }))
+      .sort((a, b) => b.margin - a.margin)
+      .slice(0, limit);
+  }
+
+  /** ROI por sucursal cliente (ServiceClientBranch) — actividades cerradas vs. abiertas. */
+  async getBranchActivityRanking(limit = 25) {
+    const rows = await this.prisma.$queryRaw<Array<{
+      clientName: string | null;
+      branchName: string | null;
+      total: bigint;
+      completed: bigint;
+      avgEfficiency: number | null;
+    }>>`
+      SELECT
+        sc."name" AS "clientName",
+        a."branchName",
+        COUNT(*)::bigint AS "total",
+        COUNT(*) FILTER (WHERE a."estatus" = 'Finalizado')::bigint AS "completed",
+        AVG(a."eficienciaScore")::float AS "avgEfficiency"
+      FROM "Activity" a
+      LEFT JOIN "service_clients" sc ON sc."id" = a."clientId"
+      WHERE a."branchName" IS NOT NULL
+        AND a."fechaAsignacion" >= NOW() - INTERVAL '180 days'
+      GROUP BY sc."name", a."branchName"
+      ORDER BY "total" DESC
+      LIMIT ${limit}
+    `;
+
+    return rows.map((r) => {
+      const total = Number(r.total || 0n);
+      const completed = Number(r.completed || 0n);
+      return {
+        clientName: r.clientName || 'Sin cliente',
+        branchName: r.branchName,
+        total,
+        completed,
+        completionRate: total > 0 ? +((completed / total) * 100).toFixed(1) : 0,
+        avgEfficiency: r.avgEfficiency != null ? +Number(r.avgEfficiency).toFixed(1) : null,
+      };
+    });
+  }
+
+  /** Visión consolidada: contratos recurrentes, MRR, visitas próximas. */
+  async getMaintenanceContractsKpis() {
+    const [active, total, mrrAgg, upcomingVisits, generatedVisits] = await Promise.all([
+      (this.prisma as any).maintenanceContract.count({ where: { status: 'ACTIVE', deletedAt: null } }).catch(() => 0),
+      (this.prisma as any).maintenanceContract.count({ where: { deletedAt: null } }).catch(() => 0),
+      (this.prisma as any).maintenanceContract.aggregate({
+        _sum: { monthlyFee: true },
+        where: { status: 'ACTIVE', deletedAt: null },
+      }).catch(() => ({ _sum: { monthlyFee: 0 } })),
+      (this.prisma as any).maintenanceContractVisit.count({
+        where: { status: 'SCHEDULED', scheduledDate: { lte: new Date(Date.now() + 14 * 86400000) } },
+      }).catch(() => 0),
+      (this.prisma as any).maintenanceContractVisit.count({
+        where: { status: 'GENERATED' },
+      }).catch(() => 0),
+    ]);
+
+    return {
+      activeContracts: active,
+      totalContracts: total,
+      monthlyRecurringRevenue: Number(mrrAgg?._sum?.monthlyFee || 0),
+      upcomingVisits,
+      generatedVisits,
+    };
+  }
+
+  /** Dashboard BI ejecutivo unificado — todo lo de fase 10 en un solo payload. */
+  async getExecutiveBiDashboard() {
+    const [marginByType, engineers, clientRoi, branches, contracts, dashboard] = await Promise.all([
+      this.getMarginByProjectType(),
+      this.getEngineerPerformanceRanking(10),
+      this.getClientRoi(15),
+      this.getBranchActivityRanking(15),
+      this.getMaintenanceContractsKpis(),
+      this.getExecutiveDashboard(),
+    ]);
+    return {
+      generatedAt: new Date().toISOString(),
+      summary: dashboard,
+      contracts,
+      marginByType,
+      engineers,
+      clientRoi,
+      branches,
+    };
   }
 }

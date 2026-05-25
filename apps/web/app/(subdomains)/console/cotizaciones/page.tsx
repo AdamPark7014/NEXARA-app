@@ -5,9 +5,12 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { PERMISSIONS } from "@/lib/permissions";
 import { useUser } from "@/components/UserContext";
 import HelpTab from '@/components/HelpTab';
+import CatalogPicker from "@/components/CatalogPicker";
+import type { CatalogProduct } from "@/lib/catalog-api";
 
 type QuoteItem = {
   id: string;
+  productId?: number;
   category: string;
   name: string;
   description: string;
@@ -166,6 +169,7 @@ export default function CotizacionesPage() {
   const [publicToken, setPublicToken] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [catalogOpen, setCatalogOpen] = useState(false);
 
   const updateMeta = (field: keyof QuoteMeta, value: string) => {
     setMeta((prev) => ({ ...prev, [field]: value }));
@@ -214,6 +218,38 @@ export default function CotizacionesPage() {
 
   const removeItem = (id: string) => {
     setItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const addItemFromCatalog = (product: CatalogProduct) => {
+    setItems((prev) => [
+      ...prev,
+      {
+        id: `item-${Date.now()}`,
+        productId: product.id,
+        category: product.category || "Hardware",
+        name: product.name,
+        description: product.description || "",
+        scope: "",
+        brand: product.brand?.name || "",
+        model: "",
+        sku: product.sku,
+        partNumber: "",
+        batchReference: "",
+        unit: "pieza",
+        qty: 1,
+        unitPrice: Number(product.price || 0),
+        discount: 0,
+        tax: 16,
+        ieps: 0,
+        retention: 0,
+        laborHours: 0,
+        laborRate: 0,
+        warrantyMonths: 12,
+        deliveryTime: "",
+        countryOrigin: "",
+        notes: "",
+      },
+    ]);
   };
 
   const totals = useMemo(() => {
@@ -268,6 +304,7 @@ export default function CotizacionesPage() {
     ...meta,
     status,
     items: items.map((item) => ({
+      productId: item.productId,
       category: item.category,
       name: item.name,
       description: item.description,
@@ -523,6 +560,9 @@ export default function CotizacionesPage() {
               <div className="sectionHeader">
                 <h2>Conceptos</h2>
                 <div className="sectionActions">
+                  <button type="button" className="ghostButton" onClick={() => setCatalogOpen(true)}>
+                    + Desde catálogo
+                  </button>
                   <button type="button" className="ghostButton" onClick={addItem}>+ Agregar</button>
                 </div>
               </div>
@@ -1412,6 +1452,14 @@ export default function CotizacionesPage() {
           .headerActions { width: 100%; }
         }
       `}</style>
+      {user?.token && (
+        <CatalogPicker
+          token={user.token}
+          open={catalogOpen}
+          onClose={() => setCatalogOpen(false)}
+          onSelect={addItemFromCatalog}
+        />
+      )}
     </RoleGuard>
   );
 }

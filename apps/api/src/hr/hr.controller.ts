@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Query, Body, UseGuards, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Query, Body, UseGuards, ParseIntPipe, ForbiddenException } from '@nestjs/common';
 import { HrService } from './hr.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
@@ -13,33 +13,50 @@ export class HrController {
   // ── Leave Requests ────────────────────────────────────────────────
 
   @Post('leaves')
-  @RBAC({ permissions: [PERMISSIONS.HR_VIEW] })
+  @RBAC({ anyPermissions: [PERMISSIONS.HR_VIEW, PERMISSIONS.PEOPLE_VIEW] })
   createLeave(@Body() dto: any, @CurrentUser() user: any) {
+    // Empleados normales solo pueden crear leaves para sí mismos
+    const userPermissions: string[] = user.permissions || [];
+    const isHrStaff = userPermissions.includes(PERMISSIONS.HR_VIEW) || userPermissions.includes(PERMISSIONS.HR_MANAGE) || user.isSuperAdmin;
+    if (!isHrStaff) {
+      dto = { ...dto, userId: user.id };
+    }
     return this.svc.createLeave(dto, user.id);
   }
 
   @Get('leaves')
-  @RBAC({ permissions: [PERMISSIONS.HR_VIEW] })
+  @RBAC({ anyPermissions: [PERMISSIONS.HR_VIEW, PERMISSIONS.PEOPLE_VIEW] })
   listLeaves(
     @Query() query: PaginationQueryDto,
+    @CurrentUser() user: any,
     @Query('status') status?: string,
     @Query('type') type?: string,
     @Query('userId') userId?: string,
   ) {
-    return this.svc.listLeaves(query, { status, type, userId: userId ? +userId : undefined });
+    const userPermissions: string[] = user.permissions || [];
+    const isHrStaff = userPermissions.includes(PERMISSIONS.HR_VIEW) || userPermissions.includes(PERMISSIONS.HR_MANAGE) || user.isSuperAdmin;
+    // Empleados normales solo ven las suyas
+    const effectiveUserId = isHrStaff ? (userId ? +userId : undefined) : user.id;
+    return this.svc.listLeaves(query, { status, type, userId: effectiveUserId });
   }
 
   @Get('leaves/balance/:userId')
-  @RBAC({ permissions: [PERMISSIONS.HR_VIEW] })
+  @RBAC({ anyPermissions: [PERMISSIONS.HR_VIEW, PERMISSIONS.PEOPLE_VIEW] })
   getLeaveBalance(
     @Param('userId', ParseIntPipe) userId: number,
+    @CurrentUser() user: any,
     @Query('year') year?: string,
   ) {
+    const userPermissions: string[] = user.permissions || [];
+    const isHrStaff = userPermissions.includes(PERMISSIONS.HR_VIEW) || userPermissions.includes(PERMISSIONS.HR_MANAGE) || user.isSuperAdmin;
+    if (!isHrStaff && userId !== user.id) {
+      throw new ForbiddenException('Solo puedes consultar tu propio balance');
+    }
     return this.svc.getLeaveBalance(userId, year ? +year : undefined);
   }
 
   @Get('leaves/:id')
-  @RBAC({ permissions: [PERMISSIONS.HR_VIEW] })
+  @RBAC({ anyPermissions: [PERMISSIONS.HR_VIEW, PERMISSIONS.PEOPLE_VIEW] })
   getLeave(@Param('id', ParseIntPipe) id: number) {
     return this.svc.getLeave(id);
   }
@@ -61,7 +78,7 @@ export class HrController {
   }
 
   @Patch('leaves/:id/cancel')
-  @RBAC({ permissions: [PERMISSIONS.HR_VIEW] })
+  @RBAC({ anyPermissions: [PERMISSIONS.HR_VIEW, PERMISSIONS.PEOPLE_VIEW] })
   cancelLeave(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
     return this.svc.cancelLeave(id, user.id);
   }

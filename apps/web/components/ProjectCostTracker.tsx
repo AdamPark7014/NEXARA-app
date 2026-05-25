@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useUser } from './UserContext';
 import styles from './ProjectCostTracker.module.css';
 import { io, Socket } from 'socket.io-client';
-import { getSocketBaseUrl } from '@/lib/api-base';
+import { buildApiUrl, getSocketBaseUrl } from '@/lib/api-base';
 
 interface ProjectCosts {
   costProducts: number;
@@ -15,6 +15,19 @@ interface ProjectCosts {
   margin: number;
   marginPercent: number;
   isOverBudget: boolean;
+  actual?: {
+    hasOperationalLink: boolean;
+    operationalProjectId?: number | null;
+    activityCount: number;
+    completedActivities: number;
+    actualViaticos: number;
+    actualOperativo: number;
+    actualTotal: number;
+    actualTotalWithProducts: number;
+    marginActual: number;
+    marginActualPercent: number;
+    isOverBudgetActual: boolean;
+  };
 }
 
 interface ProjectCostTrackerProps {
@@ -40,13 +53,21 @@ export default function ProjectCostTracker({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [syncingViáticos, setSyncingViáticos] = useState(false);
+  const [syncingActual, setSyncingActual] = useState(false);
+
+  const apiFetch = (path: string, init?: RequestInit) =>
+    fetch(buildApiUrl(path), {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(init?.headers || {}),
+      },
+    });
 
   const loadCosts = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/ventas/proyectos/${projectId}/costos`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await apiFetch(`ventas/proyectos/${projectId}/costos`);
 
       if (!response.ok) {
         throw new Error('Failed to load costs');
@@ -104,12 +125,9 @@ export default function ProjectCostTracker({
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/ventas/proyectos/${projectId}/costos`, {
+      const response = await apiFetch(`ventas/proyectos/${projectId}/costos`, {
         method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           costProducts: Number(editValues.costProducts),
           costViáticos: Number(editValues.costViáticos),
@@ -137,9 +155,8 @@ export default function ProjectCostTracker({
       setSyncingViáticos(true);
       setError(null);
 
-      const response = await fetch(`/api/ventas/proyectos/${projectId}/sync-viaticos`, {
+      const response = await apiFetch(`ventas/proyectos/${projectId}/sync-viaticos`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!response.ok) {
@@ -161,11 +178,30 @@ export default function ProjectCostTracker({
     }
   };
 
+  const handleSyncActualCosts = async () => {
+    try {
+      setSyncingActual(true);
+      setError(null);
+      const response = await apiFetch(`ventas/proyectos/${projectId}/sync-actual-costs`, { method: 'POST' });
+      if (!response.ok) throw new Error('Failed to sync actual costs');
+      const data = await response.json();
+      setCosts(data);
+      setEditValues({
+        costProducts: String(data.costProducts),
+        costViáticos: String(data.costViáticos),
+        costOperativo: String(data.costOperativo),
+      });
+      await onCostsUpdated?.();
+    } catch (err) {
+      setError('Error syncing actual costs: ' + (err instanceof Error ? err.message : 'Unknown'));
+    } finally {
+      setSyncingActual(false);
+    }
+  };
+
   const validateBudget = async () => {
     try {
-      const response = await fetch(`/api/ventas/proyectos/${projectId}/validar-presupuesto`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await apiFetch(`ventas/proyectos/${projectId}/validar-presupuesto`);
 
       if (!response.ok) {
         throw new Error('Failed to validate budget');
@@ -270,6 +306,37 @@ export default function ProjectCostTracker({
             </div>
           </div>
 
+          {costs.actual?.hasOperationalLink && (
+            <div className={styles.budgetSection} style={{ marginTop: 12 }}>
+              <h4 style={{ margin: '0 0 8px' }}>📡 Costos reales (operación / campo)</h4>
+              <div className={styles.costsGrid}>
+                <div className={styles.costCard}>
+                  <div className={styles.costLabel}>Viáticos reales</div>
+                  <div className={styles.costValue}>${costs.actual.actualViaticos.toFixed(2)}</div>
+                </div>
+                <div className={styles.costCard}>
+                  <div className={styles.costLabel}>Gastos OT</div>
+                  <div className={styles.costValue}>${costs.actual.actualOperativo.toFixed(2)}</div>
+                </div>
+                <div className={styles.costCard}>
+                  <div className={styles.costLabel}>OT completadas</div>
+                  <div className={styles.costValue}>
+                    {costs.actual.completedActivities}/{costs.actual.activityCount}
+                  </div>
+                </div>
+                <div className={styles.costCard + ' ' + styles.totalCost}>
+                  <div className={styles.costLabel}>Total real</div>
+                  <div className={styles.costValue}>${costs.actual.actualTotalWithProducts.toFixed(2)}</div>
+                </div>
+              </div>
+              <div className={styles.marginBox + (costs.actual.isOverBudgetActual ? ' ' + styles.marginBoxWarning : ' ' + styles.marginBoxSuccess)} style={{ marginTop: 10 }}>
+                <div className={styles.marginLabel}>Margen real</div>
+                <div className={styles.marginValue}>${costs.actual.marginActual.toFixed(2)}</div>
+                <div className={styles.marginPercent}>{costs.actual.marginActualPercent.toFixed(1)}% del presupuesto</div>
+              </div>
+            </div>
+          )}
+
           {/* ACTIONS */}
           <div className={styles.actions}>
             <button
@@ -287,6 +354,13 @@ export default function ProjectCostTracker({
               disabled={syncingViáticos}
             >
               {syncingViáticos ? '⏳ Sincronizando...' : '🔄 Sincronizar Viáticos'}
+            </button>
+            <button
+              onClick={handleSyncActualCosts}
+              className={styles.syncButton}
+              disabled={syncingActual || !costs.actual?.hasOperationalLink}
+            >
+              {syncingActual ? '⏳ Sincronizando...' : '📡 Sincronizar costos reales'}
             </button>
             <button
               onClick={validateBudget}

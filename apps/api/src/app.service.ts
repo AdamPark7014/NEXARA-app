@@ -26,14 +26,8 @@ export class AppService {
       totalFines,
       totalPurchaseOrders,
       pendingPurchaseOrders,
-      totalProductionOrders,
-      activeProductionOrders,
       totalMaintenanceOrders,
       openMaintenanceOrders,
-      totalQualityInspections,
-      totalSafetyIncidents,
-      totalWorkflows,
-      pendingWorkflows,
     ] = await Promise.all([
       this.prisma.activity.count(),
       this.prisma.activity.groupBy({ by: ['estatus'], _count: { _all: true } }),
@@ -52,14 +46,8 @@ export class AppService {
       this.prisma.fine.count(),
       this.prisma.purchaseOrder.count(),
       this.prisma.purchaseOrder.count({ where: { status: 'DRAFT' } }),
-      this.prisma.productionOrder.count(),
-      this.prisma.productionOrder.count({ where: { status: { in: ['IN_PROGRESS', 'RELEASED'] } } }),
       this.prisma.maintenanceOrder.count(),
       this.prisma.maintenanceOrder.count({ where: { status: { in: ['PLANNED', 'IN_PROGRESS'] } } }),
-      this.prisma.qualityInspection.count(),
-      this.prisma.safetyIncident.count(),
-      this.prisma.workflowInstance.count(),
-      this.prisma.workflowInstance.count({ where: { isComplete: false, isCancelled: false } }),
     ]);
     return {
       actividades: {
@@ -104,23 +92,9 @@ export class AppService {
         totalPurchaseOrders,
         pendingPurchaseOrders,
       },
-      produccion: {
-        totalProductionOrders,
-        activeProductionOrders,
-      },
       mantenimiento: {
         totalMaintenanceOrders,
         openMaintenanceOrders,
-      },
-      calidad: {
-        totalQualityInspections,
-      },
-      seguridad: {
-        totalSafetyIncidents,
-      },
-      workflows: {
-        total: totalWorkflows,
-        pending: pendingWorkflows,
       },
     };
   }

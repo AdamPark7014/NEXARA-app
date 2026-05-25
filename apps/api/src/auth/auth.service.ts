@@ -90,9 +90,6 @@ export class AuthService {
         PERMISSIONS.HR_VIEW,
         PERMISSIONS.HR_MANAGE,
         PERMISSIONS.HR_APPROVE_LEAVE,
-        PERMISSIONS.SAFETY_VIEW,
-        PERMISSIONS.SAFETY_MANAGE,
-        PERMISSIONS.SAFETY_PERMITS,
         PERMISSIONS.COTIZACIONES_ACCESS,
       );
     }
@@ -112,6 +109,12 @@ export class AuthService {
         PERMISSIONS.SALES_REPORTS_EXPORT,
         PERMISSIONS.SALES_TEMPLATES_MANAGE,
         PERMISSIONS.SALES_AUDIT_VIEW,
+        PERMISSIONS.TENDERS_VIEW,
+        PERMISSIONS.TENDERS_MANAGE,
+        PERMISSIONS.CRM_ACTIVITIES_VIEW,
+        PERMISSIONS.CRM_ACTIVITIES_MANAGE,
+        PERMISSIONS.SALES_TARGETS_VIEW,
+        PERMISSIONS.KB_VIEW,
       );
     }
     if (role?.accesoContabilidad) {
@@ -174,39 +177,16 @@ export class AuthService {
         PERMISSIONS.PROCUREMENT_APPROVE, PERMISSIONS.PROCUREMENT_MANAGE,
       );
     }
-    if (role?.accesoManufactura) {
-      permissions.push(
-        PERMISSIONS.MANUFACTURING_VIEW, PERMISSIONS.MANUFACTURING_MANAGE,
-        PERMISSIONS.BOM_MANAGE, PERMISSIONS.PRODUCTION_MANAGE,
-      );
-    }
-    if (role?.accesoCalidad) {
-      permissions.push(
-        PERMISSIONS.QUALITY_VIEW, PERMISSIONS.QUALITY_MANAGE,
-        PERMISSIONS.QUALITY_INSPECT,
-      );
-    }
     if (role?.accesoMantenimiento) {
       permissions.push(
         PERMISSIONS.MAINTENANCE_VIEW, PERMISSIONS.MAINTENANCE_MANAGE,
         PERMISSIONS.ASSETS_VIEW, PERMISSIONS.ASSETS_MANAGE,
       );
     }
-    if (role?.accesoSeguridad) {
-      permissions.push(
-        PERMISSIONS.SAFETY_VIEW, PERMISSIONS.SAFETY_MANAGE,
-        PERMISSIONS.SAFETY_PERMITS,
-      );
-    }
     if (role?.accesoDocumentos) {
       permissions.push(
         PERMISSIONS.DOCUMENTS_VIEW, PERMISSIONS.DOCUMENTS_MANAGE,
         PERMISSIONS.DOCUMENTS_APPROVE,
-      );
-    }
-    if (role?.accesoWorkflow) {
-      permissions.push(
-        PERMISSIONS.WORKFLOW_VIEW, PERMISSIONS.WORKFLOW_MANAGE,
       );
     }
     if (role?.accesoAuditoria) {
@@ -233,12 +213,120 @@ export class AuthService {
     if (role?.accesoLunchBreaks) {
       permissions.push(PERMISSIONS.LUNCH_BREAKS_VIEW, PERMISSIONS.LUNCH_BREAKS_MANAGE);
     }
+    if (role?.accesoRRHH) {
+      permissions.push(
+        PERMISSIONS.HR_VIEW,
+        PERMISSIONS.HR_MANAGE,
+        PERMISSIONS.HR_APPROVE_LEAVE,
+        PERMISSIONS.USERS_MANAGE,
+        PERMISSIONS.USERS_REVIEW,
+      );
+    }
+    if (role?.accesoCatalogo || role?.accesoPanelVentas || role?.accesoCotizaciones) {
+      permissions.push(PERMISSIONS.CATALOG_VIEW);
+    }
+    if (role?.accesoCatalogo && role?.accesoInventario) {
+      permissions.push(PERMISSIONS.CATALOG_MANAGE);
+    }
 
     if (isSuperAdmin) {
       permissions.push(PERMISSIONS.CVS_SUPERADMIN_REVIEW, PERMISSIONS.CVS_ADMIN_REVIEW, PERMISSIONS.CVS_MANAGE);
     }
 
+    // Acceso a Knowledge Base — todos los usuarios autenticados pueden leer; admin gestiona
+    permissions.push(PERMISSIONS.KB_VIEW);
+    if (isConsoleAdmin || isSuperAdmin) {
+      permissions.push(
+        PERMISSIONS.KB_MANAGE,
+        PERMISSIONS.SALES_TARGETS_MANAGE,
+        PERMISSIONS.SALES_TARGETS_VIEW,
+        PERMISSIONS.COMPANY_SETTINGS_VIEW,
+        PERMISSIONS.COMPANY_SETTINGS_MANAGE,
+        PERMISSIONS.WORKFLOW_VIEW,
+        PERMISSIONS.WORKFLOW_MANAGE,
+        PERMISSIONS.EXECUTIVE_DASHBOARD,
+        PERMISSIONS.PANEL_SUPPORT,
+        PERMISSIONS.PANEL_NOC,
+        PERMISSIONS.PANEL_PEOPLE,
+        PERMISSIONS.PANEL_LAB,
+        PERMISSIONS.NOC_VIEW,
+        PERMISSIONS.NOC_MANAGE,
+        PERMISSIONS.SUPPORT_MANAGE,
+        PERMISSIONS.SUPPORT_VIEW,
+        PERMISSIONS.PEOPLE_VIEW,
+        PERMISSIONS.PEOPLE_MANAGE,
+        PERMISSIONS.LAB_ACCESS,
+      );
+    }
+    // Workflow: cualquier usuario que pueda aprobar (managers) ve sus pendientes
+    permissions.push(PERMISSIONS.WORKFLOW_VIEW);
+    // Support: cualquier usuario puede levantar tickets internos para sí mismo
+    permissions.push(PERMISSIONS.PANEL_SUPPORT, PERMISSIONS.SUPPORT_VIEW);
+    // People: todos los empleados ven su propia info de RH
+    permissions.push(PERMISSIONS.PANEL_PEOPLE, PERMISSIONS.PEOPLE_VIEW);
+
     return Array.from(new Set(permissions));
+  }
+
+  private pickRoleFlags(role: any) {
+    if (!role) {
+      return {
+        accesoConsole: false,
+        accesoConsoleAdmin: false,
+        accesoActividades: false,
+        accesoEvidencias: false,
+        accesoViaticos: false,
+        accesoVehiculos: false,
+        accesoAsistencia: false,
+        accesoGps: false,
+        accesoGestionUsuarios: false,
+        accesoGestionWeb: false,
+        accesoGestionCvs: false,
+        accesoPanelVentas: false,
+        accesoContabilidad: false,
+        accesoCotizaciones: false,
+        accesoInventario: false,
+        accesoCompras: false,
+        accesoMantenimiento: false,
+        accesoDocumentos: false,
+        accesoAuditoria: false,
+        accesoBI: false,
+        accesoBanca: false,
+        accesoMultas: false,
+        accesoClientes: false,
+        accesoLunchBreaks: false,
+        accesoRRHH: false,
+        accesoCatalogo: false,
+      };
+    }
+    return {
+      accesoConsole: Boolean(role.accesoConsole),
+      accesoConsoleAdmin: Boolean(role.accesoConsoleAdmin),
+      accesoActividades: Boolean(role.accesoActividades),
+      accesoEvidencias: Boolean(role.accesoEvidencias),
+      accesoViaticos: Boolean(role.accesoViaticos),
+      accesoVehiculos: Boolean(role.accesoVehiculos),
+      accesoAsistencia: Boolean(role.accesoAsistencia),
+      accesoGps: Boolean(role.accesoGps),
+      accesoGestionUsuarios: Boolean(role.accesoGestionUsuarios),
+      accesoGestionWeb: Boolean(role.accesoGestionWeb),
+      accesoGestionCvs: Boolean(role.accesoGestionCvs),
+      accesoPanelVentas: Boolean(role.accesoPanelVentas),
+      accesoContabilidad: Boolean(role.accesoContabilidad),
+      accesoCotizaciones: Boolean(role.accesoCotizaciones),
+      accesoInventario: Boolean(role.accesoInventario),
+      accesoCompras: Boolean(role.accesoCompras),
+      accesoMantenimiento: Boolean(role.accesoMantenimiento),
+      accesoDocumentos: Boolean(role.accesoDocumentos),
+      accesoAuditoria: Boolean(role.accesoAuditoria),
+      accesoBI: Boolean(role.accesoBI),
+      accesoBanca: Boolean(role.accesoBanca),
+      accesoMultas: Boolean(role.accesoMultas),
+      accesoClientes: Boolean(role.accesoClientes),
+      accesoLunchBreaks: Boolean(role.accesoLunchBreaks),
+      accesoRRHH: Boolean(role.accesoRRHH),
+      accesoCatalogo: Boolean(role.accesoCatalogo),
+    };
   }
 
   private mapSessionUser(user: any, permissions: string[], isSuperAdmin: boolean, loginDevice?: string) {
@@ -248,13 +336,9 @@ export class AuthService {
       email: user.email,
       role: user.role?.nombre ?? '',
       roleId: user.roleId,
-      roleFlags: {
-        accesoConsole: Boolean(user.role?.accesoConsole),
-        accesoConsoleAdmin: Boolean(user.role?.accesoConsoleAdmin),
-        accesoGestionCvs: Boolean(user.role?.accesoGestionCvs),
-        accesoPanelVentas: Boolean(user.role?.accesoPanelVentas),
-        accesoCotizaciones: Boolean(user.role?.accesoCotizaciones),
-      },
+      orgRoleKey: user.role?.orgRoleKey ?? null,
+      nivelAutoridad: user.role?.nivelAutoridad ?? 0,
+      roleFlags: this.pickRoleFlags(user.role),
       department: user.department?.nombre ?? '',
       departmentId: user.departmentId,
       permissions,

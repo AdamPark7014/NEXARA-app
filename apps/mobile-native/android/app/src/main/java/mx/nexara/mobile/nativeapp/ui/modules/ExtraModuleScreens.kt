@@ -626,16 +626,3 @@ fun BankingModuleScreen() = GenericListModuleScreen(title = "Banca · Cuentas") 
     }
 }
 
-// ── Workflow ──────────────────────────────────────────────────────────────
-@Composable
-fun WorkflowModuleScreen() = GenericListModuleScreen(title = "Flujos") { repo ->
-    repo.workflow().map { w ->
-        SimpleRow(
-            id = w.id.toString(),
-            title = nn(w.name),
-            subtitle = w.assignedTo,
-            meta = w.updatedAt,
-            trailing = w.status,
-        )
-    }
-}

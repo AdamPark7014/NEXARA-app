@@ -53,8 +53,11 @@ async function readJsonSafe<T>(response: Response, fallbackLabel: string): Promi
   try {
     return JSON.parse(raw) as T;
   } catch {
+    // Check if response is HTML (common when session expired or server error)
+    const isHtml = raw.trim().startsWith('<!DOCTYPE') || raw.trim().startsWith('<html');
     const firstLine = raw.split("\n")[0]?.trim();
-    throw new Error(`${fallbackLabel}: respuesta no es JSON (${firstLine?.slice(0, 120) || "vacía"})`);
+    const errorHint = isHtml ? ' (posible error de sesión o página de error)' : '';
+    throw new Error(`${fallbackLabel}: respuesta no es JSON (${firstLine?.slice(0, 100) || "vacía"})${errorHint}`);
   }
 }
 
@@ -95,9 +98,10 @@ export default function WebPanel() {
           fetch(buildApiUrl("news"), { cache: "no-store" }),
         ]);
 
-        if (!clientsRes.ok || !projectsRes.ok || !contactsRes.ok || !newsRes.ok) {
-          throw new Error("No se pudieron cargar los datos del dashboard");
-        }
+        if (!clientsRes.ok) throw new Error(`Clientes: ${clientsRes.status} ${clientsRes.statusText}`);
+        if (!projectsRes.ok) throw new Error(`Proyectos: ${projectsRes.status} ${projectsRes.statusText}`);
+        if (!contactsRes.ok) throw new Error(`Contactos: ${contactsRes.status} ${contactsRes.statusText}`);
+        if (!newsRes.ok) throw new Error(`Noticias: ${newsRes.status} ${newsRes.statusText}`);
 
         const [clientsData, projectsData, contactsData, newsData] = await Promise.all([
           readJsonSafe<Client[]>(clientsRes, "Clientes"),

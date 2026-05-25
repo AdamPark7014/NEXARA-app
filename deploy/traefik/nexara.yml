@@ -1,8 +1,56 @@
+## Traefik routing for NEXARA ERP
+##
+## Estructura de subdominios canónicos (todos terminan en .nexara.com.mx):
+##   core      → ERP principal (console)
+##   sales     → CRM (ventas)
+##   ops       → Operaciones técnicas (operacion)
+##   finance   → Administración / contabilidad
+##   studio    → Estudio creativo / marketing (panel web)
+##   portal    → Portal de clientes empresariales (tickets)
+##   support   → Helpdesk interno
+##   noc       → Centro de monitoreo 24/7
+##   people    → Recursos humanos
+##   lab       → Playground interno (AI/dev)
+##   api       → Backend NestJS
+##   (raíz)    → Sitio público
+##
+## Hosts legacy (aliases): consola, console, app, ventas, operacion, contabilidad,
+## web, tickets, crm, admin, media, help, monitor, rh, hr, dev. Estos llegan al
+## mismo backend; el middleware de Next.js los redirige 308 al canónico.
+
 http:
   routers:
-    # HTTP redirects
-    console-http:
-      rule: 'Host(`consola.nexara.com.mx`) || Host(`console.nexara.com.mx`) || Host(`app.nexara.com.mx`)'
+    # ───────────────────────────────────────────────────────────
+    # HTTP → HTTPS redirects (todos los subdominios)
+    # ───────────────────────────────────────────────────────────
+    erp-http:
+      rule: >-
+        Host(`core.nexara.com.mx`) ||
+        Host(`consola.nexara.com.mx`) ||
+        Host(`console.nexara.com.mx`) ||
+        Host(`app.nexara.com.mx`) ||
+        Host(`sales.nexara.com.mx`) ||
+        Host(`ventas.nexara.com.mx`) ||
+        Host(`crm.nexara.com.mx`) ||
+        Host(`ops.nexara.com.mx`) ||
+        Host(`operacion.nexara.com.mx`) ||
+        Host(`finance.nexara.com.mx`) ||
+        Host(`contabilidad.nexara.com.mx`) ||
+        Host(`admin.nexara.com.mx`) ||
+        Host(`studio.nexara.com.mx`) ||
+        Host(`media.nexara.com.mx`) ||
+        Host(`web.nexara.com.mx`) ||
+        Host(`portal.nexara.com.mx`) ||
+        Host(`tickets.nexara.com.mx`) ||
+        Host(`support.nexara.com.mx`) ||
+        Host(`help.nexara.com.mx`) ||
+        Host(`noc.nexara.com.mx`) ||
+        Host(`monitor.nexara.com.mx`) ||
+        Host(`people.nexara.com.mx`) ||
+        Host(`rh.nexara.com.mx`) ||
+        Host(`hr.nexara.com.mx`) ||
+        Host(`lab.nexara.com.mx`) ||
+        Host(`dev.nexara.com.mx`)
       entryPoints:
         - web
       middlewares:
@@ -10,7 +58,7 @@ http:
       service: dummy
 
     public-http:
-      rule: 'Host(`web.nexara.com.mx`) || Host(`nexara.com.mx`) || Host(`www.nexara.com.mx`)'
+      rule: 'Host(`nexara.com.mx`) || Host(`www.nexara.com.mx`)'
       entryPoints:
         - web
       middlewares:
@@ -25,10 +73,91 @@ http:
         - redirect-https
       service: dummy
 
-    # HTTPS routes
-    # API backend (higher priority)
+    # ───────────────────────────────────────────────────────────
+    # Socket.IO backend (real-time) en TODOS los subdominios del ERP
+    # ───────────────────────────────────────────────────────────
+    socket-io:
+      rule: >-
+        Host(
+          `core.nexara.com.mx`,
+          `consola.nexara.com.mx`,
+          `console.nexara.com.mx`,
+          `app.nexara.com.mx`,
+          `sales.nexara.com.mx`,
+          `ventas.nexara.com.mx`,
+          `crm.nexara.com.mx`,
+          `ops.nexara.com.mx`,
+          `operacion.nexara.com.mx`,
+          `finance.nexara.com.mx`,
+          `contabilidad.nexara.com.mx`,
+          `admin.nexara.com.mx`,
+          `studio.nexara.com.mx`,
+          `media.nexara.com.mx`,
+          `web.nexara.com.mx`,
+          `portal.nexara.com.mx`,
+          `tickets.nexara.com.mx`,
+          `support.nexara.com.mx`,
+          `help.nexara.com.mx`,
+          `noc.nexara.com.mx`,
+          `monitor.nexara.com.mx`,
+          `people.nexara.com.mx`,
+          `rh.nexara.com.mx`,
+          `hr.nexara.com.mx`,
+          `lab.nexara.com.mx`,
+          `dev.nexara.com.mx`
+        ) && PathPrefix(`/socket.io`)
+      entryPoints:
+        - websecure
+      service: nexara-api
+      priority: 101
+      tls:
+        certResolver: letsencrypt
+
+    # ───────────────────────────────────────────────────────────
+    # Uploads estáticos (máxima prioridad, todos los subdominios)
+    # ───────────────────────────────────────────────────────────
+    uploads:
+      rule: 'PathPrefix(`/uploads`)'
+      entryPoints:
+        - websecure
+      service: nexara-api
+      priority: 102
+      tls:
+        certResolver: letsencrypt
+
+    # ───────────────────────────────────────────────────────────
+    # API backend bajo /api en todos los subdominios del ERP
+    # ───────────────────────────────────────────────────────────
     api:
-      rule: 'PathPrefix(`/api`)'
+      rule: >-
+        Host(
+          `core.nexara.com.mx`,
+          `consola.nexara.com.mx`,
+          `console.nexara.com.mx`,
+          `app.nexara.com.mx`,
+          `sales.nexara.com.mx`,
+          `ventas.nexara.com.mx`,
+          `crm.nexara.com.mx`,
+          `ops.nexara.com.mx`,
+          `operacion.nexara.com.mx`,
+          `finance.nexara.com.mx`,
+          `contabilidad.nexara.com.mx`,
+          `admin.nexara.com.mx`,
+          `studio.nexara.com.mx`,
+          `media.nexara.com.mx`,
+          `web.nexara.com.mx`,
+          `portal.nexara.com.mx`,
+          `tickets.nexara.com.mx`,
+          `support.nexara.com.mx`,
+          `help.nexara.com.mx`,
+          `noc.nexara.com.mx`,
+          `monitor.nexara.com.mx`,
+          `people.nexara.com.mx`,
+          `rh.nexara.com.mx`,
+          `hr.nexara.com.mx`,
+          `lab.nexara.com.mx`,
+          `dev.nexara.com.mx`
+        ) && PathPrefix(`/api`)
       entryPoints:
         - websecure
       service: nexara-api
@@ -44,9 +173,40 @@ http:
       tls:
         certResolver: letsencrypt
 
-    # Console/Admin Dashboard
-    console:
-      rule: 'Host(`consola.nexara.com.mx`) || Host(`console.nexara.com.mx`) || Host(`app.nexara.com.mx`)'
+    # ───────────────────────────────────────────────────────────
+    # Frontends (Next.js). El middleware de Next mapea cada host
+    # a su carpeta interna y redirige aliases → canónicos.
+    # ───────────────────────────────────────────────────────────
+    erp-frontends:
+      rule: >-
+        (
+          Host(`core.nexara.com.mx`) ||
+          Host(`consola.nexara.com.mx`) ||
+          Host(`console.nexara.com.mx`) ||
+          Host(`app.nexara.com.mx`) ||
+          Host(`sales.nexara.com.mx`) ||
+          Host(`ventas.nexara.com.mx`) ||
+          Host(`crm.nexara.com.mx`) ||
+          Host(`ops.nexara.com.mx`) ||
+          Host(`operacion.nexara.com.mx`) ||
+          Host(`finance.nexara.com.mx`) ||
+          Host(`contabilidad.nexara.com.mx`) ||
+          Host(`admin.nexara.com.mx`) ||
+          Host(`studio.nexara.com.mx`) ||
+          Host(`media.nexara.com.mx`) ||
+          Host(`web.nexara.com.mx`) ||
+          Host(`portal.nexara.com.mx`) ||
+          Host(`tickets.nexara.com.mx`) ||
+          Host(`support.nexara.com.mx`) ||
+          Host(`help.nexara.com.mx`) ||
+          Host(`noc.nexara.com.mx`) ||
+          Host(`monitor.nexara.com.mx`) ||
+          Host(`people.nexara.com.mx`) ||
+          Host(`rh.nexara.com.mx`) ||
+          Host(`hr.nexara.com.mx`) ||
+          Host(`lab.nexara.com.mx`) ||
+          Host(`dev.nexara.com.mx`)
+        ) && !PathPrefix(`/api`,`/socket.io`,`/uploads`)
       entryPoints:
         - websecure
       service: nexara-web
@@ -54,9 +214,9 @@ http:
       tls:
         certResolver: letsencrypt
 
-    # Public website
+    # Sitio público
     public:
-      rule: 'Host(`web.nexara.com.mx`) || Host(`nexara.com.mx`) || Host(`www.nexara.com.mx`)'
+      rule: 'Host(`nexara.com.mx`) || Host(`www.nexara.com.mx`)'
       entryPoints:
         - websecure
       service: nexara-web

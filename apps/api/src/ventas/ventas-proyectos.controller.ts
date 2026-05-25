@@ -64,6 +64,24 @@ export class VentasProyectosController {
     return updated;
   }
 
+  @Post(':id/provision-operacion')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
+  async provisionOperational(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    const result = await this.ventasService.provisionOperationalProject(id, user);
+    await this.ventasService.createAuditEvent({
+      action: 'project.provision_operacion',
+      entityType: 'project',
+      entityId: id,
+      actorId: user?.id,
+      metadata: {
+        operationalProjectId: result.operationalProject.id,
+        created: result.created,
+      },
+    });
+    return result;
+  }
+
   @Post(':id/close')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
@@ -84,6 +102,13 @@ export class VentasProyectosController {
   @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
   getOrder(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
     return this.ventasService.getProjectOrder(id, user);
+  }
+
+  @Get(':id/resumen')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: SALES_VIEW_ACCESS })
+  getSummary(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.ventasService.getProjectSummary(id, user);
   }
 
   @Get(':id/viaticos')
@@ -149,7 +174,7 @@ export class VentasProyectosController {
     @Body() body: { costProducts?: number; costViaticos?: number; costOperativo?: number },
     @CurrentUser() user: any,
   ) {
-    return this.ventasService.updateProjectCosts(id, body, user).then(async (updated) => {
+    return this.ventasService.updateProjectCosts(id, body, user).then(async () => {
       await this.ventasService.createAuditEvent({
         action: 'project.costs.update',
         entityType: 'project',
@@ -157,7 +182,7 @@ export class VentasProyectosController {
         actorId: user?.id,
         metadata: body,
       });
-      return updated;
+      return this.ventasService.calculateProjectCosts(id, user);
     });
   }
 
@@ -175,6 +200,20 @@ export class VentasProyectosController {
     const result = await this.ventasService.syncViaticosToProject(id, user);
     await this.ventasService.createAuditEvent({
       action: 'project.viatic.sync',
+      entityType: 'project',
+      entityId: id,
+      actorId: user?.id,
+    });
+    return result;
+  }
+
+  @Post(':id/sync-actual-costs')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
+  async syncActualCosts(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    const result = await this.ventasService.syncActualCostsFromField(id, user);
+    await this.ventasService.createAuditEvent({
+      action: 'project.costs.sync_actual',
       entityType: 'project',
       entityId: id,
       actorId: user?.id,

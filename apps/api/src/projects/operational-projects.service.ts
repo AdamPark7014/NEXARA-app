@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { CreateOperationalProjectDto, UpdateOperationalProjectDto, ProjectStatusChangeDto, AssignProjectEngineerDto } from './dto/create-operational-project.dto.js';
+import { ActivitiesService } from '../activities/activities.service.js';
+import { CreateOperationalProjectDto, UpdateOperationalProjectDto, ProjectStatusChangeDto, AssignProjectEngineerDto, CreateProjectActivityDto } from './dto/create-operational-project.dto.js';
 
 @Injectable()
 export class OperationalProjectsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly activitiesService: ActivitiesService,
+  ) {}
 
   private get projectRepo() {
     return (this.prisma as any).operationalProject;
@@ -38,6 +42,10 @@ export class OperationalProjectsService {
       data: {
         title: createDto.title,
         description: createDto.description,
+        projectType: createDto.projectType ?? 'OTRO',
+        scopeSummary: createDto.scopeSummary?.trim() || null,
+        siteCount: createDto.siteCount ?? null,
+        salesProjectId: createDto.salesProjectId ?? null,
         status: 'ACTIVE',
         vendorId: createDto.vendorId,
         clientId: createDto.clientId,
@@ -355,5 +363,50 @@ export class OperationalProjectsService {
       durationDays,
       isActive: project.status === 'ACTIVE',
     };
+  }
+
+  async createProjectActivity(projectId: number, dto: CreateProjectActivityDto, userId: number) {
+    const project = await this.findById(projectId);
+    return this.activitiesService.create({
+      titulo: dto.titulo,
+      descripcion: dto.descripcion,
+      projectId,
+      clientId: project.clientId,
+      activityType: 'CLIENT',
+      ticketType: 'INSTALACION',
+      workType: 'ISSUE',
+      branchName: dto.branchName,
+      branchNumber: dto.branchNumber,
+      creadoPorId: userId,
+      responsableId: dto.responsableId,
+    });
+  }
+
+  async createSiteActivities(projectId: number, userId: number, responsableId?: number) {
+    const project = await this.findById(projectId);
+    const siteCount = project.siteCount ?? 0;
+    if (siteCount < 1) {
+      throw new BadRequestException('El proyecto no tiene sitios/sucursales definidos');
+    }
+
+    const assigneeId = responsableId ?? project.vendorId;
+    const created = [];
+    for (let i = 1; i <= siteCount; i += 1) {
+      const activity = await this.activitiesService.create({
+        titulo: `${project.title} — Sucursal ${i}`,
+        descripcion: project.scopeSummary || project.description || undefined,
+        projectId,
+        clientId: project.clientId,
+        activityType: 'CLIENT',
+        ticketType: 'INSTALACION',
+        workType: 'ISSUE',
+        branchName: `Sucursal ${i}`,
+        branchNumber: String(i),
+        creadoPorId: userId,
+        responsableId: assigneeId,
+      });
+      created.push(activity);
+    }
+    return { count: created.length, activities: created };
   }
 }

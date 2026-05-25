@@ -2,7 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function seedRoles() {
-  console.log('🌱 Seeding roles...');
+  console.log('🌱 Seeding legacy panel roles...');
   
   const roles = [
     { nombre: 'PanelWeb', nivelAutoridad: 20 },
@@ -17,6 +17,10 @@ async function seedRoles() {
     });
     console.log(`✅ Rol ${role.nombre} creado/actualizado`);
   }
+
+  console.log('🌱 Seeding ERP org role templates (ts-node)...');
+  const { execSync } = require('child_process');
+  execSync('npx ts-node ./seed-roles.ts', { cwd: __dirname, stdio: 'inherit' });
 }
 
 async function seedProjects() {

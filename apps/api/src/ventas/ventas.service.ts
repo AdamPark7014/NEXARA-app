@@ -19,6 +19,7 @@ import { UpdateSalesProjectDto } from './dto/update-sales-project.dto.js';
 import { CreateOrderTemplateDto } from './dto/create-order-template.dto.js';
 import { UpdateOrderTemplateDto } from './dto/update-order-template.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
+import { isSalesTeamLeadUser } from '../common/org-roles.js';
 
 @Injectable()
 export class VentasService {
@@ -34,8 +35,7 @@ export class VentasService {
   }
 
   private isConsoleAdminUser(user?: any) {
-    const permissions = Array.isArray(user?.permissions) ? user.permissions : [];
-    return permissions.includes('console.admin');
+    return isSalesTeamLeadUser(user);
   }
 
   private canAccessOwner(user: any, ownerId?: number | null) {
@@ -252,7 +252,7 @@ export class VentasService {
         ownerId,
         serviceClientId: dto.serviceClientId ?? null,
       },
-      include: { documents: true, opportunities: true },
+      include: { documents: true, opportunities: true, serviceClient: { select: { id: true, name: true, isActive: true, accountCode: true } } },
     });
     if (user?.id) {
       const actorName = String(user.nombre || 'Usuario').trim() || 'Usuario';
@@ -265,7 +265,11 @@ export class VentasService {
 
   async listClients(user?: any, ownerId?: number, query?: PaginationQueryDto) {
     const where = this.buildScopedOwnerWhere(user, ownerId);
-    const include = { documents: true, opportunities: true };
+    const include = {
+      documents: true,
+      opportunities: true,
+      serviceClient: { select: { id: true, name: true, isActive: true, accountCode: true } },
+    };
     if (query?.limit) {
       const [data, total] = await Promise.all([
         this.prisma.salesClient.findMany({ where, orderBy: { updatedAt: 'desc' }, include, skip: query.skip, take: query.take }),
@@ -283,7 +287,7 @@ export class VentasService {
   async getClient(id: number, user?: any) {
     const client = await this.prisma.salesClient.findUnique({
       where: { id },
-      include: { documents: true, opportunities: true },
+      include: { documents: true, opportunities: true, serviceClient: { select: { id: true, name: true, isActive: true, accountCode: true } } },
     });
     if (!client) throw new NotFoundException('Cliente no encontrado');
     this.assertOwnerAccess(client.ownerId, user, 'cliente');
@@ -309,13 +313,51 @@ export class VentasService {
         ownerId,
         serviceClientId: dto.serviceClientId,
       },
-      include: { documents: true, opportunities: true },
+      include: { documents: true, opportunities: true, serviceClient: { select: { id: true, name: true, isActive: true, accountCode: true } } },
     });
   }
 
   async deleteClient(id: number, user?: any) {
     await this.getClient(id, user);
     return this.prisma.salesClient.delete({ where: { id } });
+  }
+
+  /** Crea o devuelve el ServiceClient operativo vinculado a un cliente comercial. */
+  async provisionServiceClient(id: number, user?: any) {
+    const salesClient = await this.getClient(id, user);
+    if (salesClient.serviceClientId) {
+      const existing = await this.prisma.serviceClient.findUnique({
+        where: { id: salesClient.serviceClientId },
+      });
+      if (existing) {
+        return { salesClient, serviceClient: existing, created: false };
+      }
+    }
+
+    const accountCode = salesClient.taxId?.trim() || `SC-${salesClient.id}`;
+    const serviceClient = await this.prisma.serviceClient.create({
+      data: {
+        name: salesClient.legalName?.trim() || salesClient.name,
+        contactName: salesClient.name,
+        contactEmail: salesClient.billingEmail,
+        contactPhone: salesClient.billingPhone,
+        address: salesClient.fiscalAddress,
+        accountCode,
+        isActive: true,
+      },
+    });
+
+    const updated = await this.prisma.salesClient.update({
+      where: { id },
+      data: { serviceClientId: serviceClient.id },
+      include: {
+        documents: true,
+        opportunities: true,
+        serviceClient: { select: { id: true, name: true, isActive: true, accountCode: true } },
+      },
+    });
+
+    return { salesClient: updated, serviceClient, created: true };
   }
 
   async addClientDocuments(clientId: number, type: string, files: Array<{ url: string; name?: string }>, user?: any) {
@@ -596,6 +638,9 @@ export class VentasService {
       data: {
         opportunityId: dto.opportunityId,
         name: dto.name,
+        projectType: dto.projectType ?? 'OTRO',
+        scopeSummary: dto.scopeSummary?.trim() || null,
+        siteCount: dto.siteCount ?? null,
         budget: dto.budget ?? 0,
         costProducts: dto.costProducts ?? 0,
         costViaticos: dto.costViaticos ?? 0,
@@ -635,6 +680,9 @@ export class VentasService {
       where: { id },
       data: {
         name: dto.name,
+        projectType: dto.projectType,
+        scopeSummary: dto.scopeSummary?.trim() || undefined,
+        siteCount: dto.siteCount,
         budget: dto.budget,
         costProducts: dto.costProducts,
         costViaticos: dto.costViaticos,
@@ -646,6 +694,62 @@ export class VentasService {
       },
       include: { opportunity: true },
     });
+  }
+
+  /** Crea proyecto operativo en campo vinculado a un proyecto comercial ganado. */
+  async provisionOperationalProject(id: number, user?: any) {
+    const project = await this.prisma.salesProject.findUnique({
+      where: { id },
+      include: {
+        opportunity: {
+          include: {
+            client: true,
+            owner: true,
+          },
+        },
+      },
+    });
+    if (!project) throw new NotFoundException('Proyecto no encontrado');
+    this.assertOwnerAccess(project.opportunity?.ownerId, user, 'proyecto');
+
+    const existing = await this.prisma.operationalProject.findFirst({
+      where: { salesProjectId: id },
+    });
+    if (existing) {
+      return { salesProject: project, operationalProject: existing, created: false };
+    }
+
+    const salesClient = project.opportunity?.client;
+    if (!salesClient?.serviceClientId) {
+      throw new BadRequestException(
+        'El cliente comercial no tiene cuenta operativa. Actívalo en Ventas → Clientes antes de desplegar en campo.',
+      );
+    }
+
+    const vendorId = project.opportunity?.ownerId || user?.id;
+    if (!vendorId) throw new BadRequestException('No se pudo determinar el responsable comercial del proyecto');
+
+    const operationalProject = await this.prisma.operationalProject.create({
+      data: {
+        title: project.name,
+        description: project.scopeSummary || project.opportunity?.description || null,
+        projectType: project.projectType,
+        scopeSummary: project.scopeSummary,
+        siteCount: project.siteCount,
+        salesProjectId: project.id,
+        vendorId,
+        clientId: salesClient.serviceClientId,
+        startDate: project.startDate || new Date(),
+        endDate: project.endDate,
+        status: 'ACTIVE',
+      },
+      include: {
+        client: { select: { id: true, name: true } },
+        vendor: { select: { id: true, nombre: true, email: true } },
+      },
+    });
+
+    return { salesProject: project, operationalProject, created: true };
   }
 
   private parseReportRange(range?: { start?: string; end?: string }) {
@@ -821,6 +925,71 @@ export class VentasService {
 
   // ===== COSTEO AUTOMÁTICO Y GESTIÓN DE PROYECTOS =====
 
+  private async computeProjectActualCosts(salesProjectId: number) {
+    const opProject = await this.prisma.operationalProject.findFirst({
+      where: { salesProjectId },
+      select: { id: true, title: true },
+    });
+
+    if (!opProject) {
+      return {
+        hasOperationalLink: false as const,
+        operationalProjectId: null,
+        activityCount: 0,
+        completedActivities: 0,
+        actualProducts: 0,
+        actualViaticos: 0,
+        actualOperativo: 0,
+        actualTotal: 0,
+      };
+    }
+
+    const activities = await this.prisma.activity.findMany({
+      where: { projectId: opProject.id, deletedAt: null },
+      select: { id: true, estatus: true },
+    });
+    const activityIds = activities.map((a) => a.id);
+    const completedActivities = activities.filter((a) =>
+      /finaliz|complet|cerrad/i.test(String(a.estatus || '')),
+    ).length;
+
+    const [expenseAgg, viaticoActivityAgg, viaticoProjectAgg] = await Promise.all([
+      activityIds.length
+        ? this.prisma.expense.aggregate({
+            where: { actividadId: { in: activityIds }, deletedAt: null },
+            _sum: { montoSolicitado: true },
+          })
+        : Promise.resolve({ _sum: { montoSolicitado: null } }),
+      activityIds.length
+        ? this.prisma.viatico.aggregate({
+            where: { actividadId: { in: activityIds } },
+            _sum: { montoSolicitado: true },
+          })
+        : Promise.resolve({ _sum: { montoSolicitado: null } }),
+      this.prisma.viatico.aggregate({
+        where: { projectId: salesProjectId },
+        _sum: { montoSolicitado: true },
+      }),
+    ]);
+
+    const actualOperativo = Number(expenseAgg._sum.montoSolicitado || 0);
+    const actualViaticos =
+      Number(viaticoActivityAgg._sum.montoSolicitado || 0) +
+      Number(viaticoProjectAgg._sum.montoSolicitado || 0);
+
+    return {
+      hasOperationalLink: true as const,
+      operationalProjectId: opProject.id,
+      operationalProjectTitle: opProject.title,
+      activityCount: activityIds.length,
+      completedActivities,
+      actualProducts: 0,
+      actualViaticos,
+      actualOperativo,
+      actualTotal: actualViaticos + actualOperativo,
+    };
+  }
+
   /**
    * Calcula costos totales y margen de un proyecto
    */
@@ -845,6 +1014,11 @@ export class VentasService {
     const marginPercent = budget > 0 ? (margin / budget) * 100 : 0;
     const isOverBudget = totalCost > budget;
 
+    const actual = await this.computeProjectActualCosts(projectId);
+    const actualTotalWithProducts = Number(project.costProducts) + actual.actualTotal;
+    const marginActual = budget - actualTotalWithProducts;
+    const marginActualPercent = budget > 0 ? (marginActual / budget) * 100 : 0;
+
     return {
       costProducts,
       costViaticos,
@@ -854,7 +1028,39 @@ export class VentasService {
       margin,
       marginPercent: Number(marginPercent.toFixed(2)),
       isOverBudget,
+      actual: {
+        ...actual,
+        actualTotalWithProducts,
+        marginActual: Number(marginActual.toFixed(2)),
+        marginActualPercent: Number(marginActualPercent.toFixed(2)),
+        isOverBudgetActual: actualTotalWithProducts > budget,
+      },
     };
+  }
+
+  /**
+   * Sincroniza costos de campo (viáticos + gastos OT) al proyecto comercial.
+   */
+  async syncActualCostsFromField(projectId: number, user?: any) {
+    const project = await this.prisma.salesProject.findUnique({
+      where: { id: projectId },
+      include: { opportunity: true },
+    });
+    if (!project) throw new NotFoundException(`Project with ID ${projectId} not found`);
+    this.assertOwnerAccess(project.opportunity?.ownerId, user, 'proyecto');
+
+    const actual = await this.computeProjectActualCosts(projectId);
+    const costViaticos = actual.actualViaticos;
+    const costOperativo = actual.actualOperativo;
+    const totalCost = Number(project.costProducts) + costViaticos + costOperativo;
+    const margin = Math.max(0, Number(project.budget) - totalCost);
+
+    await this.prisma.salesProject.update({
+      where: { id: projectId },
+      data: { costViaticos, costOperativo, margin },
+    });
+
+    return this.calculateProjectCosts(projectId, user);
   }
 
   /**
@@ -950,9 +1156,11 @@ export class VentasService {
     }, 0);
 
     // Actualizar proyecto con los costos sincronizados
-    return this.updateProjectCosts(projectId, {
+    await this.updateProjectCosts(projectId, {
       costViaticos: totalViaticos,
     }, user);
+
+    return this.calculateProjectCosts(projectId, user);
   }
 
   async closeProject(projectId: number, user?: any) {
@@ -1039,6 +1247,40 @@ export class VentasService {
       include: { project: true, quote: true, createdBy: true },
     });
 
+    const quoteItems = lastQuote?.cotizacion?.items ?? [];
+    if (quoteItems.length) {
+      await this.prisma.salesProjectOrderLine.createMany({
+        data: quoteItems.map((item, index) => ({
+          orderId: order.id,
+          productId: item.productId,
+          sortOrder: index,
+          category: item.category,
+          name: item.name,
+          description: item.description,
+          scope: item.scope,
+          brand: item.brand,
+          model: item.model,
+          sku: item.sku,
+          partNumber: item.partNumber,
+          batchReference: item.batchReference,
+          unit: item.unit,
+          qty: item.qty,
+          unitPrice: item.unitPrice,
+          discount: item.discount,
+          tax: item.tax,
+          ieps: item.ieps,
+          retention: item.retention,
+          laborHours: item.laborHours,
+          laborRate: item.laborRate,
+          warrantyMonths: item.warrantyMonths,
+          deliveryTime: item.deliveryTime,
+          countryOrigin: item.countryOrigin,
+          notes: item.notes,
+          lineTotal: item.lineTotal,
+        })),
+      });
+    }
+
     // Actualizar proyecto: cambiar status a CLOSED y linkar con orden
     await this.prisma.salesProject.update({
       where: { id: projectId },
@@ -1049,7 +1291,10 @@ export class VentasService {
       },
     });
 
-    return order;
+    return this.prisma.salesProjectOrder.findUnique({
+      where: { id: order.id },
+      include: { project: true, quote: true, createdBy: true, lines: { orderBy: { sortOrder: 'asc' } } },
+    });
   }
 
   /**
@@ -1084,11 +1329,126 @@ export class VentasService {
   async getProjectOrder(projectId: number, user?: any) {
     const order = await this.prisma.salesProjectOrder.findUnique({
       where: { projectId },
-      include: { project: { include: { opportunity: true } }, quote: true, createdBy: true },
+      include: {
+        project: { include: { opportunity: { include: { client: true } } } },
+        quote: true,
+        createdBy: true,
+        lines: { orderBy: { sortOrder: 'asc' }, include: { product: { select: { id: true, sku: true, name: true } } } },
+        invoice: { select: { id: true, invoiceNumber: true, status: true } },
+      },
     });
     if (!order) return null;
     this.assertOwnerAccess(order.project?.opportunity?.ownerId, user, 'proyecto');
     return order;
+  }
+
+  /**
+   * Vista unificada de un proyecto comercial — incluye comercial, operación,
+   * orden, factura y costos reales en un solo payload para detalle ejecutivo.
+   */
+  async getProjectSummary(projectId: number, user?: any) {
+    const project = await this.prisma.salesProject.findUnique({
+      where: { id: projectId },
+      include: {
+        opportunity: {
+          include: {
+            client: { select: { id: true, name: true, taxId: true, legalName: true } },
+            owner: { select: { id: true, nombre: true, email: true } },
+          },
+        },
+        closureOrder: {
+          include: {
+            lines: { orderBy: { sortOrder: 'asc' } },
+            invoice: {
+              select: {
+                id: true,
+                invoiceNumber: true,
+                status: true,
+                totalAmount: true,
+                paidAmount: true,
+                cfdiUuid: true,
+                cfdiStampDate: true,
+                isCancelled: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!project) throw new NotFoundException('Proyecto no encontrado');
+    this.assertOwnerAccess(project.opportunity?.ownerId, user, 'proyecto');
+
+    const opProject = await this.prisma.operationalProject.findFirst({
+      where: { salesProjectId: projectId },
+      include: {
+        engineers: { include: { engineer: { select: { id: true, nombre: true, email: true } } } },
+      },
+    });
+
+    let activityStats: { total: number; completed: number; inProgress: number; pending: number } | null = null;
+    if (opProject?.id) {
+      const acts = await this.prisma.activity.findMany({
+        where: { projectId: opProject.id, deletedAt: null },
+        select: { estatus: true },
+      });
+      const completed = acts.filter((a) => /finaliz|complet|cerrad/i.test(String(a.estatus || ''))).length;
+      const inProgress = acts.filter((a) => /proceso|progres|curso|asign/i.test(String(a.estatus || ''))).length;
+      activityStats = {
+        total: acts.length,
+        completed,
+        inProgress,
+        pending: Math.max(0, acts.length - completed - inProgress),
+      };
+    }
+
+    const costs = await this.calculateProjectCosts(projectId, user);
+
+    return {
+      project: {
+        id: project.id,
+        name: project.name,
+        status: project.status,
+        projectType: project.projectType,
+        scopeSummary: project.scopeSummary,
+        siteCount: project.siteCount,
+        startDate: project.startDate,
+        endDate: project.endDate,
+        budget: Number(project.budget),
+        margin: Number(project.margin),
+      },
+      opportunity: project.opportunity
+        ? {
+            id: project.opportunity.id,
+            title: project.opportunity.title,
+            stage: project.opportunity.stage,
+            owner: project.opportunity.owner,
+            client: project.opportunity.client,
+          }
+        : null,
+      operational: opProject
+        ? {
+            id: opProject.id,
+            title: opProject.title,
+            status: opProject.status,
+            engineers: opProject.engineers?.map((e) => e.engineer) || [],
+            activityStats,
+            progressPercent: activityStats?.total
+              ? Math.round((activityStats.completed / activityStats.total) * 100)
+              : 0,
+          }
+        : null,
+      order: project.closureOrder
+        ? {
+            id: project.closureOrder.id,
+            orderId: project.closureOrder.orderId,
+            status: project.closureOrder.status,
+            lineCount: project.closureOrder.lines.length,
+            invoice: project.closureOrder.invoice,
+          }
+        : null,
+      costs,
+    };
   }
 
   async findCotizacionesForVentas(clientName?: string, status?: string, startDate?: string, endDate?: string) {
@@ -1297,6 +1657,7 @@ export class VentasService {
       viaticosCount,
       margin: Number(project.margin),
       status: project.status,
+      actual: await this.computeProjectActualCosts(projectId),
     };
   }
 

@@ -28,6 +28,7 @@ model Product {
   thumbnailUrl    String?
   upc             String?
   activo          Boolean?        @default(true)
+  itemType        CatalogItemType @default(PRODUCT)
   existencia      Json?
   promociones     Json?
   protegido       Boolean?        @default(false)
@@ -44,6 +45,8 @@ model Product {
   purchaseReqItems   PurchaseRequisitionItem[]
   purchaseOrderItems PurchaseOrderItem[]
   boms               BillOfMaterials[]         @relation("ProductBOM")
+  cotizacionItems    CotizacionItem[]
+  salesOrderLines    SalesProjectOrderLine[]
   bomComponents      BOMComponent[]            @relation("BOMComponentProduct")
   productionOrders   ProductionOrder[]
   qualityInspections QualityInspection[]
@@ -108,6 +111,26 @@ enum OperationalProjectStatus {
   COMPLETED
 }
 
+enum ServiceProjectType {
+  INSTALACION_CCTV
+  CABLEADO_ESTRUCTURADO
+  CONTROL_ACCESO
+  REDES_WIFI
+  COMPUTO
+  AUDITORIA_NODOS
+  MANTENIMIENTO
+  SUSTITUCION_EQUIPOS
+  PROYECTO_INTEGRAL
+  OTRO
+}
+
+enum CatalogItemType {
+  PRODUCT
+  SERVICE
+  LABOR
+  BUNDLE
+}
+
 enum ActivityType {
   INTERNAL
   CLIENT
@@ -117,6 +140,10 @@ model OperationalProject {
   id            Int                      @id @default(autoincrement())
   title         String                   @db.VarChar(220)
   description   String?
+  projectType   ServiceProjectType       @default(OTRO)
+  scopeSummary  String?
+  siteCount     Int?
+  salesProjectId Int?                    @unique
   status        OperationalProjectStatus @default(ACTIVE)
   vendorId      Int
   clientId      Int
@@ -364,6 +391,9 @@ model Role {
   accesoMultas        Boolean @default(false)
   accesoClientes      Boolean @default(false)
   accesoLunchBreaks   Boolean @default(false)
+  accesoRRHH          Boolean @default(false)
+  accesoCatalogo      Boolean @default(false)
+  orgRoleKey          String? @db.VarChar(40)
 
   users User[]
 
@@ -466,6 +496,13 @@ model User {
   assetsResponsible       Asset[]                @relation("AssetResponsible")
   maintenanceAssigned     MaintenanceOrder[]     @relation("MaintenanceAssignee")
   maintenanceCreated      MaintenanceOrder[]     @relation("MaintenanceCreator")
+  maintenanceContractsOwned MaintenanceContract[] @relation("MaintenanceContractOwner")
+  maintenanceVisitsAssigned MaintenanceContractVisit[] @relation("MaintenanceVisitAssignee")
+  tendersOwned            Tender[]               @relation("TenderOwner")
+  crmActivitiesOwned      CrmActivity[]          @relation("CrmActivityOwner")
+  crmActivitiesCreated    CrmActivity[]          @relation("CrmActivityCreator")
+  salesTargets            SalesTarget[]          @relation("SalesTargetOwner")
+  kbArticlesAuthored      KbArticle[]            @relation("KbArticleAuthor")
   safetyIncidentsReported SafetyIncident[]       @relation("IncidentReporter")
   safetyIncidentsAssigned SafetyIncident[]       @relation("IncidentAssignee")
   workPermitsRequested    WorkPermit[]           @relation("PermitRequester")
@@ -686,6 +723,7 @@ model ServiceClient {
   salesClients        SalesClient[]
   inventorySnapshots  InventorySnapshot[]
   operationalProjects OperationalProject[]
+  maintenanceContracts MaintenanceContract[]
 
   @@map("service_clients")
 }
@@ -725,6 +763,7 @@ model ServiceClientBranch {
   client             ServiceClient         @relation(fields: [clientId], references: [id], onDelete: Cascade)
   ticketRequests     ClientTicketRequest[]
   inventorySnapshots InventorySnapshot[]
+  maintenanceContracts MaintenanceContract[]
 
   @@unique([clientId, branchNumber])
   @@map("service_client_branches")
@@ -1217,6 +1256,7 @@ model Cotizacion {
 model CotizacionItem {
   id             Int        @id @default(autoincrement())
   cotizacionId   Int
+  productId      Int?
   category       String?    @db.VarChar(120)
   name           String     @db.VarChar(200)
   description    String?
@@ -1242,6 +1282,7 @@ model CotizacionItem {
   lineTotal      Decimal    @default(0) @db.Decimal(12, 2)
   createdAt      DateTime   @default(now())
   cotizacion     Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  product        Product?   @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   @@map("cotizacion_items")
 }
@@ -1256,8 +1297,10 @@ enum SalesLeadStatus {
 
 enum SalesOpportunityStage {
   DISCOVERY
+  QUALIFICATION
   PROPOSAL
   NEGOTIATION
+  CLOSING
   WON
   LOST
 }
@@ -1331,6 +1374,7 @@ model SalesLead {
   opportunities SalesOpportunity[]
   createdBy     User?              @relation("SalesLeadCreator", fields: [createdById], references: [id])
   owner         User?              @relation("SalesLeadOwner", fields: [ownerId], references: [id])
+  crmActivities CrmActivity[]
 
   @@map("sales_leads")
 }
@@ -1356,6 +1400,8 @@ model SalesOpportunity {
   evidences         SalesOpportunityEvidence[]
   quotes            SalesOpportunityQuote[]
   projects          SalesProject[]
+  tender            Tender?
+  crmActivities     CrmActivity[]
 
   @@map("sales_opportunities")
 }
@@ -1406,6 +1452,9 @@ model SalesProject {
   id             Int                @id @default(autoincrement())
   opportunityId  Int
   name           String             @db.VarChar(220)
+  projectType    ServiceProjectType @default(OTRO)
+  scopeSummary   String?
+  siteCount      Int?
   budget         Decimal            @default(0) @db.Decimal(14, 2)
   costProducts   Decimal            @default(0) @db.Decimal(14, 2)
   costViaticos   Decimal            @default(0) @db.Decimal(14, 2)
@@ -1439,8 +1488,47 @@ model SalesProjectOrder {
   quote       SalesOpportunityQuote? @relation(fields: [quoteId], references: [id])
   template    OrderTemplate?         @relation(fields: [templateId], references: [id], onDelete: SetNull)
   createdBy   User?                  @relation("SalesProjectOrderCreator", fields: [createdById], references: [id])
+  lines       SalesProjectOrderLine[]
+  invoice     Invoice?
 
   @@map("sales_project_orders")
+}
+
+model SalesProjectOrderLine {
+  id             Int               @id @default(autoincrement())
+  orderId        Int
+  productId      Int?
+  sortOrder      Int               @default(0)
+  category       String?           @db.VarChar(120)
+  name           String            @db.VarChar(200)
+  description    String?
+  scope          String?
+  brand          String?           @db.VarChar(120)
+  model          String?           @db.VarChar(120)
+  sku            String?           @db.VarChar(120)
+  partNumber     String?           @db.VarChar(120)
+  batchReference String?           @db.VarChar(120)
+  unit           String?           @db.VarChar(40)
+  qty            Int               @default(1)
+  unitPrice      Decimal           @default(0) @db.Decimal(12, 2)
+  discount       Int               @default(0)
+  tax            Int               @default(0)
+  ieps           Int               @default(0)
+  retention      Int               @default(0)
+  laborHours     Decimal           @default(0) @db.Decimal(10, 2)
+  laborRate      Decimal           @default(0) @db.Decimal(12, 2)
+  warrantyMonths Int               @default(0)
+  deliveryTime   String?           @db.VarChar(120)
+  countryOrigin  String?           @db.VarChar(80)
+  notes          String?
+  lineTotal      Decimal           @default(0) @db.Decimal(12, 2)
+  createdAt      DateTime          @default(now())
+  order          SalesProjectOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product        Product?          @relation(fields: [productId], references: [id], onDelete: SetNull)
+  invoiceItem    InvoiceItem?
+
+  @@index([orderId])
+  @@map("sales_project_order_lines")
 }
 
 model SalesAuditEvent {
@@ -2104,6 +2192,8 @@ model Invoice {
   createdBy        User?             @relation("InvoiceCreator", fields: [createdById], references: [id])
   items            InvoiceItem[]
   payments         Payment[]
+  salesProjectOrderId Int?           @unique
+  salesProjectOrder   SalesProjectOrder? @relation(fields: [salesProjectOrderId], references: [id], onDelete: SetNull)
 
   @@index([type, status])
   @@index([dueDate])
@@ -2139,6 +2229,8 @@ model InvoiceItem {
   // ── end SAT ──
   invoice       Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   product       Product? @relation(fields: [productId], references: [id])
+  salesOrderLineId Int?  @unique
+  salesOrderLine   SalesProjectOrderLine? @relation(fields: [salesOrderLineId], references: [id], onDelete: SetNull)
 
   @@map("invoice_items")
 }
@@ -3346,3 +3438,413 @@ model PerformanceReview {
   @@index([period, reviewDate])
   @@map("performance_reviews")
 }
+
+// ============================================================================
+// FASE 9 — CONTRATOS DE MANTENIMIENTO RECURRENTE (SLA + OT automáticas)
+// ============================================================================
+
+enum MaintenanceContractStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  EXPIRED
+  CANCELLED
+}
+
+enum MaintenanceFrequency {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  BIMONTHLY
+  QUARTERLY
+  SEMIANNUAL
+  ANNUAL
+}
+
+enum MaintenanceContractVisitStatus {
+  SCHEDULED
+  GENERATED
+  COMPLETED
+  SKIPPED
+}
+
+model MaintenanceContract {
+  id                  Int                          @id @default(autoincrement())
+  contractNumber      String                       @unique @db.VarChar(40)
+  clientId            Int
+  branchId            Int?
+  ownerId             Int?
+  title               String                       @db.VarChar(200)
+  description         String?
+  serviceScope        String?
+  frequency           MaintenanceFrequency
+  // SLA en horas para acudir tras alta del ticket / próxima visita.
+  slaResponseHours    Int                          @default(48)
+  slaResolutionHours  Int                          @default(72)
+  monthlyFee          Decimal                      @default(0) @db.Decimal(12, 2)
+  currency            String                       @default("MXN") @db.VarChar(3)
+  startDate           DateTime                     @db.Date
+  endDate             DateTime?                    @db.Date
+  nextVisitDate       DateTime?                    @db.Date
+  status              MaintenanceContractStatus    @default(ACTIVE)
+  autoGenerateOt      Boolean                      @default(true)
+  notifyHoursBefore   Int                          @default(24)
+  notes               String?
+  createdAt           DateTime                     @default(now())
+  updatedAt           DateTime                     @updatedAt
+  deletedAt           DateTime?
+
+  client              ServiceClient                @relation(fields: [clientId], references: [id])
+  branch              ServiceClientBranch?         @relation(fields: [branchId], references: [id])
+  owner               User?                        @relation("MaintenanceContractOwner", fields: [ownerId], references: [id])
+  visits              MaintenanceContractVisit[]
+
+  @@index([status, nextVisitDate])
+  @@index([clientId, status])
+  @@map("maintenance_contracts")
+}
+
+model MaintenanceContractVisit {
+  id                  Int                              @id @default(autoincrement())
+  contractId          Int
+  scheduledDate       DateTime                         @db.Date
+  status              MaintenanceContractVisitStatus   @default(SCHEDULED)
+  generatedAt         DateTime?
+  completedAt         DateTime?
+  operationalProjectId Int?
+  activityId          Int?
+  assignedToId        Int?
+  notes               String?
+  createdAt           DateTime                         @default(now())
+  updatedAt           DateTime                         @updatedAt
+
+  contract            MaintenanceContract              @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  assignedTo          User?                            @relation("MaintenanceVisitAssignee", fields: [assignedToId], references: [id])
+
+  @@unique([contractId, scheduledDate])
+  @@index([status, scheduledDate])
+  @@map("maintenance_contract_visits")
+}
+
+// ============================================================================
+// FASE 11 — LICITACIONES (TENDERS) Sector público y privado
+// ============================================================================
+
+enum TenderType {
+  PUBLIC_GOV
+  PRIVATE
+  INVITATION
+  CONSOLIDATED
+}
+
+enum TenderStatus {
+  PROSPECT
+  IN_REVIEW
+  PREPARING_BID
+  SUBMITTED
+  AWARDED
+  LOST
+  CANCELLED
+  DISQUALIFIED
+}
+
+model Tender {
+  id                  Int                @id @default(autoincrement())
+  tenderNumber        String             @unique @db.VarChar(60)
+  title               String             @db.VarChar(220)
+  description         String?
+  tenderType          TenderType         @default(PUBLIC_GOV)
+  status              TenderStatus       @default(PROSPECT)
+  // Datos del convocante (gobierno / empresa)
+  conveningEntity     String             @db.VarChar(220)
+  conveningContact    String?            @db.VarChar(180)
+  conveningEmail      String?            @db.VarChar(180)
+  conveningPhone      String?            @db.VarChar(60)
+  publicationUrl      String?            @db.VarChar(500)
+  // CompraNet u otro identificador externo
+  externalReference   String?            @db.VarChar(160)
+  // Montos
+  budgetCeiling       Decimal            @default(0) @db.Decimal(16, 2)
+  ourBidAmount        Decimal            @default(0) @db.Decimal(16, 2)
+  estimatedCost       Decimal            @default(0) @db.Decimal(16, 2)
+  expectedMargin      Decimal            @default(0) @db.Decimal(16, 2)
+  guaranteeAmount     Decimal            @default(0) @db.Decimal(16, 2)
+  currency            String             @default("MXN") @db.VarChar(3)
+  // Fechas críticas
+  publishDate         DateTime?          @db.Date
+  questionsDeadline   DateTime?
+  submissionDeadline  DateTime?
+  openingDate         DateTime?
+  awardDate           DateTime?
+  contractStartDate   DateTime?          @db.Date
+  contractEndDate     DateTime?          @db.Date
+  // Operativo
+  scope               String?
+  technicalRequirements String?
+  legalRequirements   String?
+  ownerId             Int?
+  salesOpportunityId  Int?               @unique
+  awardedToCompetitor String?            @db.VarChar(220)
+  awardNotes          String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  deletedAt           DateTime?
+
+  owner               User?              @relation("TenderOwner", fields: [ownerId], references: [id])
+  opportunity         SalesOpportunity?  @relation(fields: [salesOpportunityId], references: [id])
+  documents           TenderDocument[]
+  events              TenderEvent[]
+  crmActivities       CrmActivity[]
+
+  @@index([status, submissionDeadline])
+  @@index([tenderType])
+  @@map("tenders")
+}
+
+enum TenderDocumentType {
+  CONVOCATORIA
+  BASES
+  ANEXO_TECNICO
+  PROPUESTA_TECNICA
+  PROPUESTA_ECONOMICA
+  ACTA_PRESENTACION
+  FALLO
+  CONTRATO
+  GARANTIA
+  OTRO
+}
+
+model TenderDocument {
+  id          Int                @id @default(autoincrement())
+  tenderId    Int
+  documentType TenderDocumentType
+  name        String             @db.VarChar(200)
+  url         String?            @db.VarChar(500)
+  uploadedBy  Int?
+  notes       String?
+  createdAt   DateTime           @default(now())
+  tender      Tender             @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  @@index([tenderId, documentType])
+  @@map("tender_documents")
+}
+
+model TenderEvent {
+  id          Int      @id @default(autoincrement())
+  tenderId    Int
+  eventName   String   @db.VarChar(160)
+  description String?
+  occursAt    DateTime
+  createdAt   DateTime @default(now())
+  tender      Tender   @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  @@index([tenderId, occursAt])
+  @@map("tender_events")
+}
+
+// ============================================================================
+// FASE 17 — CRM ACTIVITIES (follow-ups, tasks, calls)
+// ============================================================================
+
+enum CrmActivityType {
+  CALL
+  EMAIL
+  MEETING
+  TASK
+  WHATSAPP
+  VISIT
+  NOTE
+}
+
+enum CrmActivityStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  OVERDUE
+}
+
+model CrmActivity {
+  id                 Int                @id @default(autoincrement())
+  activityType       CrmActivityType    @default(TASK)
+  status             CrmActivityStatus  @default(PENDING)
+  subject            String             @db.VarChar(220)
+  description        String?
+  dueDate            DateTime
+  completedAt        DateTime?
+  outcome            String?
+  // Polimórfico — apunta a Lead o Opportunity o Tender
+  leadId             Int?
+  opportunityId      Int?
+  tenderId           Int?
+  // Asignación
+  ownerId            Int?
+  createdById        Int?
+  // Recordatorio
+  remindAt           DateTime?
+  reminderSent       Boolean            @default(false)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  lead               SalesLead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  opportunity        SalesOpportunity?  @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  tender             Tender?            @relation(fields: [tenderId], references: [id], onDelete: SetNull)
+  owner              User?              @relation("CrmActivityOwner", fields: [ownerId], references: [id])
+  createdBy          User?              @relation("CrmActivityCreator", fields: [createdById], references: [id])
+
+  @@index([ownerId, status, dueDate])
+  @@index([leadId])
+  @@index([opportunityId])
+  @@index([tenderId])
+  @@map("crm_activities")
+}
+
+// ============================================================================
+// FASE 18 — SALES TARGETS & COMMISSIONS
+// ============================================================================
+
+enum SalesTargetPeriod {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+model SalesTarget {
+  id              Int                @id @default(autoincrement())
+  ownerId         Int
+  period          SalesTargetPeriod  @default(MONTHLY)
+  year            Int
+  month           Int?               // 1-12 si MONTHLY
+  quarter         Int?               // 1-4 si QUARTERLY
+  // Metas
+  revenueTarget   Decimal            @default(0) @db.Decimal(14, 2)
+  newClientsTarget Int               @default(0)
+  opportunitiesTarget Int            @default(0)
+  // Comisiones
+  baseCommissionPct Decimal          @default(0) @db.Decimal(5, 2)
+  bonusCommissionPct Decimal         @default(0) @db.Decimal(5, 2)
+  bonusThresholdPct Decimal          @default(100) @db.Decimal(5, 2) // 100% = al alcanzar la meta
+  notes           String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  owner           User               @relation("SalesTargetOwner", fields: [ownerId], references: [id])
+
+  @@unique([ownerId, period, year, month, quarter])
+  @@index([year, month])
+  @@map("sales_targets")
+}
+
+// ============================================================================
+// FASE 19 — KNOWLEDGE BASE (FAQ pública / portal cliente)
+// ============================================================================
+
+enum KbVisibility {
+  PUBLIC
+  CLIENT_ONLY
+  INTERNAL
+}
+
+enum KbArticleStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model KbCategory {
+  id           Int          @id @default(autoincrement())
+  slug         String       @unique @db.VarChar(120)
+  name         String       @db.VarChar(180)
+  description  String?
+  icon         String?      @db.VarChar(60)
+  visibility   KbVisibility @default(PUBLIC)
+  sortOrder    Int          @default(0)
+  parentId     Int?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  parent       KbCategory?  @relation("KbCategoryHierarchy", fields: [parentId], references: [id])
+  children     KbCategory[] @relation("KbCategoryHierarchy")
+  articles     KbArticle[]
+
+  @@map("kb_categories")
+}
+
+model KbArticle {
+  id            Int             @id @default(autoincrement())
+  slug          String          @unique @db.VarChar(180)
+  title         String          @db.VarChar(220)
+  excerpt       String?
+  content       String          @db.Text
+  visibility    KbVisibility    @default(PUBLIC)
+  status        KbArticleStatus @default(DRAFT)
+  categoryId    Int?
+  authorId      Int?
+  tags          String?         @db.VarChar(400)  // CSV
+  viewCount     Int             @default(0)
+  helpfulCount  Int             @default(0)
+  publishedAt   DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  category      KbCategory?     @relation(fields: [categoryId], references: [id])
+  author        User?           @relation("KbArticleAuthor", fields: [authorId], references: [id])
+
+  @@index([status, publishedAt])
+  @@index([categoryId])
+  @@map("kb_articles")
+}
+
+// ============================================================================
+// FASE 21 — COMPANY SETTINGS (datos fiscales, branding, multi-empresa-ready)
+// ============================================================================
+
+model CompanyProfile {
+  id              Int      @id @default(autoincrement())
+  slug            String?  @unique @db.VarChar(80)
+  legalName       String   @db.VarChar(220)
+  tradeName       String?  @db.VarChar(220)
+  rfc             String   @db.VarChar(13)
+  fiscalRegime    String?  @db.VarChar(10)
+  fiscalAddress   String?
+  fiscalPostalCode String? @db.VarChar(10)
+  // Contacto
+  contactEmail    String?  @db.VarChar(180)
+  contactPhone    String?  @db.VarChar(60)
+  supportEmail    String?  @db.VarChar(180)
+  websiteUrl      String?  @db.VarChar(300)
+  // Branding
+  logoUrl         String?  @db.VarChar(500)
+  logoDarkUrl     String?  @db.VarChar(500)
+  faviconUrl      String?  @db.VarChar(500)
+  brandPrimary    String?  @db.VarChar(20)
+  brandSecondary  String?  @db.VarChar(20)
+  // Banca
+  defaultBankName String?  @db.VarChar(180)
+  defaultClabe    String?  @db.VarChar(20)
+  // Notificación
+  notificationEmail String? @db.VarChar(180)
+  isPrimary       Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("company_profile")
+}
+
+// ============================================================================
+// FASE 34 — FEATURE FLAGS (toggle de features por scope, persistido en DB)
+// ============================================================================
+
+model FeatureFlag {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique @db.VarChar(120)
+  scope       String   @db.VarChar(60)
+  description String?  @db.VarChar(500)
+  enabled     Boolean  @default(false)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([scope])
+  @@map("feature_flags")
+}
+

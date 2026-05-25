@@ -347,22 +347,16 @@ fun ConsoleNavHost(
                     "accounting" -> { { mx.nexara.mobile.nativeapp.ui.modules.AccountingModuleScreen() } }
                     "invoicing" -> { { mx.nexara.mobile.nativeapp.ui.modules.InvoicingModuleScreen() } }
                     "banking" -> { { mx.nexara.mobile.nativeapp.ui.modules.BankingModuleScreen() } }
-                    "workflow" -> { { mx.nexara.mobile.nativeapp.ui.modules.WorkflowModuleScreen() } }
                     "my-viatics" -> { { mx.nexara.mobile.nativeapp.ui.modules.MyViaticsScreen() } }
                     "my-vehicles" -> { { mx.nexara.mobile.nativeapp.ui.modules.MyVehiclesScreen() } }
                     "my-preferences" -> { { mx.nexara.mobile.nativeapp.ui.modules.MyPreferencesScreen() } }
-                    "service-clients" -> { { mx.nexara.mobile.nativeapp.ui.modules.ServiceClientsModuleScreen() } }
                     "work-projects" -> { { mx.nexara.mobile.nativeapp.ui.modules.WorkProjectsModuleScreen() } }
                     "hr" -> { { mx.nexara.mobile.nativeapp.ui.modules.HrModuleScreen() } }
-                    "safety" -> { { mx.nexara.mobile.nativeapp.ui.modules.SafetyModuleScreen() } }
                     "warehouse" -> { { mx.nexara.mobile.nativeapp.ui.modules.WarehouseModuleScreen() } }
                     "stock" -> { { mx.nexara.mobile.nativeapp.ui.modules.StockModuleScreen() } }
                     "procurement" -> { { mx.nexara.mobile.nativeapp.ui.modules.ProcurementModuleScreen() } }
-                    "manufacturing" -> { { mx.nexara.mobile.nativeapp.ui.modules.ManufacturingModuleScreen() } }
-                    "production" -> { { mx.nexara.mobile.nativeapp.ui.modules.ProductionModuleScreen() } }
                     "maintenance" -> { { mx.nexara.mobile.nativeapp.ui.modules.MaintenanceModuleScreen() } }
                     "assets" -> { { mx.nexara.mobile.nativeapp.ui.modules.AssetsModuleScreen() } }
-                    "quality" -> { { mx.nexara.mobile.nativeapp.ui.modules.QualityModuleScreen() } }
                     "service-sheets" -> { { mx.nexara.mobile.nativeapp.ui.modules.ServiceSheetsModuleScreen() } }
                     "cvs" -> { { mx.nexara.mobile.nativeapp.ui.modules.CvsModuleScreen() } }
                     "client-tickets" -> { { mx.nexara.mobile.nativeapp.ui.modules.ClientTicketsModuleScreen() } }
@@ -372,10 +366,10 @@ fun ConsoleNavHost(
                 if (key in setOf(
                         "news","contact-messages","newsletter","audit","analytics","expenses",
                         "fines","employee-payments","cotizaciones","lunch-breaks","my-lunch-breaks",
-                        "documents","accounting","invoicing","banking","workflow","my-viatics",
-                        "my-vehicles","my-preferences","service-clients","work-projects",
-                        "hr","safety","warehouse","stock","procurement","manufacturing","production",
-                        "maintenance","assets","quality","service-sheets","cvs","client-tickets",
+                        "documents","accounting","invoicing","banking","my-viatics",
+                        "my-vehicles","my-preferences","work-projects",
+                        "hr","warehouse","stock","procurement",
+                        "maintenance","assets","service-sheets","cvs","client-tickets",
                         "gestion-vendedores",
                     )) {
                     handled()

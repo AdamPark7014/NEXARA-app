@@ -3,12 +3,14 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
+import { PacService } from '../pac/pac.service.js';
 
 @Injectable()
 export class AccountingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationHierarchy: NotificationHierarchyService,
+    private readonly pacService: PacService,
   ) {}
 
   private readonly satPaymentFormValues = new Set([
@@ -559,6 +561,169 @@ export class AccountingService {
     return invoice;
   }
 
+  async createInvoiceFromSalesProject(
+    projectId: number,
+    userId: number,
+    options?: { lineIds?: number[] },
+  ) {
+    const order = await this.prisma.salesProjectOrder.findUnique({
+      where: { projectId },
+      include: {
+        lines: { orderBy: { sortOrder: 'asc' } },
+        invoice: true,
+        project: { include: { opportunity: { include: { client: true } } } },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('No hay orden de cierre para este proyecto');
+    }
+    if (order.invoice) {
+      throw new BadRequestException('Este proyecto ya tiene una factura vinculada');
+    }
+    if (!order.lines.length) {
+      throw new BadRequestException('La orden no tiene líneas para facturar');
+    }
+
+    const client = order.project?.opportunity?.client;
+    if (!client?.id) {
+      throw new BadRequestException('Cliente comercial no encontrado para facturar');
+    }
+
+    const selectedLines = options?.lineIds?.length
+      ? order.lines.filter((line) => options.lineIds!.includes(line.id))
+      : order.lines;
+
+    if (!selectedLines.length) {
+      throw new BadRequestException('No hay líneas seleccionadas para facturar');
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const due = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const invoice = await this.createInvoice(
+      {
+        type: 'ACCOUNTS_RECEIVABLE',
+        issueDate: today,
+        dueDate: due,
+        clientId: client.id,
+        notes: `Factura generada desde orden ${order.orderId} — ${order.project.name}`,
+        receptorRfc: client.taxId ?? undefined,
+        receptorName: client.legalName || client.name,
+        items: selectedLines.map((line) => {
+          const qty = Number(line.qty);
+          const unitPrice = Number(line.unitPrice);
+          const lineSubtotal = qty * unitPrice;
+          return {
+            description: line.name,
+            quantity: qty,
+            unitPrice,
+            taxRate: Number(line.tax),
+            ivaRate: Number(line.tax),
+            productId: line.productId ?? undefined,
+            unitName: line.unit || 'Servicio',
+            discount: lineSubtotal * (Number(line.discount) / 100),
+          };
+        }),
+      },
+      userId,
+    );
+
+    await this.prisma.invoice.update({
+      where: { id: invoice.id },
+      data: { salesProjectOrderId: order.id },
+    });
+
+    const createdItems = await this.prisma.invoiceItem.findMany({
+      where: { invoiceId: invoice.id },
+      orderBy: { id: 'asc' },
+    });
+    for (let i = 0; i < createdItems.length && i < selectedLines.length; i += 1) {
+      await this.prisma.invoiceItem.update({
+        where: { id: createdItems[i].id },
+        data: { salesOrderLineId: selectedLines[i].id },
+      });
+    }
+
+    return this.getInvoice(invoice.id);
+  }
+
+  /**
+   * Timbra una factura borrador llamando al PAC configurado (Facturama / SW / Finkok / Mock).
+   * Pasa a SENT y persiste UUID + XML + sello + número de certificado SAT.
+   */
+  async stampInvoice(id: number, userId: number) {
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id },
+      include: { items: { include: { product: true } } },
+    });
+    if (!invoice || invoice.deletedAt) throw new NotFoundException('Factura no encontrada');
+    if (invoice.isCancelled) throw new BadRequestException('La factura está cancelada');
+    if (invoice.cfdiUuid) throw new BadRequestException('La factura ya está timbrada');
+    if (invoice.status !== 'DRAFT') {
+      throw new BadRequestException('Solo facturas en borrador pueden timbrarse');
+    }
+    if (!invoice.receptorRfc) {
+      throw new BadRequestException('La factura no tiene RFC del receptor');
+    }
+    if (!invoice.emisorRfc) {
+      throw new BadRequestException('La factura no tiene RFC del emisor configurado');
+    }
+
+    const stamp = await this.pacService.stamp({
+      invoiceNumber: invoice.invoiceNumber,
+      serie: invoice.cfdiSerie,
+      folio: invoice.cfdiFolio,
+      total: Number(invoice.totalAmount),
+      subtotal: Number(invoice.subtotal),
+      taxTotal: Number(invoice.taxAmount),
+      currency: invoice.currency || 'MXN',
+      exchangeRate: invoice.exchangeRate ? Number(invoice.exchangeRate) : null,
+      paymentForm: invoice.satPaymentForm || 'FP99',
+      paymentMethod: invoice.satPaymentMethod || 'PUE',
+      cfdiUsage: invoice.cfdiUsage || 'G03',
+      emisor: {
+        rfc: invoice.emisorRfc,
+        name: invoice.emisorName || 'Emisor',
+        regime: invoice.emisorRegime || 'R601',
+      },
+      receptor: {
+        rfc: invoice.receptorRfc,
+        name: invoice.receptorName || 'Receptor',
+        zipCode: invoice.receptorZipCode,
+        regime: invoice.receptorRegime,
+      },
+      items: invoice.items.map((item) => ({
+        description: item.description,
+        quantity: Number(item.quantity),
+        unitPrice: Number(item.unitPrice),
+        discount: Number(item.discount),
+        taxRate: Number(item.taxRate),
+        satProductKey: item.satProductKey,
+        satUnitKey: item.satUnitKey,
+        unitName: item.unitName,
+      })),
+    });
+
+    const updated = await this.prisma.invoice.update({
+      where: { id },
+      data: {
+        cfdiUuid: stamp.uuid,
+        cfdiStampDate: stamp.stampedAt,
+        satCertNumber: stamp.satCertNumber,
+        status: 'SENT',
+        cfdiSerie: invoice.cfdiSerie || 'A',
+        cfdiFolio: invoice.cfdiFolio || invoice.invoiceNumber.replace(/[^0-9]/g, '').slice(0, 12) || String(invoice.id),
+        cfdiXml: stamp.xml || invoice.cfdiXml,
+        pdfUrl: stamp.pdfUrl || invoice.pdfUrl,
+        createdById: invoice.createdById ?? userId,
+      },
+      include: { items: { include: { product: true } }, client: true, supplier: true, payments: true },
+    });
+
+    return { ...updated, pacProvider: stamp.provider };
+  }
+
   async listInvoices(filters?: { type?: string; status?: string; from?: string; to?: string }, query?: PaginationQueryDto) {
     const where: any = { deletedAt: null };
     if (filters?.type) where.type = filters.type;
@@ -905,23 +1070,48 @@ export class AccountingService {
   }
 
   // ── CFDI Cancel ───────────────────────────────────────────────────
-  async cancelInvoice(id: number, dto: { cancelReason: string; substitutionUuid?: string }, userId: number) {
+  async cancelInvoice(id: number, dto: { cancelReason: string; substitutionUuid?: string }, _userId: number) {
     const invoice = await this.prisma.invoice.findUnique({ where: { id } });
     if (!invoice) throw new NotFoundException('Factura no encontrada');
     if (invoice.isCancelled) throw new BadRequestException('La factura ya está cancelada');
     if (!invoice.cfdiUuid) throw new BadRequestException('La factura no tiene UUID CFDI para cancelar');
+    if (!invoice.emisorRfc) throw new BadRequestException('La factura no tiene RFC del emisor');
+
+    const reasonRaw = (dto.cancelReason || '').trim();
+    const reasonNorm = reasonRaw.padStart(2, '0');
+    if (!['01', '02', '03', '04'].includes(reasonNorm)) {
+      throw new BadRequestException('Motivo SAT inválido (01, 02, 03 o 04)');
+    }
+    if (reasonNorm === '01' && !dto.substitutionUuid) {
+      throw new BadRequestException('Motivo 01 requiere UUID sustituto');
+    }
+
+    const cancelResult = await this.pacService.cancel({
+      uuid: invoice.cfdiUuid,
+      emisorRfc: invoice.emisorRfc,
+      cancelReason: reasonNorm as '01' | '02' | '03' | '04',
+      substitutionUuid: dto.substitutionUuid || null,
+    });
 
     return this.prisma.invoice.update({
       where: { id },
       data: {
         isCancelled: true,
-        cancelledAt: new Date(),
-        cancelReason: dto.cancelReason.trim(),
+        cancelledAt: cancelResult.cancelledAt,
+        cancelReason: reasonNorm,
         substitutionUuid: dto.substitutionUuid?.trim() || null,
         status: 'CANCELLED',
       },
       include: { items: true, client: true, supplier: true },
     });
+  }
+
+  getPacInfo() {
+    return {
+      provider: this.pacService.provider,
+      fallbackToMock: this.pacService.fallbackToMock,
+      env: process.env.NODE_ENV || 'development',
+    };
   }
 
   // ── Overdue invoices ──────────────────────────────────────────────
@@ -936,6 +1126,166 @@ export class AccountingService {
       include: { client: true, payments: true },
       orderBy: { dueDate: 'asc' },
     });
+  }
+
+  // ── Dashboard ejecutivo financiero (P&L + cash + AR/AP) ─────────────
+  async getFinancialDashboard() {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+    const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
+    const [
+      arAggregate,
+      apAggregate,
+      cashAccounts,
+      monthRevenue,
+      monthExpenses,
+      ytdRevenue,
+      ytdExpenses,
+      prevMonthRevenue,
+      topReceivables,
+      topPayables,
+      overdueCount,
+      monthInvoiceCount,
+      ytdInvoiceCount,
+    ] = await Promise.all([
+      this.prisma.invoice.aggregate({
+        where: { deletedAt: null, type: 'ACCOUNTS_RECEIVABLE', status: { in: ['SENT', 'PARTIALLY_PAID'] }, isCancelled: false },
+        _sum: { totalAmount: true, paidAmount: true },
+      }),
+      this.prisma.invoice.aggregate({
+        where: { deletedAt: null, type: 'ACCOUNTS_PAYABLE', status: { in: ['SENT', 'PARTIALLY_PAID'] }, isCancelled: false },
+        _sum: { totalAmount: true, paidAmount: true },
+      }),
+      this.prisma.bankAccount.findMany({
+        where: { isActive: true },
+        select: { id: true, name: true, bankName: true, currentBalance: true, currency: true },
+      }).catch(() => []),
+      this.prisma.invoice.aggregate({
+        where: {
+          deletedAt: null,
+          type: 'ACCOUNTS_RECEIVABLE',
+          issueDate: { gte: startOfMonth },
+          isCancelled: false,
+        },
+        _sum: { subtotal: true, totalAmount: true },
+      }),
+      this.prisma.invoice.aggregate({
+        where: {
+          deletedAt: null,
+          type: 'ACCOUNTS_PAYABLE',
+          issueDate: { gte: startOfMonth },
+          isCancelled: false,
+        },
+        _sum: { subtotal: true, totalAmount: true },
+      }),
+      this.prisma.invoice.aggregate({
+        where: { deletedAt: null, type: 'ACCOUNTS_RECEIVABLE', issueDate: { gte: startOfYear }, isCancelled: false },
+        _sum: { subtotal: true, totalAmount: true },
+      }),
+      this.prisma.invoice.aggregate({
+        where: { deletedAt: null, type: 'ACCOUNTS_PAYABLE', issueDate: { gte: startOfYear }, isCancelled: false },
+        _sum: { subtotal: true, totalAmount: true },
+      }),
+      this.prisma.invoice.aggregate({
+        where: {
+          deletedAt: null,
+          type: 'ACCOUNTS_RECEIVABLE',
+          issueDate: { gte: startOfPrevMonth, lte: endOfPrevMonth },
+          isCancelled: false,
+        },
+        _sum: { subtotal: true, totalAmount: true },
+      }),
+      this.prisma.invoice.groupBy({
+        by: ['receptorName'],
+        where: { deletedAt: null, type: 'ACCOUNTS_RECEIVABLE', status: { in: ['SENT', 'PARTIALLY_PAID'] }, isCancelled: false },
+        _sum: { totalAmount: true, paidAmount: true },
+        orderBy: { _sum: { totalAmount: 'desc' } },
+        take: 5,
+      }),
+      this.prisma.invoice.groupBy({
+        by: ['receptorName'],
+        where: { deletedAt: null, type: 'ACCOUNTS_PAYABLE', status: { in: ['SENT', 'PARTIALLY_PAID'] }, isCancelled: false },
+        _sum: { totalAmount: true, paidAmount: true },
+        orderBy: { _sum: { totalAmount: 'desc' } },
+        take: 5,
+      }),
+      this.prisma.invoice.count({
+        where: { deletedAt: null, status: { in: ['SENT', 'PARTIALLY_PAID'] }, dueDate: { lt: now }, isCancelled: false },
+      }),
+      this.prisma.invoice.count({ where: { deletedAt: null, issueDate: { gte: startOfMonth } } }),
+      this.prisma.invoice.count({ where: { deletedAt: null, issueDate: { gte: startOfYear } } }),
+    ]);
+
+    const arTotal = Number(arAggregate._sum.totalAmount || 0);
+    const arPaid = Number(arAggregate._sum.paidAmount || 0);
+    const apTotal = Number(apAggregate._sum.totalAmount || 0);
+    const apPaid = Number(apAggregate._sum.paidAmount || 0);
+
+    const monthRev = Number(monthRevenue._sum.subtotal || 0);
+    const monthExp = Number(monthExpenses._sum.subtotal || 0);
+    const prevMonthRev = Number(prevMonthRevenue._sum.subtotal || 0);
+    const monthProfit = monthRev - monthExp;
+    const ytdRev = Number(ytdRevenue._sum.subtotal || 0);
+    const ytdExp = Number(ytdExpenses._sum.subtotal || 0);
+    const ytdProfit = ytdRev - ytdExp;
+
+    const cashBalance = (cashAccounts as any[]).reduce(
+      (acc, a) => acc + Number(a.currentBalance || 0),
+      0,
+    );
+
+    const monthGrowth = prevMonthRev > 0 ? ((monthRev - prevMonthRev) / prevMonthRev) * 100 : 0;
+
+    return {
+      cash: {
+        totalBalance: cashBalance,
+        accounts: cashAccounts,
+      },
+      profitAndLoss: {
+        month: {
+          revenue: monthRev,
+          expenses: monthExp,
+          profit: monthProfit,
+          marginPct: monthRev > 0 ? +((monthProfit / monthRev) * 100).toFixed(1) : 0,
+          growthVsPrev: +monthGrowth.toFixed(1),
+        },
+        ytd: {
+          revenue: ytdRev,
+          expenses: ytdExp,
+          profit: ytdProfit,
+          marginPct: ytdRev > 0 ? +((ytdProfit / ytdRev) * 100).toFixed(1) : 0,
+        },
+      },
+      accountsReceivable: {
+        total: arTotal,
+        collected: arPaid,
+        pending: arTotal - arPaid,
+        invoices: arAggregate as any,
+      },
+      accountsPayable: {
+        total: apTotal,
+        paid: apPaid,
+        pending: apTotal - apPaid,
+      },
+      workingCapital: cashBalance + (arTotal - arPaid) - (apTotal - apPaid),
+      overdueInvoices: overdueCount,
+      invoices: { month: monthInvoiceCount, ytd: ytdInvoiceCount },
+      topReceivables: topReceivables.map((r: any) => ({
+        name: r.receptorName,
+        total: Number(r._sum.totalAmount || 0),
+        paid: Number(r._sum.paidAmount || 0),
+        pending: Number(r._sum.totalAmount || 0) - Number(r._sum.paidAmount || 0),
+      })),
+      topPayables: topPayables.map((r: any) => ({
+        name: r.receptorName,
+        total: Number(r._sum.totalAmount || 0),
+        paid: Number(r._sum.paidAmount || 0),
+        pending: Number(r._sum.totalAmount || 0) - Number(r._sum.paidAmount || 0),
+      })),
+    };
   }
 
   // ── Invoice Dashboard ─────────────────────────────────────────────
