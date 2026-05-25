@@ -1,4 +1,5 @@
 "use client";
+import { ORG_ROLE_OPTIONS } from "@/lib/org-roles";
 import { buildApiUrl } from "@/lib/api-base";
 import React, { useEffect, useRef, useState } from "react";
 import Cropper from "react-easy-crop";
@@ -17,6 +18,7 @@ import { appendAvatarToFormData, resolveUserAvatarUrl } from '@/lib/user-avatar'
 export type UserRole = {
   id: number;
   nombre: string;
+  orgRoleKey?: string | null;
   superadmin?: boolean;
   accesoConsole?: boolean;
   accesoConsoleAdmin?: boolean;
@@ -115,7 +117,17 @@ export default function UserForm({
     accesoGestionCvs: initialUser?.role?.accesoGestionCvs || false,
     accesoContabilidad: initialUser?.role?.accesoContabilidad || false,
     accesoCotizaciones: initialUser?.role?.accesoCotizaciones || false,
+    orgRoleTemplate: "",
   });
+  const [orgTemplates, setOrgTemplates] = useState<Array<{
+    orgRoleKey: string;
+    nombre: string;
+    label: string;
+    description: string;
+    departmentHint: string;
+    flags: Record<string, boolean>;
+    nivelAutoridad: number;
+  }>>([]);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarRemoved, setAvatarRemoved] = useState(false);
 
@@ -191,6 +203,24 @@ export default function UserForm({
     void loadNextEmployeeNumber();
   }, [isEdit, user?.token]);
 
+  useEffect(() => {
+    if (!user?.token) return;
+    fetch(buildApiUrl("roles/org-templates"), {
+      headers: { Authorization: `Bearer ${user.token}` },
+    })
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setOrgTemplates(Array.isArray(data) ? data : []))
+      .catch(() => setOrgTemplates([]));
+  }, [user?.token]);
+
+  useEffect(() => {
+    if (!isEdit || !initialUser?.role) return;
+    const orgKey = initialUser.role.orgRoleKey;
+    if (orgKey) {
+      setForm((prev) => (prev.orgRoleTemplate ? prev : { ...prev, orgRoleTemplate: orgKey }));
+    }
+  }, [isEdit, initialUser?.id, initialUser?.role?.orgRoleKey]);
+
   if (!user || !hasPermission(user, PERMISSIONS.USERS_MANAGE)) return null;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -205,6 +235,23 @@ export default function UserForm({
     }
     setForm((prev) => {
       let nextForm = { ...prev, [name]: nextValue };
+      if (name === "orgRoleTemplate" && nextValue) {
+        const template = orgTemplates.find((t) => t.orgRoleKey === nextValue);
+        if (template) {
+          nextForm = {
+            ...nextForm,
+            roleNombre: template.nombre,
+            department: template.departmentHint,
+            admin: Boolean(template.flags.accesoConsoleAdmin),
+            ingeniero: Boolean(template.flags.accesoConsole) && !template.flags.accesoConsoleAdmin,
+            vendedor: Boolean(template.flags.accesoPanelVentas),
+            accesoGestionWeb: Boolean(template.flags.accesoGestionWeb),
+            accesoGestionCvs: Boolean(template.flags.accesoGestionCvs),
+            accesoContabilidad: Boolean(template.flags.accesoContabilidad),
+            accesoCotizaciones: Boolean(template.flags.accesoCotizaciones),
+          };
+        }
+      }
       if (name === "nombre" && !isEdit && !emailManuallyEdited) {
         nextForm = { ...nextForm, email: suggestConsoleEmail(String(nextValue || "")) };
       }
@@ -339,7 +386,18 @@ export default function UserForm({
       const hasConsoleUser = isAdminRole || isIngenieroRole;
 
       // Payload compatible con CreateRoleDto/UpdateRoleDto (backend)
-      const rolePayload = {
+      const selectedTemplate = form.orgRoleTemplate
+        ? orgTemplates.find((t) => t.orgRoleKey === form.orgRoleTemplate)
+        : null;
+
+      const rolePayload = selectedTemplate
+        ? {
+            nombre: form.roleNombre || selectedTemplate.nombre,
+            orgRoleKey: selectedTemplate.orgRoleKey,
+            nivelAutoridad: selectedTemplate.nivelAutoridad,
+            ...selectedTemplate.flags,
+          }
+        : {
         nombre: form.roleNombre,
         accesoConsole: hasConsoleUser,
         accesoConsoleAdmin: isAdminRole,
@@ -355,7 +413,6 @@ export default function UserForm({
         accesoPanelVentas: isVendedorRole,
         accesoContabilidad: form.accesoContabilidad || isAdminRole,
         accesoCotizaciones: form.accesoCotizaciones,
-        // Módulos ERP para Administración
         accesoInventario: isAdminRole,
         accesoCompras: isAdminRole,
         accesoSeguridad: isAdminRole,
@@ -490,6 +547,7 @@ export default function UserForm({
           accesoGestionCvs: false,
           accesoContabilidad: false,
           accesoCotizaciones: false,
+          orgRoleTemplate: "",
         });
         setEmailManuallyEdited(false);
         setAvatarFile(null);
@@ -558,6 +616,23 @@ export default function UserForm({
               La contraseña actual no se puede precargar porque se almacena cifrada. Si necesitas cambiarla, escribe una nueva y usa Ver para revisarla antes de guardar.
             </span>
           )}
+        </div>
+        <div className="field">
+          <label className="label">Plantilla de rol ERP</label>
+          <select
+            name="orgRoleTemplate"
+            value={form.orgRoleTemplate}
+            onChange={handleChange}
+            className="input"
+          >
+            <option value="">Selecciona un rol organizacional…</option>
+            {(orgTemplates.length ? orgTemplates : ORG_ROLE_OPTIONS.map((o) => ({ orgRoleKey: o.value, label: o.label, nombre: o.label, departmentHint: o.departmentHint, description: o.description, flags: {}, nivelAutoridad: 0 }))).map((t) => (
+              <option key={t.orgRoleKey} value={t.orgRoleKey}>
+                {t.label} — {t.departmentHint}
+              </option>
+            ))}
+          </select>
+          <span className="helperText">Dueño, directores, ingenieros, ventas, diseño, RRHH y contabilidad.</span>
         </div>
         <div className="field">
           <label className="label">Nombre del Rol</label>

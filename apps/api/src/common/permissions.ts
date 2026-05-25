@@ -10,6 +10,31 @@ export const PERMISSIONS = {
   SALES_REPORTS_EXPORT: 'sales.reports.export',
   SALES_TEMPLATES_MANAGE: 'sales.templates.manage',
   SALES_AUDIT_VIEW: 'sales.audit.view',
+  TENDERS_VIEW: 'tenders.view',
+  TENDERS_MANAGE: 'tenders.manage',
+  CRM_ACTIVITIES_VIEW: 'crm.activities.view',
+  CRM_ACTIVITIES_MANAGE: 'crm.activities.manage',
+  SALES_TARGETS_VIEW: 'sales.targets.view',
+  SALES_TARGETS_MANAGE: 'sales.targets.manage',
+  KB_VIEW: 'kb.view',
+  KB_MANAGE: 'kb.manage',
+  COMPANY_SETTINGS_VIEW: 'company.settings.view',
+  COMPANY_SETTINGS_MANAGE: 'company.settings.manage',
+  WORKFLOW_VIEW: 'workflow.view',
+  WORKFLOW_MANAGE: 'workflow.manage',
+  EXECUTIVE_DASHBOARD: 'executive.dashboard',
+  // Paneles satélite
+  PANEL_SUPPORT: 'panel.support',
+  PANEL_NOC: 'panel.noc',
+  PANEL_PEOPLE: 'panel.people',
+  PANEL_LAB: 'panel.lab',
+  NOC_VIEW: 'noc.view',
+  NOC_MANAGE: 'noc.manage',
+  SUPPORT_VIEW: 'support.view',
+  SUPPORT_MANAGE: 'support.manage',
+  PEOPLE_VIEW: 'people.view',
+  PEOPLE_MANAGE: 'people.manage',
+  LAB_ACCESS: 'lab.access',
   ACTIVITIES_VIEW: 'activities.view',
   ACTIVITIES_MANAGE: 'activities.manage',
   ACTIVITIES_EXPORT: 'activities.export',
@@ -82,36 +107,16 @@ export const PERMISSIONS = {
   PROCUREMENT_APPROVE: 'procurement.approve',
   PROCUREMENT_MANAGE: 'procurement.manage',
 
-  // Manufacturing
-  MANUFACTURING_VIEW: 'manufacturing.view',
-  MANUFACTURING_MANAGE: 'manufacturing.manage',
-  BOM_MANAGE: 'bom.manage',
-  PRODUCTION_MANAGE: 'production.manage',
-
-  // Quality
-  QUALITY_VIEW: 'quality.view',
-  QUALITY_MANAGE: 'quality.manage',
-  QUALITY_INSPECT: 'quality.inspect',
-
-  // Maintenance (CMMS)
+  // Maintenance (contratos de mantenimiento a clientes)
   MAINTENANCE_VIEW: 'maintenance.view',
   MAINTENANCE_MANAGE: 'maintenance.manage',
   ASSETS_VIEW: 'assets.view',
   ASSETS_MANAGE: 'assets.manage',
 
-  // Safety / EHS
-  SAFETY_VIEW: 'safety.view',
-  SAFETY_MANAGE: 'safety.manage',
-  SAFETY_PERMITS: 'safety.permits',
-
   // Document Management
   DOCUMENTS_VIEW: 'documents.view',
   DOCUMENTS_MANAGE: 'documents.manage',
   DOCUMENTS_APPROVE: 'documents.approve',
-
-  // Workflow Engine
-  WORKFLOW_VIEW: 'workflow.view',
-  WORKFLOW_MANAGE: 'workflow.manage',
 
   // Audit
   AUDIT_VIEW: 'audit.view',
@@ -127,6 +132,10 @@ export const PERMISSIONS = {
 
   // Global Search
   SEARCH_VIEW: 'search.view',
+
+  // Product catalog (IT/CCTV)
+  CATALOG_VIEW: 'catalog.view',
+  CATALOG_MANAGE: 'catalog.manage',
 } as const;
 
 export type Permission = typeof PERMISSIONS[keyof typeof PERMISSIONS];

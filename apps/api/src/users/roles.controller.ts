@@ -7,6 +7,8 @@ import { AuthGuard } from '@nestjs/passport';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 
+import { ORG_ROLE_TEMPLATES } from '../common/org-roles.js';
+
 @Controller('roles')
 export class RolesController {
   constructor(private readonly prisma: PrismaService) {}
@@ -83,6 +85,22 @@ export class RolesController {
   @RBAC({ permissions: [PERMISSIONS.ROLES_MANAGE] })
   async findAll() {
     return this.prisma.role.findMany();
+  }
+
+  @Get('org-templates')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.ROLES_MANAGE, PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  listOrgTemplates() {
+    return ORG_ROLE_TEMPLATES.map(({ orgRoleKey, nombre, label, description, nivelAutoridad, departmentHint, panels, flags }) => ({
+      orgRoleKey,
+      nombre,
+      label,
+      description,
+      nivelAutoridad,
+      departmentHint,
+      panels,
+      flags,
+    }));
   }
 
   @Get(':id')

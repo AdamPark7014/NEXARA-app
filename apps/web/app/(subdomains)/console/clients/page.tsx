@@ -6,7 +6,7 @@ import { PERMISSIONS } from '@/lib/permissions';
 import { useUser } from '@/components/UserContext';
 import HelpTab from '@/components/HelpTab';
 import ClientCreationForm from '@/components/ClientCreationForm';
-import { ClientTicketsPanel } from '../client-tickets/ClientTicketsPanel';
+import { ClientTicketsPanel } from '../../operacion/client-tickets/ClientTicketsPanel';
 
 export default function ClientsPage() {
   const { user } = useUser();

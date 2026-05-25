@@ -10,12 +10,35 @@ export interface User {
 	email: string;
 	role: string;
 	roleId?: number;
+	orgRoleKey?: string | null;
+	nivelAutoridad?: number;
 	roleFlags?: {
 		accesoConsole?: boolean;
 		accesoConsoleAdmin?: boolean;
+		accesoActividades?: boolean;
+		accesoEvidencias?: boolean;
+		accesoViaticos?: boolean;
+		accesoVehiculos?: boolean;
+		accesoAsistencia?: boolean;
+		accesoGps?: boolean;
+		accesoGestionUsuarios?: boolean;
+		accesoGestionWeb?: boolean;
 		accesoGestionCvs?: boolean;
 		accesoPanelVentas?: boolean;
+		accesoContabilidad?: boolean;
 		accesoCotizaciones?: boolean;
+		accesoInventario?: boolean;
+		accesoCompras?: boolean;
+		accesoMantenimiento?: boolean;
+		accesoDocumentos?: boolean;
+		accesoAuditoria?: boolean;
+		accesoBI?: boolean;
+		accesoBanca?: boolean;
+		accesoMultas?: boolean;
+		accesoClientes?: boolean;
+		accesoLunchBreaks?: boolean;
+		accesoRRHH?: boolean;
+		accesoCatalogo?: boolean;
 	};
 	department: string;
 	departmentId: number;
@@ -50,6 +73,8 @@ const normalizeUser = (value: unknown): User | null => {
 		email: candidate.email,
 		role: candidate.role || '',
 		roleId: candidate.roleId,
+		orgRoleKey: candidate.orgRoleKey ?? null,
+		nivelAutoridad: Number(candidate.nivelAutoridad || 0),
 		roleFlags: candidate.roleFlags,
 		department: candidate.department || '',
 		departmentId: Number(candidate.departmentId || 0),

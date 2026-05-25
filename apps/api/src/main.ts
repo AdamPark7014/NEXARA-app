@@ -440,8 +440,8 @@ async function bootstrap() {
 
   // ── Swagger / OpenAPI ─────────────────────────────────────
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('NEXARA ERP Industrial')
-    .setDescription('API del sistema ERP industrial NEXARA — gestión de operaciones, RRHH, finanzas, manufactura, calidad, mantenimiento y más.')
+    .setTitle('NEXARA ERP Servicios IT/CCTV')
+    .setDescription('API del sistema ERP NEXARA orientado a venta y servicios de cómputo, tech y CCTV — operaciones, RRHH, finanzas, inventario, mantenimiento, helpdesk y más.')
     .setVersion('1.0.0')
     .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'JWT')
     .addTag('auth', 'Autenticación y tokens')
@@ -450,9 +450,9 @@ async function bootstrap() {
     .addTag('hr', 'Asistencia, breaks, multas, nómina, CVs')
     .addTag('commercial', 'Clientes, cotizaciones, ventas')
     .addTag('inventory', 'Almacenes, stock, compras')
-    .addTag('manufacturing', 'BOM, producción, calidad')
+    .addTag('service', 'Helpdesk, órdenes de servicio, mantenimiento, contratos')
     .addTag('finance', 'Contabilidad, facturación, banca')
-    .addTag('compliance', 'Seguridad, documentos, workflow, auditoría, BI')
+    .addTag('compliance', 'Documentos, auditoría, BI')
     .addTag('system', 'Configuración, health, notificaciones')
     .build();
 

@@ -48,7 +48,11 @@ private fun SessionUser.isPlatformAdmin(): Boolean {
 }
 
 private fun normalizedConsolePath(module: ModuleEntry): String {
-    return module.webPath.removePrefix("/console")
+    return when {
+        module.webPath.startsWith("/operacion") -> module.webPath.removePrefix("/operacion")
+        module.webPath.startsWith("/console") -> module.webPath.removePrefix("/console")
+        else -> module.webPath
+    }
 }
 
 fun canAccessConsoleModule(user: SessionUser?, module: ModuleEntry): Boolean {
@@ -148,7 +152,7 @@ fun consoleSidebarGroups(user: SessionUser?): List<ConsoleSidebarGroup> {
         ),
         ConsoleSidebarGroup(
             "compliance", "Cumplimiento y BI",
-            pick("safety", "documents", "workflow", "audit", "analytics"),
+            pick("documents", "audit", "analytics"),
         ),
     )
 

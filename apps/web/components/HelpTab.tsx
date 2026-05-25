@@ -4,23 +4,11 @@ import React from "react";
 import { useTheme } from "./ThemeContext";
 
 const helpContent: Record<string, Record<string, string>> = {
-  safety: {
-    superadmin: `Aquí supervisa toda la seguridad e higiene de la organización. Gestiona incidentes (reporte, investigación, seguimiento de acciones), permisos de trabajo (APT, TATM, espacios confinados), capacitación obligatoria y planes de seguridad. Todos los registros quedan auditados y generan reportes de cumplimiento normativo.`,
-    admin: `Aquí registra y da seguimiento a incidentes del equipo, autoriza o rechaza permisos de trabajo, verifica que la capacitación esté al día y mantiene trazabilidad de everything para auditorías. Es tu responsabilidad que nada se quede sin reportar ni validar.`,
-    ingeniero: `Aquí reportas incidentes de seguridad cuando ocurren, solicitas permisos de trabajo antes de ejecutar tareas de riesgo (trabajos en altura, espacios confinados, energía, calor), y consultas tu historial de capacitación. Si un permiso es rechazado, no inicies el trabajo hasta que sea aprobado.`,
-    vendedor: `Si tu perfil tiene acceso, aquí consultas información de seguridad relevante a tu conducta y actividades. Si tienes incidentes o necesitas permisos, coordina directamente con tu administrador.`
-  },
   documents: {
     superadmin: `Aquí gestiona todos los documentos corporativos: políticas, procedimientos, plantillas contractuales, certificaciones. Puedes crear categorías, registrar documentos nuevos, gestionar versionamiento y establecer flujos de aprobación. Todo queda centralizado, versionado y con trazabilidad de cambios.`,
     admin: `Aquí administra los documentos de tu área: crea documentos nuevos, organízalos en categorías, gestiona versiones y lidera o participa en flujos de aprobación. Asegúrate de que los documentos vigentes sean accesibles y los documentos obsoletos queden marcados como archivados.`,
     ingeniero: `Aquí consultas los documentos corporativos que regulan tu trabajo: procedimientos de seguridad, plantillas de reporte, normas de calidad, políticas internas. Si necesitas una nueva versión o un documento está outdated, avísale a tu administrador.`,
     vendedor: `Aquí consultas documentos corporativos como contratos plantilla, políticas de atención al cliente, procedimientos de facturación. Si necesitas agregar un documento nuevo o revisar una versión anterior, coordina con tu administrador.`
-  },
-  workflow: {
-    superadmin: `Aquí diseña flujos de aprobación para cualquier entidad corporativa: órdenes de compra, gastos, licencias, cambios, etc. Define pasos secuenciales de aprobación, asigna aprobadores, y monitorea instancias en progreso. Todo es rastreable y evita decisiones ad-hoc sin autorización.`,
-    admin: `Aquí participas en flujos de trabajo: apruebas o rechazas solicitudes asignadas a ti en tu bandeja de entrada, inicias flujos nuevos cuando tu equipo lo solicita, y revisa el historial de aprobaciones completadas. Mantén tus aprobaciones pendientes al día.`,
-    ingeniero: `Aquí inicias flujos de aprobación cuando necesitas autorización (gastos, permisos, cambios, compras). Completa la solicitud con detalle, envía para aprobación y monitorea su avance. Si es rechazada, el administrador te indicará por qué y cómo corregir.`,
-    vendedor: `Si tu perfil participa, aquí inicias y consultabas flujos de aprobación para solicitudes comerciales o cambios de alcance. Sigue el estado de tu solicitud y responde si se requieren ajustes.`
   },
   audit: {
     superadmin: `Aquí audita toda la actividad del sistema en tiempo real: quién hizo qué, cuándo y en qué registro. Filtra por acción, entidad, usuario o fecha para investigar cambios, validar cumplimiento normativo y detectar irregularidades. Es tu pista de auditoría completa.`,
@@ -136,30 +124,6 @@ const helpContent: Record<string, Record<string, string>> = {
     ingeniero: `Si tu perfil participa en reclutamiento, aquí puedes subir CVs, revisar candidatos y dar seguimiento por etapas hasta su resolución.`,
     vendedor: `Si tienes acceso, aquí puedes consultar el estado de candidatos y sus documentos CV en el flujo de selección. Si no ves acciones esperadas, revisa permisos con administración.`
   },
-  manufacturing: {
-    superadmin: `En una empresa de servicios, este módulo se usa para estandarizar la ejecución técnica por tipo de servicio/proyecto. Flujo recomendado: 1) define centros de trabajo (cuadrillas, taller, laboratorio o áreas operativas), 2) arma la plantilla técnica (BOM) con insumos y cantidades base, 3) valida que quede activo para que el equipo pueda planear y ejecutar sin improvisación.`,
-    admin: `Aquí preparas el estándar operativo del servicio. Registra centros de trabajo y después la plantilla BOM de cada línea de servicio. Esto evita variaciones entre equipos y mejora tiempos de ejecución.`,
-    ingeniero: `Aquí consultas la plantilla técnica del servicio antes de salir a ejecutar: insumos requeridos, cantidades base y centro responsable. Úsalo como checklist previo para reducir retrabajos.`,
-    vendedor: `Si tienes acceso, aquí puedes consultar la estructura técnica base del servicio para alinear expectativas de alcance y tiempos con operación.`
-  },
-  production: {
-    superadmin: `Este módulo controla la ejecución operativa por orden de trabajo interna. Flujo: Crear orden -> Iniciar -> Completar. Cada orden representa una ejecución planificada de servicio, instalación o preparación técnica; al cierre se registra el resultado real para medir cumplimiento.`,
-    admin: `Aquí gestionas órdenes de ejecución del equipo. Crea la orden con plantilla BOM, prioridad y fechas; luego inicia cuando entra a operación y completa al terminar. Esto te da trazabilidad real de tiempos y avance.`,
-    ingeniero: `Aquí ves tus órdenes activas, su avance y fechas compromiso. Úsalo para priorizar trabajo diario y reportar desviaciones cuando el avance real no coincide con lo planeado.`,
-    vendedor: `Aquí puedes consultar el estado operativo de las órdenes para dar seguimiento comercial: planificada, en progreso o completada.`
-  },
-  "production-schedule": {
-    superadmin: `Aquí balanceas capacidad operativa por periodo. Filtra por fechas para detectar sobrecarga de centros/cuadrillas y ajustar la agenda antes de afectar compromisos de servicio.`,
-    admin: `Aquí haces planeación semanal/diaria de órdenes. Usa Desde/Hasta para ver carga por centro de trabajo y redistribuir cuando una línea está saturada.`,
-    ingeniero: `Aquí consultas la secuencia programada de trabajo para organizar ruta y prioridades operativas del día.`,
-    vendedor: `Aquí validas ventanas reales de ejecución para coordinar fechas con clientes sin comprometer capacidad operativa.`
-  },
-  quality: {
-    superadmin: `Aquí controlas la calidad del servicio ejecutado. Flujo: 1) registra inspección, 2) evalúa checklist, 3) si hay desviación levanta NCR, 4) da seguimiento a acción correctiva/preventiva hasta cierre.`,
-    admin: `Aquí documentas hallazgos de calidad y su resolución. Cuando algo no cumple, crea NCR con causa raíz y acción correctiva para evitar repetición en futuros servicios.`,
-    ingeniero: `Aquí registras evidencia de calidad de la ejecución. Si detectas desviación, repórtala con detalle para que se atienda y cierre formalmente.`,
-    vendedor: `Aquí puedes consultar incidencias de calidad abiertas que puedan impactar tiempos de entrega, garantías o satisfacción del cliente.`
-  },
   accounting: {
     superadmin: `Este módulo es la base financiera. Aquí validas plan de cuentas, pólizas y períodos fiscales; toda captura en gastos, nómina, proyectos, facturación y banca termina reflejándose en este libro contable. Flujo recomendado: 1) define cuentas, 2) valida período abierto, 3) revisa pólizas generadas por operación.`,
     admin: `Aquí revisas la estructura contable oficial: catálogo de cuentas, pólizas y períodos. Antes de registrar operaciones en otros módulos, confirma que el período esté abierto y que la cuenta correcta exista para evitar reclasificaciones.`,
@@ -201,12 +165,6 @@ const helpContent: Record<string, Record<string, string>> = {
     admin: `Este módulo consolida la salud financiera. Úsalo para validar que lo capturado en los demás módulos esté correctamente reflejado antes de cierre.`,
     ingeniero: `Si tienes acceso, aquí puedes consultar reportes financieros consolidados para contexto de operación.`,
     vendedor: `Si tienes acceso, aquí puedes revisar indicadores financieros para planear metas y compromisos comerciales realistas.`
-  },
-  "quality-dashboard": {
-    superadmin: `Aquí visualizas KPIs de calidad: inspecciones totales, tasa de aprobación, NCR abiertas y críticas. Úsalo para decisiones ejecutivas y priorización de acciones correctivas.`,
-    admin: `Aquí monitoreas el desempeño de calidad del equipo mediante indicadores y NCR recientes. Sirve para detectar focos rojos y dar seguimiento oportuno.`,
-    ingeniero: `Aquí puedes revisar indicadores de calidad y tendencias de no conformidades para prevenir recurrencias en la operación.`,
-    vendedor: `Si tienes acceso, este tablero te ayuda a entender el estado de calidad general y posibles riesgos para clientes.`
   },
   procurement: {
     superadmin: `Aquí puedes supervisar todo el proceso de compras de la organización. Revisa requisiciones, órdenes de compra, proveedores registrados y estados de aprobación. Controla el flujo desde la solicitud hasta la entrega y valida cumplimiento de proveedores.`,
@@ -281,7 +239,6 @@ const moduleNames: Record<string, string> = {
   "service-sheets": "Hojas de Servicio",
   gps: "GPS en Vivo",
   cvs: "CVs / Candidatos",
-  workflow: "Flujo de Trabajo",
   "work-projects": "Proyectos de Trabajo",
   accounting: "Contabilidad General",
   "employee-payments": "Nómina y Pagos",
@@ -293,11 +250,6 @@ const moduleNames: Record<string, string> = {
   audit: "Auditoría",
   newsletter: "Boletín",
   "client-tickets": "Tickets de Clientes",
-  manufacturing: "Manufactura / BOM",
-  production: "Producción",
-  "production-schedule": "Planificación de Producción",
-  quality: "Control de Calidad",
-  "quality-dashboard": "Dashboard de Calidad",
   news: "Noticias y Comunicados",
   tools: "Herramientas Internas",
   settings: "Configuración del Sistema",

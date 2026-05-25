@@ -60,20 +60,6 @@ fun HrModuleScreen() = GenericListModuleScreen(title = "Recursos humanos · Perm
     }
 }
 
-// ── Safety (incidents) ────────────────────────────────────────────────────
-@Composable
-fun SafetyModuleScreen() = GenericListModuleScreen(title = "Seguridad · Incidentes") { repo ->
-    repo.safetyIncidents().map {
-        toRow(
-            it,
-            titleKeys = arrayOf("title", "titulo", "description", "descripcion", "type", "tipo"),
-            subtitleKeys = arrayOf("location", "ubicacion", "area"),
-            metaKeys = arrayOf("occurredAt", "reportedAt", "createdAt"),
-            statusKeys = arrayOf("severity", "severidad", "status"),
-        )
-    }
-}
-
 // ── Warehouse ─────────────────────────────────────────────────────────────
 @Composable
 fun WarehouseModuleScreen() = GenericListModuleScreen(title = "Bodega") { repo ->
@@ -111,22 +97,6 @@ fun ProcurementModuleScreen() = GenericListModuleScreen(title = "Compras · Requ
     }
 }
 
-// ── Manufacturing · Production ───────────────────────────────────────────
-@Composable
-fun ManufacturingModuleScreen() = GenericListModuleScreen(title = "Manufactura · Producción") { repo ->
-    repo.production().map {
-        toRow(
-            it,
-            titleKeys = arrayOf("orderNumber", "number", "folio", "productName", "product", "title"),
-            subtitleKeys = arrayOf("line", "linea", "workCenter"),
-            metaKeys = arrayOf("startDate", "endDate", "scheduledAt", "createdAt"),
-        )
-    }
-}
-
-@Composable
-fun ProductionModuleScreen() = ManufacturingModuleScreen()
-
 // ── Maintenance · Work Orders ────────────────────────────────────────────
 @Composable
 fun MaintenanceModuleScreen() = GenericListModuleScreen(title = "Mantenimiento · Órdenes") { repo ->
@@ -149,20 +119,6 @@ fun AssetsModuleScreen() = GenericListModuleScreen(title = "Activos") { repo ->
             titleKeys = arrayOf("name", "nombre", "assetName"),
             subtitleKeys = arrayOf("code", "tag", "serial"),
             metaKeys = arrayOf("location", "ubicacion", "area"),
-        )
-    }
-}
-
-// ── Quality · Inspections ────────────────────────────────────────────────
-@Composable
-fun QualityModuleScreen() = GenericListModuleScreen(title = "Calidad · Inspecciones") { repo ->
-    repo.inspections().map {
-        toRow(
-            it,
-            titleKeys = arrayOf("title", "titulo", "description", "item", "reference"),
-            subtitleKeys = arrayOf("inspector", "inspectorName"),
-            metaKeys = arrayOf("inspectedAt", "createdAt", "date"),
-            statusKeys = arrayOf("result", "status", "estatus"),
         )
     }
 }

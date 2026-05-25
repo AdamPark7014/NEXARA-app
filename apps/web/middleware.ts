@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isOperationalPanelPath } from '@/lib/panel-urls';
 
 /**
  * Middleware para manejar subdominios dinámicos
@@ -10,14 +11,69 @@ import { NextRequest, NextResponse } from 'next/server';
  * - localhost:3000/console → carpeta [subdomain] con slug=console (para desarrollo)
  */
 
-// Mapeo de subdominios públicos a carpetas internas
+// Mapeo de subdominios públicos a carpetas internas.
+// La clave es el subdominio del host (parte antes del primer punto).
+// El valor es el slug interno = carpeta en app/(subdomains)/<slug>/
+//
+// Cada folder interno puede tener varios alias públicos:
+//   console: ['core', 'console', 'consola', 'app']
+//   ventas:  ['sales', 'ventas', 'crm']
+//   operacion: ['ops', 'operacion']
+//   contabilidad: ['finance', 'contabilidad', 'admin']
+//   web:     ['studio', 'media', 'web']
+//   tickets: ['portal', 'tickets']
 const SUBDOMAIN_MAP: Record<string, string> = {
-  'consola': 'console',
+  // Núcleo ERP
+  'core': 'console',
   'console': 'console',
+  'consola': 'console',
+  'app': 'console',
+  // CRM
+  'sales': 'ventas',
   'ventas': 'ventas',
-  'web': 'web',
+  'crm': 'ventas',
+  // Operaciones
+  'ops': 'operacion',
+  'operacion': 'operacion',
+  // Finanzas
+  'finance': 'contabilidad',
   'contabilidad': 'contabilidad',
+  'admin': 'contabilidad',
+  // Estudio creativo / marketing
+  'studio': 'web',
+  'media': 'web',
+  'web': 'web',
+  // Portal cliente
+  'portal': 'tickets',
   'tickets': 'tickets',
+  // Helpdesk
+  'support': 'support',
+  'help': 'support',
+  // NOC
+  'noc': 'noc',
+  'monitor': 'noc',
+  // People
+  'people': 'people',
+  'rh': 'people',
+  'hr': 'people',
+  // Lab
+  'lab': 'lab',
+  'dev': 'lab',
+};
+
+// Hostnames canónicos por slug (los preferidos / la URL "bonita").
+// Los demás aliases redirigen 308 → canónico.
+const CANONICAL_BY_SLUG: Record<string, string> = {
+  console: 'core',
+  ventas: 'sales',
+  operacion: 'ops',
+  contabilidad: 'finance',
+  web: 'studio',
+  tickets: 'portal',
+  support: 'support',
+  noc: 'noc',
+  people: 'people',
+  lab: 'lab',
 };
 
 const DEFAULT_ALLOWED_METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']);
@@ -200,6 +256,19 @@ export function middleware(request: NextRequest) {
   }
 
   const hostWithoutPort = hostname.split(':')[0];
+  const requestPathname = request.nextUrl.pathname;
+
+  // Legacy: /console/<modulo-operativo> → /operacion/<modulo-operativo>
+  if (
+    (request.method === 'GET' || request.method === 'HEAD') &&
+    requestPathname.startsWith('/console/') &&
+    isOperationalPanelPath(requestPathname, 'console')
+  ) {
+    const rest = requestPathname.split('/').filter(Boolean).slice(1).join('/');
+    const url = request.nextUrl.clone();
+    url.pathname = `/operacion/${rest}`;
+    return applySecurityHeaders(NextResponse.redirect(url, 308));
+  }
 
   // Remover puerto para obtener host limpio
   const hostParts = hostWithoutPort.split('.');
@@ -238,6 +307,45 @@ export function middleware(request: NextRequest) {
   if (isMappedPanelSubdomain && subdomain) {
     const internalSlug = SUBDOMAIN_MAP[subdomain];
     const pathname = request.nextUrl.pathname;
+
+    // ── Canonical redirect ──
+    // Si el host actual es un alias legacy, redirigir 308 al subdominio canónico.
+    // p.ej. consola.nexara.com.mx → core.nexara.com.mx
+    //       ventas.nexara.com.mx → sales.nexara.com.mx
+    // Solo aplica en producción (dominios .nexara.com.mx). En localhost no redirige
+    // para no romper el flujo de desarrollo.
+    const canonicalSub = CANONICAL_BY_SLUG[internalSlug];
+    const enableCanonicalRedirect =
+      !isLocalhost &&
+      hostWithoutPort.endsWith('.nexara.com.mx') &&
+      canonicalSub &&
+      subdomain !== canonicalSub &&
+      (request.method === 'GET' || request.method === 'HEAD');
+
+    if (enableCanonicalRedirect) {
+      const url = request.nextUrl.clone();
+      url.hostname = `${canonicalSub}.nexara.com.mx`;
+      return applySecurityHeaders(NextResponse.redirect(url, 308));
+    }
+
+    // Consola → Operación: módulos de campo ya no viven en admin
+    if (
+      (request.method === 'GET' || request.method === 'HEAD') &&
+      internalSlug === 'console' &&
+      isOperationalPanelPath(pathname)
+    ) {
+      const url = request.nextUrl.clone();
+      // Núcleo (core/console/app) → Operaciones (ops). Soportamos los aliases viejos por compatibilidad.
+      const operHost = hostWithoutPort.replace(/^(core|consola|console|app)\./i, 'ops.');
+      if (operHost !== hostWithoutPort) {
+        url.hostname = operHost;
+      } else {
+        url.hostname = isLocalhost ? 'ops.localhost' : `ops.${hostParts.slice(1).join('.')}`;
+      }
+      url.pathname = pathname;
+      return applySecurityHeaders(NextResponse.redirect(url, 308));
+    }
+
     const isAlreadyScopedPath = (() => {
       const firstSegment = pathname.split('/').filter(Boolean)[0]?.toLowerCase();
       return firstSegment === internalSlug;

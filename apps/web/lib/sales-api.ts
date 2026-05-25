@@ -43,6 +43,9 @@ export type SalesOpportunity = {
   expectedCloseDate?: string | null;
   clientName?: string | null;
   clientId?: number | null;
+  ownerId?: number | null;
+  owner?: { id: number; nombre: string } | null;
+  client?: { id: number; name: string } | null;
   notes?: SalesOpportunityNote[];
   evidences?: SalesOpportunityEvidence[];
   quotes?: SalesOpportunityQuote[];
@@ -64,6 +67,7 @@ export type SalesDashboardData = {
     opportunityCount: number;
     projectCount: number;
     clientCount: number;
+    averageMargin: number;
   };
 };
 
@@ -88,6 +92,13 @@ export type SalesClientDocument = {
   createdAt: string;
 };
 
+export type ServiceClientLink = {
+  id: number;
+  name: string;
+  isActive: boolean;
+  accountCode?: string | null;
+};
+
 export type SalesClient = {
   id: number;
   name: string;
@@ -100,12 +111,23 @@ export type SalesClient = {
   website?: string | null;
   status?: string | null;
   notes?: string | null;
+  serviceClientId?: number | null;
+  serviceClient?: ServiceClientLink | null;
   documents?: SalesClientDocument[];
+};
+
+export type ProvisionServiceClientResult = {
+  salesClient: SalesClient;
+  serviceClient: ServiceClientLink & { contactEmail?: string | null; contactPhone?: string | null; address?: string | null };
+  created: boolean;
 };
 
 export type SalesProjectDetail = {
   id: number;
   name: string;
+  projectType?: string | null;
+  scopeSummary?: string | null;
+  siteCount?: number | null;
   budget: number;
   costProducts: number;
   costViáticos: number;
@@ -115,12 +137,98 @@ export type SalesProjectDetail = {
   opportunity?: { id: number; title: string } | null;
 };
 
+export type SalesProjectOrderLine = {
+  id: number;
+  name: string;
+  sku?: string | null;
+  qty: number;
+  unitPrice: number | string;
+  discount: number;
+  tax: number;
+  lineTotal: number | string;
+  unit?: string | null;
+  category?: string | null;
+  productId?: number | null;
+};
+
 export type SalesProjectOrder = {
   id: number;
   orderId: string;
   orderPdfUrl: string;
   status: string;
   createdAt: string;
+  lines?: SalesProjectOrderLine[];
+  invoice?: { id: number; invoiceNumber: string; status: string } | null;
+};
+
+export type SalesProjectSummary = {
+  project: {
+    id: number;
+    name: string;
+    status: string;
+    projectType?: string | null;
+    scopeSummary?: string | null;
+    siteCount?: number | null;
+    startDate?: string | null;
+    endDate?: string | null;
+    budget: number;
+    margin: number;
+  };
+  opportunity?: {
+    id: number;
+    title: string;
+    stage: string;
+    owner?: { id: number; nombre: string; email?: string } | null;
+    client?: { id: number; name: string; taxId?: string | null; legalName?: string | null } | null;
+  } | null;
+  operational?: {
+    id: number;
+    title: string;
+    status: string;
+    engineers: Array<{ id: number; nombre: string; email?: string }>;
+    activityStats: { total: number; completed: number; inProgress: number; pending: number } | null;
+    progressPercent: number;
+  } | null;
+  order?: {
+    id: number;
+    orderId: string;
+    status: string;
+    lineCount: number;
+    invoice?: {
+      id: number;
+      invoiceNumber: string;
+      status: string;
+      totalAmount: number | string;
+      paidAmount: number | string;
+      cfdiUuid?: string | null;
+      cfdiStampDate?: string | null;
+      isCancelled?: boolean;
+    } | null;
+  } | null;
+  costs: {
+    costProducts: number;
+    costViaticos: number;
+    costOperativo: number;
+    totalCost: number;
+    budget: number;
+    margin: number;
+    marginPercent: number;
+    isOverBudget: boolean;
+    actual?: {
+      hasOperationalLink: boolean;
+      operationalProjectId?: number | null;
+      operationalProjectTitle?: string | null;
+      activityCount: number;
+      completedActivities: number;
+      actualViaticos: number;
+      actualOperativo: number;
+      actualTotal: number;
+      actualTotalWithProducts: number;
+      marginActual: number;
+      marginActualPercent: number;
+      isOverBudgetActual: boolean;
+    };
+  };
 };
 
 export type SalesMetrics = {
@@ -452,6 +560,8 @@ export const getSalesDashboardData = async (token: string, filters?: { ownerId?:
   const safeProjects = Array.isArray(projects) ? (projects as SalesProject[]) : [];
   const pipelineValue = opportunities.reduce((sum, opportunity) => sum + Number(opportunity.value || 0), 0);
   const clientCount = new Set(opportunities.map((opportunity) => opportunity.clientId).filter(Boolean)).size;
+  const margins = safeProjects.map((p) => Number(p.margin || 0)).filter((m) => !Number.isNaN(m));
+  const averageMargin = margins.length ? margins.reduce((a, b) => a + b, 0) / margins.length : 0;
 
   return {
     leads: leads.slice(0, 5).map((lead) => ({
@@ -477,6 +587,7 @@ export const getSalesDashboardData = async (token: string, filters?: { ownerId?:
       opportunityCount: opportunities.length,
       projectCount: safeProjects.length,
       clientCount,
+      averageMargin,
     },
   };
 };
@@ -563,6 +674,14 @@ export const uploadSalesClientDocuments = async (
   );
 };
 
+export const provisionSalesServiceClient = async (token: string, clientId: number) => {
+  return apiRequest<ProvisionServiceClientResult>(
+    `ventas/clientes/${clientId}/provision-service-client`,
+    { token, method: "POST" },
+    "No se pudo activar el cliente en operación",
+  );
+};
+
 export const listSalesProjects = async (token: string, filters?: { ownerId?: number }) => {
   const search = new URLSearchParams();
   if (filters?.ownerId) search.set("ownerId", String(filters.ownerId));
@@ -576,6 +695,9 @@ export const createSalesProject = async (
   payload: {
     opportunityId: number;
     name: string;
+    projectType?: string;
+    scopeSummary?: string;
+    siteCount?: number;
     budget: number;
     costProducts: number;
     costViáticos: number;
@@ -592,6 +714,14 @@ export const createSalesProject = async (
       body: JSON.stringify(payload),
     },
     "No se pudo crear el proyecto",
+  );
+};
+
+export const provisionSalesProjectOperacion = async (token: string, projectId: number) => {
+  return apiRequest<{ operationalProject: { id: number; title: string }; created: boolean }>(
+    `ventas/proyectos/${projectId}/provision-operacion`,
+    { token, method: "POST" },
+    "No se pudo activar el proyecto en operación",
   );
 };
 
@@ -612,6 +742,35 @@ export const getSalesProjectOrder = async (token: string, projectId: number) => 
     `ventas/proyectos/${projectId}/orden`,
     { token, method: "GET" },
     "No se pudo cargar la orden del proyecto",
+  );
+};
+
+export const getSalesProjectSummary = async (token: string, projectId: number) => {
+  return apiRequest<SalesProjectSummary>(
+    `ventas/proyectos/${projectId}/resumen`,
+    { token, method: "GET" },
+    "No se pudo cargar el resumen del proyecto",
+  );
+};
+
+export const stampInvoice = async (token: string, invoiceId: number) => {
+  return apiRequest<{ id: number; invoiceNumber: string; status: string; cfdiUuid: string; cfdiStampDate: string }>(
+    `accounting/invoices/${invoiceId}/stamp`,
+    { token, method: "POST" },
+    "No se pudo timbrar la factura",
+  );
+};
+
+export const invoiceSalesProject = async (token: string, projectId: number, lineIds?: number[]) => {
+  return apiRequest<{ id: number; invoiceNumber: string; status: string; totalAmount: number | string }>(
+    `accounting/invoices/from-sales-project/${projectId}`,
+    {
+      token,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(lineIds?.length ? { lineIds } : {}),
+    },
+    "No se pudo generar la factura desde la orden",
   );
 };
 

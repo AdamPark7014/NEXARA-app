@@ -89,6 +89,24 @@ export class VentasClientesController {
     return removed;
   }
 
+  @Post(':id/provision-service-client')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })
+  async provisionServiceClient(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    const result = await this.ventasService.provisionServiceClient(id, user);
+    await this.ventasService.createAuditEvent({
+      action: 'client.provision_service',
+      entityType: 'client',
+      entityId: id,
+      actorId: user?.id,
+      metadata: {
+        serviceClientId: result.serviceClient.id,
+        created: result.created,
+      },
+    });
+    return result;
+  }
+
   @Post(':id/documentos')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
-import { getAccessiblePanels, setActivePanel } from "@/lib/panel-routing";
+import { getAccessiblePanels, setActivePanel, type PanelKey } from "@/lib/panel-routing";
 import styles from "./page.module.css";
 
 const getGreeting = () => {
@@ -72,7 +72,7 @@ export default function PanelHubPage() {
     return null;
   }
 
-  const handleEnterPanel = (panelKey: "console" | "ventas" | "contabilidad" | "web" | "tickets", entryPath: string) => {
+  const handleEnterPanel = (panelKey: PanelKey, entryPath: string) => {
     setActivePanel(panelKey);
     router.push(entryPath);
   };

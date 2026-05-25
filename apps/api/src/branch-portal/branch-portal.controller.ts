@@ -38,6 +38,60 @@ export class BranchPortalController {
     return branch;
   }
 
+  @Get('projects')
+  async projects(@CurrentUser() user: any) {
+    const branch = await this.prisma['serviceClientBranch'].findFirst({
+      where: { id: user.branchId, clientId: user.clientId },
+      select: { name: true, branchNumber: true },
+    });
+
+    const projects = await this.prisma['operationalProject'].findMany({
+      where: {
+        clientId: user.clientId,
+        deletedAt: null,
+        status: { in: ['ACTIVE', 'ON_HOLD'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        engineers: { include: { engineer: { select: { id: true, nombre: true } } } },
+      },
+    });
+
+    const projectIds = projects.map((p: any) => p.id);
+    const activities = projectIds.length
+      ? await this.prisma['activity'].findMany({
+          where: { projectId: { in: projectIds }, clientId: user.clientId, deletedAt: null },
+          select: { id: true, projectId: true, estatus: true, branchName: true, branchNumber: true },
+        })
+      : [];
+
+    return projects.map((project: any) => {
+      const branchActs = activities.filter(
+        (a: any) =>
+          a.projectId === project.id &&
+          (a.branchName === branch?.name || a.branchNumber === branch?.branchNumber || (!a.branchName && !a.branchNumber)),
+      );
+      const total = branchActs.length;
+      const completed = branchActs.filter((a: any) =>
+        /finaliz|complet|cerrad/i.test(String(a.estatus || '')),
+      ).length;
+      return {
+        id: project.id,
+        title: project.title,
+        status: project.status,
+        projectType: project.projectType,
+        scopeSummary: project.scopeSummary,
+        siteCount: project.siteCount,
+        startDate: project.startDate,
+        endDate: project.endDate,
+        engineers: project.engineers.map((e: any) => e.engineer),
+        activityCount: total,
+        completedActivities: completed,
+        progressPercent: total ? Math.round((completed / total) * 100) : 0,
+      };
+    });
+  }
+
   @Get('requests')
   async requests(@CurrentUser() user: any) {
     const requests = await this.prisma['clientTicketRequest'].findMany({

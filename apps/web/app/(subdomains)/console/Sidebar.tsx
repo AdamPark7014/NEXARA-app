@@ -5,9 +5,11 @@ import styles from "./console.module.css";
 import { useUser } from '@/components/UserContext';
 import { useTheme } from '@/components/ThemeContext';
 import Image from "next/image";
-import { hasAnyPermission, hasPermission, PERMISSIONS } from '@/lib/permissions';
+import { PERMISSIONS } from '@/lib/permissions';
 import { getAvatarSrc, getRoleLabel, isPlatformAdmin } from '@/lib/panel-user';
+import { canAccessMenuItem } from '@/lib/org-access';
 import { useState, useEffect } from "react";
+import { getOperacionUrl } from "@/lib/panel-urls";
 import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
 
 export default function Sidebar() {
@@ -78,31 +80,10 @@ export default function Sidebar() {
 
   if (!user) return null;
 
-  // Nueva lógica de roles principales
-  const role = String(user.role || '').toLowerCase();
-  const hasConsoleAdmin = isPlatformAdmin(user);
+  // Sidebar dinámico: permisos JWT + jerarquía org (sin buckets legacy ingeniero/vendedor)
   const isSuperAdmin = Boolean(user.isSuperAdmin);
-  const isAdmin = !isSuperAdmin && hasConsoleAdmin;
-  const isIngeniero = !isSuperAdmin && !isAdmin && role.includes('ingenier');
-  const isVendedor = !isSuperAdmin && !isAdmin && !isIngeniero;
+  const isAdmin = !isSuperAdmin && isPlatformAdmin(user);
   const userRoleLabel = getRoleLabel(user);
-  const roleFlags = user.roleFlags || {};
-  const canAccessCotizaciones = hasPermission(user, PERMISSIONS.COTIZACIONES_ACCESS);
-  const canAccessCvs = hasAnyPermission(user, [
-    PERMISSIONS.CVS_MANAGE,
-    PERMISSIONS.CVS_ADMIN_REVIEW,
-    PERMISSIONS.CVS_SUPERADMIN_REVIEW,
-    PERMISSIONS.CONSOLE_ADMIN,
-  ]);
-  const canAccessVentas = hasAnyPermission(user, [
-    PERMISSIONS.PANEL_VENTAS,
-    PERMISSIONS.SALES_VIEW,
-    PERMISSIONS.SALES_MANAGE,
-    PERMISSIONS.SALES_REPORTS_VIEW,
-  ]);
-  const canAccessCotizacionesByRole = Boolean(roleFlags.accesoCotizaciones);
-  const canAccessCvsByRole = Boolean(roleFlags.accesoGestionCvs);
-  const canAccessVentasByRole = Boolean(roleFlags.accesoPanelVentas);
 
   type MenuItem = {
     icon: string;
@@ -118,46 +99,8 @@ export default function Sidebar() {
     items: MenuItem[];
   };
 
-  // Sidebar dinámico según perfil
-  const canAccessItem = (item: MenuItem) => {
-    // Superadmin: solo vistas globales, nunca personales
-    if (isSuperAdmin) {
-      if (item.href.startsWith('/my-')) return false;
-      return true;
-    }
-    // Admin: solo gestión, nunca vistas personales ni ventas ni contabilidad completa
-    if (isAdmin) {
-      if (item.href.startsWith('/my-')) return false;
-      if (["/ventas", "/accounting", "/newsletter", "/news", "/gestion-pagina-web"].some((p) => item.href.startsWith(p))) return false;
-      if (item.href === "/cotizaciones" && !(canAccessCotizaciones || canAccessCotizacionesByRole)) return false;
-      if (item.href === "/cvs" && !(canAccessCvs || canAccessCvsByRole)) return false;
-      return true;
-    }
-    // Ingeniero: solo vistas personales y módulos extra habilitados
-    if (isIngeniero) {
-      if (!item.href.startsWith('/my-') && !["/dashboard", "/cotizaciones", "/cvs", "/ventas", "/attendance"].includes(item.href)) return false;
-      if (item.href === "/cotizaciones" && !(canAccessCotizaciones || canAccessCotizacionesByRole)) return false;
-      if (item.href === "/cvs" && !(canAccessCvs || canAccessCvsByRole)) return false;
-      if (item.href === "/ventas" && !(canAccessVentas || canAccessVentasByRole)) return false;
-      return true;
-    }
-    // Vendedor: solo ventas y módulos extra habilitados
-    if (isVendedor) {
-      if (!item.href.startsWith('/my-') && !["/dashboard", "/ventas", "/cotizaciones", "/cvs", "/attendance"].includes(item.href)) return false;
-      if (item.href === "/cotizaciones" && !(canAccessCotizaciones || canAccessCotizacionesByRole)) return false;
-      if (item.href === "/cvs" && !(canAccessCvs || canAccessCvsByRole)) return false;
-      if (item.href === "/ventas" && !(canAccessVentas || canAccessVentasByRole)) return false;
-      return true;
-    }
-    // Por defecto, usar permisos
-    if (item.permissions && !item.permissions.every((permission) => hasPermission(user, permission))) {
-      return false;
-    }
-    if (item.anyPermissions && !hasAnyPermission(user, item.anyPermissions)) {
-      return false;
-    }
-    return true;
-  };
+  // Sidebar dinámico: permisos JWT + jerarquía org (sin buckets legacy ingeniero/vendedor)
+  const canAccessItem = (item: MenuItem) => canAccessMenuItem(user, item);
 
   // Solo perfiles no globales ven vistas personales
   const profileItems: MenuItem[] = [];
@@ -167,29 +110,22 @@ export default function Sidebar() {
     );
   }
 
-  // ── Empleado (auto-servicio) ──────────────────────────
+  // ── Mi espacio (solo perfil; operación en panel operacion) ──
   const employeeItems: MenuItem[] = [
     { icon: "📊", label: "Resumen ejecutivo", href: "/dashboard", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
   ];
-  // Todo usuario de consola no admin puede ver su espacio personal
   if (!isSuperAdmin && !isAdmin) {
     employeeItems.push(
-      { icon: "📋", label: "Mis actividades", href: "/my-activities", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-      { icon: "📸", label: "Mis evidencias", href: "/my-evidences", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-      { icon: "💼", label: "Mis viáticos", href: "/my-viatics", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-      { icon: "🚗", label: "Mis vehículos", href: "/my-vehicles", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
-      { icon: "🍽️", label: "Breaks y comidas", href: "/my-lunch-breaks", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] }
+      { icon: "🍽️", label: "Breaks y comidas", href: "/my-lunch-breaks", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
     );
   }
 
-  // ── Operación (supervisión) ────────────────────────────
-  const operationItems: MenuItem[] = [
-    { icon: "🗂️", label: "Operación: actividades", href: "/activities", anyPermissions: [PERMISSIONS.ACTIVITIES_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "📸", label: "Evidencias de servicio", href: "/evidences", anyPermissions: [PERMISSIONS.EVIDENCES_REVIEW, PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "💼", label: "Viáticos operativos", href: "/viatics", anyPermissions: [PERMISSIONS.VIATICS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "🚗", label: "Control vehicular", href: "/vehicles", anyPermissions: [PERMISSIONS.VEHICLES_REVIEW, PERMISSIONS.VEHICLES_INVENTORY, PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "🛰️", label: "Monitoreo GPS", href: "/gps", permissions: [PERMISSIONS.GPS_VIEW] },
-  ];
+  const operacionLink: MenuItem = {
+    icon: "🚀",
+    label: "Operación de campo",
+    href: getOperacionUrl("/dashboard"),
+    anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN],
+  };
 
   const peopleItems: MenuItem[] = [
     { icon: "🕒", label: "Asistencia", href: "/attendance", anyPermissions: [PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.ATTENDANCE_MANAGE] },
@@ -202,17 +138,23 @@ export default function Sidebar() {
 
   const commercialItems: MenuItem[] = [
     { icon: "🏢", label: "Clientes corporativos", href: "/clients", anyPermissions: [PERMISSIONS.CLIENTS_VIEW, PERMISSIONS.CLIENTS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "🧩", label: "Proyectos", href: "/projects", anyPermissions: [PERMISSIONS.ACTIVITIES_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
     { icon: "🧾", label: "Cotizaciones", href: "/cotizaciones", permissions: [PERMISSIONS.COTIZACIONES_ACCESS] },
     { icon: "📈", label: "Gestión comercial", href: "/gestion-vendedores", anyPermissions: [PERMISSIONS.SALES_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
     { icon: "📬", label: "Mensajes de contacto", href: "/contact-messages", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
   ];
 
   const systemItems: MenuItem[] = [
-    { icon: "🛠️", label: "Herramientas internas", href: "/tools", anyPermissions: [PERMISSIONS.TOOLS_VIEW, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "📊", label: "Dashboard ejecutivo", href: "/executive", anyPermissions: [PERMISSIONS.EXECUTIVE_DASHBOARD, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🛡️", label: "Mis aprobaciones", href: "/approvals", anyPermissions: [PERMISSIONS.WORKFLOW_VIEW, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "⏱️", label: "SLA Tracker", href: "/sla", anyPermissions: [PERMISSIONS.ACTIVITIES_VIEW, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🛡️", label: "Audit log", href: "/audit", anyPermissions: [PERMISSIONS.AUDIT_VIEW, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "📥", label: "Exportaciones", href: "/exports", anyPermissions: [PERMISSIONS.SALES_REPORTS_EXPORT, PERMISSIONS.CONSOLE_ADMIN] },
     { icon: "📰", label: "Noticias y comunicados", href: "/news", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
     { icon: "📧", label: "Newsletter", href: "/newsletter", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "🔧", label: "Configuración del sistema", href: "/settings", permissions: [PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "📅", label: "Calendario unificado", href: "/calendar", anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "📚", label: "Knowledge Base", href: "/kb", anyPermissions: [PERMISSIONS.KB_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🏢", label: "Datos de la empresa", href: "/settings", anyPermissions: [PERMISSIONS.COMPANY_SETTINGS_VIEW, PERMISSIONS.CONSOLE_ADMIN] },
+    { icon: "🏛️", label: "Multi-empresa", href: "/companies", anyPermissions: [PERMISSIONS.COMPANY_SETTINGS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
   ];
 
   // ── ERP Industrial ──────────────────────────────────────
@@ -227,18 +169,16 @@ export default function Sidebar() {
     { icon: "📒", label: "Contabilidad (GL)", href: "/accounting", anyPermissions: [PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE] },
     { icon: "💰", label: "Nómina y pagos", href: "/employee-payments", anyPermissions: [PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
     { icon: "📊", label: "Gastos operativos", href: "/expenses", anyPermissions: [PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
-    { icon: "🏗️", label: "Proyectos de obra", href: "/work-projects", anyPermissions: [PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
     { icon: "🧾", label: "Facturacion", href: "/invoicing", anyPermissions: [PERMISSIONS.INVOICING_VIEW, PERMISSIONS.INVOICING_MANAGE] },
     { icon: "🏦", label: "Banca y conciliaciones", href: "/banking", anyPermissions: [PERMISSIONS.BANKING_VIEW, PERMISSIONS.BANKING_MANAGE] },
     { icon: "📈", label: "Reportes financieros", href: "/accounting/reports", anyPermissions: [PERMISSIONS.ACCOUNTING_VIEW, PERMISSIONS.ACCOUNTING_MANAGE] },
   ];
 
   const complianceItems: MenuItem[] = [
-    { icon: "🦺", label: "Seguridad industrial", href: "/safety", anyPermissions: [PERMISSIONS.SAFETY_VIEW, PERMISSIONS.SAFETY_MANAGE] },
     { icon: "📑", label: "Gestion documental", href: "/documents", anyPermissions: [PERMISSIONS.DOCUMENTS_VIEW, PERMISSIONS.DOCUMENTS_MANAGE] },
-    { icon: "🔄", label: "Flujos de aprobacion", href: "/workflow", anyPermissions: [PERMISSIONS.WORKFLOW_VIEW, PERMISSIONS.WORKFLOW_MANAGE] },
     { icon: "🔍", label: "Auditoria", href: "/audit", permissions: [PERMISSIONS.AUDIT_VIEW] },
     { icon: "📊", label: "BI y Analytics", href: "/analytics", anyPermissions: [PERMISSIONS.BI_VIEW, PERMISSIONS.BI_MANAGE] },
+    { icon: "📈", label: "BI Ejecutivo", href: "/analytics/bi", anyPermissions: [PERMISSIONS.BI_VIEW, PERMISSIONS.BI_MANAGE, PERMISSIONS.CONSOLE_ADMIN] },
   ];
 
   const groups: MenuGroup[] = [
@@ -253,9 +193,9 @@ export default function Sidebar() {
       items: employeeItems,
     },
     {
-      id: "operations",
-      title: "Supervisión operativa",
-      items: operationItems,
+      id: "operacion",
+      title: "Operación de servicios",
+      items: [operacionLink],
     },
     {
       id: "people",
@@ -416,17 +356,22 @@ export default function Sidebar() {
             {(!isMobile || mobileOpenGroups.includes(group.id)) && (
               <ul className={styles.sidebarMenu} id={`menu-group-${group.id}`}>
                 {group.items.map((item) => {
-                  const isItemActive = isPathActive(item.href);
+                  const isExternal = item.href.startsWith("http://") || item.href.startsWith("https://");
+                  const isItemActive = !isExternal && isPathActive(item.href);
+                  const linkClass = isItemActive ? `${styles.menuLink} ${styles.active}` : styles.menuLink;
                   return (
                     <li key={`${group.id}-${item.href}`} className={styles.sidebarMenuItem}>
-                      <Link
-                        href={item.href}
-                        className={isItemActive ? `${styles.menuLink} ${styles.active}` : styles.menuLink}
-                        onClick={closeMenu}
-                      >
-                        <span className={styles.menuLinkIcon} aria-hidden="true">{item.icon}</span>
-                        <span className={styles.menuLinkText}>{item.label}</span>
-                      </Link>
+                      {isExternal ? (
+                        <a href={item.href} className={linkClass} onClick={closeMenu}>
+                          <span className={styles.menuLinkIcon} aria-hidden="true">{item.icon}</span>
+                          <span className={styles.menuLinkText}>{item.label}</span>
+                        </a>
+                      ) : (
+                        <Link href={item.href} className={linkClass} onClick={closeMenu}>
+                          <span className={styles.menuLinkIcon} aria-hidden="true">{item.icon}</span>
+                          <span className={styles.menuLinkText}>{item.label}</span>
+                        </Link>
+                      )}
                     </li>
                   );
                 })}

@@ -22,7 +22,6 @@ import mx.nexara.mobile.nativeapp.data.api.LunchCheckinRequest
 import mx.nexara.mobile.nativeapp.data.api.LunchCheckoutRequest
 import mx.nexara.mobile.nativeapp.data.api.NewsPostDto
 import mx.nexara.mobile.nativeapp.data.api.NewsletterSubscriberDto
-import mx.nexara.mobile.nativeapp.data.api.WorkflowStepDto
 import java.lang.reflect.ParameterizedType
 
 class ExtraRepository(context: Context) {
@@ -97,7 +96,6 @@ class ExtraRepository(context: Context) {
     suspend fun journalEntries(): List<JournalEntryDto> = parseList(api.getJournalEntriesRaw())
     suspend fun invoices(): List<InvoiceDto> = parseList(api.getInvoicesRaw())
     suspend fun bankAccounts(): List<BankAccountDto> = parseList(api.getBankAccountsRaw())
-    suspend fun workflow(): List<WorkflowStepDto> = parseList(api.getWorkflowRaw())
 
     // ── Generic endpoints (Map<String, Any?>) for screens that only list raw
     // records. Mantiene paridad visual sin forzar DTOs específicos.
@@ -130,21 +128,14 @@ class ExtraRepository(context: Context) {
     suspend fun hrLeaves() = loadGeneric { api.getHrLeavesRaw() }
     suspend fun hrReviews() = loadGeneric { api.getHrReviewsRaw() }
     suspend fun hrDashboardRaw(): String = api.getHrDashboardRaw().string()
-    suspend fun safetyIncidents() = loadGeneric { api.getSafetyIncidentsRaw() }
-    suspend fun safetyPermits() = loadGeneric { api.getSafetyPermitsRaw() }
-    suspend fun safetyTraining() = loadGeneric { api.getSafetyTrainingRaw() }
     suspend fun warehouse() = loadGeneric { api.getWarehouseRaw() }
     suspend fun stock() = loadGeneric { api.getStockRaw() }
     suspend fun requisitions() = loadGeneric { api.getRequisitionsRaw() }
     suspend fun purchaseOrders() = loadGeneric { api.getPurchaseOrdersRaw() }
     suspend fun goodsReceipts() = loadGeneric { api.getGoodsReceiptsRaw() }
     suspend fun supplierEvaluations() = loadGeneric { api.getSupplierEvaluationsRaw() }
-    suspend fun production() = loadGeneric { api.getProductionRaw() }
-    suspend fun bom() = loadGeneric { api.getBomRaw() }
     suspend fun maintenanceAssets() = loadGeneric { api.getMaintenanceAssetsRaw() }
     suspend fun workOrders() = loadGeneric { api.getWorkOrdersRaw() }
-    suspend fun inspections() = loadGeneric { api.getInspectionsRaw() }
-    suspend fun ncr() = loadGeneric { api.getNcrRaw() }
     suspend fun serviceSheets() = loadGeneric { api.getServiceSheetsRaw() }
     suspend fun cvs() = loadGeneric { api.getCvsRaw() }
     suspend fun clientTicketRequests() = loadGeneric { api.getClientTicketRequestsRaw() }

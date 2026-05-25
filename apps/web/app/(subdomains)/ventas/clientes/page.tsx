@@ -5,11 +5,12 @@ import { useUser } from "@/components/UserContext";
 import {
   createSalesClient,
   listSalesClients,
+  provisionSalesServiceClient,
   uploadSalesClientDocuments,
   type SalesClient,
-  type SalesClientDocument,
 } from "@/lib/sales-api";
 import { getApiAssetOrigin } from "@/lib/api-base";
+import { getConsoleUrl } from "@/lib/panel-urls";
 import { getSalesScope } from "@/lib/sales-scope";
 import styles from "./page.module.css";
 
@@ -23,6 +24,7 @@ export default function VentasClientesPage() {
   const [docFiles, setDocFiles] = useState<File[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [provisioningId, setProvisioningId] = useState<number | null>(null);
   const [form, setForm] = useState({
     name: "",
     legalName: "",
@@ -85,6 +87,20 @@ export default function VentasClientesPage() {
       setError(err instanceof Error ? err.message : "Error inesperado");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleProvision = async (clientId: number) => {
+    if (!user?.token) return;
+    setProvisioningId(clientId);
+    setError(null);
+    try {
+      await provisionSalesServiceClient(user.token, clientId);
+      await fetchClients();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Error inesperado");
+    } finally {
+      setProvisioningId(null);
     }
   };
 
@@ -234,10 +250,46 @@ export default function VentasClientesPage() {
                 <h3>{client.name}</h3>
                 <div className={styles.clientMeta}>{client.legalName || "Sin razon social"}</div>
               </div>
-              <div className={styles.clientMeta}>{client.status || "Sin estado"}</div>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+                <div className={styles.clientMeta}>{client.status || "Sin estado"}</div>
+                {client.serviceClient ? (
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      padding: "4px 10px",
+                      borderRadius: 999,
+                      background: "color-mix(in srgb, var(--success, #22c55e) 15%, transparent)",
+                      color: "var(--success, #22c55e)",
+                    }}
+                  >
+                    En operación
+                  </span>
+                ) : null}
+              </div>
             </div>
             <p className={styles.clientMeta}>{client.billingEmail || ""}</p>
             <p className={styles.clientMeta}>{client.taxId || ""}</p>
+            <div className={styles.buttonRow}>
+              {client.serviceClient ? (
+                <a
+                  className={styles.primaryButton}
+                  href={getConsoleUrl("/clients")}
+                  style={{ textDecoration: "none", display: "inline-flex", alignItems: "center" }}
+                >
+                  Ver en administración
+                </a>
+              ) : (
+                <button
+                  className={styles.primaryButton}
+                  type="button"
+                  onClick={() => handleProvision(client.id)}
+                  disabled={loading || provisioningId === client.id}
+                >
+                  {provisioningId === client.id ? "Activando…" : "Activar en operación"}
+                </button>
+              )}
+            </div>
             <div className={styles.docGrid}>
               {client.documents?.map((doc) => (
                 <div key={doc.id} className={styles.docCard}>

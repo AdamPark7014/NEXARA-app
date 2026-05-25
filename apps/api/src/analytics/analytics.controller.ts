@@ -44,9 +44,40 @@ export class AnalyticsController {
     return this.svc.getSalesTrend(months ? +months : undefined);
   }
 
-  @Get('production-efficiency')
-  @RBAC({ permissions: [PERMISSIONS.BI_VIEW] })
-  productionEfficiency() {
-    return this.svc.getProductionEfficiency();
+  // ── BI Ejecutivo (Fase 10) ────────────────────────────────────────
+  @Get('bi/executive')
+  @RBAC({ anyPermissions: [PERMISSIONS.BI_VIEW, PERMISSIONS.BI_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  executiveBi() {
+    return this.svc.getExecutiveBiDashboard();
+  }
+
+  @Get('bi/margin-by-type')
+  @RBAC({ anyPermissions: [PERMISSIONS.BI_VIEW, PERMISSIONS.BI_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  marginByType() {
+    return this.svc.getMarginByProjectType();
+  }
+
+  @Get('bi/engineers')
+  @RBAC({ anyPermissions: [PERMISSIONS.BI_VIEW, PERMISSIONS.BI_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  engineerRanking(@Query('limit') limit?: string) {
+    return this.svc.getEngineerPerformanceRanking(limit ? +limit : 20);
+  }
+
+  @Get('bi/clients-roi')
+  @RBAC({ anyPermissions: [PERMISSIONS.BI_VIEW, PERMISSIONS.BI_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  clientsRoi(@Query('limit') limit?: string) {
+    return this.svc.getClientRoi(limit ? +limit : 25);
+  }
+
+  @Get('bi/branches')
+  @RBAC({ anyPermissions: [PERMISSIONS.BI_VIEW, PERMISSIONS.BI_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  branchesRanking(@Query('limit') limit?: string) {
+    return this.svc.getBranchActivityRanking(limit ? +limit : 25);
+  }
+
+  @Get('bi/maintenance-contracts')
+  @RBAC({ anyPermissions: [PERMISSIONS.BI_VIEW, PERMISSIONS.BI_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  maintenanceKpis() {
+    return this.svc.getMaintenanceContractsKpis();
   }
 }

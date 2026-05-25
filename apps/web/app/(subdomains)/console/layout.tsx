@@ -39,17 +39,12 @@ const formatConsoleTitle = (pathname: string) => {
     warehouse: "Almacenes",
     stock: "Inventario / Stock",
     procurement: "Compras y requisiciones",
-    manufacturing: "Manufactura / BOM",
-    production: "Órdenes de producción",
-    quality: "Control de calidad",
-    assets: "Activos y equipos",
-    maintenance: "Órdenes de mantenimiento",
+    assets: "Activos instalados",
+    maintenance: "Contratos de mantenimiento",
     accounting: "Contabilidad general",
     invoicing: "Facturación CFDI",
     banking: "Banca y conciliaciones",
-    safety: "Seguridad industrial",
     documents: "Gestión documental",
-    workflow: "Flujos de aprobación",
     audit: "Auditoría",
     analytics: "BI y Analytics",
     "employee-payments": "Nómina y pagos",
@@ -69,12 +64,12 @@ const formatConsoleTitle = (pathname: string) => {
 
 export default function ConsoleLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [viewSubtitle, setViewSubtitle] = useState("Consola NEXARA");
+  const [viewSubtitle, setViewSubtitle] = useState("Administración NEXARA");
   const viewTitle = useMemo(() => formatConsoleTitle(pathname || "console"), [pathname]);
 
   useEffect(() => {
     const now = new Date();
-    setViewSubtitle(`Consola NEXARA · ${now.toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" })}`);
+    setViewSubtitle(`Administración NEXARA · ${now.toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" })}`);
     setActivePanel("console");
   }, []);
   // Si estamos en rutas de autenticacion, no renderizar shell de consola
@@ -88,7 +83,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
       <Sidebar />
       <main className={styles.consoleMain}>
         <section className={styles.consoleTopbar}>
-          <p className={styles.consoleEyebrow}>Panel corporativo</p>
+          <p className={styles.consoleEyebrow}>Backoffice corporativo</p>
           <div className={styles.consoleTopbarRow}>
             <div className={styles.consoleTitleGroup}>
               <h1 className={styles.consoleViewTitle}>{viewTitle}</h1>

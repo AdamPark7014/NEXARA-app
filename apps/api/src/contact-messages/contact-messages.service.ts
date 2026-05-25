@@ -63,7 +63,52 @@ export class ContactMessagesService {
       }
     }
 
+    // Auto-conversión a Lead del CRM cuando es una solicitud comercial.
+    if (message.category === 'VENTAS') {
+      try {
+        await this.createLeadFromContact(message);
+      } catch (err) {
+        console.warn('[contact-messages] Lead auto-creation failed', err);
+      }
+    }
+
     return message;
+  }
+
+  /**
+   * Crea un SalesLead automáticamente desde un ContactMessage con scoring inicial heurístico.
+   * Score = base 30 + signals (empresa +20, teléfono +15, mensaje >100 chars +10, dominio empresarial +10).
+   */
+  private async createLeadFromContact(message: { id: number; name: string; email: string; phone: string | null; company: string | null; subject: string | null; message: string; source: string | null; pageUrl: string | null }) {
+    const existing = await this.db.salesLead.findFirst({ where: { email: message.email } });
+    if (existing) {
+      return existing;
+    }
+
+    let score = 30;
+    if (message.company && message.company.trim().length > 2) score += 20;
+    if (message.phone && message.phone.trim().length >= 8) score += 15;
+    if ((message.message || '').length > 100) score += 10;
+    const isCorpDomain = !/(@gmail\.|@hotmail\.|@yahoo\.|@outlook\.|@live\.|@icloud\.)/i.test(message.email);
+    if (isCorpDomain) score += 10;
+    if ((message.subject || message.message || '').match(/cctv|cableado|licitaci|proyecto|presupuesto|cotiza|sucursal/i)) score += 10;
+    score = Math.min(score, 99);
+
+    const lead = await this.db.salesLead.create({
+      data: {
+        name: message.name,
+        company: message.company || null,
+        email: message.email,
+        phone: message.phone || null,
+        source: message.source || 'web.nexara.com.mx',
+        status: 'NEW',
+        score,
+        notes: `Origen: ${message.source || 'web'}. Página: ${message.pageUrl || 'n/a'}.\n\n${message.message || ''}`,
+      },
+    });
+
+    this.realtimeGateway.emit('leads:changed', { type: 'created', lead });
+    return lead;
   }
 
   async findAll(status?: string, category?: string, query?: PaginationQueryDto) {

@@ -34,6 +34,13 @@ export class InvoicesController {
     return this.service.getInvoiceDashboard();
   }
 
+  @Get('financial-dashboard')
+  @UseGuards(RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.INVOICING_VIEW, PERMISSIONS.CONTABILIDAD_VIEW, PERMISSIONS.CONSOLE_ADMIN] })
+  financialDashboard() {
+    return this.service.getFinancialDashboard();
+  }
+
   @Get('issuer-profile')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_VIEW] })
@@ -41,11 +48,29 @@ export class InvoicesController {
     return this.service.getInvoiceIssuerProfile();
   }
 
+  @Get('pac-info')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.INVOICING_VIEW] })
+  pacInfo() {
+    return this.service.getPacInfo();
+  }
+
   @Get('overdue')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_VIEW] })
   overdue() {
     return this.service.getOverdueInvoices();
+  }
+
+  @Post('from-sales-project/:projectId')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
+  createFromSalesProject(
+    @Param('projectId') projectId: string,
+    @CurrentUser() user: any,
+    @Body() body?: { lineIds?: number[] },
+  ) {
+    return this.service.createInvoiceFromSalesProject(+projectId, user.id, body);
   }
 
   @Get(':id')
@@ -60,6 +85,13 @@ export class InvoicesController {
   @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
   registerPayment(@Param('id') id: string, @CurrentUser() user: any, @Body() dto: any) {
     return this.service.registerPayment({ ...dto, invoiceId: +id }, user.id);
+  }
+
+  @Post(':id/stamp')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
+  stamp(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.service.stampInvoice(+id, user.id);
   }
 
   @Patch(':id/cancel')

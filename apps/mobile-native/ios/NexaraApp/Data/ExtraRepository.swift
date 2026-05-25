@@ -30,17 +30,13 @@ final class ExtraRepository {
     func journalEntries() async     -> [[String: Any]] { await load("accounting/journal-entries") }
     func invoices() async           -> [[String: Any]] { await load("accounting/invoices") }
     func bankAccounts() async       -> [[String: Any]] { await load("accounting/banking/accounts") }
-    func workflow() async           -> [[String: Any]] { await load("workflow") }
     func hrLeaves() async           -> [[String: Any]] { await load("hr/leaves") }
-    func safetyIncidents() async    -> [[String: Any]] { await load("safety/incidents") }
     func warehouse() async          -> [[String: Any]] { await load("warehouse") }
     func stock() async              -> [[String: Any]] { await load("stock") }
     func requisitions() async       -> [[String: Any]] { await load("procurement/requisitions") }
     func purchaseOrders() async     -> [[String: Any]] { await load("procurement/purchase-orders") }
-    func production() async         -> [[String: Any]] { await load("manufacturing/production") }
     func maintenanceAssets() async  -> [[String: Any]] { await load("maintenance/assets") }
     func workOrders() async         -> [[String: Any]] { await load("maintenance/work-orders") }
-    func inspections() async        -> [[String: Any]] { await load("quality/inspections") }
     func serviceSheets() async      -> [[String: Any]] { await load("service-sheets") }
     func cvs() async                -> [[String: Any]] { await load("cvs") }
     func clientTicketRequests() async -> [[String: Any]] { await load("client-ticket-requests") }

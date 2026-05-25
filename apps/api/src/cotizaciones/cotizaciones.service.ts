@@ -49,6 +49,7 @@ export class CotizacionesService {
     }
 
     return items.map((item) => ({
+      productId: item.productId ? Number(item.productId) : null,
       category: item.category?.trim() || 'Otros',
       name: item.name?.trim() || 'Concepto',
       description: item.description?.trim() || null,

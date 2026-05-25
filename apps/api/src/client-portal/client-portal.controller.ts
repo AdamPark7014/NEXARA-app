@@ -82,6 +82,120 @@ export class ClientPortalController {
     };
   }
 
+  /**
+   * Resumen 360° de servicios para el cliente:
+   * - Proyectos activos
+   * - Contratos de mantenimiento + próximas visitas
+   * - OT recientes y SLA
+   * - Tickets abiertos / cerrados (mes)
+   * - Facturas (solo si el módulo está habilitado)
+   */
+  @Get('services-summary')
+  async servicesSummary(@CurrentUser() user: any) {
+    const clientId = user.clientId;
+    const since = new Date();
+    since.setDate(since.getDate() - 30);
+
+    const [
+      projects,
+      activeContracts,
+      upcomingVisits,
+      recentTickets,
+      openTickets,
+      branches,
+      pendingFeedbacks,
+    ] = await Promise.all([
+      this.prisma['operationalProject'].findMany({
+        where: { clientId, deletedAt: null, status: { in: ['ACTIVE', 'ON_HOLD'] as any } },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          projectType: true,
+          scopeSummary: true,
+          startDate: true,
+          endDate: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      }).catch(() => []),
+      (this.prisma as any).maintenanceContract.findMany({
+        where: { clientId, status: 'ACTIVE', deletedAt: null },
+        select: {
+          id: true,
+          contractNumber: true,
+          title: true,
+          frequency: true,
+          slaResponseHours: true,
+          slaResolutionHours: true,
+          nextVisitDate: true,
+          monthlyFee: true,
+          currency: true,
+          branch: { select: { id: true, name: true } },
+        },
+        orderBy: { nextVisitDate: 'asc' },
+      }).catch(() => []),
+      (this.prisma as any).maintenanceContractVisit.findMany({
+        where: {
+          status: 'SCHEDULED',
+          scheduledDate: { gte: new Date(), lte: new Date(Date.now() + 30 * 86400000) },
+          contract: { clientId, status: 'ACTIVE' },
+        },
+        include: {
+          contract: { select: { id: true, contractNumber: true, title: true, branch: { select: { name: true } } } },
+        },
+        orderBy: { scheduledDate: 'asc' },
+        take: 10,
+      }).catch(() => []),
+      this.prisma['activity'].findMany({
+        where: { clientId, fechaAsignacion: { gte: since } },
+        select: {
+          id: true,
+          anNumber: true,
+          titulo: true,
+          estatus: true,
+          ticketType: true,
+          branchName: true,
+          fechaAsignacion: true,
+          fechaFinalizacion: true,
+          responsable: { select: { id: true, nombre: true } },
+        },
+        orderBy: { fechaAsignacion: 'desc' },
+        take: 15,
+      }).catch(() => []),
+      this.prisma['activity'].count({
+        where: { clientId, estatus: { in: ['Pendiente', 'En Proceso'] } },
+      }).catch(() => 0),
+      this.prisma['serviceClientBranch'].count({ where: { clientId, isActive: true } }).catch(() => 0),
+      this.prisma['clientActivityFeedback']?.count({
+        where: { clientId, rating: null },
+      }).catch(() => 0),
+    ]);
+
+    const completedTickets = recentTickets.filter((t: any) => t.estatus === 'Finalizado').length;
+    const completionRate = recentTickets.length > 0 ? +((completedTickets / recentTickets.length) * 100).toFixed(1) : 0;
+
+    return {
+      summary: {
+        activeProjects: projects.length,
+        activeContracts: activeContracts.length,
+        upcomingVisits: upcomingVisits.length,
+        openTickets,
+        ticketsLast30Days: recentTickets.length,
+        completionRate,
+        branches,
+        pendingFeedbacks: pendingFeedbacks || 0,
+      },
+      projects,
+      contracts: activeContracts.map((c: any) => ({
+        ...c,
+        monthlyFee: Number(c.monthlyFee || 0),
+      })),
+      upcomingVisits,
+      recentTickets,
+    };
+  }
+
   @Put('profile')
   async updateProfile(@CurrentUser() user: any, @Body() body: any) {
     return this.prisma['serviceClient'].update({
@@ -448,14 +562,69 @@ export class ClientPortalController {
     });
   }
 
+  @Get('projects')
+  async projects(@CurrentUser() user: any) {
+    const rows = await this.prisma.operationalProject.findMany({
+      where: { clientId: user.clientId, status: { in: ['ACTIVE', 'ON_HOLD'] } },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        projectType: true,
+        siteCount: true,
+        scopeSummary: true,
+        startDate: true,
+        endDate: true,
+        _count: { select: { activities: true } },
+      },
+      orderBy: { startDate: 'desc' },
+    });
+
+    const withProgress = await Promise.all(
+      rows.map(async (p) => {
+        const completed = await this.prisma.activity.count({
+          where: {
+            projectId: p.id,
+            deletedAt: null,
+            estatus: { contains: 'Finaliz', mode: 'insensitive' },
+          },
+        });
+        const total = p._count.activities;
+        return {
+          id: p.id,
+          title: p.title,
+          status: p.status,
+          projectType: p.projectType,
+          siteCount: p.siteCount,
+          scopeSummary: p.scopeSummary,
+          startDate: p.startDate,
+          endDate: p.endDate,
+          activityCount: total,
+          completedActivities: completed,
+          progressPercent: total > 0 ? Math.round((completed / total) * 100) : 0,
+        };
+      }),
+    );
+
+    return withProgress;
+  }
+
   @Get('tickets')
   async tickets(
     @CurrentUser() user: any,
     @Query('start') start?: string,
     @Query('end') end?: string,
     @Query('branchId') branchId?: string,
+    @Query('projectId') projectId?: string,
   ) {
     const where: any = { clientId: user.clientId };
+
+    if (projectId) {
+      const parsedProjectId = Number(projectId);
+      if (!Number.isNaN(parsedProjectId)) {
+        where.projectId = parsedProjectId;
+      }
+    }
 
     if (branchId) {
       const parsedBranchId = Number(branchId);
@@ -485,7 +654,13 @@ export class ClientPortalController {
 
     return this.prisma['activity'].findMany({
       where,
-      include: { responsable: true, evidencias: true, serviceSheet: true, activityEvidence: true },
+      include: {
+        responsable: true,
+        evidencias: true,
+        serviceSheet: true,
+        activityEvidence: true,
+        project: { select: { id: true, title: true, status: true, projectType: true } },
+      },
       orderBy: { fechaAsignacion: 'desc' },
     });
   }

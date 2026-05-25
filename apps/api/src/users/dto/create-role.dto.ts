@@ -109,6 +109,33 @@ export class CreateRoleDto {
   @IsBoolean()
   @IsOptional()
   accesoBanca?: boolean = false;
+
+  @IsBoolean()
+  @IsOptional()
+  accesoMultas?: boolean = false;
+
+  @IsBoolean()
+  @IsOptional()
+  accesoClientes?: boolean = false;
+
+  @IsBoolean()
+  @IsOptional()
+  accesoLunchBreaks?: boolean = false;
+
+  @IsBoolean()
+  @IsOptional()
+  accesoRRHH?: boolean = false;
+
+  @IsBoolean()
+  @IsOptional()
+  accesoCatalogo?: boolean = false;
+
+  @IsOptional()
+  @IsString()
+  orgRoleKey?: string;
+
+  @IsOptional()
+  nivelAutoridad?: number;
 }
 
 

@@ -35,9 +35,10 @@ export default function ContabilidadLayout({ children }: { children: React.React
       title: "Panorama financiero",
       items: [
         { icon: "📊", label: "Resumen ejecutivo", href: "/dashboard" },
-        { icon: "💼", label: "Capital y liquidez", href: "/capital" },
+        { icon: "💼", label: "Dashboard ejecutivo", href: "/financial-dashboard" },
         { icon: "📒", label: "Contabilidad (GL)", href: "/accounting" },
         { icon: "📈", label: "Reportes financieros", href: "/accounting/reports" },
+        { icon: "🏦", label: "Banca y conciliaciones", href: "/banking" },
       ],
     },
     {
@@ -53,9 +54,9 @@ export default function ContabilidadLayout({ children }: { children: React.React
       title: "Operación financiera",
       items: [
         { icon: "📊", label: "Gastos operativos", href: "/expenses" },
-        { icon: "🏗️", label: "Proyectos de obra", href: "/work-projects" },
+        { icon: "🧩", label: "Proyectos (P&L)", href: "/work-projects" },
         { icon: "🧾", label: "Facturación", href: "/invoicing" },
-        { icon: "🏦", label: "Banca y conciliaciones", href: "/banking" },
+        { icon: "📑", label: "CFDI y timbrado", href: "/cfdi" },
       ],
     },
   ];

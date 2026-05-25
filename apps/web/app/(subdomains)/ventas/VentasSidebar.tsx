@@ -21,16 +21,23 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   { label: "Mi perfil", icon: "👤", href: "/my-profile", section: "Cuenta y panorama", description: "Resumen y datos personales" },
   { label: "Dashboard", icon: "📊", href: "/dashboard", section: "Cuenta y panorama", description: "Visión general de ventas" },
+  { label: "CRM Dashboard", icon: "🧠", href: "/crm", section: "Cuenta y panorama", description: "Embudo, forecast y leads calientes" },
 
   { label: "Leads", icon: "🎯", href: "/leads", section: "Prospección comercial", description: "Gestiona leads potenciales" },
   { label: "Oportunidades", icon: "💼", href: "/oportunidades", section: "Prospección comercial", description: "Oportunidades comerciales" },
+  { label: "Pipeline (Kanban)", icon: "🧭", href: "/pipeline", section: "Prospección comercial", description: "Embudo Kanban de oportunidades" },
+  { label: "Licitaciones", icon: "📋", href: "/licitaciones", section: "Prospección comercial", description: "Licitaciones públicas y privadas" },
 
   { label: "Clientes", icon: "👥", href: "/clientes", section: "Clientes y ejecución", description: "Base de datos de clientes" },
   { label: "Proyectos", icon: "📁", href: "/proyectos", section: "Clientes y ejecución", description: "Proyectos en desarrollo" },
   { label: "Cotizaciones", icon: "📄", href: "/cotizaciones", section: "Clientes y ejecución", description: "Gestiona cotizaciones" },
+  { label: "Catálogo IT/CCTV", icon: "📦", href: "/productos", section: "Clientes y ejecución", description: "Productos para cotizar" },
   { label: "Plantillas", icon: "🎨", href: "/plantillas", section: "Clientes y ejecución", description: "Plantillas de órdenes PDF" },
 
+  { label: "Mi agenda", icon: "📅", href: "/agenda", section: "Comunicación y seguimiento", description: "Tareas, llamadas y seguimientos" },
   { label: "Notificaciones", icon: "🔔", href: "/notificaciones", section: "Comunicación y seguimiento", description: "Centro de notificaciones" },
+
+  { label: "Cuotas y comisiones", icon: "🎯", href: "/cuotas", section: "Análisis y estrategia", description: "Metas, performance y comisiones" },
 ];
 
 const sectionOrder = [

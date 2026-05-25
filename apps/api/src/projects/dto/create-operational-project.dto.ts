@@ -1,4 +1,5 @@
-import { IsString, IsNumber, IsOptional, IsDateString, MinLength } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsDateString, MinLength, IsEnum, IsInt } from 'class-validator';
+import { ServiceProjectType } from '@prisma/client';
 
 export class CreateOperationalProjectDto {
   @IsString()
@@ -8,6 +9,22 @@ export class CreateOperationalProjectDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsEnum(ServiceProjectType)
+  projectType?: ServiceProjectType;
+
+  @IsOptional()
+  @IsString()
+  scopeSummary?: string;
+
+  @IsOptional()
+  @IsInt()
+  siteCount?: number;
+
+  @IsOptional()
+  @IsInt()
+  salesProjectId?: number;
 
   @IsNumber()
   vendorId!: number;
@@ -34,6 +51,18 @@ export class UpdateOperationalProjectDto {
   description?: string;
 
   @IsOptional()
+  @IsEnum(ServiceProjectType)
+  projectType?: ServiceProjectType;
+
+  @IsOptional()
+  @IsString()
+  scopeSummary?: string;
+
+  @IsOptional()
+  @IsInt()
+  siteCount?: number;
+
+  @IsOptional()
   @IsDateString()
   endDate?: string;
 
@@ -50,6 +79,27 @@ export class ProjectStatusChangeDto {
 export class AssignProjectEngineerDto {
   @IsNumber()
   engineerId!: number;
+}
+
+export class CreateProjectActivityDto {
+  @IsString()
+  @MinLength(3)
+  titulo!: string;
+
+  @IsOptional()
+  @IsString()
+  descripcion?: string;
+
+  @IsNumber()
+  responsableId!: number;
+
+  @IsOptional()
+  @IsString()
+  branchName?: string;
+
+  @IsOptional()
+  @IsString()
+  branchNumber?: string;
 }
 
 export class RemoveProjectEngineerDto {

@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { EmailService } from '../email/email.service.js';
+import { NotificationHierarchyService } from '../../notifications/notification-hierarchy.service.js';
+import { MaintenanceContractsService } from '../../maintenance-contracts/maintenance-contracts.service.js';
 
 @Injectable()
 export class CronService {
@@ -10,7 +12,23 @@ export class CronService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly email: EmailService,
+    private readonly notificationHierarchy: NotificationHierarchyService,
+    private readonly maintenanceContracts: MaintenanceContractsService,
   ) {}
+
+  // ── Contratos de mantenimiento — generar OT cada hora ───────────
+  @Cron('15 * * * *', { name: 'maintenance-contracts-auto-ot' })
+  async handleMaintenanceContractsAutoOt() {
+    this.logger.log('Procesando contratos de mantenimiento (auto-OT)...');
+    try {
+      const result = await this.maintenanceContracts.runAutoGenerationCycle();
+      if (result.generated > 0) {
+        this.logger.log(`Auto-OT generadas: ${result.generated} de ${result.processed} visitas`);
+      }
+    } catch (error) {
+      this.logger.error('Auto-OT contratos falló', error as Error);
+    }
+  }
 
   // ── Facturas vencidas — cada día 8AM ─────────────────────────────
   @Cron('0 8 * * *', { name: 'overdue-invoices' })
@@ -92,34 +110,6 @@ export class CronService {
     this.logger.log(`Maintenance reminders: ${upcoming.length}`);
   }
 
-  // ── Workflow aprobaciones pendientes — cada día 10AM ─────────────
-  @Cron('0 10 * * *', { name: 'workflow-nudge' })
-  async handleWorkflowNudges() {
-    this.logger.log('Verificando aprobaciones pendientes...');
-    const pending = await this.prisma.workflowApproval.findMany({
-      where: {
-        status: 'PENDING',
-        createdAt: { lt: new Date(Date.now() - 2 * 86400000) },
-      },
-      include: {
-        instance: { include: { workflow: true } },
-        step: { include: { approverUser: true } },
-      },
-    });
-
-    for (const approval of pending) {
-      const email = (approval.step?.approverUser as any)?.email;
-      if (email) {
-        await this.email.sendWorkflowPending(
-          email,
-          approval.instance?.workflow?.entityType || 'Documento',
-          approval.instance?.entityId?.toString() || '',
-        );
-      }
-    }
-    this.logger.log(`Workflow nudges: ${pending.length}`);
-  }
-
   // ── Limpieza de logs de auditoría > 90 días — domingo 3AM ──────
   @Cron('0 3 * * 0', { name: 'audit-cleanup' })
   async handleAuditCleanup() {
@@ -131,21 +121,78 @@ export class CronService {
     this.logger.log(`Audit logs eliminados: ${result.count}`);
   }
 
+  // ── Alertas de margen de proyectos — cada día 10AM ─────────────
+  @Cron('0 10 * * *', { name: 'project-margin-alerts' })
+  async handleProjectMarginAlerts() {
+    this.logger.log('Verificando proyectos con riesgo de margen...');
+    const activeProjects = await this.prisma.salesProject.findMany({
+      where: { status: { in: ['IN_PROGRESS', 'PLANNED'] } },
+      include: { opportunity: { select: { ownerId: true, title: true } } },
+    });
+
+    let alertsSent = 0;
+    for (const project of activeProjects) {
+      const opProject = await this.prisma.operationalProject.findFirst({
+        where: { salesProjectId: project.id },
+        select: { id: true },
+      });
+      if (!opProject) continue;
+
+      const acts = await this.prisma.activity.findMany({
+        where: { projectId: opProject.id, deletedAt: null },
+        select: { id: true },
+      });
+      const activityIds = acts.map((a) => a.id);
+
+      const [viaticAgg, expAgg, viaticProjAgg] = await Promise.all([
+        activityIds.length
+          ? this.prisma.viatico.aggregate({ where: { actividadId: { in: activityIds } }, _sum: { montoSolicitado: true } })
+          : Promise.resolve({ _sum: { montoSolicitado: null } }),
+        activityIds.length
+          ? this.prisma.expense.aggregate({ where: { actividadId: { in: activityIds }, deletedAt: null }, _sum: { montoSolicitado: true } })
+          : Promise.resolve({ _sum: { montoSolicitado: null } }),
+        this.prisma.viatico.aggregate({ where: { projectId: project.id }, _sum: { montoSolicitado: true } }),
+      ]);
+
+      const actualViaticos =
+        Number(viaticAgg._sum.montoSolicitado || 0) + Number(viaticProjAgg._sum.montoSolicitado || 0);
+      const actualOperativo = Number(expAgg._sum.montoSolicitado || 0);
+      const budget = Number(project.budget) || 0;
+      const totalActual = Number(project.costProducts) + actualViaticos + actualOperativo;
+      const marginActual = budget - totalActual;
+      const marginPercent = budget > 0 ? (marginActual / budget) * 100 : 0;
+
+      let severity: 'overspend' | 'low_margin' | null = null;
+      if (marginPercent < 0) severity = 'overspend';
+      else if (marginPercent < 10) severity = 'low_margin';
+
+      if (severity) {
+        await this.notificationHierarchy.notifyProjectMarginAlert({
+          projectId: project.id,
+          projectName: project.name || project.opportunity?.title || `Proyecto ${project.id}`,
+          ownerId: project.opportunity?.ownerId,
+          marginPercent,
+          severity,
+          actualMargin: marginActual,
+          budget,
+        });
+        alertsSent += 1;
+      }
+    }
+    this.logger.log(`Alertas de margen emitidas: ${alertsSent}`);
+  }
+
   // ── KPI Snapshot — cada hora ────────────────────────────────────
   @Cron(CronExpression.EVERY_HOUR, { name: 'kpi-snapshot' })
   async handleKpiSnapshot() {
     const [
       activeActivities,
       pendingPOs,
-      openNCRs,
       overdueInvoices,
-      productionInProgress,
     ] = await Promise.all([
       this.prisma.activity.count({ where: { estatus: 'EN_PROGRESO' } }),
       this.prisma.purchaseOrder.count({ where: { status: { in: ['DRAFT', 'CONFIRMED'] } } }),
-      this.prisma.nonConformanceReport.count({ where: { status: { notIn: ['CLOSED', 'RESOLVED'] } } }),
       this.prisma.invoice.count({ where: { status: { in: ['SENT', 'PARTIALLY_PAID'] }, dueDate: { lt: new Date() }, isCancelled: false } }),
-      this.prisma.productionOrder.count({ where: { status: 'IN_PROGRESS' } }),
     ]);
 
     const today = new Date();
@@ -159,9 +206,7 @@ export class CronService {
         metadata: {
           activeActivities,
           pendingPOs,
-          openNCRs,
           overdueInvoices,
-          productionInProgress,
           timestamp: new Date().toISOString(),
         },
       },

@@ -1,339 +1,175 @@
 "use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
-import React, { useEffect, useState } from 'react';
-import { RoleGuard } from '../../../../components/RoleGuard';
-import { useUser } from '../../../../components/UserContext';
-import { PERMISSIONS } from '@/lib/permissions';
-import HelpTab from '@/components/HelpTab';
 
-interface SystemSetting {
-  id: number;
-  key: string;
-  value: string;
-  category: string;
-  label?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-type GroupedSettings = Record<string, SystemSetting[]>;
-
-const DEFAULT_CATEGORIES = [
-  { key: 'general', label: 'General', icon: '⚙️' },
-  { key: 'empresa', label: 'Empresa', icon: '🏢' },
-  { key: 'fiscal', label: 'Fiscal', icon: '🧾' },
-  { key: 'notificaciones', label: 'Notificaciones', icon: '🔔' },
-  { key: 'seguridad', label: 'Seguridad', icon: '🔒' },
-];
+type CompanyProfile = {
+  id?: number;
+  legalName?: string;
+  tradeName?: string;
+  rfc?: string;
+  fiscalRegime?: string;
+  fiscalAddress?: string;
+  fiscalPostalCode?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  supportEmail?: string;
+  websiteUrl?: string;
+  logoUrl?: string;
+  logoDarkUrl?: string;
+  faviconUrl?: string;
+  brandPrimary?: string;
+  brandSecondary?: string;
+  defaultBankName?: string;
+  defaultClabe?: string;
+  notificationEmail?: string;
+};
 
 export default function SettingsPage() {
   const { user } = useUser();
-  const [settings, setSettings] = useState<SystemSetting[]>([]);
+  const [profile, setProfile] = useState<CompanyProfile>({});
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [activeCategory, setActiveCategory] = useState('general');
-  const [editValues, setEditValues] = useState<Record<string, string>>({});
-  const [newKey, setNewKey] = useState('');
-  const [newValue, setNewValue] = useState('');
-  const [newLabel, setNewLabel] = useState('');
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [section, setSection] = useState<"fiscal" | "contact" | "brand" | "bank" | "system">("fiscal");
 
-  const loadSettings = async () => {
+  const refresh = useCallback(async () => {
+    if (!user?.token) return;
     setLoading(true);
     try {
-      const res = await fetch(buildApiUrl('settings'), {
-        headers: { Authorization: `Bearer ${user?.token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSettings(Array.isArray(data) ? data : []);
-        const vals: Record<string, string> = {};
-        (Array.isArray(data) ? data : []).forEach((s: SystemSetting) => { vals[s.key] = s.value; });
-        setEditValues(vals);
-      }
-    } catch { /* ignore */ } finally {
+      const res = await fetch(buildApiUrl("company"), { headers: { Authorization: `Bearer ${user.token}` } });
+      if (res.ok) setProfile(await res.json());
+    } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    if (user?.token) loadSettings();
   }, [user?.token]);
 
-  const grouped: GroupedSettings = settings.reduce((acc, s) => {
-    const cat = s.category || 'general';
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(s);
-    return acc;
-  }, {} as GroupedSettings);
+  useEffect(() => { refresh(); }, [refresh]);
 
-  const allCategories = Array.from(new Set([
-    ...DEFAULT_CATEGORIES.map(c => c.key),
-    ...Object.keys(grouped),
-  ]));
-
-  const getCategoryLabel = (key: string) => {
-    const found = DEFAULT_CATEGORIES.find(c => c.key === key);
-    return found ? `${found.icon} ${found.label}` : key.charAt(0).toUpperCase() + key.slice(1);
-  };
-
-  const handleSave = async (key: string) => {
-    setSaving(true);
-    setMessage(null);
+  const save = async () => {
     try {
-      const res = await fetch(buildApiUrl('settings'), {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${user?.token}`,
-        },
-        body: JSON.stringify({ key, value: editValues[key] || '', category: activeCategory }),
+      const res = await fetch(buildApiUrl("company"), {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${user?.token}`, "Content-Type": "application/json" },
+        body: JSON.stringify(profile),
       });
-      if (res.ok) {
-        setMessage({ type: 'success', text: `"${key}" guardado correctamente` });
-        loadSettings();
-      } else {
-        setMessage({ type: 'error', text: 'Error al guardar configuración' });
-      }
-    } catch {
-      setMessage({ type: 'error', text: 'Error de conexión' });
-    } finally {
-      setSaving(false);
+      if (!res.ok) throw new Error(await res.text());
+      setMsg("Configuración guardada");
+      await refresh();
+    } catch (err) {
+      setMsg((err as Error).message);
     }
   };
-
-  const handleAdd = async () => {
-    if (!newKey.trim()) return;
-    setSaving(true);
-    setMessage(null);
-    try {
-      const res = await fetch(buildApiUrl('settings'), {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${user?.token}`,
-        },
-        body: JSON.stringify({
-          key: newKey.trim(),
-          value: newValue,
-          category: activeCategory,
-          label: newLabel || undefined,
-        }),
-      });
-      if (res.ok) {
-        setMessage({ type: 'success', text: `"${newKey}" creado correctamente` });
-        setNewKey('');
-        setNewValue('');
-        setNewLabel('');
-        loadSettings();
-      } else {
-        setMessage({ type: 'error', text: 'Error al crear configuración' });
-      }
-    } catch {
-      setMessage({ type: 'error', text: 'Error de conexión' });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = async (key: string) => {
-    if (!confirm(`¿Eliminar la configuración "${key}"?`)) return;
-    try {
-      const res = await fetch(buildApiUrl(`settings/${encodeURIComponent(key)}`), {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${user?.token}` },
-      });
-      if (res.ok) {
-        setMessage({ type: 'success', text: `"${key}" eliminado` });
-        loadSettings();
-      }
-    } catch {
-      setMessage({ type: 'error', text: 'Error al eliminar' });
-    }
-  };
-
-  const categorySettings = grouped[activeCategory] || [];
 
   return (
-    <RoleGuard permissions={[PERMISSIONS.CONSOLE_ADMIN]}>
-      <HelpTab module="settings" user={user} />
-      <div style={{ display: 'grid', gap: 24 }}>
-        {/* KPI cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
-          <div className="card" style={{ padding: 16, textAlign: 'center' }}>
-            <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--primary)' }}>{settings.length}</div>
-            <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Total configuraciones</div>
-          </div>
-          <div className="card" style={{ padding: 16, textAlign: 'center' }}>
-            <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--success, #22c55e)' }}>{Object.keys(grouped).length}</div>
-            <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Categorías</div>
-          </div>
-        </div>
+    <div style={{ padding: 24, maxWidth: 1100, margin: "0 auto" }}>
+      <h1 style={{ margin: 0 }}>⚙️ Configuración de empresa</h1>
+      <p style={{ color: "var(--text-secondary)", margin: 0 }}>
+        Datos fiscales, contacto, branding y configuración financiera.
+      </p>
 
-        {message && (
-          <div style={{
-            padding: '10px 16px',
-            borderRadius: 8,
-            background: message.type === 'success' ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)',
-            color: message.type === 'success' ? 'var(--success, #22c55e)' : 'var(--error, #ef4444)',
-            fontWeight: 600,
-            fontSize: 14,
-          }}>
-            {message.text}
-          </div>
-        )}
+      {msg && <div style={{ padding: 10, background: "#dcfce7", color: "#166534", borderRadius: 8, marginTop: 12 }}>{msg}</div>}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 16 }}>
-          {/* Category tabs */}
-          <div className="card" style={{ padding: 8 }}>
-            {allCategories.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '10px 12px',
-                  borderRadius: 8,
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: 14,
-                  fontWeight: activeCategory === cat ? 700 : 400,
-                  background: activeCategory === cat ? 'var(--primary)' : 'transparent',
-                  color: activeCategory === cat ? '#fff' : 'var(--text-primary)',
-                  marginBottom: 2,
-                }}
-              >
-                {getCategoryLabel(cat)}
-              </button>
-            ))}
-          </div>
-
-          {/* Settings panel */}
-          <div className="card" style={{ padding: 16 }}>
-            <h2 style={{ marginBottom: 16, color: 'var(--primary)' }}>
-              {getCategoryLabel(activeCategory)}
-            </h2>
-
-            {loading ? (
-              <p>Cargando configuraciones...</p>
-            ) : categorySettings.length === 0 ? (
-              <p style={{ color: 'var(--text-secondary)' }}>No hay configuraciones en esta categoría.</p>
-            ) : (
-              <div style={{ display: 'grid', gap: 12 }}>
-                {categorySettings.map(s => (
-                  <div key={s.key} style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 2fr auto auto',
-                    gap: 8,
-                    alignItems: 'center',
-                    padding: '8px 0',
-                    borderBottom: '1px solid var(--border)',
-                  }}>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>{s.label || s.key}</div>
-                      {s.label && <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{s.key}</div>}
-                    </div>
-                    <input
-                      value={editValues[s.key] || ''}
-                      onChange={e => setEditValues(prev => ({ ...prev, [s.key]: e.target.value }))}
-                      style={{
-                        padding: '6px 10px',
-                        borderRadius: 6,
-                        border: '1px solid var(--border)',
-                        fontSize: 14,
-                        background: 'var(--bg-secondary, #f9fafb)',
-                      }}
-                    />
-                    <button
-                      onClick={() => handleSave(s.key)}
-                      disabled={saving}
-                      style={{
-                        padding: '6px 14px',
-                        borderRadius: 6,
-                        border: 'none',
-                        background: 'var(--primary)',
-                        color: '#fff',
-                        cursor: 'pointer',
-                        fontSize: 13,
-                        fontWeight: 600,
-                      }}
-                    >
-                      Guardar
-                    </button>
-                    <button
-                      onClick={() => handleDelete(s.key)}
-                      style={{
-                        padding: '6px 10px',
-                        borderRadius: 6,
-                        border: '1px solid var(--error, #ef4444)',
-                        background: 'transparent',
-                        color: 'var(--error, #ef4444)',
-                        cursor: 'pointer',
-                        fontSize: 13,
-                      }}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Add new setting */}
-            <div style={{ marginTop: 24, padding: 16, borderRadius: 8, background: 'var(--bg-secondary, #f9fafb)' }}>
-              <h3 style={{ fontSize: 14, marginBottom: 12, color: 'var(--text-secondary)' }}>Agregar configuración</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr auto', gap: 8, alignItems: 'end' }}>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Clave</label>
-                  <input
-                    value={newKey}
-                    onChange={e => setNewKey(e.target.value)}
-                    placeholder="ej: empresa.nombre"
-                    style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13 }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Etiqueta</label>
-                  <input
-                    value={newLabel}
-                    onChange={e => setNewLabel(e.target.value)}
-                    placeholder="ej: Nombre de empresa"
-                    style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13 }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Valor</label>
-                  <input
-                    value={newValue}
-                    onChange={e => setNewValue(e.target.value)}
-                    placeholder="Valor de la configuración"
-                    style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13 }}
-                  />
-                </div>
-                <button
-                  onClick={handleAdd}
-                  disabled={saving || !newKey.trim()}
-                  style={{
-                    padding: '6px 16px',
-                    borderRadius: 6,
-                    border: 'none',
-                    background: 'var(--success, #22c55e)',
-                    color: '#fff',
-                    cursor: 'pointer',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    opacity: !newKey.trim() ? 0.5 : 1,
-                  }}
-                >
-                  + Agregar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
+        {[
+          { id: "fiscal", label: "🧾 Datos fiscales" },
+          { id: "contact", label: "📧 Contacto" },
+          { id: "brand", label: "🎨 Branding" },
+          { id: "bank", label: "🏦 Cuenta bancaria" },
+          { id: "system", label: "🔔 Sistema" },
+        ].map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => setSection(s.id as any)}
+            style={{
+              padding: "8px 14px",
+              borderRadius: 8,
+              border: section === s.id ? "2px solid var(--primary)" : "1px solid var(--border)",
+              background: section === s.id ? `${"var(--primary)"}22` : "var(--bg-primary)",
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            {s.label}
+          </button>
+        ))}
       </div>
-    </RoleGuard>
+
+      {loading ? <p>Cargando…</p> : (
+        <div style={{ marginTop: 16, padding: 16, background: "var(--bg-primary)", border: "1px solid var(--border)", borderRadius: 12 }}>
+          {section === "fiscal" && (
+            <Grid>
+              <Field label="Razón social"><input style={inputStyle} value={profile.legalName || ""} onChange={(e) => setProfile({ ...profile, legalName: e.target.value })} /></Field>
+              <Field label="Nombre comercial"><input style={inputStyle} value={profile.tradeName || ""} onChange={(e) => setProfile({ ...profile, tradeName: e.target.value })} /></Field>
+              <Field label="RFC"><input style={inputStyle} value={profile.rfc || ""} onChange={(e) => setProfile({ ...profile, rfc: e.target.value.toUpperCase() })} /></Field>
+              <Field label="Régimen fiscal (clave SAT)"><input style={inputStyle} value={profile.fiscalRegime || ""} onChange={(e) => setProfile({ ...profile, fiscalRegime: e.target.value })} /></Field>
+              <Field label="Domicilio fiscal" full><textarea style={{ ...inputStyle, minHeight: 60 }} value={profile.fiscalAddress || ""} onChange={(e) => setProfile({ ...profile, fiscalAddress: e.target.value })} /></Field>
+              <Field label="Código postal fiscal"><input style={inputStyle} value={profile.fiscalPostalCode || ""} onChange={(e) => setProfile({ ...profile, fiscalPostalCode: e.target.value })} /></Field>
+            </Grid>
+          )}
+
+          {section === "contact" && (
+            <Grid>
+              <Field label="Email comercial"><input type="email" style={inputStyle} value={profile.contactEmail || ""} onChange={(e) => setProfile({ ...profile, contactEmail: e.target.value })} /></Field>
+              <Field label="Email de soporte"><input type="email" style={inputStyle} value={profile.supportEmail || ""} onChange={(e) => setProfile({ ...profile, supportEmail: e.target.value })} /></Field>
+              <Field label="Teléfono"><input style={inputStyle} value={profile.contactPhone || ""} onChange={(e) => setProfile({ ...profile, contactPhone: e.target.value })} /></Field>
+              <Field label="Sitio web"><input style={inputStyle} value={profile.websiteUrl || ""} onChange={(e) => setProfile({ ...profile, websiteUrl: e.target.value })} /></Field>
+            </Grid>
+          )}
+
+          {section === "brand" && (
+            <Grid>
+              <Field label="Logo URL"><input style={inputStyle} value={profile.logoUrl || ""} onChange={(e) => setProfile({ ...profile, logoUrl: e.target.value })} /></Field>
+              <Field label="Logo (modo oscuro) URL"><input style={inputStyle} value={profile.logoDarkUrl || ""} onChange={(e) => setProfile({ ...profile, logoDarkUrl: e.target.value })} /></Field>
+              <Field label="Favicon URL"><input style={inputStyle} value={profile.faviconUrl || ""} onChange={(e) => setProfile({ ...profile, faviconUrl: e.target.value })} /></Field>
+              <Field label="Color primario (HEX)">
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <input type="color" style={{ width: 50, height: 36, border: "1px solid var(--border)" }} value={profile.brandPrimary || "#0ea5e9"} onChange={(e) => setProfile({ ...profile, brandPrimary: e.target.value })} />
+                  <input style={{ ...inputStyle, flex: 1 }} value={profile.brandPrimary || ""} onChange={(e) => setProfile({ ...profile, brandPrimary: e.target.value })} />
+                </div>
+              </Field>
+              <Field label="Color secundario (HEX)">
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <input type="color" style={{ width: 50, height: 36, border: "1px solid var(--border)" }} value={profile.brandSecondary || "#16a34a"} onChange={(e) => setProfile({ ...profile, brandSecondary: e.target.value })} />
+                  <input style={{ ...inputStyle, flex: 1 }} value={profile.brandSecondary || ""} onChange={(e) => setProfile({ ...profile, brandSecondary: e.target.value })} />
+                </div>
+              </Field>
+              <div style={{ gridColumn: "1 / -1", padding: 14, background: "var(--bg-secondary)", borderRadius: 8 }}>
+                <strong>Vista previa:</strong>
+                <div style={{ display: "flex", gap: 10, marginTop: 8, alignItems: "center" }}>
+                  {profile.logoUrl && <img src={profile.logoUrl} alt="logo" style={{ height: 40 }} />}
+                  <button type="button" style={{ padding: "8px 14px", background: profile.brandPrimary || "#0ea5e9", color: "#fff", border: "none", borderRadius: 6 }}>Botón primario</button>
+                  <button type="button" style={{ padding: "8px 14px", background: profile.brandSecondary || "#16a34a", color: "#fff", border: "none", borderRadius: 6 }}>Botón secundario</button>
+                </div>
+              </div>
+            </Grid>
+          )}
+
+          {section === "bank" && (
+            <Grid>
+              <Field label="Banco por defecto"><input style={inputStyle} value={profile.defaultBankName || ""} onChange={(e) => setProfile({ ...profile, defaultBankName: e.target.value })} /></Field>
+              <Field label="CLABE"><input style={inputStyle} value={profile.defaultClabe || ""} onChange={(e) => setProfile({ ...profile, defaultClabe: e.target.value })} /></Field>
+            </Grid>
+          )}
+
+          {section === "system" && (
+            <Grid>
+              <Field label="Email para notificaciones administrativas"><input type="email" style={inputStyle} value={profile.notificationEmail || ""} onChange={(e) => setProfile({ ...profile, notificationEmail: e.target.value })} /></Field>
+            </Grid>
+          )}
+
+          <button type="button" className="button-primary" onClick={save} style={{ marginTop: 16 }}>💾 Guardar configuración</button>
+        </div>
+      )}
+    </div>
   );
 }
+
+function Grid({ children }: { children: React.ReactNode }) {
+  return <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>{children}</div>;
+}
+function Field({ label, children, full }: { label: string; children: React.ReactNode; full?: boolean }) {
+  return <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", gridColumn: full ? "1 / -1" : undefined }}>{label}{children}</label>;
+}
+const inputStyle: React.CSSProperties = { display: "block", width: "100%", padding: 8, borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg-primary)", color: "var(--text-primary)", marginTop: 4 };
