@@ -226,7 +226,8 @@ http:
         - websecure
       service: nexara-web
       priority: 10
-      tls: {}
+      tls:
+        certResolver: letsencrypt
 
   middlewares:
     redirect-https:
