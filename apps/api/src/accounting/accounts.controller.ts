@@ -3,10 +3,12 @@ import { Response } from 'express';
 import { AccountingService } from './accounting.service.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
+import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { generateFinancialReportsPdf } from './accounting-reports-pdf.js';
 
 @Controller('accounting/accounts')
+@UseGuards(UrlAccessGuard)
 export class AccountsController {
   constructor(private readonly service: AccountingService) {}
 

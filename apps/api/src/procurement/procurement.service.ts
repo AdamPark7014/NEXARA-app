@@ -3,12 +3,14 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
+import { AutoApprovalService } from '../workflow/auto-approval.service.js';
 
 @Injectable()
 export class ProcurementService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationHierarchy: NotificationHierarchyService,
+    private readonly autoApproval: AutoApprovalService,
   ) {}
 
   // ── Purchase Requisitions ─────────────────────────────────────────
@@ -197,6 +199,23 @@ export class ProcurementService {
     const supplierName = created.supplier?.name?.trim() || 'Proveedor';
     void this.notificationHierarchy
       .notifyPurchaseOrderCreated(userId, created.id, created.poNumber, supplierName)
+      .catch(() => undefined);
+
+    // Workflow: toda OC > $0 requiere validación de Compras + autorización
+    // de Dirección Administrativa. El servicio es idempotente.
+    this.autoApproval
+      .evaluate({
+        entityType: 'PURCHASE_ORDER',
+        entityId: created.id,
+        userId,
+        payload: {
+          amount: subtotal + taxAmount,
+          totalAmount: subtotal + taxAmount,
+          supplierId,
+          supplierName,
+          poNumber: created.poNumber,
+        },
+      })
       .catch(() => undefined);
     return created;
   }

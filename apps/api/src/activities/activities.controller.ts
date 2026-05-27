@@ -17,6 +17,7 @@ import {
 import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
+import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { ActivitiesService } from './activities.service.js';
 import { UsersService } from '../users/users.service.js';
@@ -28,6 +29,7 @@ import { ExcelExportService } from '../common/excel-export.service.js';
 import { ExcelImportService } from '../common/excel-import.service.js';
 
 @Controller('activities')
+@UseGuards(UrlAccessGuard) // RBAC v2 — gate por URL/rol antes que RbacGuard legacy
 export class ActivitiesController {
   constructor(
     private readonly activitiesService: ActivitiesService,

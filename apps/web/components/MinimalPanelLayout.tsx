@@ -5,7 +5,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useTheme } from "@/components/ThemeContext";
 import { useUser } from "@/components/UserContext";
+import PanelTopbarActions from "@/components/PanelTopbarActions";
+import { ToastViewport } from "@/components/Toast";
 import { getAvatarSrc, getRoleLabel } from "@/lib/panel-user";
+import type { PanelKey } from "@/lib/panel-routing";
 
 export type MinimalPanelMenuItem = {
   icon: string;
@@ -22,6 +25,8 @@ export type MinimalPanelLayoutProps = {
   accentColor?: string;
   baseHref?: string;
   menu: MinimalPanelMenuItem[];
+  /** Slug del panel actual para el PanelSwitcher (support/noc/people/lab). */
+  panelKey?: PanelKey;
   children: React.ReactNode;
 };
 
@@ -38,6 +43,7 @@ export default function MinimalPanelLayout({
   accentColor = "#0ea5e9",
   baseHref = "/",
   menu,
+  panelKey,
   children,
 }: MinimalPanelLayoutProps) {
   const pathname = usePathname();
@@ -84,6 +90,7 @@ export default function MinimalPanelLayout({
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg-secondary)" }}>
+      <ToastViewport />
       {/* Sidebar */}
       <aside
         style={{
@@ -222,27 +229,38 @@ export default function MinimalPanelLayout({
       </aside>
 
       <main style={{ flex: 1, minWidth: 0 }}>
-        {isMobile && (
-          <div
-            style={{
-              padding: 10,
-              background: "var(--bg-primary)",
-              borderBottom: "1px solid var(--border)",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
+        {/* Topbar siempre visible con PanelSwitcher discreto a la derecha */}
+        <div
+          style={{
+            padding: isMobile ? "10px 12px" : "12px 24px",
+            background: "var(--bg-primary)",
+            borderBottom: "1px solid var(--border)",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            position: "sticky",
+            top: 0,
+            zIndex: 30,
+          }}
+        >
+          {isMobile && (
             <button
               type="button"
               onClick={() => setOpen(!open)}
+              aria-label="Abrir menú"
               style={{ padding: 8, background: accentColor, color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}
             >
               ☰
             </button>
-            <strong>{panelIcon} {panelName}</strong>
-          </div>
-        )}
+          )}
+          <strong style={{ fontSize: isMobile ? 14 : 15, flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
+            <span>{panelIcon}</span>
+            <span>{panelName}</span>
+          </strong>
+          {panelKey ? (
+            <PanelTopbarActions panelKey={panelKey} accentColor={accentColor} compact={isMobile} />
+          ) : null}
+        </div>
         {children}
       </main>
 

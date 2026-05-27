@@ -53,6 +53,21 @@ export function isSalesTeam(user: OrgUser | null | undefined): boolean {
   );
 }
 
+export function isWarehouseStaff(user: OrgUser | null | undefined): boolean {
+  const key = resolveUserOrgKey(user);
+  return key === ORG_ROLE_KEYS.WAREHOUSE_MANAGER || key === ORG_ROLE_KEYS.PROCUREMENT_OFFICER;
+}
+
+export function isNocStaff(user: OrgUser | null | undefined): boolean {
+  const key = resolveUserOrgKey(user);
+  return key === ORG_ROLE_KEYS.NOC_LEAD || key === ORG_ROLE_KEYS.NOC_OPERATOR;
+}
+
+export function isSupportStaff(user: OrgUser | null | undefined): boolean {
+  const key = resolveUserOrgKey(user);
+  return key === ORG_ROLE_KEYS.SUPPORT_AGENT || key === ORG_ROLE_KEYS.MAINTENANCE_COORDINATOR;
+}
+
 export function canViewTeamSalesData(user: OrgUser | null | undefined): boolean {
   if (!user) return false;
   if (user.isSuperAdmin || isPlatformAdmin(user)) return true;

@@ -2,12 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
+import { AutoApprovalService } from '../workflow/auto-approval.service.js';
 
 @Injectable()
 export class ViaticosService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationHierarchy: NotificationHierarchyService,
+    private readonly autoApproval: AutoApprovalService,
   ) {}
 
   // Exportar a CSV
@@ -45,16 +47,28 @@ export class ViaticosService {
       include: { User: { select: { nombre: true, id: true } }, Activity: { select: { anNumber: true, id: true } } },
     });
 
+    const amount =
+      typeof viatico.montoSolicitado === 'object' && 'toNumber' in viatico.montoSolicitado
+        ? viatico.montoSolicitado.toNumber()
+        : Number(viatico.montoSolicitado) || 0;
+
     // Notify supervisors about viatico request
     if (viatico.usuarioId && viatico.User) {
       await this.notificationHierarchy.notifyViaticRequested(
         viatico.usuarioId,
         viatico.id,
         viatico.User.nombre || 'Usuario',
-        typeof viatico.montoSolicitado === 'object' && 'toNumber' in viatico.montoSolicitado
-          ? viatico.montoSolicitado.toNumber()
-          : Number(viatico.montoSolicitado) || 0,
+        amount,
       );
+
+      this.autoApproval
+        .evaluate({
+          entityType: 'VIATIC',
+          entityId: viatico.id,
+          userId: viatico.usuarioId,
+          payload: { amount, outOfPolicy: Boolean(dto?.outOfPolicy) },
+        })
+        .catch(() => undefined);
     }
 
     return viatico;

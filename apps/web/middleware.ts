@@ -1,5 +1,141 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isOperationalPanelPath } from '@/lib/panel-urls';
+
+/**
+ * Traduce segmentos legacy en español a sus equivalentes canónicos del
+ * access-matrix (Fase 2.3 — consolidación a 5 paneles).
+ *
+ * Ejemplos:
+ *   /crm/cotizaciones  →  /crm/quotes
+ *   /crm/clientes      →  /crm/clients
+ *   /ops/viaticos      →  /ops/viatics
+ *   /erp/multas        →  /erp/hr/fines
+ *   /erp/cvs           →  /ops/recruiting
+ *
+ * Esto evita romper enlaces externos viejos en correos, redes y bookmarks.
+ */
+function remapLegacySlugs(pathname: string): string {
+  const SEGMENT_ALIASES: Record<string, string> = {
+    // CRM (español → inglés canónico)
+    cotizaciones: 'quotes',
+    plantillas: 'templates',
+    proyectos: 'projects',
+    licitaciones: 'tenders',
+    productos: 'products',
+    clientes: 'clients',
+    oportunidades: 'opportunities',
+    cuotas: 'targets',
+    reportes: 'reports',
+    'sales-team': 'team',
+    // OPS
+    viaticos: 'viatics',
+    'mis-viaticos': 'my-viatics',
+    'mis-actividades': 'my-activities',
+    'mis-evidencias': 'my-evidences',
+    'mis-vehiculos': 'my-vehicles',
+    vehiculos: 'vehicles',
+    actividades: 'activities',
+    evidencias: 'evidences',
+    herramientas: 'tools',
+    mantenimiento: 'maintenance',
+    monitoreo: 'noc',
+    soporte: 'support',
+    reclutamiento: 'recruiting',
+    'service-clients': 'service-clients',
+    // ERP / People
+    asistencia: 'attendance',
+    'mis-vacaciones': 'my-vacation',
+    multas: 'fines',
+    organigrama: 'orgchart',
+    'kpis-rh': 'kpis',
+    nomina: 'employee-payments',
+    gastos: 'expenses',
+    bancos: 'banking',
+    contabilidad: 'accounting',
+    facturacion: 'invoicing',
+    almacen: 'warehouse',
+    compras: 'procurement',
+    auditoria: 'audit',
+    documentos: 'documents',
+    exportaciones: 'exports',
+    notificaciones: 'notifications-center',
+    calendario: 'calendar',
+    'mi-perfil': 'my-profile',
+    'mi-equipo': 'team',
+    'mi-area': 'orgchart',
+    // Studio
+    paginas: 'pages',
+    casos: 'cases',
+    noticias: 'news',
+    redes: 'social',
+    contactos: 'contacts',
+    boletin: 'newsletter',
+    // Re-mapeos especiales: páginas que ya no existen en su carpeta antigua
+    cvs: 'recruiting', // gestión de CVs → reclutamiento técnico en OPS
+  };
+
+  // Re-mapeos cross-panel (cuando el path entero cambia de hogar)
+  const CROSS_PANEL_REMAPS: Array<[RegExp, string]> = [
+    // CVs (gestión de hojas de vida) ahora vive en OPS · Reclutamiento
+    [/^\/erp\/cvs(\/.*)?$/, '/ops/recruiting'],
+    [/^\/erp\/recruiting(\/.*)?$/, '/ops/recruiting'],
+    // Cotizaciones bajo ERP → CRM (es una vista comercial, no admin)
+    [/^\/erp\/cotizaciones(\/.*)?$/, '/crm/quotes'],
+    [/^\/erp\/quotes(\/.*)?$/, '/crm/quotes'],
+    // Multas en /erp/multas (legacy) → /erp/hr/fines
+    [/^\/erp\/multas(\/?.*)$/, '/erp/hr/fines'],
+    [/^\/erp\/fines(\/?.*)$/, '/erp/hr/fines'],
+    // Asistencia / vacaciones / kpis-rh sueltos → submódulo de hr
+    [/^\/erp\/asistencia(\/?.*)$/, '/erp/hr/attendance'],
+    [/^\/erp\/attendance(\/?.*)$/, '/erp/hr/attendance'],
+    [/^\/erp\/lunch-breaks(\/?.*)$/, '/erp/hr/lunch-breaks'],
+    [/^\/erp\/my-lunch-breaks(\/?.*)$/, '/erp/hr/lunch-breaks'],
+    [/^\/erp\/my-vacation(\/?.*)$/, '/erp/hr/attendance'],
+    [/^\/erp\/team(\/?.*)$/, '/erp/hr/orgchart'],
+    [/^\/erp\/my-area(\/?.*)$/, '/erp/hr/orgchart'],
+    // /erp/viaticos → /erp/finance/viatics
+    [/^\/erp\/viaticos(\/?.*)$/, '/erp/finance/viatics'],
+    [/^\/erp\/viatics(\/?.*)$/, '/erp/finance/viatics'],
+    // /erp/gastos → /erp/finance/expenses
+    [/^\/erp\/expenses(\/?.*)$/, '/erp/finance/expenses'],
+    [/^\/erp\/employee-payments(\/?.*)$/, '/erp/finance/employee-payments'],
+    // contact-messages legacy → studio/contacts
+    [/^\/erp\/contact-messages(\/?.*)$/, '/studio/contacts'],
+    // accounting/reports → solo /erp/accounting
+    [/^\/erp\/accounting\/reports(\/?.*)$/, '/erp/accounting'],
+    [/^\/erp\/procurement\/dashboard(\/?.*)$/, '/erp/procurement'],
+    // operacion/work-projects → ops/projects
+    [/^\/ops\/work-projects(\/?.*)$/, '/ops/projects'],
+    [/^\/ops\/assets\/depreciation(\/?.*)$/, '/ops/assets'],
+    // financial-dashboard → executive
+    [/^\/erp\/financial-dashboard(\/?.*)$/, '/erp/executive'],
+    // dashboard duplicados
+    [/^\/erp\/dashboard\/dashboard(\/?.*)$/, '/erp/dashboard'],
+    // Newsletter consolidada con comunicados en /erp/news (tabs)
+    [/^\/erp\/newsletter(\/?.*)$/, '/erp/news'],
+    // Stock visto dentro de Almacén (sin pestaña separada)
+    [/^\/erp\/warehouse\/stock(\/?.*)$/, '/erp/warehouse'],
+  ];
+
+  for (const [pattern, target] of CROSS_PANEL_REMAPS) {
+    const match = pathname.match(pattern);
+    if (match) {
+      const rest = match[1] || '';
+      return `${target}${rest && rest !== '/' ? rest : ''}`;
+    }
+  }
+
+  // Reemplazos de segmentos individuales
+  const segments = pathname.split('/').filter(Boolean);
+  if (segments.length < 2) return pathname;
+  const panel = segments[0];
+  if (!['erp', 'crm', 'ops', 'studio', 'lab'].includes(panel)) return pathname;
+
+  const remapped = segments.map((seg, idx) => {
+    if (idx === 0) return seg;
+    return SEGMENT_ALIASES[seg] || seg;
+  });
+  return '/' + remapped.join('/');
+}
 
 /**
  * Middleware para manejar subdominios dinámicos
@@ -11,69 +147,70 @@ import { isOperationalPanelPath } from '@/lib/panel-urls';
  * - localhost:3000/console → carpeta [subdomain] con slug=console (para desarrollo)
  */
 
-// Mapeo de subdominios públicos a carpetas internas.
+// Mapeo de subdominios públicos al panel CANÓNICO del nuevo modelo de 5
+// paneles consolidados (single source of truth: access-matrix.ts).
 // La clave es el subdominio del host (parte antes del primer punto).
-// El valor es el slug interno = carpeta en app/(subdomains)/<slug>/
+// El valor es el prefijo de path interno donde vive ese panel:
+//   erp.nexara.com.mx           → /erp
+//   crm.nexara.com.mx           → /crm
+//   ops.nexara.com.mx           → /ops
+//   studio.nexara.com.mx        → /studio
+//   lab.nexara.com.mx           → /lab
+//   portal.nexara.com.mx        → /tickets (portal cliente externo)
 //
-// Cada folder interno puede tener varios alias públicos:
-//   console: ['core', 'console', 'consola', 'app']
-//   ventas:  ['sales', 'ventas', 'crm']
-//   operacion: ['ops', 'operacion']
-//   contabilidad: ['finance', 'contabilidad', 'admin']
-//   web:     ['studio', 'media', 'web']
-//   tickets: ['portal', 'tickets']
+// Aliases legacy (consola, ventas, operacion, contabilidad…) también
+// existen para no romper bookmarks; apuntan al panel consolidado correcto.
 const SUBDOMAIN_MAP: Record<string, string> = {
-  // Núcleo ERP
-  'core': 'console',
-  'console': 'console',
-  'consola': 'console',
-  'app': 'console',
-  // CRM
-  'sales': 'ventas',
-  'ventas': 'ventas',
-  'crm': 'ventas',
-  // Operaciones
-  'ops': 'operacion',
-  'operacion': 'operacion',
-  // Finanzas
-  'finance': 'contabilidad',
-  'contabilidad': 'contabilidad',
-  'admin': 'contabilidad',
-  // Estudio creativo / marketing
-  'studio': 'web',
-  'media': 'web',
-  'web': 'web',
-  // Portal cliente
-  'portal': 'tickets',
-  'tickets': 'tickets',
-  // Helpdesk
-  'support': 'support',
-  'help': 'support',
-  // NOC
-  'noc': 'noc',
-  'monitor': 'noc',
-  // People
-  'people': 'people',
-  'rh': 'people',
-  'hr': 'people',
-  // Lab
-  'lab': 'lab',
-  'dev': 'lab',
+  // ── ERP (núcleo administrativo) ──
+  'erp': '/erp',
+  'core': '/erp',
+  'app': '/erp',
+  'console': '/erp',
+  'consola': '/erp',
+  'contabilidad': '/erp',
+  'finance': '/erp',
+  'admin': '/erp',
+  'people': '/erp/hr',
+  'rh': '/erp/hr',
+  'hr': '/erp/hr',
+  // ── CRM (comercial) ──
+  'crm': '/crm',
+  'sales': '/crm',
+  'ventas': '/crm',
+  // ── OPS (campo, NOC, soporte) ──
+  'ops': '/ops',
+  'operacion': '/ops',
+  'noc': '/ops/noc',
+  'monitor': '/ops/noc',
+  'support': '/ops/support',
+  'help': '/ops/support',
+  // ── STUDIO (sitio público, marketing) ──
+  'studio': '/studio',
+  'web': '/studio',
+  'media': '/studio',
+  // ── LAB (sandbox técnico) ──
+  'lab': '/lab',
+  'dev': '/lab',
+  // ── Portal cliente externo (sigue siendo subdomain dedicado) ──
+  'portal': '/tickets',
+  'tickets': '/tickets',
 };
 
-// Hostnames canónicos por slug (los preferidos / la URL "bonita").
-// Los demás aliases redirigen 308 → canónico.
-const CANONICAL_BY_SLUG: Record<string, string> = {
-  console: 'core',
-  ventas: 'sales',
-  operacion: 'ops',
-  contabilidad: 'finance',
-  web: 'studio',
-  tickets: 'portal',
-  support: 'support',
-  noc: 'noc',
-  people: 'people',
-  lab: 'lab',
+// Subdominio canónico por panel interno (la URL "bonita" en producción).
+// El resto de aliases se redirige 308 al canónico cuando estás en .nexara.com.mx.
+//   /erp        → erp.nexara.com.mx
+//   /crm        → crm.nexara.com.mx
+//   /ops        → ops.nexara.com.mx
+//   /studio     → studio.nexara.com.mx
+//   /lab        → lab.nexara.com.mx
+//   /tickets    → portal.nexara.com.mx
+const CANONICAL_BY_INTERNAL_PREFIX: Record<string, string> = {
+  '/erp': 'erp',
+  '/crm': 'crm',
+  '/ops': 'ops',
+  '/studio': 'studio',
+  '/lab': 'lab',
+  '/tickets': 'portal',
 };
 
 const DEFAULT_ALLOWED_METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']);
@@ -258,16 +395,70 @@ export function middleware(request: NextRequest) {
   const hostWithoutPort = hostname.split(':')[0];
   const requestPathname = request.nextUrl.pathname;
 
-  // Legacy: /console/<modulo-operativo> → /operacion/<modulo-operativo>
-  if (
-    (request.method === 'GET' || request.method === 'HEAD') &&
-    requestPathname.startsWith('/console/') &&
-    isOperationalPanelPath(requestPathname, 'console')
-  ) {
-    const rest = requestPathname.split('/').filter(Boolean).slice(1).join('/');
-    const url = request.nextUrl.clone();
-    url.pathname = `/operacion/${rest}`;
-    return applySecurityHeaders(NextResponse.redirect(url, 308));
+  // ════════════════════════════════════════════════════════════════════
+  //  Migración a la arquitectura de 5 paneles consolidados (Fase 2.3)
+  // ════════════════════════════════════════════════════════════════════
+  //  Cuando alguien intenta un path legacy (/console/*, /operacion/*,
+  //  /ventas/*, /contabilidad/*, /web/*, /people/*, /noc/*, /support/*,
+  //  /lab/* sin el prefijo nuevo), lo redirigimos 308 al equivalente en
+  //  la nueva arquitectura. La fuente de verdad es access-matrix.ts.
+  //
+  //  Reglas:
+  //   - console        → erp
+  //   - contabilidad   → erp  (todo "/contabilidad/X" → "/erp/X")
+  //   - people         → erp/hr  (RH bajo ERP)
+  //   - operacion      → ops
+  //   - noc            → ops/noc/<resto>
+  //   - support        → ops/support/<resto>
+  //   - ventas         → crm
+  //   - web            → studio
+  //   - lab            → lab  (mismo nombre, sin cambio)
+  //   - tickets        → tickets  (portal externo, NO se toca)
+  if (request.method === 'GET' || request.method === 'HEAD') {
+    const LEGACY_PREFIX_MAP: Array<[RegExp, string]> = [
+      // console y contabilidad → ambos viven dentro de /erp
+      [/^\/console(\/.*)?$/, '/erp'],
+      [/^\/contabilidad(\/.*)?$/, '/erp'],
+      // people → /erp/hr (RH consolidado bajo ERP)
+      [/^\/people\/?$/, '/erp/hr'],
+      [/^\/people(\/.*)$/, '/erp/hr'],
+      // operacion → /ops
+      [/^\/operacion(\/.*)?$/, '/ops'],
+      // noc legacy → /ops/noc (NOC ya es submódulo de OPS)
+      [/^\/noc\/?$/, '/ops/noc'],
+      [/^\/noc(\/.*)$/, '/ops/noc'],
+      // support legacy → /ops/support
+      [/^\/support\/?$/, '/ops/support'],
+      [/^\/support(\/.*)$/, '/ops/support'],
+      // ventas → /crm
+      [/^\/ventas(\/.*)?$/, '/crm'],
+      // web → /studio
+      [/^\/web(\/.*)?$/, '/studio'],
+    ];
+
+    for (const [pattern, newPrefix] of LEGACY_PREFIX_MAP) {
+      const match = requestPathname.match(pattern);
+      if (!match) continue;
+      const rest = match[1] || '';
+      // No redirigir cuando entramos por subdominio (rewrite interno);
+      // esos casos los maneja el bloque de subdominio más abajo.
+      const url = request.nextUrl.clone();
+      url.pathname = `${newPrefix}${rest}`;
+      // Mapeos de slug específicos legacy → canónico nuevo
+      url.pathname = remapLegacySlugs(url.pathname);
+      return applySecurityHeaders(NextResponse.redirect(url, 308));
+    }
+
+    // ── Path ya nuevo pero con segmentos en español (p.ej. /crm/cotizaciones) ──
+    // Si después del remap el path cambia, hacemos redirect 308 al canónico.
+    if (/^\/(erp|crm|ops|studio|lab)\//.test(requestPathname)) {
+      const remapped = remapLegacySlugs(requestPathname);
+      if (remapped !== requestPathname) {
+        const url = request.nextUrl.clone();
+        url.pathname = remapped;
+        return applySecurityHeaders(NextResponse.redirect(url, 308));
+      }
+    }
   }
 
   // Remover puerto para obtener host limpio
@@ -303,18 +494,22 @@ export function middleware(request: NextRequest) {
 
   const isMappedPanelSubdomain = Boolean(subdomain && SUBDOMAIN_MAP[subdomain]);
 
-  // Si detectamos un subdominio conocido, reescribir a ruta específica
+  // Si detectamos un subdominio conocido, reescribir a la ruta interna del
+  // panel consolidado correspondiente (single source of truth: access-matrix).
   if (isMappedPanelSubdomain && subdomain) {
-    const internalSlug = SUBDOMAIN_MAP[subdomain];
+    const internalPrefix = SUBDOMAIN_MAP[subdomain]; // p.ej. "/erp", "/ops", "/erp/hr"
     const pathname = request.nextUrl.pathname;
 
-    // ── Canonical redirect ──
-    // Si el host actual es un alias legacy, redirigir 308 al subdominio canónico.
-    // p.ej. consola.nexara.com.mx → core.nexara.com.mx
-    //       ventas.nexara.com.mx → sales.nexara.com.mx
-    // Solo aplica en producción (dominios .nexara.com.mx). En localhost no redirige
-    // para no romper el flujo de desarrollo.
-    const canonicalSub = CANONICAL_BY_SLUG[internalSlug];
+    // ── Canonical redirect (solo producción) ──
+    // Si el host actual es un alias legacy (consola.X, ventas.X, etc.), redirigir
+    // 308 al subdominio canónico del panel:
+    //   consola.nexara.com.mx     → erp.nexara.com.mx
+    //   contabilidad.nexara.com.mx → erp.nexara.com.mx
+    //   ventas.nexara.com.mx      → crm.nexara.com.mx
+    //   operacion.nexara.com.mx   → ops.nexara.com.mx
+    //   web.nexara.com.mx         → studio.nexara.com.mx
+    //   noc.nexara.com.mx         → ops.nexara.com.mx (con path /noc preservado)
+    const canonicalSub = CANONICAL_BY_INTERNAL_PREFIX[internalPrefix.split('/').slice(0, 2).join('/')];
     const enableCanonicalRedirect =
       !isLocalhost &&
       hostWithoutPort.endsWith('.nexara.com.mx') &&
@@ -325,31 +520,29 @@ export function middleware(request: NextRequest) {
     if (enableCanonicalRedirect) {
       const url = request.nextUrl.clone();
       url.hostname = `${canonicalSub}.nexara.com.mx`;
-      return applySecurityHeaders(NextResponse.redirect(url, 308));
-    }
-
-    // Consola → Operación: módulos de campo ya no viven en admin
-    if (
-      (request.method === 'GET' || request.method === 'HEAD') &&
-      internalSlug === 'console' &&
-      isOperationalPanelPath(pathname)
-    ) {
-      const url = request.nextUrl.clone();
-      // Núcleo (core/console/app) → Operaciones (ops). Soportamos los aliases viejos por compatibilidad.
-      const operHost = hostWithoutPort.replace(/^(core|consola|console|app)\./i, 'ops.');
-      if (operHost !== hostWithoutPort) {
-        url.hostname = operHost;
-      } else {
-        url.hostname = isLocalhost ? 'ops.localhost' : `ops.${hostParts.slice(1).join('.')}`;
+      // Si el alias mapea a un sub-path (p.ej. people → /erp/hr, noc → /ops/noc),
+      // preservar ese sub-path. P.ej. people.X.com/calendar → erp.X.com/hr/calendar.
+      const extraPath = internalPrefix.split('/').slice(2).join('/');
+      if (extraPath && pathname !== '/') {
+        url.pathname = `/${extraPath}${pathname.startsWith('/') ? pathname : `/${pathname}`}`;
+      } else if (extraPath) {
+        url.pathname = `/${extraPath}`;
       }
-      url.pathname = pathname;
       return applySecurityHeaders(NextResponse.redirect(url, 308));
     }
 
-    const isAlreadyScopedPath = (() => {
-      const firstSegment = pathname.split('/').filter(Boolean)[0]?.toLowerCase();
-      return firstSegment === internalSlug;
-    })();
+    // Cuando entramos por subdominio: redirigir paths legacy (/console/X, /ventas/Y…)
+    // al nuevo modelo antes de hacer el rewrite (también cubre el caso console → ops).
+    if (request.method === 'GET' || request.method === 'HEAD') {
+      const legacyPrefixHit = /^\/(console|contabilidad|people|operacion|ventas|web|noc|support)(\/.*)?$/.exec(pathname);
+      if (legacyPrefixHit) {
+        const url = request.nextUrl.clone();
+        // Forzar pathname canónico, descartando el alias legacy
+        url.pathname = '/';
+        // El bloque legacy global ya cubrió esto, pero lo dejamos aquí como red de seguridad.
+        return applySecurityHeaders(NextResponse.redirect(url, 308));
+      }
+    }
 
     if (
       pathname.startsWith('/_next/') ||
@@ -363,41 +556,46 @@ export function middleware(request: NextRequest) {
       return applyNoStoreForHtml(request, response);
     }
 
-    // Si la ruta ya está prefijada con el slug del subdominio actual,
-    // no la reescribimos para evitar /console/console/dashboard.
-    if (isAlreadyScopedPath) {
+    // Si la ruta YA está prefijada con el panel canónico (p.ej. /erp/dashboard
+    // en erp.localhost), no reescribir para evitar /erp/erp/dashboard.
+    const firstSegment = '/' + (pathname.split('/').filter(Boolean)[0] || '');
+    const prefixRoot = '/' + internalPrefix.split('/').filter(Boolean)[0];
+    if (firstSegment === prefixRoot) {
       const response = applySecurityHeaders(NextResponse.next());
       return applyNoStoreForHtml(request, response);
     }
-    
-    // NO reescribir archivos estáticos (imágenes, fuentes, etc.)
-    // Permitir que Next.js los sirva directamente desde /public
+
+    // No reescribir archivos estáticos
     const staticFileExtensions = /\.(png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot|css|js|json)$/i;
     if (staticFileExtensions.test(pathname)) {
       const response = applySecurityHeaders(NextResponse.next());
       return applyNoStoreForHtml(request, response);
     }
 
-    // Hub de selección de paneles vive en /paneles (grupo (auth)), no bajo /<slug>/…
-    if (pathname === "/paneles" || pathname === "/paneles/") {
+    // Hub de selección de paneles vive en /paneles, no bajo el subdominio
+    if (pathname === '/paneles' || pathname === '/paneles/') {
       const response = applySecurityHeaders(NextResponse.next());
       return applyNoStoreForHtml(request, response);
     }
 
-    // Login vive en la ruta global /(auth)/login -> /login, no bajo /console/login, etc.
-    if (pathname === "/login" || pathname === "/login/") {
+    // Login vive en /(auth)/login, no bajo el subdominio
+    if (pathname === '/login' || pathname === '/login/') {
       const response = applySecurityHeaders(NextResponse.next());
       return applyNoStoreForHtml(request, response);
     }
-    
-    // Reescribir a /<slug><pathname>
-    // Ejemplo: consola.localhost/ → /console/
-    //          consola.localhost/dashboard → /console/dashboard
-    const rewritePath = `/${internalSlug}${pathname}`;
-    
+
+    // Reescribir a <internalPrefix><pathname>
+    //   erp.localhost/          → /erp
+    //   erp.localhost/dashboard → /erp/dashboard
+    //   crm.localhost/leads     → /crm/leads
+    //   ops.localhost/my-activities → /ops/my-activities
+    //   people.localhost/orgchart   → /erp/hr/orgchart
+    const trimmedPath = pathname === '/' ? '' : pathname;
+    const rewritePath = `${internalPrefix}${trimmedPath}`;
+
     const url = request.nextUrl.clone();
-    url.pathname = rewritePath;
-    
+    url.pathname = remapLegacySlugs(rewritePath); // por si el path tiene segmentos en español
+
     const response = applySecurityHeaders(NextResponse.rewrite(url));
     return applyNoStoreForHtml(request, response);
   }

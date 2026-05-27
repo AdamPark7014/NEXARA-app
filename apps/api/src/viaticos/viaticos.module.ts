@@ -5,9 +5,10 @@ import { AuthModule } from '../auth/auth.module.js';
 import { PrismaModule } from '../prisma/prisma.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
+import { WorkflowModule } from '../workflow/workflow.module.js';
 
 @Module({
-  imports: [AuthModule, PrismaModule, UsersModule, NotificationsModule],
+  imports: [AuthModule, PrismaModule, UsersModule, NotificationsModule, WorkflowModule],
   controllers: [ViaticosController],
   providers: [ViaticosService],
   exports: [ViaticosService],

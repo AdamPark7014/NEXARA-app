@@ -418,6 +418,10 @@ model User {
   employeeNumber            String?                    @unique @db.VarChar(30)
   passwordHash              String
   roleId                    Int
+  // RBAC v2 — clave de rol normalizada (super_admin, ceo, dir_admin, …)
+  // Coexiste con roleId/Role mientras dura la migración. Fuente de verdad
+  // para UrlAccessGuard y canOpenPage().  Ver apps/api/src/common/rbac/roles.v2.ts
+  roleKey                   String?                    @db.VarChar(40)
   departmentId              Int
   fechaCreacion             DateTime                   @default(now())
   avatarUrl                 String?                    @db.VarChar(500)
@@ -1672,6 +1676,11 @@ enum NotificationType {
   INVOICE_CREATED
   PAYMENT_REGISTERED
   MAINTENANCE_WORK_ORDER_CREATED
+
+  // Alertas cross-módulo (Phase 8)
+  MARGIN_ALERT
+  SLA_ALERT
+  STOCK_ALERT
 }
 
 model Notification {

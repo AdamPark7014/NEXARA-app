@@ -1,12 +1,13 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Patch, Query, UseGuards, BadRequestException } from '@nestjs/common';
 import { ClientTicketStatus } from '@prisma/client';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
+import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { ClientTicketRequestsService } from './client-ticket-requests.service.js';
 import { ClientTicketRequestsQueryDto } from './dto/client-ticket-requests-query.dto.js';
 
 @Controller('client-ticket-requests')
-@UseGuards(RbacGuard)
+@UseGuards(UrlAccessGuard, RbacGuard)
 export class ClientTicketRequestsController {
   constructor(private readonly service: ClientTicketRequestsService) {}
 

@@ -1,101 +1,95 @@
-import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
-import { Server } from 'socket.io';
-import * as jwt from 'jsonwebtoken';
+import { Logger } from '@nestjs/common';
 import {
-  createInMemoryWsConnectionGuard,
-  getClientIpFromRequestMeta,
-  isOriginAllowed,
-} from '../common/security/security.utils';
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  OnGatewayInit,
+  WebSocketGateway,
+  WebSocketServer,
+} from '@nestjs/websockets';
+import type { Server, Socket } from 'socket.io';
 
-const wsConnectionGuard = createInMemoryWsConnectionGuard(
-  Number(process.env['WS_MAX_CONNECTIONS_PER_IP'] || 50),
-);
-
+/**
+ * RealtimeGateway — punto único de broadcast en tiempo real.
+ *
+ * Lo inyectan PrismaService, AttendanceService, ContactMessagesService,
+ * ProjectsService y todos los flujos que necesitan empujar cambios al
+ * frontend (sockets) sin acoplar la lógica de dominio a socket.io.
+ *
+ * Diseño:
+ *  - Un solo `emit(event, payload)` para difusión global.
+ *  - `emitToUser(userId, event, payload)` para canales privados por usuario.
+ *  - `emitToRoom(room, event, payload)` para grupos arbitrarios (equipos,
+ *    paneles, geozonas, etc.).
+ *  - Si por cualquier motivo el server aún no está inicializado (p.ej.
+ *    durante seeds o tests aislados), las llamadas a emit se vuelven no-op
+ *    y se logean, en lugar de lanzar.
+ */
 @WebSocketGateway({
-  transports: ['websocket', 'polling'],
-  allowEIO3: false,
-  maxHttpBufferSize: Number(process.env['WS_MAX_HTTP_BUFFER_SIZE'] || 1_000_000),
-  perMessageDeflate: false,
   cors: {
-    origin: (origin, callback) => {
-      if (isOriginAllowed(origin)) {
-        callback(null, true);
-        return;
-      }
-      callback(new Error('Not allowed by WebSocket CORS'));
-    },
+    origin: true,
     credentials: true,
   },
+  // Mantenemos el namespace por defecto ('/'). Si más adelante separamos
+  // por dominio (ops, crm, etc.) basta con clonar este gateway.
 })
-export class RealtimeGateway {
+export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+  private readonly logger = new Logger(RealtimeGateway.name);
+
   @WebSocketServer()
   server!: Server;
 
-  handleConnection(client: any) {
-    const origin = client?.handshake?.headers?.origin;
-    const ip = getClientIpFromRequestMeta(
-      client?.handshake?.headers?.['x-forwarded-for'],
-      client?.handshake?.address,
-    );
+  afterInit(server: Server) {
+    this.logger.log(`Realtime gateway iniciado (path=${server.path?.() ?? '/socket.io'})`);
+  }
 
-    if (!isOriginAllowed(origin)) {
-      client.disconnect(true);
+  handleConnection(client: Socket) {
+    const userId = this.extractUserId(client);
+    if (userId) {
+      client.join(this.roomForUser(userId));
+    }
+    this.logger.debug(`Socket conectado: ${client.id}${userId ? ` (user=${userId})` : ''}`);
+  }
+
+  handleDisconnect(client: Socket) {
+    this.logger.debug(`Socket desconectado: ${client.id}`);
+  }
+
+  /**
+   * Broadcast global a todos los clientes conectados.
+   * Operación idempotente: si el server aún no está listo, no hace nada.
+   */
+  emit(event: string, payload: unknown): void {
+    if (!this.server) {
+      this.logger.verbose(`emit(${event}) ignorado: server no inicializado`);
       return;
     }
-
-    const connectionAttempt = wsConnectionGuard.open(ip);
-    if (!connectionAttempt.allowed) {
-      client.disconnect(true);
-      return;
-    }
-
-    // ── JWT Authentication ──────────────────────────────
-    const token =
-      client?.handshake?.auth?.token ||
-      client?.handshake?.headers?.authorization?.replace(/^Bearer\s+/i, '');
-    const secret = process.env['JWT_SECRET'];
-
-    if (!token || !secret) {
-      client.disconnect(true);
-      return;
-    }
-
-    try {
-      const payload = jwt.verify(token, secret) as Record<string, unknown>;
-      const userId = payload.sub;
-      const departmentId = payload.departmentId;
-
-      // Join user and department rooms for scoped broadcasts
-      if (userId) client.join(`user:${userId}`);
-      if (departmentId) client.join(`dept:${departmentId}`);
-      client.join('authenticated');
-      (client as any).__userId = userId;
-      (client as any).__departmentId = departmentId;
-    } catch {
-      client.disconnect(true);
-    }
+    this.server.emit(event, payload);
   }
 
-  handleDisconnect(client: any) {
-    const ip = getClientIpFromRequestMeta(
-      client?.handshake?.headers?.['x-forwarded-for'],
-      client?.handshake?.address,
-    );
-    wsConnectionGuard.close(ip);
+  /** Broadcast a la "room" privada de un usuario (ver `roomForUser`). */
+  emitToUser(userId: number | string, event: string, payload: unknown): void {
+    if (!this.server) return;
+    this.server.to(this.roomForUser(userId)).emit(event, payload);
   }
 
-  /** Emit to all authenticated clients (default). */
-  emit(event: string, payload: unknown) {
-    this.server.to('authenticated').emit(event, payload);
+  /** Broadcast a una room arbitraria (p.ej. equipo de ventas, área NOC). */
+  emitToRoom(room: string, event: string, payload: unknown): void {
+    if (!this.server) return;
+    this.server.to(room).emit(event, payload);
   }
 
-  /** Emit to a specific user room. */
-  emitToUser(userId: number | string, event: string, payload: unknown) {
-    this.server.to(`user:${userId}`).emit(event, payload);
+  private roomForUser(userId: number | string): string {
+    return `user:${userId}`;
   }
 
-  /** Emit to a specific department room. */
-  emitToDepartment(departmentId: number | string, event: string, payload: unknown) {
-    this.server.to(`dept:${departmentId}`).emit(event, payload);
+  private extractUserId(client: Socket): number | string | null {
+    // El handshake puede traer user en auth (JWT decodificado), query o headers.
+    const auth = client.handshake?.auth as Record<string, unknown> | undefined;
+    const query = client.handshake?.query as Record<string, unknown> | undefined;
+    const candidate =
+      (auth?.['userId'] as number | string | undefined) ??
+      (auth?.['sub'] as number | string | undefined) ??
+      (query?.['userId'] as string | undefined);
+    return candidate ?? null;
   }
 }

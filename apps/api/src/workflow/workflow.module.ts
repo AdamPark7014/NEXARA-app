@@ -4,11 +4,12 @@ import { AuthModule } from '../auth/auth.module.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 import { WorkflowService } from './workflow.service.js';
 import { WorkflowController } from './workflow.controller.js';
+import { AutoApprovalService } from './auto-approval.service.js';
 
 @Module({
   imports: [PrismaModule, AuthModule, NotificationsModule],
-  providers: [WorkflowService],
+  providers: [WorkflowService, AutoApprovalService],
   controllers: [WorkflowController],
-  exports: [WorkflowService],
+  exports: [WorkflowService, AutoApprovalService],
 })
 export class WorkflowModule {}

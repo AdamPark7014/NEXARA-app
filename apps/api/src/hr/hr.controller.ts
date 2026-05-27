@@ -1,12 +1,13 @@
 import { Controller, Get, Post, Patch, Param, Query, Body, UseGuards, ParseIntPipe, ForbiddenException } from '@nestjs/common';
 import { HrService } from './hr.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
+import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 
 @Controller('hr')
-@UseGuards(RbacGuard)
+@UseGuards(UrlAccessGuard, RbacGuard)
 export class HrController {
   constructor(private readonly svc: HrService) {}
 

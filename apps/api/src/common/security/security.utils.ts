@@ -16,7 +16,38 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-const DEFAULT_ALLOWED_SUBDOMAINS = ['consola', 'console', 'ventas', 'web', 'contabilidad', 'tickets', 'mobile'];
+const DEFAULT_ALLOWED_SUBDOMAINS = [
+  // Canonical production subdomains
+  'core',
+  'sales',
+  'ops',
+  'finance',
+  'studio',
+  'portal',
+  'support',
+  'noc',
+  'people',
+  'lab',
+  // Legacy aliases kept for backward compatibility
+  'consola',
+  'console',
+  'app',
+  'ventas',
+  'crm',
+  'operacion',
+  'contabilidad',
+  'admin',
+  'web',
+  'media',
+  'tickets',
+  'help',
+  'monitor',
+  'rh',
+  'hr',
+  'dev',
+  // Local mobile alias
+  'mobile',
+];
 const DEFAULT_ALLOWED_IP_HOSTS = ['138.197.42.104', '10.17.0.5'];
 const DEFAULT_ALLOWED_HOST_PATTERNS: RegExp[] = [
   /^localhost(?::\d+)?$/i,

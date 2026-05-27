@@ -20,6 +20,7 @@ import { VehiclesModule } from './vehicles/vehicles.module';
 import { ExpensesModule } from './expenses/expenses.module';
 import { GpsModule } from './gps/gps.module';
 import { NotificationsModule } from './notifications/notifications.module.js';
+import { AlertsModule } from './alerts/alerts.module.js';
 import { DevicesModule } from './devices/devices.module.js';
 import { ViaticosModule } from './viaticos/viaticos.module';
 import { AttendanceModule } from './attendance/attendance.module';
@@ -38,10 +39,10 @@ import { ClientTicketRequestsModule } from './client-ticket-requests/client-tick
 import { BranchAuthModule } from './branch-auth/branch-auth.module';
 import { BranchPortalModule } from './branch-portal/branch-portal.module';
 import { VentasModule } from './ventas/ventas.module';
-import { ActivityEvidenceModule } from './activity-evidence/activity-evidence.module';
+import { ActivityEvidenceModule } from './activities/evidence/activity-evidence.module';
 import { FinesModule } from './fines/fines.module.js';
 import { ToolRequestsModule } from './tool-requests/tool-requests.module.js';
-import { LunchBreaksModule } from './lunch-breaks/lunch-breaks.module.js';
+import { LunchBreaksModule } from './attendance/lunch/lunch-breaks.module.js';
 import { CvsModule } from './cvs/cvs.module.js';
 import { InventoriesModule } from './inventories/inventories.module.js';
 import { AccountingModule } from './accounting/accounting.module.js';
@@ -75,11 +76,13 @@ import { SlaTrackerModule } from './sla-tracker/sla-tracker.module.js';
 import { ExportsModule } from './exports/exports.module.js';
 import { NocModule } from './noc/noc.module.js';
 import { LabModule } from './lab/lab.module.js';
+import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
   imports: [
     CoreModule,
     ExcelModule,
+    RealtimeModule, // @Global() — inyectable desde cualquier módulo
     PrismaModule,
     ClientsModule,
     UsersModule,
@@ -92,6 +95,7 @@ import { LabModule } from './lab/lab.module.js';
     ScheduleModule.forRoot(),
     DevicesModule,
     NotificationsModule,
+    AlertsModule,
     ViaticosModule,
     AttendanceModule,
     ProjectsModule,

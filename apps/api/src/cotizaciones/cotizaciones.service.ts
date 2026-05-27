@@ -12,6 +12,7 @@ import { UpdateCotizacionDto } from './dto/update-cotizacion.dto.js';
 import { SendCotizacionDto } from './dto/send-cotizacion.dto.js';
 import { SignCotizacionDto } from './dto/sign-cotizacion.dto.js';
 import { generateCotizacionPdf } from './cotizacion-pdf.js';
+import { AutoApprovalService } from '../workflow/auto-approval.service.js';
 import { randomBytes } from 'crypto';
 import nodemailer from 'nodemailer';
 import fs from 'fs/promises';
@@ -30,10 +31,23 @@ const normalizeStatus = (status?: string) => {
 
 @Injectable()
 export class CotizacionesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly autoApproval: AutoApprovalService,
+  ) {}
 
   private get db() {
     return this.prisma;
+  }
+
+  /**
+   * Devuelve el descuento máximo (en %) entre todas las líneas de una cotización.
+   * Sirve para evaluar la política de descuentos: si supera 15% se dispara el
+   * workflow "Aprobación de descuento en cotización".
+   */
+  private maxDiscountPercent(items: Array<{ discount: number }>): number {
+    if (!items.length) return 0;
+    return items.reduce((max, it) => Math.max(max, Number(it.discount) || 0), 0);
   }
 
   private parseDate(value?: string) {
@@ -163,21 +177,37 @@ export class CotizacionesService {
       createdBy: createdById ? { connect: { id: createdById } } : undefined,
     };
 
+    let created: Awaited<ReturnType<typeof this.db.cotizacion.create>>;
     try {
-      return await this.db.cotizacion.create({
+      created = await this.db.cotizacion.create({
         data,
         include: { items: true },
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         const fallback = await this.ensureUniqueQuoteNumber(`${baseQuoteNumber}-${String(Date.now()).slice(-4)}`);
-        return this.db.cotizacion.create({
+        created = await this.db.cotizacion.create({
           data: { ...data, quoteNumber: fallback },
           include: { items: true },
         });
+      } else {
+        throw error;
       }
-      throw error;
     }
+
+    if (createdById) {
+      const maxDiscount = this.maxDiscountPercent(items);
+      this.autoApproval
+        .evaluate({
+          entityType: 'COTIZACION',
+          entityId: created.id,
+          userId: createdById,
+          payload: { maxDiscountPercent: maxDiscount, total: created.total },
+        })
+        .catch(() => undefined);
+    }
+
+    return created;
   }
 
   async findAll(query?: PaginationQueryDto) {
@@ -205,8 +235,11 @@ export class CotizacionesService {
     return quote;
   }
 
-  async update(id: number, dto: UpdateCotizacionDto) {
-    const existing = await this.db.cotizacion.findUnique({ where: { id } });
+  async update(id: number, dto: UpdateCotizacionDto, updatedById?: number) {
+    const existing = await this.db.cotizacion.findUnique({
+      where: { id },
+      include: { items: true },
+    });
     if (!existing) throw new NotFoundException('Cotizacion no encontrada');
 
     const updateData: Record<string, any> = {
@@ -232,6 +265,9 @@ export class CotizacionesService {
     const status = normalizeStatus(dto.status);
     if (status) updateData['status'] = status;
 
+    let result: Awaited<ReturnType<typeof this.db.cotizacion.update>>;
+    let finalItems: Array<{ discount: number }>;
+
     if (dto.items) {
       const items = this.normalizeItems(dto.items);
       const totals = this.calculateTotals(items);
@@ -244,7 +280,7 @@ export class CotizacionesService {
       updateData['retentionTotal'] = round2(totals.retentionTotal);
       updateData['total'] = round2(totals.total);
 
-      return this.db.$transaction(async (tx) => {
+      result = await this.db.$transaction(async (tx) => {
         await tx.cotizacionItem.deleteMany({ where: { cotizacionId: id } });
         return tx.cotizacion.update({
           where: { id },
@@ -255,13 +291,35 @@ export class CotizacionesService {
           include: { items: true, createdBy: true },
         });
       });
+      finalItems = items;
+    } else {
+      result = await this.db.cotizacion.update({
+        where: { id },
+        data: Object.fromEntries(Object.entries(updateData).filter(([, value]) => value !== undefined)),
+        include: { items: true, createdBy: true },
+      });
+      // Sin items en el payload reutilizamos los existentes para evaluar política
+      // de descuentos: así detectamos si el descuento previo (1%) ya rebasaba
+      // los umbrales aunque el PATCH actual sólo cambió status/cliente/etc.
+      finalItems = existing.items.map((it) => ({ discount: Number(it.discount) }));
     }
 
-    return this.db.cotizacion.update({
-      where: { id },
-      data: Object.fromEntries(Object.entries(updateData).filter(([, value]) => value !== undefined)),
-      include: { items: true, createdBy: true },
-    });
+    const requesterId = updatedById ?? existing.createdById ?? undefined;
+    if (requesterId) {
+      const maxDiscount = this.maxDiscountPercent(finalItems);
+      // Siempre re-evaluamos en update (parcial o total). El servicio de
+      // auto-approval es idempotente: no creará un workflow nuevo si ya hay
+      // uno activo para la misma entidad.
+      this.autoApproval
+        .evaluate({
+          entityType: 'COTIZACION',
+          entityId: id,
+          userId: requesterId,
+          payload: { maxDiscountPercent: maxDiscount, total: result.total },
+        })
+        .catch(() => undefined);
+    }
+    return result;
   }
 
   async getPdfBuffer(id: number) {
