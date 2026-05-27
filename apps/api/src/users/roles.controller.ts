@@ -91,14 +91,13 @@ export class RolesController {
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.ROLES_MANAGE, PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
   listOrgTemplates() {
-    return ORG_ROLE_TEMPLATES.map(({ orgRoleKey, nombre, label, description, nivelAutoridad, departmentHint, panels, flags }) => ({
+    return ORG_ROLE_TEMPLATES.map(({ orgRoleKey, nombre, label, description, nivelAutoridad, departmentHint, flags }) => ({
       orgRoleKey,
       nombre,
       label,
       description,
       nivelAutoridad,
       departmentHint,
-      panels,
       flags,
     }));
   }

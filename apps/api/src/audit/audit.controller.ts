@@ -1,10 +1,11 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { AuditService } from './audit.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
+import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 
 @Controller('audit')
-@UseGuards(RbacGuard)
+@UseGuards(UrlAccessGuard, RbacGuard)
 export class AuditController {
   constructor(private readonly svc: AuditService) {}
 

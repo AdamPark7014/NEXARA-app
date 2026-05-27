@@ -29,6 +29,12 @@ const ORG_ROLE_DB_NAME: Record<OrgRoleKey, string> = {
   [ORG_ROLE_KEYS.ADMIN_STAFF]: 'Personal Administrativo',
   [ORG_ROLE_KEYS.ACCOUNTANT]: 'Contador',
   [ORG_ROLE_KEYS.HR_SPECIALIST]: 'Especialista RRHH',
+  [ORG_ROLE_KEYS.WAREHOUSE_MANAGER]: 'Gerente de Almacén',
+  [ORG_ROLE_KEYS.PROCUREMENT_OFFICER]: 'Comprador / Procurement',
+  [ORG_ROLE_KEYS.MAINTENANCE_COORDINATOR]: 'Coordinador de Mantenimiento',
+  [ORG_ROLE_KEYS.SUPPORT_AGENT]: 'Agente de Soporte',
+  [ORG_ROLE_KEYS.NOC_LEAD]: 'Líder NOC',
+  [ORG_ROLE_KEYS.NOC_OPERATOR]: 'Operador NOC',
 };
 
 const upsertUser = async (data: {
@@ -197,11 +203,23 @@ async function main() {
     const roleCEO = await upsertOrgRole(ORG_ROLE_KEYS.CEO);
     const roleDirectorAdmin = await upsertOrgRole(ORG_ROLE_KEYS.DIRECTOR_ADMIN);
     const roleDirectorOps = await upsertOrgRole(ORG_ROLE_KEYS.DIRECTOR_OPS);
-    const roleDirectorCommercial = await upsertOrgRole(ORG_ROLE_KEYS.DIRECTOR_COMMERCIAL);
+    // Nota: DIRECTOR_COMMERCIAL sigue existiendo como plantilla en org-roles,
+    // pero Karen consolida sus poderes vía DIRECTOR_ADMIN (super-set).
+    await upsertOrgRole(ORG_ROLE_KEYS.DIRECTOR_COMMERCIAL);
     const roleSalesRep = await upsertOrgRole(ORG_ROLE_KEYS.SALES_REP);
     const roleProjectManager = await upsertOrgRole(ORG_ROLE_KEYS.PROJECT_MANAGER);
     const roleSeniorEngineer = await upsertOrgRole(ORG_ROLE_KEYS.SENIOR_ENGINEER);
     const roleFieldEngineer = await upsertOrgRole(ORG_ROLE_KEYS.FIELD_ENGINEER);
+    // Roles adicionales necesarios para probar los 5 paneles consolidados
+    // (ERP, CRM, OPS, STUDIO, LAB) con un demo por rol clave.
+    const roleDesigner = await upsertOrgRole(ORG_ROLE_KEYS.DESIGNER);
+    const roleAccountant = await upsertOrgRole(ORG_ROLE_KEYS.ACCOUNTANT);
+    const roleHrSpecialist = await upsertOrgRole(ORG_ROLE_KEYS.HR_SPECIALIST);
+    const roleWarehouseManager = await upsertOrgRole(ORG_ROLE_KEYS.WAREHOUSE_MANAGER);
+    const roleMaintenanceCoord = await upsertOrgRole(ORG_ROLE_KEYS.MAINTENANCE_COORDINATOR);
+    const roleSupportAgent = await upsertOrgRole(ORG_ROLE_KEYS.SUPPORT_AGENT);
+    const roleNocLead = await upsertOrgRole(ORG_ROLE_KEYS.NOC_LEAD);
+    const roleAdminStaff = await upsertOrgRole(ORG_ROLE_KEYS.ADMIN_STAFF);
 
     console.log('[SEED] ✓ Roles ERP referenciados por usuarios demo creados');
 
@@ -237,7 +255,15 @@ async function main() {
     const passDavid = 'David@005Q6txCt';
     const passIsrael = 'Israel@0269$74uB';
     const passLuis = 'NexaraLui2026!@';
-    const passLizbeth = 'Lizeth@0098%nzrv';
+    // Demos por panel consolidado (cobertura para QA visual de los 5 paneles)
+    const passDesigner = 'NexaraDesigner2026!';
+    const passAccountant = 'NexaraContador2026!';
+    const passHr = 'NexaraRRHH2026!';
+    const passWarehouse = 'NexaraAlmacen2026!';
+    const passMaintenance = 'NexaraMant2026!';
+    const passSupport = 'NexaraSupport2026!';
+    const passNoc = 'NexaraNoc2026!';
+    const passAdminStaff = 'NexaraAdmin2026!';
 
     console.log('[SEED] Creando/sincronizando usuarios con jerarquía ERP...');
 
@@ -263,17 +289,6 @@ async function main() {
     });
     console.log(`[SEED] ✓ Developer/CEO: ${userDeveloper.email} (id=${userDeveloper.id})`);
 
-    // ── DIRECCIÓN — Administración ──────────────────────────────────────
-    const userLizeth = await syncUserByIdentity({
-      nombre: 'Lizeth Antele Antonio',
-      email: 'administracion@nexara.com.mx',
-      passwordHash: await bcrypt.hash(passLizbeth, 10),
-      roleId: roleDirectorAdmin.id,
-      departmentId: departments['Administración'].id,
-      nameAliases: ['Lizeth Antele Antonio', 'Lizbeth Antele Antonio', 'Lizeth', 'Lizbeth'],
-    });
-    console.log(`[SEED] ✓ Director Admin: ${userLizeth.email} (id=${userLizeth.id})`);
-
     // ── DIRECCIÓN — Operaciones ─────────────────────────────────────────
     const userLuis = await syncUserByIdentity({
       nombre: 'Luis Joel Aguilar',
@@ -285,16 +300,20 @@ async function main() {
     });
     console.log(`[SEED] ✓ Director Operativo: ${userLuis.email} (id=${userLuis.id})`);
 
-    // ── DIRECCIÓN — Comercial (Karen lidera ventas) ─────────────────────
+    // ── DIRECCIÓN — Karen consolida Comercial + Administración ──────────
+    // Se transfieren a Karen todos los poderes que tenía Lizeth (Dir. Admin).
+    // Su rol pasa a DIRECTOR_ADMIN (super-set: Admin + Comercial) y
+    // hereda el buzón administracion@ como alias para mantener histórico.
     const userKaren = await syncUserByIdentity({
       nombre: 'Karen Elizalde Sarmiento',
       email: 'ventas@nexara.com.mx',
       passwordHash: await bcrypt.hash(passCOO, 10),
-      roleId: roleDirectorCommercial.id,
+      roleId: roleDirectorAdmin.id,
       departmentId: departments['Ventas'].id,
+      emailAliases: ['administracion@nexara.com.mx'],
       nameAliases: ['Karen Elizalde Sarmiento', 'Karen'],
     });
-    console.log(`[SEED] ✓ Director Comercial: ${userKaren.email} (id=${userKaren.id})`);
+    console.log(`[SEED] ✓ Director Admin + Comercial: ${userKaren.email} (id=${userKaren.id})`);
 
     // ── JEFE DE PROYECTOS (sistemas/operaciones) ────────────────────────
     const userAlejandro = await syncUserByIdentity({
@@ -361,12 +380,104 @@ async function main() {
     });
     console.log(`[SEED] ✓ Ingeniero Campo: ${userIsrael.email} (id=${userIsrael.id})`);
 
+    // ── DEMOS DE COBERTURA POR PANEL ────────────────────────────────────
+    // Un usuario por rol clave para que el QA visual cubra los 5 paneles
+    // consolidados (ERP, CRM, OPS, STUDIO, LAB) con un solo seed.
+
+    // DISEÑADORA → aterriza en STUDIO (sitio público, redes, casos)
+    const userDesigner = await syncUserByIdentity({
+      nombre: 'Vania Salgado',
+      email: 'diseno@nexara.com.mx',
+      passwordHash: await bcrypt.hash(passDesigner, 10),
+      roleId: roleDesigner.id,
+      departmentId: departments['Marketing'].id,
+      nameAliases: ['Vania Salgado', 'Vania'],
+    });
+    console.log(`[SEED] ✓ Diseñadora (STUDIO): ${userDesigner.email}`);
+
+    // CONTADORA → aterriza en ERP (contabilidad, facturación, banca)
+    const userAccountant = await syncUserByIdentity({
+      nombre: 'Karla Ruiz',
+      email: 'contabilidad@nexara.com.mx',
+      passwordHash: await bcrypt.hash(passAccountant, 10),
+      roleId: roleAccountant.id,
+      departmentId: departments['Administración'].id,
+      nameAliases: ['Karla Ruiz', 'Karla'],
+    });
+    console.log(`[SEED] ✓ Contadora (ERP): ${userAccountant.email}`);
+
+    // ESPECIALISTA RH → aterriza en ERP (RH, asistencia, multas)
+    const userHr = await syncUserByIdentity({
+      nombre: 'Adriana Castro',
+      email: 'rh@nexara.com.mx',
+      passwordHash: await bcrypt.hash(passHr, 10),
+      roleId: roleHrSpecialist.id,
+      departmentId: departments['Administración'].id,
+      nameAliases: ['Adriana Castro', 'Adriana'],
+    });
+    console.log(`[SEED] ✓ Especialista RH (ERP): ${userHr.email}`);
+
+    // GERENTE DE ALMACÉN → aterriza en ERP (warehouse, stock, procurement)
+    const userWarehouse = await syncUserByIdentity({
+      nombre: 'Mario Lozano',
+      email: 'almacen@nexara.com.mx',
+      passwordHash: await bcrypt.hash(passWarehouse, 10),
+      roleId: roleWarehouseManager.id,
+      departmentId: departments['Operaciones'].id,
+      nameAliases: ['Mario Lozano', 'Mario'],
+    });
+    console.log(`[SEED] ✓ Gerente Almacén (ERP): ${userWarehouse.email}`);
+
+    // COORD. MANTENIMIENTO → aterriza en OPS (contratos, visitas, SLA)
+    const userMaintenance = await syncUserByIdentity({
+      nombre: 'Ronaldo Hernández',
+      email: 'mantenimiento@nexara.com.mx',
+      passwordHash: await bcrypt.hash(passMaintenance, 10),
+      roleId: roleMaintenanceCoord.id,
+      departmentId: departments['Operaciones'].id,
+      nameAliases: ['Ronaldo Hernández', 'Ronaldo Hernandez', 'Ronaldo'],
+    });
+    console.log(`[SEED] ✓ Coord. Mantenimiento (OPS): ${userMaintenance.email}`);
+
+    // AGENTE DE SOPORTE → aterriza en OPS (bandeja, SLA)
+    const userSupportAgent = await syncUserByIdentity({
+      nombre: 'Brandon Castillo',
+      email: 'soporte.tickets@nexara.com.mx',
+      passwordHash: await bcrypt.hash(passSupport, 10),
+      roleId: roleSupportAgent.id,
+      departmentId: departments['Operaciones'].id,
+      nameAliases: ['Brandon Castillo', 'Brandon'],
+    });
+    console.log(`[SEED] ✓ Agente Soporte (OPS): ${userSupportAgent.email}`);
+
+    // LÍDER NOC → aterriza en OPS (monitoreo de uptime de clientes)
+    const userNocLead = await syncUserByIdentity({
+      nombre: 'Sandra López',
+      email: 'noc@nexara.com.mx',
+      passwordHash: await bcrypt.hash(passNoc, 10),
+      roleId: roleNocLead.id,
+      departmentId: departments['Operaciones'].id,
+      nameAliases: ['Sandra López', 'Sandra Lopez', 'Sandra'],
+    });
+    console.log(`[SEED] ✓ Líder NOC (OPS): ${userNocLead.email}`);
+
+    // PERSONAL ADMINISTRATIVO → aterriza en ERP (documentos, agenda, KB)
+    const userAdminStaff = await syncUserByIdentity({
+      nombre: 'Eduardo Mendoza',
+      email: 'admin.staff@nexara.com.mx',
+      passwordHash: await bcrypt.hash(passAdminStaff, 10),
+      roleId: roleAdminStaff.id,
+      departmentId: departments['Administración'].id,
+      nameAliases: ['Eduardo Mendoza', 'Eduardo'],
+    });
+    console.log(`[SEED] ✓ Personal Admin (ERP): ${userAdminStaff.email}`);
+
     // ── Limpieza de duplicados y aliases legacy ─────────────────────────
     console.log('[SEED] Limpiando duplicados de identidad...');
     const duplicateCounts = await Promise.all([
       cleanupIdentityDuplicates({ targetUserId: userGerencia.id, email: 'gerencia@nexara.com.mx', nombre: 'Christian Del Pozo', nameAliases: ['Christian Del Pozo', 'Christian'] }),
       cleanupIdentityDuplicates({ targetUserId: userDeveloper.id, email: 'developer@nexara.com.mx', nombre: 'Adam Del Pozo', nameAliases: ['Adam Del Pozo', 'Adam'] }),
-      cleanupIdentityDuplicates({ targetUserId: userKaren.id, email: 'ventas@nexara.com.mx', nombre: 'Karen Elizalde Sarmiento', nameAliases: ['Karen Elizalde Sarmiento', 'Karen'] }),
+      cleanupIdentityDuplicates({ targetUserId: userKaren.id, email: 'ventas@nexara.com.mx', emailAliases: ['administracion@nexara.com.mx'], nombre: 'Karen Elizalde Sarmiento', nameAliases: ['Karen Elizalde Sarmiento', 'Karen', 'Lizeth Antele Antonio', 'Lizbeth Antele Antonio', 'Lizeth', 'Lizbeth'] }),
       cleanupIdentityDuplicates({ targetUserId: userCarolina.id, email: 'soporte@nexara.com.mx', nombre: 'Carolina Juarez Alvarez', nameAliases: ['Carolina Juarez Alvarez', 'Carolina'] }),
       cleanupIdentityDuplicates({ targetUserId: userAlejandro.id, email: 'operaciones@nexara.com.mx', emailAliases: ['sistemas@nexara.com.mx'], nombre: 'Alejandro Gonzales Bustamante', nameAliases: ['Alejandro Gonzales Bustamante', 'Alejandro Gonzales', 'Alejandro'] }),
       cleanupIdentityDuplicates({ targetUserId: userKarina.id, email: 'vendedor@nexara.com.mx', nombre: 'Karina Martinez Flores', nameAliases: ['Karina Martinez Flores', 'Karina'] }),
@@ -374,7 +485,14 @@ async function main() {
       cleanupIdentityDuplicates({ targetUserId: userDavid.id, email: 'david.morzenon@nexara.com.mx', nombre: 'David Morales Zenon', nameAliases: ['David Morales Zenon', 'David'] }),
       cleanupIdentityDuplicates({ targetUserId: userIsrael.id, email: 'israel.ralima@nexara.com.mx', nombre: 'Israel Ramos Lima', nameAliases: ['Israel Ramos Lima', 'Israel'] }),
       cleanupIdentityDuplicates({ targetUserId: userLuis.id, email: 'direccion.operaciones@nexara.com.mx', nombre: 'Luis Joel Aguilar', nameAliases: ['Luis Joel Aguilar', 'Luis'] }),
-      cleanupIdentityDuplicates({ targetUserId: userLizeth.id, email: 'administracion@nexara.com.mx', nombre: 'Lizeth Antele Antonio', nameAliases: ['Lizeth Antele Antonio', 'Lizbeth Antele Antonio', 'Lizeth', 'Lizbeth'] }),
+      cleanupIdentityDuplicates({ targetUserId: userDesigner.id, email: 'diseno@nexara.com.mx', nombre: 'Vania Salgado', nameAliases: ['Vania Salgado', 'Vania'] }),
+      cleanupIdentityDuplicates({ targetUserId: userAccountant.id, email: 'contabilidad@nexara.com.mx', nombre: 'Karla Ruiz', nameAliases: ['Karla Ruiz', 'Karla'] }),
+      cleanupIdentityDuplicates({ targetUserId: userHr.id, email: 'rh@nexara.com.mx', nombre: 'Adriana Castro', nameAliases: ['Adriana Castro', 'Adriana'] }),
+      cleanupIdentityDuplicates({ targetUserId: userWarehouse.id, email: 'almacen@nexara.com.mx', nombre: 'Mario Lozano', nameAliases: ['Mario Lozano', 'Mario'] }),
+      cleanupIdentityDuplicates({ targetUserId: userMaintenance.id, email: 'mantenimiento@nexara.com.mx', nombre: 'Ronaldo Hernández', nameAliases: ['Ronaldo Hernández', 'Ronaldo Hernandez', 'Ronaldo'] }),
+      cleanupIdentityDuplicates({ targetUserId: userSupportAgent.id, email: 'soporte.tickets@nexara.com.mx', nombre: 'Brandon Castillo', nameAliases: ['Brandon Castillo', 'Brandon'] }),
+      cleanupIdentityDuplicates({ targetUserId: userNocLead.id, email: 'noc@nexara.com.mx', nombre: 'Sandra López', nameAliases: ['Sandra López', 'Sandra Lopez', 'Sandra'] }),
+      cleanupIdentityDuplicates({ targetUserId: userAdminStaff.id, email: 'admin.staff@nexara.com.mx', nombre: 'Eduardo Mendoza', nameAliases: ['Eduardo Mendoza', 'Eduardo'] }),
     ]);
     const duplicatesRemoved = duplicateCounts.reduce((sum, count) => sum + count, 0);
 
@@ -391,31 +509,70 @@ async function main() {
       },
     });
 
-    // ── Resumen final con jerarquía visible ─────────────────────────────
+    // Defensa adicional: si quedó algún usuario residual de Lizeth/Lizbeth
+    // (distinto a Karen, que ya tiene administracion@ como alias), bórralo.
+    const removedLizeth = await prisma.user.deleteMany({
+      where: {
+        id: { not: userKaren.id },
+        OR: [
+          { email: 'administracion@nexara.com.mx' },
+          { nombre: { contains: 'Lizeth', mode: 'insensitive' } },
+          { nombre: { contains: 'Lizbeth', mode: 'insensitive' } },
+        ],
+      },
+    });
+    if (removedLizeth.count > 0) {
+      console.log(`[SEED] 🗑️  Lizeth/Lizbeth residual eliminado: ${removedLizeth.count} registro(s)`);
+    }
+
+    // ── Resumen final con jerarquía visible y panel HOME nuevo ──────────
+    // Modelo de 5 paneles consolidados (single source of truth = access-matrix.ts):
+    //   ⚙️  ERP    → Administración, finanzas, RH, almacén, BI, gobierno
+    //   📈 CRM    → Pipeline comercial, cotizaciones, clientes
+    //   🚀 OPS    → Campo, NOC, soporte y mantenimiento
+    //   🎨 STUDIO → Sitio público, marketing, redes
+    //   🧪 LAB    → Sandbox técnico / playground (CEO + Developer)
     console.log('');
-    console.log('═════════════════════════════════════════════════════════════');
-    console.log(' Jerarquía ERP — Usuarios demo NEXARA');
-    console.log('═════════════════════════════════════════════════════════════');
-    console.log(' 🏛️  EJECUTIVO');
-    console.log(`   • Christian Del Pozo (CEO):                ${passCEO}`);
-    console.log(`   • Adam Del Pozo (Developer/CEO):           ${passDeveloper}`);
-    console.log(' 🧭 DIRECCIÓN');
-    console.log(`   • Lizeth Antele (Director Admin):          ${passLizbeth}`);
-    console.log(`   • Luis Joel Aguilar (Director Ops):        ${passLuis}`);
-    console.log(`   • Karen Elizalde (Director Comercial):     ${passCOO}`);
-    console.log(' 🧩 MANDOS MEDIOS');
-    console.log(`   • Alejandro Gonzales (Jefe Proyectos):     ${passOperaciones}`);
-    console.log(' 🔧 ESPECIALISTAS');
-    console.log(`   • Carolina Juárez (Ingeniero Senior):      ${passSoporte}`);
-    console.log(' 💼 EQUIPO COMERCIAL');
-    console.log(`   • Karina Martínez (Ejecutivo Ventas):      ${passVendedor}`);
-    console.log(' 🛠️  CAMPO');
-    console.log(`   • Julio Rivera (Ingeniero Campo):          ${passJulio}`);
-    console.log(`   • David Morales (Ingeniero Campo):         ${passDavid}`);
-    console.log(`   • Israel Ramos (Ingeniero Campo):          ${passIsrael}`);
-    console.log('═════════════════════════════════════════════════════════════');
-    console.log(`Duplicados removidos:        ${duplicatesRemoved}`);
-    console.log(`Buzones demo legacy removidos: ${removedUsers.count}`);
+    console.log('══════════════════════════════════════════════════════════════════════════════');
+    console.log(' Usuarios demo NEXARA — Jerarquía ERP + Panel HOME (5 paneles consolidados)');
+    console.log('══════════════════════════════════════════════════════════════════════════════');
+    const rows: Array<{ tier: string; name: string; role: string; panel: string; url: string; pass: string }> = [
+      { tier: '🏛️  EJECUTIVO',    name: 'Christian Del Pozo',  role: 'CEO',              panel: '⚙️  ERP',    url: '/erp/dashboard',     pass: passCEO },
+      { tier: '🏛️  EJECUTIVO',    name: 'Adam Del Pozo',       role: 'Developer/CEO',    panel: '🧪 LAB',     url: '/lab',               pass: passDeveloper },
+      { tier: '🧭 DIRECCIÓN',     name: 'Luis Joel Aguilar',   role: 'Director Ops',     panel: '🚀 OPS',     url: '/ops/dashboard',     pass: passLuis },
+      { tier: '🧭 DIRECCIÓN',     name: 'Karen Elizalde',      role: 'Director Admin',   panel: '⚙️  ERP',    url: '/erp/dashboard',     pass: passCOO },
+      { tier: '🧩 MANDOS MEDIOS', name: 'Alejandro Gonzales',  role: 'Jefe Proyectos',   panel: '🚀 OPS',     url: '/ops/dashboard',     pass: passOperaciones },
+      { tier: '🧩 MANDOS MEDIOS', name: 'Mario Lozano',        role: 'Almacén',          panel: '⚙️  ERP',    url: '/erp/warehouse',     pass: passWarehouse },
+      { tier: '🧩 MANDOS MEDIOS', name: 'Ronaldo Hernández',   role: 'Mantenimiento',    panel: '🚀 OPS',     url: '/ops/dashboard',     pass: passMaintenance },
+      { tier: '🧩 MANDOS MEDIOS', name: 'Sandra López',        role: 'Líder NOC',        panel: '🚀 OPS',     url: '/ops/noc',           pass: passNoc },
+      { tier: '🔧 ESPECIALISTAS', name: 'Carolina Juárez',     role: 'Ingeniero Senior', panel: '🚀 OPS',     url: '/ops/dashboard',     pass: passSoporte },
+      { tier: '🔧 ESPECIALISTAS', name: 'Karla Ruiz',          role: 'Contadora',        panel: '⚙️  ERP',    url: '/erp/accounting',    pass: passAccountant },
+      { tier: '🔧 ESPECIALISTAS', name: 'Adriana Castro',      role: 'RH',               panel: '⚙️  ERP',    url: '/erp/hr',            pass: passHr },
+      { tier: '🔧 ESPECIALISTAS', name: 'Brandon Castillo',    role: 'Soporte',          panel: '🚀 OPS',     url: '/ops/support',       pass: passSupport },
+      { tier: '🔧 ESPECIALISTAS', name: 'Vania Salgado',       role: 'Diseñadora',       panel: '🎨 STUDIO',  url: '/studio/dashboard',  pass: passDesigner },
+      { tier: '💼 EQUIPO COMERCIAL', name: 'Karina Martínez',  role: 'Ejecutivo Ventas', panel: '📈 CRM',     url: '/crm/dashboard',     pass: passVendedor },
+      { tier: '🛠️  CAMPO',        name: 'Julio Rivera',        role: 'Ingeniero Campo',  panel: '🚀 OPS',     url: '/ops/my-activities', pass: passJulio },
+      { tier: '🛠️  CAMPO',        name: 'David Morales',       role: 'Ingeniero Campo',  panel: '🚀 OPS',     url: '/ops/my-activities', pass: passDavid },
+      { tier: '🛠️  CAMPO',        name: 'Israel Ramos',        role: 'Ingeniero Campo',  panel: '🚀 OPS',     url: '/ops/my-activities', pass: passIsrael },
+      { tier: '🛠️  ADMIN',        name: 'Eduardo Mendoza',     role: 'Admin Staff',      panel: '⚙️  ERP',    url: '/erp/dashboard',     pass: passAdminStaff },
+    ];
+    let currentTier = '';
+    for (const r of rows) {
+      if (r.tier !== currentTier) {
+        console.log('');
+        console.log(` ${r.tier}`);
+        currentTier = r.tier;
+      }
+      const namePad = r.name.padEnd(22);
+      const rolePad = r.role.padEnd(20);
+      const panelPad = r.panel.padEnd(12);
+      const urlPad = r.url.padEnd(22);
+      console.log(`   • ${namePad} ${rolePad} → ${panelPad} ${urlPad} ${r.pass}`);
+    }
+    console.log('══════════════════════════════════════════════════════════════════════════════');
+    console.log(`Duplicados removidos:           ${duplicatesRemoved}`);
+    console.log(`Buzones demo legacy removidos:  ${removedUsers.count}`);
+    console.log(`Total usuarios demo activos:    ${rows.length}`);
     console.log('[SEED] ✓ Seed completado exitosamente');
   } catch (error) {
     console.error('[SEED] ❌ Error en seed-demo-users:', error);

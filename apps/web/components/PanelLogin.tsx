@@ -8,6 +8,7 @@ import { io, Socket } from "socket.io-client";
 import { useUser } from "./UserContext";
 import { hasPermission, PERMISSIONS } from "../lib/permissions";
 import { getDeviceIdentityHeaders } from "@/lib/device-identity";
+import { getUserHomeUrl } from "@/lib/panel-home";
 
 type PanelLoginProps = {
   redirectTo: string;
@@ -18,9 +19,16 @@ type PanelLoginProps = {
   title?: string;
   subtitle?: string;
   accessNotice?: string;
+  /**
+   * Si es `true`, después del login se redirige al panel HOME del usuario
+   * (ventas/operacion/contabilidad/console según su rol) en vez de a la
+   * ruta `redirectTo` fija. Útil para `core.nexara.com.mx/login` donde no
+   * sabemos a qué panel debe ir cada persona.
+   */
+  smartRedirect?: boolean;
 };
 
-export default function PanelLogin({ redirectTo, requiredPermission, mode = "console", onClientLogin, onBranchLogin, title, subtitle, accessNotice }: PanelLoginProps) {
+export default function PanelLogin({ redirectTo, requiredPermission, mode = "console", onClientLogin, onBranchLogin, title, subtitle, accessNotice, smartRedirect = false }: PanelLoginProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -146,6 +154,16 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
       }
 
       setUser(userData);
+
+      if (smartRedirect) {
+        const homeUrl = getUserHomeUrl(userData);
+        if (homeUrl.startsWith("http")) {
+          window.location.assign(homeUrl);
+        } else {
+          router.replace(homeUrl);
+        }
+        return;
+      }
 
       router.replace(redirectTo);
     } catch (err: unknown) {

@@ -7,6 +7,7 @@ import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import ExcelDownloadModal from './ExcelDownloadModal';
 import styles from './ViaticTable.module.css';
 import { openExternalUrl } from '@/lib/open-external-url';
+import ApprovalHistory from './ApprovalHistory';
 
 interface Viatic {
   id: number;
@@ -36,6 +37,7 @@ const ViaticTable = () => {
   const [excelUrl, setExcelUrl] = useState<string | null>(null);
   const [excelBlob, setExcelBlob] = useState<Blob | null>(null);
   const [excelPreparing, setExcelPreparing] = useState(false);
+  const [selectedViaticId, setSelectedViaticId] = useState<number | null>(null);
   const MOBILE_BREAKPOINT = 1024;
 
 
@@ -261,12 +263,16 @@ const ViaticTable = () => {
                 <th>Ticket</th>
                 <th>Estatus</th>
                 <th>Usuario</th>
+                <th>Aprobaciones</th>
                 {hasPermission(user, PERMISSIONS.VIATICS_MANAGE) && <th>Acciones</th>}
               </tr>
             </thead>
             <tbody>
               {paginated.map((v: Viatic) => (
-                <tr key={v.id}>
+                <tr
+                  key={v.id}
+                  style={selectedViaticId === v.id ? { background: 'var(--primary)10' } : undefined}
+                >
                   <td>{v.actividad?.anNumber}</td>
                   <td>${v.montoSolicitado}</td>
                   <td>{v.razonGasto}</td>
@@ -283,6 +289,17 @@ const ViaticTable = () => {
                     <span className={`badge ${v.estatusPago === 'Aprobado' ? 'approved' : v.estatusPago === 'Pendiente' ? 'pending' : v.estatusPago === 'Rechazado' ? 'rejected' : ''}`}>{v.estatusPago}</span>
                   </td>
                   <td>{v.usuario?.nombre}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="link"
+                      onClick={() => setSelectedViaticId((prev) => (prev === v.id ? null : v.id))}
+                      style={{ fontSize: 12, fontWeight: 600 }}
+                      aria-label={selectedViaticId === v.id ? 'Ocultar historial' : 'Ver historial'}
+                    >
+                      {selectedViaticId === v.id ? '× Ocultar' : '🛡️ Ver'}
+                    </button>
+                  </td>
                   {hasPermission(user, PERMISSIONS.VIATICS_MANAGE) && (
                     <td>
                       {v.estatusPago === 'Pendiente' && (
@@ -301,6 +318,16 @@ const ViaticTable = () => {
               ))}
             </tbody>
           </table>
+          {selectedViaticId !== null && (
+            <div style={{ marginTop: 16 }}>
+              <ApprovalHistory
+                entityType="VIATIC"
+                entityId={selectedViaticId}
+                title={`Aprobaciones · viático #${selectedViaticId}`}
+                compact
+              />
+            </div>
+          )}
         </div>
       )}
 

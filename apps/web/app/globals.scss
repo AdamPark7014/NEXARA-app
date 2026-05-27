@@ -128,6 +128,78 @@
   --nx-motion-fast: 180ms;
   --nx-motion-base: 280ms;
   --nx-motion-slow: 480ms;
+
+  /* ============================================================
+     NEXARA · App Panel premium layer
+     Tokens semánticos consumidos por TODO el shell de (panels)/
+     y por todas las primitives de `components/ui/*`. Permiten
+     subir el nivel visual sin reescribir el resto del producto.
+     ============================================================ */
+  --nx-panel-radius: 18px;
+  --nx-panel-radius-sm: 12px;
+  --nx-panel-radius-lg: 24px;
+  --nx-panel-radius-pill: 999px;
+
+  --nx-panel-hairline: color-mix(in srgb, var(--border) 70%, transparent);
+  --nx-panel-hairline-soft: color-mix(in srgb, var(--border) 38%, transparent);
+  --nx-panel-hairline-strong: color-mix(in srgb, var(--border) 100%, transparent);
+
+  --nx-panel-surface-overlay:
+    linear-gradient(168deg,
+      color-mix(in srgb, var(--surface) 96%, transparent) 0%,
+      color-mix(in srgb, var(--surface-2) 86%, transparent) 100%);
+  --nx-panel-surface-overlay-strong:
+    linear-gradient(168deg,
+      color-mix(in srgb, var(--surface) 94%, var(--background)) 0%,
+      color-mix(in srgb, var(--surface-2) 90%, var(--background)) 100%);
+
+  --nx-panel-elev-1:
+    0 1px 2px rgba(8, 24, 38, 0.04),
+    0 6px 14px rgba(8, 24, 38, 0.06);
+  --nx-panel-elev-2:
+    0 2px 4px rgba(8, 24, 38, 0.06),
+    0 14px 28px rgba(8, 24, 38, 0.10);
+  --nx-panel-elev-3:
+    0 4px 8px rgba(8, 24, 38, 0.08),
+    0 24px 48px rgba(8, 24, 38, 0.14);
+  --nx-panel-elev-hover:
+    0 4px 10px rgba(8, 24, 38, 0.09),
+    0 20px 38px rgba(8, 24, 38, 0.13);
+
+  --nx-panel-ring: 0 0 0 3px color-mix(in srgb, var(--primary) 30%, transparent);
+  --nx-panel-ring-accent: 0 0 0 3px color-mix(in srgb, var(--accent) 32%, transparent);
+
+  --nx-panel-eyebrow-letter: 0.12em;
+  --nx-panel-title-letter: -0.02em;
+  --nx-panel-mono-font: "JetBrains Mono", "SF Mono", "Cascadia Code", "Menlo", monospace;
+
+  --nx-tabular: "tnum" on, "lnum" on;
+}
+
+body.dark {
+  /* Sombras más profundas en oscuro para que las cards "floten" sobre el ink */
+  --nx-panel-elev-1:
+    0 1px 3px rgba(0, 0, 0, 0.32),
+    0 8px 16px rgba(0, 0, 0, 0.30);
+  --nx-panel-elev-2:
+    0 2px 6px rgba(0, 0, 0, 0.38),
+    0 16px 36px rgba(0, 0, 0, 0.46),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --nx-panel-elev-3:
+    0 4px 10px rgba(0, 0, 0, 0.42),
+    0 26px 52px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --nx-panel-elev-hover:
+    0 5px 12px rgba(0, 0, 0, 0.42),
+    0 22px 42px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+
+  --nx-panel-hairline: color-mix(in srgb, var(--border) 90%, transparent);
+  --nx-panel-hairline-soft: color-mix(in srgb, var(--border) 50%, transparent);
+  --nx-panel-surface-overlay:
+    linear-gradient(168deg,
+      color-mix(in srgb, var(--surface) 94%, transparent) 0%,
+      color-mix(in srgb, var(--surface-2) 92%, transparent) 100%);
 }
 
 * {

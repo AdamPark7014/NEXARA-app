@@ -3,9 +3,10 @@ import { CotizacionesService } from './cotizaciones.service.js';
 import { CotizacionesController } from './cotizaciones.controller.js';
 import { PrismaModule } from '../prisma/prisma.module.js';
 import { AuthModule } from '../auth/auth.module.js';
+import { WorkflowModule } from '../workflow/workflow.module.js';
 
 @Module({
-  imports: [PrismaModule, AuthModule],
+  imports: [PrismaModule, AuthModule, WorkflowModule],
   controllers: [CotizacionesController],
   providers: [CotizacionesService],
   exports: [CotizacionesService],

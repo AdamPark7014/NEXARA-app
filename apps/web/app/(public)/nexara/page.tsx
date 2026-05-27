@@ -68,7 +68,7 @@ const expertosFallback = [
   { name: "Ing. David Morales Zenon", role: "IDC/Instalador" },
   { name: "Ing. Julio Cesar Rivera Vazquez", role: "IDC/Instalador" },
   { name: "Ing. Israel Ramos Lima", role: "IDC/Instalador" },
-  { name: "Ing. Lizeth Antele Antonio", role: "Administrador" },
+  { name: "Lic. Karen Elizalde Sarmiento", role: "Dirección Administrativa & Comercial" },
   { name: "Ing. Luis Joel Aguilar", role: "Coordinador de Operaciones" },
 ];
 

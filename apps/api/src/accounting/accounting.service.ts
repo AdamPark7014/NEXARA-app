@@ -663,12 +663,31 @@ export class AccountingService {
     if (invoice.status !== 'DRAFT') {
       throw new BadRequestException('Solo facturas en borrador pueden timbrarse');
     }
-    if (!invoice.receptorRfc) {
-      throw new BadRequestException('La factura no tiene RFC del receptor');
+    // Validaciones CFDI 4.0 (SAT). Detectarlas aquí evita errores oscuros del PAC.
+    const cfdiErrors: string[] = [];
+    if (!invoice.receptorRfc) cfdiErrors.push('RFC del receptor');
+    if (!invoice.receptorZipCode) cfdiErrors.push('CP fiscal del receptor (CFDI 4.0)');
+    if (!invoice.receptorRegime) cfdiErrors.push('régimen fiscal del receptor (CFDI 4.0)');
+    if (!invoice.emisorRfc) cfdiErrors.push('RFC del emisor');
+    if (!invoice.emisorRegime) cfdiErrors.push('régimen fiscal del emisor');
+    if (!invoice.cfdiUsage) cfdiErrors.push('uso de CFDI');
+    if (!invoice.items?.length) cfdiErrors.push('al menos un concepto');
+    const itemsWithoutSatKey = invoice.items?.filter(
+      (it) => !it.satProductKey || !it.satUnitKey,
+    ) || [];
+    if (itemsWithoutSatKey.length > 0) {
+      cfdiErrors.push(`claves SAT (ClaveProdServ + ClaveUnidad) en ${itemsWithoutSatKey.length} concepto(s)`);
     }
-    if (!invoice.emisorRfc) {
-      throw new BadRequestException('La factura no tiene RFC del emisor configurado');
+    if (cfdiErrors.length > 0) {
+      throw new BadRequestException(
+        `Faltan datos para timbrar CFDI 4.0: ${cfdiErrors.join(', ')}.`,
+      );
     }
+
+    // Tras las validaciones, TS sigue viendo estos campos como `string | null`
+    // (Prisma optional), pero el flujo asegura que existen. Casteo explícito.
+    const emisorRfc = invoice.emisorRfc as string;
+    const receptorRfc = invoice.receptorRfc as string;
 
     const stamp = await this.pacService.stamp({
       invoiceNumber: invoice.invoiceNumber,
@@ -683,12 +702,12 @@ export class AccountingService {
       paymentMethod: invoice.satPaymentMethod || 'PUE',
       cfdiUsage: invoice.cfdiUsage || 'G03',
       emisor: {
-        rfc: invoice.emisorRfc,
+        rfc: emisorRfc,
         name: invoice.emisorName || 'Emisor',
         regime: invoice.emisorRegime || 'R601',
       },
       receptor: {
-        rfc: invoice.receptorRfc,
+        rfc: receptorRfc,
         name: invoice.receptorName || 'Receptor',
         zipCode: invoice.receptorZipCode,
         regime: invoice.receptorRegime,
@@ -1107,10 +1126,25 @@ export class AccountingService {
   }
 
   getPacInfo() {
+    const provider = this.pacService.provider;
+    let configured = false;
+    if (provider === 'facturama') {
+      configured = Boolean(process.env['FACTURAMA_USER'] && process.env['FACTURAMA_PASSWORD']);
+    } else if (provider === 'sw') {
+      configured = Boolean(process.env['SW_TOKEN'] || (process.env['SW_USER'] && process.env['SW_PASSWORD']));
+    } else if (provider === 'finkok') {
+      configured = Boolean(process.env['FINKOK_USER'] && process.env['FINKOK_PASSWORD']);
+    } else {
+      // mock no requiere credenciales reales
+      configured = true;
+    }
     return {
-      provider: this.pacService.provider,
+      provider,
+      // Compat: la UI consume tanto `fallback` (legacy) como `fallbackToMock`.
+      fallback: this.pacService.fallbackToMock,
       fallbackToMock: this.pacService.fallbackToMock,
-      env: process.env.NODE_ENV || 'development',
+      configured,
+      env: process.env['NODE_ENV'] || 'development',
     };
   }
 

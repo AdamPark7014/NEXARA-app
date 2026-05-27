@@ -6,11 +6,13 @@ import { UpdateCotizacionDto } from './dto/update-cotizacion.dto.js';
 import { SendCotizacionDto } from './dto/send-cotizacion.dto.js';
 import { SignCotizacionDto } from './dto/sign-cotizacion.dto.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
+import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 
 @Controller('cotizaciones')
+@UseGuards(UrlAccessGuard)
 export class CotizacionesController {
   constructor(private readonly cotizacionesService: CotizacionesService) {}
 
@@ -38,8 +40,12 @@ export class CotizacionesController {
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.COTIZACIONES_ACCESS] })
   @Put(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateCotizacionDto) {
-    return this.cotizacionesService.update(id, dto);
+  update(
+    @CurrentUser() user: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateCotizacionDto,
+  ) {
+    return this.cotizacionesService.update(id, dto, user?.id);
   }
 
   @UseGuards(RbacGuard)

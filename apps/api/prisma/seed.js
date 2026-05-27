@@ -18,9 +18,12 @@ async function seedRoles() {
     console.log(`✅ Rol ${role.nombre} creado/actualizado`);
   }
 
-  console.log('🌱 Seeding ERP org role templates (ts-node)...');
+  console.log('🌱 Seeding ERP org role templates + demo users (ts-node)...');
   const { execSync } = require('child_process');
-  execSync('npx ts-node ./seed-roles.ts', { cwd: __dirname, stdio: 'inherit' });
+  execSync('npx ts-node ./seed-demo-users.ts', { cwd: __dirname, stdio: 'inherit' });
+
+  console.log('🌱 Seeding workflow definitions (ts-node)...');
+  execSync('npx ts-node ./seed-workflows.ts', { cwd: __dirname, stdio: 'inherit' });
 }
 
 async function seedProjects() {

@@ -45,6 +45,15 @@ export class WorkflowController {
     return this.service.getInstance(id);
   }
 
+  @Get('entity/:entityType/:entityId')
+  @RBAC({ anyPermissions: VIEW })
+  listForEntity(
+    @Param('entityType') entityType: string,
+    @Param('entityId', ParseIntPipe) entityId: number,
+  ) {
+    return this.service.listInstancesForEntity(entityType, entityId);
+  }
+
   @Post('approvals/:id/decide')
   decide(
     @Param('id', ParseIntPipe) id: number,

@@ -109,6 +109,36 @@ export class WorkflowService {
     return instance;
   }
 
+  /**
+   * Devuelve TODAS las instancias de workflow (open/closed/cancelled) asociadas
+   * a una entidad concreta. Usado por la tab "Historial de aprobaciones" en
+   * cada entidad (cotización, gasto, viático, OC, proyecto).
+   */
+  async listInstancesForEntity(entityType: string, entityId: number) {
+    return this.prisma.workflowInstance.findMany({
+      where: {
+        entityType: entityType.toUpperCase(),
+        entityId,
+      },
+      include: {
+        workflow: {
+          include: {
+            steps: { orderBy: { stepNumber: 'asc' } },
+          },
+        },
+        startedBy: { select: { id: true, nombre: true } },
+        approvals: {
+          include: {
+            step: true,
+            decidedBy: { select: { id: true, nombre: true } },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+      orderBy: { startedAt: 'desc' },
+    });
+  }
+
   async listMyPending(userId: number) {
     // Aprobaciones pendientes donde el usuario es approverUser o tiene el rol approverRole
     const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { roleId: true } });

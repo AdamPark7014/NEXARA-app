@@ -1,5 +1,6 @@
 import { PERMISSIONS, hasAnyPermission, hasPermission, type UserPermissions } from "@/lib/permissions";
-import { ORG_ROLE_META, ORG_ROLE_KEYS, resolveOrgRoleKey, type OrgRoleKey } from "@/lib/org-roles";
+import { ORG_ROLE_KEYS, resolveOrgRoleKey, type OrgRoleKey } from "@/lib/org-roles";
+import { getAllowedPanels, PANEL_META, LEGACY_PANEL_MAP, type PanelId, type PanelMeta } from "@/lib/access-matrix";
 
 export type PanelKey =
   | "console"
@@ -12,6 +13,24 @@ export type PanelKey =
   | "noc"
   | "people"
   | "lab";
+
+/**
+ * Mapeo de PanelKey (legacy) → PanelId (canónico) de los 5 paneles
+ * consolidados. Sirve para que el switcher viejo siga funcionando
+ * mientras migramos por completo a `access-matrix.ts`.
+ */
+export const LEGACY_PANEL_TO_NEW: Record<PanelKey, PanelId | "tickets"> = {
+  console: "erp",
+  contabilidad: "erp",
+  people: "erp",
+  operacion: "ops",
+  noc: "ops",
+  support: "ops",
+  ventas: "crm",
+  web: "studio",
+  lab: "lab",
+  tickets: "tickets", // portal cliente externo, fuera del modelo consolidado
+};
 
 export type MobilePanelOption = {
   key: PanelKey;
@@ -142,7 +161,9 @@ export const getAccessiblePanels = (
       PERMISSIONS.USERS_MANAGE,
       PERMISSIONS.HR_VIEW,
       PERMISSIONS.HR_MANAGE,
-    ]) || orgKey === ORG_ROLE_KEYS.DIRECTOR_ADMIN || orgKey === ORG_ROLE_KEYS.HR_SPECIALIST || orgKey === ORG_ROLE_KEYS.ADMIN_STAFF,
+    ]) || orgKey === ORG_ROLE_KEYS.DIRECTOR_ADMIN || orgKey === ORG_ROLE_KEYS.HR_SPECIALIST
+      || orgKey === ORG_ROLE_KEYS.ADMIN_STAFF || orgKey === ORG_ROLE_KEYS.WAREHOUSE_MANAGER
+      || orgKey === ORG_ROLE_KEYS.PROCUREMENT_OFFICER,
     operacion: hasAnyPermission(user, [
       PERMISSIONS.CONSOLE_ACCESS,
       PERMISSIONS.CONSOLE_ADMIN,
@@ -153,7 +174,9 @@ export const getAccessiblePanels = (
       PERMISSIONS.MAINTENANCE_VIEW,
       PERMISSIONS.ASSETS_VIEW,
     ]) || orgKey === ORG_ROLE_KEYS.DIRECTOR_OPS || orgKey === ORG_ROLE_KEYS.PROJECT_MANAGER
-      || orgKey === ORG_ROLE_KEYS.SENIOR_ENGINEER || orgKey === ORG_ROLE_KEYS.FIELD_ENGINEER,
+      || orgKey === ORG_ROLE_KEYS.SENIOR_ENGINEER || orgKey === ORG_ROLE_KEYS.FIELD_ENGINEER
+      || orgKey === ORG_ROLE_KEYS.MAINTENANCE_COORDINATOR || orgKey === ORG_ROLE_KEYS.SUPPORT_AGENT
+      || orgKey === ORG_ROLE_KEYS.WAREHOUSE_MANAGER,
     ventas: hasAnyPermission(user, [
       PERMISSIONS.PANEL_VENTAS,
       PERMISSIONS.SALES_VIEW,
@@ -171,18 +194,30 @@ export const getAccessiblePanels = (
     // Paneles satélite: support y people son de acceso amplio (cualquier empleado).
     support: hasPermission(user, PERMISSIONS.PANEL_SUPPORT) || true,
     people: hasPermission(user, PERMISSIONS.PANEL_PEOPLE) || true,
-    // NOC: solo operadores / dirección.
+    // NOC: NOC team + dirección operaciones + senior eng + support agents
     noc: hasAnyPermission(user, [PERMISSIONS.PANEL_NOC, PERMISSIONS.NOC_VIEW, PERMISSIONS.CONSOLE_ADMIN])
-      || orgKey === ORG_ROLE_KEYS.DIRECTOR_OPS,
+      || orgKey === ORG_ROLE_KEYS.DIRECTOR_OPS || orgKey === ORG_ROLE_KEYS.NOC_LEAD
+      || orgKey === ORG_ROLE_KEYS.NOC_OPERATOR || orgKey === ORG_ROLE_KEYS.SUPPORT_AGENT
+      || orgKey === ORG_ROLE_KEYS.SENIOR_ENGINEER,
     // Lab: solo super-admin / dev team.
     lab: hasAnyPermission(user, [PERMISSIONS.PANEL_LAB, PERMISSIONS.LAB_ACCESS]),
   };
 
   const panels = PANEL_ORDER.filter((panel) => accessMap[panel.key]);
 
-  if (orgKey && ORG_ROLE_META[orgKey as OrgRoleKey]) {
-    const allowed = new Set(ORG_ROLE_META[orgKey as OrgRoleKey].panels);
-    return panels.filter((panel) => allowed.has(panel.key));
+  // Intersección con access-matrix: solo dejamos paneles legacy cuyo panel
+  // consolidado equivalente (LEGACY_PANEL_MAP) está permitido por la matriz
+  // canónica para este rol. Esto evita que el switcher legacy muestre paneles
+  // a los que el rol ya no tiene acceso real en `(panels)/`.
+  // `tickets` (portal cliente externo) se respeta tal cual lo decidió la
+  // lógica de `accessMap` arriba — no pertenece al modelo de 5 paneles.
+  if (orgKey) {
+    const allowedNew = new Set(getAllowedPanels(orgKey, Boolean(user.isSuperAdmin)).map((p) => p.id));
+    return panels.filter((panel) => {
+      if (panel.key === "tickets") return true;
+      const consolidatedId = LEGACY_PANEL_MAP[panel.key];
+      return consolidatedId ? allowedNew.has(consolidatedId) : true;
+    });
   }
 
   return panels;
@@ -196,4 +231,35 @@ export const setActivePanel = (panel: PanelKey) => {
 export const clearActivePanel = () => {
   if (typeof document === "undefined") return;
   document.cookie = `${PANEL_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
+};
+
+// ─────────────────────────────────────────────────────────────────────────
+// NUEVO MODELO (5 paneles consolidados) — recomendado para código fresco
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Devuelve los paneles consolidados (ERP, CRM, OPS, STUDIO, LAB) accesibles
+ * para el usuario actual. Esta es la API canónica que usa el AppShell nuevo.
+ *
+ * Si necesitas el modelo viejo (10 PanelKey) para compatibilidad con el
+ * `PanelSwitcher` legacy, usa `getAccessiblePanels` arriba.
+ */
+export const getAccessiblePanelsV2 = (
+  user: (UserPermissions & { role?: string; orgRoleKey?: string | null }) | null | undefined,
+): PanelMeta[] => {
+  if (!user) return [];
+  const isSuperAdmin = Boolean(user.isSuperAdmin);
+  const roleKey = resolveOrgRoleKey(user.role, user.orgRoleKey);
+  return getAllowedPanels(roleKey, isSuperAdmin);
+};
+
+/**
+ * Resuelve el `PanelMeta` (icono, nombre, color, entryPath) a partir de un
+ * `PanelKey` legacy. Útil para mostrar metadatos modernos en código que aún
+ * trabaja con los slugs viejos.
+ */
+export const resolvePanelMetaFromLegacyKey = (key: PanelKey): PanelMeta | null => {
+  const newId = LEGACY_PANEL_TO_NEW[key];
+  if (newId === "tickets" || !newId) return null;
+  return PANEL_META[newId];
 };

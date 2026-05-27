@@ -100,6 +100,14 @@ export class ServiceClientsController {
     return this.serviceClientsService.findOne(id);
   }
 
+  /** Vista 360° del cliente: agregaciones cross-módulo + timeline. */
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @Get(':id/snapshot')
+  snapshot(@Param('id', ParseIntPipe) id: number) {
+    return this.serviceClientsService.clientSnapshot(id);
+  }
+
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
   @Get(':id/report')

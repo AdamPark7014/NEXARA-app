@@ -20,6 +20,7 @@ import { CreateOrderTemplateDto } from './dto/create-order-template.dto.js';
 import { UpdateOrderTemplateDto } from './dto/update-order-template.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { isSalesTeamLeadUser } from '../common/org-roles.js';
+import { AutoApprovalService } from '../workflow/auto-approval.service.js';
 
 @Injectable()
 export class VentasService {
@@ -28,6 +29,7 @@ export class VentasService {
     private readonly cotizacionesService: CotizacionesService,
     private readonly pdfGeneratorService: PdfGeneratorService,
     private readonly notificationHierarchy: NotificationHierarchyService,
+    private readonly autoApproval: AutoApprovalService,
   ) {}
 
   private isSuperAdminUser(user?: any) {
@@ -634,7 +636,7 @@ export class VentasService {
   async createProject(dto: CreateSalesProjectDto, user?: any) {
     await this.getOpportunity(dto.opportunityId, user);
     const margin = this.calculateProjectMargin(dto);
-    return this.prisma.salesProject.create({
+    const created = await this.prisma.salesProject.create({
       data: {
         opportunityId: dto.opportunityId,
         name: dto.name,
@@ -652,6 +654,25 @@ export class VentasService {
       },
       include: { opportunity: true },
     });
+
+    if (user?.id) {
+      // Workflow: proyectos > $500k requieren visto bueno Dir. Comercial + Ops + CEO.
+      this.autoApproval
+        .evaluate({
+          entityType: 'SALES_PROJECT',
+          entityId: created.id,
+          userId: user.id,
+          payload: {
+            budget: Number(created.budget ?? 0),
+            margin: Number(created.margin ?? 0),
+            projectType: created.projectType,
+            opportunityId: created.opportunityId,
+          },
+        })
+        .catch(() => undefined);
+    }
+
+    return created;
   }
 
   async listProjects(user?: any, ownerId?: number, query?: PaginationQueryDto) {
@@ -676,7 +697,7 @@ export class VentasService {
     if (!project) throw new NotFoundException('Proyecto no encontrado');
     this.assertOwnerAccess(project.opportunity?.ownerId, user, 'proyecto');
     const margin = this.calculateProjectMargin(dto);
-    return this.prisma.salesProject.update({
+    const updated = await this.prisma.salesProject.update({
       where: { id },
       data: {
         name: dto.name,
@@ -694,6 +715,26 @@ export class VentasService {
       },
       include: { opportunity: true },
     });
+
+    const requesterId = user?.id ?? project.opportunity?.ownerId ?? undefined;
+    if (requesterId) {
+      // Si el budget sube y rebasa el umbral, dispara workflow. Idempotente:
+      // no crea instancias duplicadas si ya existe una abierta.
+      this.autoApproval
+        .evaluate({
+          entityType: 'SALES_PROJECT',
+          entityId: updated.id,
+          userId: requesterId,
+          payload: {
+            budget: Number(updated.budget ?? 0),
+            margin: Number(updated.margin ?? 0),
+            projectType: updated.projectType,
+          },
+        })
+        .catch(() => undefined);
+    }
+
+    return updated;
   }
 
   /** Crea proyecto operativo en campo vinculado a un proyecto comercial ganado. */

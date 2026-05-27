@@ -16,9 +16,11 @@ import { CreateExpenseDto } from './dto/create-expense.dto.js';
 import { UpdateExpenseDto } from './dto/update-expense.dto.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
+import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 
 @Controller('expenses')
+@UseGuards(UrlAccessGuard)
 export class ExpensesController {
   constructor(private readonly expensesService: ExpensesService) {}
 

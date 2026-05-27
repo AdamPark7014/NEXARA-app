@@ -316,6 +316,220 @@ export class ServiceClientsService {
     return client;
   }
 
+  /**
+   * Vista 360° del cliente: cuenta principal + sucursales + métricas
+   * agregadas de OT, proyectos, contratos, facturación, tickets, y la
+   * timeline reciente. Pensada para la página `/console/clients/[id]`.
+   */
+  async clientSnapshot(id: number) {
+    const client = await this.db.serviceClient.findUnique({
+      where: { id },
+      include: {
+        branches: { orderBy: { createdAt: 'desc' } },
+        _count: {
+          select: {
+            branches: true,
+            activities: true,
+            operationalProjects: true,
+            maintenanceContracts: true,
+            ticketRequests: true,
+          },
+        },
+      },
+    });
+    if (!client) throw new NotFoundException('Cliente no encontrado');
+
+    const since = new Date();
+    since.setDate(since.getDate() - 90);
+
+    const [
+      activitiesRecent,
+      operationalProjects,
+      maintenanceContracts,
+      ticketRequests,
+      salesClients,
+    ] = await Promise.all([
+      this.db.activity.findMany({
+        where: { clientId: id, deletedAt: null },
+        orderBy: { fechaAsignacion: 'desc' },
+        take: 15,
+        select: {
+          id: true,
+          anNumber: true,
+          titulo: true,
+          estatus: true,
+          prioridad: true,
+          ticketType: true,
+          workType: true,
+          branchName: true,
+          branchNumber: true,
+          fechaAsignacion: true,
+          fechaFinalizacion: true,
+          responsable: { select: { id: true, nombre: true } },
+        },
+      }),
+      this.db.operationalProject.findMany({
+        where: { clientId: id, deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          projectType: true,
+          startDate: true,
+          endDate: true,
+          siteCount: true,
+          salesProjectId: true,
+          vendor: { select: { id: true, nombre: true } },
+          _count: { select: { activities: true } },
+        },
+      }),
+      this.db.maintenanceContract.findMany({
+        where: { clientId: id, deletedAt: null },
+        orderBy: { startDate: 'desc' },
+        take: 10,
+        select: {
+          id: true,
+          contractNumber: true,
+          title: true,
+          status: true,
+          monthlyFee: true,
+          startDate: true,
+          endDate: true,
+          frequency: true,
+          nextVisitDate: true,
+          currency: true,
+        },
+      }),
+      this.db.clientTicketRequest.findMany({
+        where: { clientId: id },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        select: {
+          id: true,
+          description: true,
+          status: true,
+          urgency: true,
+          requestType: true,
+          createdAt: true,
+          dueAt: true,
+          branch: { select: { id: true, name: true } },
+        },
+      }),
+      this.db.salesClient.findMany({
+        where: { serviceClientId: id },
+        select: {
+          id: true,
+          name: true,
+          opportunities: {
+            orderBy: { updatedAt: 'desc' },
+            take: 20,
+            select: {
+              id: true,
+              title: true,
+              stage: true,
+              value: true,
+              probability: true,
+              expectedCloseDate: true,
+              owner: { select: { id: true, nombre: true } },
+              quotes: {
+                select: {
+                  id: true,
+                  versionLabel: true,
+                  createdAt: true,
+                  cotizacion: {
+                    select: {
+                      id: true,
+                      quoteNumber: true,
+                      status: true,
+                      total: true,
+                      createdAt: true,
+                    },
+                  },
+                },
+                orderBy: { createdAt: 'desc' },
+                take: 5,
+              },
+              projects: {
+                select: {
+                  id: true,
+                  name: true,
+                  status: true,
+                  budget: true,
+                  margin: true,
+                  startDate: true,
+                  endDate: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+
+    const opportunities = salesClients.flatMap((sc: any) => sc.opportunities);
+    const quotes = opportunities.flatMap((op: any) => op.quotes || []);
+    const salesProjects = opportunities
+      .flatMap((op: any) => op.projects || [])
+      .filter((p: any) => !!p);
+
+    // Facturas vinculadas a los sales projects.
+    const invoices = salesProjects.length
+      ? await this.db.invoice.findMany({
+          where: { salesProjectOrder: { projectId: { in: salesProjects.map((p: any) => p.id) } } },
+          orderBy: { issueDate: 'desc' },
+          take: 10,
+          select: {
+            id: true,
+            invoiceNumber: true,
+            status: true,
+            totalAmount: true,
+            issueDate: true,
+            dueDate: true,
+            paidAmount: true,
+          },
+        })
+      : [];
+
+    const numberOf = (status: string, list: any[]) => list.filter((x) => x.status === status).length;
+
+    const stats = {
+      branches: client._count?.branches || 0,
+      activities: client._count?.activities || 0,
+      operationalProjects: client._count?.operationalProjects || 0,
+      maintenanceContracts: client._count?.maintenanceContracts || 0,
+      ticketRequests: client._count?.ticketRequests || 0,
+      activitiesLast90d: activitiesRecent.filter((a: any) => a.fechaAsignacion >= since).length,
+      activitiesOpen: activitiesRecent.filter((a: any) => !['Completada', 'Completado', 'COMPLETADA', 'Cancelada', 'CANCELADA'].includes(String(a.estatus || ''))).length,
+      opportunitiesOpen: opportunities.filter((o: any) => o.stage !== 'WON' && o.stage !== 'LOST').length,
+      pipelineValue: opportunities
+        .filter((o: any) => o.stage !== 'WON' && o.stage !== 'LOST')
+        .reduce((acc: number, o: any) => acc + Number(o.value || 0), 0),
+      activeContracts: numberOf('ACTIVE', maintenanceContracts),
+      monthlyContractRevenue: maintenanceContracts
+        .filter((c: any) => c.status === 'ACTIVE')
+        .reduce((acc: number, c: any) => acc + Number(c.monthlyFee || 0), 0),
+      pendingInvoices: invoices
+        .filter((i: any) => i.status !== 'PAID' && i.status !== 'CANCELLED')
+        .reduce((acc: number, i: any) => acc + (Number(i.totalAmount || 0) - Number(i.paidAmount || 0)), 0),
+      totalSalesProjects: salesProjects.length,
+    };
+
+    return {
+      client,
+      stats,
+      activities: activitiesRecent,
+      operationalProjects,
+      salesProjects,
+      maintenanceContracts,
+      ticketRequests,
+      quotes,
+      opportunities,
+      invoices,
+    };
+  }
+
   async update(id: number, dto: UpdateServiceClientDto, logoUrl?: string) {
     const existing = await this.db.serviceClient.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Cliente no encontrado');

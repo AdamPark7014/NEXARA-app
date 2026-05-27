@@ -2,10 +2,12 @@ import { Controller, Get, Post, Patch, Body, Param, UseGuards, ForbiddenExceptio
 import { GpsService } from './gps.service.js';
 import { CreateGpsDto } from './dto/create-gps.dto.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
+import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { PERMISSIONS } from '../common/permissions.js';
 
 @Controller('gps')
+@UseGuards(UrlAccessGuard)
 export class GpsController {
   constructor(private readonly gpsService: GpsService) {}
 

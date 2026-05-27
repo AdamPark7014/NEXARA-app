@@ -16,10 +16,11 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 // ── Identidades del equipo (deben coincidir con seed-demo-users.ts) ─────────
+// Karen Elizalde consolida Dirección Administrativa + Dirección Comercial.
 const TEAM_EMAILS = {
   ceo: 'gerencia@nexara.com.mx',          // Christian Del Pozo
   developer: 'developer@nexara.com.mx',   // Adam Del Pozo
-  directorAdmin: 'administracion@nexara.com.mx', // Lizeth Antele
+  directorAdmin: 'ventas@nexara.com.mx',  // Karen Elizalde (Admin + Comercial)
   directorOps: 'direccion.operaciones@nexara.com.mx', // Luis Joel Aguilar
   directorCommercial: 'ventas@nexara.com.mx', // Karen Elizalde
   projectManager: 'operaciones@nexara.com.mx', // Alejandro Gonzales
@@ -175,7 +176,7 @@ async function seedKnowledgeBase(team: TeamMap) {
       visibility: 'INTERNAL',
       status: 'PUBLISHED',
       categoryId: catRH.id,
-      authorId: team.directorAdmin.id, // Lizeth
+      authorId: team.directorAdmin.id, // Karen (Dir. Admin + Comercial)
     },
     {
       slug: 'levantar-ticket-soporte-cliente',
@@ -438,7 +439,7 @@ async function seedLeaveRequests(team: TeamMap) {
       endDate: ago27Days,
       days: 4,
       reason: 'Influenza con incapacidad médica IMSS.',
-      approvedById: team.directorAdmin.id, // Lizeth
+      approvedById: team.directorAdmin.id, // Karen (Dir. Admin + Comercial)
       approvedAt: ago27Days,
     },
     // Karina — día personal pendiente
@@ -801,7 +802,7 @@ async function seedNotifications(team: TeamMap) {
       relatedUrl: '/inbox',
     },
     {
-      userId: team.directorAdmin.id, // Lizeth
+      userId: team.directorAdmin.id, // Karen (Dir. Admin + Comercial)
       title: 'NOC: 3 dispositivos OFFLINE en Toks',
       message: 'Sucursales Constitución, Gonzalitos y San Pedro reportan POS desconectado.',
       type: 'USER_ACTION_CONFIRMED' as const,
@@ -888,9 +889,8 @@ async function main() {
   console.log('═════════════════════════════════════════════════════════════');
   console.log(' 👑 Christian (CEO)         → Executive dashboard, todos los panels');
   console.log(' 👑 Adam (Developer/CEO)    → Lab (acceso AI sandbox + flags)');
-  console.log(' 💰 Lizeth (Dir. Admin)     → Approvals, RH, Multi-tenant, Finance');
   console.log(' 🛠️  Luis (Dir. Ops)        → NOC, Approvals vacaciones, Operación');
-  console.log(' 💼 Karen (Dir. Comercial)  → CRM agenda, Sales targets Q, Workflows');
+  console.log(' 💼 Karen (Dir. Admin+Com)  → Approvals, RH, Finance, CRM agenda, Sales targets, Workflows');
   console.log(' 🧩 Alejandro (Jefe Proy)   → Workflows OC, Project mgmt, KB ops');
   console.log(' 🔧 Carolina (Senior Eng)   → Helpdesk inbox, KB autor, On-call');
   console.log(' 💼 Karina (Ejecutivo Vtas) → CRM agenda diaria, meta mensual, KB');

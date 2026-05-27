@@ -1,9 +1,11 @@
 import { Controller, Get, Post, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { AccountingService } from './accounting.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
+import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 
 @Controller('accounting/budgets')
+@UseGuards(UrlAccessGuard)
 export class BudgetsController {
   constructor(private readonly service: AccountingService) {}
 

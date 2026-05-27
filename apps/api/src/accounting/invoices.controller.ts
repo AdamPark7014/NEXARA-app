@@ -2,9 +2,11 @@ import { Controller, Get, Post, Param, Body, Query, UseGuards, Patch, Delete } f
 import { AccountingService } from './accounting.service.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
+import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
 import { PERMISSIONS } from '../common/permissions.js';
 
 @Controller('accounting/invoices')
+@UseGuards(UrlAccessGuard)
 export class InvoicesController {
   constructor(private readonly service: AccountingService) {}
 

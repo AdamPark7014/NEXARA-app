@@ -3,13 +3,30 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { CreateExpenseDto } from './dto/create-expense.dto.js';
 import { UpdateExpenseDto } from './dto/update-expense.dto.js';
+import { AutoApprovalService } from '../workflow/auto-approval.service.js';
 
 @Injectable()
 export class ExpensesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly autoApproval: AutoApprovalService,
+  ) {}
 
-  create(createExpenseDto: CreateExpenseDto) {
-    return this.prisma['expense'].create({ data: createExpenseDto });
+  async create(createExpenseDto: CreateExpenseDto) {
+    const expense = await this.prisma['expense'].create({ data: createExpenseDto });
+
+    if (createExpenseDto.usuarioId) {
+      this.autoApproval
+        .evaluate({
+          entityType: 'EXPENSE',
+          entityId: expense.id,
+          userId: createExpenseDto.usuarioId,
+          payload: { amount: Number(createExpenseDto.montoSolicitado || 0) },
+        })
+        .catch(() => undefined);
+    }
+
+    return expense;
   }
 
   async findAll(query?: PaginationQueryDto) {
