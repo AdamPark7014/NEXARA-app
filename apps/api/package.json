@@ -78,6 +78,6 @@
     "yn": "^3.1.1"
   },
   "prisma": {
-    "seed": "ts-node ./src/users/seed-demo-users.ts"
+    "seed": "ts-node ./prisma/seed-demo-users.ts"
   }
 }
