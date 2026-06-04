@@ -7,7 +7,7 @@ import ClientLocationPicker, { ClientLocationValue } from "@/components/ClientLo
 import TicketsInventoryManager from "@/components/TicketsInventoryManager";
 import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
 import { useTheme } from "@/components/ThemeContext";
-import consoleStyles from "../console/console.module.css";
+import consoleStyles from "../../console/console.module.css";
 import styles from "../tickets.module.css";
 import { openExternalUrl } from "@/lib/open-external-url";
 import { isCapacitorNative } from "@/lib/capacitor-env";
