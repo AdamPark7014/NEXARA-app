@@ -42,7 +42,13 @@ OLD_REV=""
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   OLD_REV="$(git rev-parse HEAD)"
   if [[ "$SKIP_PULL" == false ]]; then
-    git pull --ff-only origin main
+    DEPLOY_BRANCH="${DEPLOY_BRANCH:-$(git branch --show-current 2>/dev/null || true)}"
+    if [[ -z "$DEPLOY_BRANCH" ]]; then
+      DEPLOY_BRANCH="main"
+    fi
+
+    echo "Pulling latest changes from origin/${DEPLOY_BRANCH}..."
+    git pull --ff-only origin "$DEPLOY_BRANCH"
   fi
 fi
 
