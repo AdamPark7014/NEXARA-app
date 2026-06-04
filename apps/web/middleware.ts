@@ -198,15 +198,15 @@ const SUBDOMAIN_MAP: Record<string, string> = {
 
 // Subdominio canónico por panel interno (la URL "bonita" en producción).
 // El resto de aliases se redirige 308 al canónico cuando estás en .nexara.com.mx.
-//   /erp        → erp.nexara.com.mx
-//   /crm        → crm.nexara.com.mx
+//   /erp        → core.nexara.com.mx
+//   /crm        → sales.nexara.com.mx
 //   /ops        → ops.nexara.com.mx
 //   /studio     → studio.nexara.com.mx
 //   /lab        → lab.nexara.com.mx
 //   /tickets    → portal.nexara.com.mx
 const CANONICAL_BY_INTERNAL_PREFIX: Record<string, string> = {
-  '/erp': 'erp',
-  '/crm': 'crm',
+  '/erp': 'core',
+  '/crm': 'sales',
   '/ops': 'ops',
   '/studio': 'studio',
   '/lab': 'lab',
@@ -520,6 +520,9 @@ export function middleware(request: NextRequest) {
     if (enableCanonicalRedirect) {
       const url = request.nextUrl.clone();
       url.hostname = `${canonicalSub}.nexara.com.mx`;
+      // `nextUrl` may preserve the internal service port (3000) behind Traefik.
+      // Force default HTTPS port for external canonical redirects.
+      url.port = '';
       // Si el alias mapea a un sub-path (p.ej. people → /erp/hr, noc → /ops/noc),
       // preservar ese sub-path. P.ej. people.X.com/calendar → erp.X.com/hr/calendar.
       const extraPath = internalPrefix.split('/').slice(2).join('/');
