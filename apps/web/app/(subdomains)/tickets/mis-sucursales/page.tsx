@@ -7,7 +7,7 @@ import BranchesForm, { Branch } from "../../../../components/BranchesForm";
 import { buildApiUrl, getSocketBaseUrl, getApiAssetOrigin } from "@/lib/api-base";
 import { useTheme } from "@/components/ThemeContext";
 import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
-import consoleStyles from "../../console/console.module.css";
+import consoleStyles from "../console/console.module.css";
 import styles from "../tickets.module.css";
 
 type ClientSession = {
