@@ -202,7 +202,7 @@ http:
         certResolver: letsencrypt
 
     erp-frontends:
-      rule: 'Host(`core.nexara.com.mx`,`sales.nexara.com.mx`,`ops.nexara.com.mx`,`finance.nexara.com.mx`,`studio.nexara.com.mx`,`portal.nexara.com.mx`,`support.nexara.com.mx`,`noc.nexara.com.mx`,`people.nexara.com.mx`,`lab.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
+      rule: 'Host(`core.nexara.com.mx`,`sales.nexara.com.mx`,`ops.nexara.com.mx`,`finance.nexara.com.mx`,`studio.nexara.com.mx`,`portal.nexara.com.mx`,`support.nexara.com.mx`,`noc.nexara.com.mx`,`people.nexara.com.mx`,`lab.nexara.com.mx`,`console.nexara.com.mx`,`app.nexara.com.mx`,`ventas.nexara.com.mx`,`contabilidad.nexara.com.mx`,`web.nexara.com.mx`,`tickets.nexara.com.mx`) && !PathPrefix(`/api`) && !PathPrefix(`/socket.io`) && !PathPrefix(`/uploads`)'
       entryPoints:
         - websecure
       service: nexara-web
