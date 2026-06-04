@@ -1,6 +1,9 @@
 services:
   nexara-api:
     image: nexara-api:latest
+    build:
+      context: .
+      dockerfile: ./deploy/docker/Dockerfile.api
     container_name: nexara-api
     restart: unless-stopped
     expose:
@@ -24,6 +27,9 @@ services:
 
   nexara-web:
     image: nexara-web:latest
+    build:
+      context: .
+      dockerfile: ./deploy/docker/Dockerfile.web
     container_name: nexara-web
     restart: unless-stopped
     expose:
