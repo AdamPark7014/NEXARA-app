@@ -1,0 +1,13 @@
+http:
+  routers:
+    zynoratek-https:
+      rule: 'Host(`zynoratek.com`, `www.zynoratek.com`)'
+      service: zynoratek-web
+      entryPoints: [websecure]
+      tls:
+        certResolver: letsencrypt
+  services:
+    zynoratek-web:
+      loadBalancer:
+        servers:
+          - url: http://zynoratek-web-1:3000
