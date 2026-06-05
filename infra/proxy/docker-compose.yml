@@ -8,6 +8,8 @@ services:
       - --providers.docker=true
       - --providers.docker.network=proxy
       - --providers.docker.exposedbydefault=false
+      - --providers.file=true
+      - --providers.file.directory=/var/www/nexara-app/deploy/traefik
       - --entrypoints.web.address=:80
       - --entrypoints.web.http.redirections.entryPoint.to=websecure
       - --entrypoints.web.http.redirections.entryPoint.scheme=https
@@ -22,6 +24,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./letsencrypt:/letsencrypt
+      - /var/www/nexara-app/deploy/traefik:/var/www/nexara-app/deploy/traefik:ro
     networks:
       - proxy
     labels:
