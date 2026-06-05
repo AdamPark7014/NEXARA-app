@@ -1,0 +1,13 @@
+http:
+  routers:
+    acrobat-https:
+      rule: 'Host(`acrobat.mx`, `www.acrobat.mx`)'
+      service: acrobat-app
+      entryPoints: [websecure]
+      tls:
+        certResolver: letsencrypt
+  services:
+    acrobat-app:
+      loadBalancer:
+        servers:
+          - url: http://acrobat-app-app-1:80
