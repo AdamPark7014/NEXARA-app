@@ -15,7 +15,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
-import { ORG_ROLE_TEMPLATES, ORG_ROLE_KEYS, type OrgRoleKey } from '../src/common/org-roles';
+import { ORG_ROLE_TEMPLATES, ORG_ROLE_KEYS, type OrgRoleKey, type OrgRoleTemplate } from '../../src/common/org-roles';
 
 const prisma = new PrismaClient();
 
@@ -227,7 +227,7 @@ async function seedDemoUsers() {
   let updated = 0;
 
   for (const u of DEMO_USERS) {
-    const template = ORG_ROLE_TEMPLATES.find((t) => t.orgRoleKey === u.orgRoleKey);
+    const template = ORG_ROLE_TEMPLATES.find((t: OrgRoleTemplate) => t.orgRoleKey === u.orgRoleKey);
     if (!template) {
       console.warn(`   ⚠️  Sin plantilla para ${u.orgRoleKey} — se omite ${u.email}`);
       continue;
