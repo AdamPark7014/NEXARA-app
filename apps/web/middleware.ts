@@ -396,6 +396,35 @@ export function middleware(request: NextRequest) {
   const requestPathname = request.nextUrl.pathname;
 
   // ════════════════════════════════════════════════════════════════════
+  //  Auth gate de panel (server-side, antes del render)
+  // ════════════════════════════════════════════════════════════════════
+  // Cualquier path que viva dentro de un panel privado (/erp, /crm, /ops,
+  // /studio, /lab y sus alias legacy/subdominios) requiere que el usuario
+  // haya iniciado sesión. La autenticación cliente vive en `sessionStorage`,
+  // pero el AuthService también setea la cookie no-HTTPOnly `nx_session=1`
+  // (ver `apps/web/components/UserContext.tsx` → `safePersistUser`). Sin
+  // esa cookie, redirigimos a `/login` ANTES de renderizar nada para
+  // eliminar el flash de UI que se mostraba al público sin sidebar.
+  //
+  // El portal cliente (`/tickets`) tiene su propio gate dentro del layout
+  // porque permite registro/login desde la misma URL.
+  if (request.method === 'GET' || request.method === 'HEAD') {
+    const isPanelPath = /^\/(erp|crm|ops|studio|lab|console|consola|contabilidad|people|operacion|noc|support|ventas|web)(\/.*)?$/.test(requestPathname);
+    const accept = (request.headers.get('accept') || '').toLowerCase();
+    const isHtmlNav = accept.includes('text/html');
+    if (isPanelPath && isHtmlNav) {
+      const sessionCookie = request.cookies.get('nx_session');
+      if (!sessionCookie || sessionCookie.value !== '1') {
+        const url = request.nextUrl.clone();
+        const nextPath = `${requestPathname}${request.nextUrl.search || ''}`;
+        url.pathname = '/login';
+        url.search = `?next=${encodeURIComponent(nextPath)}`;
+        return applySecurityHeaders(NextResponse.redirect(url, 302));
+      }
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════
   //  Migración a la arquitectura de 5 paneles consolidados (Fase 2.3)
   // ════════════════════════════════════════════════════════════════════
   //  Cuando alguien intenta un path legacy (/console/*, /operacion/*,

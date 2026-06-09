@@ -336,6 +336,9 @@ export class AuthService {
       email: user.email,
       role: user.role?.nombre ?? '',
       roleId: user.roleId,
+      // RBAC v2: clave canónica de rol (roles.v2.ts). Coexiste con roleId
+      // legacy hasta que terminemos la migración de toda la base de usuarios.
+      roleKey: user.roleKey ?? null,
       orgRoleKey: user.role?.orgRoleKey ?? null,
       nivelAutoridad: user.role?.nivelAutoridad ?? 0,
       roleFlags: this.pickRoleFlags(user.role),
@@ -423,6 +426,10 @@ export class AuthService {
     const payload = {
       sub: user.id,
       roleId: user.roleId,
+      // RBAC v2: el guard híbrido lee `roleKey` para resolver permisos
+      // contra `url-matrix.ts`. Si es null, cae al modelo legacy.
+      roleKey: user.roleKey ?? null,
+      orgRoleKey: user.role?.orgRoleKey ?? null,
       departmentId: user.departmentId,
       permissions,
       isSuperAdmin,

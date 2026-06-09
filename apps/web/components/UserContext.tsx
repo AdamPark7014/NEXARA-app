@@ -58,6 +58,8 @@ interface UserContextType {
 	setUser: (user: User | null) => void;
 	logout: () => void;
 	isContextReady: boolean;
+	/** JWT del usuario activo, o `null` si no hay sesión. Atajo de `user?.token`. */
+	token: string | null;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -148,6 +150,30 @@ const safeGetStoredUser = (): User | null => {
 	}
 };
 
+/**
+ * Cookie ligera leída por `apps/web/middleware.ts` para protección del lado
+ * del servidor: si no existe, el middleware redirige cualquier ruta de panel
+ * (`/erp/...`, `/crm/...`, `/ops/...`, `/studio/...`, `/lab/...`) a `/login`
+ * ANTES de renderizar — eliminando el flash de UI sin sidebar.
+ *
+ * No contiene secretos: solo señaliza "hay una sesión activa en este
+ * navegador". El JWT real sigue en sessionStorage.
+ *
+ * Nota: configuramos `Secure` solo cuando estamos en HTTPS para no romper
+ * el desarrollo local en `http://localhost`.
+ */
+const SESSION_COOKIE = 'nx_session';
+const setSessionCookie = (active: boolean) => {
+	if (typeof document === 'undefined') return;
+	const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+	const secureFlag = isHttps ? '; Secure' : '';
+	if (active) {
+		document.cookie = `${SESSION_COOKIE}=1; Path=/; SameSite=Lax; Max-Age=86400${secureFlag}`;
+	} else {
+		document.cookie = `${SESSION_COOKIE}=; Path=/; SameSite=Lax; Max-Age=0${secureFlag}`;
+	}
+};
+
 const safePersistUser = (user: User | null) => {
 	if (typeof window === 'undefined') return;
 
@@ -179,6 +205,8 @@ const safePersistUser = (user: User | null) => {
 			/* ignore */
 		}
 	}
+
+	setSessionCookie(Boolean(user?.token));
 };
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
@@ -275,7 +303,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 	};
 
 	return (
-		<UserContext.Provider value={{ user, setUser, logout, isContextReady }}>
+		<UserContext.Provider value={{ user, setUser, logout, isContextReady, token: user?.token ?? null }}>
 			{children}
 		</UserContext.Provider>
 	);

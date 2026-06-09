@@ -140,8 +140,13 @@ export class WorkflowService {
   }
 
   async listMyPending(userId: number) {
-    // Aprobaciones pendientes donde el usuario es approverUser o tiene el rol approverRole
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { roleId: true } });
+    // Aprobaciones pendientes donde el usuario es approverUser o tiene el rol approverRole.
+    // Incluye la cadena COMPLETA de aprobaciones de cada instancia para que la
+    // bandeja `/erp/approvals` pueda dibujar el timeline (paso 1 ✓, paso 2 ✓, paso 3 ⏳…).
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { roleId: true, role: { select: { nombre: true } } },
+    });
     return this.prisma.workflowApproval.findMany({
       where: {
         status: 'PENDING',
@@ -151,11 +156,30 @@ export class WorkflowService {
         ],
       },
       include: {
-        step: true,
+        step: { include: { approverRole: { select: { nombre: true } }, approverUser: { select: { nombre: true } } } },
         instance: {
           include: {
-            workflow: { select: { name: true, entityType: true } },
-            startedBy: { select: { id: true, nombre: true } },
+            workflow: {
+              select: {
+                name: true,
+                entityType: true,
+                steps: {
+                  orderBy: { stepNumber: 'asc' },
+                  include: {
+                    approverRole: { select: { nombre: true } },
+                    approverUser: { select: { nombre: true } },
+                  },
+                },
+              },
+            },
+            startedBy: { select: { id: true, nombre: true, role: { select: { nombre: true } } } },
+            approvals: {
+              orderBy: { createdAt: 'asc' },
+              include: {
+                step: true,
+                decidedBy: { select: { id: true, nombre: true } },
+              },
+            },
           },
         },
       },

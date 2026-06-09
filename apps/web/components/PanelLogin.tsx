@@ -135,6 +135,12 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         email: data.user.email,
         role: data.user.role,
         roleId: data.user.roleId,
+        // RBAC v2: clave canónica (super_admin, ceo, dir_admin…). El backend
+        // la incluye en `mapSessionUser`. Sin esto, `useUser().user.roleKey`
+        // queda undefined y `canOpenPage()` en el AppShell no puede aplicar.
+        roleKey: data.user.roleKey ?? null,
+        orgRoleKey: data.user.orgRoleKey ?? null,
+        nivelAutoridad: data.user.nivelAutoridad ?? 0,
         roleFlags: data.user.roleFlags || undefined,
         department: data.user.department,
         departmentId: data.user.departmentId,
@@ -151,6 +157,15 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
 
       if (typeof window !== 'undefined' && data.loginGreeting) {
         window.sessionStorage.setItem('nexara_login_greeting', data.loginGreeting);
+      }
+
+      // Setear cookie de sesión inmediatamente (sin esperar al ciclo de
+      // React) — el middleware la lee en el siguiente request para
+      // permitir el acceso a `/erp/...`, `/crm/...`, etc.
+      if (typeof document !== "undefined") {
+        const isHttps = window.location.protocol === "https:";
+        const secureFlag = isHttps ? "; Secure" : "";
+        document.cookie = `nx_session=1; Path=/; SameSite=Lax; Max-Age=86400${secureFlag}`;
       }
 
       setUser(userData);

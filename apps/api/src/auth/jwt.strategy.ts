@@ -60,7 +60,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, roleId: true, departmentId: true },
+      select: {
+        id: true,
+        roleId: true,
+        departmentId: true,
+        // RBAC v2 — leemos siempre el roleKey fresco de BD para que los
+        // cambios desde /erp/users surtan efecto sin requerir re-login.
+        roleKey: true,
+        role: { select: { orgRoleKey: true } },
+      },
     });
 
     if (!user) {
@@ -73,6 +81,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       departmentId: payload.departmentId,
       permissions: payload.permissions || [],
       isSuperAdmin: Boolean(payload.isSuperAdmin),
+      // RBAC v2: el guard híbrido usa estos para evaluar url-matrix.ts.
+      roleKey: user.roleKey ?? payload.roleKey ?? null,
+      orgRoleKey: user.role?.orgRoleKey ?? payload.orgRoleKey ?? null,
       clientId: payload.clientId,
       isClient: false,
     };

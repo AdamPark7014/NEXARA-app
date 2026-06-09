@@ -37,6 +37,7 @@ import {
   type ModuleId,
   type PanelId,
 } from "@/lib/access-matrix";
+import { canOpenPage, type RoleKey } from "@/lib/rbac";
 import styles from "./AppShell.module.scss";
 import CommandPalette from "./CommandPalette";
 
@@ -48,8 +49,35 @@ type AppShellProps = {
 export default function AppShell({ panel, children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout } = useUser();
+  const { user, logout, isContextReady } = useUser();
   const { darkMode, toggleDarkMode } = useTheme();
+
+  // ── Auth gate ─────────────────────────────────────────────────────────
+  // Si la sesión cargó y no hay usuario, redirigir a /login. Esto evita el
+  // bug en el que `/erp/dashboard` (y cualquier otra ruta de panel) se
+  // pintaba al público sin sidebar ni autenticación.
+  useEffect(() => {
+    if (!isContextReady) return;
+    if (user) return;
+    const nextPath = pathname || `/${panel}`;
+    const loginUrl =
+      typeof window !== "undefined"
+        ? `/login?next=${encodeURIComponent(nextPath)}`
+        : "/login";
+    router.replace(loginUrl);
+  }, [isContextReady, user, pathname, panel, router]);
+
+  // ── Token expirado / corrupto ─────────────────────────────────────────
+  // Si el user en sessionStorage no tiene `token` válido, también lo
+  // tratamos como sesión muerta y forzamos login. Cubre el caso clásico:
+  // el navegador conserva un `nexara_user` viejo de un build anterior.
+  useEffect(() => {
+    if (!isContextReady || !user) return;
+    if (!user.token || typeof user.token !== "string") {
+      logout?.();
+      router.replace("/login");
+    }
+  }, [isContextReady, user, logout, router]);
 
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -104,6 +132,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
   }, [user]);
 
   const isSuperAdmin = Boolean(user?.isSuperAdmin);
+  const v2RoleKey = (user as { roleKey?: string } | null)?.roleKey as RoleKey | undefined;
 
   const sidebarGroups = useMemo(
     () => buildSidebar(panel, orgRoleKey, isSuperAdmin),
@@ -116,6 +145,18 @@ export default function AppShell({ panel, children }: AppShellProps) {
   );
 
   const homeUrl = useMemo(() => getHomeUrl(orgRoleKey, isSuperAdmin), [orgRoleKey, isSuperAdmin]);
+
+  // Si el user está logueado PERO no tiene ningún rol resoluble, su sidebar
+  // queda vacío y la experiencia es ambigua: parece "público sin login".
+  // Forzamos el redirect al hub `/paneles` que muestra una pantalla clara
+  // ("tu cuenta no tiene rol asignado, contacta a tu administrador") en vez
+  // de dejar la página renderizada sin navegación.
+  const hasAnyAccess = isSuperAdmin || sidebarGroups.length > 0 || allowedPanels.length > 0 || Boolean(v2RoleKey);
+  useEffect(() => {
+    if (!isContextReady || !user) return;
+    if (hasAnyAccess) return;
+    router.replace("/paneles");
+  }, [isContextReady, user, hasAnyAccess, router]);
 
   const filteredGroups = useMemo(() => {
     const q = navQuery.trim().toLowerCase();
@@ -132,9 +173,88 @@ export default function AppShell({ panel, children }: AppShellProps) {
 
   if (!user) {
     return (
-      <div className={styles.shell} style={{ "--panel-accent": panelMeta.accent } as React.CSSProperties}>
+      <div
+        className={styles.shell}
+        style={{ "--panel-accent": panelMeta.accent } as React.CSSProperties}
+        data-auth-state={isContextReady ? "redirecting" : "loading"}
+      >
         <main className={styles.main}>
-          <div className={styles.contentInner}>{children}</div>
+          <div
+            className={styles.contentInner}
+            style={{
+              minHeight: "60vh",
+              display: "grid",
+              placeItems: "center",
+              color: "var(--text-tertiary, #64748b)",
+              fontSize: 14,
+              gap: 8,
+            }}
+          >
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontWeight: 600, fontSize: 15, color: "var(--text-secondary, #475569)" }}>
+                {isContextReady ? "Redirigiendo a inicio de sesión…" : "Cargando tu sesión…"}
+              </div>
+              <div style={{ marginTop: 4, fontSize: 12.5 }}>
+                NEXARA · {panelMeta.name}
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Sesión truthy pero sin acceso a NINGÚN panel/módulo: la UI no tiene
+  // jerarquía válida (sidebar vacío, no hay home). Mostramos un estado
+  // explícito y ofrecemos cerrar sesión / volver al login en vez de dejar
+  // la página suelta sin navegación.
+  if (!hasAnyAccess) {
+    return (
+      <div
+        className={styles.shell}
+        style={{ "--panel-accent": panelMeta.accent } as React.CSSProperties}
+        data-auth-state="no-access"
+      >
+        <main className={styles.main}>
+          <div
+            className={styles.contentInner}
+            style={{
+              minHeight: "60vh",
+              display: "grid",
+              placeItems: "center",
+              padding: 24,
+            }}
+          >
+            <div style={{ textAlign: "center", maxWidth: 420 }}>
+              <div style={{ fontSize: 36, marginBottom: 12 }}>🔒</div>
+              <div style={{ fontWeight: 700, fontSize: 18, color: "var(--text-primary)", marginBottom: 8 }}>
+                Tu cuenta no tiene un rol asignado
+              </div>
+              <div style={{ fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: 18 }}>
+                Estás autenticado como <strong>{user.email}</strong>, pero todavía
+                no se te ha asignado un rol con permisos. Pide a tu
+                administrador que te asigne uno desde <em>ERP · Usuarios</em>.
+              </div>
+              <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+                <button
+                  type="button"
+                  onClick={() => { logout?.(); router.replace("/login"); }}
+                  style={{
+                    padding: "10px 16px",
+                    borderRadius: 10,
+                    border: "1px solid var(--nx-panel-hairline)",
+                    background: "var(--surface)",
+                    color: "var(--text-primary)",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Cerrar sesión
+                </button>
+              </div>
+            </div>
+          </div>
         </main>
       </div>
     );
@@ -157,7 +277,27 @@ export default function AppShell({ panel, children }: AppShellProps) {
     router.replace("/login");
   };
 
-  const accessGuardWarning = !canAccessUrl(orgRoleKey, pathname || "/", isSuperAdmin);
+  // Gate de acceso jerárquico con preferencia RBAC v2.
+  //   - Si el usuario tiene `roleKey` v2 → consultamos `canOpenPage()` con la
+  //     matriz canónica de paths (`page-matrix.ts`).
+  //   - Si todavía sólo tiene rol legacy → caemos al `canAccessUrl()` previo
+  //     basado en `access-matrix.ts` (no rompe usuarios sin migrar).
+  const accessGuardWarning = useMemo(() => {
+    const path = pathname || "/";
+    if (v2RoleKey) return !canOpenPage(v2RoleKey, path);
+    return !canAccessUrl(orgRoleKey, path, isSuperAdmin);
+  }, [v2RoleKey, orgRoleKey, isSuperAdmin, pathname]);
+
+  // Si el rol del usuario no puede ver la URL actual, redirigirlo a su home
+  // (en vez de mostrar la página con un warning).
+  useEffect(() => {
+    if (!isContextReady || !user) return;
+    if (isSuperAdmin) return;
+    if (!accessGuardWarning) return;
+    if (!homeUrl) return;
+    if (pathname && pathname.startsWith(homeUrl)) return; // ya estamos en home
+    router.replace(homeUrl);
+  }, [isContextReady, user, isSuperAdmin, accessGuardWarning, homeUrl, pathname, router]);
 
   return (
     <div
