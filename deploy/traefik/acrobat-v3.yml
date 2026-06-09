@@ -1,0 +1,15 @@
+# Traefik v3.1 routing for Acrobat (HTTP + HTTPS)
+
+http:
+  routers:
+    acrobat-http:
+      rule: Host(`acrobat.mx`) || Host(`www.acrobat.mx`)
+      entryPoints: [web, websecure]
+      service: acrobat-app
+      tls: {}
+
+  services:
+    acrobat-app:
+      loadBalancer:
+        servers:
+          - url: http://acrobat-app-app-1:80

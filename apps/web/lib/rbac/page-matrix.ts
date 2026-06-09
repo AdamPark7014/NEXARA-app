@@ -1,166 +1,262 @@
 /**
- * NEXARA · RBAC v2 (frontend) — Matriz URL ligera.
+ * NEXARA · RBAC v2 (FRONTEND) — Matriz de páginas por rol.
+ * --------------------------------------------------------
+ * Whitelist de páginas (no endpoints) por rol. Cualquier ruta NO listada está
+ * bloqueada. Las APIs (`/api/**`) las controla el backend `UrlAccessGuard`.
  *
- * Sólo necesitamos checar páginas, no endpoints (la API ya tiene su guard).
- * Esto es lo que consulta `middleware.ts` para gate de rutas.
+ * Convención de paths (canónica, alineada con `apps/web/app/(panels)/*` y
+ * con el subdominio bonito):
+ *   /erp/...     → core.nexara.com.mx        (ERP: CEO, directores, admin, RH, contabilidad)
+ *   /crm/...     → sales.nexara.com.mx       (CRM: vendedores, coord. ventas)
+ *   /ops/...     → ops.nexara.com.mx         (Ingenieros de campo, soporte, NOC)
+ *   /studio/...  → studio.nexara.com.mx      (Diseñadores, marketing)
+ *   /lab/...     → lab.nexara.com.mx         (Sandbox técnico, super_admin)
+ *   /tickets/... → portal.nexara.com.mx      (Cliente externo)
+ *
+ * Aliases legacy (`/core`, `/sales`) se normalizan automáticamente vía
+ * `normalizePathToCanonical()` para no romper bookmarks viejos.
  */
 import { ROLES, type RoleKey } from './roles';
 
-export type PageRule = string; // path con comodines: /core/**, /sales/cotizaciones/*, /core/users/:id
+export type PageRule = string; // path con comodines: /erp/**, /crm/quotes/*, /erp/users/:id
 
 /**
- * Páginas permitidas por rol. Cualquier ruta NO listada está bloqueada.
- * (Las rutas /api/** las controla el backend.)
+ * Mapeo de prefijos legacy → canónico. Mantiene compatibilidad con la
+ * documentación previa (`/core/...`, `/sales/...`, `/portal/...`) sin tener
+ * que reescribir cada referencia.
+ */
+const LEGACY_PANEL_PREFIX_MAP: Record<string, string> = {
+  '/core': '/erp',
+  '/sales': '/crm',
+  '/portal': '/tickets',
+};
+
+/** Normaliza un pathname al prefijo de panel canónico (`/erp`, `/crm`, etc.). */
+export function normalizePathToCanonical(pathname: string): string {
+  const clean = pathname.split('?')[0].replace(/\/+$/, '') || '/';
+  for (const [legacy, canonical] of Object.entries(LEGACY_PANEL_PREFIX_MAP)) {
+    if (clean === legacy) return canonical;
+    if (clean.startsWith(`${legacy}/`)) return `${canonical}${clean.slice(legacy.length)}`;
+  }
+  return clean;
+}
+
+/**
+ * Páginas permitidas por rol (whitelist). Los paths usan los slugs reales que
+ * existen en `apps/web/app/(panels)/*`. Si no aparece, está bloqueado.
  */
 export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
+  // ─── SUPER_ADMIN — bypass total ───────────────────────────────────────
   [ROLES.SUPER_ADMIN]: ['/**'],
 
+  // ─── CEO — ve TODO en lectura ─────────────────────────────────────────
   [ROLES.CEO]: [
-    '/core/**',
-    '/sales/**',
+    '/erp/**',
+    '/crm/**',
     '/ops/**',
     '/studio/**',
   ],
 
+  // ─── DIR. OPERACIONES — visión global, aprobaciones operativas ────────
   [ROLES.DIR_OPERACIONES]: [
-    '/core/dashboard',
-    '/core/aprobaciones/**',
-    '/core/proyectos/**',
-    '/core/cotizaciones/**',
-    '/core/viaticos/**',
-    '/core/actividades/**',
-    '/core/mantenimiento/**',
-    '/core/inventario/**',
-    '/core/sla/**',
-    '/core/reportes/**',
-    '/core/clientes/**',
+    '/erp',
+    '/erp/dashboard',
+    '/erp/executive',
+    '/erp/approvals',
+    '/erp/architecture',
+    '/erp/companies',
+    '/erp/calendar',
+    '/erp/documents',
+    '/erp/finance/**',
+    '/erp/procurement',
+    '/erp/warehouse',
+    '/erp/analytics/**',
+    '/erp/exports',
+    '/erp/notifications-center',
+    '/erp/my-profile',
     '/ops/**',
-    '/sales/dashboard',
-    '/sales/cotizaciones/**',
+    '/crm/dashboard',
+    '/crm/quotes/**',
+    '/crm/projects/**',
+    '/crm/tenders/**',
+    '/crm/pipeline',
+    '/crm/reports',
   ],
 
+  // ─── DIR. ADMIN — finanzas, RH, gobierno ──────────────────────────────
   [ROLES.DIR_ADMIN]: [
-    '/core/**',
+    '/erp/**',
+    '/crm/dashboard',
+    '/crm/quotes/**',
+    '/crm/reports',
   ],
 
+  // ─── COORD ADMIN — segundo nivel administrativo ───────────────────────
   [ROLES.COORD_ADMIN]: [
-    '/core/dashboard',
-    '/core/aprobaciones/**',
-    '/core/contabilidad/**',
-    '/core/facturacion/**',
-    '/core/compras/**',
-    '/core/viaticos/**',
-    '/core/inventario/**',
-    '/core/almacen/**',
-    '/core/actividades/**',
-    '/core/clientes/**',
-    '/core/documentos/**',
-    '/core/usuarios',
-    '/core/reportes/**',
+    '/erp',
+    '/erp/dashboard',
+    '/erp/approvals',
+    '/erp/companies',
+    '/erp/calendar',
+    '/erp/documents',
+    '/erp/accounting',
+    '/erp/banking',
+    '/erp/invoicing',
+    '/erp/finance/**',
+    '/erp/procurement',
+    '/erp/warehouse',
+    '/erp/users',
+    '/erp/exports',
+    '/erp/notifications-center',
+    '/erp/my-profile',
+    '/erp/news',
   ],
 
+  // ─── ADMINISTRATIVO — operación día a día ─────────────────────────────
   [ROLES.ADMINISTRATIVO]: [
-    '/core/dashboard',
-    '/core/actividades/**',
-    '/core/viaticos/**',
-    '/core/documentos/**',
-    '/core/clientes/**',
-    '/core/cotizaciones',
-    '/core/inventario',
-    '/core/contabilidad',
-    '/core/aprobaciones/mias',
-    '/core/mi-perfil',
+    '/erp',
+    '/erp/dashboard',
+    '/erp/approvals',
+    '/erp/companies',
+    '/erp/calendar',
+    '/erp/documents',
+    '/erp/finance/viatics',
+    '/erp/finance/expenses',
+    '/erp/notifications-center',
+    '/erp/my-profile',
+    '/erp/news',
   ],
 
+  // ─── COORD OPERACIONES — supervisa campo / project manager ────────────
   [ROLES.COORD_OPERACIONES]: [
+    '/ops',
     '/ops/dashboard',
-    '/ops/actividades/**',
-    '/ops/proyectos/**',
-    '/ops/agenda/**',
-    '/ops/equipos/**',
-    '/ops/mantenimiento/**',
-    '/ops/sla/**',
-    '/ops/vehiculos/**',
-    '/ops/gps/**',
-    '/core/cotizaciones',
-    '/core/dashboard',
+    '/ops/activities',
+    '/ops/evidences',
+    '/ops/projects',
+    '/ops/vehicles',
+    '/ops/maintenance/**',
+    '/ops/support/**',
+    '/ops/noc',
+    '/ops/gps',
+    '/ops/assets',
+    '/ops/service-clients',
+    '/ops/tools',
+    '/ops/recruiting',
+    '/erp/calendar',
+    '/erp/dashboard',
+    '/erp/notifications-center',
+    '/erp/my-profile',
+    '/crm/quotes',
   ],
 
+  // ─── ING. CAMPO — solo lo suyo ────────────────────────────────────────
   [ROLES.ING_CAMPO]: [
-    '/ops/mi-agenda',
-    '/ops/mis-actividades/**',
-    '/ops/mis-viaticos/**',
-    '/ops/asistencia/**',
-    '/ops/mis-vehiculos',
-    '/ops/mi-perfil',
+    '/ops',
+    '/ops/dashboard',
+    '/ops/my-activities',
+    '/ops/my-evidences',
+    '/ops/my-viatics',
+    '/ops/my-vehicles',
+    '/ops/tools',
+    '/erp/notifications-center',
+    '/erp/my-profile',
   ],
 
+  // ─── ING. SOPORTE — tickets, NOC, mantenimiento ───────────────────────
   [ROLES.ING_SOPORTE]: [
-    '/ops/soporte/**',
-    '/ops/noc/**',
-    '/ops/mantenimiento/**',
-    '/ops/sla/**',
-    '/ops/equipos/**',
-    '/ops/clientes-servicio/**',
-    '/ops/kb/**',
+    '/ops',
+    '/ops/dashboard',
+    '/ops/support/**',
+    '/ops/noc',
+    '/ops/maintenance/**',
+    '/ops/assets',
+    '/ops/service-clients',
+    '/ops/activities',
+    '/erp/notifications-center',
+    '/erp/my-profile',
   ],
 
+  // ─── COORD VENTAS — gerente comercial ─────────────────────────────────
   [ROLES.COORD_VENTAS]: [
-    '/sales/**',
-    '/core/dashboard',
+    '/crm/**',
+    '/erp/dashboard',
+    '/erp/notifications-center',
+    '/erp/my-profile',
   ],
 
+  // ─── VENDEDOR — su pipeline ──────────────────────────────────────────
   [ROLES.VENDEDOR]: [
-    '/sales/dashboard',
-    '/sales/mis-leads/**',
-    '/sales/mis-clientes/**',
-    '/sales/oportunidades/**',
-    '/sales/cotizaciones/**',
-    '/sales/agenda',
-    '/sales/catalogo',
-    '/sales/mi-cuota',
-    '/sales/mi-perfil',
+    '/crm',
+    '/crm/dashboard',
+    '/crm/leads',
+    '/crm/clients',
+    '/crm/opportunities',
+    '/crm/quotes',
+    '/crm/templates',
+    '/crm/agenda',
+    '/crm/products',
+    '/crm/targets',
+    '/crm/pipeline',
+    '/erp/notifications-center',
+    '/erp/my-profile',
   ],
 
+  // ─── LÍDER DISEÑO — Studio completo ───────────────────────────────────
   [ROLES.LIDER_DISENO]: [
     '/studio/**',
-    '/core/dashboard',
+    '/erp/dashboard',
+    '/erp/notifications-center',
+    '/erp/my-profile',
   ],
 
+  // ─── DISEÑADOR — Studio core ──────────────────────────────────────────
   [ROLES.DISENADOR]: [
+    '/studio',
     '/studio/dashboard',
-    '/studio/sitio/**',
-    '/studio/proyectos/**',
-    '/studio/galeria/**',
-    '/studio/noticias/**',
-    '/studio/redes/**',
-    '/studio/mi-perfil',
+    '/studio/pages',
+    '/studio/news',
+    '/studio/social',
+    '/studio/cases',
+    '/studio/contacts',
+    '/studio/leads',
+    '/erp/notifications-center',
+    '/erp/my-profile',
   ],
 
+  // ─── RH ───────────────────────────────────────────────────────────────
   [ROLES.RH]: [
-    '/core/dashboard',
-    '/core/rh/**',
-    '/core/empleados/**',
-    '/core/asistencia/**',
-    '/core/cvs/**',
-    '/core/nomina/**',
-    '/core/vacaciones/**',
-    '/core/sanciones/**',
-    '/core/lunch-breaks/**',
+    '/erp',
+    '/erp/dashboard',
+    '/erp/hr/**',
+    '/erp/finance/employee-payments',
+    '/erp/calendar',
+    '/erp/documents',
+    '/erp/notifications-center',
+    '/erp/my-profile',
+    '/ops/recruiting',
   ],
 
+  // ─── CONTABILIDAD ─────────────────────────────────────────────────────
   [ROLES.CONTABILIDAD]: [
-    '/core/dashboard',
-    '/core/contabilidad/**',
-    '/core/facturacion/**',
-    '/core/banca/**',
-    '/core/gastos/**',
-    '/core/cotizaciones',
-    '/core/reportes/**',
+    '/erp',
+    '/erp/dashboard',
+    '/erp/accounting',
+    '/erp/banking',
+    '/erp/invoicing',
+    '/erp/finance/**',
+    '/erp/exports',
+    '/erp/calendar',
+    '/erp/documents',
+    '/erp/notifications-center',
+    '/erp/my-profile',
+    '/crm/quotes',
   ],
 
+  // ─── CLIENTE EXTERNO — portal ─────────────────────────────────────────
   [ROLES.CLIENTE]: [
-    '/portal/**',
+    '/tickets',
+    '/tickets/**',
   ],
 };
 
@@ -180,15 +276,15 @@ function rx(p: string): RegExp {
   return r;
 }
 
-/** Verifica si un rol puede ABRIR una página concreta. */
+/** Verifica si un rol puede ABRIR una página concreta (acepta paths legacy). */
 export function canOpenPage(role: RoleKey, pathname: string): boolean {
   if (role === ROLES.SUPER_ADMIN) return true;
-  const clean = pathname.split('?')[0].replace(/\/+$/, '') || '/';
+  const clean = normalizePathToCanonical(pathname);
   const rules = PAGE_MATRIX[role] ?? [];
   return rules.some(p => rx(p).test(clean));
 }
 
-/** Lista plana de prefijos permitidos (para sidebar). */
+/** Lista plana de prefijos permitidos (para sidebar / introspección). */
 export function allowedPrefixes(role: RoleKey): string[] {
   return PAGE_MATRIX[role] ?? [];
 }

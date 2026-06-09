@@ -1,28 +1,34 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import KpiCard from "@/components/ui/KpiCard";
 import Button from "@/components/ui/Button";
 import { Tag, Money } from "@/components/ui/DataTable";
+import { useUser } from "@/components/UserContext";
+import {
+  alertsToCards,
+  fetchExecutiveDashboard,
+  type ExecutiveCardAlert,
+  type ExecutiveDashboard,
+} from "@/lib/executive-api";
 
 /**
  * Vista ejecutiva — la pantalla que ve el CEO al hacer login.
  * Agregado de los 4 paneles operativos con KPIs de alto nivel y
  * deeplinks a los módulos correspondientes.
+ *
+ * Datos: `GET /api/executive/c-level` (executive.service.ts). Si la API falla
+ * o el usuario no tiene permisos (`SALES_REPORTS_VIEW | CONTABILIDAD_VIEW |
+ * CONSOLE_ADMIN`), caemos a un demo estático para no dejar la pantalla vacía
+ * en demos / staging sin datos.
  */
 
-type Alert = {
-  icon: string;
-  title: string;
-  desc: string;
-  href: string;
-  urgency: "danger" | "warning";
-  cta: string;
-};
+type Alert = ExecutiveCardAlert;
 
-const ALERTS: Alert[] = [
+const FALLBACK_ALERTS: Alert[] = [
   {
     icon: "🛡️",
     title: "3 aprobaciones esperando tu firma",
@@ -49,7 +55,7 @@ const ALERTS: Alert[] = [
   },
 ];
 
-const SHORTCUTS = [
+const SHORTCUTS_BASE = [
   { href: "/erp/approvals", label: "Aprobaciones", icon: "🛡️", count: 3, accent: "#ef4444" },
   { href: "/erp/users", label: "Roles y accesos", icon: "🧑‍💼", accent: "#0ea5e9" },
   { href: "/erp/architecture", label: "Arquitectura", icon: "🗺️", accent: "#0ea5e9" },
@@ -60,19 +66,85 @@ const SHORTCUTS = [
   { href: "/studio/dashboard", label: "Studio", icon: "🎨", accent: "#a855f7" },
 ];
 
+type FetchState =
+  | { status: "loading" }
+  | { status: "ready"; data: ExecutiveDashboard }
+  | { status: "error"; message: string }
+  | { status: "anonymous" };
+
 export default function ExecutivePage() {
+  const { token, user } = useUser();
+  const [state, setState] = useState<FetchState>({ status: "loading" });
+
+  useEffect(() => {
+    if (!token || !user) {
+      setState({ status: "anonymous" });
+      return;
+    }
+    let cancelled = false;
+    setState({ status: "loading" });
+    fetchExecutiveDashboard(token)
+      .then((data) => { if (!cancelled) setState({ status: "ready", data }); })
+      .catch((err: Error) => {
+        if (cancelled) return;
+        setState({ status: "error", message: err.message });
+      });
+    return () => { cancelled = true; };
+  }, [token, user]);
+
+  const data = state.status === "ready" ? state.data : null;
+
+  // Alertas: si tenemos backend, las usamos; sino, fallback demo.
+  const alerts: Alert[] = useMemo(() => {
+    if (data && data.alerts.length > 0) return alertsToCards(data.alerts);
+    return FALLBACK_ALERTS;
+  }, [data]);
+
+  // Aprobaciones pendientes (atajos): contamos warnings/criticals si los hay.
+  const pendingCount = useMemo(() => {
+    if (!data) return 3;
+    return (data.alerts || []).filter(
+      (a) => a.level === "critical" || a.level === "warning",
+    ).length;
+  }, [data]);
+
+  const shortcuts = useMemo(() => {
+    return SHORTCUTS_BASE.map((s) =>
+      s.href === "/erp/approvals" ? { ...s, count: pendingCount } : s,
+    );
+  }, [pendingCount]);
+
+  // KPIs financieros: usar backend cuando esté, fallback demo si no.
+  const kpis = data?.headlineKpis ?? null;
+  const sales = data?.sales ?? null;
+  const operations = data?.operations ?? null;
+  const finance = data?.finance ?? null;
+
+  const isLive = state.status === "ready";
+
   return (
     <>
       <PageHeader
         eyebrow="ERP · CEO"
         title="Vista ejecutiva"
-        subtitle="Todo el negocio en una pantalla. Si algo necesita tu atención, aparece arriba — el resto es contexto."
+        subtitle={
+          state.status === "loading"
+            ? "Consolidando ventas, operación, finanzas y RH…"
+            : "Todo el negocio en una pantalla. Si algo necesita tu atención, aparece arriba — el resto es contexto."
+        }
         variant="hero"
         meta={
           <>
-            <Tag variant="danger" dot>3 firmas pendientes</Tag>
-            <Tag variant="warning">2 alertas operativas</Tag>
-            <Tag variant="positive">Salud global 87%</Tag>
+            <Tag variant={isLive ? "positive" : "neutral"} dot>{isLive ? "Live" : state.status === "loading" ? "Cargando" : "Demo"}</Tag>
+            {alerts.some((a) => a.urgency === "danger") && (
+              <Tag variant="danger" dot>{alerts.filter((a) => a.urgency === "danger").length} críticas</Tag>
+            )}
+            {alerts.some((a) => a.urgency === "warning") && (
+              <Tag variant="warning">{alerts.filter((a) => a.urgency === "warning").length} alertas</Tag>
+            )}
+            {data && (
+              <Tag variant="neutral">{data.teamSize} en plantilla</Tag>
+            )}
           </>
         }
         actions={
@@ -94,7 +166,7 @@ export default function ExecutivePage() {
         tone="accent"
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {ALERTS.map((a, i) => {
+          {alerts.map((a, i) => {
             const color = a.urgency === "danger" ? "var(--danger)" : "var(--warning)";
             return (
               <Link
@@ -185,14 +257,50 @@ export default function ExecutivePage() {
         </div>
       </Section>
 
-      <Section eyebrow="$" title="Pulso financiero" subtitle="Mes actual vs anterior">
+      <Section eyebrow="$" title="Pulso financiero" subtitle={kpis ? `Cierre de ${new Date().toLocaleDateString("es-MX", { month: "long", year: "numeric" })} en vivo` : "Mes actual vs anterior"}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
-          <KpiCard label="Ingresos del mes" value={<Money value={4820000} compact />} hint="vs $4.1M mes pasado" trend={{ direction: "up", value: "+17.5%" }} variant="positive" icon="💰" sparkline={[3.4, 3.7, 3.9, 4.0, 4.2, 4.5, 4.82]} />
-          <KpiCard label="Gastos del mes" value={<Money value={2840000} compact />} hint="vs $2.9M mes pasado" trend={{ direction: "up", value: "-2.1%" }} variant="positive" icon="📉" />
-          <KpiCard label="Margen bruto" value="41.1%" hint="vs 38.6% mes pasado" trend={{ direction: "up", value: "+2.5pp" }} variant="accent" icon="📊" sparkline={[35, 36, 37, 38, 39, 40, 41.1]} />
-          <KpiCard label="MRR vigente" value={<Money value={177000} compact />} hint="5 contratos activos" icon="🔄" />
-          <KpiCard label="Cobranza vencida" value={<Money value={852000} compact />} hint="3 clientes > 60 días" variant="warning" icon="⏳" trend={{ direction: "down", value: "+$120k WoW" }} />
-          <KpiCard label="Saldo en bancos" value={<Money value={2410000} compact />} hint="3 cuentas operativas" icon="🏦" />
+          <KpiCard
+            label="Ingresos del mes"
+            value={<Money value={kpis?.revenueMtd ?? 4820000} compact />}
+            hint={kpis ? `vs ${new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 }).format(kpis.revenuePrevMonth)} mes pasado` : "vs $4.1M mes pasado"}
+            trend={kpis ? { direction: kpis.revenueMoMChange >= 0 ? "up" : "down", value: `${kpis.revenueMoMChange >= 0 ? "+" : ""}${kpis.revenueMoMChange}%` } : { direction: "up", value: "+17.5%" }}
+            variant={kpis ? (kpis.revenueMoMChange >= 0 ? "positive" : "warning") : "positive"}
+            icon="💰"
+          />
+          <KpiCard
+            label="Ingresos YTD"
+            value={<Money value={kpis?.revenueYtd ?? 38400000} compact />}
+            hint={kpis ? `${kpis.wonOppsMtd} oportunidades ganadas este mes` : "Acumulado del año"}
+            variant="accent"
+            icon="📊"
+          />
+          <KpiCard
+            label="Pipeline activo"
+            value={<Money value={kpis?.pipelineValue ?? 8420000} compact />}
+            hint={kpis ? `${kpis.pipelineCount} oportunidades en curso` : "9 oportunidades activas"}
+            variant="accent"
+            icon="🎯"
+          />
+          <KpiCard
+            label="Saldo en bancos"
+            value={<Money value={kpis?.cashOnHand ?? 2410000} compact />}
+            hint={kpis ? "Total cuentas activas" : "3 cuentas operativas"}
+            icon="🏦"
+          />
+          <KpiCard
+            label="Cuentas por cobrar"
+            value={<Money value={kpis?.arOutstanding ?? 852000} compact />}
+            hint={finance ? `${finance.overdueInvoices} facturas vencidas` : "3 clientes > 60 días"}
+            variant={finance && finance.overdueInvoices > 0 ? "warning" : "default"}
+            icon="⏳"
+          />
+          <KpiCard
+            label="Capital de trabajo"
+            value={<Money value={kpis?.workingCapital ?? 1200000} compact />}
+            hint="AR − AP"
+            variant={kpis && kpis.workingCapital >= 0 ? "positive" : "warning"}
+            icon="💼"
+          />
         </div>
       </Section>
 
@@ -209,10 +317,34 @@ export default function ExecutivePage() {
         }
       >
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
-          <KpiCard label="Pipeline total" value={<Money value={8420000} compact />} hint="9 oportunidades activas" variant="accent" icon="🎯" sparkline={[6.2, 6.8, 7.1, 7.5, 7.9, 8.2, 8.42]} />
-          <KpiCard label="Pipeline ponderado" value={<Money value={4180000} compact />} hint="por probabilidad" icon="⚖️" />
-          <KpiCard label="Cotizaciones firmadas" value="2 / 7" hint="tasa 28.6%" trend={{ direction: "up", value: "+5pp" }} variant="positive" icon="✍️" />
-          <KpiCard label="Leads del mes" value="47" hint="vs 32 mes pasado" trend={{ direction: "up", value: "+47%" }} variant="positive" icon="✨" sparkline={[18, 22, 28, 32, 38, 42, 47]} />
+          <KpiCard
+            label="Pipeline total"
+            value={<Money value={kpis?.pipelineValue ?? 8420000} compact />}
+            hint={kpis ? `${kpis.pipelineCount} oportunidades activas` : "9 oportunidades activas"}
+            variant="accent"
+            icon="🎯"
+          />
+          <KpiCard
+            label="Ganadas (mes)"
+            value={String(kpis?.wonOppsMtd ?? 2)}
+            hint={kpis ? new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 }).format(kpis.revenueMtd) : "vs 7 cotizaciones"}
+            trend={kpis ? { direction: "up", value: `${kpis.revenueMoMChange >= 0 ? "+" : ""}${kpis.revenueMoMChange}% MoM` } : { direction: "up", value: "+5pp" }}
+            variant="positive"
+            icon="✍️"
+          />
+          <KpiCard
+            label="Leads calientes"
+            value={String(sales?.hotLeads ?? 47)}
+            hint={sales ? "Score ≥ 70" : "vs 32 mes pasado"}
+            variant={sales && sales.hotLeads > 0 ? "accent" : "default"}
+            icon="✨"
+          />
+          <KpiCard
+            label="Licitaciones"
+            value={`${sales?.tendersOpen ?? 4} / ${sales?.tendersWon ?? 2}`}
+            hint="abiertas / ganadas"
+            icon="📜"
+          />
         </div>
       </Section>
 
@@ -229,10 +361,33 @@ export default function ExecutivePage() {
         }
       >
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
-          <KpiCard label="OT cerradas (mes)" value="142" hint="92% en tiempo" variant="positive" icon="✓" sparkline={[110, 118, 124, 130, 134, 138, 142]} />
-          <KpiCard label="OT abiertas hoy" value="11" hint="5 en curso · 6 pendientes" icon="📋" />
-          <KpiCard label="SLA cumplimiento" value="96.2%" hint="vs 94.8% mes pasado" trend={{ direction: "up", value: "+1.4pp" }} variant="positive" icon="⏱️" sparkline={[94, 94.5, 95, 95.5, 96, 96.1, 96.2]} />
-          <KpiCard label="Sitios monitoreados" value="48" hint="46 OK · 1 degradado · 1 caído" variant="warning" icon="📡" />
+          <KpiCard
+            label="OT cerradas (mes)"
+            value={String(operations?.otCompletedMtd ?? 142)}
+            hint={operations ? `${operations.activeProjects} proyectos activos` : "92% en tiempo"}
+            variant="positive"
+            icon="✓"
+          />
+          <KpiCard
+            label="OT abiertas"
+            value={String(operations?.otOpen ?? 11)}
+            hint={operations ? `${operations.otOverdue} vencidas` : "5 en curso · 6 pendientes"}
+            variant={operations && operations.otOverdue > 0 ? "warning" : "default"}
+            icon="📋"
+          />
+          <KpiCard
+            label="Tickets soporte"
+            value={String(operations?.ticketsOpen ?? 8)}
+            hint={operations ? `${operations.ticketsClosedMtd} cerrados este mes` : "vs 12 mes pasado"}
+            variant={operations && operations.ticketsOpen > 10 ? "warning" : "positive"}
+            icon="🎫"
+          />
+          <KpiCard
+            label="Mantenimiento"
+            value={String(data?.maintenance.activeContracts ?? 12)}
+            hint={data ? `${data.maintenance.upcomingVisits} visitas próximas (30d)` : "contratos activos"}
+            icon="🛠️"
+          />
         </div>
       </Section>
 
@@ -249,16 +404,39 @@ export default function ExecutivePage() {
         }
       >
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
-          <KpiCard label="Plantilla activa" value="34" hint="28 internos · 6 contratistas" icon="🧑‍💼" />
-          <KpiCard label="Ingenieros en campo" value="12 / 14" hint="2 con vacaciones" icon="🛠️" />
-          <KpiCard label="Bajas (90d)" value="1" hint="rotación 2.9%" variant="positive" icon="📉" />
-          <KpiCard label="Capacitaciones pendientes" value="6" hint="vence en 2 semanas" variant="warning" icon="🎓" />
+          <KpiCard
+            label="Plantilla activa"
+            value={String(data?.teamSize ?? 34)}
+            hint={data ? `${data.clientsCount} clientes activos` : "28 internos · 6 contratistas"}
+            icon="🧑‍💼"
+          />
+          <KpiCard
+            label="Compras pendientes"
+            value={`${data?.procurement.pendingRequisitions ?? 0} / ${data?.procurement.pendingPOs ?? 0}`}
+            hint="requisiciones / OC"
+            variant={data && (data.procurement.pendingRequisitions + data.procurement.pendingPOs) > 5 ? "warning" : "default"}
+            icon="🛒"
+          />
+          <KpiCard
+            label="Stock crítico"
+            value={String(data?.procurement.lowStockItems ?? 0)}
+            hint="insumos en mínimo"
+            variant={data && data.procurement.lowStockItems > 0 ? "warning" : "positive"}
+            icon="📦"
+          />
+          <KpiCard
+            label="Top vendedor"
+            value={data?.topSellers[0]?.ownerName ?? "—"}
+            hint={data?.topSellers[0]?.revenue ? new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 }).format(data.topSellers[0].revenue) : "del mes"}
+            variant="accent"
+            icon="🏆"
+          />
         </div>
       </Section>
 
       <Section eyebrow="Saltos" title="Atajos rápidos" subtitle="Lo que más usas — un clic">
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
-          {SHORTCUTS.map((a) => (
+          {shortcuts.map((a) => (
             <Link
               key={a.href}
               href={a.href}

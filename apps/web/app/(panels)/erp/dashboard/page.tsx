@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import KpiCard from "@/components/ui/KpiCard";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import { Tag, Money } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
+import { fetchExecutiveDashboard, type ExecutiveDashboard } from "@/lib/executive-api";
+import { listMyPendingApprovals, type PendingApproval } from "@/lib/workflow-api";
 
 type Approval = {
   id: string;
@@ -17,12 +20,39 @@ type Approval = {
   urgencia: "alta" | "media" | "baja";
 };
 
-const APPROVALS: Approval[] = [
+const APPROVALS_DEMO: Approval[] = [
   { id: "OC-4892", titulo: "OC #4892 · 24 cámaras Hikvision DS-2CD2143", monto: 84200, solicita: "Almacén · Israel R.", panel: "ERP", urgencia: "alta" },
   { id: "VIA-188", titulo: "Viáticos · Visita Soriana Querétaro (4 ing, 3 días)", monto: 18400, solicita: "PM · Alejandro G.", panel: "OPS", urgencia: "media" },
   { id: "COT-602", titulo: "Descuento 22% · Cotización UDLA Puebla (laptops)", monto: 412000, solicita: "Karina M.", panel: "CRM", urgencia: "alta" },
   { id: "HR-21", titulo: "Contratación · Ingeniero CCTV junior", monto: null, solicita: "RH · Carolina J.", panel: "ERP", urgencia: "baja" },
 ];
+
+/**
+ * Mapea una aprobación pendiente del backend a la fila visual del tablero.
+ * El "panel" se infiere del tipo de entidad (cotización → CRM, viático → OPS,
+ * compra/factura → ERP) para colorear el lateral del card.
+ */
+function pendingToApproval(p: PendingApproval): Approval {
+  const entity = (p.instance?.entityType ?? "").toLowerCase();
+  let panel: Approval["panel"] = "ERP";
+  if (entity.includes("cotiz") || entity.includes("opportun") || entity.includes("quote")) panel = "CRM";
+  else if (entity.includes("viatic") || entity.includes("activity") || entity.includes("project")) panel = "OPS";
+  const idLabel = `${entity.toUpperCase().slice(0, 3) || "WF"}-${p.instance?.entityId ?? p.id}`;
+  const titulo = p.step?.name
+    ? `${p.step.name} · ${entity || "workflow"} #${p.instance?.entityId ?? p.id}`
+    : `Workflow #${p.id}`;
+  // Heurística simple de urgencia: stepNumber alto = más arriba en jerarquía = más crítico
+  const stepNum = p.step?.stepNumber ?? 1;
+  const urgencia: Approval["urgencia"] = stepNum >= 3 ? "alta" : stepNum >= 2 ? "media" : "baja";
+  return {
+    id: idLabel,
+    titulo,
+    monto: null,
+    solicita: p.step?.approverRole?.nombre ?? p.step?.approverUser?.nombre ?? "Sistema",
+    panel,
+    urgencia,
+  };
+}
 
 const PANEL_COLOR: Record<Approval["panel"], string> = {
   ERP: "#0ea5e9",
@@ -49,11 +79,35 @@ const HEALTH = [
 ];
 
 export default function ErpDashboardPage() {
-  const { user } = useUser();
+  const { user, token } = useUser();
   const nombre = user?.nombre?.split(" ")[0] ?? "Equipo";
   const ahora = new Date();
   const horas = ahora.getHours();
   const saludo = horas < 12 ? "Buenos días" : horas < 19 ? "Buenas tardes" : "Buenas noches";
+
+  const [exec, setExec] = useState<ExecutiveDashboard | null>(null);
+  const [pendings, setPendings] = useState<PendingApproval[] | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    Promise.allSettled([
+      fetchExecutiveDashboard(token),
+      listMyPendingApprovals(token),
+    ]).then(([e, p]) => {
+      if (cancelled) return;
+      if (e.status === "fulfilled") setExec(e.value);
+      if (p.status === "fulfilled") setPendings(p.value);
+    });
+    return () => { cancelled = true; };
+  }, [token]);
+
+  const approvals: Approval[] = useMemo(() => {
+    if (pendings && pendings.length > 0) return pendings.slice(0, 6).map(pendingToApproval);
+    return APPROVALS_DEMO;
+  }, [pendings]);
+
+  const isLive = Boolean(exec);
 
   return (
     <>
@@ -64,9 +118,11 @@ export default function ErpDashboardPage() {
         variant="hero"
         meta={
           <>
-            <Tag variant="accent" dot>EN VIVO</Tag>
+            <Tag variant={isLive ? "accent" : "neutral"} dot>{isLive ? "EN VIVO" : "Cargando…"}</Tag>
             <Tag variant="neutral">{new Intl.DateTimeFormat("es-MX", { weekday: "long", day: "numeric", month: "long" }).format(ahora)}</Tag>
-            <Tag variant="positive">Salud global 87%</Tag>
+            {pendings && pendings.length > 0 && (
+              <Tag variant="warning" dot>{pendings.length} aprobaciones</Tag>
+            )}
           </>
         }
         actions={
@@ -93,50 +149,45 @@ export default function ErpDashboardPage() {
       >
         <KpiCard
           label="Pipeline activo"
-          value={<>$<span style={{ fontSize: "0.7em", opacity: 0.85, marginLeft: 2 }}>4.8M</span></>}
-          hint="32 oportunidades en negociación"
+          value={<Money value={exec?.headlineKpis.pipelineValue ?? 4_800_000} compact />}
+          hint={exec ? `${exec.headlineKpis.pipelineCount} oportunidades en negociación` : "32 oportunidades en negociación"}
           icon="🎯"
           variant="accent"
-          trend={{ value: "+12% MoM", direction: "up" }}
-          sparkline={[3.6, 3.9, 4.1, 4.0, 4.3, 4.6, 4.8]}
+          trend={exec ? { value: `${exec.headlineKpis.revenueMoMChange >= 0 ? "+" : ""}${exec.headlineKpis.revenueMoMChange}% MoM`, direction: exec.headlineKpis.revenueMoMChange >= 0 ? "up" : "down" } : { value: "+12% MoM", direction: "up" }}
         />
         <KpiCard
           label="Proyectos en campo"
-          value="18"
-          hint="6 CCTV · 4 redes · 8 mantenimiento"
+          value={String(exec?.operations.activeProjects ?? 18)}
+          hint={exec ? `${exec.operations.otOpen} OT abiertas · ${exec.operations.otOverdue} vencidas` : "6 CCTV · 4 redes · 8 mantenimiento"}
           icon="🛠️"
-          sparkline={[12, 13, 14, 16, 15, 17, 18]}
         />
         <KpiCard
-          label="Margen del mes"
-          value="34.2%"
-          hint="vs 31% planeado"
-          icon="📈"
-          variant="positive"
-          trend={{ value: "+3.2pp", direction: "up" }}
-          sparkline={[28, 30, 31, 32, 32, 33, 34.2]}
+          label="Ingresos del mes"
+          value={<Money value={exec?.headlineKpis.revenueMtd ?? 4_820_000} compact />}
+          hint={exec ? `vs ${new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 }).format(exec.headlineKpis.revenuePrevMonth)} mes pasado` : "vs $4.1M mes pasado"}
+          icon="💰"
+          variant={exec && exec.headlineKpis.revenueMoMChange >= 0 ? "positive" : "warning"}
+          trend={exec ? { value: `${exec.headlineKpis.revenueMoMChange >= 0 ? "+" : ""}${exec.headlineKpis.revenueMoMChange}%`, direction: exec.headlineKpis.revenueMoMChange >= 0 ? "up" : "down" } : { value: "+3.2pp", direction: "up" }}
         />
         <KpiCard
           label="Cobranza pendiente"
-          value={<><Money value={1_200_000} compact /></>}
-          hint="9 facturas > 30 días"
+          value={<Money value={exec?.headlineKpis.arOutstanding ?? 1_200_000} compact />}
+          hint={exec ? `${exec.finance.overdueInvoices} facturas vencidas` : "9 facturas > 30 días"}
           icon="🧾"
-          variant="warning"
-          trend={{ value: "-4% WoW", direction: "down" }}
+          variant={exec && exec.finance.overdueInvoices > 0 ? "warning" : "default"}
         />
         <KpiCard
           label="Alertas críticas"
-          value="3"
-          hint="2 SLA en riesgo · 1 stock mínimo"
+          value={String(exec?.alerts.filter((a) => a.level === "critical").length ?? 3)}
+          hint={exec ? `${exec.alerts.filter((a) => a.level === "warning").length} avisos · ${exec.procurement.lowStockItems} stock crítico` : "2 SLA en riesgo · 1 stock mínimo"}
           icon="⚠️"
-          variant="danger"
+          variant={exec && exec.alerts.some((a) => a.level === "critical") ? "danger" : "default"}
         />
         <KpiCard
-          label="Personal en sitio"
-          value="11/14"
-          hint="3 ingenieros en oficina"
+          label="Plantilla activa"
+          value={String(exec?.teamSize ?? 14)}
+          hint={exec ? `${exec.clientsCount} clientes activos` : "3 ingenieros en oficina"}
           icon="🧑‍💼"
-          sparkline={[10, 11, 12, 11, 12, 11, 11]}
         />
       </div>
 
@@ -161,7 +212,7 @@ export default function ErpDashboardPage() {
           }
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {APPROVALS.map((a) => (
+            {approvals.map((a) => (
               <article
                 key={a.id}
                 style={{
@@ -226,9 +277,11 @@ export default function ErpDashboardPage() {
                   <Tag variant={a.urgencia === "alta" ? "danger" : a.urgencia === "media" ? "warning" : "neutral"} dot>
                     {a.urgencia}
                   </Tag>
-                  <Button size="sm" variant="primary">
-                    Revisar
-                  </Button>
+                  <Link href="/erp/approvals" style={{ textDecoration: "none" }}>
+                    <Button size="sm" variant="primary">
+                      Revisar
+                    </Button>
+                  </Link>
                 </div>
               </article>
             ))}

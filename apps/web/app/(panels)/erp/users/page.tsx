@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import { Tag } from "@/components/ui/DataTable";
+import { useUser } from "@/components/UserContext";
 import {
   PANEL_META,
   PANELS,
@@ -18,6 +19,15 @@ import {
   ORG_ROLE_META,
   type OrgRoleKey,
 } from "@/lib/org-roles";
+import {
+  ROLES,
+  ALL_ROLES,
+  ROLE_LABELS,
+  ROLE_TIER,
+  ROLE_HOME_PANEL,
+  type RoleKey,
+} from "@/lib/rbac/roles";
+import { listUsers, updateUserRoleKey, type ApiUserRow } from "@/lib/users-api";
 
 /**
  * Página premium de Gestión de Usuarios y Roles.
@@ -54,9 +64,63 @@ function tierFor(nivel: number): { label: string; color: string; bg: string } {
   return { label: "Operativo", color: "#64748b", bg: "color-mix(in srgb, #64748b 14%, transparent)" };
 }
 
+type RealUserState =
+  | { kind: "loading" }
+  | { kind: "ready"; users: ApiUserRow[] }
+  | { kind: "empty" }
+  | { kind: "error"; message: string }
+  | { kind: "anonymous" };
+
 export default function UsersPage() {
+  const { user } = useUser();
   const [selectedRole, setSelectedRole] = useState<OrgRoleKey>(ORG_ROLE_KEYS.SALES_REP);
   const [filter, setFilter] = useState("");
+  const [realState, setRealState] = useState<RealUserState>({ kind: "loading" });
+  const [savingUserId, setSavingUserId] = useState<number | null>(null);
+  const [savedUserId, setSavedUserId] = useState<number | null>(null);
+
+  const fetchRealUsers = async () => {
+    if (!user?.token) {
+      setRealState({ kind: "anonymous" });
+      return;
+    }
+    setRealState({ kind: "loading" });
+    try {
+      const list = await listUsers(user.token, { limit: 200 });
+      setRealState(list.length === 0 ? { kind: "empty" } : { kind: "ready", users: list });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Error al cargar usuarios";
+      setRealState({ kind: "error", message: msg });
+    }
+  };
+
+  useEffect(() => {
+    void fetchRealUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.token]);
+
+  const handleRoleKeyChange = async (userId: number, roleKey: RoleKey) => {
+    if (!user?.token) return;
+    setSavingUserId(userId);
+    setSavedUserId(null);
+    try {
+      const updated = await updateUserRoleKey(user.token, userId, roleKey);
+      setRealState((s) => {
+        if (s.kind !== "ready") return s;
+        return {
+          ...s,
+          users: s.users.map((u) => (u.id === userId ? { ...u, roleKey: (updated.roleKey ?? roleKey) as RoleKey } : u)),
+        };
+      });
+      setSavedUserId(userId);
+      window.setTimeout(() => setSavedUserId((prev) => (prev === userId ? null : prev)), 2200);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "No se pudo cambiar el rol";
+      window.alert(`Error: ${msg}`);
+    } finally {
+      setSavingUserId(null);
+    }
+  };
 
   const filteredUsers = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -108,6 +172,214 @@ export default function UsersPage() {
           </>
         }
       />
+
+      <Section
+        eyebrow="Cuentas reales · RBAC v2"
+        title={
+          realState.kind === "ready"
+            ? `${realState.users.length} usuarios sincronizados con la API`
+            : "Cuentas en la base de datos"
+        }
+        subtitle="Asigna el rol RBAC v2 a cada cuenta. La matriz URL→Rol se aplica al instante en backend (UrlAccessGuard) y frontend (canOpenPage)."
+        actions={
+          <Button size="sm" variant="ghost" onClick={() => void fetchRealUsers()}>
+            Actualizar
+          </Button>
+        }
+      >
+        {realState.kind === "anonymous" && (
+          <EmptyState
+            icon="🔒"
+            title="Inicia sesión"
+            description="Solo CEO / dir_admin pueden gestionar cuentas. Inicia sesión para ver el listado real."
+          />
+        )}
+        {realState.kind === "loading" && (
+          <EmptyState icon="⏳" title="Cargando…" description="Consultando usuarios desde la API." />
+        )}
+        {realState.kind === "error" && (
+          <EmptyState
+            icon="⚠️"
+            title="No se pudo cargar"
+            description={realState.message}
+            action={
+              <Button size="sm" variant="secondary" onClick={() => void fetchRealUsers()}>
+                Reintentar
+              </Button>
+            }
+          />
+        )}
+        {realState.kind === "empty" && (
+          <EmptyState
+            icon="🪶"
+            title="Sin usuarios visibles"
+            description="Tu cuenta no tiene permisos para listar usuarios o aún no hay registros en la base."
+          />
+        )}
+        {realState.kind === "ready" && (
+          <div
+            style={{
+              border: "1px solid var(--nx-panel-hairline)",
+              borderRadius: 14,
+              overflow: "hidden",
+              background: "var(--surface)",
+            }}
+          >
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "minmax(220px, 1.6fr) minmax(160px, 1fr) minmax(220px, 1.4fr) auto",
+                gap: 14,
+                padding: "10px 16px",
+                background: "var(--surface-2)",
+                borderBottom: "1px solid var(--nx-panel-hairline)",
+                fontSize: 10.5,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                color: "var(--text-tertiary)",
+              }}
+            >
+              <span>Usuario</span>
+              <span>Rol legacy / depto</span>
+              <span>Rol RBAC v2</span>
+              <span style={{ textAlign: "right" }}>Panel home</span>
+            </div>
+            {realState.users
+              .slice()
+              .sort((a, b) => (ROLE_TIER[b.roleKey as RoleKey] ?? 0) - (ROLE_TIER[a.roleKey as RoleKey] ?? 0))
+              .map((u) => {
+                const currentRole = (u.roleKey as RoleKey | null) ?? null;
+                const tier = currentRole ? ROLE_TIER[currentRole] ?? 0 : 0;
+                const homePanel = currentRole ? ROLE_HOME_PANEL[currentRole] : null;
+                const initials = (u.nombre || u.email || "?")
+                  .split(/\s+/)
+                  .slice(0, 2)
+                  .map((w) => w[0]?.toUpperCase() ?? "")
+                  .join("");
+                const isSaving = savingUserId === u.id;
+                const justSaved = savedUserId === u.id;
+                return (
+                  <div
+                    key={u.id}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "minmax(220px, 1.6fr) minmax(160px, 1fr) minmax(220px, 1.4fr) auto",
+                      gap: 14,
+                      alignItems: "center",
+                      padding: "12px 16px",
+                      borderBottom: "1px solid var(--nx-panel-hairline-soft)",
+                      fontSize: 12.5,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                      <span
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 999,
+                          background: "linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, var(--primary)))",
+                          color: "#fff",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontWeight: 700,
+                          fontSize: 12,
+                          fontFamily: "var(--nx-font-display)",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {initials || "U"}
+                      </span>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {u.nombre || "—"}
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--text-tertiary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {u.email}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                        {u.role?.nombre || "—"}
+                      </span>
+                      <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                        {u.department?.nombre || "Sin departamento"}
+                      </span>
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <select
+                        value={currentRole ?? ""}
+                        onChange={(e) => {
+                          const next = e.target.value as RoleKey;
+                          if (!next) return;
+                          if (next === currentRole) return;
+                          void handleRoleKeyChange(u.id, next);
+                        }}
+                        disabled={isSaving}
+                        style={{
+                          flex: 1,
+                          padding: "7px 10px",
+                          fontSize: 12.5,
+                          background: "var(--surface)",
+                          border: "1px solid var(--nx-panel-hairline)",
+                          borderRadius: 8,
+                          color: "var(--text-primary)",
+                          fontFamily: "inherit",
+                          cursor: isSaving ? "wait" : "pointer",
+                        }}
+                      >
+                        <option value="" disabled>
+                          Sin rol asignado…
+                        </option>
+                        {ALL_ROLES.filter((r) => r !== ROLES.SUPER_ADMIN).map((r) => (
+                          <option key={r} value={r}>
+                            {ROLE_LABELS[r]} · tier {ROLE_TIER[r]}
+                          </option>
+                        ))}
+                      </select>
+                      {isSaving && (
+                        <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Guardando…</span>
+                      )}
+                      {justSaved && (
+                        <span style={{ fontSize: 11, color: "var(--success)", fontWeight: 700 }}>✓ Guardado</span>
+                      )}
+                    </div>
+
+                    <div style={{ textAlign: "right", display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+                      {homePanel ? (
+                        <>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 800,
+                              padding: "2px 8px",
+                              borderRadius: 6,
+                              background: "color-mix(in srgb, var(--accent) 12%, transparent)",
+                              color: "var(--accent)",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.08em",
+                            }}
+                          >
+                            {homePanel}
+                          </span>
+                          <span style={{ fontSize: 10.5, color: "var(--text-tertiary)" }}>
+                            tier {tier}
+                          </span>
+                        </>
+                      ) : (
+                        <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>—</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        )}
+      </Section>
 
       <div
         style={{
