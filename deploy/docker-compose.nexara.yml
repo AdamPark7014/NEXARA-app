@@ -10,11 +10,12 @@ services:
       - "--api.dashboard=true"
       - "--log.level=INFO"
       - "--accesslog=true"
-      # Apuntamos al archivo concreto pero montamos el DIRECTORIO padre
-      # como volumen. Así, cuando `git pull` reescribe nexara.yml (cambiando
-      # el inode), Traefik sigue viendo el archivo nuevo en lugar de
-      # quedarse pegado al inode original.
-      - "--providers.file.filename=/traefik-config/nexara.yml"
+      # Modo `directory` (no `filename`) para que Traefik cargue TODOS los
+      # routers de los proyectos hospedados en este servidor: nexara.yml,
+      # acrobat.yml, zynoratek.yml. Los archivos *-v3.yml/-debug.yml fueron
+      # renombrados a *.yml.disabled para que Traefik los ignore (sólo lee
+      # extensiones .yml/.yaml/.toml).
+      - "--providers.file.directory=/traefik-config"
       - "--providers.file.watch=true"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
