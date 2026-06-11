@@ -521,6 +521,17 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  // ════════════════════════════════════════════════════════════════════
+  // Redireccionamiento del dominio base → subdominio canónico
+  // ════════════════════════════════════════════════════════════════════
+  // Si accedes a nexara.com.mx o www.nexara.com.mx sin subdominio,
+  // redirigir a core.nexara.com.mx (panel ERP canónico)
+  if (!subdomain && !isLocalhost && hostWithoutPort.match(/^(www\.)?nexara\.com\.mx$/)) {
+    const url = request.nextUrl.clone();
+    url.hostname = 'core.nexara.com.mx';
+    return applySecurityHeaders(NextResponse.redirect(url, 308));
+  }
+
   const isMappedPanelSubdomain = Boolean(subdomain && SUBDOMAIN_MAP[subdomain]);
 
   // Si detectamos un subdominio conocido, reescribir a la ruta interna del
