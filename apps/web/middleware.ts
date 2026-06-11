@@ -524,12 +524,16 @@ export function middleware(request: NextRequest) {
   // ════════════════════════════════════════════════════════════════════
   // Sitio público para dominio base (nexara.com.mx)
   // ════════════════════════════════════════════════════════════════════
-  // Si accedes a nexara.com.mx o www.nexara.com.mx sin subdominio,
-  // servir el sitio público desde /studio (no redirigir, reescribir internamente)
-  if (!subdomain && !isLocalhost && hostWithoutPort.match(/^(www\.)?nexara\.com\.mx$/)) {
-    const response = NextResponse.rewrite(new URL('/studio' + request.nextUrl.pathname + request.nextUrl.search, request.url));
-    return applySecurityHeaders(response);
-  }
+  // El sitio público vive en `apps/web/app/(public)/*`. Las rutas como `/`,
+  // `/servicios`, `/contacto`, `/cotizaciones/firmar/[token]`, etc. ya
+  // resuelven directamente desde ese route-group, así que NO necesitamos
+  // reescribir aquí. La home `/` se reescribe a `/nexara` más abajo (línea
+  // ~657) para servir `(public)/nexara/page.tsx` sin cambiar la URL.
+  //
+  // ⚠️ NO reescribir `nexara.com.mx/*` → `/studio/*`: `/studio` es un panel
+  // privado (AppShell + auth gate) y el guard server-side acabaría en un
+  // bucle hacia `/login` y un 404 final. El sitio público de marketing es
+  // independiente del CMS Studio (que sólo usan los diseñadores logueados).
 
   const isMappedPanelSubdomain = Boolean(subdomain && SUBDOMAIN_MAP[subdomain]);
 
