@@ -210,24 +210,20 @@ http:
       tls:
         certResolver: letsencrypt
 
-    # Sitio público
+    # Sitio público (apex + www en un solo router para que el cert SAN
+    # cubra ambos hostnames y reducir puntos de fallo en ACME).
     public:
-      rule: 'Host(`nexara.com.mx`)'
+      rule: 'Host(`nexara.com.mx`,`www.nexara.com.mx`)'
       entryPoints:
         - websecure
       service: nexara-web
       priority: 10
       tls:
         certResolver: letsencrypt
-
-    public-www:
-      rule: 'Host(`www.nexara.com.mx`)'
-      entryPoints:
-        - websecure
-      service: nexara-web
-      priority: 10
-      tls:
-        certResolver: letsencrypt
+        domains:
+          - main: nexara.com.mx
+            sans:
+              - www.nexara.com.mx
 
   middlewares:
     redirect-https:
