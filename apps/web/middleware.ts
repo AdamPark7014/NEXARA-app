@@ -646,7 +646,9 @@ export function middleware(request: NextRequest) {
     return applyNoStoreForHtml(request, response);
   }
 
-  // URL legacy: consolidar en / (canonical del sitio público)
+  // URL legacy: consolidar en `/` (canonical del sitio público).
+  // `/nexara` redirige 308 a `/` porque ahora `(public)/page.tsx` re-exporta
+  // el componente de `(public)/nexara/page.tsx` y la URL canónica es la raíz.
   if (
     (request.method === 'GET' || request.method === 'HEAD') &&
     request.nextUrl.pathname === '/nexara' &&
@@ -657,13 +659,10 @@ export function middleware(request: NextRequest) {
     return applySecurityHeaders(NextResponse.redirect(url, 308));
   }
 
-  // Dominio principal: reescribir / para servir /nexara/page.tsx sin cambiar URL
-  if ((request.method === 'GET' || request.method === 'HEAD') && request.nextUrl.pathname === '/') {
-    const url = request.nextUrl.clone();
-    url.pathname = '/nexara';
-    const rewriteResponse = applySecurityHeaders(NextResponse.rewrite(url));
-    return applyNoStoreForHtml(request, rewriteResponse);
-  }
+  // NOTA: ya NO reescribimos `/` → `/nexara` aquí. Hacerlo causaba un loop
+  // (`(public)/page.tsx` redirige a `/nexara` y el bloque de arriba volvía
+  // a `/` → 404). Ahora la home pública vive directamente en
+  // `(public)/page.tsx` (re-export del componente de `nexara/page.tsx`).
 
   const response = applyNoStoreForHtml(request, applySecurityHeaders(NextResponse.next()));
   if (SENSITIVE_PATH_PATTERN.test(request.nextUrl.pathname)) {
