@@ -522,14 +522,13 @@ export function middleware(request: NextRequest) {
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // Redireccionamiento del dominio base → subdominio canónico
+  // Sitio público para dominio base (nexara.com.mx)
   // ════════════════════════════════════════════════════════════════════
   // Si accedes a nexara.com.mx o www.nexara.com.mx sin subdominio,
-  // redirigir a core.nexara.com.mx (panel ERP canónico)
+  // servir el sitio público desde /studio (no redirigir, reescribir internamente)
   if (!subdomain && !isLocalhost && hostWithoutPort.match(/^(www\.)?nexara\.com\.mx$/)) {
-    const url = request.nextUrl.clone();
-    url.hostname = 'core.nexara.com.mx';
-    return applySecurityHeaders(NextResponse.redirect(url, 308));
+    const response = NextResponse.rewrite(new URL('/studio' + request.nextUrl.pathname + request.nextUrl.search, request.url));
+    return applySecurityHeaders(response);
   }
 
   const isMappedPanelSubdomain = Boolean(subdomain && SUBDOMAIN_MAP[subdomain]);
