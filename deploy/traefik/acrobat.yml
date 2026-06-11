@@ -1,11 +1,27 @@
+## Traefik routing for Acrobat (app.acrobat.mx + apex)
+##
+## Hosts servidos:
+##   - acrobat.mx          (apex, marketing)
+##   - www.acrobat.mx      (alias)
+##   - app.acrobat.mx      (aplicación principal)
+##
+## Si necesitas más subdominios (api, admin, etc.) añade el host a la
+## regla y como SAN del cert.
+
 http:
   routers:
     acrobat-https:
-      rule: 'Host(`acrobat.mx`, `www.acrobat.mx`)'
+      rule: 'Host(`acrobat.mx`,`www.acrobat.mx`,`app.acrobat.mx`)'
       service: acrobat-app
       entryPoints: [websecure]
       tls:
         certResolver: letsencrypt
+        domains:
+          - main: acrobat.mx
+            sans:
+              - www.acrobat.mx
+              - app.acrobat.mx
+
   services:
     acrobat-app:
       loadBalancer:

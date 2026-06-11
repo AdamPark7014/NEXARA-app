@@ -1,11 +1,28 @@
+## Traefik routing for Zynoratek (frontend Next.js multi-locale)
+##
+## Hosts servidos:
+##   - zynoratek.com          (apex; el frontend redirige a /es)
+##   - www.zynoratek.com      (alias)
+##   - es.zynoratek.com       (locale español)
+##
+## Si añades más locales (en, fr, ...) añádelos también a la regla y
+## como SAN del cert. Cada locale apunta al mismo backend porque el
+## propio Next.js distingue el idioma por hostname o cookie zyn_locale.
+
 http:
   routers:
     zynoratek-https:
-      rule: 'Host(`zynoratek.com`, `www.zynoratek.com`)'
+      rule: 'Host(`zynoratek.com`,`www.zynoratek.com`,`es.zynoratek.com`)'
       service: zynoratek-web
       entryPoints: [websecure]
       tls:
         certResolver: letsencrypt
+        domains:
+          - main: zynoratek.com
+            sans:
+              - www.zynoratek.com
+              - es.zynoratek.com
+
   services:
     zynoratek-web:
       loadBalancer:
