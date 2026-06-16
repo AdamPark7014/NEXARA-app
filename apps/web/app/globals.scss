@@ -217,26 +217,53 @@ body {
 }
 
 html {
-  scroll-behavior: smooth;
+  /* Smooth-scroll sólo para anclas internas; el scroll natural del usuario
+   * usa "auto" para no sentir lag/inercia artificial. */
+  scroll-behavior: auto;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
 
-/* Scroll-reveal micro animations (public site)
-   Important: we only hide/blur once JS marks "reveal-ready",
-   so above-the-fold content is crisp on initial load. */
+/* Scrollbar discreto y homologado en todo el sitio público (light + dark) */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, #10a183 55%, transparent) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, #10a183 45%, transparent);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, #10a183 75%, transparent);
+  background-clip: padding-box;
+}
+
+/* Scroll-reveal micro animations (public site) — homologado y limpio:
+   sólo fade + leve translateY, sin blur ni parpadeo. */
 [data-reveal] {
   --reveal-delay: 0ms;
-  --reveal-duration: 720ms;
-  --reveal-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --reveal-duration: 500ms;
+  --reveal-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
   opacity: 1;
   transform: none;
-  filter: none;
   transition:
     opacity var(--reveal-duration) var(--reveal-ease) var(--reveal-delay),
-    transform var(--reveal-duration) var(--reveal-ease) var(--reveal-delay),
-    filter calc(var(--reveal-duration) * 0.8) var(--reveal-ease) var(--reveal-delay);
-  will-change: opacity, transform, filter;
+    transform var(--reveal-duration) var(--reveal-ease) var(--reveal-delay);
+  will-change: opacity, transform;
 }
 
 /* If we explicitly skip a reveal transition (above-the-fold on load) */
@@ -244,41 +271,38 @@ html {
   transition: none !important;
 }
 
-/* Hidden state only after JS initializes */
+/* Hidden state only after JS initializes — sólo fade + 10px de translate,
+   sin scale ni blur (eliminan el flicker en cards de la home). */
 html.reveal-ready [data-reveal]:not(.reveal-visible) {
   opacity: 0;
-  transform: translate3d(0, 14px, 0) scale(0.985);
-  filter: blur(8px);
+  transform: translate3d(0, 10px, 0);
 }
 
 html.reveal-ready [data-reveal="left"]:not(.reveal-visible) {
-  transform: translate3d(-14px, 0, 0) scale(0.99);
+  transform: translate3d(-10px, 0, 0);
 }
 
 html.reveal-ready [data-reveal="right"]:not(.reveal-visible) {
-  transform: translate3d(14px, 0, 0) scale(0.99);
+  transform: translate3d(10px, 0, 0);
 }
 
 html.reveal-ready [data-reveal="up"]:not(.reveal-visible) {
-  transform: translate3d(0, 14px, 0) scale(0.985);
+  transform: translate3d(0, 10px, 0);
 }
 
 html.reveal-ready [data-reveal="soft"]:not(.reveal-visible) {
-  transform: translate3d(0, 10px, 0);
-  filter: blur(6px);
+  transform: translate3d(0, 6px, 0);
 }
 
 .reveal-visible {
   opacity: 1;
-  transform: translate3d(0, 0, 0) scale(1);
-  filter: blur(0);
+  transform: translate3d(0, 0, 0);
 }
 
 @media (prefers-reduced-motion: reduce) {
   [data-reveal] {
     opacity: 1 !important;
     transform: none !important;
-    filter: none !important;
     transition: none !important;
   }
 }
@@ -504,10 +528,45 @@ body::before {
 
 .public-layout-wrapper {
   min-height: 100vh;
+  background:
+    radial-gradient(ellipse 70% 55% at 0% 0%, color-mix(in srgb, var(--nx-teal) 10%, transparent), transparent 62%),
+    radial-gradient(ellipse 68% 52% at 100% 100%, color-mix(in srgb, var(--nx-teal-soft) 9%, transparent), transparent 64%),
+    linear-gradient(180deg, #03110d 0%, #061a16 100%);
 }
 
 .public-layout-content {
   padding-top: var(--public-header-height);
+}
+
+/* ── Home pública: liberación full-bleed del HomeHero ────────────
+ * El `HomeHero` debe ocupar 100vh y extenderse hasta los DOS bordes
+ * del viewport. Hay dos obstáculos:
+ *   1. `.public-layout-content` añade `padding-top: header-height`.
+ *   2. La regla global de @media (min-width: 1100px):
+ *        :where(main, section, article, .public-layout-content)
+ *        { max-width: var(--content-max); margin-inline: auto; }
+ *      limita el ancho del `<main>` a 1380px y lo centra, dejando
+ *      bandas laterales (donde se ve el `.brochureBg`) cuando el
+ *      viewport es más ancho.
+ *
+ * Anulamos AMBAS cosas con clases explícitas (`public-layout-content--flush`
+ * en el wrapper y `home-main-flush` en el `<main>`) que sólo se aplican
+ * cuando estamos en la home. Sin `:has()` para máxima compatibilidad y
+ * predictibilidad cross-browser.
+ */
+.public-layout-content--flush {
+  padding-top: 0 !important;
+  max-width: none !important;
+  width: 100% !important;
+  margin-inline: 0 !important;
+}
+
+.home-main-flush {
+  max-width: none !important;
+  width: 100% !important;
+  margin-inline: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
 }
 
 /* Global polish pass for consistent, clean, professional feel */
@@ -538,11 +597,11 @@ body::before {
     background-color var(--motion-base) ease;
 }
 
-:where(.card, [class*="card"], [class*="Card"]) {
+:where(.card) {
   animation: nexara-fade-up var(--motion-slow) ease both;
 }
 
-:where(.card, [class*="card"], [class*="Card"]):hover {
+:where(.card):hover {
   box-shadow: 0 16px 32px color-mix(in srgb, var(--shadow) 58%, transparent);
 }
 
@@ -798,7 +857,7 @@ textarea:disabled {
     margin-inline: auto;
   }
 
-  :where(.card, [class*="card"], [class*="Card"]):not([class*="heroTopCard"]) {
+  :where(.card):not([class*="heroTopCard"]) {
     border-radius: 18px;
     border: 1px solid color-mix(in srgb, var(--border-strong) 74%, transparent);
     background: linear-gradient(
@@ -811,7 +870,7 @@ textarea:disabled {
       inset 0 1px 0 color-mix(in srgb, #fff 58%, transparent);
   }
 
-  :where(.card, [class*="card"], [class*="Card"]):not([class*="heroTopCard"]):hover {
+  :where(.card):not([class*="heroTopCard"]):hover {
     transform: translateY(-2px);
     box-shadow:
       0 20px 38px color-mix(in srgb, var(--shadow) 62%, transparent),
@@ -857,12 +916,46 @@ textarea:disabled {
   /* Paleta semántica reasignada a los colores oficiales */
   --primary: var(--nx-teal);
   --primary-strong: var(--nx-teal-strong);
-  --secondary: var(--nx-skyblue);
+  --secondary: #2ec4aa;
   --accent: var(--nx-orange);
   --accent-strong: var(--nx-orange-strong);
-  --support: var(--nx-skyblue);
+  --support: var(--nx-teal-soft);
   --highlight: var(--nx-magenta);
   --deep: var(--nx-maroon);
+
+  /* Base pública unificada en teal oscuro (evita el cast azul del body.dark global) */
+  --background: #03110d;
+  --background-elevated: #071a16;
+  --surface: #0a211b;
+  --surface-2: #0d2a23;
+  --surface-3: #12342b;
+
+  --foreground: #f4f1ec;
+  --text-primary: #f4f1ec;
+  --text-secondary: rgba(244, 241, 236, 0.78);
+  --text-tertiary: rgba(244, 241, 236, 0.58);
+
+  --border: color-mix(in srgb, var(--nx-teal) 26%, rgba(255, 255, 255, 0.08));
+  --border-strong: color-mix(in srgb, var(--nx-teal) 42%, rgba(255, 255, 255, 0.12));
+  --shadow: 0 18px 42px rgba(0, 0, 0, 0.56);
+  --focus: color-mix(in srgb, var(--nx-teal-soft) 56%, transparent);
+  --surface-clean: color-mix(in srgb, var(--surface) 94%, var(--background));
+  --surface-clean-soft: color-mix(in srgb, var(--surface-2) 90%, var(--background));
+  --stroke-clean: color-mix(in srgb, var(--nx-teal) 24%, transparent);
+
+  --header-bg: linear-gradient(142deg, #041813 0%, #0a2a22 54%, #0f3a31 100%);
+  --header-border: color-mix(in srgb, var(--nx-teal) 32%, transparent);
+  --header-text: #f4f1ec;
+  --header-link: #f4f1ec;
+  --header-link-hover-bg: color-mix(in srgb, var(--nx-teal) 20%, transparent);
+  --header-link-active-bg: linear-gradient(135deg, color-mix(in srgb, var(--nx-teal) 34%, transparent), color-mix(in srgb, var(--nx-teal-soft) 16%, transparent));
+
+  --menu-bg: linear-gradient(170deg, #041a14 0%, #0a2b23 54%, #0e362d 100%);
+  --menu-text: #f4f1ec;
+  --menu-muted: rgba(244, 241, 236, 0.78);
+  --menu-item-bg: color-mix(in srgb, var(--nx-teal) 12%, transparent);
+  --menu-item-hover-bg: color-mix(in srgb, var(--nx-teal) 20%, transparent);
+  --menu-item-active-bg: linear-gradient(135deg, color-mix(in srgb, var(--nx-teal-soft) 34%, transparent), color-mix(in srgb, var(--nx-teal) 24%, transparent));
 
   /* Tipografías globales del manual aplicadas al sitio público */
   --font-base: var(--nx-font-body, "Manrope", "Inter", "Segoe UI", sans-serif);

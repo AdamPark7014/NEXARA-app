@@ -8,19 +8,40 @@ async function main() {
     // Hash: $2b$10$dxRXAhS0hjdm8MFPxVLHJ.kBXKV0zLjlY8K0I0sZ8k0mhH8K2G7x6
     const hashedPassword = '$2b$10$dxRXAhS0hjdm8MFPxVLHJ.kBXKV0zLjlY8K0I0sZ8k0mhH8K2G7x6';
 
+    const department = await prisma.department.upsert({
+      where: { nombre: 'Dirección General' },
+      update: {},
+      create: { nombre: 'Dirección General' },
+    });
+
+    const role = await prisma.role.findFirst({
+      where: {
+        OR: [
+          { orgRoleKey: 'ceo' },
+          { nombre: 'CEO / Dirección General' },
+        ],
+      },
+      orderBy: { id: 'asc' },
+    });
+
+    if (!role) {
+      throw new Error('No se encontró un rol admin/ceo. Corre primero seed-roles.ts o seed-demo-users.ts.');
+    }
+
     const admin = await prisma.user.upsert({
       where: { email: 'admin@nexara.com.mx' },
       update: {
-        password: hashedPassword,
-        isActive: true,
+        nombre: 'Admin Nexara',
+        passwordHash: hashedPassword,
+        roleId: role.id,
+        departmentId: department.id,
       },
       create: {
         email: 'admin@nexara.com.mx',
-        nombre: 'Admin',
-        apellido: 'Nexara',
-        password: hashedPassword,
-        emailVerified: new Date(),
-        isActive: true,
+        nombre: 'Admin Nexara',
+        passwordHash: hashedPassword,
+        roleId: role.id,
+        departmentId: department.id,
       },
     });
 

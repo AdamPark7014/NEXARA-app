@@ -28,6 +28,7 @@ import { ProjectsModule } from './projects/projects.module';
 import { ContactMessagesModule } from './contact-messages/contact-messages.module';
 import { NewsletterModule } from './newsletter/newsletter.module';
 import { NewsModule } from './news/news.module';
+import { HeroSlidesModule } from './hero-slides/hero-slides.module';
 import { WorkProjectsModule } from './work-projects/work-projects.module';
 import { EmployeePaymentsModule } from './employee-payments/employee-payments.module';
 import { CotizacionesModule } from './cotizaciones/cotizaciones.module';
@@ -102,6 +103,7 @@ import { RealtimeModule } from './realtime/realtime.module';
     ContactMessagesModule,
     NewsletterModule,
     NewsModule,
+    HeroSlidesModule,
     WorkProjectsModule,
     EmployeePaymentsModule,
     CotizacionesModule,

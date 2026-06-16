@@ -1,0 +1,100 @@
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:16
+    container_name: nexara-db-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nexara
+      POSTGRES_PASSWORD: Nx@r4_Secure_2024!
+      POSTGRES_DB: nexara
+    ports:
+      - "5432:5432"
+    volumes:
+      - nexara-db-dev:/var/lib/postgresql/data
+    networks:
+      - nexara-dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexara"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis (for caching and queues)
+  redis:
+    image: redis:7-alpine
+    container_name: nexara-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    networks:
+      - nexara-dev
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # API Service
+  api:
+    build:
+      context: .
+      dockerfile: ./deploy/docker/Dockerfile.api
+    container_name: nexara-api-dev
+    restart: unless-stopped
+    ports:
+      - "4000:3001"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://nexara:Nx@r4_Secure_2024!@db:5432/nexara?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev-secret-key-change-in-production
+      HIKVISION_URL: http://localhost:54483
+      HIKVISION_PORT: 54483
+      HIKVISION_USERNAME: admin
+      HIKVISION_PASSWORD: password
+      HIKVISION_TIMEOUT: 10000
+      API_URL: http://localhost:4000
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nexara-dev
+    volumes:
+      - ./apps/api/src:/app/apps/api/src
+      - ./apps/api/uploads:/app/apps/api/uploads
+
+  # Web Service (Frontend)
+  web:
+    build:
+      context: .
+      dockerfile: ./deploy/docker/Dockerfile.web
+    container_name: nexara-web-dev
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      API_INTERNAL_URL: http://api:3001
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+      NEXT_PUBLIC_BASE_URL: http://localhost:3000
+    depends_on:
+      - api
+    networks:
+      - nexara-dev
+    volumes:
+      - ./apps/web/app:/app/apps/web/app
+      - ./apps/web/components:/app/apps/web/components
+      - ./apps/web/lib:/app/apps/web/lib
+      - ./apps/web/public:/app/apps/web/public
+
+volumes:
+  nexara-db-dev:
+    name: nexara-db-dev
+
+networks:
+  nexara-dev:
+    driver: bridge

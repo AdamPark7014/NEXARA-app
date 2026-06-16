@@ -63,7 +63,7 @@ export default function PublicScrollReveal() {
         const groupItems = Array.from(group.querySelectorAll<RevealEl>("[data-reveal]"));
         groupItems.forEach((el, idx) => {
           if (el.dataset.revealDelay) return;
-          const delay = clamp(idx * 70, 0, 420);
+          const delay = clamp(idx * 45, 0, 240);
           el.style.setProperty("--reveal-delay", `${delay}ms`);
         });
       }
@@ -79,7 +79,7 @@ export default function PublicScrollReveal() {
             if (once) io?.unobserve(el);
           }
         },
-        { threshold: 0.16, rootMargin: "0px 0px -10% 0px" }
+        { threshold: 0.05, rootMargin: "0px 0px -5% 0px" }
       );
 
       for (const el of elements) {

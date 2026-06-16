@@ -101,17 +101,35 @@ import styles from './Header.module.css';
 import { usePathname } from 'next/navigation';
 
 const navLinks = [
-  { name: 'Nosotros', href: '/' },
+  { name: 'Inicio', href: '/' },
   { name: 'Servicios', href: '/servicios' },
-  { name: 'Cobertura', href: '/cobertura' },
+  { name: 'Nosotros', href: '/nosotros' },
   { name: 'Proyectos', href: '/proyectos' },
-  { name: 'Contacto', href: '/contacto' },
+  { name: 'Blog', href: '/blog' },
 ];
+
+const isHomeRoute = (pathname: string | null) =>
+  pathname === '/' || pathname === '/nexara' || pathname === '/nexara/';
 
 export default function Header() {
   const pathname = usePathname();
   const isConsole = Boolean(pathname && pathname.startsWith('/console'));
+  const isHome = isHomeRoute(pathname);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  // En la home el header arranca transparente sobre el hero y, al hacer scroll
+  // más allá de ~80 px, se condensa con blur para garantizar legibilidad.
+  useEffect(() => {
+    if (!isHome) {
+      setScrolled(true);
+      return;
+    }
+    const onScroll = () => setScrolled(window.scrollY > 80);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [isHome]);
 
   const isActiveLink = (href: string) => {
     if (!pathname) return false;
@@ -152,15 +170,28 @@ export default function Header() {
     };
   }, [mobileMenuOpen]);
 
+  // El componente `Header` SOLO se monta dentro de `(public)/layout.tsx`,
+  // así que el estilo "limpio" (`.headerPublic`) aplica siempre. Lo único
+  // que cambia entre rutas es si arriba se muestra transparente sobre el
+  // hero (sólo en home, antes de hacer scroll).
+  const headerClass = [
+    styles.header,
+    isConsole ? styles.consoleHeader : '',
+    styles.headerPublic,
+    isHome && !scrolled ? styles.headerTransparent : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <header className={`${styles.header} ${isConsole ? styles.consoleHeader : ''}`}>
+    <header className={headerClass}>
       <div className={styles.headerInner}>
         <div className={styles.logoSection}>
-          <Link href="/" onClick={closeMobileMenu}>
+          <Link href="/" onClick={closeMobileMenu} className={styles.logoLink}>
             <Image src="/logo-nexara.png" alt="Nexara Logo" className={styles.logo} width={200} height={62} priority />
           </Link>
         </div>
-        
+
         {/* Desktop Navigation */}
         <nav className={styles.navLinks}>
           {navLinks.map((link) => (
@@ -178,8 +209,13 @@ export default function Header() {
         <div className={styles.rightSection}>
           {(pathname && pathname.startsWith('/console')) && <BackupRestorePanel />}
 
+          <Link href="/contacto" className={styles.contactCta} onClick={closeMobileMenu}>
+            Contactar
+            <span aria-hidden className={styles.contactArrow}>→</span>
+          </Link>
+
           {/* Mobile Menu Button */}
-          <button 
+          <button
             type="button"
             className={`${styles.mobileMenuButton} ${mobileMenuOpen ? styles.active : ''}`}
             onClick={toggleMobileMenu}

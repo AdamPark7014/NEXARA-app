@@ -1,0 +1,604 @@
+/* ============================================================
+   NEXARA · Estilos compartidos para páginas del sitio público
+   Paleta: teal-oscuro #03110d + mint #6efbd5 + teal #10a183
+   Patrón estándar: hero + secciones concisas con imágenes
+   ============================================================ */
+
+.page {
+  --bg: #03110d;
+  --bg-2: #061a16;
+  --bg-3: #0a2620;
+  --text: #f4f1ec;
+  --text-dim: rgba(244, 241, 236, 0.72);
+  --text-mute: rgba(244, 241, 236, 0.55);
+  --mint: #6efbd5;
+  --teal: #10a183;
+  --sky: #45c9b1;
+  --line: color-mix(in srgb, var(--teal) 28%, rgba(255, 255, 255, 0.08));
+  --line-soft: color-mix(in srgb, var(--teal) 14%, rgba(255, 255, 255, 0.04));
+  --glass: rgba(8, 22, 18, 0.62);
+  --shadow: 0 24px 48px -16px rgba(0, 0, 0, 0.4), 0 12px 24px -12px rgba(16, 161, 131, 0.18);
+
+  position: relative;
+  background:
+    radial-gradient(ellipse 50% 40% at 80% 0%, color-mix(in srgb, var(--teal) 14%, transparent), transparent 60%),
+    radial-gradient(ellipse 40% 30% at 0% 60%, color-mix(in srgb, var(--mint) 6%, transparent), transparent 65%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+  color: var(--text);
+  min-height: 100vh;
+  font-family: var(--nx-font-body, "Manrope", system-ui, sans-serif);
+  overflow-x: hidden;
+}
+
+.inner {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 clamp(20px, 4vw, 56px);
+}
+
+/* ── Hero ─────────────────────────────────────────────────── */
+
+.hero {
+  position: relative;
+  padding: clamp(96px, 12vw, 140px) 0 clamp(48px, 6vw, 80px);
+  overflow: hidden;
+}
+
+.heroGrid {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: clamp(32px, 5vw, 64px);
+  align-items: center;
+}
+
+.heroEyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--mint) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--mint) 32%, transparent);
+  color: var(--mint);
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 18px;
+}
+
+.heroEyebrow::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--mint);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--mint) 24%, transparent);
+}
+
+.heroTitle {
+  margin: 0 0 18px;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: clamp(2.2rem, 5vw, 3.8rem);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.heroTitleAccent {
+  background: linear-gradient(135deg, var(--mint), var(--sky));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.heroLead {
+  margin: 0 0 28px;
+  font-size: clamp(1rem, 1.4vw, 1.18rem);
+  line-height: 1.55;
+  color: var(--text-dim);
+  max-width: 56ch;
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.heroImage {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--bg-3);
+  box-shadow: var(--shadow);
+}
+
+.heroImage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.heroImageOverlay {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, transparent 50%, rgba(3, 17, 13, 0.5) 100%),
+    linear-gradient(135deg, color-mix(in srgb, var(--teal) 24%, transparent) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+/* ── Buttons ──────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 22px;
+  border-radius: 999px;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: transform 200ms ease, box-shadow 200ms ease, background 200ms ease, border-color 200ms ease, color 200ms ease;
+  text-decoration: none;
+}
+
+.btnPrimary {
+  background: linear-gradient(135deg, var(--mint), var(--sky));
+  color: #03110d;
+  box-shadow: 0 12px 28px -10px color-mix(in srgb, var(--mint) 65%, transparent);
+}
+
+.btnPrimary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 36px -10px color-mix(in srgb, var(--mint) 80%, transparent);
+}
+
+.btnSecondary {
+  background: color-mix(in srgb, var(--teal) 18%, transparent);
+  color: var(--text);
+  border-color: var(--line);
+}
+
+.btnSecondary:hover {
+  border-color: var(--mint);
+  color: var(--mint);
+  transform: translateY(-2px);
+}
+
+.btnArrow {
+  font-size: 1em;
+  line-height: 1;
+}
+
+/* ── Section heads ────────────────────────────────────────── */
+
+.section {
+  padding: clamp(56px, 7vw, 96px) 0;
+}
+
+.sectionDivider {
+  border-top: 1px solid var(--line);
+}
+
+.sectionHead {
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto clamp(36px, 4vw, 56px);
+}
+
+.eyebrow {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--teal) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--teal) 40%, transparent);
+  color: var(--mint);
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+.sectionTitle {
+  margin: 0 0 14px;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: clamp(1.7rem, 3.4vw, 2.6rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.sectionTitleAccent {
+  background: linear-gradient(135deg, var(--mint), var(--sky));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.sectionLead {
+  margin: 0;
+  font-size: clamp(0.98rem, 1.3vw, 1.08rem);
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+/* ── Generic grids ────────────────────────────────────────── */
+
+.grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(20px, 2.4vw, 28px);
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: clamp(20px, 2.4vw, 28px);
+}
+
+.grid4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: clamp(16px, 1.8vw, 22px);
+}
+
+/* ── Cards genéricas ──────────────────────────────────────── */
+
+.card {
+  position: relative;
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: clamp(20px, 2.2vw, 28px);
+  backdrop-filter: blur(10px);
+  transition: transform 280ms ease, border-color 280ms ease, box-shadow 280ms ease;
+  overflow: hidden;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  border-color: color-mix(in srgb, var(--mint) 55%, transparent);
+  box-shadow: var(--shadow);
+}
+
+.cardIcon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, var(--teal), color-mix(in srgb, var(--teal) 60%, #000));
+  color: #ffffff;
+  box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--teal) 70%, transparent);
+}
+
+.cardIcon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.cardTitle {
+  margin: 0 0 8px;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.cardText {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+/* ── Imagen-card ─────────────────────────────────────────── */
+
+.imageCard {
+  position: relative;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--bg-3);
+  transition: transform 280ms ease, border-color 280ms ease, box-shadow 280ms ease;
+}
+
+.imageCard:hover {
+  transform: translateY(-4px);
+  border-color: color-mix(in srgb, var(--mint) 55%, transparent);
+  box-shadow: var(--shadow);
+}
+
+.imageCardImg {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+}
+
+.imageCardImg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 600ms ease;
+}
+
+.imageCard:hover .imageCardImg img {
+  transform: scale(1.04);
+}
+
+.imageCardImg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 40%, rgba(3, 17, 13, 0.75) 100%);
+  pointer-events: none;
+}
+
+.imageCardBody {
+  padding: 20px 22px 24px;
+}
+
+.imageCardTitle {
+  margin: 0 0 8px;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.imageCardText {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+/* ── CTA Final ───────────────────────────────────────────── */
+
+.ctaShell {
+  position: relative;
+  padding: clamp(48px, 6vw, 72px);
+  border-radius: 28px;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(ellipse 60% 80% at 100% 0%, color-mix(in srgb, var(--mint) 16%, transparent), transparent 60%),
+    linear-gradient(135deg, var(--bg-3) 0%, var(--bg-2) 100%);
+  text-align: center;
+  overflow: hidden;
+}
+
+.ctaShell::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--mint) 32%, transparent), transparent 60%);
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.6;
+  mix-blend-mode: overlay;
+}
+
+.ctaShell > * {
+  position: relative;
+  z-index: 1;
+}
+
+.ctaTitle {
+  margin: 0 0 12px;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.ctaLead {
+  margin: 0 auto 28px;
+  max-width: 50ch;
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+.ctaActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+
+/* ── Pills / chips ───────────────────────────────────────── */
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--teal) 14%, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: transform 200ms ease, border-color 200ms ease, color 200ms ease;
+}
+
+.chip:hover {
+  transform: translateY(-2px);
+  border-color: var(--mint);
+  color: var(--mint);
+}
+
+.chip svg {
+  width: 16px;
+  height: 16px;
+  color: var(--mint);
+}
+
+/* ── Métricas / stats ────────────────────────────────────── */
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: clamp(16px, 2vw, 24px);
+}
+
+.stat {
+  text-align: center;
+  padding: 24px 18px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--glass);
+}
+
+.statValue {
+  display: block;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--mint), var(--sky));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1;
+}
+
+.statLabel {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+}
+
+/* ── Split (texto + imagen) ──────────────────────────────── */
+
+.splitGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(32px, 5vw, 56px);
+  align-items: center;
+}
+
+.splitImage {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--bg-3);
+  box-shadow: var(--shadow);
+}
+
+.splitImage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.splitBody h3 {
+  margin: 0 0 14px;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: clamp(1.4rem, 2.4vw, 1.9rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.splitBody p {
+  margin: 0 0 18px;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+.bulletList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.bulletList li {
+  position: relative;
+  padding-left: 26px;
+  font-size: 0.94rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.bulletList li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, var(--mint), var(--sky));
+}
+
+.bulletList li::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: calc(0.55em + 3px);
+  width: 5px;
+  height: 8px;
+  border-right: 2px solid #03110d;
+  border-bottom: 2px solid #03110d;
+  transform: rotate(45deg);
+}
+
+/* ── Responsive ──────────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+  .heroGrid,
+  .splitGrid {
+    grid-template-columns: 1fr;
+  }
+  .grid3,
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .grid4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .grid3,
+  .grid2,
+  .statsGrid,
+  .grid4 {
+    grid-template-columns: 1fr;
+  }
+  .heroImage {
+    aspect-ratio: 16 / 10;
+  }
+}

@@ -1,0 +1,23 @@
+/* Soluciones · estilos específicos */
+
+.indCard {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.indCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #6efbd5;
+  transition: gap 200ms ease;
+}
+
+.indCard:hover .indCta {
+  gap: 12px;
+}

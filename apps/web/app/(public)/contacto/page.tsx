@@ -1,20 +1,71 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
+import shared from "../_shared/public.module.css";
 import styles from "./page.module.css";
-import Map from "@/app/components/Map";
 import { buildApiUrl } from "@/lib/api-base";
 import ExternalLinkButton from "@/components/ExternalLinkButton";
+import Map from "@/app/components/Map";
+
+const IconMail = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+    <polyline points="22,6 12,13 2,6" />
+  </svg>
+);
+
+const IconPhone = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+  </svg>
+);
+
+const IconChat = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+  </svg>
+);
+
+const IconPin = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+    <circle cx="12" cy="10" r="3" />
+  </svg>
+);
+
+const channels = [
+  {
+    icon: <IconChat />,
+    title: "WhatsApp",
+    desc: "Respuesta inmediata en horario laboral",
+    cta: "Iniciar chat",
+    href: "https://wa.me/525536505044?text=Hola%2C%20me%20interesa%20información",
+  },
+  {
+    icon: <IconMail />,
+    title: "Email",
+    desc: "ventas@nexara.com.mx · soporte@nexara.com.mx",
+    cta: "Escribir correo",
+    href: "mailto:ventas@nexara.com.mx",
+  },
+  {
+    icon: <IconPhone />,
+    title: "Teléfono",
+    desc: "Lun a Vie · 9:00 – 18:00 hrs",
+    cta: "+52 55 3650 5044",
+    href: "tel:+525536505044",
+  },
+];
 
 export default function ContactoPage() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, []);
 
@@ -23,11 +74,8 @@ export default function ContactoPage() {
     setLoading(true);
     const form = e.currentTarget;
     const formData = new FormData(form);
-    const entries: [string, FormDataEntryValue][] = [];
-    formData.forEach((value, key) => {
-      entries.push([key, value]);
-    });
-    const data = Object.fromEntries(entries) as Record<string, FormDataEntryValue>;
+    const data: Record<string, FormDataEntryValue> = {};
+    formData.forEach((v, k) => (data[k] = v));
 
     const payload = {
       name: String(data.name || ""),
@@ -35,9 +83,8 @@ export default function ContactoPage() {
       phone: data.phone ? String(data.phone) : undefined,
       company: data.company ? String(data.company) : undefined,
       subject: data.subject ? String(data.subject) : undefined,
-      category: String(data.category || "SOPORTE"),
+      category: String(data.category || "VENTAS"),
       message: String(data.message || ""),
-      newsletter: Boolean(data.newsletter),
       source: "contacto-page",
       pageUrl: typeof window !== "undefined" ? window.location.pathname : "/contacto",
     };
@@ -48,15 +95,9 @@ export default function ContactoPage() {
       body: JSON.stringify(payload),
     });
 
-    if (!response.ok) {
-      setLoading(false);
-      return;
-    }
-    
     setLoading(false);
+    if (!response.ok) return;
     setSubmitted(true);
-
-    // Reset form after 5 seconds (cleared on unmount)
     timeoutRef.current = setTimeout(() => {
       setSubmitted(false);
       form.reset();
@@ -65,320 +106,186 @@ export default function ContactoPage() {
   };
 
   return (
-    <main
-      className={`${styles.container} public-section-page ultra-corp-page ultra-corp-contacto ultra-corp-strict`}
-      aria-label="Página de contacto"
-    >
-      {/* Hero Section */}
-      <section className={styles.hero} data-reveal="soft" data-nx-grain>
-        <div className={styles.heroAura} aria-hidden />
-        <div className={styles.heroContent}>
-          <span data-nx-eyebrow>Nexara Contact Center</span>
-          <h1 className={styles.heroTitle}>
-            Hablemos de tu <em className={styles.heroTitleAccent}>próximo proyecto</em>
-          </h1>
-          <p className={styles.heroSubtitle}>
-            Estamos listos para ayudarte a impulsar tu proyecto tecnológico.
-            Cuanto más contexto nos compartas, más precisa será nuestra propuesta.
-          </p>
-          <dl className={styles.heroFacts} aria-label="Indicadores de respuesta">
-            <div className={styles.heroFact}>
-              <dt>Respuesta</dt>
-              <dd>&lt; 24h</dd>
+    <main className={shared.page}>
+      {/* Hero */}
+      <section className={shared.hero}>
+        <div className={shared.inner}>
+          <div className={shared.heroGrid}>
+            <div data-reveal="soft">
+              <span className={shared.heroEyebrow}>Contacto</span>
+              <h1 className={shared.heroTitle}>
+                Hablemos de tu <span className={shared.heroTitleAccent}>próximo proyecto</span>
+              </h1>
+              <p className={shared.heroLead}>
+                Cuéntanos lo que necesitas. Un especialista te responde en menos de 24 horas con una
+                ruta de acción clara, alcance y presupuesto estimado.
+              </p>
+              <div className={shared.heroActions}>
+                <ExternalLinkButton
+                  href="https://wa.me/525536505044?text=Hola%2C%20me%20interesa%20agendar%20una%20llamada"
+                  className={`${shared.btn} ${shared.btnPrimary}`}
+                >
+                  Iniciar WhatsApp <span className={shared.btnArrow}>→</span>
+                </ExternalLinkButton>
+                <a href="#formulario" className={`${shared.btn} ${shared.btnSecondary}`}>
+                  Enviar formulario
+                </a>
+              </div>
             </div>
-            <div className={styles.heroFact}>
-              <dt>Cobertura</dt>
-              <dd>Nacional</dd>
+            <div className={shared.heroImage} data-reveal="soft">
+              <Image
+                src="/images/hero/hero-02.png"
+                alt="Equipo Nexara en proyecto"
+                width={720}
+                height={540}
+                priority
+              />
+              <div className={shared.heroImageOverlay} />
             </div>
-            <div className={styles.heroFact}>
-              <dt>Atención</dt>
-              <dd>Lun · Vie</dd>
-            </div>
-          </dl>
+          </div>
         </div>
       </section>
 
-      <div className={styles.contentGrid} data-reveal-stagger>
-        {/* Contact Information */}
-        <aside className={styles.contactInfo} data-reveal="up">
-          <div className={styles.infoTile} data-reveal="up">
-            <div className={styles.infoIcon}>
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                <circle cx="12" cy="10" r="3" />
-              </svg>
-            </div>
-            <div>
-              <h3>Ubicación</h3>
-              <p>Ciudad de México, México</p>
-              <p className={styles.infoDetail}>Cobertura nacional</p>
-            </div>
+      {/* Canales rápidos */}
+      <section className={shared.section}>
+        <div className={shared.inner}>
+          <div className={shared.sectionHead} data-reveal="soft">
+            <span className={shared.eyebrow}>Canales directos</span>
+            <h2 className={shared.sectionTitle}>
+              Elige el <span className={shared.sectionTitleAccent}>medio que prefieras</span>
+            </h2>
+            <p className={shared.sectionLead}>
+              Tres formas de empezar la conversación. Todas responden con un humano.
+            </p>
           </div>
-
-          <div className={styles.infoTile} data-reveal="up">
-            <div className={styles.infoIcon}>
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-              </svg>
-            </div>
-            <div>
-              <h3>Teléfono</h3>
-              <p>
-                <ExternalLinkButton href="tel:+525536505044" className={styles.contactLink}>
-                  +52 55 3650 5044
-                </ExternalLinkButton>
-              </p>
-              <p className={styles.infoDetail}>Lun - Vie: 9:00 AM - 6:00 PM</p>
-            </div>
+          <div className={shared.grid3} data-reveal-stagger>
+            {channels.map((c) => (
+              <ExternalLinkButton key={c.title} href={c.href} className={`${shared.card} ${styles.channelCard}`}>
+                <span className={shared.cardIcon}>{c.icon}</span>
+                <h3 className={shared.cardTitle}>{c.title}</h3>
+                <p className={shared.cardText}>{c.desc}</p>
+                <span className={styles.channelCta}>
+                  {c.cta} <span aria-hidden>→</span>
+                </span>
+              </ExternalLinkButton>
+            ))}
           </div>
+        </div>
+      </section>
 
-          <div className={styles.infoTile} data-reveal="up">
-            <div className={styles.infoIcon}>
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                <polyline points="22,6 12,13 2,6" />
-              </svg>
-            </div>
-            <div>
-              <h3>Email</h3>
-              <p>
-                <ExternalLinkButton href="mailto:contacto@nexara.com.mx" className={styles.contactLink}>
-                  contacto@nexara.com.mx
-                </ExternalLinkButton>
-              </p>
-              <p className={styles.infoDetail}>Respuesta en 24h</p>
-            </div>
-          </div>
+      {/* Formulario */}
+      <section id="formulario" className={`${shared.section} ${shared.sectionDivider}`}>
+        <div className={shared.inner}>
+          <div className={styles.formLayout}>
+            <aside className={styles.formAside} data-reveal="up">
+              <span className={shared.eyebrow}>Antes de enviar</span>
+              <h2 className={shared.sectionTitle} style={{ textAlign: "left", margin: "10px 0 18px" }}>
+                Cuéntanos lo esencial
+              </h2>
+              <ul className={shared.bulletList}>
+                <li>Objetivo de negocio o problema a resolver</li>
+                <li>Plazo y nivel de urgencia</li>
+                <li>Alcance estimado (sedes, usuarios, equipos)</li>
+                <li>Presupuesto orientativo si lo tienes</li>
+              </ul>
+              <div className={styles.asideContact}>
+                <IconPin />
+                <div>
+                  <strong>Ciudad de México</strong>
+                  <span>Cobertura nacional</span>
+                </div>
+              </div>
+            </aside>
 
-          <div className={styles.infoTile} data-reveal="up">
-            <div className={styles.infoIcon}>
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-              </svg>
-            </div>
-            <div>
-              <h3>WhatsApp</h3>
-              <p>
-                <ExternalLinkButton href="https://wa.me/525536505044" className={styles.contactLink}>
-                  Chat directo
-                </ExternalLinkButton>
-              </p>
-              <p className={styles.infoDetail}>Respuesta inmediata</p>
-            </div>
-          </div>
-
-          {/* Quick Links */}
-          <div className={styles.quickLinks} data-reveal="up">
-            <h4>Enlaces rápidos</h4>
-            <ul>
-              <li>
-                <Link href="/nexara">Sobre nosotros</Link>
-              </li>
-              <li>
-                <Link href="/servicios">Nuestras soluciones</Link>
-              </li>
-              <li>
-                <Link href="/">Inicio</Link>
-              </li>
-            </ul>
-          </div>
-
-          <div className={styles.quickLinks} data-reveal="up">
-            <h4>Antes de contactarnos</h4>
-            <ul>
-              <li><span>1.</span> Describe el objetivo de negocio.</li>
-              <li><span>2.</span> Indica urgencia y fecha objetivo.</li>
-              <li><span>3.</span> Comparte alcance estimado o número de sedes.</li>
-            </ul>
-          </div>
-        </aside>
-
-        {/* Contact Form */}
-        <section className={styles.formSection} data-reveal="up">
-          <div className={styles.formHeader} data-reveal="soft">
-            <h2>Envia tu requerimiento</h2>
-            <p>Completa el formulario y un especialista te responderá con una ruta de acción clara.</p>
-          </div>
-
-          {!submitted ? (
-            <form className={styles.form} onSubmit={onSubmit}>
-              <div className={styles.formRow}>
-                <div className={styles.formField}>
-                  <label htmlFor="contact-name">
-                    Nombre completo <span className={styles.required}>*</span>
+            <div className={`${shared.card} ${styles.formCard}`} data-reveal="up">
+              {!submitted ? (
+                <form className={styles.form} onSubmit={onSubmit}>
+                  <div className={styles.formRow}>
+                    <label className={styles.field}>
+                      <span>Nombre *</span>
+                      <input name="name" type="text" required placeholder="Tu nombre" disabled={loading} />
+                    </label>
+                    <label className={styles.field}>
+                      <span>Email *</span>
+                      <input name="email" type="email" required placeholder="tu@correo.com" disabled={loading} />
+                    </label>
+                  </div>
+                  <div className={styles.formRow}>
+                    <label className={styles.field}>
+                      <span>Teléfono</span>
+                      <input name="phone" type="tel" placeholder="+52 55 0000 0000" disabled={loading} />
+                    </label>
+                    <label className={styles.field}>
+                      <span>Empresa</span>
+                      <input name="company" type="text" placeholder="Nombre comercial" disabled={loading} />
+                    </label>
+                  </div>
+                  <label className={styles.field}>
+                    <span>¿En qué te ayudamos? *</span>
+                    <select name="category" required disabled={loading} defaultValue="">
+                      <option value="" disabled>Selecciona…</option>
+                      <option value="VENTAS">Ventas / Proyecto nuevo</option>
+                      <option value="SOPORTE">Soporte técnico</option>
+                      <option value="ALIANZA">Alianza comercial</option>
+                    </select>
                   </label>
-                  <input
-                    id="contact-name"
-                    name="name"
-                    type="text"
-                    required
-                    placeholder="Juan Pérez"
-                    disabled={loading}
-                  />
-                </div>
-
-                <div className={styles.formField}>
-                  <label htmlFor="contact-email">
-                    Correo electrónico <span className={styles.required}>*</span>
+                  <label className={styles.field}>
+                    <span>Asunto *</span>
+                    <input name="subject" type="text" required placeholder="Resumen breve" disabled={loading} />
                   </label>
-                  <input
-                    id="contact-email"
-                    name="email"
-                    type="email"
-                    required
-                    placeholder="tu@email.com"
+                  <label className={styles.field}>
+                    <span>Mensaje *</span>
+                    <textarea name="message" rows={5} required placeholder="Cuéntanos el contexto…" disabled={loading} />
+                  </label>
+                  <button
+                    type="submit"
+                    className={`${shared.btn} ${shared.btnPrimary} ${styles.submitBtn}`}
                     disabled={loading}
-                  />
-                </div>
-              </div>
-
-              <div className={styles.formRow}>
-                <div className={styles.formField}>
-                  <label htmlFor="contact-phone">Teléfono</label>
-                  <input
-                    id="contact-phone"
-                    name="phone"
-                    type="tel"
-                    placeholder="+52 55 0000 0000"
-                    disabled={loading}
-                  />
-                </div>
-
-                <div className={styles.formField}>
-                  <label htmlFor="contact-company">Empresa</label>
-                  <input
-                    id="contact-company"
-                    name="company"
-                    type="text"
-                    placeholder="Nombre de tu empresa"
-                    disabled={loading}
-                  />
-                </div>
-              </div>
-
-              <div className={styles.formField}>
-                <label htmlFor="contact-category">
-                  En qué podemos ayudarte <span className={styles.required}>*</span>
-                </label>
-                <select
-                  id="contact-category"
-                  name="category"
-                  required
-                  disabled={loading}
-                >
-                  <option value="">Selecciona una opción</option>
-                  <option value="SOPORTE">Soporte y ayuda</option>
-                  <option value="VENTAS">Ventas, productos o proyectos</option>
-                </select>
-              </div>
-
-              <div className={styles.formField}>
-                <label htmlFor="contact-subject">
-                  Asunto <span className={styles.required}>*</span>
-                </label>
-                <input
-                  id="contact-subject"
-                  name="subject"
-                  type="text"
-                  required
-                  placeholder="Ej: Cotizacion de servicios, problema con mi cuenta..."
-                  disabled={loading}
-                />
-              </div>
-
-              <div className={styles.formField}>
-                <label htmlFor="contact-message">
-                  Mensaje <span className={styles.required}>*</span>
-                </label>
-                <textarea
-                  id="contact-message"
-                  name="message"
-                  rows={6}
-                  required
-                  placeholder="Cuéntanos sobre tu proyecto o necesidad..."
-                  disabled={loading}
-                />
-              </div>
-
-              <div className={styles.formField}>
-                <label className={styles.checkboxLabel}>
-                  <input
-                    type="checkbox"
-                    name="newsletter"
-                    disabled={loading}
-                  />
-                  <span>Deseo recibir información sobre productos y promociones</span>
-                </label>
-              </div>
-
-              <button
-                type="submit"
-                data-track-conversion="contact_submit"
-                className={styles.submitButton}
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <svg className={styles.spinner} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="12" cy="12" r="10" opacity="0.25" />
-                      <path d="M12 2a10 10 0 0 1 10 10" />
+                    data-track-conversion="contact_submit"
+                  >
+                    {loading ? "Enviando…" : "Enviar mensaje"} <span className={shared.btnArrow}>→</span>
+                  </button>
+                  <p className={styles.formNote}>
+                    Al enviar aceptas nuestra <Link href="/legal/privacidad">política de privacidad</Link>.
+                  </p>
+                </form>
+              ) : (
+                <div className={styles.successBlock}>
+                  <div className={styles.successIcon}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                      <polyline points="22 4 12 14.01 9 11.01" />
                     </svg>
-                    Enviando...
-                  </>
-                ) : (
-                  <>
-                    Enviar mensaje
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="22" y1="2" x2="11" y2="13" />
-                      <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                    </svg>
-                  </>
-                )}
-              </button>
-
-              <p className={styles.formNote}>
-                Al enviar este formulario, aceptas nuestra política de privacidad.
-              </p>
-            </form>
-          ) : (
-            <div className={styles.successMessage}>
-              <div className={styles.successIcon}>
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                  <polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
-              </div>
-              <h3>¡Mensaje enviado exitosamente!</h3>
-              <p>
-                Gracias por contactarnos. Hemos recibido tu mensaje y un especialista
-                se pondra en contacto contigo dentro de las proximas 24 horas.
-              </p>
-              <div className={styles.successActions}>
-                <Link href="/" className={styles.primaryButton}>
-                  Volver al inicio
-                </Link>
-                <button
-                  type="button"
-                  className={styles.secondaryButton}
-                  onClick={() => setSubmitted(false)}
-                >
-                  Enviar otro mensaje
-                </button>
-              </div>
+                  </div>
+                  <h3>¡Mensaje recibido!</h3>
+                  <p>Un especialista te contacta en menos de 24 horas.</p>
+                  <button
+                    type="button"
+                    className={`${shared.btn} ${shared.btnSecondary}`}
+                    onClick={() => setSubmitted(false)}
+                  >
+                    Enviar otro mensaje
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-        </section>
-      </div>
+          </div>
+        </div>
+      </section>
 
-      <section id="ubicacion" className={styles.mapSection} aria-labelledby="ubicacion-heading" data-reveal="up">
-        <h2 id="ubicacion-heading" className={styles.mapSectionTitle}>
-          Ubicación
-        </h2>
-        <p className={styles.mapSectionLead}>
-          Consulta nuestra sede en el mapa. También atendemos con cobertura nacional.
-        </p>
-        <div className={styles.mapEmbed}>
-          <Map />
+      {/* Mapa */}
+      <section id="ubicacion" className={`${shared.section} ${shared.sectionDivider}`}>
+        <div className={shared.inner}>
+          <div className={shared.sectionHead} data-reveal="soft">
+            <span className={shared.eyebrow}>Ubicación</span>
+            <h2 className={shared.sectionTitle}>
+              Sede central <span className={shared.sectionTitleAccent}>en CDMX</span>
+            </h2>
+            <p className={shared.sectionLead}>Atendemos con cobertura nacional en sitio y remoto.</p>
+          </div>
+          <div className={styles.mapWrap} data-reveal="up">
+            <Map />
+          </div>
         </div>
       </section>
     </main>

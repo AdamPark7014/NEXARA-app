@@ -1,28 +1,45 @@
 import { PrismaClient } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
   try {
     const hashedPassword = await bcrypt.hash('Nexara@2026', 10);
+    const department = await prisma.department.upsert({
+      where: { nombre: 'Dirección General' },
+      update: {},
+      create: { nombre: 'Dirección General' },
+    });
+
+    const role = await prisma.role.findFirst({
+      where: {
+        OR: [
+          { orgRoleKey: 'ceo' },
+          { nombre: 'CEO / Dirección General' },
+        ],
+      },
+      orderBy: { id: 'asc' },
+    });
+
+    if (!role) {
+      throw new Error('No se encontró un rol admin/ceo. Corre primero seed-roles.ts o seed-demo-users.ts.');
+    }
 
     const admin = await prisma.user.upsert({
       where: { email: 'admin@nexara.com.mx' },
       update: {
-        password: hashedPassword,
-        isActive: true,
+        nombre: 'Admin Nexara',
+        passwordHash: hashedPassword,
+        roleId: role.id,
+        departmentId: department.id,
       },
       create: {
         email: 'admin@nexara.com.mx',
-        nombre: 'Admin',
-        apellido: 'Nexara',
-        password: hashedPassword,
-        emailVerified: new Date(),
-        isActive: true,
-        roles: {
-          connect: { id: 1 }, // Asumiendo que role con id=1 existe
-        },
+        nombre: 'Admin Nexara',
+        passwordHash: hashedPassword,
+        roleId: role.id,
+        departmentId: department.id,
       },
     });
 

@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { ORG_ROLE_TEMPLATES } from '../src/common/org-roles';
+import { ORG_ROLE_TEMPLATES } from '../src/common/org-roles.ts';
 
 const prisma = new PrismaClient();
 

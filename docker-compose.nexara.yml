@@ -17,6 +17,12 @@ services:
       - HIKVISION_USERNAME=${HIKVISION_USERNAME:-admin}
       - HIKVISION_PASSWORD=${HIKVISION_PASSWORD:-password}
       - HIKVISION_TIMEOUT=${HIKVISION_TIMEOUT:-10000}
+    # Volumen para uploads de Studio (banner del hero, noticias, evidencias,
+    # documentos, etc.). El backend guarda en `./uploads/<modulo>/` y los
+    # sirve vía endpoints `/api/<modulo>/image/:filename`. El volumen named
+    # `nexara-uploads` sobrevive a `docker compose down` y a redeploys.
+    volumes:
+      - nexara-uploads:/app/uploads
     depends_on:
       - nexara-db
     networks:
@@ -80,3 +86,5 @@ networks:
 volumes:
   nexara-db-data:
     name: nexara-db-data
+  nexara-uploads:
+    name: nexara-uploads

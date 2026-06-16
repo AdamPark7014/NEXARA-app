@@ -1,5 +1,5 @@
 /**
- * Seed de onboarding: conecta los 11 usuarios reales del equipo NEXARA a
+ * Seed de onboarding: conecta el equipo real del seed de usuarios NEXARA a
  * TODOS los nuevos procesos generados en las fases 17-34 (Helpdesk, NOC,
  * People/RH, Lab, Multi-tenant, Vacaciones, Workflow, CRM activities, Sales
  * targets, KB, Notifications, Performance reviews).
@@ -16,19 +16,18 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 // ── Identidades del equipo (deben coincidir con seed-demo-users.ts) ─────────
-// Karen Elizalde consolida Dirección Administrativa + Dirección Comercial.
 const TEAM_EMAILS = {
   ceo: 'gerencia@nexara.com.mx',          // Christian Del Pozo
   developer: 'developer@nexara.com.mx',   // Adam Del Pozo
-  directorAdmin: 'ventas@nexara.com.mx',  // Karen Elizalde (Admin + Comercial)
+  directorAdmin: 'lizeth.antele@nexara.com.mx', // Lizeth Antele Antonio
   directorOps: 'direccion.operaciones@nexara.com.mx', // Luis Joel Aguilar
-  directorCommercial: 'ventas@nexara.com.mx', // Karen Elizalde
+  directorCommercial: 'ventas@nexara.com.mx', // Karen Elizalde Sarmiento
   projectManager: 'operaciones@nexara.com.mx', // Alejandro Gonzales
-  seniorEngineer: 'soporte@nexara.com.mx', // Carolina Juárez
-  salesRep: 'vendedor@nexara.com.mx',     // Karina Martínez
-  fieldEngineerJulio: 'julio.rivazquez@nexara.com.mx',
-  fieldEngineerDavid: 'david.morzenon@nexara.com.mx',
-  fieldEngineerIsrael: 'israel.ralima@nexara.com.mx',
+  seniorEngineer: 'soporte@nexara.com.mx', // Carolina Juarez Alvarez
+  salesRep: 'ventas@nexara.com.mx',        // Karen Elizalde Sarmiento
+  fieldEngineerJulio: 'julio.rivera@nexara.com.mx',
+  fieldEngineerDavid: 'david.morales@nexara.com.mx',
+  fieldEngineerIsrael: 'israel.ramos@nexara.com.mx',
 } as const;
 
 type TeamMap = Record<keyof typeof TEAM_EMAILS, { id: number; nombre: string; email: string }>;

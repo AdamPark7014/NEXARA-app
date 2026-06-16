@@ -7,6 +7,23 @@ const GOOGLE_MAPS_API_KEY =
   process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "AIzaSyDOJ7TFUE5F1vD_qVh9ofKOSS5gd2mbnyE";
 const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || "";
 
+const NEXARA_MAP_STYLES = [
+  { elementType: "geometry", stylers: [{ color: "#0b1918" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#9fd9cb" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#0b1918" }] },
+  { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#18413b" }] },
+  { featureType: "landscape.natural", elementType: "geometry", stylers: [{ color: "#102725" }] },
+  { featureType: "poi", elementType: "geometry", stylers: [{ color: "#13332f" }] },
+  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#123a33" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#24524a" }] },
+  { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#2a5f56" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#2f776a" }] },
+  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1a4e46" }] },
+  { featureType: "transit", elementType: "geometry", stylers: [{ color: "#1a3d38" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#113838" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#8bd8c6" }] },
+] as const;
+
 // Tipos para Google Maps
 interface GoogleMapsOptions {
   zoom: number;
@@ -164,6 +181,7 @@ export default function Map() {
           zoom: 18,
           center: location,
           ...(GOOGLE_MAPS_MAP_ID ? { mapId: GOOGLE_MAPS_MAP_ID } : {}),
+          ...(!GOOGLE_MAPS_MAP_ID ? { styles: NEXARA_MAP_STYLES } : {}),
           mapTypeControl: true,
           fullscreenControl: true,
           streetViewControl: true,

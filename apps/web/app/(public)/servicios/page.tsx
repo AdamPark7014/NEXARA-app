@@ -1,346 +1,210 @@
+import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import type { Metadata } from "next";
+import shared from "../_shared/public.module.css";
 import styles from "./page.module.css";
-import SeoInterlinkHub from "@/components/SeoInterlinkHub";
-import { SERVICIOS_IMAGES } from "./serviciosImagery";
-import ExternalLinkButton from "@/components/ExternalLinkButton";
 
-const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
-
-export const metadata: Metadata = {
-  title: "Servicios de Tecnologia Empresarial | Nexara",
-  description:
-    "Infraestructura, ciberseguridad, equipamiento y servicios gestionados para empresas que exigen continuidad operativa.",
-  keywords: [
-    "servicios TI empresariales",
-    "ciberseguridad para empresas",
-    "infraestructura tecnologica",
-    "servicios gestionados",
-    "soporte tecnologico corporativo",
-    "ERP industrial Mexico",
-  ],
-  alternates: {
-    canonical: "/servicios",
-  },
-  openGraph: {
-    type: "website",
-    url: `${siteUrl}/servicios`,
-    title: "Servicios de Tecnologia Empresarial | Nexara",
-    description: "Servicios integrales de tecnologia para operaciones empresariales de alta demanda en Mexico.",
-    images: [{ url: "/logo-nexara.png", width: 1200, height: 630, alt: "Servicios Nexara" }],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Servicios de Tecnologia Empresarial | Nexara",
-    description: "Arquitectura, soporte y operacion TI para escalar empresas con control.",
-    images: ["/logo-nexara.png"],
-  },
+export const metadata = {
+  title: "Servicios | Nexara",
+  description: "Catálogo de servicios tecnológicos de Nexara: Software, Cloud, Ciberseguridad, Data & IA, Conectividad y Transformación.",
 };
 
+/* ── Iconos ─────────────────────────────────────────────── */
+const IconCode = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
+  </svg>
+);
+const IconCloud = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M17.5 19A4.5 4.5 0 0 0 16 10.27 7 7 0 1 0 3 14.5h13a3.5 3.5 0 0 1 1.5 4.5z" />
+  </svg>
+);
+const IconShield = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+  </svg>
+);
+const IconBrain = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58A2.5 2.5 0 0 1 4.5 6.5a2.5 2.5 0 0 1 5-1.96V2z" />
+    <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-.42-4.78 2.5 2.5 0 0 0-5-1.96V2z" />
+  </svg>
+);
+const IconNetwork = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="2" y="2" width="6" height="6" rx="1" /><rect x="16" y="2" width="6" height="6" rx="1" />
+    <rect x="9" y="16" width="6" height="6" rx="1" /><path d="M5 8v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8M12 13v3" />
+  </svg>
+);
+const IconCompass = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="10" /><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+  </svg>
+);
+
+const servicios = [
+  {
+    id: "software",
+    icon: <IconCode />,
+    title: "Desarrollo de Software",
+    text: "Aplicaciones web y móviles a medida, integraciones API y plataformas internas.",
+    image: "/images/hero/hero-01.png",
+  },
+  {
+    id: "cloud",
+    icon: <IconCloud />,
+    title: "Cloud & Infraestructura",
+    text: "Migración, arquitectura multi-cloud y optimización de costos en AWS/Azure/GCP.",
+    image: "/images/hero/hero-03.png",
+  },
+  {
+    id: "ciberseguridad",
+    icon: <IconShield />,
+    title: "Ciberseguridad",
+    text: "Pentesting, hardening, SOC y cumplimiento normativo (ISO 27001, PCI-DSS).",
+    image: "/images/hero/hero-04.png",
+  },
+  {
+    id: "data-ai",
+    icon: <IconBrain />,
+    title: "Data & IA",
+    text: "Pipelines de datos, dashboards ejecutivos y modelos de IA aplicados al negocio.",
+    image: "/images/hero/hero-05.png",
+  },
+  {
+    id: "conectividad",
+    icon: <IconNetwork />,
+    title: "Conectividad y Redes",
+    text: "Diseño LAN/WAN, fibra óptica, redes inalámbricas y telefonía IP empresarial.",
+    image: "/images/hero/hero-06.png",
+  },
+  {
+    id: "transformacion",
+    icon: <IconCompass />,
+    title: "Transformación Digital",
+    text: "Diagnóstico, hoja de ruta y ejecución de proyectos de modernización end-to-end.",
+    image: "/images/hero/hero-07.png",
+  },
+];
+
+const proceso = [
+  { num: "01", title: "Descubrimiento", text: "Entrevistas, levantamiento y diagnóstico técnico." },
+  { num: "02", title: "Propuesta", text: "Alcance, plan, equipo y presupuesto cerrado." },
+  { num: "03", title: "Ejecución", text: "Sprints quincenales con demos y entregables claros." },
+  { num: "04", title: "Operación", text: "Soporte, mejora continua y SLA medibles." },
+];
+
 export default function ServiciosPage() {
-  const serviceSchema = {
-    "@context": "https://schema.org",
-    "@type": "ProfessionalService",
-    name: "Nexara Servicios de Tecnologia Empresarial",
-    url: `${siteUrl}/servicios`,
-    areaServed: "MX",
-    serviceType: "Infraestructura TI, ciberseguridad, soporte y servicios gestionados",
-    provider: {
-      "@type": "Organization",
-      name: "NEXARA",
-      url: siteUrl,
-    },
-  };
-
-  const coreServices = [
-    {
-      title: "Infraestructura y conectividad",
-      text: "Diseño e implementación de redes, energía, seguridad perimetral y plataformas de operación.",
-      cover: SERVICIOS_IMAGES.offerInfrastructure,
-      coverAlt: "Infraestructura de red y equipamiento en rack",
-    },
-    {
-      title: "Equipamiento empresarial",
-      text: "Suministro de hardware y periféricos con criterios de rendimiento, vida útil y costo total.",
-      cover: SERVICIOS_IMAGES.offerEquipment,
-      coverAlt: "Equipos de cómputo y estación de trabajo empresarial",
-    },
-    {
-      title: "Servicios gestionados",
-      text: "Monitoreo, soporte y mantenimiento continuo con acuerdos de nivel de servicio claros.",
-      cover: SERVICIOS_IMAGES.offerManaged,
-      coverAlt: "Equipo de trabajo coordinando servicios TI",
-    },
-  ];
-
-  const workModel = [
-    "Levantamiento técnico y operativo en sitio o remoto.",
-    "Plan de implementación por fases con hitos de control.",
-    "Ejecución con documentación y transferencia de conocimiento.",
-    "Seguimiento posterior para estabilización y mejora continua.",
-  ];
-
-  const includeBlocks = [
-    {
-      title: "Soporte técnico corporativo",
-      items: [
-        "Atención especializada para operaciones multi-sucursal.",
-        "Ventanas de atención y esquemas de escalamiento definidos.",
-        "Tiempos de respuesta y resolución alineados a SLA.",
-        "Cobertura de campo según alcance contratado.",
-      ],
-      cover: SERVICIOS_IMAGES.includeSupport,
-      coverAlt: "Equipo colaborando en soporte y seguimiento",
-    },
-    {
-      title: "Arrendamiento y renovación",
-      items: [
-        "Esquemas financieros para preservar flujo de efectivo.",
-        "Renovación tecnológica sin inversiones iniciales elevadas.",
-        "Mantenimiento y soporte durante vigencia del contrato.",
-        "Planeación de reemplazo con base en ciclo de vida.",
-      ],
-      cover: SERVICIOS_IMAGES.includeLeasing,
-      coverAlt: "Planificación financiera y renovación de activos",
-    },
-  ];
-
   return (
-    <main
-      className={`${styles.container} public-section-page ultra-corp-page ultra-corp-servicios ultra-corp-strict`}
-      aria-label="Página de servicios"
-    >
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceSchema) }}
-      />
+    <main className={shared.page}>
+      {/* Hero */}
+      <section className={shared.hero}>
+        <div className={shared.inner}>
+          <div className={shared.heroGrid}>
+            <div data-reveal="soft">
+              <span className={shared.heroEyebrow}>Servicios</span>
+              <h1 className={shared.heroTitle}>
+                Tecnología que <span className={shared.heroTitleAccent}>opera el día a día</span>
+              </h1>
+              <p className={shared.heroLead}>
+                Seis capacidades integradas para diseñar, implementar y operar la tecnología que
+                sostiene tu negocio. Una sola firma, responsabilidad punta a punta.
+              </p>
+              <div className={shared.heroActions}>
+                <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`}>
+                  Solicitar propuesta <span className={shared.btnArrow}>→</span>
+                </Link>
+                <Link href="/proyectos" className={`${shared.btn} ${shared.btnSecondary}`}>
+                  Ver proyectos
+                </Link>
+              </div>
+            </div>
+            <div className={shared.heroImage} data-reveal="soft">
+              <Image src="/images/hero/hero-08.png" alt="Equipo Nexara en sala de control" width={720} height={540} priority />
+              <div className={shared.heroImageOverlay} />
+            </div>
+          </div>
+        </div>
+      </section>
 
-      <header className={styles.hero} data-reveal="soft" data-nx-grain>
-        <div className={styles.heroAura} aria-hidden />
-        <div className={styles.heroSplit}>
-          <div className={styles.heroCopy}>
-            <span data-nx-eyebrow>Servicios Profesionales</span>
-            <h1 className={styles.pageTitle}>
-              Tecnología que <em className={styles.pageTitleAccent}>sostiene tu operación</em>
-            </h1>
-            <p className={styles.pageLead}>
-              Construimos operaciones tecnológicas robustas para organizaciones que requieren continuidad,
-              control y crecimiento sostenible.
+      {/* Servicios principales */}
+      <section id="servicios-principales" className={shared.section}>
+        <div className={shared.inner}>
+          <div className={shared.sectionHead} data-reveal="soft">
+            <span className={shared.eyebrow}>Capacidades</span>
+            <h2 className={shared.sectionTitle}>
+              Todo lo que <span className={shared.sectionTitleAccent}>tu operación necesita</span>
+            </h2>
+            <p className={shared.sectionLead}>
+              Equipos especializados con experiencia comprobada en cada disciplina.
             </p>
-            <nav className={styles.quickNav} aria-label="Accesos rápidos">
-              <a href="#ofrecemos" className={styles.quickNavLink}>
-                ¿Qué ofrecemos?
-              </a>
-              <a href="#ejecucion" className={styles.quickNavLink}>
-                ¿Cómo lo ejecutamos?
-              </a>
-              <a href="#beneficios" className={styles.quickNavLink}>
-                Beneficios
-              </a>
-              <a href="#integracion" className={styles.quickNavLink}>
-                ¿Dónde integrarlos?
-              </a>
-              <a href="#incluyen" className={styles.quickNavLink}>
-                ¿Qué incluyen?
-              </a>
-            </nav>
           </div>
-          <div className={styles.heroVisual}>
-            <Image
-              src={SERVICIOS_IMAGES.hero}
-              alt="Espacio corporativo con enfoque en operación y tecnología"
-              fill
-              sizes="(max-width: 899px) 100vw, 42vw"
-              className={styles.heroImg}
-              priority
-            />
+          <div className={`${shared.grid3} ${styles.servGrid}`} data-reveal-stagger>
+            {servicios.map((s) => (
+              <article id={s.id} key={s.id} className={shared.imageCard} data-reveal="up">
+                <div className={shared.imageCardImg}>
+                  <Image src={s.image} alt={s.title} width={640} height={400} />
+                </div>
+                <div className={shared.imageCardBody}>
+                  <div className={styles.servIconRow}>
+                    <span className={shared.cardIcon}>{s.icon}</span>
+                  </div>
+                  <h3 className={shared.imageCardTitle}>{s.title}</h3>
+                  <p className={shared.imageCardText}>{s.text}</p>
+                </div>
+              </article>
+            ))}
           </div>
         </div>
-      </header>
+      </section>
 
-      <section id="ofrecemos" className={styles.contentSection} data-reveal="up">
-        <header className={styles.sectionHead}>
-          <h2 className={styles.sectionTitle}>Qué ofrecemos</h2>
-          <p className={styles.sectionLead}>
-            Tres pilares que cubren desde la base física y lógica hasta el acompañamiento continuo.
-          </p>
-        </header>
-        <div className={styles.offerGrid} data-reveal-stagger>
-          {coreServices.map((service) => (
-            <article key={service.title} className={styles.offerTile} data-reveal="up">
-              <div className={styles.offerTileMedia}>
-                <Image
-                  src={service.cover}
-                  alt={service.coverAlt}
-                  fill
-                  sizes="(max-width: 719px) 100vw, 33vw"
-                  className={styles.offerTileImg}
-                />
+      {/* Proceso */}
+      <section className={`${shared.section} ${shared.sectionDivider}`}>
+        <div className={shared.inner}>
+          <div className={shared.sectionHead} data-reveal="soft">
+            <span className={shared.eyebrow}>Proceso</span>
+            <h2 className={shared.sectionTitle}>
+              Cuatro pasos, <span className={shared.sectionTitleAccent}>resultados medibles</span>
+            </h2>
+            <p className={shared.sectionLead}>
+              Un método ordenado que reduce sorpresas y acelera la entrega de valor.
+            </p>
+          </div>
+          <div className={shared.grid4} data-reveal-stagger>
+            {proceso.map((p) => (
+              <div key={p.num} className={`${shared.card} ${styles.procesoCard}`} data-reveal="up">
+                <span className={styles.procesoNum}>{p.num}</span>
+                <h3 className={shared.cardTitle}>{p.title}</h3>
+                <p className={shared.cardText}>{p.text}</p>
               </div>
-              <div className={styles.offerTileBody}>
-                <h3>{service.title}</h3>
-                <p>{service.text}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section id="ejecucion" className={styles.contentSection} data-reveal="up">
-        <header className={styles.sectionHead}>
-          <h2 className={styles.sectionTitle}>Cómo lo ejecutamos</h2>
-          <p className={styles.sectionLead}>
-            Un método ordenado para reducir riesgos y asegurar trazabilidad en cada etapa.
-          </p>
-        </header>
-        <div className={styles.processShell}>
-          <figure className={styles.processVisual}>
-            <Image
-              src={SERVICIOS_IMAGES.processMethod}
-              alt="Equipo revisando planificación y control de proyecto"
-              fill
-              sizes="(max-width: 900px) 100vw, min(920px, 90vw)"
-              className={styles.processImg}
-            />
-          </figure>
-          <div className={styles.processBlock}>
-            <ol className={styles.processList}>
-              {workModel.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ol>
+            ))}
           </div>
         </div>
       </section>
 
-      <section id="beneficios" className={styles.contentSection} data-reveal="up">
-        <header className={styles.sectionHead}>
-          <h2 className={styles.sectionTitle}>Beneficios para tu operación</h2>
-        </header>
-        <div className={styles.splitRow}>
-          <div className={styles.splitMain}>
-            <ul className={styles.proseList}>
-              <li>Reducción de riesgos operativos mediante diseño y control técnico.</li>
-              <li>Mayor disponibilidad y estabilidad en procesos críticos del negocio.</li>
-              <li>Visibilidad ejecutiva con indicadores para decisión y mejora continua.</li>
-              <li>Un solo aliado para arquitectura, implementación y soporte.</li>
-              <li>Escalabilidad real para acompañar crecimiento por etapas.</li>
-            </ul>
-          </div>
-          <div className={styles.splitAside}>
-            <figure className={styles.splitFigure}>
-              <Image
-                src={SERVICIOS_IMAGES.benefitsContext}
-                alt="Equipo directivo alineando estrategia y operación"
-                fill
-                sizes="(max-width: 879px) 100vw, 35vw"
-                className={styles.splitImg}
-              />
-            </figure>
-            <aside className={`${styles.sideNote} ${styles.sideNoteStrong}`} aria-label="Resultado operativo esperado">
-              <p className={styles.signalLabel}>Resultado esperado</p>
-              <p className={styles.signalBody}>
-                Equipos directivos con mejor control de tecnología, menores interrupciones y mayor capacidad
-                para crecer sin fricción operativa.
-              </p>
-            </aside>
+      {/* CTA final */}
+      <section className={shared.section} id="contacto">
+        <div className={shared.inner}>
+          <div className={shared.ctaShell} data-reveal="up">
+            <h2 className={shared.ctaTitle}>
+              ¿Necesitas un <span className={shared.sectionTitleAccent}>diagnóstico rápido</span>?
+            </h2>
+            <p className={shared.ctaLead}>
+              30 minutos con un especialista. Sin costo, sin compromiso. Te llevamos una propuesta
+              clara y aterrizada a tu realidad.
+            </p>
+            <div className={shared.ctaActions}>
+              <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`}>
+                Agendar reunión <span className={shared.btnArrow}>→</span>
+              </Link>
+              <Link href="/nosotros" className={`${shared.btn} ${shared.btnSecondary}`}>
+                Conoce al equipo
+              </Link>
+            </div>
           </div>
         </div>
       </section>
-
-      <section id="integracion" className={styles.contentSection} data-reveal="up">
-        <header className={styles.sectionHead}>
-          <h2 className={styles.sectionTitle}>Dónde integrarlos</h2>
-        </header>
-        <div className={styles.splitRow}>
-          <div className={styles.splitMain}>
-            <ul className={styles.proseList}>
-              <li>Centros administrativos, puntos de venta y sedes operativas distribuidas.</li>
-              <li>Áreas de atención con necesidades de continuidad y respuesta inmediata.</li>
-              <li>Plataformas de colaboración, seguridad y productividad corporativa.</li>
-              <li>Entornos donde convergen tecnología, procesos y personal de campo.</li>
-            </ul>
-          </div>
-          <div className={styles.splitAside}>
-            <figure className={styles.splitFigure}>
-              <Image
-                src={SERVICIOS_IMAGES.integrationVenues}
-                alt="Operaciones en sedes corporativas y entorno urbano"
-                fill
-                sizes="(max-width: 879px) 100vw, 35vw"
-                className={styles.splitImg}
-              />
-            </figure>
-            <aside className={styles.sideNote}>
-              <h3>Integración por capas</h3>
-              <p>
-                Priorizamos primero la estabilidad base (red, energía, seguridad), luego incorporamos
-                plataformas y automatización.
-              </p>
-            </aside>
-          </div>
-        </div>
-      </section>
-
-      <section id="incluyen" className={styles.contentSection} data-reveal="up">
-        <header className={styles.sectionHead}>
-          <h2 className={styles.sectionTitle}>Qué incluyen nuestros servicios</h2>
-        </header>
-        <div className={styles.detailGrid} data-reveal-stagger>
-          {includeBlocks.map((block) => (
-            <article key={block.title} className={styles.detailTile} data-reveal="up">
-              <div className={styles.detailTileMedia}>
-                <Image
-                  src={block.cover}
-                  alt={block.coverAlt}
-                  fill
-                  sizes="(max-width: 799px) 100vw, 50vw"
-                  className={styles.detailTileImg}
-                />
-              </div>
-              <div className={styles.detailTileBody}>
-                <h3>{block.title}</h3>
-                <ul className={styles.proseList}>
-                  {block.items.map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section id="contacto" className={styles.finalCta} data-reveal="up">
-        <h2>Listo para profesionalizar tu operación tecnológica</h2>
-        <p>Conversemos y diseñemos una propuesta de servicios alineada a tu negocio.</p>
-        <div className={styles.ctaActions}>
-          <Link
-            href="/contacto"
-            data-track-conversion="services_primary_cta"
-            className={styles.primaryCta}
-          >
-            Contactar
-          </Link>
-          <ExternalLinkButton
-            href="https://wa.me/525536505044"
-            data-track-conversion="services_whatsapp_cta"
-            className={styles.secondaryCta}
-          >
-            WhatsApp
-          </ExternalLinkButton>
-        </div>
-      </section>
-
-      <div className={styles.hubShell} data-reveal="up">
-        <SeoInterlinkHub
-          title="Soluciones recomendadas por industria"
-          subtitle="Cada industria enlaza a páginas de contexto por servicio; encaja con las líneas de infraestructura, equipamiento y soporte descritas arriba."
-          currentPath="/servicios"
-          maxItems={9}
-        />
-      </div>
     </main>
   );
 }

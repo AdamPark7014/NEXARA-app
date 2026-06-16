@@ -119,7 +119,7 @@ export default function CatalogShowcase({ projects }: CatalogShowcaseProps) {
                 </div>
 
                 <div className={styles.caseVisual}>
-                  <div className={styles.caseMainPhoto}>
+                  <figure className={styles.caseMainPhoto}>
                     <Image
                       src={normalizeProjectImageUrl(project.mainImage)}
                       alt={`Proyecto ${project.title}`}
@@ -128,24 +128,45 @@ export default function CatalogShowcase({ projects }: CatalogShowcaseProps) {
                       className={styles.casePhoto}
                       unoptimized
                     />
-                  </div>
-                  <div className={styles.caseThumbs}>
-                    {project.gallery.slice(0, 4).map((image, i) => (
-                      <div key={`${project.id}-g-${i}`} className={styles.caseThumb}>
-                        <Image
-                          src={normalizeProjectImageUrl(image)}
-                          alt={`${project.title} — imagen ${i + 1}`}
-                          fill
-                          sizes="(max-width: 900px) 50vw, 20vw"
-                          className={styles.casePhoto}
-                          unoptimized
-                        />
-                      </div>
-                    ))}
-                    {project.gallery.length === 0 && (
-                      <div className={styles.caseThumbsPlaceholder}>Sin galería adicional</div>
+                    <figcaption className={styles.caseMainBadge}>
+                      <span className={styles.caseMainBadgeDot} aria-hidden />
+                      Imagen principal
+                    </figcaption>
+                    {project.gallery.length > 0 && (
+                      <span className={styles.caseGalleryCount} aria-hidden>
+                        {project.gallery.length + 1} imágenes
+                      </span>
                     )}
-                  </div>
+                  </figure>
+                  {project.gallery.length === 0 ? (
+                    <div className={styles.caseThumbsPlaceholder}>Sin galería adicional</div>
+                  ) : (
+                    <div
+                      className={styles.caseThumbs}
+                      role="list"
+                      aria-label={`Galería del proyecto ${project.title}`}
+                    >
+                      {project.gallery.slice(0, 8).map((image, i) => (
+                        <div
+                          key={`${project.id}-g-${i}`}
+                          className={styles.caseThumb}
+                          role="listitem"
+                        >
+                          <Image
+                            src={normalizeProjectImageUrl(image)}
+                            alt={`${project.title} — imagen ${i + 2}`}
+                            fill
+                            sizes="(max-width: 600px) 33vw, (max-width: 900px) 22vw, 11vw"
+                            className={styles.casePhoto}
+                            unoptimized
+                          />
+                          <span className={styles.caseThumbIndex} aria-hidden>
+                            {String(i + 2).padStart(2, "0")}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </article>
             );

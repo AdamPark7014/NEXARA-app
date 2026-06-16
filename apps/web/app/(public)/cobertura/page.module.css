@@ -1,0 +1,36 @@
+/* Cobertura · estilos específicos */
+
+.regionCard {
+  position: relative;
+}
+
+.regionHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.regionBadge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #6efbd5, #45c9b1);
+  color: #03110d;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.regionBase {
+  border-color: color-mix(in srgb, #6efbd5 50%, transparent) !important;
+}
+
+.modIcon {
+  display: inline-block;
+  font-size: 2rem;
+  line-height: 1;
+  margin-bottom: 14px;
+}
