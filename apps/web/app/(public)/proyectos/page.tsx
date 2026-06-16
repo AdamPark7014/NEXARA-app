@@ -1,45 +1,64 @@
+import React from "react";
 import Image from "next/image";
-import type { Metadata } from "next";
+import Link from "next/link";
+import shared from "../_shared/public.module.css";
 import styles from "./page.module.css";
 import { buildApiUrl, getApiAssetOrigin } from "@/lib/api-base";
-import CatalogShowcase from "./CatalogShowcase";
-import { PROYECTOS_SECTOR_COVERS } from "./proyectosSectorCovers";
-import ExternalLinkButton from "@/components/ExternalLinkButton";
 
-const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
-
-export const metadata: Metadata = {
-  title: "Catalogo de Proyectos | Nexara",
-  description:
-    "Casos y catalogo de proyectos tecnologicos implementados por Nexara para sectores empresariales y operativos.",
-  keywords: [
-    "casos de exito tecnologia",
-    "proyectos ERP industrial",
-    "portafolio de proyectos TI",
-    "implementaciones empresariales",
-    "catalogo tecnologico",
-  ],
-  alternates: {
-    canonical: "/proyectos",
-  },
-  openGraph: {
-    type: "website",
-    url: `${siteUrl}/proyectos`,
-    title: "Catalogo de Proyectos | Nexara",
-    description: "Explora sectores y proyectos recientes con impacto operativo medible.",
-    images: [{ url: "/logo-nexara.png", width: 1200, height: 630, alt: "Proyectos Nexara" }],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Catalogo de Proyectos | Nexara",
-    description: "Portafolio de implementaciones tecnologicas por sector.",
-    images: ["/logo-nexara.png"],
-  },
+export const metadata = {
+  title: "Proyectos | Nexara",
+  description: "Casos de éxito y proyectos representativos ejecutados por Nexara en distintos sectores.",
 };
-
 export const dynamic = "force-dynamic";
 
-type Project = {
+const casos = [
+  {
+    sector: "Retail",
+    title: "Modernización de POS multi-sede",
+    desc: "Integración con SAP y monitoreo centralizado en 60 sucursales.",
+    image: "/images/hero/hero-01.png",
+    metric: "60 sedes",
+  },
+  {
+    sector: "Manufactura",
+    title: "Línea de producción IoT",
+    desc: "Sensórica, dashboards en tiempo real y alertas predictivas.",
+    image: "/images/hero/hero-02.png",
+    metric: "-23% paros",
+  },
+  {
+    sector: "Hospitalidad",
+    title: "Red Wi-Fi de alta densidad",
+    desc: "Diseño RF y cableado estructurado para 480 habitaciones.",
+    image: "/images/hero/hero-03.png",
+    metric: "480 hab.",
+  },
+  {
+    sector: "Salud",
+    title: "Expediente clínico unificado",
+    desc: "Migración a la nube, HL7/FHIR y portal de pacientes.",
+    image: "/images/hero/hero-04.png",
+    metric: "12 clínicas",
+  },
+  {
+    sector: "Educación",
+    title: "Campus conectado",
+    desc: "Aulas inteligentes, control de acceso y videovigilancia integrada.",
+    image: "/images/hero/hero-05.png",
+    metric: "3 campus",
+  },
+  {
+    sector: "Gobierno",
+    title: "Centro de datos regional",
+    desc: "Infraestructura redundante con SLA 99.95 % y DRP geo-replicado.",
+    image: "/images/hero/hero-06.png",
+    metric: "99.95% SLA",
+  },
+];
+
+const sectores = ["Retail", "Manufactura", "Hospitalidad", "Salud", "Educación", "Gobierno"];
+
+type StudioProject = {
   id: number;
   slug: string;
   title: string;
@@ -51,372 +70,235 @@ type Project = {
   highlights: string[];
   gallery: string[];
   mainImage?: string | null;
-  showInCatalog: boolean;
   createdAt: string;
 };
 
-type NewsPost = {
-  id: number;
-  title: string;
-  slug: string;
-  status?: string;
-  summary?: string | null;
-  content: string;
-  coverImageUrl?: string | null;
-  publishedAt?: string | null;
-  createdAt: string;
-  updatedAt?: string;
-};
-
-type SectorTemplate = {
-  key: keyof typeof PROYECTOS_SECTOR_COVERS;
-  title: string;
-  bullets: string[];
-  group: "main" | "other";
-};
-
-const normalizeImageUrl = (imageUrl?: string | null) => {
-  if (!imageUrl) return "/soluciones/rect-a.jpg";
-  if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
-    return imageUrl;
-  }
+function normalizeProjectImageUrl(imageUrl?: string | null): string {
+  if (!imageUrl) return "/images/hero/hero-07.png";
+  if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) return imageUrl;
   const origin = getApiAssetOrigin();
   if (imageUrl.startsWith("/")) {
     if (imageUrl.startsWith("/projects/image/")) return `${origin}${imageUrl}`;
     return imageUrl;
   }
   return `${origin}/projects/image/${imageUrl}`;
-};
+}
 
-const getProjects = async (): Promise<Project[]> => {
+async function fetchStudioProjects(): Promise<StudioProject[]> {
   try {
-    const response = await fetch(buildApiUrl("projects"), { cache: "no-store" });
-    if (!response.ok) return [];
-
-    const raw = (await response.json()) as unknown;
-    if (!Array.isArray(raw)) return [];
-
-    return raw.map((entry) => {
-      const item = (entry ?? {}) as Partial<Project>;
-      return {
-        id: Number(item.id) || 0,
-        slug: typeof item.slug === "string" ? item.slug : "",
-        title: typeof item.title === "string" ? item.title : "Proyecto sin titulo",
-        sector: typeof item.sector === "string" ? item.sector : "General",
-        summary: typeof item.summary === "string" ? item.summary : "",
-        impact: typeof item.impact === "string" ? item.impact : "",
-        services: Array.isArray(item.services)
-          ? item.services.filter((value): value is string => typeof value === "string")
-          : [],
-        tags: Array.isArray(item.tags)
-          ? item.tags.filter((value): value is string => typeof value === "string")
-          : [],
-        highlights: Array.isArray(item.highlights)
-          ? item.highlights.filter((value): value is string => typeof value === "string")
-          : [],
-        gallery: Array.isArray(item.gallery)
-          ? item.gallery.filter((value): value is string => typeof value === "string")
-          : [],
-        mainImage: typeof item.mainImage === "string" ? item.mainImage : null,
-        showInCatalog: Boolean(item.showInCatalog),
-        createdAt:
-          typeof item.createdAt === "string" && item.createdAt.trim().length > 0
-            ? item.createdAt
-            : new Date().toISOString(),
-      };
+    const res = await fetch(buildApiUrl("projects?limit=12"), {
+      cache: "no-store",
     });
+    if (!res.ok) return [];
+    const payload = (await res.json()) as StudioProject[] | { data?: StudioProject[] };
+    if (Array.isArray(payload)) return payload;
+    return Array.isArray(payload.data) ? payload.data : [];
   } catch {
     return [];
   }
-};
+}
 
-const getNews = async (): Promise<NewsPost[]> => {
-  try {
-    const response = await fetch(buildApiUrl("news"), { cache: "no-store" });
-    if (!response.ok) return [];
-    const raw = (await response.json()) as unknown;
-    const rows = Array.isArray(raw) ? raw : [];
-    const normalized = rows.map((entry) => {
-      const item = (entry ?? {}) as Partial<NewsPost>;
-      return {
-        id: Number(item.id) || 0,
-        title: typeof item.title === "string" ? item.title : "Sin título",
-        slug: typeof item.slug === "string" ? item.slug : "",
-        status: typeof item.status === "string" ? item.status : undefined,
-        summary: typeof item.summary === "string" ? item.summary : null,
-        content: typeof item.content === "string" ? item.content : "",
-        coverImageUrl: typeof item.coverImageUrl === "string" ? item.coverImageUrl : null,
-        publishedAt: typeof item.publishedAt === "string" ? item.publishedAt : null,
-        createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
-        updatedAt: typeof item.updatedAt === "string" ? item.updatedAt : undefined,
-      } as NewsPost;
-    });
-
-    return normalized
-      .filter((item) => {
-        const status = String((item.status ?? "")).toUpperCase();
-        return !status || status === "PUBLISHED";
-      })
-      .sort((a, b) => new Date(b.publishedAt || b.createdAt).getTime() - new Date(a.publishedAt || a.createdAt).getTime());
-  } catch {
-    return [];
-  }
-};
-
-const sectorTemplates: SectorTemplate[] = [
-  {
-    key: "computo-empresarial",
-    title: "Computo empresarial",
-    bullets: [
-      "Suministro y configuración de equipos listos para operación y crecimiento.",
-      "Accesorios: laptops, workstations y servidores.",
-    ],
-    group: "main",
-  },
-  {
-    key: "redes-conectividad",
-    title: "Redes y conectividad",
-    bullets: [
-      "Diseño e implementación de redes estables, seguras y administrables.",
-      "Accesorios: switches, access points y cableado.",
-    ],
-    group: "main",
-  },
-  {
-    key: "videovigilancia-seguridad",
-    title: "Videovigilancia y seguridad",
-    bullets: [
-      "Cobertura integral para proteger activos físicos y digitales.",
-      "Accesorios: CCTV, control de acceso y monitoreo.",
-    ],
-    group: "main",
-  },
-  {
-    key: "licenciamiento",
-    title: "Licenciamiento",
-    bullets: [
-      "Gestión de licencias y cumplimiento para operar con software legal y actualizado.",
-      "Accesorios: productividad, seguridad y colaboración.",
-    ],
-    group: "main",
-  },
-  {
-    key: "gubernamental",
-    title: "Gubernamental",
-    bullets: [
-      "Modernizamos entornos públicos con infraestructura segura, equipamiento y soporte operativo continuo.",
-    ],
-    group: "other",
-  },
-  {
-    key: "educativo",
-    title: "Educativo",
-    bullets: [
-      "Implementamos aulas y redes institucionales para aprendizaje digital con alta disponibilidad.",
-    ],
-    group: "other",
-  },
-  {
-    key: "pymes",
-    title: "Pymes",
-    bullets: [
-      "Diseñamos paquetes tecnológicos escalables para crecer sin frenar la operación.",
-    ],
-    group: "other",
-  },
-  {
-    key: "salud",
-    title: "Salud",
-    bullets: [
-      "Aseguramos continuidad y protección de información en clínicas y centros médicos.",
-    ],
-    group: "other",
-  },
-  {
-    key: "industrial",
-    title: "Industrial",
-    bullets: [
-      "Integración de TI para plantas y operaciones con foco en control, seguridad y productividad.",
-    ],
-    group: "other",
-  },
-];
-
-export default async function ProjectsPage() {
-  const projects = await getProjects();
-  const news = await getNews();
-  const sortedProjects = [...projects].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  );
-
-  const catalogForShowcase = sortedProjects.filter((p) => p.showInCatalog);
-  const showcaseProjects = (catalogForShowcase.length ? catalogForShowcase : sortedProjects).slice(0, 6);
-
-  const catalogSchema = {
-    "@context": "https://schema.org",
-    "@type": "ItemList",
-    name: "Catalogo de proyectos Nexara",
-    url: `${siteUrl}/proyectos`,
-    numberOfItems: sortedProjects.length,
-    itemListElement: sortedProjects.slice(0, 10).map((project, index) => ({
-      "@type": "ListItem",
-      position: index + 1,
-      name: project.title,
-      url: `${siteUrl}/proyectos#${project.slug || project.id}`,
-    })),
-  };
-
-  const sectors = sectorTemplates.map((template, index) => {
-    const project = sortedProjects[index];
-    return {
-      key: template.key,
-      id: project ? String(project.id) : template.key,
-      slug: project?.slug,
-      title: template.title,
-      bullets: template.bullets,
-      image: PROYECTOS_SECTOR_COVERS[template.key],
-      alt: template.title,
-      group: template.group,
-    };
-  });
-
-  const mainSectors = sectors.filter((sector) => sector.group === "main");
-  const otherSectors = sectors.filter((sector) => sector.group === "other");
-  const latestNews = news.slice(0, 3);
-
-  const renderSectorCard = (
-    sector: (typeof sectors)[number],
-    variant: "main" | "other",
-  ) => (
-    <article
-      key={sector.id}
-      id={sector.slug || sector.key}
-      className={variant === "main" ? styles.sectorTile : styles.sectorTileMuted}
-      data-reveal="up"
-    >
-      <div className={styles.sectorTileMedia}>
-        <Image
-          src={sector.image}
-          alt={sector.alt}
-          fill
-          sizes="(max-width: 640px) 100vw, (max-width: 1000px) 33vw, 260px"
-          className={styles.sectorTileImg}
-        />
-      </div>
-      <div className={styles.sectorTileBody}>
-        <h3 className={styles.sectorTileTitle}>{sector.title}</h3>
-        <ul className={styles.sectorTileList}>
-          {sector.bullets.map((bullet, bulletIndex) => (
-            <li key={`${sector.id}-${bulletIndex}`}>{bullet}</li>
-          ))}
-        </ul>
-      </div>
-    </article>
-  );
+export default async function ProyectosPage() {
+  const studioProjects = await fetchStudioProjects();
 
   return (
-    <main className={`${styles.container} public-section-page ultra-corp-page ultra-corp-proyectos ultra-corp-strict`} aria-label="Catálogo de proyectos Nexara">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(catalogSchema) }}
-      />
-      <header className={styles.hero} data-reveal="soft" data-nx-grain>
-        <div className={styles.heroAura} aria-hidden />
-        <div className={styles.heroCopy}>
-          <span data-nx-eyebrow>Portafolio Tecnológico</span>
-          <h1 className={styles.heroTitle}>
-            Sectores donde ya <em className={styles.heroTitleAccent}>generamos impacto</em>
-          </h1>
-          <p className={styles.heroText}>
-            Arriba encontrarás casos publicados con detalle e imágenes; más abajo, líneas de solución
-            y sectores atendidos para orientar compra e implementación con criterio empresarial.
-          </p>
-        </div>
-        <ExternalLinkButton href={buildApiUrl("projects/catalog-pdf/download")} className={styles.pdfButton}>
-          Descargar PDF completo
-        </ExternalLinkButton>
-      </header>
-
-      <div data-reveal="up">
-        <CatalogShowcase projects={showcaseProjects} />
-      </div>
-
-      <section className={styles.sectorSection} aria-labelledby="sectores-principales-title" data-reveal="up">
-        <header className={styles.sectorSectionHead}>
-          <h2 id="sectores-principales-title" className={styles.sectorSectionTitle}>
-            Sectores principales
-          </h2>
-          <p className={styles.sectorSectionLead}>
-            Líneas núcleo donde solemos intervenir con equipamiento, redes, videovigilancia y cumplimiento de software.
-          </p>
-        </header>
-        <div className={styles.sectorGrid} data-reveal-stagger>
-          {mainSectors.map((s) => renderSectorCard(s, "main"))}
-        </div>
-      </section>
-
-      <section className={styles.sectorSection} aria-labelledby="otros-sectores-title" data-reveal="up">
-        <header className={styles.sectorSectionHead}>
-          <h2 id="otros-sectores-title" className={styles.sectorSectionTitle}>
-            Otros sectores
-          </h2>
-          <p className={styles.sectorSectionLead}>
-            Verticales complementarias con el mismo criterio de continuidad, seguridad y soporte operativo.
-          </p>
-        </header>
-        <div className={styles.sectorGrid} data-reveal-stagger>
-          {otherSectors.map((s) => renderSectorCard(s, "other"))}
-        </div>
-      </section>
-
-      <section className={styles.bottomActions} data-reveal="up">
-        <a href="/contacto" data-track-conversion="projects_consult_cta" className={styles.consultButton}>
-          Solicitar asesoría para mi sector
-        </a>
-        <ExternalLinkButton
-          href={buildApiUrl("projects/catalog-pdf/download")}
-          data-track-conversion="projects_catalog_pdf"
-          className={styles.pdfButton}
-        >
-          Descargar PDF completo de proyectos
-        </ExternalLinkButton>
-      </section>
-
-      <section className={styles.newsHub} aria-labelledby="news-hub-heading" data-reveal="up">
-        <div className={styles.newsHubHead}>
-          <div className={styles.newsHubBrand}>
-            <Image src="/logo-nexara.png" alt="Nexara" width={48} height={48} className={styles.newsHubLogo} />
-            <div>
-              <h2 id="news-hub-heading" className={styles.newsHubTitle}>Entérate lo que pasa en Nexara</h2>
-              <p className={styles.newsHubSubtitle}>
-                Actualizaciones, novedades y comunicados relevantes para operación, compras y dirección.
+    <main className={shared.page}>
+      {/* Hero */}
+      <section className={shared.hero}>
+        <div className={shared.inner}>
+          <div className={shared.heroGrid}>
+            <div data-reveal="soft">
+              <span className={shared.heroEyebrow}>Proyectos</span>
+              <h1 className={shared.heroTitle}>
+                Casos reales, <span className={shared.heroTitleAccent}>resultados medibles</span>
+              </h1>
+              <p className={shared.heroLead}>
+                Una selección de proyectos donde la tecnología cambió la forma de operar.
+                Cada uno con métricas claras y clientes que recomiendan.
               </p>
+              <div className={shared.heroActions}>
+                <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`}>
+                  Cuéntanos tu reto <span className={shared.btnArrow}>→</span>
+                </Link>
+                <Link href="/servicios" className={`${shared.btn} ${shared.btnSecondary}`}>
+                  Ver servicios
+                </Link>
+              </div>
+            </div>
+            <div className={shared.heroImage} data-reveal="soft">
+              <Image src="/images/hero/hero-07.png" alt="Proyectos Nexara" width={720} height={540} priority />
+              <div className={shared.heroImageOverlay} />
             </div>
           </div>
-          <a className={styles.newsHubCta} href="/contacto">Recibir novedades</a>
         </div>
+      </section>
 
-        {latestNews.length ? (
-          <div className={styles.newsHubGrid} data-reveal-stagger>
-            {latestNews.map((item) => (
-              <article key={item.id} className={styles.newsHubCard} data-reveal="up">
-                <div className={styles.newsHubMeta}>
-                  <span>Actualización</span>
-                  <span>{new Date(item.publishedAt || item.createdAt).toLocaleDateString("es-MX")}</span>
-                </div>
-                <h3 className={styles.newsHubCardTitle}>{item.title}</h3>
-                <p className={styles.newsHubCardSummary}>{item.summary || "Nueva actualización disponible."}</p>
-              </article>
+      {/* Stats */}
+      <section className={shared.section}>
+        <div className={shared.inner}>
+          <div className={shared.statsGrid} data-reveal-stagger>
+            <div className={shared.stat} data-reveal="up">
+              <span className={shared.statValue}>+120</span>
+              <span className={shared.statLabel}>Proyectos entregados</span>
+            </div>
+            <div className={shared.stat} data-reveal="up">
+              <span className={shared.statValue}>+40</span>
+              <span className={shared.statLabel}>Clientes activos</span>
+            </div>
+            <div className={shared.stat} data-reveal="up">
+              <span className={shared.statValue}>10 años</span>
+              <span className={shared.statLabel}>De experiencia</span>
+            </div>
+            <div className={shared.stat} data-reveal="up">
+              <span className={shared.statValue}>99.9%</span>
+              <span className={shared.statLabel}>SLA promedio</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Casos */}
+      <section className={`${shared.section} ${shared.sectionDivider}`}>
+        <div className={shared.inner}>
+          <div className={shared.sectionHead} data-reveal="soft">
+            <span className={shared.eyebrow}>Casos destacados</span>
+            <h2 className={shared.sectionTitle}>
+              Proyectos que <span className={shared.sectionTitleAccent}>contamos con orgullo</span>
+            </h2>
+            <p className={shared.sectionLead}>
+              {studioProjects.length
+                ? "Contenido sincronizado desde Studio, con impacto, servicios y evidencias visuales."
+                : "Seis casos representativos de los últimos 24 meses."}
+            </p>
+          </div>
+          {studioProjects.length ? (
+            <div className={styles.studioCasesList} data-reveal-stagger>
+              {studioProjects.map((p) => (
+                <article key={p.id} className={styles.studioCaseCard} data-reveal="up">
+                  <div className={styles.studioCaseMedia}>
+                    <Image
+                      src={normalizeProjectImageUrl(p.mainImage)}
+                      alt={p.title}
+                      fill
+                      sizes="(max-width: 1024px) 100vw, 42vw"
+                      className={styles.studioCasePhoto}
+                      unoptimized
+                    />
+                    <span className={styles.caseMetric}>{p.impact || "Impacto validado"}</span>
+                  </div>
+                  <div className={styles.studioCaseBody}>
+                    <span className={styles.caseSector}>{p.sector || "Proyecto"}</span>
+                    <h3 className={styles.studioCaseTitle}>{p.title}</h3>
+                    <p className={styles.studioCaseSummary}>{p.summary}</p>
+
+                    {p.services?.length > 0 && (
+                      <div className={styles.infoRow}>
+                        <strong>Servicios:</strong>
+                        <span>{p.services.join(" • ")}</span>
+                      </div>
+                    )}
+
+                    {p.tags?.length > 0 && (
+                      <div className={styles.tagsWrap}>
+                        {p.tags.slice(0, 8).map((tag) => (
+                          <span key={`${p.id}-${tag}`} className={styles.tag}>
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {p.highlights?.length > 0 && (
+                      <ul className={styles.highlights}>
+                        {p.highlights.slice(0, 4).map((h, idx) => (
+                          <li key={`${p.id}-h-${idx}`}>{h}</li>
+                        ))}
+                      </ul>
+                    )}
+
+                    {p.gallery?.length > 0 && (
+                      <div className={styles.galleryBlock}>
+                        <strong className={styles.galleryTitle}>Galería ({p.gallery.length}/8):</strong>
+                        <div className={styles.galleryGrid}>
+                          {p.gallery.slice(0, 8).map((img, idx) => (
+                            <div key={`${p.id}-g-${idx}`} className={styles.galleryThumb}>
+                              <Image
+                                src={normalizeProjectImageUrl(img)}
+                                alt={`${p.title} galería ${idx + 1}`}
+                                fill
+                                sizes="(max-width: 1024px) 16vw, 80px"
+                                className={styles.galleryThumbPhoto}
+                                unoptimized
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className={styles.metaFooter}>
+                      <span>{(p.mainImage ? 1 : 0) + (p.gallery?.length || 0)} imágenes (principal + galería)</span>
+                      <span>{new Date(p.createdAt).toLocaleDateString("es-MX")}</span>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className={shared.grid3} data-reveal-stagger>
+              {casos.map((c) => (
+                <article key={c.title} className={shared.imageCard} data-reveal="up">
+                  <div className={shared.imageCardImg}>
+                    <Image src={c.image} alt={c.title} width={640} height={400} />
+                    <span className={styles.caseMetric}>{c.metric}</span>
+                  </div>
+                  <div className={shared.imageCardBody}>
+                    <span className={styles.caseSector}>{c.sector}</span>
+                    <h3 className={shared.imageCardTitle}>{c.title}</h3>
+                    <p className={shared.imageCardText}>{c.desc}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Sectores */}
+      <section className={shared.section}>
+        <div className={shared.inner}>
+          <div className={shared.sectionHead} data-reveal="soft">
+            <span className={shared.eyebrow}>Sectores</span>
+            <h2 className={shared.sectionTitle}>
+              Industrias donde <span className={shared.sectionTitleAccent}>operamos</span>
+            </h2>
+          </div>
+          <div className={shared.chipRow} data-reveal-stagger>
+            {sectores.map((s) => (
+              <span key={s} className={shared.chip} data-reveal="up">{s}</span>
             ))}
           </div>
-        ) : (
-          <div className={styles.newsHubEmpty}>
-            <strong>Próximamente</strong>
-            <span>Estamos preparando nuevas publicaciones.</span>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className={shared.section}>
+        <div className={shared.inner}>
+          <div className={shared.ctaShell} data-reveal="up">
+            <h2 className={shared.ctaTitle}>
+              ¿Tu proyecto es el <span className={shared.sectionTitleAccent}>siguiente caso</span>?
+            </h2>
+            <p className={shared.ctaLead}>
+              Escríbenos y armamos juntos el alcance. Sin compromiso.
+            </p>
+            <div className={shared.ctaActions}>
+              <Link href="/contacto" className={`${shared.btn} ${shared.btnPrimary}`}>
+                Iniciar conversación <span className={shared.btnArrow}>→</span>
+              </Link>
+            </div>
           </div>
-        )}
+        </div>
       </section>
     </main>
   );
 }
-

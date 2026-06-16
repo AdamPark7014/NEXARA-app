@@ -1,0 +1,204 @@
+/* ============================================================
+   NEXARA · Sección "Nosotros" amigable (/nosotros)
+   Capa LIGERA sobre los estilos base del brochure (importados
+   desde ../nexara/page.module.css). Aquí sólo definimos los
+   acentos cálidos exclusivos del hero y la sección de cierre,
+   manteniendo coherencia visual con la home.
+   ============================================================ */
+
+.friendlyHero {
+  position: relative;
+  margin-top: calc(var(--page-padding-y) * -0.18);
+  margin-bottom: clamp(18px, 3vw, 32px);
+  padding: clamp(30px, 4.4vw, 52px) clamp(18px, 3vw, 34px);
+  border-radius: clamp(20px, 2vw, 28px);
+  border: 1px solid color-mix(in srgb, var(--nx-teal) 28%, rgba(255, 255, 255, 0.1));
+  background:
+    radial-gradient(ellipse 60% 80% at 0% 0%, color-mix(in srgb, var(--nx-teal) 28%, transparent), transparent 62%),
+    radial-gradient(ellipse 70% 80% at 100% 100%, color-mix(in srgb, var(--nx-teal-soft) 16%, transparent), transparent 64%),
+    linear-gradient(150deg, rgba(8, 22, 28, 0.9) 0%, rgba(4, 14, 20, 0.96) 100%);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  text-align: center;
+  isolation: isolate;
+}
+
+.friendlyHero::before {
+  content: "";
+  position: absolute;
+  inset: auto -10% -40% -10%;
+  height: 70%;
+  background: radial-gradient(ellipse 60% 100% at 50% 100%,
+    color-mix(in srgb, var(--nx-teal) 28%, transparent) 0%,
+    transparent 70%);
+  filter: blur(36px);
+  z-index: -1;
+  pointer-events: none;
+}
+
+.friendlyBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--nx-teal) 50%, rgba(255, 255, 255, 0.2));
+  background: color-mix(in srgb, var(--nx-teal) 18%, rgba(255, 255, 255, 0.04));
+  font-family: var(--nx-font-ui);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--nx-teal-soft) 80%, #ffffff);
+}
+
+.friendlyBadgeDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--nx-teal);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--nx-teal) 80%, transparent);
+  animation: friendlyPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes friendlyPulse {
+  0%, 100% { opacity: 0.55; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+.friendlyTitle {
+  margin: 14px auto 12px;
+  font-family: var(--nx-font-hero);
+  font-size: clamp(1.85rem, 3.6vw, 2.75rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: #f4f1ec;
+  max-width: 20ch;
+  text-wrap: balance;
+}
+
+.friendlyTitleAccent {
+  font-style: normal;
+  background: linear-gradient(120deg,
+    var(--nx-teal) 0%,
+    color-mix(in srgb, var(--nx-teal-soft) 72%, var(--nx-teal) 28%) 55%,
+    var(--nx-teal-soft) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 4px 18px color-mix(in srgb, var(--nx-teal) 36%, transparent));
+}
+
+.friendlyLead {
+  margin: 0 auto 20px;
+  font-family: var(--nx-font-body);
+  font-size: clamp(0.98rem, 1.2vw, 1.06rem);
+  line-height: 1.62;
+  color: color-mix(in srgb, #f4f1ec 88%, var(--nx-teal-soft));
+  max-width: 58ch;
+  text-wrap: pretty;
+}
+
+.friendlyActions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: center;
+}
+
+.friendlyStats {
+  margin: clamp(18px, 2.4vw, 26px) auto 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(10px, 1.4vw, 16px);
+  max-width: 680px;
+}
+
+.friendlyStat {
+  padding: 12px 10px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--nx-teal) 22%, rgba(255, 255, 255, 0.08));
+  background: rgba(8, 18, 22, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  text-align: center;
+}
+
+.friendlyStatValue {
+  display: block;
+  font-family: var(--nx-font-numbers);
+  font-size: clamp(1.4rem, 2.2vw, 1.9rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  background: linear-gradient(120deg, var(--nx-teal-soft), var(--nx-teal));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.friendlyStatLabel {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--nx-font-ui);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, #d8dde6 80%, var(--nx-teal-soft));
+}
+
+/* Tarjeta cálida de cierre */
+.warmClose {
+  margin-top: clamp(40px, 6vw, 64px);
+  padding: clamp(28px, 4vw, 48px);
+  border-radius: clamp(20px, 2vw, 28px);
+  border: 1px solid color-mix(in srgb, var(--nx-teal) 35%, rgba(255, 255, 255, 0.1));
+  background:
+    radial-gradient(ellipse 90% 100% at 50% 0%, color-mix(in srgb, var(--nx-teal) 24%, transparent), transparent 70%),
+    linear-gradient(160deg, rgba(8, 22, 28, 0.9), rgba(4, 14, 20, 0.95));
+  text-align: center;
+  display: grid;
+  gap: 18px;
+  justify-items: center;
+}
+
+.warmCloseTitle {
+  margin: 0;
+  font-family: var(--nx-font-hero);
+  font-size: clamp(1.5rem, 2.6vw, 2.2rem);
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  color: #f4f1ec;
+  max-width: 24ch;
+  text-wrap: balance;
+}
+
+.warmCloseText {
+  margin: 0;
+  font-family: var(--nx-font-body);
+  font-size: 1rem;
+  line-height: 1.7;
+  color: color-mix(in srgb, #d8dde6 88%, var(--nx-teal-soft));
+  max-width: 56ch;
+}
+
+.warmCloseActions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+@media (max-width: 640px) {
+  .friendlyStats {
+    grid-template-columns: 1fr;
+  }
+  .friendlyActions,
+  .warmCloseActions {
+    width: 100%;
+    flex-direction: column;
+  }
+}

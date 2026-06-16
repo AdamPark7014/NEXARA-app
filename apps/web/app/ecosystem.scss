@@ -4,7 +4,7 @@
   border-bottom: 1px solid var(--header-border);
   color: var(--header-text);
   box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--header-border) 88%, transparent), 
-              0 4px 16px rgba(26, 123, 168, 0.22),
+              0 4px 16px rgba(16, 161, 131, 0.22),
               0 8px 24px rgba(6, 22, 42, 0.12);
   backdrop-filter: blur(12px) saturate(130%);
 }
@@ -327,8 +327,8 @@
 .ultra-corp-strict.ultra-corp-page button[type="submit"],
 .ultra-corp-strict.ultra-corp-home [data-ui="landing-qa"] a[href="/contacto"],
 .ultra-corp-strict.ultra-corp-home [data-ui="landing-qa"] a[href="/qa"] {
-  background: linear-gradient(135deg, #1f5f83 0%, #23729b 100%);
-  border-color: color-mix(in srgb, #1f5f83 72%, var(--border));
+  background: linear-gradient(135deg, #0b7d65 0%, #10a183 100%);
+  border-color: color-mix(in srgb, #0b7d65 72%, var(--border));
 }
 
 .ultra-corp-strict.ultra-corp-home [data-ui="landing-hero-wrap"]::after {

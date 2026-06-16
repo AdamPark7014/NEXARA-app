@@ -1,0 +1,842 @@
+/* ============================================================
+   NEXARA · Home · Secciones del inicio (`/`)
+   ------------------------------------------------------------
+   Estilos exclusivos del refactor estético de la home. Toda la
+   paleta está anclada a los mismos valores del HomeHero
+   (#03110d + teal #10a183 + acento mint #6efbd5) para que la
+   transición hero → contenido sea continua, oscura, limpia y
+   con un toque editorial profesional.
+   ============================================================ */
+
+.homeWrap {
+  --home-bg: #03110d;
+  --home-bg-2: #061a16;
+  --home-text: #f4f1ec;
+  --home-text-dim: rgba(244, 241, 236, 0.72);
+  --home-mint: #6efbd5;
+  --home-teal: #10a183;
+  --home-teal-deep: #0b7d65;
+  --home-line: color-mix(in srgb, var(--home-teal) 28%, rgba(255, 255, 255, 0.08));
+  --home-line-strong: color-mix(in srgb, var(--home-teal) 60%, rgba(255, 255, 255, 0.18));
+  --home-glass: rgba(8, 22, 18, 0.62);
+  --home-glass-strong: rgba(6, 18, 14, 0.78);
+
+  position: relative;
+  width: 100%;
+  background: var(--home-bg);
+  color: var(--home-text);
+  font-family: var(--nx-font-body, "Manrope", system-ui, sans-serif);
+  isolation: isolate;
+}
+
+/* Fondo decorativo continuo con halos teal sutiles, hereda el tono
+ * exacto del hero (#03110d) para que no haya costuras visibles. */
+.homeBg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 70% 50% at 15% 0%, color-mix(in srgb, var(--home-teal) 22%, transparent), transparent 60%),
+    radial-gradient(ellipse 60% 50% at 100% 30%, color-mix(in srgb, var(--home-mint) 10%, transparent), transparent 65%),
+    radial-gradient(ellipse 60% 50% at 0% 75%, color-mix(in srgb, var(--home-teal-deep) 16%, transparent), transparent 60%),
+    linear-gradient(180deg, var(--home-bg) 0%, var(--home-bg-2) 50%, var(--home-bg) 100%);
+}
+
+.homeBg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.06;
+  background-image:
+    linear-gradient(90deg, color-mix(in srgb, var(--home-teal) 38%, transparent) 1px, transparent 1px),
+    linear-gradient(color-mix(in srgb, var(--home-teal) 30%, transparent) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 35%, #000 18%, transparent 80%);
+}
+
+.homeInner {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: var(--content-max, 1400px);
+  margin: 0 auto;
+  padding: clamp(56px, 8vw, 96px) clamp(20px, 5vw, 88px) clamp(72px, 9vw, 112px);
+  display: grid;
+  gap: clamp(72px, 10vw, 132px);
+}
+
+/* ── Encabezado universal de sección ─────────────────────── */
+
+.sectionHead {
+  display: grid;
+  gap: 14px;
+  max-width: 720px;
+  margin: 0 0 clamp(24px, 3.5vw, 40px);
+}
+
+.sectionHeadCenter {
+  margin-inline: auto;
+  text-align: center;
+  justify-items: center;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--home-mint);
+  margin: 0;
+}
+
+.eyebrow::before {
+  content: "";
+  width: 28px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--home-mint), transparent);
+}
+
+.sectionHeadCenter .eyebrow::after {
+  content: "";
+  width: 28px;
+  height: 1px;
+  background: linear-gradient(270deg, var(--home-mint), transparent);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: clamp(1.85rem, 3.4vw, 2.8rem);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.022em;
+  color: var(--home-text);
+  text-wrap: balance;
+}
+
+.sectionTitleAccent {
+  font-style: normal;
+  background: linear-gradient(120deg, var(--home-mint) 0%, var(--home-teal) 50%, var(--home-mint) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.sectionLead {
+  margin: 0;
+  font-size: clamp(1rem, 1.2vw, 1.1rem);
+  line-height: 1.65;
+  color: var(--home-text-dim);
+  max-width: 60ch;
+  text-wrap: pretty;
+}
+
+/* ── 1. Trust strip — debajo del hero ────────────────────── */
+
+.trustStrip {
+  margin-top: clamp(26px, 4vw, 52px);
+  margin-bottom: 0;
+  padding: clamp(18px, 2vw, 24px) clamp(22px, 3vw, 32px);
+  border-radius: 18px;
+  border: 1px solid var(--home-line);
+  background: var(--home-glass-strong);
+  backdrop-filter: blur(18px) saturate(1.1);
+  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(14px, 2vw, 28px);
+}
+
+.trustItem {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.trustIcon {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--home-teal) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--home-teal) 42%, transparent);
+  color: var(--home-mint);
+}
+
+.trustIcon svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.8;
+}
+
+.trustText {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.trustValue {
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--home-text);
+  line-height: 1.2;
+}
+
+.trustLabel {
+  font-size: 0.78rem;
+  color: var(--home-text-dim);
+  line-height: 1.3;
+}
+
+/* ── 2. Pilares — 4 propuestas de valor ──────────────────── */
+
+.pilaresGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(16px, 2vw, 24px);
+}
+
+.pilarCard {
+  position: relative;
+  padding: clamp(24px, 3vw, 32px);
+  border-radius: 18px;
+  border: 1px solid var(--home-line);
+  background: linear-gradient(165deg, var(--home-glass) 0%, rgba(3, 12, 10, 0.65) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  display: grid;
+  gap: 14px;
+  overflow: hidden;
+  transition: transform 280ms ease, border-color 280ms ease, box-shadow 280ms ease;
+}
+
+.pilarCard::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--home-mint), transparent);
+  opacity: 0.45;
+}
+
+.pilarCard:hover {
+  transform: translateY(-4px);
+  border-color: var(--home-line-strong);
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.5), 0 0 0 1px color-mix(in srgb, var(--home-teal) 38%, transparent);
+}
+
+.pilarIcon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--home-teal) 28%, transparent), color-mix(in srgb, var(--home-mint) 12%, transparent));
+  border: 1px solid color-mix(in srgb, var(--home-teal) 38%, transparent);
+  color: var(--home-mint);
+}
+
+.pilarIcon svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 1.7;
+}
+
+.pilarTitle {
+  margin: 0;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: 1.12rem;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--home-text);
+}
+
+.pilarText {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--home-text-dim);
+}
+
+/* ── 3. Servicios destacados ─────────────────────────────── */
+
+.serviciosGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(18px, 2.4vw, 28px);
+}
+
+.servicioCard {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 16px;
+  padding: clamp(26px, 3vw, 34px);
+  border-radius: 22px;
+  border: 1px solid var(--home-line);
+  background: linear-gradient(160deg, rgba(8, 22, 18, 0.78), rgba(3, 12, 10, 0.85));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  text-decoration: none;
+  color: inherit;
+  overflow: hidden;
+  isolation: isolate;
+  transition: transform 280ms ease, border-color 280ms ease, box-shadow 280ms ease;
+}
+
+.servicioCard::before {
+  content: "";
+  position: absolute;
+  inset: auto -20% -50% -20%;
+  height: 60%;
+  background: radial-gradient(ellipse 60% 100% at 50% 100%,
+    color-mix(in srgb, var(--home-teal) 38%, transparent) 0%,
+    transparent 70%);
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 320ms ease;
+}
+
+.servicioCard:hover {
+  transform: translateY(-6px);
+  border-color: var(--home-line-strong);
+  box-shadow: 0 28px 56px rgba(0, 0, 0, 0.5);
+}
+
+.servicioCard:hover::before {
+  opacity: 1;
+}
+
+.servicioHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.servicioIcon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--home-teal), var(--home-teal-deep));
+  color: #ffffff;
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--home-teal) 35%, transparent);
+}
+
+.servicioIcon svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 1.6;
+}
+
+.servicioBadge {
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--home-mint);
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--home-mint) 38%, transparent);
+  background: color-mix(in srgb, var(--home-mint) 8%, transparent);
+}
+
+.servicioTitle {
+  margin: 0;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--home-text);
+  line-height: 1.2;
+}
+
+.servicioText {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--home-text-dim);
+}
+
+.servicioCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--home-mint);
+  margin-top: 6px;
+}
+
+.servicioCard:hover .servicioCta span {
+  transform: translateX(4px);
+}
+
+.servicioCta span {
+  display: inline-block;
+  transition: transform 220ms ease;
+}
+
+/* ── 4. Proceso — timeline horizontal ────────────────────── */
+
+.procesoGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(16px, 2vw, 24px);
+  position: relative;
+}
+
+.procesoGrid::before {
+  content: "";
+  position: absolute;
+  top: 28px;
+  left: 8%;
+  right: 8%;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent,
+    color-mix(in srgb, var(--home-teal) 60%, transparent) 15%,
+    color-mix(in srgb, var(--home-mint) 50%, transparent) 50%,
+    color-mix(in srgb, var(--home-teal) 60%, transparent) 85%,
+    transparent);
+  z-index: 0;
+}
+
+.procesoStep {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 14px;
+  padding: 0 6px;
+}
+
+.procesoNumber {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--home-bg-2), var(--home-bg));
+  border: 2px solid color-mix(in srgb, var(--home-mint) 60%, transparent);
+  box-shadow: 0 0 0 6px var(--home-bg), 0 0 24px color-mix(in srgb, var(--home-mint) 30%, transparent);
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--home-mint);
+  margin: 0 auto;
+}
+
+.procesoStepTitle {
+  margin: 0;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--home-text);
+  text-align: center;
+  letter-spacing: -0.01em;
+}
+
+.procesoStepText {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--home-text-dim);
+  text-align: center;
+}
+
+/* ── 5. Industrias ──────────────────────────────────────── */
+
+.industriasGrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: clamp(12px, 1.6vw, 18px);
+}
+
+.industriaCard {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  padding: 22px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--home-line);
+  background: rgba(8, 22, 18, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  text-align: center;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 240ms ease, border-color 240ms ease, background 240ms ease;
+}
+
+.industriaCard:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--home-mint) 55%, transparent);
+  background: rgba(12, 30, 24, 0.78);
+}
+
+.industriaIcon {
+  width: 36px;
+  height: 36px;
+  color: var(--home-mint);
+}
+
+.industriaIcon svg {
+  width: 100%;
+  height: 100%;
+  stroke-width: 1.6;
+}
+
+.industriaLabel {
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: var(--home-text);
+  letter-spacing: 0.005em;
+}
+
+/* ── 6. Métricas ─────────────────────────────────────────── */
+
+.metricasShell {
+  padding: clamp(40px, 5vw, 64px) clamp(24px, 4vw, 56px);
+  border-radius: 24px;
+  border: 1px solid var(--home-line);
+  background:
+    radial-gradient(ellipse 80% 100% at 50% 0%, color-mix(in srgb, var(--home-teal) 22%, transparent), transparent 70%),
+    linear-gradient(160deg, rgba(8, 22, 18, 0.82), rgba(3, 12, 10, 0.92));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5);
+}
+
+.metricasGrid {
+  margin-top: clamp(28px, 3.5vw, 40px);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(20px, 3vw, 36px);
+}
+
+.metrica {
+  text-align: center;
+  position: relative;
+}
+
+.metrica + .metrica::before {
+  content: "";
+  position: absolute;
+  top: 12%;
+  bottom: 12%;
+  left: calc(clamp(20px, 3vw, 36px) * -0.5);
+  width: 1px;
+  background: linear-gradient(180deg, transparent, var(--home-line-strong), transparent);
+}
+
+.metricaValue {
+  display: block;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: clamp(2.4rem, 4vw, 3.4rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1;
+  background: linear-gradient(120deg, var(--home-mint) 0%, var(--home-teal) 70%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.metricaLabel {
+  display: block;
+  margin-top: 8px;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--home-text-dim);
+}
+
+/* ── 7. Quiénes somos refinado ───────────────────────────── */
+
+.aboutCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: clamp(28px, 4vw, 56px);
+  align-items: center;
+  padding: clamp(32px, 4vw, 56px);
+  border-radius: 24px;
+  border: 1px solid var(--home-line);
+  background:
+    radial-gradient(ellipse 90% 100% at 100% 0%, color-mix(in srgb, var(--home-teal) 18%, transparent), transparent 65%),
+    linear-gradient(155deg, rgba(8, 22, 18, 0.85), rgba(3, 12, 10, 0.92));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  position: relative;
+}
+
+.aboutCard::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--home-mint) 50%, transparent);
+  opacity: 0.5;
+}
+
+.aboutBody {
+  display: grid;
+  gap: 18px;
+}
+
+.aboutActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.aboutAside {
+  display: grid;
+  gap: 14px;
+}
+
+.aboutAsideRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--home-line);
+  background: rgba(6, 18, 14, 0.55);
+}
+
+.aboutAsideIcon {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--home-teal) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--home-teal) 42%, transparent);
+  color: var(--home-mint);
+}
+
+.aboutAsideIcon svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.7;
+}
+
+.aboutAsideTitle {
+  margin: 0 0 2px;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--home-text);
+}
+
+.aboutAsideText {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--home-text-dim);
+}
+
+/* ── 8. Marcas/certificaciones · contenedor ─────────────── */
+
+.partnersShell {
+  display: grid;
+  gap: 20px;
+}
+
+/* ── 9. CTA final ────────────────────────────────────────── */
+
+.ctaFinal {
+  position: relative;
+  padding: clamp(40px, 5vw, 72px) clamp(28px, 5vw, 64px);
+  border-radius: 28px;
+  border: 1px solid color-mix(in srgb, var(--home-mint) 40%, var(--home-line));
+  background:
+    radial-gradient(ellipse 90% 100% at 50% 100%, color-mix(in srgb, var(--home-teal) 32%, transparent), transparent 70%),
+    radial-gradient(ellipse 60% 60% at 50% 0%, color-mix(in srgb, var(--home-mint) 14%, transparent), transparent 70%),
+    linear-gradient(160deg, rgba(8, 24, 20, 0.92), rgba(3, 12, 10, 0.95));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 40px 100px rgba(0, 0, 0, 0.55);
+  text-align: center;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.ctaFinalGlow {
+  position: absolute;
+  inset: auto 0 -50% 0;
+  height: 80%;
+  background: radial-gradient(ellipse 50% 100% at 50% 100%,
+    color-mix(in srgb, var(--home-mint) 26%, transparent) 0%,
+    transparent 65%);
+  filter: blur(40px);
+  z-index: -1;
+  pointer-events: none;
+}
+
+.ctaFinalTitle {
+  margin: 0 auto 16px;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: clamp(1.85rem, 3.4vw, 2.8rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--home-text);
+  max-width: 22ch;
+  text-wrap: balance;
+}
+
+.ctaFinalText {
+  margin: 0 auto 28px;
+  font-size: clamp(1rem, 1.2vw, 1.1rem);
+  line-height: 1.65;
+  color: var(--home-text-dim);
+  max-width: 56ch;
+}
+
+.ctaFinalActions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: center;
+}
+
+/* ── Botones unificados (variante home oscura) ───────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 28px;
+  border-radius: 999px;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: 0.96rem;
+  font-weight: 600;
+  letter-spacing: 0.012em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 220ms ease, box-shadow 220ms ease, background 220ms ease, color 220ms ease;
+  will-change: transform;
+}
+
+.btnPrimary {
+  background: var(--home-teal);
+  color: #ffffff;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--home-teal) 35%, transparent),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.btnPrimary:hover {
+  transform: translateY(-2px);
+  background: #0fbf9b;
+  box-shadow: 0 16px 40px color-mix(in srgb, var(--home-teal) 48%, transparent),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+.btnSecondary {
+  background: transparent;
+  color: var(--home-text);
+  border: 1.5px solid color-mix(in srgb, var(--home-mint) 55%, rgba(255, 255, 255, 0.3));
+  backdrop-filter: blur(4px);
+}
+
+.btnSecondary:hover {
+  transform: translateY(-2px);
+  background: color-mix(in srgb, var(--home-mint) 10%, transparent);
+  border-color: var(--home-mint);
+  color: var(--home-mint);
+}
+
+.btnArrow {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  font-size: 13px;
+  line-height: 1;
+  transition: transform 220ms ease, background 220ms ease;
+}
+
+.btn:hover .btnArrow {
+  transform: translateX(3px);
+}
+
+.btnSecondary .btnArrow {
+  background: color-mix(in srgb, var(--home-mint) 28%, transparent);
+}
+
+/* ── Responsive ──────────────────────────────────────────── */
+
+@media (max-width: 1100px) {
+  .pilaresGrid,
+  .procesoGrid,
+  .metricasGrid,
+  .trustStrip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .serviciosGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .industriasGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .aboutCard {
+    grid-template-columns: 1fr;
+  }
+  .metrica + .metrica::before {
+    display: none;
+  }
+  .procesoGrid::before {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .pilaresGrid,
+  .serviciosGrid,
+  .procesoGrid,
+  .metricasGrid,
+  .trustStrip {
+    grid-template-columns: 1fr;
+  }
+  .industriasGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .aboutActions,
+  .ctaFinalActions {
+    width: 100%;
+    flex-direction: column;
+  }
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

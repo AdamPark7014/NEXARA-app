@@ -204,6 +204,7 @@ export type ModuleId =
   | "ops-cvs"
   // STUDIO
   | "studio-dashboard"
+  | "studio-hero"
   | "studio-pages"
   | "studio-news"
   | "studio-cases"
@@ -701,6 +702,12 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
     label: "Studio dashboard", description: "Tráfico, leads y campañas",
     icon: "🎨", allowedRoles: STUDIO_TEAM,
     group: "Tablero", visible: true,
+  },
+  "studio-hero": {
+    id: "studio-hero", panel: PANELS.STUDIO, path: "/hero",
+    label: "Banner del inicio", description: "Imágenes y orden del carrusel principal",
+    icon: "🎞️", allowedRoles: STUDIO_TEAM,
+    group: "Contenido", visible: true,
   },
   "studio-pages": {
     id: "studio-pages", panel: PANELS.STUDIO, path: "/pages",

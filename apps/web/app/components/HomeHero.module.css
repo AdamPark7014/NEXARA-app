@@ -1,0 +1,362 @@
+/* ============================================================
+   NEXARA · HomeHero (home pública `/`)
+   ------------------------------------------------------------
+   Hero full-bleed que ocupa 100vh y arranca pegado al top del
+   viewport. El header transparente flota encima sin separar.
+   ============================================================ */
+
+.hero {
+  position: relative;
+  z-index: 2; /* encima del .brochureBg fixed que vive en su mismo padre */
+  /* Full-bleed real: anulamos la regla global de globals.scss
+   *   :where(main, section, article, .public-layout-content) { max-width: var(--content-max); margin-inline: auto; }
+   * que limitaba el <section> a 1380px y dejaba banda negra a la derecha.
+   * Especificidad: nuestra clase (0,1,0) ya gana contra :where() (0,0,0),
+   * pero usamos !important por defensa contra futuras reglas globales. */
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  min-height: 100vh;
+  overflow: hidden;
+  isolation: isolate;
+  background: #03110d;
+  color: #f4f1ec;
+  font-family: var(--nx-font-body, "Manrope", system-ui, sans-serif);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* "Tail" inferior: degradado que funde el hero con el fondo teal-oscuro
+ * de las secciones siguientes (`.brochureBg`). Sin esto, al scrollear hacia
+ * abajo se ve un corte abrupto entre la imagen y el fondo de la home. */
+.hero::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: clamp(80px, 12vh, 140px);
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(3, 17, 13, 0.55) 55%,
+    #03110d 100%
+  );
+}
+
+/* ── Capa de slides (crossfade) ─────────────────────────── */
+
+.slides {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.slide {
+  position: absolute;
+  inset: 0;
+  background-color: #03110d;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transform: scale(1.02);
+  transition: opacity 1200ms ease-in-out;
+  will-change: opacity;
+}
+
+.slideActive {
+  opacity: 1;
+  animation: heroKenBurns 14s ease-in-out infinite alternate;
+}
+
+@keyframes heroKenBurns {
+  from { transform: scale(1.02) translate3d(0, 0, 0); }
+  to   { transform: scale(1.10) translate3d(-1%, -1%, 0); }
+}
+
+/* Overlay teal con gradiente: fuerte a la izquierda (texto),
+ * casi transparente a la derecha (deja ver la imagen). */
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(
+      95deg,
+      rgba(8, 70, 56, 0.82) 0%,
+      rgba(16, 161, 131, 0.50) 38%,
+      rgba(16, 161, 131, 0.15) 72%,
+      rgba(16, 161, 131, 0.22) 100%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.18) 0%,
+      transparent 35%,
+      transparent 65%,
+      rgba(0, 0, 0, 0.42) 100%
+    );
+  pointer-events: none;
+}
+
+/* ── Contenido principal (copy + CTAs) ──────────────────── */
+
+.content {
+  position: relative;
+  z-index: 3;
+  width: 100%;
+  max-width: var(--content-max, 1400px);
+  margin: 0 auto;
+  padding:
+    clamp(120px, 16vh, 200px)
+    clamp(20px, 5vw, 88px)
+    clamp(40px, 6vh, 80px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: clamp(14px, 2vh, 22px);
+}
+
+.kicker {
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: clamp(14px, 1.3vw, 18px);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #6efbd5;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+  margin: 0;
+}
+
+.title {
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: clamp(40px, 6vw, 92px);
+  line-height: 1.02;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.015em;
+  margin: 0;
+  max-width: 14ch;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+}
+
+.titleAccent {
+  display: inline;
+  color: #6efbd5;
+  font-style: normal;
+}
+
+.lead {
+  font-size: clamp(15px, 1.25vw, 18px);
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.92);
+  margin: 0;
+  max-width: 44ch;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.25);
+}
+
+.actions {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: clamp(6px, 1.2vh, 14px);
+}
+
+.ctaPrimary,
+.ctaSecondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 28px;
+  border-radius: 999px;
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: clamp(14px, 1.05vw, 16px);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 220ms ease, box-shadow 220ms ease, background 220ms ease, color 220ms ease;
+  will-change: transform;
+}
+
+.ctaPrimary {
+  background: var(--nx-teal, #10a183);
+  color: #ffffff;
+  box-shadow: 0 10px 30px rgba(16, 161, 131, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.ctaPrimary:hover {
+  transform: translateY(-2px);
+  background: #0fbf9b;
+  box-shadow: 0 14px 36px rgba(16, 161, 131, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
+.ctaSecondary {
+  background: transparent;
+  color: #ffffff;
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.ctaSecondary:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: #ffffff;
+}
+
+.ctaArrow {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* ── Indicadores del carrusel ───────────────────────────── */
+
+/* Dots en el flujo flex del .hero (NO absolute) — así nunca se solapan
+ * con la franja de servicios ni con los CTAs, sin importar el alto del
+ * viewport. Quedan exactamente entre el contenido y los iconos. */
+.dots {
+  position: relative;
+  z-index: 4;
+  align-self: center;
+  display: flex;
+  gap: 10px;
+  padding: 0;
+  margin: 0 0 clamp(18px, 2.6vh, 28px);
+  list-style: none;
+}
+
+.dot {
+  width: 32px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.3);
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: background 220ms ease, width 220ms ease;
+}
+
+.dot:hover {
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.dotActive {
+  background: #6efbd5;
+  width: 56px;
+}
+
+/* ── Banda inferior de servicios (5 íconos) ────────────── */
+
+.services {
+  position: relative;
+  z-index: 3;
+  width: 100%;
+  max-width: var(--content-max, 1400px);
+  margin: 0 auto;
+  padding: 0 clamp(20px, 5vw, 88px) clamp(28px, 5vh, 56px);
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: clamp(12px, 2vw, 32px);
+}
+
+.serviceItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  color: #ffffff;
+  text-decoration: none;
+  padding: 12px 8px;
+  border-radius: 14px;
+  transition: transform 220ms ease, background 220ms ease;
+}
+
+.serviceItem:hover {
+  transform: translateY(-3px);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.serviceIcon {
+  width: clamp(36px, 3.4vw, 52px);
+  height: clamp(36px, 3.4vw, 52px);
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.3));
+}
+
+.serviceIcon svg {
+  width: 100%;
+  height: 100%;
+  stroke-width: 1.6;
+}
+
+.serviceLabel {
+  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-size: clamp(12px, 0.95vw, 14px);
+  font-weight: 500;
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: 0.02em;
+  margin: 0;
+  max-width: 16ch;
+}
+
+/* ── Responsive ─────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .content {
+    padding-top: clamp(100px, 14vh, 150px);
+  }
+
+  .title {
+    max-width: 16ch;
+  }
+
+  .dots {
+    margin-bottom: clamp(14px, 2vh, 22px);
+  }
+
+  .services {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    padding-bottom: clamp(24px, 4vh, 36px);
+  }
+
+  .serviceItem:nth-child(5) {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 520px) {
+  .actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .ctaPrimary,
+  .ctaSecondary {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .dots {
+    margin-bottom: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide {
+    transition: none;
+    animation: none;
+  }
+}

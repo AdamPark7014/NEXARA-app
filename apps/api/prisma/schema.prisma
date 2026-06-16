@@ -1208,6 +1208,30 @@ model NewsPost {
   @@map("news_posts")
 }
 
+// ──────────────────────────────────────────────────────────────────────
+// Hero del sitio público — slides editables desde Studio
+// ──────────────────────────────────────────────────────────────────────
+// Cada slide es una imagen de fondo del carrusel del home (`/`).
+// El texto del hero (eyebrow, título, CTAs) NO se edita: vive en
+// `apps/web/app/components/HeroCarousel.tsx`. Solo cambian las imágenes
+// y opcionalmente su orden, alt-text accesible y un href cuando se
+// quiera que el slide entero sea clickeable.
+model HeroSlide {
+  id        Int      @id @default(autoincrement())
+  imageUrl  String   @db.VarChar(500)
+  altText   String?  @db.VarChar(200)
+  caption   String?  @db.VarChar(500)
+  href      String?  @db.VarChar(500)
+  position  Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([position])
+  @@index([isActive])
+  @@map("hero_slides")
+}
+
 enum CotizacionStatus {
   DRAFT
   SENT
