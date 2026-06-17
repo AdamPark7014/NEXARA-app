@@ -19,7 +19,7 @@
   min-height: 100vh;
   overflow: hidden;
   isolation: isolate;
-  background: #03110d;
+  background: #14211C;
   color: #f4f1ec;
   font-family: var(--nx-font-body, "Manrope", system-ui, sans-serif);
   display: flex;
@@ -42,8 +42,9 @@
   background: linear-gradient(
     180deg,
     transparent 0%,
-    rgba(3, 17, 13, 0.55) 55%,
-    #03110d 100%
+    transparent 45%,
+    rgba(20, 33, 28, 0.7) 80%,
+    #14211C 100%
   );
 }
 
@@ -58,7 +59,7 @@
 .slide {
   position: absolute;
   inset: 0;
-  background-color: #03110d;
+  background-color: #14211C;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -87,17 +88,17 @@
   background:
     linear-gradient(
       95deg,
-      rgba(8, 70, 56, 0.82) 0%,
-      rgba(16, 161, 131, 0.50) 38%,
-      rgba(16, 161, 131, 0.15) 72%,
-      rgba(16, 161, 131, 0.22) 100%
+      rgba(20, 33, 28, 0.88) 0%,
+      rgba(31, 95, 78, 0.42) 42%,
+      rgba(31, 95, 78, 0.10) 72%,
+      transparent 100%
     ),
     linear-gradient(
       180deg,
-      rgba(0, 0, 0, 0.18) 0%,
-      transparent 35%,
-      transparent 65%,
-      rgba(0, 0, 0, 0.42) 100%
+      rgba(0, 0, 0, 0.14) 0%,
+      transparent 38%,
+      transparent 62%,
+      rgba(0, 0, 0, 0.36) 100%
     );
   pointer-events: none;
 }
@@ -125,7 +126,7 @@
   font-size: clamp(14px, 1.3vw, 18px);
   font-weight: 600;
   letter-spacing: 0.04em;
-  color: #6efbd5;
+  color: rgba(220, 230, 221, 0.9);
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
   margin: 0;
 }
@@ -144,7 +145,7 @@
 
 .titleAccent {
   display: inline;
-  color: #6efbd5;
+  color: #DCE6DD;
   font-style: normal;
 }
 
@@ -182,15 +183,15 @@
 }
 
 .ctaPrimary {
-  background: var(--nx-teal, #10a183);
-  color: #ffffff;
-  box-shadow: 0 10px 30px rgba(16, 161, 131, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  background: #1F5F4E;
+  color: #FAF9F6;
+  box-shadow: 0 10px 30px rgba(31, 95, 78, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 .ctaPrimary:hover {
   transform: translateY(-2px);
-  background: #0fbf9b;
-  box-shadow: 0 14px 36px rgba(16, 161, 131, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  background: #2F7A65;
+  box-shadow: 0 14px 36px rgba(31, 95, 78, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 .ctaSecondary {
@@ -249,7 +250,7 @@
 }
 
 .dotActive {
-  background: #6efbd5;
+  background: #FAF9F6;
   width: 56px;
 }
 

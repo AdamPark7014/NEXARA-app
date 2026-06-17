@@ -78,6 +78,7 @@ import { ExportsModule } from './exports/exports.module.js';
 import { NocModule } from './noc/noc.module.js';
 import { LabModule } from './lab/lab.module.js';
 import { RealtimeModule } from './realtime/realtime.module';
+import { PageContentModule } from './page-content/page-content.module.js';
 
 @Module({
   imports: [
@@ -104,6 +105,7 @@ import { RealtimeModule } from './realtime/realtime.module';
     NewsletterModule,
     NewsModule,
     HeroSlidesModule,
+    PageContentModule,
     WorkProjectsModule,
     EmployeePaymentsModule,
     CotizacionesModule,

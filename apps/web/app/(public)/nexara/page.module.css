@@ -5,42 +5,27 @@
    ============================================================ */
 
 .brochurePage {
-  /* Paleta unificada verde teal NEXARA — sin maroon/orange/magenta en el
-   * fondo para que TODA la home combine con el hero del carrusel. Cada
-   * sección puede seguir usando colores de acento (orange/magenta/skyblue)
-   * en detalles pequeños, pero el fondo es uniformemente teal-oscuro. */
-  --nb-teal: var(--nx-teal);
-  --nb-teal-dim: color-mix(in srgb, var(--nb-teal) 65%, #0a1a14);
-  --nb-bg0: color-mix(in srgb, var(--nx-teal) 9%, #051210);
-  --nb-bg1: color-mix(in srgb, var(--nx-teal-strong) 7%, #030c0a);
-  --nb-text: #f4f1ec;
-  --nb-muted: color-mix(in srgb, #d8dde6 80%, var(--nx-teal-soft));
-  --nb-line: color-mix(in srgb, var(--nb-teal) 48%, rgba(255, 255, 255, 0.14));
+  /* Tokens del sistema de diseño — remapea las variables nb-* heredadas */
+  --nb-teal:    #1F5F4E;   /* Pino */
+  --nb-teal-dim:#2F7A65;   /* Pino claro */
+  --nb-bg0:     #FAF9F6;   /* Papel */
+  --nb-bg1:     #F1F0EA;   /* Papel hueso */
+  --nb-text:    #14211C;   /* Tinta */
+  --nb-muted:   #5B6660;   /* Pizarra */
+  --nb-line:    #E3E5DF;   /* Línea */
 
   position: relative;
   width: 100%;
   min-height: 100%;
-  color: var(--nb-text);
-  font-family: var(--nx-font-body);
-  padding-bottom: calc(var(--page-padding-y) * 1.5);
+  color: #14211C;
+  font-family: "Inter", var(--nx-font-body, system-ui), sans-serif;
+  background: #FAF9F6;
+  padding-bottom: 0;
 }
 
+/* .brochureBg era el fondo decorativo oscuro — eliminado */
 .brochureBg {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  /* Fondo teal-oscuro uniforme con halos verdes sutiles. Coincide con el
-   * #03110d del HomeHero para que la transición hero → contenido sea
-   * imperceptible al hacer scroll. */
-  background:
-    radial-gradient(ellipse 90% 55% at 50% -8%, color-mix(in srgb, var(--nx-teal) 38%, transparent), transparent 60%),
-    radial-gradient(ellipse 65% 45% at 100% 28%, color-mix(in srgb, var(--nx-teal) 16%, transparent), transparent 62%),
-    radial-gradient(ellipse 65% 45% at 0% 78%, color-mix(in srgb, var(--nx-teal-strong) 13%, transparent), transparent 58%),
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--nx-teal) 5%, #03110d) 0%,
-      #040f0c 50%,
-      #020a08 100%);
+  display: none;
 }
 
 .brochureBg::before {
@@ -344,14 +329,10 @@
 
 .pageTitleAccent {
   font-style: normal;
-  background: linear-gradient(120deg,
-    var(--nx-teal) 0%,
-    var(--nx-skyblue) 60%,
-    var(--nx-teal-soft) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 4px 18px color-mix(in srgb, var(--nx-teal) 36%, transparent));
+  color: #DCE6DD;
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  filter: none;
 }
 
 .pageLead {
@@ -494,15 +475,12 @@
 
 .headDiamond {
   flex-shrink: 0;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   margin-top: 8px;
-  background: linear-gradient(135deg, var(--nx-teal), var(--nx-skyblue));
+  background: #1F5F4E;
   transform: rotate(45deg);
   border-radius: 3px;
-  box-shadow:
-    0 0 18px color-mix(in srgb, var(--nx-teal) 65%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .sectionHeadText {
@@ -522,35 +500,31 @@
 
 .headRule {
   display: block;
-  height: 2px;
-  width: min(100%, 480px);
-  margin-top: 14px;
-  background: linear-gradient(90deg,
-    var(--nx-teal) 0%,
-    var(--nx-skyblue) 50%,
-    transparent 100%);
+  height: 1px;
+  width: min(100%, 320px);
+  margin-top: 12px;
+  background: #E3E5DF;
   border-radius: 1px;
 }
 
 .sectionH2Center {
   margin: 0 0 clamp(28px, 4vw, 44px);
   text-align: center;
-  font-family: var(--nx-font-section);
-  font-size: var(--nx-text-3xl);
+  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
+  font-size: clamp(1.75rem, 3.2vw, 2.6rem);
   font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--nb-text);
+  letter-spacing: -0.018em;
+  color: #14211C;
 }
 
 .sectionH2Center::after {
   content: "";
   display: block;
-  width: 64px;
-  height: 3px;
-  margin: 16px auto 0;
-  background: linear-gradient(90deg, var(--nx-teal), var(--nx-skyblue));
-  border-radius: 999px;
+  width: 40px;
+  height: 2px;
+  margin: 14px auto 0;
+  background: #1F5F4E;
+  border-radius: 2px;
 }
 
 .bodyText {
@@ -609,26 +583,17 @@
 
 .mvCard {
   padding: clamp(28px, 3.4vw, 40px);
-  border-radius: var(--nx-radius-xl);
-  border: 1px solid color-mix(in srgb, var(--nx-teal) 32%, rgba(255, 255, 255, 0.08));
-  background: linear-gradient(155deg,
-    color-mix(in srgb, var(--nx-teal) 16%, rgba(6, 18, 14, 0.78)),
-    color-mix(in srgb, var(--nx-teal-strong) 8%, rgba(3, 12, 10, 0.65)));
-  backdrop-filter: var(--nx-glass-blur);
-  -webkit-backdrop-filter: var(--nx-glass-blur);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.32);
+  border-radius: 12px;
+  border: 1px solid #E3E5DF;
+  background: #F1F0EA;
   position: relative;
   overflow: hidden;
-  transition:
-    transform var(--nx-motion-base) var(--nx-ease-out),
-    box-shadow var(--nx-motion-base) var(--nx-ease-out),
-    border-color var(--nx-motion-base) var(--nx-ease-out);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .mvCard:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.42), 0 0 0 1px color-mix(in srgb, var(--nx-teal) 40%, transparent);
-  border-color: color-mix(in srgb, var(--nx-teal) 60%, transparent);
+  border-color: color-mix(in srgb, #1F5F4E 60%, transparent);
+  box-shadow: 0 4px 16px rgba(31, 95, 78, 0.07);
 }
 
 .mvCard::before {
@@ -637,19 +602,17 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
-  /* Ambas cards comparten el mismo accent teal para coherencia con el hero.
-   * La VISIÓN usa un teal más claro para diferenciarse sutilmente. */
-  background: linear-gradient(90deg, var(--nx-teal), color-mix(in srgb, var(--nx-teal-soft) 90%, white));
+  height: 2px;
+  background: #1F5F4E;
+  opacity: 0.6;
 }
 
 .mvCard:nth-child(2)::before {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--nx-teal-soft) 70%, white), var(--nx-teal));
+  opacity: 0.35;
 }
 
 .mvCard:nth-child(2):hover {
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.42), 0 0 0 1px color-mix(in srgb, var(--nx-teal-soft) 50%, transparent);
-  border-color: color-mix(in srgb, var(--nx-teal-soft) 60%, transparent);
+  border-color: color-mix(in srgb, #1F5F4E 40%, transparent);
 }
 
 .mvTitle {
@@ -657,24 +620,24 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  font-family: var(--nx-font-subtitle);
-  font-size: var(--nx-text-xl);
+  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
+  font-size: 0.76rem;
   font-weight: 500;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--nx-teal);
+  color: #1F5F4E;
 }
 
 .mvTitle::before {
   content: "";
-  width: 6px;
-  height: 24px;
-  border-radius: 3px;
+  width: 24px;
+  height: 1px;
   background: currentColor;
+  flex-shrink: 0;
 }
 
 .mvCard:nth-child(2) .mvTitle {
-  color: color-mix(in srgb, var(--nx-teal-soft) 80%, white);
+  color: #2F7A65;
 }
 
 /* Valores 2x2 */
@@ -687,57 +650,25 @@
 .valorCard {
   position: relative;
   padding: clamp(24px, 2.8vw, 32px);
-  border-radius: var(--nx-radius-xl);
-  border: 1px solid color-mix(in srgb, var(--nx-teal) 22%, rgba(255, 255, 255, 0.08));
-  /* Fondo unificado teal-oscuro para todos los 4 cards. El "halo" superior
-   * usa un tinte teal sutil (no el color del valor) para coherencia con
-   * el hero. El color identitario de cada valor vive ÚNICAMENTE en el
-   * .valorDiamond (debajo), que conserva la paleta original NEXARA. */
-  background:
-    radial-gradient(ellipse 100% 100% at 0% 0%, color-mix(in srgb, var(--nx-teal) 14%, transparent), transparent 65%),
-    linear-gradient(155deg, rgba(6, 18, 14, 0.82), rgba(3, 12, 10, 0.92));
-  backdrop-filter: var(--nx-glass-blur);
-  -webkit-backdrop-filter: var(--nx-glass-blur);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.32);
+  border-radius: 12px;
+  border: 1px solid #E3E5DF;
+  background: #F1F0EA;
   overflow: hidden;
-  transition:
-    transform var(--nx-motion-base) var(--nx-ease-out),
-    border-color var(--nx-motion-base) var(--nx-ease-out),
-    box-shadow var(--nx-motion-base) var(--nx-ease-out);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .valorCard:hover {
-  transform: translateY(-4px);
-  border-color: color-mix(in srgb, var(--valor-color, var(--nx-teal)) 50%, rgba(255, 255, 255, 0.12));
-  box-shadow:
-    0 14px 32px rgba(0, 0, 0, 0.4),
-    0 0 0 1px color-mix(in srgb, var(--valor-color, var(--nx-teal)) 28%, transparent);
+  border-color: color-mix(in srgb, #1F5F4E 60%, transparent);
+  box-shadow: 0 4px 16px rgba(31, 95, 78, 0.07);
 }
 
-.valorCard:nth-child(1) { --valor-color: var(--nx-teal); }
-.valorCard:nth-child(2) { --valor-color: var(--nx-orange); }
-.valorCard:nth-child(3) { --valor-color: var(--nx-skyblue); }
-.valorCard:nth-child(4) { --valor-color: var(--nx-magenta); }
-
-/* Cada valor toma un color de la paleta oficial para reforzar la identidad */
-.valorCard:nth-child(1) .valorDiamond {
-  background: linear-gradient(135deg, var(--nx-teal), var(--nx-teal-strong));
-  box-shadow: 0 6px 20px color-mix(in srgb, var(--nx-teal) 45%, transparent);
-}
-
-.valorCard:nth-child(2) .valorDiamond {
-  background: linear-gradient(135deg, var(--nx-orange), var(--nx-orange-strong));
-  box-shadow: 0 6px 20px color-mix(in srgb, var(--nx-orange) 45%, transparent);
-}
-
-.valorCard:nth-child(3) .valorDiamond {
-  background: linear-gradient(135deg, var(--nx-skyblue), var(--nx-skyblue-strong));
-  box-shadow: 0 6px 20px color-mix(in srgb, var(--nx-skyblue) 45%, transparent);
-}
-
+/* Todos los diamonds usan Musgo + Pino — paleta unificada */
+.valorCard:nth-child(1) .valorDiamond,
+.valorCard:nth-child(2) .valorDiamond,
+.valorCard:nth-child(3) .valorDiamond,
 .valorCard:nth-child(4) .valorDiamond {
-  background: linear-gradient(135deg, var(--nx-magenta), var(--nx-magenta-strong));
-  box-shadow: 0 6px 20px color-mix(in srgb, var(--nx-magenta) 45%, transparent);
+  background: #DCE6DD;
+  box-shadow: none;
 }
 
 .valorHead {
@@ -749,37 +680,33 @@
 
 .valorDiamond {
   flex-shrink: 0;
-  width: 56px;
-  height: 56px;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transform: rotate(45deg);
-  border-radius: 8px;
-  transition: transform var(--nx-motion-base) var(--nx-ease-spring);
+  border-radius: 10px;
+  transition: transform 150ms ease;
 }
 
 .valorCard:hover .valorDiamond {
-  transform: rotate(50deg) scale(1.08);
+  transform: scale(1.05);
 }
 
 .valorDiamond span {
-  transform: rotate(-45deg);
-  font-family: var(--nx-font-numbers);
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: #fff;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1F5F4E;
 }
 
 .valorTitle {
   margin: 0;
-  font-family: var(--nx-font-subtitle);
-  font-size: var(--nx-text-base);
-  font-weight: 500;
-  letter-spacing: 0.14em;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--nb-text);
+  color: #14211C;
 }
 
 /* Expertos */
@@ -801,34 +728,27 @@
 }
 
 .expertCard:hover {
-  background: color-mix(in srgb, var(--nx-teal) 8%, transparent);
-  border-color: color-mix(in srgb, var(--nx-teal) 28%, transparent);
-  transform: translateY(-3px);
+  background: #F1F0EA;
+  border-color: #E3E5DF;
+  transform: translateY(-2px);
 }
 
 .expertPhoto {
   position: relative;
   width: 100%;
-  max-width: 128px;
+  max-width: 120px;
   margin: 0 auto 14px;
   aspect-ratio: 1;
   border-radius: 50%;
   overflow: hidden;
-  border: 3px solid transparent;
-  background:
-    linear-gradient(#0d1a22, #0d1a22) padding-box,
-    linear-gradient(135deg, var(--nx-teal), var(--nx-skyblue)) border-box;
-  box-shadow:
-    0 12px 28px color-mix(in srgb, var(--nx-teal) 28%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  transition: transform var(--nx-motion-base) var(--nx-ease-spring), box-shadow var(--nx-motion-base) var(--nx-ease-out);
+  border: 2px solid #E3E5DF;
+  background: #DCE6DD;
+  transition: transform 150ms ease, border-color 150ms ease;
 }
 
 .expertCard:hover .expertPhoto {
-  transform: scale(1.04);
-  box-shadow:
-    0 18px 36px color-mix(in srgb, var(--nx-teal) 40%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transform: scale(1.03);
+  border-color: color-mix(in srgb, #1F5F4E 50%, transparent);
 }
 
 .expertSvg {
@@ -849,14 +769,12 @@
   height: 100%;
   display: grid;
   place-items: center;
-  font-family: var(--nx-font-numbers);
-  font-size: 1.15rem;
-  font-weight: 700;
+  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
+  font-size: 1.1rem;
+  font-weight: 600;
   letter-spacing: 0.04em;
-  color: color-mix(in srgb, var(--nb-text) 92%, #ffffff);
-  background: radial-gradient(circle at 30% 24%,
-    color-mix(in srgb, var(--nx-teal) 28%, transparent),
-    rgba(9, 22, 34, 0.94));
+  color: #1F5F4E;
+  background: #DCE6DD;
 }
 
 .expertName {
@@ -964,68 +882,52 @@
 }
 
 .primaryCta {
-  color: #fff;
-  border: 1px solid color-mix(in srgb, var(--nx-orange) 70%, #000);
-  background: linear-gradient(135deg, var(--nx-orange) 0%, var(--nx-orange-strong) 100%);
-  box-shadow:
-    0 12px 30px color-mix(in srgb, var(--nx-orange) 42%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  color: #FAF9F6;
+  border: 1px solid #1F5F4E;
+  background: #1F5F4E;
 }
 
 .primaryCta::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.22) 50%, transparent 70%);
-  transform: translateX(-100%);
-  transition: transform var(--nx-motion-slow) var(--nx-ease-out);
+  display: none;
 }
 
 .primaryCta:hover {
-  transform: translateY(-3px);
-  box-shadow:
-    0 18px 40px color-mix(in srgb, var(--nx-orange) 52%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.28);
-  filter: brightness(1.05);
-}
-
-.primaryCta:hover::before {
-  transform: translateX(100%);
+  background: #2F7A65;
+  border-color: #2F7A65;
+  transform: translateY(-2px);
+  filter: none;
 }
 
 .secondaryCta {
-  color: #f8fafc;
-  border: 1px solid color-mix(in srgb, var(--nx-teal) 60%, rgba(255, 255, 255, 0.22));
-  background: color-mix(in srgb, var(--nx-teal) 14%, transparent);
-  backdrop-filter: blur(6px);
+  color: #14211C;
+  border: 1px solid #E3E5DF;
+  background: transparent;
+  backdrop-filter: none;
 }
 
 .secondaryCta:hover {
-  background: color-mix(in srgb, var(--nx-teal) 28%, transparent);
-  border-color: color-mix(in srgb, var(--nx-teal) 80%, transparent);
-  transform: translateY(-3px);
-  box-shadow: 0 12px 28px color-mix(in srgb, var(--nx-teal) 28%, transparent);
+  border-color: #1F5F4E;
+  transform: translateY(-2px);
+  background: transparent;
+  box-shadow: none;
 }
 
 .secondaryCta:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--nx-teal) 45%, transparent);
+  outline: 2px solid #1F5F4E;
+  outline-offset: 2px;
 }
 
 .primaryCta:focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 3px color-mix(in srgb, #ffffff 35%, transparent),
-    0 10px 26px color-mix(in srgb, var(--nx-orange) 38%, transparent);
+  outline: 2px solid #1F5F4E;
+  outline-offset: 2px;
 }
 
 .seoHubShell {
   margin-top: 36px;
   padding: clamp(22px, 3vw, 30px);
-  border-radius: 20px;
-  border: 1px solid var(--nb-line);
-  background: linear-gradient(180deg, rgba(12, 28, 32, 0.92) 0%, rgba(8, 18, 28, 0.88) 100%);
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.35);
+  border-radius: 12px;
+  border: 1px solid #E3E5DF;
+  background: #F1F0EA;
 }
 
 .marcasLideres {

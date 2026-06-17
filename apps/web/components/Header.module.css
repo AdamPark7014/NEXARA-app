@@ -46,16 +46,11 @@
  * `.header` / `.navLinks` / `.link` base sin reescribir todo el archivo.
  */
 .headerPublic {
-	background: linear-gradient(
-		180deg,
-		rgba(3, 17, 13, 0.92) 0%,
-		rgba(3, 17, 13, 0.72) 60%,
-		rgba(3, 17, 13, 0.55) 100%
-	) !important;
-	border-bottom: 1px solid rgba(110, 251, 213, 0.14) !important;
-	backdrop-filter: blur(16px) saturate(140%) !important;
-	-webkit-backdrop-filter: blur(16px) saturate(140%) !important;
-	box-shadow: 0 12px 30px rgba(0, 0, 0, 0.32) !important;
+	background: rgba(250, 249, 246, 0.95) !important;
+	border-bottom: 1px solid #E3E5DF !important;
+	backdrop-filter: blur(16px) saturate(120%) !important;
+	-webkit-backdrop-filter: blur(16px) saturate(120%) !important;
+	box-shadow: 0 1px 0 #E3E5DF, 0 4px 16px rgba(20, 33, 28, 0.05) !important;
 }
 
 .headerPublic::before {
@@ -65,48 +60,49 @@
 
 .headerPublic .link,
 .headerPublic .logoLink {
-	color: #ffffff;
+	color: #14211C;
 }
 
 .headerPublic .logo {
-	filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.55));
+	filter: none;
 }
 
-/* Nav SIEMPRE plano (sin contenedor pill) en TODA la web pública. */
+/* Nav plano — sin contenedor pill */
 .headerPublic .navLinks {
 	background: transparent !important;
 	border: 1px solid transparent !important;
 	box-shadow: none !important;
 	padding: 0 !important;
-	gap: 0.2rem !important;
+	gap: 0.1rem !important;
 }
 
-/* Links SIEMPRE limpios (mayúsculas, sin pill, sin borde) en la web pública. */
+/* Links limpios sobre fondo claro */
 .headerPublic .link {
 	background: transparent !important;
 	border-color: transparent !important;
 	box-shadow: none !important;
-	color: #ffffff !important;
+	color: #14211C !important;
 	text-transform: uppercase;
-	letter-spacing: 0.08em;
+	letter-spacing: 0.07em;
 	font-weight: 600;
-	font-size: 0.82rem;
-	text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
-	padding: 0.5rem 0.95rem;
+	font-size: 0.8rem;
+	text-shadow: none;
+	padding: 0.5rem 0.9rem;
 }
 
 .headerPublic .link:hover {
-	background: rgba(255, 255, 255, 0.1) !important;
+	background: #F1F0EA !important;
 	border-color: transparent !important;
 	box-shadow: none !important;
-	transform: translateY(-1px);
+	transform: none;
+	color: #1F5F4E !important;
 }
 
 .headerPublic .linkActive {
 	background: transparent !important;
 	border-color: transparent !important;
 	box-shadow: none !important;
-	color: #6efbd5 !important;
+	color: #1F5F4E !important;
 	position: relative;
 }
 
@@ -116,9 +112,9 @@
 	left: 50%;
 	bottom: 2px;
 	transform: translateX(-50%);
-	width: 28px;
+	width: 20px;
 	height: 2px;
-	background: #6efbd5;
+	background: #1F5F4E;
 	border-radius: 2px;
 }
 
@@ -216,39 +212,33 @@
 	gap: 0.6rem;
 }
 
-/* ── Botón "Contactar" (pill turquesa) a la derecha del header ── */
+/* ── Botón "Contactar" — Pino sólido ── */
 .contactCta {
 	display: inline-flex;
 	align-items: center;
 	gap: 8px;
 	padding: 9px 18px;
-	border-radius: 999px;
-	background: var(--nx-teal, #10a183);
-	color: #ffffff;
-	font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-	font-size: 0.86rem;
-	font-weight: 600;
-	letter-spacing: 0.02em;
+	border-radius: 8px;
+	background: #1F5F4E;
+	color: #FAF9F6;
+	font-family: "Inter", var(--nx-font-body, system-ui), sans-serif;
+	font-size: 0.84rem;
+	font-weight: 500;
+	letter-spacing: 0.01em;
 	text-decoration: none;
-	border: 1px solid color-mix(in srgb, var(--nx-teal, #10a183) 70%, #ffffff 5%);
-	box-shadow: 0 8px 22px rgba(16, 161, 131, 0.32);
-	transition: transform 200ms ease, box-shadow 200ms ease, background 200ms ease;
+	border: 1px solid #1F5F4E;
+	box-shadow: none;
+	transition: transform 150ms ease, background 150ms ease;
 }
 
 .contactCta:hover {
 	transform: translateY(-1px);
-	background: #0fbf9b;
-	box-shadow: 0 12px 28px rgba(16, 161, 131, 0.42);
+	background: #2F7A65;
+	border-color: #2F7A65;
 }
 
 .contactArrow {
-	display: inline-grid;
-	place-items: center;
-	width: 20px;
-	height: 20px;
-	border-radius: 50%;
-	background: rgba(255, 255, 255, 0.22);
-	font-size: 12px;
+	font-size: 13px;
 	line-height: 1;
 }
 
