@@ -3,7 +3,7 @@ import "./utilities.scss";
 import "./ecosystem.scss";
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
-import { Space_Grotesk, Inter_Tight, Manrope } from "next/font/google";
+import { Space_Grotesk, Inter_Tight, Manrope, Fraunces, JetBrains_Mono } from "next/font/google";
 import ClientLayout from "./ClientLayout";
 import Providers from "./providers";
 
@@ -26,6 +26,20 @@ const manrope = Manrope({
   display: "swap",
   weight: ["300", "400", "500", "600", "700"],
   variable: "--nx-font-body",
+});
+
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["300", "400", "500", "600"],
+  variable: "--ds-font-serif",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["400", "500", "600"],
+  variable: "--ds-font-mono",
 });
 
 const siteUrl = (process.env.NEXT_PUBLIC_BASE_URL || "https://nexara.com.mx").replace(/\/+$/, "");
@@ -192,7 +206,7 @@ export default function RootLayout({
     <html
       lang="es-MX"
       suppressHydrationWarning
-      className={`${spaceGrotesk.variable} ${interTight.variable} ${manrope.variable}`}
+      className={`${spaceGrotesk.variable} ${interTight.variable} ${manrope.variable} ${fraunces.variable} ${jetbrainsMono.variable}`}
     >
       <body suppressHydrationWarning>
         {/* Organization structured data */}

@@ -1,47 +1,66 @@
 /* ============================================================
-   NEXARA · Estilos compartidos para páginas del sitio público
-   Paleta: teal-oscuro #03110d + mint #6efbd5 + teal #10a183
-   Patrón estándar: hero + secciones concisas con imágenes
+   NEXARA · Estilos compartidos — páginas del sitio público
+   Sistema de diseño: Tinta/Pino/Papel
+   Tipografía: Fraunces (display) · Inter (body) · JetBrains Mono (datos)
    ============================================================ */
 
 .page {
-  --bg: #03110d;
-  --bg-2: #061a16;
-  --bg-3: #0a2620;
-  --text: #f4f1ec;
-  --text-dim: rgba(244, 241, 236, 0.72);
-  --text-mute: rgba(244, 241, 236, 0.55);
-  --mint: #6efbd5;
-  --teal: #10a183;
-  --sky: #45c9b1;
-  --line: color-mix(in srgb, var(--teal) 28%, rgba(255, 255, 255, 0.08));
-  --line-soft: color-mix(in srgb, var(--teal) 14%, rgba(255, 255, 255, 0.04));
-  --glass: rgba(8, 22, 18, 0.62);
-  --shadow: 0 24px 48px -16px rgba(0, 0, 0, 0.4), 0 12px 24px -12px rgba(16, 161, 131, 0.18);
+  --ds-tinta:       #14211C;
+  --ds-pino:        #1F5F4E;
+  --ds-pino-claro:  #2F7A65;
+  --ds-papel:       #FAF9F6;
+  --ds-papel-hueso: #F1F0EA;
+  --ds-musgo:       #DCE6DD;
+  --ds-pizarra:     #5B6660;
+  --ds-niebla:      #9FB0A8;
+  --ds-linea:       #E3E5DF;
+  --ds-linea-osc:   rgba(255, 255, 255, 0.08);
+  --ds-sombra:      0 2px 8px rgba(20, 33, 28, 0.06);
+
+  /* Legacy aliases for partial compatibility */
+  --bg:    var(--ds-papel);
+  --text:  var(--ds-tinta);
+  --line:  var(--ds-linea);
+  --teal:  var(--ds-pino);
+  --mint:  var(--ds-pino-claro);
+  --glass: var(--ds-papel-hueso);
 
   position: relative;
-  background:
-    radial-gradient(ellipse 50% 40% at 80% 0%, color-mix(in srgb, var(--teal) 14%, transparent), transparent 60%),
-    radial-gradient(ellipse 40% 30% at 0% 60%, color-mix(in srgb, var(--mint) 6%, transparent), transparent 65%),
-    linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
-  color: var(--text);
+  background: var(--ds-papel);
+  color: var(--ds-tinta);
   min-height: 100vh;
-  font-family: var(--nx-font-body, "Manrope", system-ui, sans-serif);
+  font-family: "Inter", var(--nx-font-body, system-ui), sans-serif;
   overflow-x: hidden;
 }
 
 .inner {
-  max-width: 1240px;
+  max-width: 1180px;
   margin: 0 auto;
   padding: 0 clamp(20px, 4vw, 56px);
 }
 
-/* ── Hero ─────────────────────────────────────────────────── */
+/* ── Hero — fondo Tinta oscuro para impacto en páginas internas ── */
 
 .hero {
   position: relative;
-  padding: clamp(96px, 12vw, 140px) 0 clamp(48px, 6vw, 80px);
+  background: var(--ds-tinta);
+  color: var(--ds-papel);
+  padding: clamp(100px, 13vw, 148px) 0 clamp(64px, 8vw, 96px);
   overflow: hidden;
+  isolation: isolate;
+}
+
+/* Fade suave Tinta → Papel al pie del hero */
+.hero::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 96px;
+  background: linear-gradient(to bottom, transparent, var(--ds-papel));
+  pointer-events: none;
+  z-index: 2;
 }
 
 .heroGrid {
@@ -49,57 +68,57 @@
   grid-template-columns: 1.05fr 0.95fr;
   gap: clamp(32px, 5vw, 64px);
   align-items: center;
+  position: relative;
+  z-index: 1;
 }
 
+/* Eyebrow del hero: mono con línea izquierda, sobre fondo oscuro */
 .heroEyebrow {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--mint) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--mint) 32%, transparent);
-  color: var(--mint);
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
+  gap: 12px;
+  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  margin-bottom: 18px;
+  color: var(--ds-musgo);
+  margin-bottom: 20px;
 }
 
 .heroEyebrow::before {
   content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--mint);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--mint) 24%, transparent);
+  display: inline-block;
+  width: 24px;
+  height: 1px;
+  background: var(--ds-musgo);
+  flex-shrink: 0;
 }
 
 .heroTitle {
   margin: 0 0 18px;
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-  font-size: clamp(2.2rem, 5vw, 3.8rem);
-  font-weight: 700;
-  line-height: 1.05;
-  letter-spacing: -0.02em;
-  color: var(--text);
+  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
+  font-size: clamp(2.2rem, 4.8vw, 3.6rem);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  color: var(--ds-papel);
+  text-wrap: balance;
 }
 
+/* Un único acento por título — Musgo sobre fondo oscuro */
 .heroTitleAccent {
-  background: linear-gradient(135deg, var(--mint), var(--sky));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--ds-musgo);
+  font-style: normal;
 }
 
 .heroLead {
   margin: 0 0 28px;
-  font-size: clamp(1rem, 1.4vw, 1.18rem);
-  line-height: 1.55;
-  color: var(--text-dim);
-  max-width: 56ch;
+  font-size: clamp(1rem, 1.3vw, 1.14rem);
+  line-height: 1.65;
+  color: var(--ds-niebla);
+  max-width: 54ch;
+  text-wrap: pretty;
 }
 
 .heroActions {
@@ -108,14 +127,14 @@
   gap: 12px;
 }
 
+/* Imagen del hero — sin overlay oscuro intrusivo */
 .heroImage {
   position: relative;
   aspect-ratio: 4 / 3;
-  border-radius: 24px;
+  border-radius: 12px;
   overflow: hidden;
-  border: 1px solid var(--line);
-  background: var(--bg-3);
-  box-shadow: var(--shadow);
+  border: 1px solid var(--ds-linea-osc);
+  background: #0c1a16;
 }
 
 .heroImage img {
@@ -128,50 +147,66 @@
 .heroImageOverlay {
   position: absolute;
   inset: 0;
-  background:
-    linear-gradient(180deg, transparent 50%, rgba(3, 17, 13, 0.5) 100%),
-    linear-gradient(135deg, color-mix(in srgb, var(--teal) 24%, transparent) 0%, transparent 60%);
+  background: linear-gradient(180deg, transparent 55%, rgba(20, 33, 28, 0.55) 100%);
   pointer-events: none;
 }
 
-/* ── Buttons ──────────────────────────────────────────────── */
+/* ── Botones ─────────────────────────────────────────────── */
 
 .btn {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 13px 22px;
-  border-radius: 999px;
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-  font-size: 0.92rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  padding: 13px 24px;
+  border-radius: 8px;
+  font-family: "Inter", var(--nx-font-body, system-ui), sans-serif;
+  font-size: 0.93rem;
+  font-weight: 500;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: transform 200ms ease, box-shadow 200ms ease, background 200ms ease, border-color 200ms ease, color 200ms ease;
+  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease, border-color 150ms ease;
   text-decoration: none;
 }
 
+.btn:focus-visible {
+  outline: 2px solid var(--ds-pino);
+  outline-offset: 2px;
+}
+
+/* Primario: Pino sobre Papel (en hero: sobre Tinta bg → válido por contraste) */
 .btnPrimary {
-  background: linear-gradient(135deg, var(--mint), var(--sky));
-  color: #03110d;
-  box-shadow: 0 12px 28px -10px color-mix(in srgb, var(--mint) 65%, transparent);
+  background: var(--ds-pino);
+  color: var(--ds-papel);
+  border-color: var(--ds-pino);
 }
 
 .btnPrimary:hover {
+  background: var(--ds-pino-claro);
+  border-color: var(--ds-pino-claro);
   transform: translateY(-2px);
-  box-shadow: 0 18px 36px -10px color-mix(in srgb, var(--mint) 80%, transparent);
 }
 
+/* Secundario sobre fondo oscuro del hero */
 .btnSecondary {
-  background: color-mix(in srgb, var(--teal) 18%, transparent);
-  color: var(--text);
-  border-color: var(--line);
+  background: transparent;
+  color: var(--ds-papel);
+  border-color: rgba(250, 249, 246, 0.35);
 }
 
 .btnSecondary:hover {
-  border-color: var(--mint);
-  color: var(--mint);
+  border-color: var(--ds-papel);
+  transform: translateY(-2px);
+}
+
+/* Secundario sobre fondo claro (en secciones del body) */
+.btnSecondaryLight {
+  background: transparent;
+  color: var(--ds-tinta);
+  border: 1px solid var(--ds-linea);
+}
+
+.btnSecondaryLight:hover {
+  border-color: var(--ds-pino);
   transform: translateY(-2px);
 }
 
@@ -180,172 +215,180 @@
   line-height: 1;
 }
 
-/* ── Section heads ────────────────────────────────────────── */
+/* ── Encabezados de sección ──────────────────────────────── */
 
 .section {
   padding: clamp(56px, 7vw, 96px) 0;
 }
 
 .sectionDivider {
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--ds-linea);
 }
 
 .sectionHead {
   text-align: center;
-  max-width: 720px;
-  margin: 0 auto clamp(36px, 4vw, 56px);
+  max-width: 680px;
+  margin: 0 auto clamp(32px, 4vw, 52px);
 }
 
+/* Eyebrow de sección: mono con líneas a ambos lados cuando centrado */
 .eyebrow {
-  display: inline-block;
-  padding: 5px 12px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--teal) 18%, transparent);
-  border: 1px solid color-mix(in srgb, var(--teal) 40%, transparent);
-  color: var(--mint);
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
   font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.18em;
+  font-weight: 500;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+  color: var(--ds-pizarra);
   margin-bottom: 14px;
+}
+
+.eyebrow::before,
+.eyebrow::after {
+  content: "";
+  display: inline-block;
+  width: 24px;
+  height: 1px;
+  background: var(--ds-pino);
+  flex-shrink: 0;
 }
 
 .sectionTitle {
   margin: 0 0 14px;
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-  font-size: clamp(1.7rem, 3.4vw, 2.6rem);
-  font-weight: 700;
+  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
+  font-size: clamp(1.75rem, 3.2vw, 2.6rem);
+  font-weight: 500;
   line-height: 1.1;
-  letter-spacing: -0.02em;
-  color: var(--text);
+  letter-spacing: -0.022em;
+  color: var(--ds-tinta);
+  text-wrap: balance;
 }
 
+/* Un único acento por título — Pino sobre fondo claro */
 .sectionTitleAccent {
-  background: linear-gradient(135deg, var(--mint), var(--sky));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--ds-pino);
+  font-style: normal;
 }
 
 .sectionLead {
   margin: 0;
-  font-size: clamp(0.98rem, 1.3vw, 1.08rem);
-  line-height: 1.55;
-  color: var(--text-dim);
+  font-size: clamp(0.97rem, 1.2vw, 1.06rem);
+  line-height: 1.65;
+  color: var(--ds-pizarra);
+  max-width: 58ch;
 }
 
-/* ── Generic grids ────────────────────────────────────────── */
+/* ── Grids genéricos ─────────────────────────────────────── */
 
 .grid3 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: clamp(20px, 2.4vw, 28px);
+  gap: clamp(16px, 2vw, 24px);
 }
 
 .grid2 {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: clamp(20px, 2.4vw, 28px);
+  gap: clamp(16px, 2vw, 24px);
 }
 
 .grid4 {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: clamp(16px, 1.8vw, 22px);
+  gap: clamp(14px, 1.8vw, 20px);
 }
 
-/* ── Cards genéricas ──────────────────────────────────────── */
+/* ── Cards genéricas ─────────────────────────────────────── */
 
 .card {
   position: relative;
-  background: var(--glass);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: clamp(20px, 2.2vw, 28px);
-  backdrop-filter: blur(10px);
-  transition: transform 280ms ease, border-color 280ms ease, box-shadow 280ms ease;
-  overflow: hidden;
+  background: var(--ds-papel-hueso);
+  border: 1px solid var(--ds-linea);
+  border-radius: 12px;
+  padding: clamp(20px, 2.4vw, 28px);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .card:hover {
-  transform: translateY(-4px);
-  border-color: color-mix(in srgb, var(--mint) 55%, transparent);
-  box-shadow: var(--shadow);
+  border-color: color-mix(in srgb, var(--ds-pino) 60%, transparent);
+  box-shadow: 0 4px 16px rgba(31, 95, 78, 0.07);
 }
 
 .cardIcon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
   display: grid;
   place-items: center;
   margin-bottom: 16px;
-  background: linear-gradient(135deg, var(--teal), color-mix(in srgb, var(--teal) 60%, #000));
-  color: #ffffff;
-  box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--teal) 70%, transparent);
+  background: var(--ds-musgo);
+  color: var(--ds-pino);
+  flex-shrink: 0;
 }
 
 .cardIcon svg {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
+  stroke-width: 1.7;
 }
 
 .cardTitle {
   margin: 0 0 8px;
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-  font-size: 1.1rem;
-  font-weight: 700;
+  font-size: 1.08rem;
+  font-weight: 600;
   letter-spacing: -0.01em;
-  color: var(--text);
+  color: var(--ds-tinta);
+  line-height: 1.3;
 }
 
 .cardText {
   margin: 0;
-  font-size: 0.92rem;
-  line-height: 1.55;
-  color: var(--text-dim);
+  font-size: 0.91rem;
+  line-height: 1.65;
+  color: var(--ds-pizarra);
 }
 
 /* ── Imagen-card ─────────────────────────────────────────── */
 
 .imageCard {
   position: relative;
-  border-radius: 20px;
+  border-radius: 12px;
   overflow: hidden;
-  border: 1px solid var(--line);
-  background: var(--bg-3);
-  transition: transform 280ms ease, border-color 280ms ease, box-shadow 280ms ease;
+  border: 1px solid var(--ds-linea);
+  background: var(--ds-papel-hueso);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .imageCard:hover {
-  transform: translateY(-4px);
-  border-color: color-mix(in srgb, var(--mint) 55%, transparent);
-  box-shadow: var(--shadow);
+  border-color: color-mix(in srgb, var(--ds-pino) 60%, transparent);
+  box-shadow: 0 4px 16px rgba(31, 95, 78, 0.07);
 }
 
 .imageCardImg {
   position: relative;
   aspect-ratio: 16 / 10;
   overflow: hidden;
+  background: var(--ds-tinta);
 }
 
 .imageCardImg img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 600ms ease;
+  transition: transform 500ms ease;
 }
 
 .imageCard:hover .imageCardImg img {
-  transform: scale(1.04);
+  transform: scale(1.03);
 }
 
 .imageCardImg::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 40%, rgba(3, 17, 13, 0.75) 100%);
+  background: linear-gradient(180deg, transparent 45%, rgba(20, 33, 28, 0.65) 100%);
   pointer-events: none;
 }
 
@@ -355,44 +398,33 @@
 
 .imageCardTitle {
   margin: 0 0 8px;
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--text);
+  font-size: 1.08rem;
+  font-weight: 600;
   letter-spacing: -0.01em;
+  color: var(--ds-tinta);
+  line-height: 1.3;
 }
 
 .imageCardText {
   margin: 0;
   font-size: 0.9rem;
-  line-height: 1.55;
-  color: var(--text-dim);
+  line-height: 1.6;
+  color: var(--ds-pizarra);
 }
 
-/* ── CTA Final ───────────────────────────────────────────── */
+/* ── CTA Final — Pino sólido ─────────────────────────────── */
 
 .ctaShell {
   position: relative;
-  padding: clamp(48px, 6vw, 72px);
-  border-radius: 28px;
-  border: 1px solid var(--line);
-  background:
-    radial-gradient(ellipse 60% 80% at 100% 0%, color-mix(in srgb, var(--mint) 16%, transparent), transparent 60%),
-    linear-gradient(135deg, var(--bg-3) 0%, var(--bg-2) 100%);
+  padding: clamp(48px, 6vw, 72px) clamp(32px, 6vw, 64px);
+  border-radius: 16px;
+  background: var(--ds-pino);
+  color: var(--ds-papel);
   text-align: center;
-  overflow: hidden;
 }
 
 .ctaShell::before {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--mint) 32%, transparent), transparent 60%);
-  border-radius: inherit;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.6;
-  mix-blend-mode: overlay;
+  display: none;
 }
 
 .ctaShell > * {
@@ -402,19 +434,20 @@
 
 .ctaTitle {
   margin: 0 0 12px;
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
   font-size: clamp(1.6rem, 3vw, 2.4rem);
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: -0.02em;
-  color: var(--text);
+  color: var(--ds-papel);
+  text-wrap: balance;
 }
 
 .ctaLead {
   margin: 0 auto 28px;
   max-width: 50ch;
   font-size: 1rem;
-  line-height: 1.55;
-  color: var(--text-dim);
+  line-height: 1.65;
+  color: rgba(250, 249, 246, 0.78);
 }
 
 .ctaActions {
@@ -424,7 +457,34 @@
   justify-content: center;
 }
 
-/* ── Pills / chips ───────────────────────────────────────── */
+/* Botones dentro del CTA Pino */
+.ctaShell .btnPrimary {
+  background: var(--ds-papel);
+  color: var(--ds-tinta);
+  border-color: var(--ds-papel);
+}
+
+.ctaShell .btnPrimary:hover {
+  background: var(--ds-papel-hueso);
+  border-color: var(--ds-papel-hueso);
+}
+
+.ctaShell .btnSecondary {
+  background: transparent;
+  color: var(--ds-papel);
+  border-color: rgba(250, 249, 246, 0.38);
+}
+
+.ctaShell .btnSecondary:hover {
+  border-color: var(--ds-papel);
+}
+
+/* Acento del título dentro del CTA */
+.ctaShell .sectionTitleAccent {
+  color: var(--ds-musgo);
+}
+
+/* ── Chips / filtros ─────────────────────────────────────── */
 
 .chipRow {
   display: flex;
@@ -437,29 +497,38 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 16px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--teal) 14%, rgba(255, 255, 255, 0.03));
-  border: 1px solid var(--line);
-  color: var(--text);
-  font-size: 0.9rem;
+  padding: 9px 16px;
+  border-radius: 8px;
+  background: var(--ds-papel-hueso);
+  border: 1px solid var(--ds-linea);
+  color: var(--ds-tinta);
+  font-size: 0.88rem;
   font-weight: 500;
-  transition: transform 200ms ease, border-color 200ms ease, color 200ms ease;
+  transition: border-color 150ms ease, color 150ms ease, background 150ms ease;
+  text-decoration: none;
 }
 
 .chip:hover {
-  transform: translateY(-2px);
-  border-color: var(--mint);
-  color: var(--mint);
+  border-color: var(--ds-pino);
+  color: var(--ds-pino);
+  background: color-mix(in srgb, var(--ds-musgo) 40%, var(--ds-papel-hueso));
 }
 
 .chip svg {
   width: 16px;
   height: 16px;
-  color: var(--mint);
+  color: var(--ds-pino);
 }
 
 /* ── Métricas / stats ────────────────────────────────────── */
+
+/* Shell oscuro para secciones de resultados */
+.statsShell {
+  padding: clamp(40px, 5vw, 64px) clamp(24px, 4vw, 48px);
+  border-radius: 16px;
+  background: var(--ds-tinta);
+  color: var(--ds-papel);
+}
 
 .statsGrid {
   display: grid;
@@ -469,33 +538,51 @@
 
 .stat {
   text-align: center;
-  padding: 24px 18px;
-  border-radius: 16px;
-  border: 1px solid var(--line);
-  background: var(--glass);
+  padding: 24px 16px;
+  position: relative;
+}
+
+.stat + .stat::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 15%;
+  bottom: 15%;
+  width: 1px;
+  background: var(--ds-linea-osc);
 }
 
 .statValue {
   display: block;
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
   font-size: clamp(1.8rem, 3vw, 2.6rem);
-  font-weight: 700;
-  background: linear-gradient(135deg, var(--mint), var(--sky));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ds-papel);
   line-height: 1;
 }
 
 .statLabel {
   display: block;
-  margin-top: 6px;
-  font-size: 0.82rem;
-  color: var(--text-dim);
-  letter-spacing: 0.04em;
+  margin-top: 8px;
+  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ds-niebla);
 }
 
-/* ── Split (texto + imagen) ──────────────────────────────── */
+/* Stat sobre fondo claro (cuando no está en statsShell) */
+.statsGrid:not(.statsShell .statsGrid) .statValue {
+  color: var(--ds-tinta);
+}
+
+.statsGrid:not(.statsShell .statsGrid) .stat + .stat::before {
+  background: var(--ds-linea);
+}
+
+/* ── Split texto + imagen ────────────────────────────────── */
 
 .splitGrid {
   display: grid;
@@ -507,11 +594,10 @@
 .splitImage {
   position: relative;
   aspect-ratio: 4 / 3;
-  border-radius: 20px;
+  border-radius: 12px;
   overflow: hidden;
-  border: 1px solid var(--line);
-  background: var(--bg-3);
-  box-shadow: var(--shadow);
+  border: 1px solid var(--ds-linea);
+  background: var(--ds-papel-hueso);
 }
 
 .splitImage img {
@@ -522,18 +608,18 @@
 
 .splitBody h3 {
   margin: 0 0 14px;
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
   font-size: clamp(1.4rem, 2.4vw, 1.9rem);
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: -0.02em;
-  color: var(--text);
+  color: var(--ds-tinta);
 }
 
 .splitBody p {
   margin: 0 0 18px;
   font-size: 1rem;
-  line-height: 1.6;
-  color: var(--text-dim);
+  line-height: 1.65;
+  color: var(--ds-pizarra);
 }
 
 .bulletList {
@@ -546,33 +632,21 @@
 
 .bulletList li {
   position: relative;
-  padding-left: 26px;
+  padding-left: 20px;
   font-size: 0.94rem;
-  line-height: 1.5;
-  color: var(--text);
+  line-height: 1.55;
+  color: var(--ds-tinta);
 }
 
 .bulletList li::before {
   content: "";
   position: absolute;
   left: 0;
-  top: 0.55em;
-  width: 14px;
-  height: 14px;
-  border-radius: 4px;
-  background: linear-gradient(135deg, var(--mint), var(--sky));
-}
-
-.bulletList li::after {
-  content: "";
-  position: absolute;
-  left: 3px;
-  top: calc(0.55em + 3px);
-  width: 5px;
+  top: 0.6em;
+  width: 8px;
   height: 8px;
-  border-right: 2px solid #03110d;
-  border-bottom: 2px solid #03110d;
-  transform: rotate(45deg);
+  border-radius: 2px;
+  background: var(--ds-pino);
 }
 
 /* ── Responsive ──────────────────────────────────────────── */
@@ -582,23 +656,51 @@
   .splitGrid {
     grid-template-columns: 1fr;
   }
+
+  .heroImage {
+    aspect-ratio: 16 / 9;
+  }
+
   .grid3,
   .statsGrid {
     grid-template-columns: repeat(2, 1fr);
   }
+
   .grid4 {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat + .stat::before {
+    display: none;
   }
 }
 
 @media (max-width: 600px) {
+  .hero::after {
+    height: 64px;
+  }
+
   .grid3,
   .grid2,
-  .statsGrid,
   .grid4 {
     grid-template-columns: 1fr;
   }
+
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
   .heroImage {
-    aspect-ratio: 16 / 10;
+    aspect-ratio: 4 / 3;
+  }
+
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .heroActions,
+  .ctaActions {
+    flex-direction: column;
   }
 }

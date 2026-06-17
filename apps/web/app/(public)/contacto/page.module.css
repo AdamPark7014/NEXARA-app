@@ -1,5 +1,6 @@
 /* Contacto · estilos específicos (complementa public.module.css) */
 
+/* Canales de contacto — tarjetas limpias sobre fondo claro */
 .channelCard {
   display: flex !important;
   flex-direction: column;
@@ -8,8 +9,8 @@
   color: inherit;
   cursor: pointer;
   text-align: left;
-  border: 1px solid var(--line, color-mix(in srgb, #10a183 28%, rgba(255, 255, 255, 0.08)));
-  background: rgba(8, 22, 18, 0.62) !important;
+  border: 1px solid #E3E5DF !important;
+  background: #F1F0EA !important;
 }
 
 .channelCta {
@@ -17,15 +18,14 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
   font-size: 0.88rem;
-  font-weight: 600;
-  color: #6efbd5;
-  transition: gap 200ms ease;
+  font-weight: 500;
+  color: #1F5F4E;
+  transition: gap 150ms ease;
 }
 
 .channelCard:hover .channelCta {
-  gap: 12px;
+  gap: 10px;
 }
 
 /* ── Layout formulario ───────────────────────────────────── */
@@ -43,40 +43,42 @@
 }
 
 .asideContact {
-  margin-top: 28px;
+  margin-top: 20px;
   display: flex;
   gap: 12px;
   align-items: flex-start;
   padding: 14px 16px;
-  border-radius: 12px;
-  border: 1px solid color-mix(in srgb, #10a183 28%, rgba(255, 255, 255, 0.08));
-  background: rgba(8, 22, 18, 0.5);
+  border-radius: 10px;
+  border: 1px solid #E3E5DF;
+  background: #FAF9F6;
 }
 
 .asideContact svg {
-  width: 22px;
-  height: 22px;
-  color: #6efbd5;
+  width: 20px;
+  height: 20px;
+  color: #1F5F4E;
   flex-shrink: 0;
   margin-top: 2px;
 }
 
 .asideContact strong {
   display: block;
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-  font-size: 0.95rem;
-  color: #f4f1ec;
+  font-size: 0.93rem;
+  font-weight: 600;
+  color: #14211C;
 }
 
 .asideContact span {
-  font-size: 0.84rem;
-  color: rgba(244, 241, 236, 0.7);
+  font-size: 0.82rem;
+  color: #5B6660;
 }
 
 /* ── Form card ───────────────────────────────────────────── */
 
 .formCard {
   padding: clamp(24px, 3vw, 36px) !important;
+  background: #F1F0EA !important;
+  border: 1px solid #E3E5DF !important;
 }
 
 .form {
@@ -92,43 +94,42 @@
 
 .field {
   display: grid;
-  gap: 8px;
+  gap: 7px;
 }
 
 .field span {
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
   font-size: 0.82rem;
   font-weight: 600;
-  color: #f4f1ec;
-  letter-spacing: 0.02em;
+  color: #14211C;
+  letter-spacing: 0.01em;
 }
 
 .field input,
 .field select,
 .field textarea {
   width: 100%;
-  padding: 12px 14px;
-  border-radius: 10px;
-  border: 1px solid color-mix(in srgb, #10a183 28%, rgba(255, 255, 255, 0.08));
-  background: rgba(3, 17, 13, 0.55);
-  color: #f4f1ec;
+  padding: 11px 14px;
+  border-radius: 8px;
+  border: 1px solid #E3E5DF;
+  background: #FAF9F6;
+  color: #14211C;
   font: inherit;
   font-size: 0.94rem;
   outline: none;
-  transition: border-color 180ms ease, background 180ms ease;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .field input::placeholder,
 .field textarea::placeholder {
-  color: rgba(244, 241, 236, 0.42);
+  color: #9FB0A8;
 }
 
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
-  border-color: #6efbd5;
-  background: rgba(3, 17, 13, 0.75);
-  box-shadow: 0 0 0 3px color-mix(in srgb, #6efbd5 18%, transparent);
+  border-color: #1F5F4E;
+  box-shadow: 0 0 0 3px rgba(31, 95, 78, 0.1);
+  background: #FAF9F6;
 }
 
 .field textarea {
@@ -139,14 +140,11 @@
 
 .field select {
   appearance: none;
-  background-image: linear-gradient(45deg, transparent 50%, #6efbd5 50%),
-    linear-gradient(135deg, #6efbd5 50%, transparent 50%);
-  background-position:
-    calc(100% - 18px) 50%,
-    calc(100% - 13px) 50%;
-  background-size: 5px 5px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235B6660' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
+  background-position: calc(100% - 14px) 50%;
   padding-right: 36px;
+  background-color: #FAF9F6;
 }
 
 .submitBtn {
@@ -159,11 +157,11 @@
   margin: 0;
   text-align: center;
   font-size: 0.78rem;
-  color: rgba(244, 241, 236, 0.55);
+  color: #9FB0A8;
 }
 
 .formNote a {
-  color: #6efbd5;
+  color: #1F5F4E;
   text-decoration: none;
 }
 
@@ -182,30 +180,31 @@
 }
 
 .successIcon {
-  width: 64px;
-  height: 64px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: color-mix(in srgb, #6efbd5 18%, transparent);
-  color: #6efbd5;
+  background: #DCE6DD;
+  color: #1F5F4E;
 }
 
 .successIcon svg {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
 }
 
 .successBlock h3 {
   margin: 0;
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
   font-size: 1.4rem;
-  color: #f4f1ec;
+  font-weight: 500;
+  color: #14211C;
 }
 
 .successBlock p {
   margin: 0;
-  color: rgba(244, 241, 236, 0.72);
+  color: #5B6660;
   max-width: 36ch;
 }
 
@@ -213,12 +212,11 @@
 
 .mapWrap {
   position: relative;
-  border-radius: 22px;
+  border-radius: 12px;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, #10a183 28%, rgba(255, 255, 255, 0.08));
-  background: #0a2620;
+  border: 1px solid #E3E5DF;
+  background: #DCE6DD;
   height: 420px;
-  box-shadow: 0 24px 48px -16px rgba(0, 0, 0, 0.4);
 }
 
 .mapWrap :global(.leaflet-container) {
@@ -242,6 +240,6 @@
     grid-template-columns: 1fr;
   }
   .mapWrap {
-    height: 320px;
+    height: 300px;
   }
 }

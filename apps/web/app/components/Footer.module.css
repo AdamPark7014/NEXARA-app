@@ -1,43 +1,40 @@
 /* ============================================================
    NEXARA · Footer (sitio público)
-   Paleta unificada con el home: teal-oscuro #03110d + mint #6efbd5
+   Sistema de diseño: Tinta oscuro — paleta unificada
    ============================================================ */
 
 .footer {
-  --f-bg: #03110d;
-  --f-bg-2: #061a16;
-  --f-text: #f4f1ec;
-  --f-text-dim: rgba(244, 241, 236, 0.65);
-  --f-mint: #6efbd5;
-  --f-teal: #10a183;
-  --f-line: color-mix(in srgb, var(--f-teal) 28%, rgba(255, 255, 255, 0.08));
+  --f-tinta:  #14211C;
+  --f-pino:   #1F5F4E;
+  --f-niebla: #9FB0A8;
+  --f-papel:  #FAF9F6;
+  --f-linea:  rgba(255, 255, 255, 0.08);
+  --f-text:   rgba(250, 249, 246, 0.92);
+  --f-dim:    rgba(250, 249, 246, 0.55);
 
   position: relative;
   width: 100%;
-  margin-top: 0;
-  background:
-    radial-gradient(ellipse 80% 60% at 20% 0%, color-mix(in srgb, var(--f-teal) 18%, transparent), transparent 65%),
-    radial-gradient(ellipse 60% 50% at 90% 100%, color-mix(in srgb, var(--f-mint) 8%, transparent), transparent 65%),
-    linear-gradient(180deg, var(--f-bg) 0%, var(--f-bg-2) 100%);
+  background: var(--f-tinta);
   color: var(--f-text);
-  font-family: var(--nx-font-body, "Manrope", system-ui, sans-serif);
+  font-family: "Inter", var(--nx-font-body, system-ui), sans-serif;
   overflow: hidden;
   isolation: isolate;
 }
 
+/* Línea divisora superior — fina, Pino al centro */
 .topAccent {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, var(--f-mint) 50%, transparent);
-  opacity: 0.55;
+  background: linear-gradient(90deg, transparent, #1F5F4E 50%, transparent);
+  opacity: 0.5;
 }
 
 .footerInner {
   position: relative;
-  max-width: 1280px;
+  max-width: 1180px;
   margin: 0 auto;
   padding: clamp(48px, 6vw, 72px) clamp(20px, 4vw, 56px) clamp(24px, 3vw, 36px);
   z-index: 1;
@@ -63,38 +60,38 @@
 
 .brandName {
   margin: 0;
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-  font-size: 1.5rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  color: var(--f-text);
+  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
+  font-size: 1.4rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--f-papel);
 }
 
 .brandTagline {
   margin: 0;
-  font-size: 0.92rem;
-  line-height: 1.55;
-  color: var(--f-text-dim);
-  max-width: 32ch;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--f-dim);
+  max-width: 30ch;
 }
 
 .socials {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   margin-top: 4px;
 }
 
 .social {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
   display: grid;
   place-items: center;
-  background: color-mix(in srgb, var(--f-teal) 14%, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--f-line);
-  color: var(--f-text);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--f-linea);
+  color: var(--f-niebla);
   cursor: pointer;
-  transition: transform 200ms ease, background 200ms ease, border-color 200ms ease, color 200ms ease;
+  transition: transform 150ms ease, background 150ms ease, color 150ms ease;
 }
 
 .social svg {
@@ -104,9 +101,8 @@
 
 .social:hover {
   transform: translateY(-2px);
-  background: color-mix(in srgb, var(--f-teal) 28%, transparent);
-  border-color: var(--f-mint);
-  color: var(--f-mint);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--f-papel);
 }
 
 /* ── Link columns ───────────────────────────────────────── */
@@ -117,14 +113,15 @@
   min-width: 0;
 }
 
+/* Títulos de columna: JetBrains Mono — sin mint */
 .colTitle {
   margin: 0;
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.18em;
+  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--f-mint);
+  color: var(--f-niebla);
 }
 
 .list {
@@ -136,16 +133,15 @@
 }
 
 .list li a {
-  font-size: 0.92rem;
-  color: var(--f-text-dim);
+  font-size: 0.9rem;
+  color: var(--f-dim);
   text-decoration: none;
-  transition: color 180ms ease, transform 180ms ease;
+  transition: color 150ms ease;
   display: inline-block;
 }
 
 .list li a:hover {
-  color: var(--f-mint);
-  transform: translateX(2px);
+  color: var(--f-papel);
 }
 
 /* ── Contacto compacto ───────────────────────────────────── */
@@ -153,47 +149,46 @@
 .contactRow {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  gap: 12px;
   padding-top: clamp(20px, 2.4vw, 28px);
-  border-top: 1px solid var(--f-line);
+  border-top: 1px solid var(--f-linea);
 }
 
 .contactBlock {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 18px;
-  border-radius: 12px;
-  border: 1px solid var(--f-line);
-  background: color-mix(in srgb, var(--f-teal) 8%, rgba(255, 255, 255, 0.02));
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--f-linea);
+  background: rgba(255, 255, 255, 0.04);
   text-decoration: none;
   color: inherit;
   cursor: pointer;
-  transition: transform 200ms ease, border-color 200ms ease, background 200ms ease;
+  transition: background 150ms ease, border-color 150ms ease;
   text-align: left;
   font: inherit;
 }
 
 .contactBlock:hover {
-  transform: translateY(-2px);
-  border-color: var(--f-mint);
-  background: color-mix(in srgb, var(--f-teal) 16%, transparent);
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
 .contactIcon {
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, var(--f-teal), color-mix(in srgb, var(--f-teal) 60%, #000));
-  color: #ffffff;
+  background: #1F5F4E;
+  color: #FAF9F6;
 }
 
 .contactIcon svg {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
 }
 
 .contactInfo {
@@ -203,24 +198,23 @@
 }
 
 .contactLabel {
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--f-text);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
 }
 
 .contactValue {
-  font-size: 0.82rem;
-  color: var(--f-text-dim);
+  font-size: 0.8rem;
+  color: var(--f-dim);
 }
 
-/* ── Mapa / Ubicacion ───────────────────────────────────── */
+/* ── Mapa / Ubicación ───────────────────────────────────── */
 
 .mapSection {
   margin-top: clamp(10px, 1.8vw, 16px);
   padding-top: clamp(12px, 1.8vw, 16px);
-  border-top: 1px solid var(--f-line);
+  border-top: 1px solid var(--f-linea);
   display: grid;
   justify-items: center;
   gap: 10px;
@@ -234,33 +228,32 @@
 
 .mapTitle {
   margin: 0;
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.18em;
+  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--f-mint);
+  color: var(--f-niebla);
 }
 
 .mapAddress {
   margin: 0;
-  color: var(--f-text-dim);
+  color: var(--f-dim);
   font-size: 0.82rem;
 }
 
 .mapFrameWrap {
   width: min(640px, 100%);
-  border-radius: 14px;
-  padding: 6px;
-  border: 1px solid var(--f-line);
-  background: color-mix(in srgb, var(--f-teal) 8%, rgba(255, 255, 255, 0.02));
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.24);
+  border-radius: 10px;
+  padding: 4px;
+  border: 1px solid var(--f-linea);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .mapCanvas {
   width: 100%;
   height: clamp(170px, 24vw, 220px);
-  border-radius: 10px;
+  border-radius: 8px;
   overflow: hidden;
 }
 
@@ -269,14 +262,14 @@
 .bottomBar {
   margin-top: clamp(24px, 3vw, 32px);
   padding-top: clamp(18px, 2vw, 24px);
-  border-top: 1px solid var(--f-line);
+  border-top: 1px solid var(--f-linea);
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 18px;
   flex-wrap: wrap;
-  font-size: 0.82rem;
-  color: var(--f-text-dim);
+  font-size: 0.8rem;
+  color: var(--f-dim);
 }
 
 .legalLinks {
@@ -286,13 +279,13 @@
 }
 
 .legalLinks a {
-  color: var(--f-text-dim);
+  color: var(--f-dim);
   text-decoration: none;
-  transition: color 180ms ease;
+  transition: color 150ms ease;
 }
 
 .legalLinks a:hover {
-  color: var(--f-mint);
+  color: var(--f-papel);
 }
 
 /* ── Back-to-top ─────────────────────────────────────────── */
@@ -301,28 +294,28 @@
   position: fixed;
   right: 22px;
   bottom: 22px;
-  width: 44px;
-  height: 44px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--f-mint) 60%, transparent);
-  background: var(--f-bg-2);
-  color: var(--f-mint);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #1F5F4E;
+  color: #FAF9F6;
   display: grid;
   place-items: center;
   cursor: pointer;
   z-index: 50;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
-  transition: transform 200ms ease, background 200ms ease;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  transition: transform 150ms ease, background 150ms ease;
 }
 
 .backTop:hover {
-  transform: translateY(-3px);
-  background: color-mix(in srgb, var(--f-teal) 24%, var(--f-bg-2));
+  transform: translateY(-2px);
+  background: #2F7A65;
 }
 
 .backTop svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   fill: currentColor;
 }
 
@@ -332,10 +325,12 @@
   .mainGrid {
     grid-template-columns: 1fr 1fr;
   }
+
   .brandCol {
     grid-column: 1 / -1;
     max-width: 100%;
   }
+
   .contactRow {
     grid-template-columns: 1fr;
   }
@@ -345,6 +340,7 @@
   .mainGrid {
     grid-template-columns: 1fr;
   }
+
   .bottomBar {
     flex-direction: column;
     align-items: flex-start;

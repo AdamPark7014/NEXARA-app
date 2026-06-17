@@ -1,53 +1,60 @@
 /* Proyectos · estilos específicos */
 
+/* Badge de métrica sobre la imagen del caso */
 .caseMetric {
   position: absolute;
-  top: 14px;
-  right: 14px;
+  top: 12px;
+  right: 12px;
   z-index: 2;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: rgba(3, 17, 13, 0.78);
-  border: 1px solid color-mix(in srgb, #6efbd5 60%, transparent);
-  color: #6efbd5;
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-  font-size: 0.78rem;
-  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: rgba(20, 33, 28, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #DCE6DD;
+  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
+  font-size: 0.74rem;
+  font-weight: 500;
   letter-spacing: 0.04em;
-  backdrop-filter: blur(8px);
 }
 
+/* Etiqueta de sector — mono label */
 .caseSector {
   display: inline-block;
   margin-bottom: 8px;
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
+  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #6efbd5;
+  color: #1F5F4E;
 }
 
 .studioCasesList {
   display: grid;
-  gap: clamp(20px, 2.6vw, 30px);
+  gap: clamp(20px, 2.6vw, 28px);
 }
 
+/* Tarjeta de caso: diseño de 2 columnas limpio */
 .studioCaseCard {
   display: grid;
   grid-template-columns: 0.95fr 1.05fr;
-  border-radius: 20px;
-  border: 1px solid color-mix(in srgb, #10a183 28%, rgba(255, 255, 255, 0.08));
-  background: linear-gradient(160deg, rgba(8, 22, 18, 0.86), rgba(3, 12, 10, 0.9));
+  border-radius: 12px;
+  border: 1px solid #E3E5DF;
+  background: #F1F0EA;
   overflow: hidden;
-  box-shadow: 0 24px 48px -16px rgba(0, 0, 0, 0.45);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.studioCaseCard:hover {
+  border-color: color-mix(in srgb, #1F5F4E 55%, transparent);
+  box-shadow: 0 4px 18px rgba(31, 95, 78, 0.08);
 }
 
 .studioCaseMedia {
   position: relative;
   min-height: 320px;
-  border-right: 1px solid color-mix(in srgb, #10a183 22%, rgba(255, 255, 255, 0.06));
-  background: #0a211b;
+  border-right: 1px solid #E3E5DF;
+  background: #DCE6DD;
 }
 
 .studioCasePhoto {
@@ -59,22 +66,24 @@
   display: grid;
   gap: 12px;
   align-content: start;
+  background: #F1F0EA;
 }
 
 .studioCaseTitle {
   margin: 0;
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-  font-size: clamp(1.2rem, 2vw, 1.55rem);
-  line-height: 1.16;
+  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
+  font-size: clamp(1.15rem, 1.9vw, 1.5rem);
+  line-height: 1.15;
   letter-spacing: -0.015em;
-  color: #f4f1ec;
+  font-weight: 500;
+  color: #14211C;
 }
 
 .studioCaseSummary {
   margin: 0;
-  font-size: 0.95rem;
-  line-height: 1.55;
-  color: rgba(244, 241, 236, 0.78);
+  font-size: 0.93rem;
+  line-height: 1.6;
+  color: #5B6660;
 }
 
 .infoRow {
@@ -83,35 +92,35 @@
 }
 
 .infoRow strong {
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #6efbd5;
+  color: #1F5F4E;
 }
 
 .infoRow span {
   font-size: 0.9rem;
   line-height: 1.5;
-  color: rgba(244, 241, 236, 0.84);
+  color: #14211C;
 }
 
 .tagsWrap {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .tag {
   display: inline-flex;
   align-items: center;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, #10a183 40%, rgba(255, 255, 255, 0.1));
-  background: color-mix(in srgb, #10a183 14%, transparent);
-  font-size: 0.78rem;
-  color: #d8fff3;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid #E3E5DF;
+  background: #FAF9F6;
+  font-size: 0.76rem;
+  color: #5B6660;
 }
 
 .highlights {
@@ -119,27 +128,26 @@
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 8px;
+  gap: 7px;
 }
 
 .highlights li {
   position: relative;
-  padding-left: 18px;
+  padding-left: 16px;
   font-size: 0.88rem;
-  line-height: 1.45;
-  color: rgba(244, 241, 236, 0.8);
+  line-height: 1.5;
+  color: #5B6660;
 }
 
 .highlights li::before {
   content: "";
   position: absolute;
   left: 0;
-  top: 0.5em;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #6efbd5;
-  box-shadow: 0 0 0 3px color-mix(in srgb, #6efbd5 20%, transparent);
+  top: 0.55em;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: #1F5F4E;
 }
 
 .galleryBlock {
@@ -148,27 +156,27 @@
 }
 
 .galleryTitle {
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.11em;
+  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #6efbd5;
+  color: #5B6660;
 }
 
 .galleryGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 .galleryThumb {
   position: relative;
   aspect-ratio: 1 / 1;
-  border-radius: 10px;
+  border-radius: 8px;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, #10a183 35%, rgba(255, 255, 255, 0.1));
-  background: #0a211b;
+  border: 1px solid #E3E5DF;
+  background: #DCE6DD;
 }
 
 .galleryThumbPhoto {
@@ -181,8 +189,8 @@
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  font-size: 0.78rem;
-  color: rgba(244, 241, 236, 0.6);
+  font-size: 0.76rem;
+  color: #9FB0A8;
 }
 
 @media (max-width: 1024px) {
@@ -190,13 +198,9 @@
     grid-template-columns: 1fr;
   }
 
-  .galleryGrid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
   .studioCaseMedia {
     min-height: 240px;
-    border-right: 0;
-    border-bottom: 1px solid color-mix(in srgb, #10a183 22%, rgba(255, 255, 255, 0.06));
+    border-right: none;
+    border-bottom: 1px solid #E3E5DF;
   }
 }

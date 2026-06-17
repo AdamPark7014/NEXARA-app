@@ -3881,3 +3881,19 @@ model FeatureFlag {
   @@map("feature_flags")
 }
 
+// ============================================================================
+// FASE 35 — PAGE CONTENT (contenido editable del sitio público desde Studio)
+// ============================================================================
+
+model PageContent {
+  id        Int      @id @default(autoincrement())
+  /// Identificador de sección: "home_metricas" | "home_servicios" | etc.
+  section   String   @unique @db.VarChar(120)
+  /// Contenido serializado como JSON. Estructura libre por sección.
+  content   Json
+  updatedBy String?  @db.VarChar(180)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@map("page_content")
+}
