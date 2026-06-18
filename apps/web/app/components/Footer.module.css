@@ -4,32 +4,34 @@
    ============================================================ */
 
 .footer {
-  --f-tinta:  #14211C;
-  --f-pino:   #1F5F4E;
-  --f-niebla: #9FB0A8;
+  /* Maroon corporativo del brand guide — diferencia limpiamente
+     del body claro y marca territorio de cierre */
+  --f-bg:     #531318;
+  --f-acento: #F08A1E;   /* orange del brand guide */
+  --f-teal:   #10A183;
   --f-papel:  #FAF9F6;
-  --f-linea:  rgba(255, 255, 255, 0.08);
-  --f-text:   rgba(250, 249, 246, 0.92);
-  --f-dim:    rgba(250, 249, 246, 0.55);
+  --f-linea:  rgba(255, 255, 255, 0.09);
+  --f-text:   rgba(250, 249, 246, 0.90);
+  --f-dim:    rgba(250, 249, 246, 0.52);
 
   position: relative;
   width: 100%;
-  background: var(--f-tinta);
+  background: var(--f-bg);
   color: var(--f-text);
-  font-family: "Inter", var(--nx-font-body, system-ui), sans-serif;
+  font-family: "Inter Tight", var(--nx-font-ui, "Inter", system-ui), sans-serif;
   overflow: hidden;
   isolation: isolate;
 }
 
-/* Línea divisora superior — fina, Pino al centro */
+/* Línea divisora superior — naranja del brand guide */
 .topAccent {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, #1F5F4E 50%, transparent);
-  opacity: 0.5;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #F08A1E 50%, transparent);
+  opacity: 0.8;
 }
 
 .footerInner {
@@ -60,7 +62,7 @@
 
 .brandName {
   margin: 0;
-  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
+  font-family: "Space Grotesk", var(--nx-font-display, "Manrope", sans-serif);
   font-size: 1.4rem;
   font-weight: 500;
   letter-spacing: -0.01em;
@@ -182,7 +184,7 @@
   border-radius: 8px;
   display: grid;
   place-items: center;
-  background: #1F5F4E;
+  background: #F08A1E;
   color: #FAF9F6;
 }
 
@@ -297,20 +299,20 @@
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: #1F5F4E;
+  border: 1px solid rgba(240, 138, 30, 0.3);
+  background: #10A183;
   color: #FAF9F6;
   display: grid;
   place-items: center;
   cursor: pointer;
   z-index: 50;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 8px 20px rgba(16, 161, 131, 0.3);
   transition: transform 150ms ease, background 150ms ease;
 }
 
 .backTop:hover {
   transform: translateY(-2px);
-  background: #2F7A65;
+  background: #0b7d65;
 }
 
 .backTop svg {
