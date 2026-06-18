@@ -11,10 +11,10 @@
   align-items: center;
   gap: 6px;
   margin-top: 14px;
-  font-family: var(--nx-font-display, "Space Grotesk", system-ui, sans-serif);
+  font-family: "Inter", var(--nx-font-body, system-ui), sans-serif;
   font-size: 0.86rem;
   font-weight: 600;
-  color: #6efbd5;
+  color: var(--ds-pino);
   transition: gap 200ms ease;
 }
 

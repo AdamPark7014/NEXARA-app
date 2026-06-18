@@ -1,20 +1,23 @@
+/* ── Hero ───────────────────────────────────────────────── */
+
 .heroCompact {
-  max-width: 880px;
+  max-width: 680px;
 }
+
+/* ── Artículo destacado ──────────────────────────────────── */
 
 .featuredCard {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  border-radius: 22px;
+  border-radius: 14px;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--ds-pino) 30%, rgba(255, 255, 255, 0.08));
-  background: linear-gradient(160deg, rgba(20, 33, 28, 0.88), rgba(20, 33, 28, 0.96));
-  box-shadow: 0 28px 52px -18px rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--ds-linea);
+  background: var(--ds-papel-hueso);
 }
 
 .featuredMedia {
   position: relative;
-  min-height: 320px;
+  min-height: 300px;
   background: var(--ds-tinta);
 }
 
@@ -23,98 +26,113 @@
 }
 
 .featuredBody {
-  padding: clamp(22px, 2.8vw, 34px);
-  display: grid;
-  gap: 12px;
-  align-content: center;
+  padding: clamp(28px, 3vw, 42px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  justify-content: center;
 }
 
 .featuredMeta {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  font-size: 0.76rem;
-  letter-spacing: 0.12em;
+  align-items: center;
+  gap: 14px;
+  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ds-niebla);
+  color: var(--ds-pizarra);
 }
 
 .featuredTitle {
   margin: 0;
   font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
-  font-size: clamp(1.28rem, 2.2vw, 1.72rem);
+  font-size: clamp(1.25rem, 2vw, 1.7rem);
   font-weight: 500;
-  line-height: 1.15;
-  letter-spacing: -0.015em;
-  color: var(--ds-papel);
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+  color: var(--ds-tinta);
 }
 
 .featuredSummary {
   margin: 0;
-  font-size: 0.95rem;
-  line-height: 1.58;
-  color: var(--ds-niebla);
+  font-size: 0.93rem;
+  line-height: 1.65;
+  color: var(--ds-pizarra);
 }
+
+/* ── Grid del blog ───────────────────────────────────────── */
 
 .blogGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: clamp(20px, 2.3vw, 28px);
+  gap: clamp(18px, 2vw, 24px);
 }
+
+/* ── Fecha sobre imagen ──────────────────────────────────── */
 
 .publishedDate {
   position: absolute;
-  left: 14px;
-  top: 14px;
+  left: 12px;
+  top: 12px;
   z-index: 2;
-  padding: 6px 11px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(20, 33, 28, 0.78);
-  backdrop-filter: blur(5px);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  padding: 4px 9px;
+  border-radius: 5px;
+  background: rgba(20, 33, 28, 0.68);
+  backdrop-filter: blur(4px);
+  font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--ds-musgo);
+  color: var(--ds-papel);
 }
 
+/* ── Tags ────────────────────────────────────────────────── */
+
 .tagsRow {
-  margin-top: 14px;
+  margin-top: 10px;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .tag {
   display: inline-flex;
   align-items: center;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--ds-pino) 40%, rgba(255, 255, 255, 0.1));
-  background: color-mix(in srgb, var(--ds-pino) 16%, transparent);
-  font-size: 0.74rem;
-  color: var(--ds-musgo);
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--ds-musgo);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--ds-pino);
 }
 
+/* ── Estado vacío ────────────────────────────────────────── */
+
 .emptyState {
-  border-radius: 18px;
-  border: 1px dashed color-mix(in srgb, var(--ds-pino) 45%, rgba(255, 255, 255, 0.15));
-  background: color-mix(in srgb, var(--ds-pino) 8%, rgba(20, 33, 28, 0.6));
-  padding: clamp(28px, 4vw, 40px);
+  border-radius: 12px;
+  border: 1px dashed var(--ds-linea);
+  padding: clamp(40px, 5vw, 64px) clamp(28px, 4vw, 40px);
   text-align: center;
 }
 
 .emptyState h3 {
   margin: 0 0 8px;
   font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
-  color: var(--ds-papel);
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: var(--ds-tinta);
 }
 
 .emptyState p {
   margin: 0;
-  color: var(--ds-niebla);
+  font-size: 0.93rem;
+  color: var(--ds-pizarra);
 }
+
+/* ── Responsive ──────────────────────────────────────────── */
 
 @media (max-width: 1100px) {
   .blogGrid {
@@ -126,7 +144,6 @@
   .featuredCard {
     grid-template-columns: 1fr;
   }
-
   .featuredMedia {
     min-height: 240px;
   }

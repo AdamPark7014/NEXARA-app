@@ -528,10 +528,9 @@ body::before {
 
 .public-layout-wrapper {
   min-height: 100vh;
-  background:
-    radial-gradient(ellipse 70% 55% at 0% 0%, color-mix(in srgb, var(--nx-teal) 10%, transparent), transparent 62%),
-    radial-gradient(ellipse 68% 52% at 100% 100%, color-mix(in srgb, var(--nx-teal-soft) 9%, transparent), transparent 64%),
-    linear-gradient(180deg, #03110d 0%, #061a16 100%);
+  /* Fondo claro: elimina el gradiente verde oscuro que se colaba
+     en los costados cuando el contenido tiene max-width limitado */
+  background: #FAF9F6;
 }
 
 .public-layout-content {
@@ -904,6 +903,17 @@ textarea:disabled {
     padding-block: 0.82rem;
     padding-inline: 0.9rem;
   }
+}
+
+/* Sitio público: neutraliza el background oscuro del body.dark y
+   el orbe decorativo (position:fixed) que se asomaban al exterior
+   del wrapper cuando el contenido tiene max-width < viewport */
+body.dark:has(.public-layout-wrapper) {
+  background: #FAF9F6;
+}
+
+body.dark:has(.public-layout-wrapper)::before {
+  display: none;
 }
 
 /* ============================================================
