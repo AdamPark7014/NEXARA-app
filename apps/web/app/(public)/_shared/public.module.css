@@ -29,7 +29,8 @@
   background: var(--ds-papel);
   color: var(--ds-tinta);
   min-height: 100vh;
-  font-family: "Inter", var(--nx-font-body, system-ui), sans-serif;
+  /* Manrope Regular — texto descriptivo según brand guide */
+  font-family: "Manrope", var(--nx-font-body, system-ui), sans-serif;
   overflow-x: hidden;
 }
 
@@ -97,10 +98,11 @@
 
 .heroTitle {
   margin: 0 0 18px;
-  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
+  /* Space Grotesk Bold — Hero Principal según brand guide */
+  font-family: "Space Grotesk", var(--nx-font-display, "Manrope", sans-serif);
   font-size: clamp(2.2rem, 4.8vw, 3.6rem);
-  font-weight: 500;
-  line-height: 1.08;
+  font-weight: 700;
+  line-height: 1.06;
   letter-spacing: -0.025em;
   color: var(--ds-papel);
   text-wrap: balance;
@@ -159,7 +161,7 @@
   gap: 10px;
   padding: 13px 24px;
   border-radius: 8px;
-  font-family: "Inter", var(--nx-font-body, system-ui), sans-serif;
+  font-family: "Inter Tight", var(--nx-font-ui, "Inter", system-ui), sans-serif;
   font-size: 0.93rem;
   font-weight: 500;
   cursor: pointer;
@@ -257,7 +259,8 @@
 
 .sectionTitle {
   margin: 0 0 14px;
-  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
+  /* Space Grotesk Medium — Títulos de sección según brand guide */
+  font-family: "Space Grotesk", var(--nx-font-display, "Manrope", sans-serif);
   font-size: clamp(1.75rem, 3.2vw, 2.6rem);
   font-weight: 500;
   line-height: 1.1;
@@ -434,9 +437,9 @@
 
 .ctaTitle {
   margin: 0 0 12px;
-  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
+  font-family: "Space Grotesk", var(--nx-font-display, "Manrope", sans-serif);
   font-size: clamp(1.6rem, 3vw, 2.4rem);
-  font-weight: 500;
+  font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--ds-papel);
   text-wrap: balance;
@@ -608,7 +611,7 @@
 
 .splitBody h3 {
   margin: 0 0 14px;
-  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
+  font-family: "Space Grotesk", var(--nx-font-display, "Manrope", sans-serif);
   font-size: clamp(1.4rem, 2.4vw, 1.9rem);
   font-weight: 500;
   letter-spacing: -0.02em;

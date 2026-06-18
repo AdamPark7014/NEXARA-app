@@ -18,7 +18,7 @@
   width: 100%;
   min-height: 100%;
   color: #14211C;
-  font-family: "Inter", var(--nx-font-body, system-ui), sans-serif;
+  font-family: "Manrope", var(--nx-font-body, system-ui), sans-serif;
   background: #FAF9F6;
   padding-bottom: 0;
 }
@@ -510,7 +510,7 @@
 .sectionH2Center {
   margin: 0 0 clamp(28px, 4vw, 44px);
   text-align: center;
-  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
+  font-family: "Space Grotesk", var(--nx-font-display, "Manrope", sans-serif);
   font-size: clamp(1.75rem, 3.2vw, 2.6rem);
   font-weight: 500;
   letter-spacing: -0.018em;

@@ -933,25 +933,29 @@ body.dark:has(.public-layout-wrapper)::before {
   --highlight: var(--nx-magenta);
   --deep: var(--nx-maroon);
 
-  /* Base pública unificada en teal oscuro (evita el cast azul del body.dark global) */
-  --background: #03110d;
-  --background-elevated: #071a16;
-  --surface: #0a211b;
-  --surface-2: #0d2a23;
-  --surface-3: #12342b;
+  /* Superficies claras — eliminan el cast verde oscuro en cards y secciones
+     que usan estos tokens semánticos vía reglas globales con !important.
+     Los tokens de acento (--primary, --accent etc.) se mantienen teal/orange. */
+  --background:          #FAF9F6;   /* ds-papel */
+  --background-elevated: #FFFFFF;
+  --surface:             #FFFFFF;
+  --surface-2:           #F1F0EA;   /* ds-papel-hueso */
+  --surface-3:           #E3E5DF;   /* ds-linea */
 
-  --foreground: #f4f1ec;
-  --text-primary: #f4f1ec;
-  --text-secondary: rgba(244, 241, 236, 0.78);
-  --text-tertiary: rgba(244, 241, 236, 0.58);
+  --foreground:      #14211C;   /* ds-tinta */
+  --text-primary:    #14211C;
+  --text-secondary:  #5B6660;   /* ds-pizarra */
+  --text-tertiary:   #9FB0A8;   /* ds-niebla */
 
-  --border: color-mix(in srgb, var(--nx-teal) 26%, rgba(255, 255, 255, 0.08));
-  --border-strong: color-mix(in srgb, var(--nx-teal) 42%, rgba(255, 255, 255, 0.12));
-  --shadow: 0 18px 42px rgba(0, 0, 0, 0.56);
-  --focus: color-mix(in srgb, var(--nx-teal-soft) 56%, transparent);
-  --surface-clean: color-mix(in srgb, var(--surface) 94%, var(--background));
-  --surface-clean-soft: color-mix(in srgb, var(--surface-2) 90%, var(--background));
-  --stroke-clean: color-mix(in srgb, var(--nx-teal) 24%, transparent);
+  --border:        rgba(20, 33, 28, 0.10);
+  --border-strong: rgba(20, 33, 28, 0.18);
+  --shadow:        0 4px 16px rgba(20, 33, 28, 0.08);
+  --focus:         color-mix(in srgb, var(--nx-teal) 40%, transparent);
+  --surface-clean:      #FFFFFF;
+  --surface-clean-soft: #F1F0EA;
+  --stroke-clean:       rgba(31, 95, 78, 0.15);
+  --surface-light:      #F1F0EA;
+  --bg-secondary:       #FAF9F6;
 
   --header-bg: linear-gradient(142deg, #041813 0%, #0a2a22 54%, #0f3a31 100%);
   --header-border: color-mix(in srgb, var(--nx-teal) 32%, transparent);
