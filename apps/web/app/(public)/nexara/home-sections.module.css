@@ -317,4 +317,245 @@
   margin: 0;
 }
 
-/* ═════════════════════════
+/* ════════════════════════════════════════════════════════════
+   INDUSTRIAS — chips, sección más compacta
+   ════════════════════════════════════════════════════════════ */
+
+.industriasSection {
+  border-top: 1px solid #E3E5DF;
+  padding-bottom: clamp(56px, 7vw, 88px);
+}
+
+/* Cabecera más compacta para la sección de industrias */
+.industriasSection .sectionHead {
+  padding-top: clamp(36px, 4.5vw, 56px);
+  padding-bottom: clamp(20px, 2.5vw, 32px);
+  max-width: 480px;
+}
+
+.industriasFlow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+/* Chips de industria: sin píldora, estilo inline limpio */
+.industriaChip {
+  font-family: 'Manrope', var(--nx-font-body, system-ui), sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  color: #14211C;
+  border: 1px solid #E3E5DF;
+  padding: 8px 18px;
+  border-radius: 6px;
+  letter-spacing: 0.01em;
+  background: transparent;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+  cursor: default;
+  user-select: none;
+}
+
+.industriaChip:hover {
+  background: #F1F0EA;
+  border-color: #9FB0A8;
+  color: #14211C;
+}
+
+/* ════════════════════════════════════════════════════════════
+   BANDA CTA — fondo Tinta, cierre de página
+   ════════════════════════════════════════════════════════════ */
+
+/* !important: anula :where(section){max-width} de globals.scss */
+.ctaBand {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  background: #14211C;
+  padding: clamp(64px, 8vw, 104px) clamp(20px, 4vw, 56px);
+  text-align: center;
+}
+
+.ctaInner {
+  max-width: 600px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ctaEyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.45);
+  margin-bottom: 20px;
+}
+
+/* Título grande — Fraunces 300, el mayor de la página */
+.ctaTitle {
+  font-family: 'Space Grotesk', var(--nx-font-display, sans-serif);
+  font-size: clamp(30px, 4.8vw, 54px);
+  font-weight: 300;
+  line-height: 1.12;
+  color: #ffffff;
+  letter-spacing: -0.025em;
+  margin: 0 0 18px;
+  text-wrap: balance;
+}
+
+/* Acento en Musgo — en paleta, legible sobre Tinta */
+.ctaAccent {
+  font-style: italic;
+  color: #DCE6DD;
+}
+
+.ctaText {
+  font-family: 'Manrope', var(--nx-font-body, system-ui), sans-serif;
+  font-size: 15px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.58);
+  margin: 0 0 40px;
+  max-width: 50ch;
+}
+
+.ctaActions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ════════════════════════════════════════════════════════════
+   BOTONES
+   ════════════════════════════════════════════════════════════ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-family: 'Manrope', var(--nx-font-body, system-ui), sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+  letter-spacing: 0.005em;
+  cursor: pointer;
+}
+
+.btn:focus-visible {
+  outline: 2px solid #1F5F4E;
+  outline-offset: 2px;
+}
+
+/* Primario: Pino sólido */
+.btnPrimary {
+  background: #1F5F4E;
+  color: #FAF9F6;
+  border: 1px solid #1F5F4E;
+}
+
+.btnPrimary:hover {
+  background: #2F7A65;
+  border-color: #2F7A65;
+  transform: translateY(-1px);
+}
+
+/* Ghost: sobre fondo oscuro */
+.btnGhost {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.btnGhost:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
+}
+
+.btnArrow {
+  transition: transform 140ms ease;
+  line-height: 1;
+  font-size: 15px;
+}
+
+.btn:hover .btnArrow {
+  transform: translateX(4px);
+}
+
+/* ════════════════════════════════════════════════════════════
+   RESPONSIVO
+   ════════════════════════════════════════════════════════════ */
+
+@media (max-width: 900px) {
+  .metricsInner {
+    grid-template-columns: repeat(2, 1fr);
+    row-gap: clamp(28px, 4vw, 40px);
+  }
+
+  .metricItem + .metricItem::before { display: none; }
+  .metricItem:nth-child(2)::before  { display: block; }
+
+  .servicioRow {
+    grid-template-columns: 90px 1fr 24px;
+    gap: 0 16px;
+  }
+
+  .procesoGrid {
+    grid-template-columns: repeat(2, 1fr);
+    row-gap: 0;
+    column-gap: clamp(20px, 3vw, 36px);
+  }
+
+  .procesoStep {
+    padding-bottom: clamp(16px, 2.5vw, 24px);
+  }
+}
+
+@media (max-width: 600px) {
+  .homeBody { padding: 0 20px; }
+
+  .sectionHead { padding-top: 48px; padding-bottom: 28px; }
+  .procesoSection .sectionHead { padding-top: 36px; }
+  .industriasSection .sectionHead { padding-top: 32px; padding-bottom: 20px; }
+
+  .servicioRow {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding: 20px 0;
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .servicioRow:hover { background: transparent; }
+  .servicioArrow { display: none; }
+
+  .procesoGrid { grid-template-columns: 1fr; }
+
+  .ctaActions {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .btn {
+    justify-content: center;
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .servicioRow,
+  .servicioArrow,
+  .btn,
+  .industriaChip {
+    transition: none;
+  }
+}
