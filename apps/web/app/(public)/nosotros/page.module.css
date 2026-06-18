@@ -1,25 +1,18 @@
 /* ============================================================
-   NEXARA · Nosotros (/nosotros)
-   Sistema de diseño: Tinta hero card + Papel body
+   NEXARA · Nosotros — usa variables del sistema Tinta/Pino/Papel
    ============================================================ */
 
-/* Hero card oscuro — contraste inicial antes del contenido claro */
 .friendlyHero {
   position: relative;
   padding: clamp(48px, 6vw, 72px) clamp(32px, 5vw, 60px);
   border-radius: 16px;
-  background: #14211C;
-  color: #FAF9F6;
+  background: var(--ds-tinta);
+  color: var(--ds-papel);
   text-align: center;
   overflow: hidden;
   margin-bottom: clamp(32px, 5vw, 56px);
 }
 
-.friendlyHero::before {
-  display: none;
-}
-
-/* Eyebrow: texto mono con puntos a ambos lados */
 .friendlyBadge {
   display: inline-flex;
   align-items: center;
@@ -29,26 +22,17 @@
   font-weight: 500;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #9FB0A8;
+  color: var(--ds-niebla);
   margin-bottom: 18px;
 }
 
+/* Dot estático — sin animación */
 .friendlyBadgeDot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
-  background: #2F7A65;
+  background: var(--ds-pino-claro);
   flex-shrink: 0;
-}
-
-@keyframes friendlyPulse {
-  0%, 100% { opacity: 0.6; transform: scale(0.9); }
-  50%       { opacity: 1;   transform: scale(1.1); }
-}
-
-/* Aplicar animación solo al dot del badge */
-.friendlyBadgeDot {
-  animation: friendlyPulse 2.4s ease-in-out infinite;
 }
 
 .friendlyTitle {
@@ -58,25 +42,21 @@
   font-weight: 500;
   line-height: 1.08;
   letter-spacing: -0.022em;
-  color: #FAF9F6;
+  color: var(--ds-papel);
   max-width: 22ch;
   text-wrap: balance;
 }
 
-/* Acento en Musgo sobre fondo oscuro — legible, no saturado */
 .friendlyTitleAccent {
   font-style: normal;
-  color: #DCE6DD;
-  background: none;
-  -webkit-text-fill-color: currentColor;
-  filter: none;
+  color: var(--ds-musgo);
 }
 
 .friendlyLead {
   margin: 0 auto 28px;
   font-size: clamp(0.98rem, 1.2vw, 1.08rem);
   line-height: 1.65;
-  color: #9FB0A8;
+  color: var(--ds-niebla);
   max-width: 56ch;
   text-wrap: pretty;
 }
@@ -89,14 +69,14 @@
   margin-bottom: 32px;
 }
 
-/* Stats en fila horizontal sobre el fondo Tinta */
+/* Stats en fila */
 .friendlyStats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1px;
-  max-width: 620px;
+  max-width: 600px;
   margin: 32px auto 0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--ds-linea-osc);
   border-radius: 10px;
   overflow: hidden;
 }
@@ -108,7 +88,7 @@
 }
 
 .friendlyStat + .friendlyStat {
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 1px solid var(--ds-linea-osc);
 }
 
 .friendlyStatValue {
@@ -117,7 +97,7 @@
   font-size: clamp(1.4rem, 2.4vw, 1.8rem);
   font-weight: 500;
   letter-spacing: -0.02em;
-  color: #FAF9F6;
+  color: var(--ds-papel);
   line-height: 1;
 }
 
@@ -129,16 +109,16 @@
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #9FB0A8;
+  color: var(--ds-niebla);
 }
 
-/* CTA de cierre — Pino sólido como en el sistema de diseño */
+/* CTA de cierre */
 .warmClose {
   margin-top: clamp(40px, 6vw, 64px);
   padding: clamp(40px, 5vw, 64px) clamp(28px, 5vw, 60px);
   border-radius: 16px;
-  background: #1F5F4E;
-  color: #FAF9F6;
+  background: var(--ds-pino);
+  color: var(--ds-papel);
   text-align: center;
   display: grid;
   gap: 18px;
@@ -152,7 +132,7 @@
   line-height: 1.12;
   letter-spacing: -0.018em;
   font-weight: 500;
-  color: #FAF9F6;
+  color: var(--ds-papel);
   max-width: 24ch;
   text-wrap: balance;
 }
@@ -161,7 +141,7 @@
   margin: 0;
   font-size: 1rem;
   line-height: 1.65;
-  color: rgba(250, 249, 246, 0.76);
+  color: rgba(250, 249, 246, 0.75);
   max-width: 54ch;
 }
 
@@ -178,12 +158,10 @@
     grid-template-columns: 1fr;
     gap: 0;
   }
-
   .friendlyStat + .friendlyStat {
     border-left: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid var(--ds-linea-osc);
   }
-
   .friendlyActions,
   .warmCloseActions {
     width: 100%;

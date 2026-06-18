@@ -64,7 +64,9 @@
 }
 
 .headerPublic .logo {
-	filter: none;
+	/* Sobre fondo blanco: sombra oscura discreta para
+	   que el texto/icono claro del logo sea legible */
+	filter: drop-shadow(0 0 3px rgba(20, 33, 28, 0.45)) drop-shadow(0 1px 6px rgba(20, 33, 28, 0.25));
 }
 
 /* Nav plano — sin contenedor pill */
