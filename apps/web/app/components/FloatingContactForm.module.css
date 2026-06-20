@@ -4,43 +4,36 @@
   bottom: max(14px, calc(env(safe-area-inset-bottom, 0px) + 10px));
   width: 52px;
   height: 52px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--surface));
-  background: linear-gradient(
-    145deg,
-    color-mix(in srgb, var(--primary) 88%, var(--surface) 12%) 0%,
-    color-mix(in srgb, var(--secondary) 68%, var(--primary) 32%) 100%
-  );
-  color: #ffffff;
+  border-radius: 50%;
+  border: 1px solid rgba(31, 95, 78, 0.4);
+  background: #1F5F4E;
+  color: #FAF9F6;
   box-shadow:
-    0 10px 22px color-mix(in srgb, var(--shadow) 78%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #ffffff 24%, transparent);
+    0 10px 22px rgba(31, 95, 78, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   z-index: 960;
-  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+  transition: transform 180ms ease, background 180ms ease, box-shadow 180ms ease;
 }
 
 .fab:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  background: #2F7A65;
   box-shadow:
-    0 16px 34px color-mix(in srgb, var(--shadow) 92%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #ffffff 34%, transparent);
+    0 14px 28px rgba(31, 95, 78, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
 .fab:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--secondary) 60%, #ffffff 40%);
+  outline: 3px solid #1F5F4E;
   outline-offset: 3px;
 }
 
 .fabOpen {
-  background: linear-gradient(
-    145deg,
-    color-mix(in srgb, var(--primary-strong) 78%, var(--foreground) 22%) 0%,
-    color-mix(in srgb, var(--primary) 64%, var(--foreground) 36%) 100%
-  );
+  background: #14211C;
 }
 
 .fabIconWrap {
@@ -78,10 +71,10 @@
   width: 408px;
   max-width: calc(100vw - 32px);
   max-height: min(620px, calc(100dvh - var(--header-offset, 72px) - 128px));
-  border-radius: 18px;
-  border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
-  background: linear-gradient(165deg, color-mix(in srgb, var(--surface) 94%, #ffffff) 0%, color-mix(in srgb, var(--surface) 88%, var(--primary) 12%) 100%);
-  box-shadow: 0 24px 58px color-mix(in srgb, var(--shadow) 92%, transparent);
+  border-radius: 14px;
+  border: 1px solid #E3E5DF;
+  background: #FAF9F6;
+  box-shadow: 0 24px 58px rgba(20, 33, 28, 0.18);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -106,12 +99,9 @@
   justify-content: space-between;
   gap: 10px;
   padding: 12px 16px 9px;
-  border-bottom: 1px solid color-mix(in srgb, var(--primary) 24%, transparent);
-  background: linear-gradient(
-    145deg,
-    color-mix(in srgb, var(--primary-strong) 86%, var(--primary) 14%) 0%,
-    color-mix(in srgb, var(--primary) 60%, var(--secondary) 40%) 100%
-  );
+  border-bottom: 1px solid rgba(31, 95, 78, 0.15);
+  background: #1F5F4E;
+  border-radius: 14px 14px 0 0;
 }
 
 .panelEyebrow {
@@ -155,13 +145,13 @@
 }
 
 .panelMeta span {
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
-  background: color-mix(in srgb, var(--surface) 90%, transparent);
-  color: color-mix(in srgb, var(--foreground) 84%, var(--primary));
+  border-radius: 6px;
+  border: 1px solid #E3E5DF;
+  background: #F1F0EA;
+  color: #5B6660;
   font-size: 0.71rem;
-  font-weight: 700;
-  padding: 5px 10px;
+  font-weight: 500;
+  padding: 4px 10px;
 }
 
 .form {
@@ -176,9 +166,9 @@
 .formField label {
   display: block;
   margin-bottom: 6px;
-  font-size: 0.89rem;
-  font-weight: 620;
-  color: var(--foreground);
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #14211C;
 }
 
 .formField input,
@@ -186,19 +176,25 @@
 .formField select {
   width: 100%;
   padding: 9px 11px;
-  border-radius: 11px;
-  border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--gray-alpha-200));
-  background: color-mix(in srgb, var(--background) 97%, #ffffff);
-  color: var(--foreground);
-  font-size: 0.94rem;
+  border-radius: 8px;
+  border: 1px solid #E3E5DF;
+  background: #ffffff;
+  color: #14211C;
+  font-size: 0.93rem;
+  font-family: inherit;
+}
+
+.formField input::placeholder,
+.formField textarea::placeholder {
+  color: #9FB0A8;
 }
 
 .formField input:focus,
 .formField textarea:focus,
 .formField select:focus {
   outline: none;
-  border-color: color-mix(in srgb, var(--primary) 62%, #ffffff 38%);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent);
+  border-color: #1F5F4E;
+  box-shadow: 0 0 0 3px rgba(31, 95, 78, 0.1);
 }
 
 .checkboxLabel {
@@ -211,30 +207,33 @@
 .submitButton {
   width: 100%;
   min-height: 42px;
-  border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--primary) 38%, transparent);
-  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-  color: #ffffff;
-  font-size: 0.97rem;
-  font-weight: 740;
+  border-radius: 8px;
+  border: 1px solid #1F5F4E;
+  background: #1F5F4E;
+  color: #FAF9F6;
+  font-size: 0.93rem;
+  font-weight: 500;
+  font-family: inherit;
   cursor: pointer;
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--shadow) 76%, transparent);
+  transition: background 150ms ease, transform 150ms ease;
 }
 
 .submitButton:hover:not(:disabled) {
+  background: #2F7A65;
+  border-color: #2F7A65;
   transform: translateY(-1px);
 }
 
 .submitButton:disabled {
-  opacity: 0.7;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
 .footNote {
   margin-top: 8px;
-  font-size: 0.73rem;
-  line-height: 1.4;
-  color: color-mix(in srgb, var(--foreground) 76%, transparent);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: #9FB0A8;
 }
 
 .success {
@@ -248,12 +247,13 @@
 .success h4 {
   margin: 0;
   font-size: 1.05rem;
+  color: #14211C;
 }
 
 .success p {
   margin: 0;
   font-size: 0.92rem;
-  opacity: 0.82;
+  color: #5B6660;
 }
 
 :global(body.dark) .fab {
