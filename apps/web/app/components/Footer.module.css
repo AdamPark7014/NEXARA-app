@@ -4,15 +4,15 @@
    ============================================================ */
 
 .footer {
-  /* Maroon corporativo del brand guide — diferencia limpiamente
-     del body claro y marca territorio de cierre */
+  /* Maroon corporativo del brand guide */
   --f-bg:     #531318;
-  --f-acento: #F08A1E;   /* orange del brand guide */
-  --f-teal:   #10A183;
+  --f-acento: #F08A1E;
   --f-papel:  #FAF9F6;
   --f-linea:  rgba(255, 255, 255, 0.09);
   --f-text:   rgba(250, 249, 246, 0.90);
   --f-dim:    rgba(250, 249, 246, 0.52);
+  /* niebla: subtono apagado sobre fondo maroon */
+  --f-niebla: rgba(250, 249, 246, 0.48);
 
   position: relative;
   width: 100%;
@@ -299,20 +299,20 @@
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  border: 1px solid rgba(240, 138, 30, 0.3);
-  background: #10A183;
+  border: 1px solid rgba(240, 138, 30, 0.35);
+  background: #F08A1E;
   color: #FAF9F6;
   display: grid;
   place-items: center;
   cursor: pointer;
   z-index: 50;
-  box-shadow: 0 8px 20px rgba(16, 161, 131, 0.3);
+  box-shadow: 0 8px 20px rgba(240, 138, 30, 0.28);
   transition: transform 150ms ease, background 150ms ease;
 }
 
 .backTop:hover {
   transform: translateY(-2px);
-  background: #0b7d65;
+  background: #d77713;
 }
 
 .backTop svg {

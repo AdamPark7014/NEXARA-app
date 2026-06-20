@@ -62,9 +62,9 @@
 }
 
 .studioCaseBody {
-  padding: clamp(20px, 2.8vw, 30px);
+  padding: clamp(18px, 2.4vw, 26px);
   display: grid;
-  gap: 12px;
+  gap: 10px;
   align-content: start;
   background: #F1F0EA;
 }

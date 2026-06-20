@@ -5,14 +5,27 @@
    ============================================================ */
 
 .brochurePage {
-  /* Tokens del sistema de diseño — remapea las variables nb-* heredadas */
-  --nb-teal:    #1F5F4E;   /* Pino */
-  --nb-teal-dim:#2F7A65;   /* Pino claro */
-  --nb-bg0:     #FAF9F6;   /* Papel */
-  --nb-bg1:     #F1F0EA;   /* Papel hueso */
-  --nb-text:    #14211C;   /* Tinta */
-  --nb-muted:   #5B6660;   /* Pizarra */
-  --nb-line:    #E3E5DF;   /* Línea */
+  /* ── Sistema de diseño Tinta/Pino/Papel ── */
+  /* Variables nb-* (compatibilidad legacy) */
+  --nb-teal:    #1F5F4E;
+  --nb-teal-dim:#2F7A65;
+  --nb-bg0:     #FAF9F6;
+  --nb-bg1:     #F1F0EA;
+  --nb-text:    #14211C;
+  --nb-muted:   #5B6660;
+  --nb-line:    #E3E5DF;
+
+  /* Variables ds-* (usadas por nosotros/page.module.css y otros) */
+  --ds-tinta:       #14211C;
+  --ds-pino:        #1F5F4E;
+  --ds-pino-claro:  #2F7A65;
+  --ds-papel:       #FAF9F6;
+  --ds-papel-hueso: #F1F0EA;
+  --ds-musgo:       #DCE6DD;
+  --ds-pizarra:     #5B6660;
+  --ds-niebla:      #9FB0A8;
+  --ds-linea:       #E3E5DF;
+  --ds-linea-osc:   rgba(255, 255, 255, 0.08);
 
   position: relative;
   width: 100%;

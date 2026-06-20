@@ -22,8 +22,9 @@
   right: 20px;
   font-family: "JetBrains Mono", var(--ds-font-mono, monospace);
   font-size: 1.8rem;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1;
-  color: var(--ds-linea);
+  color: #B0C4B8;
   user-select: none;
+  letter-spacing: -0.02em;
 }
