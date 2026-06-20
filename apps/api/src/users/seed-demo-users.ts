@@ -244,25 +244,30 @@ async function main() {
     }
     console.log(`[SEED] ✓ ${departmentDefs.length} departamentos corporativos`);
 
-    // ── Passwords memorizables por jerarquía ─────────────────────────────
-    const passCEO = 'NexaraCeo2026@12888';
-    const passDeveloper = 'Developer2026@Nexara';
-    const passCOO = 'NexaraCoo2026!@';
-    const passSoporte = 'NexaraSoporte2026!';
-    const passOperaciones = 'NexaraSistemas2026!';
-    const passVendedor = 'vendedor2026@!';
-    const passJulio = 'Julio@006Pr7NHv';
-    const passDavid = 'David@005Q6txCt';
-    const passIsrael = 'Israel@0269$74uB';
-    const passLuis = 'NexaraLui2026!@';
-    // Demos por panel consolidado (cobertura para QA visual de los 5 paneles)
-    const passDesigner = 'NexaraDesigner2026!';
-    const passAccountant = 'NexaraContador2026!';
-    const passHr = 'NexaraRRHH2026!';
-    const passWarehouse = 'NexaraAlmacen2026!';
-    const passMaintenance = 'NexaraMant2026!';
-    const passSupport = 'NexaraSupport2026!';
-    const passNoc = 'NexaraNoc2026!';
+    // ── Password uniforme para todos los usuarios demo ───────────────────
+    // NOTA: El archivo .js compilado usa 'Nexara2026!' para todos los usuarios.
+    // Mantener SINCRONIZADO: cambiar aquí = cambiar en el .js también.
+    const DEMO_PASSWORD = process.env.SEED_DEMO_PASSWORD || 'Nexara2026!';
+    const demoPasswordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
+
+    // Variables locales por compatibilidad (todas usan el mismo hash)
+    const passCEO = demoPasswordHash;
+    const passDeveloper = demoPasswordHash;
+    const passCOO = demoPasswordHash;
+    const passSoporte = demoPasswordHash;
+    const passOperaciones = demoPasswordHash;
+    const passVendedor = demoPasswordHash;
+    const passJulio = demoPasswordHash;
+    const passDavid = demoPasswordHash;
+    const passIsrael = demoPasswordHash;
+    const passLuis = demoPasswordHash;
+    const passDesigner = demoPasswordHash;
+    const passAccountant = demoPasswordHash;
+    const passHr = demoPasswordHash;
+    const passWarehouse = demoPasswordHash;
+    const passMaintenance = demoPasswordHash;
+    const passSupport = demoPasswordHash;
+    const passNoc = demoPasswordHash;
     const passAdminStaff = 'NexaraAdmin2026!';
 
     console.log('[SEED] Creando/sincronizando usuarios con jerarquía ERP...');
