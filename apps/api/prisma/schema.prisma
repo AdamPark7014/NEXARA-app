@@ -426,6 +426,12 @@ model User {
   fechaCreacion             DateTime                   @default(now())
   avatarUrl                 String?                    @db.VarChar(500)
   locationConsent           Boolean                    @default(false)
+  // ── Campos RRHH ─────────────────────────────────────────
+  puesto                    String?                    @db.VarChar(120)
+  tipoContrato              String?                    @db.VarChar(30)
+  estadoRRHH                String?                    @db.VarChar(30)  @default("Activo")
+  isActive                  Boolean                    @default(true)
+  fechaIngreso              DateTime?
   perfil                    UserProfile?
   documentos                UserDocument[]
   documentosRevisados       UserDocument[]             @relation("UserDocumentReviewer")
@@ -527,6 +533,16 @@ model User {
   leaveApprovals          LeaveRequest[]      @relation("LeaveApprover")
   performanceReviews      PerformanceReview[] @relation("ReviewedUser")
   performanceReviewsGiven PerformanceReview[] @relation("Reviewer")
+
+  // === Jerarquía (organigrama) ===
+  managerId        Int?
+  manager          User?   @relation("UserReportsTo", fields: [managerId], references: [id])
+  reportees        User[]  @relation("UserReportsTo")
+
+  // === Contenido autoreado ===
+  caseStudiesAuthored       CaseStudy[]           @relation("CaseStudyAuthor")
+  socialPostsAuthored       SocialPost[]          @relation("SocialPostAuthor")
+  internalComunicadosSent   InternalComunicado[]  @relation("ComunicadoAuthor")
 
   // === Operational Project Relations ===
   projectsAsVendor OperationalProject[] @relation("ProjectVendor")
@@ -1230,6 +1246,31 @@ model HeroSlide {
   @@index([position])
   @@index([isActive])
   @@map("hero_slides")
+}
+
+model PageContent {
+  id        Int      @id @default(autoincrement())
+  section   String   @unique @db.VarChar(80)
+  content   Json
+  updatedBy String?  @db.VarChar(255)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@map("page_content")
+}
+
+model FeatureFlag {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique @db.VarChar(120)
+  scope       String   @db.VarChar(60)
+  description String?  @db.VarChar(500)
+  enabled     Boolean  @default(false)
+  metadata    Json?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@index([scope])
+  @@map("feature_flags")
 }
 
 enum CotizacionStatus {
@@ -3863,37 +3904,67 @@ model CompanyProfile {
   @@map("company_profile")
 }
 
-// ============================================================================
-// FASE 34 — FEATURE FLAGS (toggle de features por scope, persistido en DB)
-// ============================================================================
 
-model FeatureFlag {
+// ============================================================================
+// CASOS DE ÉXITO (studio/cases → sitio público /casos)
+// ============================================================================
+model CaseStudy {
   id          Int      @id @default(autoincrement())
-  key         String   @unique @db.VarChar(120)
-  scope       String   @db.VarChar(60)
-  description String?  @db.VarChar(500)
-  enabled     Boolean  @default(false)
-  metadata    Json?
+  titulo      String   @db.VarChar(200)
+  slug        String   @unique @db.VarChar(220)
+  cliente     String   @db.VarChar(200)
+  vertical    String   @db.VarChar(80)
+  impacto     String   @db.VarChar(500)
+  descripcion String?  @db.Text
+  cover       String?  @db.VarChar(10)
+  imageUrl    String?  @db.VarChar(500)
+  publicado   Boolean  @default(false)
+  autorId     Int
+  autor       User     @relation("CaseStudyAuthor", fields: [autorId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  @@index([scope])
-  @@map("feature_flags")
+  @@index([publicado])
+  @@index([slug])
 }
 
 // ============================================================================
-// FASE 35 — PAGE CONTENT (contenido editable del sitio público desde Studio)
+// POSTS DE REDES SOCIALES (studio/social — calendario editorial)
 // ============================================================================
-
-model PageContent {
+model SocialPost {
   id        Int      @id @default(autoincrement())
-  /// Identificador de sección: "home_metricas" | "home_servicios" | etc.
-  section   String   @unique @db.VarChar(120)
-  /// Contenido serializado como JSON. Estructura libre por sección.
-  content   Json
-  updatedBy String?  @db.VarChar(180)
-  updatedAt DateTime @updatedAt
+  red       String   @db.VarChar(40)
+  titulo    String   @db.VarChar(300)
+  contenido String?  @db.Text
+  mediaUrl  String?  @db.VarChar(500)
+  cuando    DateTime
+  estado    String   @default("Borrador") @db.VarChar(30)
+  autorId   Int
+  autor     User     @relation("SocialPostAuthor", fields: [autorId], references: [id])
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@map("page_content")
+  @@index([estado, cuando])
+}
+
+// ============================================================================
+// COMUNICADOS INTERNOS (erp/news — mensajes al equipo)
+// ============================================================================
+model InternalComunicado {
+  id                 Int       @id @default(autoincrement())
+  titulo             String    @db.VarChar(300)
+  cuerpo             String    @db.Text
+  audiencia          String    @db.VarChar(200)
+  prioridad          String    @default("Normal") @db.VarChar(20)
+  estado             String    @default("Borrador") @db.VarChar(20)
+  scheduledAt        DateTime?
+  sentAt             DateTime?
+  lecturas           Int       @default(0)
+  totalDestinatarios Int       @default(0)
+  autorId            Int
+  autor              User      @relation("ComunicadoAuthor", fields: [autorId], references: [id])
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([estado, createdAt])
 }

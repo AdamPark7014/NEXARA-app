@@ -52,18 +52,47 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // CEO — ve TODO (lectura) + aprobaciones de tope
   // ─────────────────────────────────────────────────────────────────
   [ROLES.CEO]: [
+    // Rutas específicas primero (first-match-wins)
+    { path: '/erp/approvals/**', scope: 'approve' },
+    { path: '/api/workflow/**', methods: ['POST'], scope: 'approve' },
+    { path: '/api/executive/**', scope: 'read' },
+    // Wildcards amplios al final
     { path: '/erp/**', scope: 'read' },
     { path: '/crm/**', scope: 'read' },
     { path: '/ops/**', scope: 'read' },
     { path: '/studio/**', scope: 'read' },
     { path: '/api/**', methods: ['GET'], scope: 'read' },
-    // Aprobaciones tope
-    { path: '/erp/approvals/**', scope: 'approve' },
-    { path: '/api/workflow/**', methods: ['POST'], scope: 'approve' },
-    // Ejecutivo
-    { path: '/erp/dashboard', scope: 'read' },
-    { path: '/erp/executive/**', scope: 'read' },
-    { path: '/api/executive/**', scope: 'read' },
+  ],
+
+  // ─────────────────────────────────────────────────────────────────
+  // ARQUITECTO / DIRECTOR TÉCNICO — Josué
+  // Supervisa OPS, valida trabajos antes de reportar a Admin + Dirección
+  // ─────────────────────────────────────────────────────────────────
+  [ROLES.ARQUITECTO]: [
+    // OPS — lectura total + aprobación de actividades y evidencias
+    { path: '/ops/**',                      scope: 'approve' },
+    { path: '/api/activities/**',           scope: 'approve' },
+    { path: '/api/activity-evidence/**',    scope: 'approve' },
+    { path: '/api/projects/**',             scope: 'write'   },
+    { path: '/api/service-sheets/**',       scope: 'write'   },
+    { path: '/api/maintenance/**',          scope: 'write'   },
+    { path: '/api/gps/**',    methods: ['GET'], scope: 'read' },
+    { path: '/api/vehicles/**', methods: ['GET'], scope: 'read' },
+    // ERP parcial — ve lo operacional, no finanzas ni usuarios
+    { path: '/erp',                         scope: 'read' },
+    { path: '/erp/dashboard',               scope: 'read' },
+    { path: '/erp/architecture',            scope: 'write' },
+    { path: '/erp/calendar',                scope: 'read'  },
+    { path: '/erp/documents/**',            scope: 'read'  },
+    { path: '/erp/notifications-center',    scope: 'read'  },
+    { path: '/erp/my-profile',              scope: 'write' },
+    { path: '/erp/kb/**',                   scope: 'read'  },
+    // CRM parcial — ve proyectos y cotizaciones (aprueba técnicamente)
+    { path: '/crm/projects/**',             scope: 'write' },
+    { path: '/crm/quotes',  methods: ['GET'], scope: 'read' },
+    // API lectura general para reportes
+    { path: '/api/users',   methods: ['GET'], scope: 'read' },
+    { path: '/api/clients', methods: ['GET'], scope: 'read' },
   ],
 
   // ─────────────────────────────────────────────────────────────────
@@ -207,19 +236,21 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
   // INGENIERO DE CAMPO — solo lo suyo
   // ─────────────────────────────────────────────────────────────────
   [ROLES.ING_CAMPO]: [
+    // Páginas frontend
     { path: '/ops', scope: 'read' },
     { path: '/ops/dashboard', scope: 'read' },
-    { path: '/ops/my-activities/**', scope: 'write' },
-    { path: '/ops/my-evidences/**', scope: 'write' },
-    { path: '/ops/my-viatics/**', scope: 'write' },
-    { path: '/ops/my-vehicles', scope: 'read' },
+    { path: '/ops/activities/**', scope: 'read' },
+    { path: '/ops/evidences/**', scope: 'write' },
+    { path: '/ops/viatics/**', scope: 'write' },
+    { path: '/ops/vehicles', scope: 'read' },
     { path: '/ops/tools', scope: 'read' },
     { path: '/erp/notifications-center', scope: 'read' },
     { path: '/erp/my-profile', scope: 'write' },
-    { path: '/api/activities/mias/**', scope: 'write' },
-    { path: '/api/activity-evidence/**', methods: ['POST', 'PATCH', 'GET'], scope: 'write' },
-    { path: '/api/viaticos/mios/**', scope: 'write' },
-    { path: '/api/viatics/mios/**', scope: 'write' },
+    // Endpoints API — usar prefijo /api/ (no /ops/)
+    { path: '/api/activities/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+    { path: '/api/activity-evidence/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+    { path: '/api/viaticos/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+    { path: '/api/viatics/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     { path: '/api/attendance/checkin', methods: ['POST'], scope: 'write' },
     { path: '/api/gps/heartbeat', methods: ['POST'], scope: 'write' },
   ],

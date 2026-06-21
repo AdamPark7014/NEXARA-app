@@ -46,7 +46,7 @@ services:
       - "4000:3001"
     environment:
       NODE_ENV: development
-      DATABASE_URL: postgresql://nexara:Nx@r4_Secure_2024!@db:5432/nexara?schema=public
+      DATABASE_URL: postgresql://nexara:Nx%40r4_Secure_2024!@db:5432/nexara?schema=public
       REDIS_URL: redis://redis:6379
       JWT_SECRET: dev-secret-key-change-in-production
       HIKVISION_URL: http://localhost:54483

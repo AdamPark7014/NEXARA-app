@@ -4,7 +4,16 @@
    Tipografía: Fraunces (display) · Inter (body) · JetBrains Mono (datos)
    ============================================================ */
 
+/* !important: anula :where(main){ max-width: var(--content-max) } de globals.scss
+   para que los heros y CTAs puedan ser full-bleed dentro de la página pública.
+   El padding-top del header viene del padre .public-layout-content, no del main. */
 .page {
+  width: 100% !important;
+  max-width: none !important;
+  margin-inline: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+
   --ds-tinta:       #14211C;
   --ds-pino:        #1F5F4E;
   --ds-pino-claro:  #2F7A65;
@@ -102,10 +111,9 @@
 
 .heroTitle {
   margin: 0 0 18px;
-  /* Space Grotesk Bold — Hero Principal según brand guide */
-  font-family: "Space Grotesk", var(--nx-font-display, "Manrope", sans-serif);
+  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
   font-size: clamp(2.2rem, 4.8vw, 3.6rem);
-  font-weight: 700;
+  font-weight: 400;
   line-height: 1.06;
   letter-spacing: -0.025em;
   color: var(--ds-papel);
@@ -140,7 +148,7 @@
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid var(--ds-linea-osc);
-  background: #0c1a16;
+  background: #14211C;
 }
 
 .heroImage img {
@@ -263,10 +271,9 @@
 
 .sectionTitle {
   margin: 0 0 14px;
-  /* Space Grotesk Medium — Títulos de sección según brand guide */
-  font-family: "Space Grotesk", var(--nx-font-display, "Manrope", sans-serif);
+  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
   font-size: clamp(1.75rem, 3.2vw, 2.6rem);
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.1;
   letter-spacing: -0.022em;
   color: var(--ds-tinta);
@@ -441,9 +448,9 @@
 
 .ctaTitle {
   margin: 0 0 12px;
-  font-family: "Space Grotesk", var(--nx-font-display, "Manrope", sans-serif);
+  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
   font-size: clamp(1.6rem, 3vw, 2.4rem);
-  font-weight: 700;
+  font-weight: 400;
   letter-spacing: -0.02em;
   color: var(--ds-papel);
   text-wrap: balance;
@@ -615,9 +622,9 @@
 
 .splitBody h3 {
   margin: 0 0 14px;
-  font-family: "Space Grotesk", var(--nx-font-display, "Manrope", sans-serif);
+  font-family: "Fraunces", var(--ds-font-serif, Georgia, serif);
   font-size: clamp(1.4rem, 2.4vw, 1.9rem);
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: -0.02em;
   color: var(--ds-tinta);
 }

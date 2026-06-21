@@ -19,6 +19,7 @@
 export const ROLES = {
   SUPER_ADMIN:        'super_admin',        // Desarrollo · bypass total
   CEO:                'ceo',                // Dirección general · lectura total
+  ARQUITECTO:         'arquitecto',         // Arquitecto / Director Técnico · valida trabajos
   DIR_OPERACIONES:    'dir_operaciones',    // Director de Operaciones
   DIR_ADMIN:          'dir_admin',          // Director Administrativo
   COORD_ADMIN:        'coord_admin',        // Coordinador Administrativo (mid-senior)
@@ -43,6 +44,7 @@ export const ALL_ROLES: RoleKey[] = Object.values(ROLES);
 export const ROLE_TIER: Record<RoleKey, number> = {
   super_admin:        999,
   ceo:                100,
+  arquitecto:         85,   // Valida trabajos; entre CEO y coordinadores
   dir_operaciones:    90,
   dir_admin:          90,
   coord_admin:        70,
@@ -65,6 +67,7 @@ export type PanelKey = 'core' | 'sales' | 'ops' | 'studio' | 'portal';
 export const ROLE_HOME_PANEL: Record<RoleKey, PanelKey> = {
   super_admin:        'core',
   ceo:                'core',
+  arquitecto:         'ops',
   dir_operaciones:    'core',
   dir_admin:          'core',
   coord_admin:        'core',
@@ -85,6 +88,7 @@ export const ROLE_HOME_PANEL: Record<RoleKey, PanelKey> = {
 export const ROLE_EXTRA_PANELS: Record<RoleKey, PanelKey[]> = {
   super_admin:        ['core', 'sales', 'ops', 'studio', 'portal'],
   ceo:                ['core', 'sales', 'ops', 'studio'], // ve todo (lectura)
+  arquitecto:         ['ops', 'core'],   // OPS supervisor + ERP parcial
   dir_operaciones:    ['core', 'ops', 'sales'],
   dir_admin:          ['core'],
   coord_admin:        ['core'],
@@ -105,6 +109,7 @@ export const ROLE_EXTRA_PANELS: Record<RoleKey, PanelKey[]> = {
 export const ROLE_LABELS: Record<RoleKey, { es: string; en: string; departamento: string }> = {
   super_admin:       { es: 'Super Administrador',  en: 'Super Admin',           departamento: 'Sistemas' },
   ceo:               { es: 'Director General',     en: 'CEO',                   departamento: 'Dirección' },
+  arquitecto:        { es: 'Arquitecto / Dir. Técnico', en: 'Technical Director', departamento: 'Operaciones' },
   dir_operaciones:   { es: 'Director de Operaciones', en: 'Operations Director', departamento: 'Operaciones' },
   dir_admin:         { es: 'Director Administrativo', en: 'Admin Director',     departamento: 'Administración' },
   coord_admin:       { es: 'Coordinador Administrativo', en: 'Admin Coordinator', departamento: 'Administración' },
@@ -123,6 +128,7 @@ export const ROLE_LABELS: Record<RoleKey, { es: string; en: string; departamento
 
 /** Mapeo legacy → v2 (para migración de usuarios existentes). */
 export const LEGACY_TO_V2: Record<string, RoleKey> = {
+  arquitecto:           'arquitecto',
   // legacy booleans / roles antiguos
   superadmin:           'super_admin',
   admin:                'dir_admin',

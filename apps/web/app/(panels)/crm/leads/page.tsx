@@ -1,96 +1,132 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
+import { useUser } from "@/components/UserContext";
+import { useRbacGuard } from "@/lib/useRbacGuard";
+import { buildApiUrl } from "@/lib/api-base";
 
-type Lead = {
-  id: string;
-  empresa: string;
-  contacto: string;
-  email: string;
-  telefono: string;
-  fuente: "Web" | "Referido" | "LinkedIn" | "Llamada" | "Feria";
-  interes: "CCTV" | "Redes" | "Cómputo" | "Mantenimiento" | "Multiple";
-  potencial: number;
-  estado: "Nuevo" | "Contactado" | "Calificado" | "Descartado";
-  asignado: string;
-  capturado: string;
-};
+interface Lead {
+  id: number;
+  empresa?: string;
+  contacto?: string;
+  email?: string;
+  telefono?: string;
+  fuente?: string;
+  interes?: string;
+  potencial?: number;
+  estado?: string;
+  asignadoA?: string;
+  creadoEn?: string;
+}
 
-const LEADS: Lead[] = [
-  { id: "L-2104", empresa: "Hotel Camino Real", contacto: "Mariana Suárez", email: "msuarez@caminoreal.com", telefono: "222 555 1010", fuente: "Web", interes: "Redes", potencial: 480000, estado: "Calificado", asignado: "Karina M.", capturado: "Hoy 09:14" },
-  { id: "L-2103", empresa: "Familia Garza", contacto: "Roberto Garza", email: "rgarza@gmail.com", telefono: "55 8821 4422", fuente: "Web", interes: "CCTV", potencial: 18500, estado: "Calificado", asignado: "Karina M.", capturado: "Hoy 08:02" },
-  { id: "L-2102", empresa: "Constructora Reyes", contacto: "Ing. Felipe Reyes", email: "freyes@constreyes.mx", telefono: "222 412 8800", fuente: "Referido", interes: "Multiple", potencial: 850000, estado: "Contactado", asignado: "Karina M.", capturado: "Ayer 16:45" },
-  { id: "L-2101", empresa: "Escuela San José", contacto: "Director Académico", email: "direccion@sanjose.edu.mx", telefono: "222 224 7700", fuente: "Llamada", interes: "Cómputo", potencial: 220000, estado: "Nuevo", asignado: "Karina M.", capturado: "Ayer 14:10" },
-  { id: "L-2100", empresa: "Polos del Bienestar (Gob)", contacto: "Lic. Adriana Pérez", email: "aperez@cdmx.gob.mx", telefono: "55 5567 8800", fuente: "LinkedIn", interes: "CCTV", potencial: 3200000, estado: "Calificado", asignado: "Karen E.", capturado: "Ayer 11:22" },
-  { id: "L-2099", empresa: "TechParts SA", contacto: "Gerente IT", email: "it@techparts.com", telefono: "222 880 1100", fuente: "Feria", interes: "Mantenimiento", potencial: 95000, estado: "Descartado", asignado: "Karina M.", capturado: "2 días" },
-  { id: "L-2098", empresa: "UDLA Cholula", contacto: "Coord. Cómputo", email: "computo@udla.mx", telefono: "222 229 2000", fuente: "Web", interes: "Cómputo", potencial: 1850000, estado: "Calificado", asignado: "Karina M.", capturado: "3 días" },
-];
+const ESTADOS = ["Nuevo", "Contactado", "Calificado", "Descartado"];
+const FUENTES = ["Web", "Referido", "LinkedIn", "Llamada", "Feria"];
+const INTERESES = ["CCTV", "Redes", "Cómputo", "Mantenimiento", "Multiple"];
+
+async function apiFetch(path: string, token: string, opts?: RequestInit) {
+  const res = await fetch(buildApiUrl(path), {
+    ...opts,
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(opts?.headers ?? {}) },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+const emptyForm = { empresa: "", contacto: "", email: "", telefono: "", fuente: "Web", interes: "CCTV", potencial: 0, estado: "Nuevo" };
 
 export default function LeadsPage() {
-  const [filter, setFilter] = useState<Lead["estado"] | "all">("all");
+  const { user } = useUser();
+  const { canCreate, canEdit, canDelete } = useRbacGuard();
+  const token = user?.token ?? "";
 
-  const filteredLeads = filter === "all" ? LEADS : LEADS.filter((l) => l.estado === filter);
+  const [items, setItems] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Lead | null>(null);
+  const [form, setForm] = useState({ ...emptyForm });
+
+  const load = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const data = await apiFetch("ventas/leads", token);
+      setItems(Array.isArray(data) ? data : (data.data ?? []));
+    } catch { /* skip */ } finally { setLoading(false); }
+  }, [token]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const openNew = () => { setEditing(null); setForm({ ...emptyForm }); setShowForm(true); };
+  const openEdit = (l: Lead) => {
+    setEditing(l);
+    setForm({ empresa: l.empresa ?? "", contacto: l.contacto ?? "", email: l.email ?? "", telefono: l.telefono ?? "", fuente: l.fuente ?? "Web", interes: l.interes ?? "CCTV", potencial: l.potencial ?? 0, estado: l.estado ?? "Nuevo" });
+    setShowForm(true);
+  };
+
+  const save = async () => {
+    if (!token) return;
+    try {
+      if (editing) {
+        const updated = await apiFetch(`ventas/leads/${editing.id}`, token, { method: "PATCH", body: JSON.stringify(form) });
+        setItems(prev => prev.map(l => l.id === editing.id ? { ...l, ...updated } : l));
+      } else {
+        const created = await apiFetch("ventas/leads", token, { method: "POST", body: JSON.stringify(form) });
+        setItems(prev => [created, ...prev]);
+      }
+      setShowForm(false);
+    } catch { /* skip */ }
+  };
+
+  const remove = async (id: number) => {
+    if (!token || !confirm("¿Eliminar este lead?")) return;
+    try {
+      await apiFetch(`ventas/leads/${id}`, token, { method: "DELETE" });
+      setItems(prev => prev.filter(l => l.id !== id));
+    } catch { /* skip */ }
+  };
+
+  const patchEstado = async (id: number, estado: string) => {
+    if (!token) return;
+    try {
+      await apiFetch(`ventas/leads/${id}`, token, { method: "PATCH", body: JSON.stringify({ estado }) });
+      setItems(prev => prev.map(l => l.id === id ? { ...l, estado } : l));
+    } catch { /* skip */ }
+  };
+
+  const nuevos = items.filter(l => l.estado === "Nuevo").length;
+  const calificados = items.filter(l => l.estado === "Calificado").length;
+  const pipeline = items.filter(l => l.estado !== "Descartado").reduce((s, l) => s + (l.potencial ?? 0), 0);
+
+  const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface)", color: "var(--foreground)", fontSize: 13, boxSizing: "border-box" };
 
   const columns: Column<Lead>[] = [
-    {
-      key: "empresa",
-      label: "Lead",
-      render: (l) => (
-        <div>
-          <div style={{ fontWeight: 700, color: "var(--text-primary)", fontSize: 13 }}>{l.empresa}</div>
-          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-            {l.contacto} · {l.id}
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: "contacto",
-      label: "Contacto",
-      render: (l) => (
-        <div style={{ fontSize: 11.5, lineHeight: 1.5 }}>
-          <div style={{ color: "var(--text-secondary)" }}>📧 {l.email}</div>
-          <div style={{ color: "var(--text-tertiary)" }}>📱 {l.telefono}</div>
-        </div>
-      ),
-    },
-    { key: "fuente", label: "Fuente", render: (l) => <Tag variant="neutral">{l.fuente}</Tag> },
-    { key: "interes", label: "Interés", render: (l) => <Tag variant="accent">{l.interes}</Tag> },
-    {
-      key: "potencial",
-      label: "Potencial",
-      align: "right",
-      render: (l) => <Money value={l.potencial} compact />,
-    },
-    {
-      key: "estado",
-      label: "Estado",
-      render: (l) => (
-        <Tag
-          variant={
-            l.estado === "Calificado"
-              ? "positive"
-              : l.estado === "Nuevo"
-                ? "accent"
-                : l.estado === "Contactado"
-                  ? "warning"
-                  : "neutral"
-          }
-        >
-          {l.estado}
-        </Tag>
-      ),
-    },
-    { key: "asignado", label: "Asignado", accessor: (l) => l.asignado, width: 120 },
-    {
-      key: "capturado",
-      label: "Capturado",
-      render: (l) => <span style={{ color: "var(--text-tertiary)", fontSize: 11.5 }}>{l.capturado}</span>,
-    },
+    { key: "empresa", label: "Empresa / Contacto", render: l => (
+      <div>
+        <div style={{ fontWeight: 700, fontSize: 13 }}>{l.empresa ?? "—"}</div>
+        <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{l.contacto} · {l.telefono}</div>
+      </div>
+    )},
+    { key: "fuente", label: "Fuente", render: l => <Tag variant="neutral">{l.fuente ?? "—"}</Tag>, width: 100 },
+    { key: "interes", label: "Interés", render: l => <Tag variant="accent">{l.interes ?? "—"}</Tag>, width: 120 },
+    { key: "potencial", label: "Potencial", render: l => <Money value={l.potencial ?? 0} />, width: 110 },
+    { key: "estado", label: "Estado", render: l => (
+      <select value={l.estado ?? "Nuevo"} onChange={e => patchEstado(l.id, e.target.value)}
+        style={{ fontSize: 12, border: "1px solid var(--border)", borderRadius: 6, padding: "3px 6px", background: "var(--surface)", color: "var(--foreground)", cursor: "pointer" }}>
+        {ESTADOS.map(s => <option key={s}>{s}</option>)}
+      </select>
+    ), width: 140 },
+    { key: "creadoEn", label: "Capturado", accessor: l => l.creadoEn ? new Date(l.creadoEn).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "—", width: 90 },
+    { key: "id", label: "", render: l => (
+      <div style={{ display: "flex", gap: 4 }}>
+        {canEdit && <button onClick={() => openEdit(l)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>}
+        {canDelete && <button onClick={() => remove(l.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>}
+      </div>
+    ), width: 60 },
   ];
 
   return (
@@ -98,57 +134,64 @@ export default function LeadsPage() {
       <PageHeader
         eyebrow="CRM · Captación"
         title="Leads"
-        subtitle="Prospectos sin calificar. De casa habitación a licitaciones de gobierno — todos entran por aquí."
-        actions={
-          <>
-            <Button variant="secondary" iconLeft="📥">
-              Importar
-            </Button>
-            <Button variant="primary" iconLeft="✨">
-              Nuevo lead
-            </Button>
-          </>
-        }
+        subtitle="Prospectos entrantes por todos los canales. Aquí se califican y convierten en oportunidades."
+        actions={canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo lead</Button> : undefined}
       />
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        {(["all", "Nuevo", "Contactado", "Calificado", "Descartado"] as const).map((p) => (
-          <button
-            key={p}
-            type="button"
-            onClick={() => setFilter(p)}
-            style={{
-              padding: "7px 14px",
-              fontSize: 12.5,
-              fontWeight: 600,
-              borderRadius: 999,
-              border: filter === p ? "1px solid var(--primary)" : "1px solid var(--border)",
-              background: filter === p ? "color-mix(in srgb, var(--primary) 10%, transparent)" : "var(--surface)",
-              color: filter === p ? "var(--primary)" : "var(--text-primary)",
-              cursor: "pointer",
-              fontFamily: "inherit",
-            }}
-          >
-            {p === "all" ? "Todos" : p}
-            <span style={{ marginLeft: 6, opacity: 0.6, fontSize: 11 }}>
-              {p === "all" ? LEADS.length : LEADS.filter((l) => l.estado === p).length}
-            </span>
-          </button>
-        ))}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
+        <KpiCard label="Nuevos" value={nuevos} />
+        <KpiCard label="Calificados" value={calificados} />
+        <KpiCard label="Pipeline total" value={`$${(pipeline / 1000000).toFixed(1)}M`} />
       </div>
 
-      <Section
-        title={`${filteredLeads.length} leads`}
-        subtitle="Clic en cualquier lead para abrir su ficha completa"
-      >
-        <DataTable
-          columns={columns}
-          rows={filteredLeads}
-          rowKey={(l) => l.id}
-          onRowClick={(l) => alert(`Abrir lead ${l.id} (siguiente fase)`)}
-          emptyTitle="Sin leads en este estado"
-          emptyDescription="Cuando llegue un prospecto desde el sitio o redes, aparecerá aquí."
-        />
+      {showForm && (
+        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {[
+            { label: "Empresa", key: "empresa", ph: "Nombre de la empresa" },
+            { label: "Contacto", key: "contacto", ph: "Nombre del contacto" },
+            { label: "Email", key: "email", ph: "correo@empresa.com" },
+            { label: "Teléfono", key: "telefono", ph: "222 555 1234" },
+          ].map(({ label, key, ph }) => (
+            <div key={key}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>{label}</label>
+              <input value={(form as Record<string, string | number>)[key] as string} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} placeholder={ph} style={inp} />
+            </div>
+          ))}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Fuente</label>
+            <select value={form.fuente} onChange={e => setForm(f => ({ ...f, fuente: e.target.value }))} style={inp}>
+              {FUENTES.map(s => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Interés</label>
+            <select value={form.interes} onChange={e => setForm(f => ({ ...f, interes: e.target.value }))} style={inp}>
+              {INTERESES.map(s => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Potencial ($)</label>
+            <input type="number" min={0} value={form.potencial} onChange={e => setForm(f => ({ ...f, potencial: +e.target.value }))} style={inp} />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Estado</label>
+            <select value={form.estado} onChange={e => setForm(f => ({ ...f, estado: e.target.value }))} style={inp}>
+              {ESTADOS.map(s => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+          <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <Button variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={save}>{editing ? "Guardar" : "Crear lead"}</Button>
+          </div>
+        </div>
+      )}
+
+      <Section title={loading ? "Cargando…" : `${items.length} leads`}>
+        {loading ? (
+          <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+        ) : (
+          <DataTable columns={columns} rows={items} rowKey={l => l.id} emptyTitle="Sin leads" emptyDescription="Agrega el primer lead." />
+        )}
       </Section>
     </>
   );

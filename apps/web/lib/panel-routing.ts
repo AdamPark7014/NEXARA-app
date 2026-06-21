@@ -163,7 +163,9 @@ export const getAccessiblePanels = (
       PERMISSIONS.HR_MANAGE,
     ]) || orgKey === ORG_ROLE_KEYS.DIRECTOR_ADMIN || orgKey === ORG_ROLE_KEYS.HR_SPECIALIST
       || orgKey === ORG_ROLE_KEYS.ADMIN_STAFF || orgKey === ORG_ROLE_KEYS.WAREHOUSE_MANAGER
-      || orgKey === ORG_ROLE_KEYS.PROCUREMENT_OFFICER,
+      || orgKey === ORG_ROLE_KEYS.PROCUREMENT_OFFICER
+      // Arquitecto ve plantilla del equipo y actividades en ERP
+      || orgKey === ORG_ROLE_KEYS.ARQUITECTO,
     operacion: hasAnyPermission(user, [
       PERMISSIONS.CONSOLE_ACCESS,
       PERMISSIONS.CONSOLE_ADMIN,
@@ -176,7 +178,9 @@ export const getAccessiblePanels = (
     ]) || orgKey === ORG_ROLE_KEYS.DIRECTOR_OPS || orgKey === ORG_ROLE_KEYS.PROJECT_MANAGER
       || orgKey === ORG_ROLE_KEYS.SENIOR_ENGINEER || orgKey === ORG_ROLE_KEYS.FIELD_ENGINEER
       || orgKey === ORG_ROLE_KEYS.MAINTENANCE_COORDINATOR || orgKey === ORG_ROLE_KEYS.SUPPORT_AGENT
-      || orgKey === ORG_ROLE_KEYS.WAREHOUSE_MANAGER,
+      || orgKey === ORG_ROLE_KEYS.WAREHOUSE_MANAGER
+      // ── Roles NEXARA ──────────────────────────────────────────────
+      || orgKey === ORG_ROLE_KEYS.ARQUITECTO || orgKey === ORG_ROLE_KEYS.COORD_OPERACIONES,
     ventas: hasAnyPermission(user, [
       PERMISSIONS.PANEL_VENTAS,
       PERMISSIONS.SALES_VIEW,

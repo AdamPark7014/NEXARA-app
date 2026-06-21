@@ -74,9 +74,15 @@ export class HeroSlidesService {
   }
 
   async update(id: number, payload: UpdateHeroSlideDto, file?: MulterFile) {
-    await this.findOne(id);
+    const existing = await this.findOne(id);
 
-    const imageUrl = file ? await this.saveImage(file) : payload.imageUrl?.trim();
+    let imageUrl: string | undefined;
+    if (file) {
+      imageUrl = await this.saveImage(file);
+      await this.deleteImageFile(existing.imageUrl);
+    } else {
+      imageUrl = payload.imageUrl?.trim();
+    }
 
     return this.prisma.heroSlide.update({
       where: { id },
@@ -92,8 +98,9 @@ export class HeroSlidesService {
   }
 
   async remove(id: number) {
-    await this.findOne(id);
-    return this.prisma.heroSlide.delete({ where: { id } });
+    const existing = await this.findOne(id);
+    await this.prisma.heroSlide.delete({ where: { id } });
+    await this.deleteImageFile(existing.imageUrl);
   }
 
   /** Reordena en lote: el primer ID queda en posición 1, etc. */
@@ -147,6 +154,20 @@ export class HeroSlidesService {
       return `/hero-slides/image/${filename}`;
     } catch (_error) {
       throw new InternalServerErrorException('Error al guardar la imagen del hero');
+    }
+  }
+
+  private async deleteImageFile(imageUrl: string | null): Promise<void> {
+    if (!imageUrl) return;
+    // Solo borra archivos locales; las URLs externas (https://) se ignoran.
+    const localPrefix = '/hero-slides/image/';
+    if (!imageUrl.startsWith(localPrefix)) return;
+    try {
+      const filename = imageUrl.slice(localPrefix.length);
+      const filepath = path.resolve(process.cwd(), './uploads/hero', filename);
+      await fs.unlink(filepath);
+    } catch {
+      // Si el archivo ya no existe no es un error crítico
     }
   }
 }

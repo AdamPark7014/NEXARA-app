@@ -51,25 +51,26 @@ export class AlertsService {
     return Array.from(new Set(users.map((u) => u.id)));
   }
 
-  private async wasAlertSentRecently(opts: {
-    userId: number;
+  private async getAlreadyAlertedUserIds(opts: {
+    userIds: number[];
     category: string;
     entityType: string;
     entityId: number;
     hoursWindow: number;
-  }): Promise<boolean> {
+  }): Promise<Set<number>> {
+    if (!opts.userIds.length) return new Set();
     const since = new Date(Date.now() - opts.hoursWindow * 3600 * 1000);
-    const existing = await this.prisma.notification.findFirst({
+    const existing = await this.prisma.notification.findMany({
       where: {
-        userId: opts.userId,
+        userId: { in: opts.userIds },
         category: opts.category,
         entityType: opts.entityType,
         relatedEntityId: opts.entityId,
         createdAt: { gte: since },
       },
-      select: { id: true },
+      select: { userId: true },
     });
-    return Boolean(existing);
+    return new Set(existing.map((n) => n.userId));
   }
 
   private async fanout(
@@ -77,22 +78,22 @@ export class AlertsService {
     base: Omit<INotificationPayload, 'userId'>,
     dedupOpts?: { entityType: string; entityId: number; category: string; hoursWindow: number },
   ) {
-    const payloads: INotificationPayload[] = [];
-    for (const userId of userIds) {
-      if (dedupOpts) {
-        const exists = await this.wasAlertSentRecently({
-          userId,
-          category: dedupOpts.category,
-          entityType: dedupOpts.entityType,
-          entityId: dedupOpts.entityId,
-          hoursWindow: dedupOpts.hoursWindow,
-        });
-        if (exists) continue;
-      }
-      payloads.push({ ...base, userId });
+    if (!userIds.length) return [];
+    let eligibleIds = userIds;
+    if (dedupOpts) {
+      const alreadySent = await this.getAlreadyAlertedUserIds({
+        userIds,
+        category: dedupOpts.category,
+        entityType: dedupOpts.entityType,
+        entityId: dedupOpts.entityId,
+        hoursWindow: dedupOpts.hoursWindow,
+      });
+      eligibleIds = userIds.filter((id) => !alreadySent.has(id));
     }
-    if (payloads.length === 0) return [];
-    return this.notifications.createBulkNotifications(payloads);
+    if (!eligibleIds.length) return [];
+    return this.notifications.createBulkNotifications(
+      eligibleIds.map((userId) => ({ ...base, userId })),
+    );
   }
 
   // ─── 1) margen real bajo umbral ────────────────────────────────────────
@@ -252,13 +253,12 @@ export class AlertsService {
   @Cron(CronExpression.EVERY_2_HOURS)
   async checkStockAlerts() {
     try {
-      const levels = await (this.prisma as any).stockLevel.findMany({
-        where: {},
+      const levels = await this.prisma.stockLevel.findMany({
+        where: { minStock: { gt: 0 } },
         include: {
           product: { select: { id: true, sku: true, name: true } },
           warehouse: { select: { id: true, name: true } },
         },
-        take: 5000,
       });
       if (!levels?.length) return;
 

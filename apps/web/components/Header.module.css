@@ -46,11 +46,11 @@
  * `.header` / `.navLinks` / `.link` base sin reescribir todo el archivo.
  */
 .headerPublic {
-	background: rgba(250, 249, 246, 0.95) !important;
+	background: #FAF9F6 !important;
 	border-bottom: 1px solid #E3E5DF !important;
-	backdrop-filter: blur(16px) saturate(120%) !important;
-	-webkit-backdrop-filter: blur(16px) saturate(120%) !important;
-	box-shadow: 0 1px 0 #E3E5DF, 0 4px 16px rgba(20, 33, 28, 0.05) !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+	box-shadow: 0 1px 0 #E3E5DF !important;
 }
 
 .headerPublic::before {
@@ -223,7 +223,7 @@
 	border-radius: 8px;
 	background: #1F5F4E;
 	color: #FAF9F6;
-	font-family: "Inter", var(--nx-font-body, system-ui), sans-serif;
+	font-family: "Inter Tight", var(--nx-font-ui, "Inter", system-ui), sans-serif;
 	font-size: 0.84rem;
 	font-weight: 500;
 	letter-spacing: 0.01em;
