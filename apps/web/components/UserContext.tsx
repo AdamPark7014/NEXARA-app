@@ -1,4 +1,5 @@
 "use client";
+import { consumeHandoffParam } from '@/lib/cross-panel-handoff';
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { clearActivePanel } from '@/lib/panel-routing';
 import { isCapacitorNative } from '@/lib/capacitor-env';
@@ -253,6 +254,22 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 				// Keep local session user if profile sync fails transiently.
 			}
 		};
+
+		// Cross-subdomain SSO: consume ?_nxt= handoff token first
+		const handoffJson = consumeHandoffParam();
+		if (handoffJson) {
+			try {
+				const handoffUser = normalizeUser(JSON.parse(handoffJson));
+				if (handoffUser && !isTokenExpired(handoffUser.token)) {
+					safePersistUser(handoffUser);
+					setUser(handoffUser);
+					setIsContextReady(true);
+					const online = typeof navigator !== "undefined" && navigator.onLine;
+					if (online) void syncProfile(handoffUser);
+					return;
+				}
+			} catch { /* fallthrough to normal flow */ }
+		}
 
 		const storedUser = safeGetStoredUser();
 		const online = typeof navigator !== "undefined" && navigator.onLine;

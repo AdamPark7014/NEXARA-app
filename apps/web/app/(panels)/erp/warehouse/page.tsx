@@ -1,85 +1,182 @@
 "use client";
 
+import { useEffect, useState, useCallback } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
-import KpiCard from "@/components/ui/KpiCard";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
+import { useUser } from "@/components/UserContext";
+import { useRbacGuard } from "@/lib/useRbacGuard";
+import { buildApiUrl } from "@/lib/api-base";
 
-type Stock = {
-  sku: string;
-  nombre: string;
-  categoria: string;
-  ubicacion: string;
-  existencia: number;
-  minimo: number;
-  costo: number;
-  estado: "OK" | "Bajo mínimo" | "Sin stock";
-};
+interface StockItem {
+  id: number;
+  sku?: string;
+  nombre?: string;
+  categoria?: string;
+  ubicacion?: string;
+  existencia?: number;
+  minimo?: number;
+  costo?: number;
+  estado?: string;
+}
 
-const STOCK: Stock[] = [
-  { sku: "HK-2143", nombre: "Cámara Hikvision DS-2CD2143G2-I 4MP", categoria: "Cámaras", ubicacion: "CEDIS Puebla · A1-03", existencia: 84, minimo: 30, costo: 2150, estado: "OK" },
-  { sku: "HK-NVR16", nombre: "NVR Hikvision 16ch", categoria: "DVR/NVR", ubicacion: "CEDIS Puebla · A2-01", existencia: 12, minimo: 8, costo: 5400, estado: "OK" },
-  { sku: "DAH-2230", nombre: "Cámara Dahua IPC-HFW2230S", categoria: "Cámaras", ubicacion: "CEDIS Puebla · A1-04", existencia: 42, minimo: 20, costo: 1380, estado: "OK" },
-  { sku: "UTP-CAT6", nombre: "Bobina UTP Cat6 305m", categoria: "Redes", ubicacion: "CEDIS Puebla · B1-02", existencia: 28, minimo: 15, costo: 2800, estado: "OK" },
-  { sku: "SW-24P", nombre: "Switch 24p PoE+ TP-Link", categoria: "Redes", ubicacion: "CEDIS Puebla · B2-01", existencia: 8, minimo: 10, costo: 4200, estado: "Bajo mínimo" },
-  { sku: "LEN-T14", nombre: "Laptop Lenovo ThinkPad T14", categoria: "Cómputo", ubicacion: "CEDIS Puebla · C1-01", existencia: 15, minimo: 5, costo: 18200, estado: "OK" },
-  { sku: "DLL-OPT", nombre: "Dell OptiPlex 3000 i5", categoria: "Cómputo", ubicacion: "CEDIS Puebla · C1-02", existencia: 22, minimo: 8, costo: 13500, estado: "OK" },
-  { sku: "PAN-55", nombre: "Pantalla LG 55\" 4K Commercial", categoria: "Pantallas", ubicacion: "CEDIS Puebla · D1-01", existencia: 6, minimo: 4, costo: 14500, estado: "OK" },
-  { sku: "CON-RJ45", nombre: "Conectores RJ45 Cat6 (bolsa 100)", categoria: "Consumibles", ubicacion: "CEDIS Puebla · E1-01", existencia: 0, minimo: 5, costo: 280, estado: "Sin stock" },
-];
+const CATEGORIAS = ["Cámaras", "DVR/NVR", "Redes", "Cómputo", "Pantallas", "Consumibles", "Herramientas", "Otro"];
+
+async function apiFetch(path: string, token: string, opts?: RequestInit) {
+  const res = await fetch(buildApiUrl(path), {
+    ...opts,
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(opts?.headers ?? {}) },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+const emptyForm = { sku: "", nombre: "", categoria: "Cámaras", ubicacion: "", existencia: 0, minimo: 5, costo: 0 };
 
 export default function WarehousePage() {
-  const valorInventario = STOCK.reduce((s, p) => s + p.existencia * p.costo, 0);
-  const bajoMinimo = STOCK.filter((p) => p.estado === "Bajo mínimo").length;
-  const sinStock = STOCK.filter((p) => p.estado === "Sin stock").length;
+  const { user } = useUser();
+  const { canCreate, canEdit, canDelete } = useRbacGuard();
+  const token = user?.token ?? "";
 
-  const columns: Column<Stock>[] = [
-    { key: "sku", label: "SKU", render: (s) => <code style={{ fontSize: 11.5 }}>{s.sku}</code>, width: 130 },
-    {
-      key: "nombre", label: "Producto",
-      render: (s) => (
-        <div>
-          <div style={{ fontWeight: 600, fontSize: 13 }}>{s.nombre}</div>
-          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{s.categoria} · {s.ubicacion}</div>
-        </div>
-      ),
-    },
-    {
-      key: "existencia", label: "Existencia", align: "center",
-      render: (s) => (
-        <Tag variant={s.estado === "OK" ? "positive" : s.estado === "Bajo mínimo" ? "warning" : "danger"}>
-          {s.existencia} / min {s.minimo}
-        </Tag>
-      ),
-    },
-    { key: "costo", label: "Costo u.", align: "right", render: (s) => <Money value={s.costo} compact /> },
-    { key: "valor", label: "Valor stock", align: "right", render: (s) => <Money value={s.existencia * s.costo} compact /> },
+  const [items, setItems] = useState<StockItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<StockItem | null>(null);
+  const [form, setForm] = useState({ ...emptyForm });
+
+  const load = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const data = await apiFetch("warehouse", token);
+      setItems(Array.isArray(data) ? data : (data.data ?? []));
+    } catch { /* skip */ } finally { setLoading(false); }
+  }, [token]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const openNew = () => { setEditing(null); setForm({ ...emptyForm }); setShowForm(true); };
+  const openEdit = (s: StockItem) => {
+    setEditing(s);
+    setForm({ sku: s.sku ?? "", nombre: s.nombre ?? "", categoria: s.categoria ?? "Cámaras", ubicacion: s.ubicacion ?? "", existencia: s.existencia ?? 0, minimo: s.minimo ?? 5, costo: s.costo ?? 0 });
+    setShowForm(true);
+  };
+
+  const save = async () => {
+    if (!token) return;
+    try {
+      if (editing) {
+        const updated = await apiFetch(`warehouse/${editing.id}`, token, { method: "PATCH", body: JSON.stringify(form) });
+        setItems(prev => prev.map(s => s.id === editing.id ? { ...s, ...updated } : s));
+      } else {
+        const created = await apiFetch("warehouse", token, { method: "POST", body: JSON.stringify(form) });
+        setItems(prev => [created, ...prev]);
+      }
+      setShowForm(false);
+    } catch { /* skip */ }
+  };
+
+  const remove = async (s: StockItem) => {
+    if (!token || !confirm(`¿Retirar "${s.nombre}" del inventario? Se marcará existencia en 0.`)) return;
+    try {
+      const updated = await apiFetch(`warehouse/${s.id}`, token, { method: "PATCH", body: JSON.stringify({ existencia: 0, estado: "Retirado" }) });
+      setItems(prev => prev.map(i => i.id === s.id ? { ...i, ...updated } : i));
+    } catch { /* skip */ }
+  };
+
+  const sinStock = items.filter(s => (s.existencia ?? 0) === 0).length;
+  const bajoMinimo = items.filter(s => (s.existencia ?? 0) > 0 && (s.existencia ?? 0) < (s.minimo ?? 0)).length;
+  const valorTotal = items.reduce((sum, s) => sum + (s.existencia ?? 0) * (s.costo ?? 0), 0);
+
+  const stockEstado = (s: StockItem): "danger" | "warning" | "neutral" =>
+    (s.existencia ?? 0) === 0 ? "danger" : (s.existencia ?? 0) < (s.minimo ?? 0) ? "warning" : "neutral";
+
+  const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface)", color: "var(--foreground)", fontSize: 13, boxSizing: "border-box" };
+
+  const columns: Column<StockItem>[] = [
+    { key: "sku", label: "SKU", render: s => <code style={{ fontSize: 11.5 }}>{s.sku ?? "—"}</code>, width: 110 },
+    { key: "nombre", label: "Producto", render: s => (
+      <div>
+        <div style={{ fontWeight: 700, fontSize: 13 }}>{s.nombre ?? "—"}</div>
+        <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{s.categoria} · {s.ubicacion}</div>
+      </div>
+    )},
+    { key: "existencia", label: "Stock", render: s => (
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontWeight: 700 }}>{s.existencia ?? 0}</span>
+        <Tag variant={stockEstado(s)}>{(s.existencia ?? 0) === 0 ? "Sin stock" : (s.existencia ?? 0) < (s.minimo ?? 0) ? "Bajo mínimo" : "OK"}</Tag>
+      </div>
+    ), width: 160 },
+    { key: "minimo", label: "Mínimo", accessor: s => s.minimo ?? 0, width: 80 },
+    { key: "costo", label: "Costo unit.", render: s => <Money value={s.costo ?? 0} />, width: 110 },
+    { key: "id", label: "", render: s => (
+      <div style={{ display: "flex", gap: 4 }}>
+        {canEdit && <button onClick={() => openEdit(s)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>}
+        {canDelete && <button onClick={() => remove(s)} title="Retirar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>}
+      </div>
+    ), width: 60 },
   ];
 
   return (
     <>
       <PageHeader
-        eyebrow="ERP · Logística"
-        title="Almacén"
-        subtitle="Inventario CEDIS Puebla. Stock, mínimos y movimientos de almacén."
-        actions={
-          <>
-            <Button variant="secondary" iconLeft="📋">Movimientos</Button>
-            <Button variant="primary" iconLeft="📦">Entrada / Salida</Button>
-          </>
-        }
+        eyebrow="ERP · Almacén"
+        title="Inventario / Almacén"
+        subtitle="Stock de productos, cámaras, cómputo, redes y consumibles en CEDIS Puebla."
+        actions={canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Agregar producto</Button> : undefined}
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginBottom: 18 }}>
-        <KpiCard label="Valor en inventario" value={<Money value={valorInventario} />} hint={`${STOCK.length} SKUs activos`} variant="positive" icon="📦" />
-        <KpiCard label="Bajo mínimo" value={bajoMinimo} hint="Requiere compra" variant="warning" icon="⚠️" />
-        <KpiCard label="Sin stock" value={sinStock} hint="Quiebre de inventario" variant="danger" icon="❌" />
-        <KpiCard label="Salidas de hoy" value="14" hint="Asignadas a OT" variant="default" icon="📤" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
+        <KpiCard label="Sin stock" value={sinStock} />
+        <KpiCard label="Bajo mínimo" value={bajoMinimo} />
+        <KpiCard label="Valor inventario" value={`$${(valorTotal / 1000000).toFixed(2)}M`} />
       </div>
 
-      <Section title="Inventario actual">
-        <DataTable columns={columns} rows={STOCK} rowKey={(s) => s.sku} onRowClick={(s) => alert(`Abrir ${s.sku}`)} />
+      {showForm && (
+        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {[
+            { label: "SKU", key: "sku", ph: "HK-2143" },
+            { label: "Nombre del producto", key: "nombre", ph: "Cámara Hikvision 4MP…" },
+            { label: "Ubicación", key: "ubicacion", ph: "CEDIS Puebla · A1-03" },
+          ].map(({ label, key, ph }) => (
+            <div key={key} style={key === "nombre" ? { gridColumn: "1 / -1" } : {}}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>{label}</label>
+              <input value={(form as Record<string, string | number>)[key] as string} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} placeholder={ph} style={inp} />
+            </div>
+          ))}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Categoría</label>
+            <select value={form.categoria} onChange={e => setForm(f => ({ ...f, categoria: e.target.value }))} style={inp}>
+              {CATEGORIAS.map(c => <option key={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Existencia</label>
+            <input type="number" min={0} value={form.existencia} onChange={e => setForm(f => ({ ...f, existencia: +e.target.value }))} style={inp} />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Mínimo</label>
+            <input type="number" min={0} value={form.minimo} onChange={e => setForm(f => ({ ...f, minimo: +e.target.value }))} style={inp} />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Costo unitario ($)</label>
+            <input type="number" min={0} value={form.costo} onChange={e => setForm(f => ({ ...f, costo: +e.target.value }))} style={inp} />
+          </div>
+          <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <Button variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={save}>{editing ? "Guardar" : "Agregar"}</Button>
+          </div>
+        </div>
+      )}
+
+      <Section title={loading ? "Cargando…" : `${items.length} productos`}>
+        {loading ? (
+          <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+        ) : (
+          <DataTable columns={columns} rows={items} rowKey={s => s.id} emptyTitle="Almacén vacío" emptyDescription="Agrega el primer producto al inventario." />
+        )}
       </Section>
     </>
   );

@@ -38,6 +38,7 @@ import {
   type PanelId,
 } from "@/lib/access-matrix";
 import { canOpenPage, type RoleKey } from "@/lib/rbac";
+import { buildCrossPanelUrl } from "@/lib/cross-panel-handoff";
 import styles from "./AppShell.module.scss";
 import CommandPalette from "./CommandPalette";
 
@@ -503,10 +504,12 @@ export default function AppShell({ panel, children }: AppShellProps) {
                   {allowedPanels.map((p) => {
                     const isCurrent = p.id === panel;
                     const isHome = homeUrl.startsWith(`/${p.id}`);
+                    const userJson = user ? JSON.stringify(user) : null;
+                    const panelHref = buildCrossPanelUrl(p.id, p.entryPath, userJson);
                     return (
                       <a
                         key={p.id}
-                        href={`/${p.id}${p.entryPath}`}
+                        href={panelHref}
                         className={styles.switcherItem}
                         data-current={isCurrent ? "true" : "false"}
                       >

@@ -1,85 +1,169 @@
 "use client";
 
+import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
+import EmptyState from "@/components/ui/EmptyState";
+import { useUser } from "@/components/UserContext";
+import { useRbacGuard } from "@/lib/useRbacGuard";
+import { buildApiUrl } from "@/lib/api-base";
 
-type Ticket = {
-  id: string;
-  cliente: string;
-  asunto: string;
-  prioridad: "Crítica" | "Alta" | "Media" | "Baja";
-  estado: "Nuevo" | "Asignado" | "En curso" | "Esperando cliente" | "Resuelto";
-  abierto: string;
-  asignado: string;
-  slaRestante: string;
-  slaVencido?: boolean;
-};
+interface TicketRequest {
+  id: number;
+  description: string;
+  requestType?: string;
+  urgency?: "LOW" | "MEDIUM" | "HIGH";
+  status?: "NEW" | "ASSIGNED" | "CLOSED" | "APPROVED" | "REJECTED";
+  dueAt?: string | null;
+  branchName?: string | null;
+  address?: string | null;
+  createdAt?: string;
+  activityId?: number | null;
+  client?: { id: number; name: string } | null;
+}
 
-const TICKETS: Ticket[] = [
-  { id: "T-8821", cliente: "Soriana Plaza Reforma", asunto: "POS-3 no imprime tickets", prioridad: "Crítica", estado: "En curso", abierto: "Hoy 11:20", asignado: "Brandon C.", slaRestante: "1h 40m" },
-  { id: "T-8820", cliente: "TOKS Centro", asunto: "Cámara pasillo 2 no graba", prioridad: "Alta", estado: "Asignado", abierto: "Hoy 09:45", asignado: "Sandra L.", slaRestante: "3h 15m" },
-  { id: "T-8819", cliente: "UDLA Cholula", asunto: "Solicitan ampliación de red en biblioteca", prioridad: "Media", estado: "Esperando cliente", abierto: "Ayer 16:00", asignado: "Ronaldo H.", slaRestante: "—" },
-  { id: "T-8818", cliente: "Hotel Camino Real", asunto: "WiFi lobby intermitente", prioridad: "Alta", estado: "Resuelto", abierto: "Ayer 14:20", asignado: "Brandon C.", slaRestante: "Cumplido" },
-  { id: "T-8817", cliente: "Constructora Reyes", asunto: "Sin enlace en obra Cholula", prioridad: "Crítica", estado: "En curso", abierto: "Ayer 16:20", asignado: "Ronaldo H.", slaRestante: "VENCIDO", slaVencido: true },
-];
+async function apiFetch(path: string, token: string, init: RequestInit = {}) {
+  const res = await fetch(buildApiUrl(path), {
+    ...init,
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(init.headers as Record<string, string> ?? {}) },
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new Error(t || `HTTP ${res.status}`);
+  }
+  if (res.status === 204) return null;
+  const t = await res.text();
+  return t ? JSON.parse(t) : null;
+}
 
 export default function SupportInboxPage() {
-  const columns: Column<Ticket>[] = [
-    { key: "id", label: "Ticket", render: (t) => <Tag variant="accent">{t.id}</Tag>, width: 90 },
+  const { user } = useUser();
+  const { canApprove, canViewAll } = useRbacGuard();
+  const token = user?.token ?? "";
+
+  const [items, setItems] = useState<TicketRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>("");
+
+  const load = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const qs = statusFilter ? `?status=${statusFilter}` : "";
+      const data = await apiFetch(`client-ticket-requests${qs}`, token);
+      setItems(Array.isArray(data) ? data : (data?.data ?? []));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al cargar tickets");
+    } finally {
+      setLoading(false);
+    }
+  }, [token, statusFilter]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const nuevos = items.filter((t) => t.status === "NEW").length;
+  const asignados = items.filter((t) => t.status === "ASSIGNED").length;
+  const vencidos = items.filter((t) => t.dueAt && new Date(t.dueAt) < new Date() && t.status !== "CLOSED").length;
+
+  const patchStatus = async (t: TicketRequest, status: string) => {
+    if (!token) return;
+    try {
+      const updated = await apiFetch(`client-ticket-requests/${t.id}/status`, token, { method: "PATCH", body: JSON.stringify({ status }) });
+      setItems((prev) => prev.map((i) => (i.id === t.id ? { ...i, ...(updated ?? { status }) } : i)));
+    } catch (e) {
+      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+    }
+  };
+
+  const urgencyVariant = (u?: string): "danger" | "warning" | "default" =>
+    u === "HIGH" ? "danger" : u === "MEDIUM" ? "warning" : "default";
+
+  const statusVariant = (s?: string): "positive" | "accent" | "warning" | "danger" | "default" => {
+    if (s === "CLOSED" || s === "APPROVED") return "positive";
+    if (s === "REJECTED") return "danger";
+    if (s === "ASSIGNED") return "accent";
+    return "warning";
+  };
+
+  const columns: Column<TicketRequest>[] = useMemo(() => [
+    { key: "id", label: "Ticket", render: (t) => <Tag variant="accent">T-{t.id}</Tag>, width: 90 },
     {
-      key: "cliente", label: "Cliente / Asunto",
+      key: "cliente", label: "Cliente / Solicitud",
       render: (t) => (
         <div>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>{t.cliente}</div>
-          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{t.asunto}</div>
+          <div style={{ fontWeight: 700, fontSize: 13 }}>{t.client?.name ?? "—"}{t.branchName ? ` · ${t.branchName}` : ""}</div>
+          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{t.description?.slice(0, 70)}</div>
         </div>
       ),
     },
+    { key: "urgency", label: "Urgencia", render: (t) => <Tag variant={urgencyVariant(t.urgency)}>{t.urgency ?? "—"}</Tag>, width: 100 },
+    { key: "status", label: "Estado", render: (t) => <Tag variant={statusVariant(t.status)}>{t.status ?? "NEW"}</Tag>, width: 110 },
+    { key: "createdAt", label: "Abierto", render: (t) => <span style={{ fontSize: 12 }}>{t.createdAt ? new Date(t.createdAt).toLocaleDateString("es-MX") : "—"}</span>, width: 100 },
     {
-      key: "prioridad", label: "Prioridad",
-      render: (t) => (
-        <Tag variant={t.prioridad === "Crítica" ? "danger" : t.prioridad === "Alta" ? "warning" : t.prioridad === "Media" ? "accent" : "neutral"}>
-          {t.prioridad}
-        </Tag>
-      ),
+      key: "dueAt", label: "Vence",
+      render: (t) => {
+        const overdue = t.dueAt && new Date(t.dueAt) < new Date() && t.status !== "CLOSED";
+        return <span style={{ fontWeight: 700, color: overdue ? "var(--danger)" : "var(--text-primary)" }}>{t.dueAt ? new Date(t.dueAt).toLocaleDateString("es-MX") : "—"}</span>;
+      },
+      width: 100,
     },
     {
-      key: "estado", label: "Estado",
+      key: "acciones" as keyof TicketRequest, label: "",
       render: (t) => (
-        <Tag variant={t.estado === "Resuelto" ? "positive" : t.estado === "Esperando cliente" ? "neutral" : "accent"}>
-          {t.estado}
-        </Tag>
+        canApprove ? (
+          <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+            {t.status === "NEW" && (
+              <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); void patchStatus(t, "ASSIGNED"); }}>Asignar</Button>
+            )}
+            {(t.status === "NEW" || t.status === "ASSIGNED") && (
+              <Button size="sm" variant="primary" onClick={(e) => { e.stopPropagation(); void patchStatus(t, "CLOSED"); }}>Cerrar</Button>
+            )}
+          </div>
+        ) : null
       ),
+      width: 160,
     },
-    { key: "asignado", label: "Asignado", accessor: (t) => t.asignado, width: 110 },
-    { key: "abierto", label: "Abierto", accessor: (t) => t.abierto, width: 110 },
-    {
-      key: "sla", label: "SLA",
-      render: (t) => (
-        <span style={{ fontWeight: 700, color: t.slaVencido ? "var(--danger)" : t.slaRestante === "Cumplido" ? "var(--success)" : "var(--text-primary)" }}>
-          {t.slaRestante}
-        </span>
-      ),
-    },
-  ];
+  ], [canApprove]);
 
   return (
     <>
       <PageHeader
         eyebrow="OPS · Soporte"
         title="Bandeja de soporte"
-        subtitle="Tickets de clientes con contrato. Prioridad y SLA visibles en todo momento."
+        subtitle={canViewAll ? "Solicitudes de tickets de clientes con contrato vigente." : "Tickets asignados a tu equipo."}
         actions={
           <>
-            <Button variant="secondary" iconLeft="📊">SLA report</Button>
-            <Button variant="primary" iconLeft="🆘">Nuevo ticket</Button>
+            <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}
+            >
+              <option value="">Todos los estados</option>
+              <option value="NEW">Nuevos</option>
+              <option value="ASSIGNED">Asignados</option>
+              <option value="CLOSED">Cerrados</option>
+            </select>
           </>
         }
       />
-      <Section title={`${TICKETS.length} tickets activos`}>
-        <DataTable columns={columns} rows={TICKETS} rowKey={(t) => t.id} onRowClick={(t) => alert(`Abrir ${t.id}`)} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 18 }}>
+        <Tag variant="warning" dot>{nuevos} nuevos</Tag>
+        <Tag variant="accent" dot>{asignados} asignados</Tag>
+        {vencidos > 0 && <Tag variant="danger" dot>{vencidos} vencidos</Tag>}
+      </div>
+      <Section title={loading ? "Cargando…" : `${items.length} tickets`}>
+        {loading && <EmptyState icon="⏳" title="Cargando tickets…" description="Consultando solicitudes desde la API." />}
+        {!loading && error && (
+          <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />
+        )}
+        {!loading && !error && (
+          <DataTable columns={columns} rows={items} rowKey={(t) => t.id} emptyTitle="Sin tickets" emptyDescription="No hay solicitudes de soporte registradas." />
+        )}
       </Section>
     </>
   );

@@ -1,129 +1,141 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
+import EmptyState from "@/components/ui/EmptyState";
+import { useUser } from "@/components/UserContext";
+import { useRbacGuard } from "@/lib/useRbacGuard";
+import { buildApiUrl } from "@/lib/api-base";
 
-type Tech = {
-  id: string;
-  nombre: string;
-  vehiculo: string;
-  estado: "En ruta" | "En sitio" | "Disponible" | "Almuerzo" | "Offline";
-  sitioActual: string;
-  proximaOT: string;
-  bateria: number;
-  ultimoPing: string;
-  km: number;
-};
+interface LocationRecord {
+  id: number;
+  usuarioId: number;
+  latitud?: number | string | null;
+  longitud?: number | string | null;
+  estaActivo?: boolean;
+  ultimaActualizacion?: string;
+  usuario?: { nombre: string; role?: { nombre?: string } | null; department?: { nombre?: string } | null } | null;
+  actividad?: { id: number; titulo?: string | null; folio?: string | null } | null;
+}
 
-const TECHS: Tech[] = [
-  { id: "T-01", nombre: "Brandon C.", vehiculo: "Camioneta 03 · NRZ-887", estado: "En sitio", sitioActual: "Soriana Plaza Reforma, Puebla", proximaOT: "OT-3425 · 16:30", bateria: 78, ultimoPing: "Hace 1 min", km: 42 },
-  { id: "T-02", nombre: "Ronaldo H.", vehiculo: "Camioneta 01 · NRZ-203", estado: "En ruta", sitioActual: "Camino a UDLA Cholula", proximaOT: "OT-3426 · Mañana 08:00", bateria: 64, ultimoPing: "Hace 3 min", km: 18 },
-  { id: "T-03", nombre: "Sandra L.", vehiculo: "Sin asignar", estado: "Disponible", sitioActual: "Base CEDIS", proximaOT: "Sin OT", bateria: 92, ultimoPing: "Hace 1 min", km: 0 },
-  { id: "T-04", nombre: "Eduardo M.", vehiculo: "Camioneta 02 · NRZ-455", estado: "Almuerzo", sitioActual: "Cerca de Centro Histórico CDMX", proximaOT: "OT-3429 · 15:00", bateria: 45, ultimoPing: "Hace 8 min", km: 67 },
-];
+async function apiFetch(path: string, token: string) {
+  const res = await fetch(buildApiUrl(path), { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+  return res.json();
+}
+
+function minutesAgo(iso?: string): string {
+  if (!iso) return "—";
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.round(diffMs / 60000);
+  if (mins < 1) return "Justo ahora";
+  if (mins < 60) return `Hace ${mins} min`;
+  return `Hace ${Math.round(mins / 60)}h`;
+}
 
 export default function GpsPage() {
+  const { user } = useUser();
+  const { canViewAll } = useRbacGuard();
+  const token = user?.token ?? "";
+
+  const [items, setItems] = useState<LocationRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [consentOn, setConsentOn] = useState<boolean | null>(null);
+
+  const load = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    setError(null);
+    try {
+      if (canViewAll) {
+        const data = await apiFetch("gps/team", token);
+        setItems(Array.isArray(data) ? data : []);
+      } else {
+        const data = await apiFetch("gps/me", token);
+        setItems(data ? [data] : []);
+        setConsentOn(Boolean(data));
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al cargar ubicaciones");
+    } finally {
+      setLoading(false);
+    }
+  }, [token, canViewAll]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const toggleConsent = async (enabled: boolean) => {
+    if (!token) return;
+    try {
+      await fetch(buildApiUrl("gps/consent"), {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+      setConsentOn(enabled);
+      void load();
+    } catch { /* skip */ }
+  };
+
   return (
     <>
       <PageHeader
         eyebrow="OPS · Campo"
         title="GPS y telemetría en vivo"
-        subtitle="Mapa en tiempo real de ingenieros, vehículos y trayectos. Útil para auditoría de almuerzos y eficiencia de ruta."
+        subtitle={canViewAll
+          ? "Ubicación en tiempo real de tu equipo en campo (solo durante jornada abierta y con consentimiento activo)."
+          : "Tu ubicación se comparte mientras tu jornada esté abierta y tengas el consentimiento activo."}
         actions={
           <>
-            <Button variant="secondary" iconLeft="🔄">Refrescar</Button>
-            <Button variant="primary" iconLeft="📍">Centrar todos</Button>
+            <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
+            {!canViewAll && (
+              <Button variant={consentOn ? "danger" : "primary"} iconLeft="📍" onClick={() => void toggleConsent(!consentOn)}>
+                {consentOn ? "Desactivar mi ubicación" : "Activar mi ubicación"}
+              </Button>
+            )}
           </>
         }
       />
 
-      <Section
-        title="Mapa de campo"
-        subtitle="Vista geográfica (próxima integración con Google Maps)"
-      >
-        <div
-          style={{
-            height: 320,
-            background:
-              "linear-gradient(135deg, color-mix(in srgb, var(--primary) 8%, transparent), color-mix(in srgb, var(--accent) 8%, transparent))",
-            border: "1px dashed var(--border)",
-            borderRadius: 14,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-          }}
-        >
-          <div style={{ fontSize: 48 }}>🗺️</div>
-          <div style={{ fontFamily: "var(--nx-font-display)", fontWeight: 700, fontSize: 16 }}>
-            Mapa en vivo
-          </div>
-          <div style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>
-            Pings recibidos cada 30s · 4 unidades activas
-          </div>
-        </div>
-      </Section>
-
-      <Section title="Estado de ingenieros" subtitle="Telemetría individual">
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-            gap: 12,
-          }}
-        >
-          {TECHS.map((t) => (
-            <article
-              key={t.id}
-              style={{
-                background: "var(--surface)",
-                border: "1px solid var(--border)",
-                borderRadius: 12,
-                padding: 16,
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                <div>
-                  <div style={{ fontFamily: "var(--nx-font-display)", fontWeight: 700, fontSize: 15 }}>
-                    {t.nombre}
+      <Section title={loading ? "Cargando…" : canViewAll ? `${items.length} unidades activas` : "Tu ubicación"}>
+        {loading && <EmptyState icon="⏳" title="Cargando telemetría…" description="Consultando ubicaciones desde la API." />}
+        {!loading && error && (
+          <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />
+        )}
+        {!loading && !error && items.length === 0 && (
+          <EmptyState icon="📍" title="Sin ubicaciones activas" description="Nadie ha compartido su ubicación en este momento. Requiere jornada abierta y consentimiento." />
+        )}
+        {!loading && !error && items.length > 0 && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+            {items.map((t) => (
+              <article key={t.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                  <div>
+                    <div style={{ fontFamily: "var(--nx-font-display)", fontWeight: 700, fontSize: 15 }}>{t.usuario?.nombre ?? "—"}</div>
+                    <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{t.usuario?.role?.nombre ?? t.usuario?.department?.nombre ?? ""}</div>
                   </div>
-                  <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-                    {t.vehiculo}
-                  </div>
+                  <Tag variant={t.estaActivo ? "positive" : "default"}>{t.estaActivo ? "Activo" : "Inactivo"}</Tag>
                 </div>
-                <Tag
-                  variant={
-                    t.estado === "En sitio" ? "positive"
-                      : t.estado === "En ruta" ? "accent"
-                        : t.estado === "Disponible" ? "neutral"
-                          : t.estado === "Almuerzo" ? "warning"
-                            : "danger"
-                  }
-                >
-                  {t.estado}
-                </Tag>
-              </div>
-
-              <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginBottom: 8 }}>
-                📍 {t.sitioActual}
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, color: "var(--text-tertiary)" }}>
-                <span>🔋 {t.bateria}%</span>
-                <span>📡 {t.ultimoPing}</span>
-                <span>🛣️ {t.km}km hoy</span>
-              </div>
-
-              <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)", fontSize: 11.5 }}>
-                <span style={{ color: "var(--text-tertiary)" }}>Siguiente:</span>{" "}
-                <span style={{ fontWeight: 600 }}>{t.proximaOT}</span>
-              </div>
-            </article>
-          ))}
-        </div>
+                <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginBottom: 8 }}>
+                  📍 {t.latitud && t.longitud ? `${Number(t.latitud).toFixed(5)}, ${Number(t.longitud).toFixed(5)}` : "Sin coordenadas"}
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, color: "var(--text-tertiary)" }}>
+                  <span>📡 {minutesAgo(t.ultimaActualizacion)}</span>
+                </div>
+                {t.actividad && (
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)", fontSize: 11.5 }}>
+                    <span style={{ color: "var(--text-tertiary)" }}>OT:</span>{" "}
+                    <span style={{ fontWeight: 600 }}>{t.actividad.folio ?? t.actividad.titulo ?? `Act-${t.actividad.id}`}</span>
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+        )}
       </Section>
     </>
   );

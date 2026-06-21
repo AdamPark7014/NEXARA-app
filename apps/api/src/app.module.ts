@@ -79,6 +79,9 @@ import { NocModule } from './noc/noc.module.js';
 import { LabModule } from './lab/lab.module.js';
 import { RealtimeModule } from './realtime/realtime.module';
 import { PageContentModule } from './page-content/page-content.module.js';
+import { CaseStudiesModule } from './case-studies/case-studies.module.js';
+import { SocialPostsModule } from './social-posts/social-posts.module.js';
+import { InternalComunicadosModule } from './internal-comunicados/internal-comunicados.module.js';
 
 @Module({
   imports: [
@@ -106,6 +109,9 @@ import { PageContentModule } from './page-content/page-content.module.js';
     NewsModule,
     HeroSlidesModule,
     PageContentModule,
+    CaseStudiesModule,
+    SocialPostsModule,
+    InternalComunicadosModule,
     WorkProjectsModule,
     EmployeePaymentsModule,
     CotizacionesModule,

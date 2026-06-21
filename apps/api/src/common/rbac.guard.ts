@@ -126,12 +126,12 @@ export class RbacGuard extends AuthGuard('jwt') {
     if (user.roleKey && validKeys.includes(user.roleKey)) {
       return user.roleKey as RoleKey;
     }
-    if (user.role && validKeys.includes(user.role)) {
-      return user.role as RoleKey;
-    }
     if (user.orgRoleKey && LEGACY_TO_V2[user.orgRoleKey]) {
       return LEGACY_TO_V2[user.orgRoleKey];
     }
+    if (user.admin) return LEGACY_TO_V2.admin ?? null;
+    if (user.ingeniero) return LEGACY_TO_V2.ingeniero ?? null;
+    if (user.vendedor) return LEGACY_TO_V2.vendedor ?? null;
     return null;
   }
 }

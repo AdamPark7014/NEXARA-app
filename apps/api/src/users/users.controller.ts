@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, ForbiddenException, UploadedFile, UploadedFiles, UseInterceptors, BadRequestException, NotFoundException, Res, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, ForbiddenException, UploadedFile, UploadedFiles, UseInterceptors, BadRequestException, NotFoundException, Res, Query, ParseIntPipe } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
@@ -121,10 +121,45 @@ export class UsersController {
     return this.usersService.findAssignableUsers(userFull);
   }
 
+  @Get('orgchart')
+  @UseGuards(AuthGuard('jwt'))
+  async getOrgchart() {
+    return this.usersService.getOrgchart();
+  }
+
+  @Patch(':id/manager')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  async setManager(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('managerId') managerId: number | null,
+  ) {
+    return this.usersService.setManager(id, managerId);
+  }
+
   @Get('public-team')
   async findPublicTeam(@Query('limit') limit?: string) {
     const parsed = Number(limit);
     return this.usersService.findPublicTeam(Number.isFinite(parsed) ? parsed : 12);
+  }
+
+  /** Plantilla RRHH — devuelve todos los usuarios con campos de RRHH */
+  @Get('hr-staff')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  async findHrStaff(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
+    return this.usersService.findHrStaff(user, query);
+  }
+
+  /** PATCH usuarios/:id/hr — actualiza campos RRHH de un empleado */
+  @Patch(':id/hr')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  async updateHrFields(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { puesto?: string; tipoContrato?: string; estadoRRHH?: string; isActive?: boolean; fechaIngreso?: string },
+  ) {
+    return this.usersService.updateHrFields(id, body);
   }
 
   @Get('next-employee-number')

@@ -1,28 +1,82 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState, useCallback } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import KpiCard from "@/components/ui/KpiCard";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
+import { useUser } from "@/components/UserContext";
+import { buildApiUrl } from "@/lib/api-base";
 
-const PAGES = [
-  { name: "Inicio", url: "/", status: "Publicada", lastUpdate: "Hace 4 días", visits: 3240 },
-  { name: "Soluciones", url: "/soluciones", status: "Publicada", lastUpdate: "Hace 2 días", visits: 1820 },
-  { name: "Casos de éxito", url: "/proyectos", status: "Publicada", lastUpdate: "Ayer", visits: 1410 },
-  { name: "Cobertura", url: "/cobertura", status: "Publicada", lastUpdate: "Hace 1 semana", visits: 950 },
-  { name: "Contacto", url: "/contacto", status: "Publicada", lastUpdate: "Hace 5 días", visits: 1000 },
+const RED_COLOR: Record<string, string> = {
+  LinkedIn: "#0a66c2", Instagram: "#e1306c", Facebook: "#1877f2",
+  Twitter: "#1da1f2", TikTok: "#000000",
+};
+
+const PAGES_STATIC = [
+  { name: "Inicio", url: "/", visits: null },
+  { name: "Soluciones", url: "/soluciones", visits: null },
+  { name: "Casos de éxito", url: "/proyectos", visits: null },
+  { name: "Cobertura", url: "/cobertura", visits: null },
+  { name: "Contacto", url: "/contacto", visits: null },
 ];
 
-const POSTS = [
-  { red: "LinkedIn", titulo: "Caso de éxito: Soriana 90% uptime POS", fecha: "Mañana 10:00", color: "#0a66c2" },
-  { red: "Instagram", titulo: "Reel: instalación CCTV en 90 segundos", fecha: "Mié 12:00", color: "#e1306c" },
-  { red: "Facebook", titulo: "Promo NVR + 4 cámaras para casa", fecha: "Jue 18:00", color: "#1877f2" },
-  { red: "LinkedIn", titulo: "Tips: Auditoría POS en retail", fecha: "Vie 09:00", color: "#0a66c2" },
-];
+async function apiFetch(path: string, token: string) {
+  const res = await fetch(buildApiUrl(path), {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
 
 export default function StudioDashboardPage() {
+  const { user } = useUser();
+  const token = user?.token ?? "";
+
+  const [contacts, setContacts]   = useState<number | null>(null);
+  const [cases, setCases]         = useState<{ total: number; publicados: number } | null>(null);
+  const [posts, setPosts]         = useState<{ id: number; red: string; titulo: string; cuando: string; estado: string }[]>([]);
+
+  const load = useCallback(async () => {
+    if (!token) return;
+    try {
+      const [contactData, caseData, postData] = await Promise.allSettled([
+        apiFetch("contact-messages?limit=1", token),
+        apiFetch("case-studies?limit=100", token),
+        apiFetch("social-posts?limit=6", token),
+      ]);
+
+      if (contactData.status === "fulfilled") {
+        const d = contactData.value;
+        setContacts(typeof d?.total === "number" ? d.total : (Array.isArray(d) ? d.length : null));
+      }
+
+      if (caseData.status === "fulfilled") {
+        const arr: { publicado: boolean }[] = Array.isArray(caseData.value) ? caseData.value : (caseData.value?.data ?? []);
+        setCases({ total: arr.length, publicados: arr.filter(c => c.publicado).length });
+      }
+
+      if (postData.status === "fulfilled") {
+        const arr = Array.isArray(postData.value) ? postData.value : (postData.value?.data ?? []);
+        setPosts(arr.filter((p: { estado: string }) => p.estado === "Programado" || p.estado === "Borrador").slice(0, 4));
+      }
+    } catch { /* ignore */ }
+  }, [token]);
+
+  useEffect(() => { load(); }, [load]);
+
+  function fmtDate(iso: string) {
+    const d = new Date(iso);
+    const now = new Date();
+    const diff = (d.getTime() - now.getTime()) / 3600000;
+    if (diff < 24 && diff >= 0) return `Hoy ${d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`;
+    if (diff < 48 && diff >= 0) return `Mañana ${d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`;
+    return d.toLocaleDateString("es-MX", { weekday: "short", day: "2-digit", month: "short" }) +
+      " " + d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  }
+
   return (
     <>
       <PageHeader
@@ -33,182 +87,117 @@ export default function StudioDashboardPage() {
         meta={
           <>
             <Tag variant="accent" dot>Sitio en producción</Tag>
-            <Tag variant="positive">8,420 visitas / 7d</Tag>
-            <Tag variant="neutral">47 leads capturados</Tag>
+            {contacts !== null && <Tag variant="neutral">{contacts} contactos capturados</Tag>}
+            {cases !== null && <Tag variant="positive">{cases.publicados} casos publicados</Tag>}
           </>
         }
         actions={
           <>
-            <Link href="/studio/news" style={{ textDecoration: "none" }}>
-              <Button variant="secondary" iconLeft="📰">
-                Nueva noticia
-              </Button>
-            </Link>
             <Link href="/studio/cases" style={{ textDecoration: "none" }}>
-              <Button variant="primary" iconLeft="🏆" iconRight="→">
-                Nuevo caso
-              </Button>
+              <Button variant="secondary" iconLeft="🏆">Nuevo caso</Button>
+            </Link>
+            <Link href="/studio/social" style={{ textDecoration: "none" }}>
+              <Button variant="primary" iconLeft="✏️" iconRight="→">Crear post</Button>
             </Link>
           </>
         }
       />
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: 16,
-          marginBottom: 24,
-        }}
-      >
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 24 }}>
         <KpiCard
-          label="Visitas (7d)"
-          value="8,420"
-          hint="+18% vs semana anterior"
-          icon="🌐"
-          variant="accent"
-          trend={{ value: "+18% WoW", direction: "up" }}
-          sparkline={[6100, 6800, 7200, 7400, 7900, 8100, 8420]}
-        />
-        <KpiCard
-          label="Leads del sitio"
-          value="47"
-          hint="32 calificados · 6 perdidos"
+          label="Contactos web"
+          value={contacts ?? "—"}
+          hint="Formularios recibidos"
           icon="📥"
-          variant="positive"
-          trend={{ value: "+9 WoW", direction: "up" }}
-          sparkline={[28, 32, 35, 38, 41, 44, 47]}
+          variant="accent"
         />
         <KpiCard
           label="Casos publicados"
-          value="14"
-          hint="2 borradores en revisión"
+          value={cases?.publicados ?? "—"}
+          hint={cases ? `${cases.total - cases.publicados} borradores en revisión` : "Cargando…"}
           icon="🏆"
+          variant="positive"
         />
         <KpiCard
-          label="Engagement redes"
-          value="3.4%"
-          hint="LinkedIn · IG · FB · promedio"
-          icon="📱"
-          variant="positive"
-          trend={{ value: "+0.6pp", direction: "up" }}
-          sparkline={[2.4, 2.6, 2.8, 3.0, 3.1, 3.2, 3.4]}
+          label="Posts programados"
+          value={posts.filter(p => p.estado === "Programado").length || "—"}
+          hint="Redes sociales"
+          icon="📅"
+          variant="default"
+        />
+        <KpiCard
+          label="Borradores sociales"
+          value={posts.filter(p => p.estado === "Borrador").length || "—"}
+          hint="Sin programar"
+          icon="📝"
+          variant="default"
         />
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-          gap: 20,
-        }}
-      >
-        <Section
-          eyebrow="Sitio"
-          title="Las 5 secciones públicas"
-          subtitle="Estado del sitio nexara.com.mx · visitas últimos 7 días"
-          tone="accent"
-        >
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 }}>
+        <Section eyebrow="Sitio" title="Secciones públicas" subtitle="nexara.com.mx — en producción">
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {PAGES.map((s) => {
-              const max = Math.max(...PAGES.map((p) => p.visits));
-              const w = (s.visits / max) * 100;
-              return (
-                <article
-                  key={s.name}
-                  style={{
-                    position: "relative",
-                    display: "grid",
-                    gridTemplateColumns: "1fr auto auto",
-                    gap: 12,
-                    alignItems: "center",
-                    padding: "13px 16px",
-                    borderRadius: 12,
-                    background: "var(--surface)",
-                    border: "1px solid var(--nx-panel-hairline)",
-                    boxShadow: "var(--nx-panel-elev-1)",
-                    overflow: "hidden",
-                  }}
-                >
-                  <span
-                    aria-hidden="true"
-                    style={{
-                      position: "absolute",
-                      left: 0,
-                      bottom: 0,
-                      height: 2,
-                      width: `${w}%`,
-                      background: "linear-gradient(90deg, var(--panel-accent, var(--primary)) 0%, transparent 100%)",
-                      opacity: 0.6,
-                    }}
-                  />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--text-primary)" }}>{s.name}</div>
-                    <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-                      <code>nexara.com.mx{s.url}</code> · {s.lastUpdate}
-                    </div>
+            {PAGES_STATIC.map(s => (
+              <article key={s.name} style={{
+                display: "grid", gridTemplateColumns: "1fr auto",
+                gap: 12, alignItems: "center", padding: "13px 16px",
+                borderRadius: 12, background: "var(--surface)",
+                border: "1px solid var(--border)", overflow: "hidden",
+              }}>
+                <div>
+                  <div style={{ fontSize: 13.5, fontWeight: 700 }}>{s.name}</div>
+                  <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
+                    <code>nexara.com.mx{s.url}</code>
                   </div>
-                  <span style={{ fontFamily: "var(--nx-font-display)", fontSize: 14, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: "var(--text-primary)" }}>
-                    {s.visits.toLocaleString("es-MX")}
-                  </span>
-                  <Tag variant="positive" size="sm">
-                    {s.status}
-                  </Tag>
-                </article>
-              );
-            })}
+                </div>
+                <Tag variant="positive" size="sm">Publicada</Tag>
+              </article>
+            ))}
           </div>
         </Section>
 
-        <Section
-          eyebrow="Calendario"
-          title="Próximas publicaciones en redes"
-          subtitle="Borradores listos para programar"
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {POSTS.map((p, i) => (
-              <article
-                key={i}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "12px 14px",
-                  borderRadius: 12,
-                  border: "1px solid var(--nx-panel-hairline)",
-                  background: "var(--surface)",
-                  boxShadow: "var(--nx-panel-elev-1)",
-                }}
-              >
-                <span
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 11,
-                    background: `linear-gradient(135deg, ${p.color} 0%, color-mix(in srgb, ${p.color} 70%, white) 100%)`,
-                    color: "#fff",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 17,
-                    fontWeight: 800,
-                    fontFamily: "var(--nx-font-display)",
-                    boxShadow: `0 6px 14px color-mix(in srgb, ${p.color} 28%, transparent)`,
-                  }}
-                >
-                  {p.red[0]}
-                </span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{p.titulo}</div>
-                  <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>
-                    {p.red} · {p.fecha}
-                  </div>
-                </div>
-                <Button size="sm" variant="ghost">
-                  Programar
-                </Button>
-              </article>
-            ))}
+        <Section eyebrow="Calendario" title="Próximas publicaciones" subtitle="Posts programados y borradores en redes">
+          {posts.length === 0 ? (
+            <div style={{ padding: 24, textAlign: "center", color: "var(--text-tertiary)", fontSize: 13 }}>
+              No hay posts pendientes.{" "}
+              <Link href="/studio/social" style={{ color: "var(--primary)", fontWeight: 600 }}>Crea uno →</Link>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {posts.map(p => {
+                const color = RED_COLOR[p.red] ?? "#666";
+                return (
+                  <article key={p.id} style={{
+                    display: "flex", alignItems: "center", gap: 12,
+                    padding: "12px 14px", borderRadius: 12,
+                    border: "1px solid var(--border)", background: "var(--surface)",
+                  }}>
+                    <span style={{
+                      width: 40, height: 40, borderRadius: 11, flexShrink: 0,
+                      background: `linear-gradient(135deg, ${color} 0%, color-mix(in srgb, ${color} 70%, white) 100%)`,
+                      color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 17, fontWeight: 800, fontFamily: "var(--nx-font-display)",
+                    }}>
+                      {p.red[0]}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {p.titulo}
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>
+                        {p.red} · {fmtDate(p.cuando)}
+                      </div>
+                    </div>
+                    <Tag variant={p.estado === "Programado" ? "positive" : "warning"} size="sm">{p.estado}</Tag>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+          <div style={{ marginTop: 12, textAlign: "right" }}>
+            <Link href="/studio/social" style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600 }}>
+              Ver todos los posts →
+            </Link>
           </div>
         </Section>
       </div>

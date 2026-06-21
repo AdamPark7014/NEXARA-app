@@ -146,6 +146,7 @@ export class UsersService {
     const excludeSuperAdmins = {
       NOT: { email: { in: this.superAdminEmails } },
     };
+    // Incluye campos RRHH (puesto, tipoContrato, estadoRRHH, isActive, fechaIngreso)
     const include = { role: true, department: true };
 
     let where: any;
@@ -171,6 +172,38 @@ export class UsersService {
     const users = await this.prisma['user'].findMany({ where, include });
     return this.withEmployeeNumberList(users);
   }
+  /** Plantilla RRHH — lista todos los usuarios activos con campos HR */
+  async findHrStaff(currentUser: { id: number; isSuperAdmin?: boolean; permissions?: string[] }, query?: PaginationQueryDto) {
+    const where: any = { NOT: { email: { in: this.superAdminEmails } } };
+    const select = {
+      id: true, nombre: true, email: true, employeeNumber: true,
+      avatarUrl: true, fechaCreacion: true,
+      puesto: true, tipoContrato: true, estadoRRHH: true, isActive: true, fechaIngreso: true,
+      department: { select: { id: true, nombre: true } },
+      role: { select: { id: true, nombre: true, nivelAutoridad: true } },
+    };
+
+    if (query?.limit) {
+      const [data, total] = await Promise.all([
+        this.prisma['user'].findMany({ where, select, skip: query.skip, take: query.take, orderBy: { id: 'asc' } }),
+        this.prisma['user'].count({ where }),
+      ]);
+      return buildPaginatedResponse(data, total, query);
+    }
+    return this.prisma['user'].findMany({ where, select, orderBy: { id: 'asc' } });
+  }
+
+  /** Actualiza campos RRHH de un usuario */
+  async updateHrFields(id: number, body: { puesto?: string; tipoContrato?: string; estadoRRHH?: string; isActive?: boolean; fechaIngreso?: string }) {
+    const data: any = {};
+    if (body.puesto !== undefined) data.puesto = body.puesto.trim() || null;
+    if (body.tipoContrato !== undefined) data.tipoContrato = body.tipoContrato || null;
+    if (body.estadoRRHH !== undefined) data.estadoRRHH = body.estadoRRHH;
+    if (body.isActive !== undefined) data.isActive = body.isActive;
+    if (body.fechaIngreso !== undefined) data.fechaIngreso = body.fechaIngreso ? new Date(body.fechaIngreso) : null;
+    return this.prisma['user'].update({ where: { id }, data });
+  }
+
   constructor(private readonly prisma: PrismaService) {}
 
   private async resolveRoleId(value: unknown) {
@@ -507,6 +540,8 @@ export class UsersService {
     await this.clearEmployeeNumberForProtectedUsers();
 
     const data: any = { ...updateUserDto };
+    // roleKey sólo se cambia desde el endpoint dedicado PATCH /users/:id/role-key
+    delete data.roleKey;
     const currentUser = await this.prisma['user'].findUnique({
       where: { id },
       select: { email: true },
@@ -542,5 +577,43 @@ export class UsersService {
 
   remove(id: number) {
     return this.prisma['user'].delete({ where: { id } });
+  }
+
+ 
+  async setManager(userId: number, managerId: number | null) {
+    return this.prisma['user'].update({
+      where: { id: userId },
+      data: { managerId: managerId ?? null },
+      select: { id: true, nombre: true, managerId: true },
+    });
+  }
+
+  async getOrgchart() {
+    const users = await this.prisma['user'].findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        nombre: true,
+        managerId: true,
+        avatarUrl: true,
+        role: { select: { id: true, nombre: true } },
+        department: { select: { id: true, nombre: true } },
+      },
+      orderBy: { nombre: 'asc' },
+    });
+
+    type OrgNode = (typeof users)[number] & { children: OrgNode[] };
+    const map = new Map<number, OrgNode>();
+    for (const u of users) map.set(u.id, { ...u, children: [] });
+
+    const roots: OrgNode[] = [];
+    for (const node of map.values()) {
+      if (node.managerId && map.has(node.managerId)) {
+        map.get(node.managerId)!.children.push(node);
+      } else {
+        roots.push(node);
+      }
+    }
+    return roots;
   }
 }

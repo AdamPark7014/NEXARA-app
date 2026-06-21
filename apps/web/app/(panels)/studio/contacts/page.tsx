@@ -1,51 +1,155 @@
 "use client";
 
+import { useEffect, useState, useCallback } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
+import { useUser } from "@/components/UserContext";
+import { buildApiUrl } from "@/lib/api-base";
 
-type Inbound = {
-  id: string;
-  fecha: string;
-  nombre: string;
-  empresa: string;
+interface ContactMsg {
+  id: number;
+  name: string;
   email: string;
-  telefono: string;
-  mensaje: string;
-  fuente: "Formulario web" | "WhatsApp" | "Instagram DM" | "Email directo";
-  estado: "Sin atender" | "Asignado a ventas" | "En seguimiento" | "Descartado";
+  phone?: string;
+  company?: string;
+  message: string;
+  source?: string;
+  status: string;
+  category: string;
+  createdAt: string;
+}
+
+const STATUS_VARIANT: Record<string, "accent" | "warning" | "neutral" | "danger"> = {
+  NEW:              "warning",
+  ASSIGNED:         "accent",
+  IN_PROGRESS:      "accent",
+  RESOLVED:         "neutral",
+  DISCARDED:        "neutral",
 };
 
-const ITEMS: Inbound[] = [
-  { id: "WL-9821", fecha: "Hoy 11:42", nombre: "Mariana Suárez", empresa: "Hotel Camino Real Puebla", email: "msuarez@caminoreal.com", telefono: "222 555 1010", mensaje: "Necesitamos cotizar cableado y WiFi 6 para 180 habitaciones.", fuente: "Formulario web", estado: "Asignado a ventas" },
-  { id: "WL-9820", fecha: "Hoy 09:30", nombre: "Roberto Garza", empresa: "—", email: "rgarza@gmail.com", telefono: "55 8821 4422", mensaje: "Quiero 4 cámaras + NVR en casa habitación. ¿Hacen instalación?", fuente: "WhatsApp", estado: "Asignado a ventas" },
-  { id: "WL-9819", fecha: "Ayer 18:00", nombre: "Coord. Cómputo UDLA", empresa: "Universidad de las Américas", email: "computo@udla.mx", telefono: "222 229 2000", mensaje: "Información sobre licitación equipo cómputo Q3.", fuente: "Email directo", estado: "En seguimiento" },
-  { id: "WL-9818", fecha: "Ayer 14:22", nombre: "Anónimo", empresa: "—", email: "—", telefono: "—", mensaje: "DM en Instagram: '¿manejan kits económicos para casa?'", fuente: "Instagram DM", estado: "Sin atender" },
-];
+const STATUS_LABEL: Record<string, string> = {
+  NEW:         "Sin atender",
+  ASSIGNED:    "Asignado a ventas",
+  IN_PROGRESS: "En seguimiento",
+  RESOLVED:    "Resuelto",
+  DISCARDED:   "Descartado",
+};
+
+async function apiFetch(path: string, token: string, opts?: RequestInit) {
+  const res = await fetch(buildApiUrl(path), {
+    ...opts,
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(opts?.headers ?? {}) },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+function fmtDate(iso: string) {
+  const d = new Date(iso);
+  const now = new Date();
+  const diff = (now.getTime() - d.getTime()) / 3600000;
+  if (diff < 24) return `Hoy ${d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`;
+  if (diff < 48) return `Ayer ${d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}`;
+  return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
+}
 
 export default function StudioContactsPage() {
-  const columns: Column<Inbound>[] = [
-    { key: "id", label: "ID", render: (i) => <Tag variant="accent">{i.id}</Tag>, width: 90 },
+  const { user } = useUser();
+  const token = user?.token ?? "";
+
+  const [items, setItems]     = useState<ContactMsg[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const data = await apiFetch("contact-messages?limit=50", token);
+      setItems(Array.isArray(data) ? data : (data.data ?? []));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Error");
+    } finally {
+      setLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const setStatus = async (id: number, status: string) => {
+    if (!token) return;
+    try {
+      await apiFetch(`contact-messages/${id}`, token, {
+        method: "PUT",
+        body: JSON.stringify({ status }),
+      });
+      setItems(prev => prev.map(c => c.id === id ? { ...c, status } : c));
+    } catch { /* ignore */ }
+  };
+
+  const remove = async (id: number) => {
+    if (!token || !confirm("¿Eliminar este mensaje?")) return;
+    try {
+      await apiFetch(`contact-messages/${id}`, token, { method: "DELETE" });
+      setItems(prev => prev.filter(c => c.id !== id));
+    } catch { /* ignore */ }
+  };
+
+  const columns: Column<ContactMsg>[] = [
     {
-      key: "nombre", label: "Contacto",
-      render: (i) => (
+      key: "name", label: "Contacto",
+      render: (c) => (
         <div>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>{i.nombre}</div>
-          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{i.empresa}</div>
+          <div style={{ fontWeight: 700, fontSize: 13 }}>{c.name}</div>
+          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{c.company || c.email}</div>
         </div>
       ),
     },
-    { key: "mensaje", label: "Mensaje", render: (i) => <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{i.mensaje.length > 80 ? i.mensaje.slice(0, 80) + "…" : i.mensaje}</span> },
-    { key: "fuente", label: "Canal", render: (i) => <Tag variant="neutral">{i.fuente}</Tag> },
-    { key: "fecha", label: "Recibido", accessor: (i) => i.fecha, width: 110 },
     {
-      key: "estado", label: "Estado",
-      render: (i) => (
-        <Tag variant={i.estado === "Asignado a ventas" || i.estado === "En seguimiento" ? "accent" : i.estado === "Descartado" ? "neutral" : "warning"}>
-          {i.estado}
-        </Tag>
+      key: "message", label: "Mensaje",
+      render: (c) => (
+        <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+          {c.message.length > 90 ? c.message.slice(0, 90) + "…" : c.message}
+        </span>
       ),
+    },
+    {
+      key: "source", label: "Canal",
+      render: (c) => <Tag variant="neutral">{c.source ?? c.category}</Tag>,
+      width: 140,
+    },
+    {
+      key: "createdAt", label: "Recibido",
+      accessor: (c) => fmtDate(c.createdAt),
+      width: 110,
+    },
+    {
+      key: "status", label: "Estado",
+      render: (c) => (
+        <select
+          value={c.status}
+          onChange={e => setStatus(c.id, e.target.value)}
+          style={{ fontSize: 12, border: "1px solid var(--border)", borderRadius: 6, padding: "3px 6px", background: "var(--surface)", color: "var(--foreground)", cursor: "pointer" }}
+        >
+          {Object.entries(STATUS_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+      ),
+      width: 160,
+    },
+    {
+      key: "id", label: "",
+      render: (c) => (
+        <button
+          onClick={() => remove(c.id)}
+          title="Eliminar"
+          style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 8px" }}
+        >
+          ✕
+        </button>
+      ),
+      width: 40,
     },
   ];
 
@@ -55,10 +159,35 @@ export default function StudioContactsPage() {
         eyebrow="STUDIO · Captación"
         title="Contactos web"
         subtitle="Formularios y mensajes que llegan por el sitio público y redes sociales. De aquí pasan al CRM."
-        actions={<Button variant="primary" iconLeft="→">Enviar lote a CRM</Button>}
+        actions={
+          <Button variant="primary" iconLeft="→" onClick={() => {
+            const news = items.filter(c => c.status === "NEW");
+            if (news.length === 0) return alert("No hay mensajes sin atender.");
+            news.forEach(c => setStatus(c.id, "ASSIGNED"));
+          }}>
+            Asignar lote a CRM ({items.filter(c => c.status === "NEW").length})
+          </Button>
+        }
       />
-      <Section title={`${ITEMS.length} mensajes recientes`}>
-        <DataTable columns={columns} rows={ITEMS} rowKey={(i) => i.id} onRowClick={(i) => alert(`Abrir ${i.id}`)} />
+
+      {error && (
+        <div style={{ padding: 14, borderRadius: 10, background: "color-mix(in srgb, var(--danger) 10%, transparent)", color: "var(--danger)", marginBottom: 12 }}>
+          {error}
+        </div>
+      )}
+
+      <Section title={loading ? "Cargando…" : `${items.length} mensajes`}>
+        {loading ? (
+          <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={items}
+            rowKey={c => c.id}
+            emptyTitle="Sin mensajes"
+            emptyDescription="No hay mensajes de contacto aún."
+          />
+        )}
       </Section>
     </>
   );
