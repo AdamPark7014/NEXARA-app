@@ -49,6 +49,46 @@ export function getUserHome(
 }
 
 /**
+ * Resuelve el URL absoluto (con subdominio) del panel HOME del usuario.
+ * Usado para redirecciones cross-subdomain después del login.
+ * 
+ * Ej: designer → https://studio.nexara.com.mx/dashboard
+ *     ceo      → https://core.nexara.com.mx/executive
+ */
+export function getUserHomeUrlAbsolute(
+  user: (UserPermissions & { role?: string | null; orgRoleKey?: string | null }) | null | undefined,
+): string {
+  if (!user) return 'https://core.nexara.com.mx/login';
+
+  const isSuperAdmin = Boolean(user.isSuperAdmin);
+  const roleKey = resolveOrgRoleKey(user.role, user.orgRoleKey);
+  const panel = getHomePanel(roleKey, isSuperAdmin);
+  const path = getHomeUrl(roleKey, isSuperAdmin);
+
+  // Mapeo panel → subdominio canónico
+  const SUBDOMAIN_MAP: Record<string, string> = {
+    erp: 'core',
+    crm: 'sales',
+    ops: 'ops',
+    studio: 'studio',
+    lab: 'lab',
+  };
+
+  const subdomain = SUBDOMAIN_MAP[panel] || 'core';
+  const protocol = typeof window !== 'undefined' ? window.location.protocol : 'https:';
+  const host = typeof window !== 'undefined' ? window.location.hostname : 'nexara.com.mx';
+
+  // En desarrollo (localhost): usar puerto si aplica
+  if (host.includes('localhost')) {
+    const port = typeof window !== 'undefined' ? window.location.port : '';
+    return `${protocol}//${subdomain}.localhost${port ? `:${port}` : ''}${path}`;
+  }
+
+  // Producción (nexara.com.mx)
+  return `${protocol}//${subdomain}.nexara.com.mx${path}`;
+}
+
+/**
  * URL absoluta del panel home. La usamos en redirects post-login.
  * Devuelve siempre paths del nuevo modelo (/erp/dashboard, /crm/dashboard…).
  */
