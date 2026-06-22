@@ -56,6 +56,19 @@ DECLARE
   u_karen         INT;
 
 BEGIN
+  -- ── Crear roles básicos si no existen ──────────────────────────────────────
+  -- Esto asegura que las migraciones sean idempotentes incluso en shadow database
+  INSERT INTO "Role" (nombre, "orgRoleKey")
+  VALUES 
+    ('Dueño / CEO', 'ceo'),
+    ('Coordinador Administrativo', 'coord_admin'),
+    ('Administrativo', 'administrativo'),
+    ('Líder de Diseño', 'lider_diseno'),
+    ('Coordinador de Operaciones', 'coord_operaciones'),
+    ('Ingeniero de Campo', 'ing_campo'),
+    ('Arquitecto', 'arquitecto')
+  ON CONFLICT (nombre) DO NOTHING;
+
   -- ── Resolver roles por nombre ──────────────────────────────────────────────
   SELECT id INTO r_ceo          FROM "Role" WHERE nombre ILIKE '%ceo%' OR nombre ILIKE '%director general%' LIMIT 1;
   SELECT id INTO r_coord_admin  FROM "Role" WHERE nombre ILIKE '%coord%admin%' OR nombre ILIKE '%coordinador admin%' LIMIT 1;
