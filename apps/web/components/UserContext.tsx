@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { clearActivePanel } from '@/lib/panel-routing';
 import { isCapacitorNative } from '@/lib/capacitor-env';
 import { buildApiUrl } from '@/lib/api-base';
+import { getSharedCookie, deleteSharedCookie, setSharedCookie, SHARED_COOKIE_KEYS } from '@/lib/shared-cookies';
 
 export interface User {
 	id: number;
@@ -130,6 +131,27 @@ const safeGetStoredUser = (): User | null => {
 		}
 	};
 
+	// 1. Intentar leer de cookies compartidas PRIMERO (para cross-subdomain)
+	// Si el usuario cambió de subdominio, localStorage/sessionStorage estarán vacíos
+	// pero la cookie compartida aún tendrá el token
+	try {
+		const cookieUserStr = getSharedCookie(SHARED_COOKIE_KEYS.USER);
+		const cookieUser = parseStored(cookieUserStr);
+		if (cookieUser) {
+			// Guardar también en sessionStorage para acceso rápido local
+			try {
+				const { offlineDegraded: _omit, ...persistable } = cookieUser;
+				window.sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(persistable));
+			} catch {
+				/* ignore */
+			}
+			return cookieUser;
+		}
+	} catch {
+		// Ignore cookie read errors
+	}
+
+	// 2. Fallback: leer de sessionStorage (sesión local dentro del mismo subdominio)
 	try {
 		const sessionCandidate = parseStored(window.sessionStorage.getItem(USER_STORAGE_KEY));
 		if (sessionCandidate) return sessionCandidate;
@@ -137,6 +159,7 @@ const safeGetStoredUser = (): User | null => {
 		// Ignore storage access errors (Safari private mode, etc.)
 	}
 
+	// 3. Fallback: leer de localStorage (legacy)
 	const native = isCapacitorNative();
 
 	try {
@@ -204,6 +227,25 @@ const safePersistUser = (user: User | null) => {
 			window.localStorage.removeItem(USER_STORAGE_KEY);
 		} catch {
 			/* ignore */
+		}
+	}
+
+	// También escribir/limpiar cookies compartidas para persistencia cross-subdomain
+	if (typeof document !== 'undefined') {
+		if (user) {
+			const { offlineDegraded: _omit, ...persistable } = user;
+			setSharedCookie(SHARED_COOKIE_KEYS.USER, JSON.stringify(persistable), {
+				maxAge: 86400,
+				sameSite: 'Lax',
+			});
+			setSharedCookie(SHARED_COOKIE_KEYS.ACCESS_TOKEN, user.token, {
+				maxAge: 86400,
+				sameSite: 'Lax',
+			});
+		} else {
+			// Logout: limpiar cookies compartidas
+			deleteSharedCookie(SHARED_COOKIE_KEYS.USER);
+			deleteSharedCookie(SHARED_COOKIE_KEYS.ACCESS_TOKEN);
 		}
 	}
 

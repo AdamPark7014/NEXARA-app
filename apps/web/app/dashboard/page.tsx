@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { getUserHomeUrlAbsolute } from '@/lib/panel-home';
+import { getSharedCookie, SHARED_COOKIE_KEYS } from '@/lib/shared-cookies';
 
 /**
  * Página de redirect de dashboard genérica.
- * Redirige al usuario a su panel HOME según su rol desde localStorage.
+ * Redirige al usuario a su panel HOME según su rol desde cookies compartidas (cross-subdomain).
  * 
  * Maneja redirecciones cross-subdomain (ej: core → studio).
  */
@@ -14,7 +15,19 @@ export default function DashboardRedirect() {
 
   useEffect(() => {
     try {
-      // Verificar si está autenticado
+      // 1. Intentar leer de cookies compartidas (cross-subdomain)
+      const tokenFromCookie = getSharedCookie(SHARED_COOKIE_KEYS.ACCESS_TOKEN);
+      const userFromCookie = getSharedCookie(SHARED_COOKIE_KEYS.USER);
+
+      if (tokenFromCookie && userFromCookie) {
+        const user = JSON.parse(userFromCookie);
+        const homeUrl = getUserHomeUrlAbsolute(user);
+        setIsChecking(false);
+        window.location.href = homeUrl;
+        return;
+      }
+
+      // 2. Fallback: intentar leer de localStorage (mismo subdominio)
       const token = localStorage.getItem('nexara_access_token');
       const userStr = localStorage.getItem('nexara_user');
 
