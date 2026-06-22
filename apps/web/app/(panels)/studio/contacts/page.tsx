@@ -6,6 +6,7 @@ import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
+import { useRbacGuard } from "@/lib/useRbacGuard";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface ContactMsg {
@@ -57,6 +58,7 @@ function fmtDate(iso: string) {
 
 export default function StudioContactsPage() {
   const { user } = useUser();
+  const { canDelete } = useRbacGuard();
   const token = user?.token ?? "";
 
   const [items, setItems]     = useState<ContactMsg[]>([]);
@@ -141,6 +143,7 @@ export default function StudioContactsPage() {
     {
       key: "id", label: "",
       render: (c) => (
+        canDelete ? (
         <button
           onClick={() => remove(c.id)}
           title="Eliminar"
@@ -148,6 +151,7 @@ export default function StudioContactsPage() {
         >
           ✕
         </button>
+        ) : null
       ),
       width: 40,
     },

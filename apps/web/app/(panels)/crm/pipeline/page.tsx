@@ -1,280 +1,159 @@
 "use client";
 
+import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
 import { Money, Tag } from "@/components/ui/DataTable";
+import EmptyState from "@/components/ui/EmptyState";
+import { useUser } from "@/components/UserContext";
+import { useRbacGuard } from "@/lib/useRbacGuard";
+import { buildApiUrl } from "@/lib/api-base";
 
-type Stage = {
-  id: string;
-  name: string;
-  color: string;
-  description: string;
-  opportunities: Opportunity[];
-};
+interface Opportunity {
+  id: number;
+  nombre?: string;
+  concepto?: string;
+  monto?: number;
+  probabilidad?: number;
+  etapa?: string;
+  cierreEsperado?: string;
+  cliente?: { razonSocial?: string };
+  owner?: { nombre?: string };
+  createdAt?: string;
+}
 
-type Opportunity = {
-  id: string;
-  cliente: string;
-  concepto: string;
-  monto: number;
-  prob: number;
-  owner: string;
-  age: string;
-  badge?: string;
-};
+async function apiFetch(path: string, token: string, init: RequestInit = {}) {
+  const res = await fetch(buildApiUrl(path), {
+    ...init,
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(init.headers as Record<string, string> ?? {}) },
+  });
+  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+  if (res.status === 204) return null;
+  const t = await res.text();
+  return t ? JSON.parse(t) : null;
+}
 
-const STAGES: Stage[] = [
-  {
-    id: "discovery", name: "Discovery", color: "#94a3b8",
-    description: "Detectar necesidad real",
-    opportunities: [
-      { id: "OP-410", cliente: "Hotel Camino Real", concepto: "Cableado + WiFi 6", monto: 480000, prob: 30, owner: "Karina", age: "2d" },
-      { id: "OP-411", cliente: "Escuela San José", concepto: "30 PCs + impresoras", monto: 220000, prob: 25, owner: "Karina", age: "5d" },
-    ],
-  },
-  {
-    id: "qualified", name: "Calificado", color: "#0ea5e9",
-    description: "Hay presupuesto y decisor",
-    opportunities: [
-      { id: "OP-405", cliente: "Polos del Bienestar", concepto: "384 cámaras CCTV", monto: 3200000, prob: 60, owner: "Karen", age: "12d", badge: "Gov" },
-      { id: "OP-407", cliente: "Constructora Reyes", concepto: "POS + red en obra", monto: 850000, prob: 45, owner: "Karina", age: "8d" },
-    ],
-  },
-  {
-    id: "proposal", name: "Cotización enviada", color: "#8b5cf6",
-    description: "PDF en manos del cliente",
-    opportunities: [
-      { id: "OP-402", cliente: "UDLA Cholula", concepto: "120 laptops + 40 monitores", monto: 1850000, prob: 80, owner: "Karina", age: "4d" },
-      { id: "OP-403", cliente: "Telcel Distribuidor", concepto: "Mantenimiento 6 sucursales", monto: 360000, prob: 55, owner: "Karen", age: "9d" },
-    ],
-  },
-  {
-    id: "negotiation", name: "Negociación", color: "#f59e0b",
-    description: "Ajuste de precio / scope",
-    opportunities: [
-      { id: "OP-398", cliente: "Soriana Querétaro", concepto: "Mant. anual POS + cámaras", monto: 720000, prob: 90, owner: "Karen", age: "3d", badge: "Caliente" },
-    ],
-  },
-  {
-    id: "closing", name: "Cierre", color: "#10b981",
-    description: "Firmando contrato",
-    opportunities: [
-      { id: "OP-390", cliente: "Familia Garza", concepto: "4 cámaras + NVR + instalación", monto: 18500, prob: 95, owner: "Karina", age: "1d" },
-      { id: "OP-391", cliente: "TOKS Centro", concepto: "Renovación mant. mensual", monto: 540000, prob: 92, owner: "Karen", age: "6d" },
-    ],
-  },
-  {
-    id: "won", name: "Ganadas", color: "#16a34a",
-    description: "Listas para handoff a OPS",
-    opportunities: [
-      { id: "OP-380", cliente: "Comercializadora Lima", concepto: "20 laptops Lenovo", monto: 285000, prob: 100, owner: "Karina", age: "1d" },
-    ],
-  },
+const STAGES: { id: string; name: string; color: string; description: string }[] = [
+  { id: "Discovery", name: "Discovery", color: "#94a3b8", description: "Detectar necesidad real" },
+  { id: "Calificado", name: "Calificado", color: "#0ea5e9", description: "Presupuesto y autoridad confirmados" },
+  { id: "Cotización", name: "Cotización", color: "#6366f1", description: "Propuesta formal enviada" },
+  { id: "Negociación", name: "Negociación", color: "#f59e0b", description: "Ajustando precio o alcance" },
+  { id: "Cierre", name: "Cierre", color: "#10b981", description: "Firma o PO en proceso" },
 ];
 
+function daysAgo(iso?: string): string {
+  if (!iso) return "—";
+  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  return d <= 0 ? "Hoy" : `${d}d`;
+}
+
 export default function PipelinePage() {
-  const totalPipeline = STAGES.reduce(
-    (sum, s) => sum + s.opportunities.reduce((acc, o) => acc + o.monto, 0),
-    0,
-  );
-  const weighted = STAGES.reduce(
-    (sum, s) =>
-      sum + s.opportunities.reduce((acc, o) => acc + (o.monto * o.prob) / 100, 0),
-    0,
-  );
+  const { user } = useUser();
+  const { canEdit } = useRbacGuard();
+  const token = user?.token ?? "";
+
+  const [items, setItems] = useState<Opportunity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<number | null>(null);
+
+  const load = useCallback(async () => {
+    if (!token) return;
+    setLoading(true); setError(null);
+    try {
+      const data = await apiFetch("ventas/oportunidades", token);
+      setItems(Array.isArray(data) ? data : (data?.data ?? []));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al cargar el pipeline");
+    } finally { setLoading(false); }
+  }, [token]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const byStage = useMemo(() => {
+    const map = new Map<string, Opportunity[]>();
+    for (const s of STAGES) map.set(s.id, []);
+    for (const o of items) {
+      const key = o.etapa ?? "Discovery";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(o);
+    }
+    return map;
+  }, [items]);
+
+  const moveStage = async (id: number, etapa: string) => {
+    if (!token) return;
+    setItems((prev) => prev.map((o) => (o.id === id ? { ...o, etapa } : o)));
+    try {
+      await apiFetch(`ventas/oportunidades/${id}`, token, { method: "PATCH", body: JSON.stringify({ etapa }) });
+    } catch (e) {
+      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      void load();
+    }
+  };
+
+  const totalPipeline = items.filter((o) => o.etapa !== "Perdido" && o.etapa !== "Ganado").reduce((s, o) => s + (o.monto ?? 0), 0);
 
   return (
     <>
       <PageHeader
         eyebrow="CRM · Pipeline"
-        title="Kanban de oportunidades"
-        subtitle={
-          <span>
-            <strong style={{ color: "var(--text-primary)" }}>$ {totalPipeline.toLocaleString("es-MX")}</strong>{" "}
-            total en pipeline · <strong>${Math.round(weighted).toLocaleString("es-MX")}</strong> ponderado por
-            probabilidad
-          </span>
-        }
-        actions={
-          <>
-            <Button variant="secondary" iconLeft="📥">
-              Exportar
-            </Button>
-            <Button variant="primary" iconLeft="🎯">
-              Nueva oportunidad
-            </Button>
-          </>
-        }
+        title="Pipeline visual"
+        subtitle={`${items.length} oportunidades · $${(totalPipeline / 1000000).toFixed(1)}M en juego. Arrastra una tarjeta para cambiar de etapa.`}
+        actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
       />
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: `repeat(${STAGES.length}, minmax(260px, 1fr))`,
-          gap: 12,
-          overflowX: "auto",
-          paddingBottom: 12,
-        }}
-      >
-        {STAGES.map((stage) => {
-          const stageTotal = stage.opportunities.reduce((acc, o) => acc + o.monto, 0);
-          return (
-            <div
-              key={stage.id}
-              style={{
-                background: "color-mix(in srgb, var(--surface-2) 50%, transparent)",
-                border: "1px solid var(--border)",
-                borderRadius: 14,
-                padding: 12,
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-                minHeight: 400,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  gap: 8,
-                }}
-              >
-                <div>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      marginBottom: 4,
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: 999,
-                        background: stage.color,
-                      }}
-                    />
-                    <span
-                      style={{
-                        fontFamily: "var(--nx-font-display)",
-                        fontWeight: 700,
-                        fontSize: 13,
-                        color: "var(--text-primary)",
-                      }}
-                    >
-                      {stage.name}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 10.5,
-                        fontWeight: 700,
-                        color: "var(--text-tertiary)",
-                      }}
-                    >
-                      {stage.opportunities.length}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                    {stage.description}
-                  </div>
-                </div>
-                <Money value={stageTotal} compact />
-              </div>
+      {loading && <EmptyState icon="⏳" title="Cargando pipeline…" description="Consultando oportunidades." />}
+      {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
 
-              {stage.opportunities.map((o) => (
-                <article
-                  key={o.id}
-                  style={{
-                    background: "var(--surface)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 10,
-                    padding: 11,
-                    cursor: "grab",
-                    transition: "border-color var(--nx-motion-fast) ease, transform var(--nx-motion-fast) ease",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-start",
-                      gap: 6,
-                      marginBottom: 6,
-                    }}
-                  >
-                    <div style={{ fontSize: 12.5, fontWeight: 700, lineHeight: 1.3 }}>
-                      {o.cliente}
-                    </div>
-                    {o.badge && <Tag variant="warning">{o.badge}</Tag>}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 11.5,
-                      color: "var(--text-secondary)",
-                      marginBottom: 8,
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {o.concepto}
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: 8,
-                    }}
-                  >
-                    <Money value={o.monto} compact />
-                    <span
-                      style={{
-                        fontSize: 10.5,
-                        fontWeight: 700,
-                        color: "var(--text-tertiary)",
-                      }}
+      {!loading && !error && (
+        <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 12 }}>
+          {STAGES.map((stage) => {
+            const opps = byStage.get(stage.id) ?? [];
+            const stageTotal = opps.reduce((s, o) => s + (o.monto ?? 0), 0);
+            return (
+              <div
+                key={stage.id}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => { if (canEdit && dragId != null) void moveStage(dragId, stage.id); setDragId(null); }}
+                style={{ minWidth: 270, flex: "1 0 270px", background: "color-mix(in srgb, var(--surface-2) 50%, transparent)", border: "1px solid var(--border)", borderRadius: 14, padding: 12 }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: 999, background: stage.color }} />
+                  <div style={{ fontWeight: 700, fontSize: 13.5 }}>{stage.name}</div>
+                  <Tag variant="default">{opps.length}</Tag>
+                </div>
+                <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginBottom: 10 }}>{stage.description}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-secondary)", marginBottom: 10 }}>
+                  <Money value={stageTotal} />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, minHeight: 60 }}>
+                  {opps.map((o) => (
+                    <article
+                      key={o.id}
+                      draggable={canEdit}
+                      onDragStart={() => setDragId(o.id)}
+                      style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: 12, cursor: canEdit ? "grab" : "default" }}
                     >
-                      {o.prob}%
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginTop: 8,
-                      fontSize: 10.5,
-                      color: "var(--text-tertiary)",
-                    }}
-                  >
-                    <span>👤 {o.owner}</span>
-                    <span>⏱ {o.age}</span>
-                  </div>
-                  <div
-                    style={{
-                      height: 4,
-                      marginTop: 8,
-                      background: "var(--surface-2)",
-                      borderRadius: 2,
-                      overflow: "hidden",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: `${o.prob}%`,
-                        height: "100%",
-                        background: stage.color,
-                      }}
-                    />
-                  </div>
-                </article>
-              ))}
-            </div>
-          );
-        })}
-      </div>
+                      <div style={{ fontWeight: 700, fontSize: 12.5, marginBottom: 4 }}>{o.cliente?.razonSocial ?? o.nombre ?? "—"}</div>
+                      <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginBottom: 8 }}>{o.concepto?.slice(0, 50) ?? ""}</div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontWeight: 700, fontSize: 13 }}><Money value={o.monto ?? 0} /></span>
+                        <Tag variant={o.probabilidad && o.probabilidad >= 70 ? "positive" : o.probabilidad && o.probabilidad >= 40 ? "warning" : "default"}>{o.probabilidad ?? 0}%</Tag>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 11, color: "var(--text-tertiary)" }}>
+                        <span>{o.owner?.nombre ?? "—"}</span>
+                        <span>{daysAgo(o.createdAt)}</span>
+                      </div>
+                    </article>
+                  ))}
+                  {opps.length === 0 && <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", textAlign: "center", padding: 12 }}>Sin oportunidades</div>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </>
   );
 }

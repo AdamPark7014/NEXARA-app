@@ -5,6 +5,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
+import { useRbacGuard } from "@/lib/useRbacGuard";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface OrgNode {
@@ -72,9 +73,10 @@ interface NodeProps {
   allUsers: OrgNode[];
   token: string;
   onRefresh: () => void;
+  canEditOrg: boolean;
 }
 
-function Node({ node, depth = 0, allUsers, token, onRefresh }: NodeProps) {
+function Node({ node, depth = 0, allUsers, token, onRefresh, canEditOrg }: NodeProps) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedManager, setSelectedManager] = useState<string>(
@@ -140,13 +142,15 @@ function Node({ node, depth = 0, allUsers, token, onRefresh }: NodeProps) {
           {node.department && (
             <Tag variant={depth === 0 ? "accent" : "neutral"}>{node.department.nombre}</Tag>
           )}
-          <button
-            onClick={() => { setEditing(e => !e); setSelectedManager(node.managerId ? String(node.managerId) : ""); }}
-            title="Editar manager"
-            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--text-tertiary)", padding: "2px 4px", flexShrink: 0 }}
-          >
-            ✎
-          </button>
+          {canEditOrg && (
+            <button
+              onClick={() => { setEditing(e => !e); setSelectedManager(node.managerId ? String(node.managerId) : ""); }}
+              title="Editar manager"
+              style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--text-tertiary)", padding: "2px 4px", flexShrink: 0 }}
+            >
+              ✎
+            </button>
+          )}
         </div>
 
         {editing && (
@@ -203,7 +207,7 @@ function Node({ node, depth = 0, allUsers, token, onRefresh }: NodeProps) {
           }}
         >
           {node.children.map(c => (
-            <Node key={c.id} node={c} depth={depth + 1} allUsers={allUsers} token={token} onRefresh={onRefresh} />
+            <Node key={c.id} node={c} depth={depth + 1} allUsers={allUsers} token={token} onRefresh={onRefresh} canEditOrg={canEditOrg} />
           ))}
         </div>
       )}
@@ -213,6 +217,7 @@ function Node({ node, depth = 0, allUsers, token, onRefresh }: NodeProps) {
 
 export default function OrgChartPage() {
   const { user } = useUser();
+  const { canManageUsers } = useRbacGuard();
   const token = user?.token ?? "";
 
   const [roots, setRoots]     = useState<OrgNode[]>([]);
@@ -242,7 +247,7 @@ export default function OrgChartPage() {
       <PageHeader
         eyebrow="ERP · Personas"
         title="Organigrama"
-        subtitle="Jerarquía de reporte en NEXARA. Haz clic en ✎ en cualquier nodo para reasignar su manager."
+        subtitle={canManageUsers ? "Jerarquía de reporte en NEXARA. Haz clic en ✎ en cualquier nodo para reasignar su manager." : "Jerarquía de reporte en NEXARA. Solo Dirección puede reasignar managers."}
       />
 
       {error && (
@@ -273,6 +278,7 @@ export default function OrgChartPage() {
                 allUsers={allUsers}
                 token={token}
                 onRefresh={load}
+                canEditOrg={canManageUsers}
               />
             ))}
           </div>

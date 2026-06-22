@@ -6,6 +6,7 @@ import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
+import { useRbacGuard } from "@/lib/useRbacGuard";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface Project {
@@ -36,6 +37,7 @@ const emptyForm = { nombre: "", descripcion: "", estado: "PLANEACION", fechaInic
 
 export default function OpsProjectsPage() {
   const { user } = useUser();
+  const { canCreate, canEdit, canDelete } = useRbacGuard();
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<Project[]>([]);
@@ -103,8 +105,8 @@ export default function OpsProjectsPage() {
     { key: "estado", label: "Estado", render: p => <Tag variant={statusVariant(p.estado)}>{(p.estado ?? "—").replace(/_/g, " ")}</Tag>, width: 120 },
     { key: "id", label: "", render: p => (
       <div style={{ display: "flex", gap: 4 }}>
-        <button onClick={() => openEdit(p)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>
-        <button onClick={() => remove(p.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>
+        {canEdit && <button onClick={() => openEdit(p)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>}
+        {canDelete && <button onClick={() => remove(p.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>}
       </div>
     ), width: 60 },
   ];
@@ -115,7 +117,7 @@ export default function OpsProjectsPage() {
         eyebrow="OPS · Proyectos"
         title="Proyectos operativos"
         subtitle="Venta ganada convertida en proyecto: alcance, cuadrilla, calendario y presupuesto."
-        actions={<Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo proyecto</Button>}
+        actions={canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo proyecto</Button> : undefined}
       />
 
       {showForm && (

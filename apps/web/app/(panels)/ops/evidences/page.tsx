@@ -6,6 +6,7 @@ import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
+import { useRbacGuard } from "@/lib/useRbacGuard";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface Evidence {
@@ -32,6 +33,7 @@ async function apiFetch(path: string, token: string, opts?: RequestInit) {
 
 export default function EvidencesReviewPage() {
   const { user } = useUser();
+  const { canApprove, canDelete } = useRbacGuard();
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<Evidence[]>([]);
@@ -82,7 +84,7 @@ export default function EvidencesReviewPage() {
         <Tag variant={e.estado === "APROBADA" ? "neutral" : e.estado === "RECHAZADA" ? "danger" : "warning"}>
           {(e.estado ?? "—").replace(/_/g, " ")}
         </Tag>
-        {e.estado === "PENDIENTE_REVISION" && (
+        {e.estado === "PENDIENTE_REVISION" && canApprove && (
           <>
             <button onClick={() => patchEstado(e.id, "APROBADA")} style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>✓</button>
             <button onClick={() => patchEstado(e.id, "RECHAZADA")} style={{ fontSize: 11, background: "var(--danger)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>✕</button>
@@ -91,7 +93,7 @@ export default function EvidencesReviewPage() {
       </div>
     ), width: 220 },
     { key: "id", label: "", render: e => (
-      <button onClick={() => remove(e.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 8px" }}>✕</button>
+      canDelete ? <button onClick={() => remove(e.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 8px" }}>✕</button> : null
     ), width: 40 },
   ];
 

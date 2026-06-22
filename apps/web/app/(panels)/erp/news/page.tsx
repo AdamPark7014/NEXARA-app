@@ -7,6 +7,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import Button from "@/components/ui/Button";
 import { useUser } from "@/components/UserContext";
+import { useRbacGuard } from "@/lib/useRbacGuard";
 import { buildApiUrl } from "@/lib/api-base";
 
 type Tab = "comunicados" | "newsletter";
@@ -23,6 +24,14 @@ interface Comunicado {
   sentAt?: string | null;
   createdAt: string;
   autor?: { id: number; nombre: string };
+}
+
+interface NewsletterSubscriber {
+  id: number;
+  email: string;
+  name?: string | null;
+  source?: string | null;
+  subscribedAt: string;
 }
 
 const ESTADO_VARIANT: Record<string, "neutral" | "warning" | "positive"> = {
@@ -65,6 +74,7 @@ function TabButton({ active, onClick, icon, label, count }: { active: boolean; o
 
 export default function ComunicacionesInternasPage() {
   const { user } = useUser();
+  const { canCreate, canEdit, canDelete, canApprove } = useRbacGuard();
   const token = user?.token ?? "";
 
   const [tab, setTab]         = useState<Tab>("comunicados");
@@ -75,6 +85,21 @@ export default function ComunicacionesInternasPage() {
   const [editing, setEditing]   = useState<Comunicado | null>(null);
   const [form, setForm]         = useState({ ...EMPTY_FORM });
   const [saving, setSaving]     = useState(false);
+  const [subs, setSubs]         = useState<NewsletterSubscriber[]>([]);
+  const [subsLoading, setSubsLoading] = useState(false);
+  const [subSearch, setSubSearch]     = useState("");
+
+  const loadSubs = useCallback(async (q?: string) => {
+    if (!token) return;
+    setSubsLoading(true);
+    try {
+      const qs = q ? `?search=${encodeURIComponent(q)}` : "";
+      const data = await apiFetch(`newsletter${qs}`, token);
+      setSubs(Array.isArray(data) ? data : (data?.data ?? []));
+    } catch { /* skip */ } finally { setSubsLoading(false); }
+  }, [token]);
+
+  useEffect(() => { if (tab === "newsletter") void loadSubs(); }, [tab, loadSubs]);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -166,15 +191,15 @@ export default function ComunicacionesInternasPage() {
       key: "id", label: "", width: 120,
       render: c => (
         <div style={{ display: "flex", gap: 4 }}>
-          {c.estado !== "Enviado" && (
+          {c.estado !== "Enviado" && canApprove && (
             <button onClick={() => enviar(c.id)} title="Enviar ahora" style={{
               fontSize: 11, padding: "3px 7px", borderRadius: 6, cursor: "pointer",
               background: "color-mix(in srgb, var(--primary) 12%, transparent)",
               color: "var(--primary)", border: "1px solid color-mix(in srgb, var(--primary) 30%, transparent)", fontWeight: 600,
             }}>Enviar</button>
           )}
-          <button onClick={() => openEdit(c)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--text-tertiary)", padding: "3px 6px" }}>✎</button>
-          <button onClick={() => remove(c.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--danger)", padding: "3px 6px" }}>✕</button>
+          {canEdit && <button onClick={() => openEdit(c)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--text-tertiary)", padding: "3px 6px" }}>✎</button>}
+          {canDelete && <button onClick={() => remove(c.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--danger)", padding: "3px 6px" }}>✕</button>}
         </div>
       ),
     },
@@ -187,7 +212,7 @@ export default function ComunicacionesInternasPage() {
         title="Noticias internas"
         subtitle="Comunicados al equipo y newsletter mensual de NEXARA."
         actions={
-          <Button variant="primary" iconLeft="📣" onClick={openNew}>Nuevo comunicado</Button>
+          canCreate ? <Button variant="primary" iconLeft="📣" onClick={openNew}>Nuevo comunicado</Button> : undefined
         }
       />
 
@@ -262,10 +287,32 @@ export default function ComunicacionesInternasPage() {
           )}
         </Section>
       ) : (
-        <Section title="Newsletter mensual" subtitle="Boletín del equipo — próximamente conectado a plantillas.">
-          <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)", fontSize: 14 }}>
-            La gestión de newsletter estará disponible próximamente.
+        <Section title="Suscriptores del newsletter" subtitle="Captados desde el formulario público del sitio web — exporta la lista para tu siguiente envío.">
+          <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 14 }}>
+            <input
+              value={subSearch}
+              onChange={(e) => { setSubSearch(e.target.value); void loadSubs(e.target.value); }}
+              placeholder="Buscar por email o nombre…"
+              style={{ flex: 1, maxWidth: 320, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}
+            />
+            <KpiCard label="Suscriptores" value={subs.length} />
           </div>
+          {subsLoading ? (
+            <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+          ) : (
+            <DataTable
+              columns={[
+                { key: "email", label: "Email", width: 240 },
+                { key: "name", label: "Nombre", accessor: (s: NewsletterSubscriber) => s.name ?? "—" },
+                { key: "source", label: "Origen", render: (s: NewsletterSubscriber) => <Tag variant="neutral">{s.source ?? "web"}</Tag>, width: 120 },
+                { key: "subscribedAt", label: "Suscrito", render: (s: NewsletterSubscriber) => <span style={{ fontSize: 12 }}>{new Date(s.subscribedAt).toLocaleDateString("es-MX")}</span>, width: 110 },
+              ]}
+              rows={subs}
+              rowKey={(s: NewsletterSubscriber) => s.id}
+              emptyTitle="Sin suscriptores"
+              emptyDescription="Aún nadie se ha registrado desde el formulario público."
+            />
+          )}
         </Section>
       )}
     </>

@@ -7,6 +7,7 @@ import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
+import { useRbacGuard } from "@/lib/useRbacGuard";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface Viatic {
@@ -33,6 +34,7 @@ async function apiFetch(path: string, token: string, opts?: RequestInit) {
 
 export default function OpsViaticsPage() {
   const { user } = useUser();
+  const { canApprove } = useRbacGuard();
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<Viatic[]>([]);
@@ -73,13 +75,13 @@ export default function OpsViaticsPage() {
         <Tag variant={v.estado === "APROBADO" ? "neutral" : v.estado === "RECHAZADO" ? "danger" : "warning"}>
           {(v.estado ?? "—").replace(/_/g, " ")}
         </Tag>
-        {v.estado === "PENDIENTE_COORD" && (
+        {v.estado === "PENDIENTE_COORD" && canApprove && (
           <>
             <button onClick={() => patchEstado(v.id, "PENDIENTE_ADMIN")} style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>✓ Coord</button>
             <button onClick={() => patchEstado(v.id, "RECHAZADO")} style={{ fontSize: 11, background: "var(--danger)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>✕</button>
           </>
         )}
-        {v.estado === "PENDIENTE_ADMIN" && (
+        {v.estado === "PENDIENTE_ADMIN" && canApprove && (
           <>
             <button onClick={() => patchEstado(v.id, "APROBADO")} style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>✓ Admin</button>
             <button onClick={() => patchEstado(v.id, "RECHAZADO")} style={{ fontSize: 11, background: "var(--danger)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>✕</button>

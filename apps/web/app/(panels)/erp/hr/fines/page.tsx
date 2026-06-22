@@ -6,6 +6,7 @@ import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
+import { useRbacGuard } from "@/lib/useRbacGuard";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface Fine {
@@ -36,6 +37,7 @@ const emptyForm = { tipo: "TARDANZA", descripcion: "", monto: 0, aplicaDescuento
 
 export default function FinesPage() {
   const { user } = useUser();
+  const { canEdit: isManager, isDirector } = useRbacGuard();
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<Fine[]>([]);
@@ -96,8 +98,8 @@ export default function FinesPage() {
     { key: "estado", label: "Estado", render: f => <Tag variant={f.estado === "APLICADO" ? "neutral" : f.estado === "CANCELADO" ? "danger" : "warning"}>{f.estado ?? "—"}</Tag>, width: 100 },
     { key: "id", label: "", render: f => (
       <div style={{ display: "flex", gap: 4 }}>
-        <button onClick={() => openEdit(f)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>
-        <button onClick={() => remove(f.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>
+        {isManager && <button onClick={() => openEdit(f)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>}
+        {isDirector && <button onClick={() => remove(f.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>}
       </div>
     ), width: 60 },
   ];
@@ -108,7 +110,7 @@ export default function FinesPage() {
         eyebrow="ERP · Personas"
         title="Multas e incidencias"
         subtitle="Sanciones administrativas con bitácora: faltas, daño a vehículo, herramienta perdida, comportamiento."
-        actions={<Button variant="primary" iconLeft="+" onClick={openNew}>Nueva sanción</Button>}
+        actions={isManager ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva sanción</Button> : undefined}
       />
 
       {showForm && (

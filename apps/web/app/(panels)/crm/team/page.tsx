@@ -1,21 +1,85 @@
 "use client";
-import ModuleStub from "@/components/ui/ModuleStub";
-export default function Page() {
+
+import { useCallback, useEffect, useState } from "react";
+import PageHeader from "@/components/ui/PageHeader";
+import Section from "@/components/ui/Section";
+import Button from "@/components/ui/Button";
+import { Tag, Money, type Column } from "@/components/ui/DataTable";
+import DataTable from "@/components/ui/DataTable";
+import EmptyState from "@/components/ui/EmptyState";
+import { useUser } from "@/components/UserContext";
+import { buildApiUrl } from "@/lib/api-base";
+
+interface Performance {
+  targetId: number;
+  ownerId: number;
+  ownerName: string;
+  revenueTarget: number;
+  revenueAchieved: number;
+  attainmentPct: number;
+  opportunitiesCreated: number;
+  newClientsAchieved: number;
+  reachedBonus: boolean;
+}
+
+async function apiFetch(path: string, token: string) {
+  const res = await fetch(buildApiUrl(path), { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+  return res.json();
+}
+
+export default function TeamPage() {
+  const { user } = useUser();
+  const token = user?.token ?? "";
+
+  const [rows, setRows] = useState<Performance[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!token) return;
+    setLoading(true); setError(null);
+    try {
+      const data = await apiFetch("sales-targets/performance", token);
+      setRows(Array.isArray(data?.performance) ? data.performance : []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al cargar el equipo de ventas");
+    } finally { setLoading(false); }
+  }, [token]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const columns: Column<Performance>[] = [
+    {
+      key: "ownerName", label: "#",
+      render: (p) => {
+        const idx = rows.findIndex((r) => r.targetId === p.targetId);
+        return <span style={{ fontWeight: 800, color: idx === 0 ? "var(--accent)" : "var(--text-tertiary)" }}>{idx + 1}</span>;
+      },
+      width: 40,
+    },
+    { key: "ownerName" as keyof Performance, label: "Ejecutivo" },
+    { key: "opportunitiesCreated", label: "Oportunidades", width: 120 },
+    { key: "newClientsAchieved", label: "Clientes nuevos", width: 120 },
+    { key: "revenueAchieved", label: "Vendido (mes)", render: (p) => <Money value={p.revenueAchieved} />, width: 130 },
+    { key: "attainmentPct", label: "% cuota", render: (p) => <Tag variant={p.attainmentPct >= 100 ? "positive" : p.attainmentPct >= 60 ? "warning" : "danger"}>{p.attainmentPct}%</Tag>, width: 100 },
+    { key: "reachedBonus", label: "Bono", render: (p) => p.reachedBonus ? <Tag variant="positive">🏆 Alcanzado</Tag> : <Tag variant="default">—</Tag>, width: 120 },
+  ];
+
   return (
-    <ModuleStub
-      eyebrow="CRM · Equipo y métricas"
-      title="Equipo de ventas"
-      description="Gestión del equipo comercial: leads asignados, oportunidades en mano, cuotas y rendimiento individual."
-      icon="🧑‍💼"
-      capabilities={[
-        { icon: "📊", title: "Tablero individual", description: "Pipeline, conversión y cierre por ejecutivo." },
-        { icon: "🎯", title: "Asignación de leads", description: "Por territorio, vertical o round-robin." },
-        { icon: "🏆", title: "Ranking", description: "Mes, trimestre y año. Sano sentido de competencia." },
-      ]}
-      relatedLinks={[
-        { href: "/crm/targets", label: "Cuotas y metas", icon: "🎯" },
-        { href: "/crm/reports", label: "Reportes", icon: "📊" },
-      ]}
-    />
+    <>
+      <PageHeader
+        eyebrow="CRM · Equipo y métricas"
+        title="Equipo de ventas"
+        subtitle="Ranking del mes en curso: oportunidades, clientes nuevos, ventas y cumplimiento de cuota por ejecutivo."
+        actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
+      />
+
+      <Section title={loading ? "Cargando…" : `${rows.length} ejecutivos`}>
+        {loading && <EmptyState icon="⏳" title="Cargando ranking…" description="Calculando desempeño del equipo." />}
+        {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
+        {!loading && !error && <DataTable columns={columns} rows={rows} rowKey={(p) => p.targetId} emptyTitle="Sin cuotas este mes" emptyDescription="Asigna cuotas al equipo desde Cuotas y metas para ver el ranking." />}
+      </Section>
+    </>
   );
 }

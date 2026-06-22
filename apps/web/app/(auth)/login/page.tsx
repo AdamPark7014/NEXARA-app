@@ -21,6 +21,7 @@ function LoginPageInner() {
       title="Iniciar sesión"
       subtitle="Ingresa a tu cuenta de Nexara"
       accessNotice={accessNotice}
+      smartRedirect={true}
     />
   );
 }

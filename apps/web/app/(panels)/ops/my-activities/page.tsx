@@ -1,86 +1,121 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
+import { useUser } from "@/components/UserContext";
+import { buildApiUrl } from "@/lib/api-base";
 
-type Activity = {
-  id: string;
-  cliente: string;
-  sitio: string;
-  concepto: string;
-  tipo: "Instalación" | "Mantenimiento" | "Correctivo" | "Auditoría";
-  horaInicio: string;
-  horaFin: string;
-  estado: "Pendiente" | "En curso" | "Completada";
-  evidenciasOk: number;
-  evidenciasReq: number;
-};
+interface ActivityRow {
+  id: number;
+  anNumber: string;
+  titulo: string;
+  descripcion?: string | null;
+  estatus: string;
+  branchName?: string | null;
+  branchAddress?: string | null;
+  fechaAsignacion: string;
+  fechaInicio?: string | null;
+  fechaEntregaEsperada?: string | null;
+  fechaFinalizacion?: string | null;
+  client?: { name: string } | null;
+}
 
-const MY_ACTIVITIES: Activity[] = [
-  { id: "OT-3421", cliente: "TOKS Centro Histórico", sitio: "Av. 5 de Mayo 18, CDMX", concepto: "Cambio cabezal impresora térmica POS-3", tipo: "Correctivo", horaInicio: "09:00", horaFin: "11:00", estado: "Completada", evidenciasOk: 4, evidenciasReq: 4 },
-  { id: "OT-3422", cliente: "Soriana Plaza Reforma", sitio: "Av. Juárez 50, Puebla", concepto: "Mantenimiento mensual POS x12 + cámaras pasillo", tipo: "Mantenimiento", horaInicio: "12:00", horaFin: "16:00", estado: "En curso", evidenciasOk: 3, evidenciasReq: 8 },
-  { id: "OT-3425", cliente: "Familia Garza", sitio: "Calzada Zavaleta 100, Puebla", concepto: "Instalación 4 cámaras + NVR + cableado", tipo: "Instalación", horaInicio: "16:30", horaFin: "19:00", estado: "Pendiente", evidenciasOk: 0, evidenciasReq: 6 },
-];
+async function apiFetch(path: string, token: string, init: RequestInit = {}) {
+  const res = await fetch(buildApiUrl(path), {
+    ...init,
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(init.headers as Record<string, string> ?? {}) },
+  });
+  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+  if (res.status === 204) return null;
+  const t = await res.text();
+  return t ? JSON.parse(t) : null;
+}
+
+function isToday(iso: string): boolean {
+  const d = new Date(iso);
+  const today = new Date();
+  return d.toDateString() === today.toDateString();
+}
+function isThisWeek(iso: string): boolean {
+  const d = new Date(iso).getTime();
+  const now = Date.now();
+  return d <= now + 7 * 86400000 && d >= now - 7 * 86400000;
+}
 
 export default function MyActivitiesPage() {
+  const { user } = useUser();
+  const token = user?.token ?? "";
+
   const [tab, setTab] = useState<"hoy" | "semana" | "todas">("hoy");
+  const [items, setItems] = useState<ActivityRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!token) return;
+    setLoading(true); setError(null);
+    try {
+      const data = await apiFetch("activities?scope=mine", token);
+      setItems(Array.isArray(data) ? data : (data?.data ?? []));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al cargar tus actividades");
+    } finally { setLoading(false); }
+  }, [token]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const filtered = useMemo(() => {
+    if (tab === "hoy") return items.filter((a) => isToday(a.fechaEntregaEsperada || a.fechaAsignacion));
+    if (tab === "semana") return items.filter((a) => isThisWeek(a.fechaEntregaEsperada || a.fechaAsignacion));
+    return items;
+  }, [items, tab]);
 
   const counts = {
-    completadas: MY_ACTIVITIES.filter((a) => a.estado === "Completada").length,
-    enCurso: MY_ACTIVITIES.filter((a) => a.estado === "En curso").length,
-    pendientes: MY_ACTIVITIES.filter((a) => a.estado === "Pendiente").length,
+    completadas: filtered.filter((a) => a.estatus === "Finalizado").length,
+    enCurso: filtered.filter((a) => a.estatus === "En Proceso").length,
+    pendientes: filtered.filter((a) => a.estatus !== "Finalizado" && a.estatus !== "En Proceso").length,
   };
+
+  const updateStatus = async (a: ActivityRow, estatus: string) => {
+    if (!token) return;
+    try {
+      const body: Record<string, unknown> = { estatus };
+      if (estatus === "En Proceso") body.fechaInicio = new Date().toISOString();
+      if (estatus === "Finalizado") body.fechaFinalizacion = new Date().toISOString();
+      await apiFetch(`activities/${a.id}`, token, { method: "PATCH", body: JSON.stringify(body) });
+      void load();
+    } catch (e) {
+      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+    }
+  };
+
+  const estadoVariant = (e: string): "positive" | "warning" | "default" => e === "Finalizado" ? "positive" : e === "En Proceso" ? "warning" : "default";
 
   return (
     <>
       <PageHeader
         eyebrow="OPS · Campo"
-        title="Mis actividades de hoy"
+        title="Mis actividades"
         subtitle="Tu ruta del día. Sube evidencias y firma cada OT para cerrarla en tiempo."
-        actions={
-          <Button variant="primary" iconLeft="📍">
-            Iniciar GPS
-          </Button>
-        }
+        actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
       />
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-          gap: 12,
-          marginBottom: 18,
-        }}
-      >
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 18 }}>
         {[
-          { label: "OT del día", value: MY_ACTIVITIES.length, color: "var(--primary)", icon: "📋" },
+          { label: "OT en esta vista", value: filtered.length, color: "var(--primary)", icon: "📋" },
           { label: "Completadas", value: counts.completadas, color: "var(--success)", icon: "✓" },
           { label: "En curso", value: counts.enCurso, color: "var(--warning)", icon: "⏳" },
           { label: "Pendientes", value: counts.pendientes, color: "var(--text-secondary)", icon: "○" },
         ].map((k) => (
-          <div
-            key={String(k.label)}
-            style={{
-              padding: 16,
-              background: "var(--surface)",
-              border: "1px solid var(--border)",
-              borderRadius: 12,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
+          <div key={k.label} style={{ padding: 16, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-tertiary)" }}>
-                {k.label}
-              </div>
-              <div style={{ marginTop: 4, fontFamily: "var(--nx-font-display)", fontSize: 28, fontWeight: 700, color: k.color, lineHeight: 1 }}>
-                {k.value}
-              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-tertiary)" }}>{k.label}</div>
+              <div style={{ marginTop: 4, fontFamily: "var(--nx-font-display)", fontSize: 28, fontWeight: 700, color: k.color, lineHeight: 1 }}>{k.value}</div>
             </div>
             <span style={{ fontSize: 24 }}>{k.icon}</span>
           </div>
@@ -89,157 +124,64 @@ export default function MyActivitiesPage() {
 
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         {(["hoy", "semana", "todas"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            style={{
-              padding: "7px 16px",
-              fontSize: 12.5,
-              fontWeight: 600,
-              borderRadius: 999,
-              border: tab === t ? "1px solid var(--primary)" : "1px solid var(--border)",
-              background: tab === t ? "color-mix(in srgb, var(--primary) 10%, transparent)" : "var(--surface)",
-              color: tab === t ? "var(--primary)" : "var(--text-primary)",
-              cursor: "pointer",
-              fontFamily: "inherit",
-              textTransform: "capitalize",
-            }}
-          >
+          <button key={t} type="button" onClick={() => setTab(t)} style={{
+            padding: "7px 16px", fontSize: 12.5, fontWeight: 600, borderRadius: 999,
+            border: tab === t ? "1px solid var(--primary)" : "1px solid var(--border)",
+            background: tab === t ? "color-mix(in srgb, var(--primary) 10%, transparent)" : "var(--surface)",
+            color: tab === t ? "var(--primary)" : "var(--text-primary)", cursor: "pointer", fontFamily: "inherit", textTransform: "capitalize",
+          }}>
             {t}
           </button>
         ))}
       </div>
 
-      {tab === "hoy" ? (
+      {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando tus actividades asignadas." />}
+      {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
+      {!loading && !error && filtered.length === 0 && <EmptyState icon="📅" title="Sin actividades" description="No tienes OT asignadas en este rango." />}
+
+      {!loading && !error && filtered.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {MY_ACTIVITIES.map((a) => (
-            <article
-              key={a.id}
-              style={{
-                background: "var(--surface)",
-                border: "1px solid var(--border)",
-                borderRadius: 16,
-                padding: 18,
-                display: "grid",
-                gridTemplateColumns: "auto 1fr auto",
-                gap: 16,
-                alignItems: "center",
-              }}
-            >
-              <div
-                style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: 14,
-                  background:
-                    a.estado === "Completada"
-                      ? "color-mix(in srgb, var(--success) 14%, transparent)"
-                      : a.estado === "En curso"
-                        ? "color-mix(in srgb, var(--warning) 14%, transparent)"
-                        : "var(--surface-2)",
-                  color:
-                    a.estado === "Completada"
-                      ? "var(--success)"
-                      : a.estado === "En curso"
-                        ? "var(--warning)"
-                        : "var(--text-secondary)",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontFamily: "var(--nx-font-display)",
-                  fontWeight: 700,
-                }}
-              >
-                <div style={{ fontSize: 11, opacity: 0.8 }}>HOY</div>
-                <div style={{ fontSize: 16 }}>{a.horaInicio}</div>
+          {filtered.map((a) => (
+            <article key={a.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 16, alignItems: "center" }}>
+              <div style={{
+                width: 64, height: 64, borderRadius: 14,
+                background: a.estatus === "Finalizado" ? "color-mix(in srgb, var(--success) 14%, transparent)" : a.estatus === "En Proceso" ? "color-mix(in srgb, var(--warning) 14%, transparent)" : "var(--surface-2)",
+                color: a.estatus === "Finalizado" ? "var(--success)" : a.estatus === "En Proceso" ? "var(--warning)" : "var(--text-secondary)",
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "var(--nx-font-display)", fontWeight: 700,
+              }}>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>OT</div>
+                <div style={{ fontSize: 13 }}>{a.anNumber}</div>
               </div>
 
               <div style={{ minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  <Tag variant="accent">{a.id}</Tag>
-                  <Tag variant="neutral">{a.tipo}</Tag>
-                  <Tag
-                    variant={
-                      a.estado === "Completada"
-                        ? "positive"
-                        : a.estado === "En curso"
-                          ? "warning"
-                          : "neutral"
-                    }
-                  >
-                    {a.estado}
-                  </Tag>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+                  <Tag variant="accent">{a.anNumber}</Tag>
+                  <Tag variant={estadoVariant(a.estatus)}>{a.estatus}</Tag>
                 </div>
-                <div style={{ fontFamily: "var(--nx-font-display)", fontWeight: 700, fontSize: 15.5 }}>
-                  {a.cliente}
-                </div>
-                <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 3 }}>
-                  📍 {a.sitio}
-                </div>
-                <div style={{ fontSize: 12.5, color: "var(--text-primary)", marginTop: 6 }}>
-                  {a.concepto}
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 12,
-                    alignItems: "center",
-                    marginTop: 10,
-                  }}
-                >
+                <div style={{ fontFamily: "var(--nx-font-display)", fontWeight: 700, fontSize: 15.5 }}>{a.client?.name ?? a.branchName ?? "—"}</div>
+                {a.branchAddress && <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 3 }}>📍 {a.branchAddress}</div>}
+                <div style={{ fontSize: 12.5, color: "var(--text-primary)", marginTop: 6 }}>{a.titulo}</div>
+                <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-                    ⏱ {a.horaInicio} – {a.horaFin}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: 11.5,
-                      fontWeight: 700,
-                      color:
-                        a.evidenciasOk === a.evidenciasReq
-                          ? "var(--success)"
-                          : a.evidenciasOk > 0
-                            ? "var(--warning)"
-                            : "var(--text-tertiary)",
-                    }}
-                  >
-                    📸 Evidencias {a.evidenciasOk}/{a.evidenciasReq}
+                    ⏱ {a.fechaEntregaEsperada ? new Date(a.fechaEntregaEsperada).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "Sin fecha límite"}
                   </span>
                 </div>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {a.estado === "Pendiente" && (
-                  <Button variant="primary" iconLeft="▶">
-                    Iniciar
-                  </Button>
+                {a.estatus !== "En Proceso" && a.estatus !== "Finalizado" && (
+                  <Button variant="primary" iconLeft="▶" onClick={() => void updateStatus(a, "En Proceso")}>Iniciar</Button>
                 )}
-                {a.estado === "En curso" && (
-                  <Button variant="primary" iconLeft="📸">
-                    Subir evidencia
-                  </Button>
+                {a.estatus === "En Proceso" && (
+                  <Button variant="primary" iconLeft="✓" onClick={() => void updateStatus(a, "Finalizado")}>Finalizar</Button>
                 )}
-                {a.estado === "Completada" && (
-                  <Button variant="secondary" iconLeft="📄">
-                    Ver hoja
-                  </Button>
-                )}
-                <Button variant="ghost" iconLeft="🗺️" size="sm">
-                  Ruta
-                </Button>
+                <Link href="/ops/activities" style={{ textDecoration: "none" }}>
+                  <Button variant="secondary" iconLeft="📸" size="sm">Subir evidencia</Button>
+                </Link>
               </div>
             </article>
           ))}
         </div>
-      ) : (
-        <Section title="">
-          <EmptyState
-            icon="📅"
-            title={tab === "semana" ? "Vista semanal" : "Histórico de actividades"}
-            description="Próximamente verás aquí tu ruta de toda la semana o el histórico completo de tus OT."
-          />
-        </Section>
       )}
     </>
   );

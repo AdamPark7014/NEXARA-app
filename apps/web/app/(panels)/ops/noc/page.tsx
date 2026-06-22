@@ -1,100 +1,112 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
+import EmptyState from "@/components/ui/EmptyState";
+import { useUser } from "@/components/UserContext";
+import { buildApiUrl } from "@/lib/api-base";
 
-type Site = {
-  cliente: string;
-  sitio: string;
-  estado: "Operativo" | "Degradado" | "Caído";
-  uptime: number;
-  latencia: number;
-  ultimoIncidente: string;
-};
+interface NocDevice {
+  id: string;
+  name: string;
+  type: string;
+  status: "ONLINE" | "OFFLINE" | "DEGRADED" | "ALERT";
+  branch: string;
+  clientName: string;
+  lastSeen: string;
+  uptimePct30d: number;
+}
 
-const SITES: Site[] = [
-  { cliente: "Soriana Plaza Reforma", sitio: "POS + 12 cámaras + red", estado: "Operativo", uptime: 99.98, latencia: 18, ultimoIncidente: "Sin incidentes 30d" },
-  { cliente: "TOKS Centro Histórico", sitio: "POS + 4 cámaras", estado: "Degradado", uptime: 98.42, latencia: 95, ultimoIncidente: "POS-3 reportó error hoy 09:00" },
-  { cliente: "UDLA Cholula", sitio: "Red campus + 120 PCs", estado: "Operativo", uptime: 99.93, latencia: 12, ultimoIncidente: "Sin incidentes 12d" },
-  { cliente: "Hotel Camino Real", sitio: "WiFi habitaciones + admin", estado: "Operativo", uptime: 99.81, latencia: 22, ultimoIncidente: "Sin incidentes 7d" },
-  { cliente: "Constructora Reyes (Obra)", sitio: "Red obra + POS móviles", estado: "Caído", uptime: 92.10, latencia: 0, ultimoIncidente: "Sin enlace desde ayer 16:20" },
-];
+interface NocSummary {
+  total: number;
+  byStatus: Record<string, number>;
+  avgUptime: number;
+  criticalCount: number;
+}
+
+async function apiFetch(path: string, token: string) {
+  const res = await fetch(buildApiUrl(path), { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+  return res.json();
+}
 
 export default function NocPage() {
-  const operativos = SITES.filter((s) => s.estado === "Operativo").length;
-  const degradados = SITES.filter((s) => s.estado === "Degradado").length;
-  const caidos = SITES.filter((s) => s.estado === "Caído").length;
+  const { user } = useUser();
+  const token = user?.token ?? "";
+
+  const [summary, setSummary] = useState<NocSummary | null>(null);
+  const [devices, setDevices] = useState<NocDevice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!token) return;
+    setLoading(true); setError(null);
+    try {
+      const [s, d] = await Promise.all([apiFetch("noc/summary", token), apiFetch("noc/devices", token)]);
+      setSummary(s); setDevices(Array.isArray(d) ? d : []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al cargar monitoreo NOC");
+    } finally { setLoading(false); }
+  }, [token]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const statusColor: Record<string, string> = { ONLINE: "var(--success)", DEGRADED: "var(--warning)", OFFLINE: "var(--danger)", ALERT: "var(--danger)" };
+  const statusVariant = (s: string): "positive" | "warning" | "danger" => s === "ONLINE" ? "positive" : s === "DEGRADED" ? "warning" : "danger";
+  const statusLabel: Record<string, string> = { ONLINE: "Operativo", DEGRADED: "Degradado", OFFLINE: "Caído", ALERT: "Alerta" };
 
   return (
     <>
       <PageHeader
         eyebrow="OPS · NOC"
         title="Monitoreo de sitios"
-        subtitle="Estado en tiempo real de la infraestructura instalada en cada cliente."
-        actions={<Button variant="primary" iconLeft="🔔">Alertas</Button>}
+        subtitle="Estado de la infraestructura instalada en clientes con proyecto activo (CCTV, POS, redes, control de acceso)."
+        actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 18 }}>
-        {[
-          { label: "Sitios monitoreados", value: SITES.length, color: "var(--primary)" },
-          { label: "Operativos", value: operativos, color: "var(--success)" },
-          { label: "Degradados", value: degradados, color: "var(--warning)" },
-          { label: "Caídos", value: caidos, color: "var(--danger)" },
-        ].map((k) => (
-          <div key={String(k.label)} style={{ padding: 16, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-tertiary)" }}>
-              {k.label}
-            </div>
-            <div style={{ marginTop: 6, fontFamily: "var(--nx-font-display)", fontSize: 26, fontWeight: 700, color: k.color }}>
-              {k.value}
-            </div>
-          </div>
-        ))}
-      </div>
+      {loading && <EmptyState icon="⏳" title="Cargando NOC…" description="Consultando estado de dispositivos." />}
+      {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
 
-      <Section title="Estado por sitio">
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {SITES.map((s, i) => (
-            <article
-              key={i}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "auto 1fr auto auto",
-                gap: 16,
-                alignItems: "center",
-                padding: 14,
-                background: "color-mix(in srgb, var(--surface-2) 40%, transparent)",
-                border: "1px solid var(--border)",
-                borderRadius: 12,
-              }}
-            >
-              <span
-                style={{
-                  width: 12, height: 12, borderRadius: 999,
-                  background: s.estado === "Operativo" ? "var(--success)" : s.estado === "Degradado" ? "var(--warning)" : "var(--danger)",
-                  boxShadow: `0 0 12px ${s.estado === "Operativo" ? "var(--success)" : s.estado === "Degradado" ? "var(--warning)" : "var(--danger)"}`,
-                }}
-              />
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 13.5 }}>{s.cliente}</div>
-                <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{s.sitio}</div>
-                <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 3 }}>{s.ultimoIncidente}</div>
+      {!loading && !error && summary && (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 18 }}>
+            {[
+              { label: "Dispositivos monitoreados", value: summary.total, color: "var(--primary)" },
+              { label: "Operativos", value: summary.byStatus.ONLINE ?? 0, color: "var(--success)" },
+              { label: "Degradados", value: summary.byStatus.DEGRADED ?? 0, color: "var(--warning)" },
+              { label: "Caídos / alerta", value: summary.criticalCount, color: "var(--danger)" },
+            ].map((k) => (
+              <div key={k.label} style={{ padding: 16, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-tertiary)" }}>{k.label}</div>
+                <div style={{ marginTop: 6, fontFamily: "var(--nx-font-display)", fontSize: 26, fontWeight: 700, color: k.color }}>{k.value}</div>
               </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontFamily: "var(--nx-font-display)", fontWeight: 700, fontSize: 15 }}>
-                  {s.uptime.toFixed(2)}%
-                </div>
-                <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Uptime 30d</div>
-              </div>
-              <Tag variant={s.estado === "Operativo" ? "positive" : s.estado === "Degradado" ? "warning" : "danger"}>
-                {s.estado}
-              </Tag>
-            </article>
-          ))}
-        </div>
-      </Section>
+            ))}
+          </div>
+
+          <Section title={`Dispositivos (${devices.length})`}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {devices.map((d) => (
+                <article key={d.id} style={{ display: "grid", gridTemplateColumns: "auto 1fr auto auto", gap: 16, alignItems: "center", padding: 14, background: "color-mix(in srgb, var(--surface-2) 40%, transparent)", border: "1px solid var(--border)", borderRadius: 12 }}>
+                  <span style={{ width: 12, height: 12, borderRadius: 999, background: statusColor[d.status], boxShadow: `0 0 12px ${statusColor[d.status]}` }} />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 13.5 }}>{d.clientName}</div>
+                    <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{d.name} · {d.branch}</div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontFamily: "var(--nx-font-display)", fontWeight: 700, fontSize: 15 }}>{d.uptimePct30d.toFixed(2)}%</div>
+                    <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>Uptime 30d</div>
+                  </div>
+                  <Tag variant={statusVariant(d.status)}>{statusLabel[d.status]}</Tag>
+                </article>
+              ))}
+            </div>
+          </Section>
+        </>
+      )}
     </>
   );
 }

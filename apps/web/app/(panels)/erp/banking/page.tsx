@@ -1,106 +1,209 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
-import KpiCard from "@/components/ui/KpiCard";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
+import EmptyState from "@/components/ui/EmptyState";
+import { useUser } from "@/components/UserContext";
+import { useRbacGuard } from "@/lib/useRbacGuard";
+import { buildApiUrl } from "@/lib/api-base";
 
-type Account = { id: string; banco: string; alias: string; cuenta: string; moneda: "MXN" | "USD"; saldo: number };
-type Mov = {
-  id: string;
-  fecha: string;
-  cuenta: string;
-  tipo: "Cargo" | "Abono";
-  concepto: string;
-  monto: number;
-  estado: "Conciliado" | "Pendiente";
-};
+interface BankAccount {
+  id: number;
+  name: string;
+  bankName: string;
+  accountNumber: string;
+  clabe?: string | null;
+  currency: string;
+  currentBalance: number | string;
+  isActive: boolean;
+}
 
-const ACCOUNTS: Account[] = [
-  { id: "A1", banco: "BBVA", alias: "Operativa MXN", cuenta: "0123 4567 8901", moneda: "MXN", saldo: 1820000 },
-  { id: "A2", banco: "Banorte", alias: "Nómina", cuenta: "0234 5678 9012", moneda: "MXN", saldo: 320000 },
-  { id: "A3", banco: "Santander", alias: "Inversión", cuenta: "0345 6789 0123", moneda: "MXN", saldo: 270000 },
-  { id: "A4", banco: "BBVA", alias: "USD operativa", cuenta: "0456 7890 1234", moneda: "USD", saldo: 12400 },
-];
+interface BankTransaction {
+  id: number;
+  transactionDate: string;
+  description: string;
+  amount: number | string;
+  isDebit: boolean;
+  concept?: string | null;
+  counterpartyName?: string | null;
+  reconciled?: boolean;
+  reconciliationStatus?: string;
+}
 
-const MOVS: Mov[] = [
-  { id: "M1", fecha: "Hoy 09:14", cuenta: "Operativa MXN", tipo: "Abono", concepto: "Cobranza UDLA fase 1", monto: 1850000, estado: "Conciliado" },
-  { id: "M2", fecha: "Hoy 08:30", cuenta: "Operativa MXN", tipo: "Cargo", concepto: "Pago proveedor Hikvision", monto: 276000, estado: "Conciliado" },
-  { id: "M3", fecha: "Ayer 17:00", cuenta: "Nómina", tipo: "Cargo", concepto: "Dispersión nómina 2da Q mayo", monto: 480000, estado: "Conciliado" },
-  { id: "M4", fecha: "Ayer 14:22", cuenta: "Operativa MXN", tipo: "Abono", concepto: "Cobranza Soriana mensualidad", monto: 45000, estado: "Pendiente" },
-  { id: "M5", fecha: "Ayer 11:05", cuenta: "Operativa MXN", tipo: "Cargo", concepto: "Renta oficinas Puebla mayo", monto: 42000, estado: "Conciliado" },
-];
+async function apiFetch(path: string, token: string, init: RequestInit = {}) {
+  const res = await fetch(buildApiUrl(path), {
+    ...init,
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(init.headers as Record<string, string> ?? {}) },
+  });
+  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+  if (res.status === 204) return null;
+  const t = await res.text();
+  return t ? JSON.parse(t) : null;
+}
+
+const emptyForm = { name: "", bankName: "", accountNumber: "", clabe: "", currentBalance: 0 };
 
 export default function BankingPage() {
-  const totalMXN = ACCOUNTS.filter((a) => a.moneda === "MXN").reduce((s, a) => s + a.saldo, 0);
-  const totalUSD = ACCOUNTS.filter((a) => a.moneda === "USD").reduce((s, a) => s + a.saldo, 0);
+  const { user } = useUser();
+  const { canApprove, isDirector } = useRbacGuard();
+  const token = user?.token ?? "";
 
-  const movColumns: Column<Mov>[] = [
-    { key: "fecha", label: "Fecha", accessor: (m) => m.fecha, width: 120 },
-    { key: "cuenta", label: "Cuenta", render: (m) => <Tag variant="neutral">{m.cuenta}</Tag> },
-    { key: "tipo", label: "Tipo", render: (m) => <Tag variant={m.tipo === "Abono" ? "positive" : "warning"}>{m.tipo}</Tag> },
-    { key: "concepto", label: "Concepto", accessor: (m) => m.concepto },
-    { key: "monto", label: "Monto", align: "right", render: (m) => (
-      <span style={{ color: m.tipo === "Abono" ? "var(--success)" : "var(--text-primary)", fontWeight: 700 }}>
-        {m.tipo === "Cargo" ? "-" : "+"}<Money value={m.monto} />
-      </span>
-    ) },
-    { key: "estado", label: "Estado", render: (m) => <Tag variant={m.estado === "Conciliado" ? "positive" : "warning"}>{m.estado}</Tag> },
+  const [accounts, setAccounts] = useState<BankAccount[]>([]);
+  const [selected, setSelected] = useState<BankAccount | null>(null);
+  const [txs, setTxs] = useState<BankTransaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingTx, setLoadingTx] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ ...emptyForm });
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!token) return;
+    setLoading(true); setError(null);
+    try {
+      const data = await apiFetch("accounting/banking/accounts", token);
+      const list: BankAccount[] = Array.isArray(data) ? data : [];
+      setAccounts(list);
+      if (list.length && !selected) setSelected(list[0]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al cargar cuentas bancarias");
+    } finally { setLoading(false); }
+  }, [token, selected]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    if (!token || !selected) return;
+    setLoadingTx(true);
+    apiFetch(`accounting/banking/accounts/${selected.id}/transactions`, token)
+      .then((data) => setTxs(Array.isArray(data) ? data : []))
+      .catch(() => setTxs([]))
+      .finally(() => setLoadingTx(false));
+  }, [token, selected]);
+
+  const totalBalance = accounts.reduce((s, a) => s + Number(a.currentBalance), 0);
+
+  const createAccount = async () => {
+    if (!token || !form.name || !form.bankName || !form.accountNumber) return;
+    setSaving(true);
+    try {
+      await apiFetch("accounting/banking/accounts", token, { method: "POST", body: JSON.stringify(form) });
+      setShowForm(false); setForm({ ...emptyForm });
+      void load();
+    } catch (e) {
+      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+    } finally { setSaving(false); }
+  };
+
+  const reconcile = async (tx: BankTransaction) => {
+    if (!token) return;
+    try {
+      await apiFetch(`accounting/banking/transactions/${tx.id}/reconcile`, token, { method: "PATCH", body: JSON.stringify({ status: "MATCHED" }) });
+      setTxs((prev) => prev.map((t) => (t.id === tx.id ? { ...t, reconciled: true, reconciliationStatus: "MATCHED" } : t)));
+    } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+  };
+
+  const inp: React.CSSProperties = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13 };
+
+  const txColumns: Column<BankTransaction>[] = [
+    { key: "transactionDate", label: "Fecha", render: (t) => <span style={{ fontSize: 12 }}>{new Date(t.transactionDate).toLocaleDateString("es-MX")}</span>, width: 100 },
+    {
+      key: "description", label: "Descripción",
+      render: (t) => (
+        <div>
+          <div style={{ fontSize: 13 }}>{t.description}</div>
+          {t.counterpartyName && <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{t.counterpartyName}</div>}
+        </div>
+      ),
+    },
+    { key: "amount", label: "Monto", align: "right" as const, render: (t) => <span style={{ color: t.isDebit ? "var(--danger)" : "var(--success)", fontWeight: 700 }}>{t.isDebit ? "-" : "+"}<Money value={Number(t.amount)} /></span>, width: 130 },
+    { key: "reconciliationStatus", label: "Estado", render: (t) => <Tag variant={t.reconciliationStatus === "MATCHED" ? "positive" : "warning"}>{t.reconciliationStatus === "MATCHED" ? "Conciliado" : "Pendiente"}</Tag>, width: 110 },
+    ...(canApprove ? [{
+      key: "acciones" as keyof BankTransaction, label: "",
+      render: (t: BankTransaction) => t.reconciliationStatus !== "MATCHED" ? <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); void reconcile(t); }}>Conciliar</Button> : null,
+      width: 100,
+    }] : []),
   ];
 
   return (
     <>
       <PageHeader
         eyebrow="ERP · Finanzas"
-        title="Banca y tesorería"
-        subtitle="Saldos en tiempo real, movimientos por conciliar y pagos programados."
+        title="Banca"
+        subtitle="Cuentas bancarias, movimientos SPEI y conciliación bancaria."
         actions={
           <>
-            <Button variant="secondary" iconLeft="🔄">Conciliar</Button>
-            <Button variant="primary" iconLeft="💸">Programar pago</Button>
+            <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
+            {isDirector && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nueva cuenta</Button>}
           </>
         }
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginBottom: 18 }}>
-        <KpiCard label="Saldo total MXN" value={<Money value={totalMXN} />} hint={`${ACCOUNTS.filter(a => a.moneda === "MXN").length} cuentas`} variant="positive" icon="🏦" />
-        <KpiCard label="Saldo total USD" value={`$${totalUSD.toLocaleString("en-US")}`} hint="1 cuenta operativa" variant="accent" icon="💵" />
-        <KpiCard label="Mov. pendientes" value={MOVS.filter(m => m.estado === "Pendiente").length} hint="Por conciliar" variant="warning" icon="⏳" />
-        <KpiCard label="Pagos programados" value="3" hint="Próximos 7 días" variant="default" icon="📅" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
+        <KpiCard label="Saldo total" value={`$${(totalBalance / 1000000).toFixed(2)}M`} icon="🏦" />
+        <KpiCard label="Cuentas activas" value={accounts.filter((a) => a.isActive).length} icon="💳" />
       </div>
 
-      <Section title="Cuentas">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
-          {ACCOUNTS.map((a) => (
-            <article
-              key={a.id}
-              style={{
-                padding: 16, background: "var(--surface)",
-                border: "1px solid var(--border)", borderRadius: 12,
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>{a.alias}</div>
-                  <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{a.banco}</div>
-                </div>
-                <Tag variant={a.moneda === "MXN" ? "neutral" : "accent"}>{a.moneda}</Tag>
-              </div>
-              <div style={{ fontFamily: "var(--nx-font-display)", fontSize: 22, fontWeight: 700 }}>
-                {a.moneda === "USD" ? `$${a.saldo.toLocaleString("en-US")}` : <Money value={a.saldo} />}
-              </div>
-              <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 6, fontFamily: "var(--font-mono, monospace)" }}>
-                {a.cuenta}
-              </div>
-            </article>
-          ))}
-        </div>
-      </Section>
+      {loading && <EmptyState icon="⏳" title="Cargando cuentas…" description="Consultando cuentas bancarias." />}
+      {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
 
-      <Section title="Movimientos recientes" subtitle="Últimas 48 horas">
-        <DataTable columns={movColumns} rows={MOVS} rowKey={(m) => m.id} onRowClick={() => alert("Detalle del movimiento")} />
-      </Section>
+      {!loading && !error && (
+        <>
+          <Section title="Cuentas">
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
+              {accounts.map((a) => (
+                <button key={a.id} onClick={() => setSelected(a)} style={{
+                  textAlign: "left", padding: 16, borderRadius: 12, cursor: "pointer",
+                  border: `1px solid ${selected?.id === a.id ? "var(--primary)" : "var(--border)"}`,
+                  background: selected?.id === a.id ? "color-mix(in srgb, var(--primary) 6%, var(--surface))" : "var(--surface)",
+                }}>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>{a.name}</div>
+                  <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginBottom: 8 }}>{a.bankName} · {a.clabe ?? a.accountNumber}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800 }}><Money value={Number(a.currentBalance)} /></div>
+                </button>
+              ))}
+            </div>
+          </Section>
+
+          {selected && (
+            <Section title={loadingTx ? "Cargando movimientos…" : `Movimientos · ${selected.name}`}>
+              {loadingTx
+                ? <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+                : <DataTable columns={txColumns} rows={txs} rowKey={(t) => t.id} emptyTitle="Sin movimientos" emptyDescription="No hay transacciones registradas para esta cuenta." />
+              }
+            </Section>
+          )}
+        </>
+      )}
+
+      {showForm && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setShowForm(false)}>
+          <div style={{ background: "var(--surface)", borderRadius: 16, padding: 28, width: 440, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.24)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Nueva cuenta bancaria</div>
+            <div style={{ display: "grid", gap: 14 }}>
+              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Nombre / alias</span>
+                <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Cuenta operativa MXN" style={inp} /></label>
+              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Banco</span>
+                <input value={form.bankName} onChange={(e) => setForm((f) => ({ ...f, bankName: e.target.value }))} placeholder="Banorte" style={inp} /></label>
+              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Número de cuenta</span>
+                <input value={form.accountNumber} onChange={(e) => setForm((f) => ({ ...f, accountNumber: e.target.value }))} style={inp} /></label>
+              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>CLABE</span>
+                <input value={form.clabe} onChange={(e) => setForm((f) => ({ ...f, clabe: e.target.value }))} style={inp} /></label>
+              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Saldo inicial</span>
+                <input type="number" value={form.currentBalance} onChange={(e) => setForm((f) => ({ ...f, currentBalance: Number(e.target.value) }))} style={inp} /></label>
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
+              <Button variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
+              <Button variant="primary" onClick={() => void createAccount()} disabled={saving || !form.name || !form.bankName}>{saving ? "Guardando…" : "Crear cuenta"}</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
