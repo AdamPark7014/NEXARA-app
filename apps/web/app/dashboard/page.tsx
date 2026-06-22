@@ -1,42 +1,60 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUser } from '@/components/UserContext';
-import { getUserHomeUrl } from '@/lib/panel-home';
 
 /**
  * Página de redirect de dashboard genérica.
- * Redirige al usuario a su panel HOME según su rol.
+ * Redirige al usuario a su panel HOME según su rol desde localStorage.
  * 
- * Esto es útil como fallback después del login si no se puede
- * usar `smartRedirect` en PanelLogin.
+ * Si `smartRedirect` está habilitado en PanelLogin, esta ruta
+ * nunca debería ser alcanzada. Esta es un fallback safety.
  */
 export default function DashboardRedirect() {
   const router = useRouter();
-  const { user } = useUser();
+  const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    if (!user) {
-      // No está autenticado, volver al login
-      router.replace('/login');
-      return;
-    }
+    try {
+      // Verificar si está autenticado (cookie/localStorage)
+      const token = localStorage.getItem('nexara_access_token');
+      const userStr = localStorage.getItem('nexara_user');
 
-    // Obtener URL del home según el rol del usuario
-    const homeUrl = getUserHomeUrl(user);
-    
-    // Redirigir al panel HOME
-    if (homeUrl.startsWith('http')) {
-      window.location.assign(homeUrl);
-    } else {
+      if (!token || !userStr) {
+        // No autenticado → ir al login
+        router.replace('/login');
+        return;
+      }
+
+      // Intentar parsear el usuario
+      const user = JSON.parse(userStr);
+      
+      // Mapeo simple: rol → panel home
+      let homeUrl = '/erp/executive'; // default
+      
+      if (user.orgRoleKey === 'designer') {
+        homeUrl = '/studio';
+      } else if (user.orgRoleKey === 'field_engineer') {
+        homeUrl = '/ops';
+      } else if (user.orgRoleKey?.includes('director') || user.orgRoleKey === 'ceo') {
+        homeUrl = '/erp/executive';
+      }
+
+      setIsChecking(false);
       router.replace(homeUrl);
+    } catch (error) {
+      console.error('Error en dashboard redirect:', error);
+      router.replace('/login');
     }
-  }, [user, router]);
+  }, [router]);
 
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-      <p>Redirigiendo a tu panel...</p>
-    </div>
-  );
+  if (isChecking) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', flexDirection: 'column' }}>
+        <p>Redirigiendo a tu panel...</p>
+      </div>
+    );
+  }
+
+  return null;
 }
