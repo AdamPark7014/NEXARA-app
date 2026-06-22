@@ -24,48 +24,57 @@ export function setSharedCookie(
   value: string,
   options?: CookieOptions,
 ): void {
-  if (typeof document === 'undefined') return;
+  // Guard: SSR check + document availability
+  if (typeof document === 'undefined' || typeof window === 'undefined') return;
 
-  const isHttps = window.location.protocol === 'https:';
-  const isProduction = window.location.hostname.includes('nexara.com.mx');
-  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  try {
+    const isHttps = window.location.protocol === 'https:';
+    const isProduction = window.location.hostname.includes('nexara.com.mx');
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-  // En localhost, no usar domain (si no, no funciona)
-  const domain = isProduction ? '.nexara.com.mx' : undefined;
+    // En localhost, no usar domain (si no, no funciona)
+    const domain = isProduction ? '.nexara.com.mx' : undefined;
 
-  const cookieParts = [
-    `${name}=${encodeURIComponent(value)}`,
-    `Path=${options?.path || '/'}`,
-    `Max-Age=${options?.maxAge || 86400}`, // 24 horas default
-  ];
+    const cookieParts = [
+      `${name}=${encodeURIComponent(value)}`,
+      `Path=${options?.path || '/'}`,
+      `Max-Age=${options?.maxAge || 86400}`, // 24 horas default
+    ];
 
-  if (domain) {
-    cookieParts.push(`Domain=${domain}`);
+    if (domain) {
+      cookieParts.push(`Domain=${domain}`);
+    }
+
+    if (isHttps) {
+      cookieParts.push('Secure');
+    }
+
+    cookieParts.push(`SameSite=${options?.sameSite || 'Lax'}`);
+
+    document.cookie = cookieParts.join('; ');
+  } catch (err) {
+    console.warn(`[setSharedCookie] Error setting cookie "${name}":`, err);
   }
-
-  if (isHttps) {
-    cookieParts.push('Secure');
-  }
-
-  cookieParts.push(`SameSite=${options?.sameSite || 'Lax'}`);
-
-  document.cookie = cookieParts.join('; ');
 }
 
 /**
  * Lee una cookie compartida entre subdomios
  */
 export function getSharedCookie(name: string): string | null {
-  if (typeof document === 'undefined') return null;
+  if (typeof document === 'undefined' || typeof window === 'undefined') return null;
 
-  const nameEQ = `${name}=`;
-  const cookies = document.cookie.split(';');
+  try {
+    const nameEQ = `${name}=`;
+    const cookies = document.cookie.split(';');
 
-  for (const cookie of cookies) {
-    const trimmed = cookie.trim();
-    if (trimmed.startsWith(nameEQ)) {
-      return decodeURIComponent(trimmed.substring(nameEQ.length));
+    for (const cookie of cookies) {
+      const trimmed = cookie.trim();
+      if (trimmed.startsWith(nameEQ)) {
+        return decodeURIComponent(trimmed.substring(nameEQ.length));
+      }
     }
+  } catch (err) {
+    console.warn(`[getSharedCookie] Error reading cookie "${name}":`, err);
   }
 
   return null;
