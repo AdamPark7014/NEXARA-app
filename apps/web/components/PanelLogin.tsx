@@ -9,6 +9,7 @@ import { useUser } from "./UserContext";
 import { hasPermission, PERMISSIONS } from "../lib/permissions";
 import { getDeviceIdentityHeaders } from "@/lib/device-identity";
 import { getUserHomeUrl, getUserHomeUrlAbsolute } from "@/lib/panel-home";
+import { setSharedCookie, SHARED_COOKIE_KEYS } from "@/lib/shared-cookies";
 
 type PanelLoginProps = {
   redirectTo: string;
@@ -169,6 +170,19 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
       }
 
       setUser(userData);
+
+      // Guardar token y user en cookies compartidas entre subdomios
+      // Esto permite que el usuario permanezca autenticado al cambiar de subdominio
+      if (typeof document !== "undefined") {
+        setSharedCookie(SHARED_COOKIE_KEYS.ACCESS_TOKEN, data.access_token, {
+          maxAge: 86400, // 24 horas
+          sameSite: 'Lax',
+        });
+        setSharedCookie(SHARED_COOKIE_KEYS.USER, JSON.stringify(userData), {
+          maxAge: 86400,
+          sameSite: 'Lax',
+        });
+      }
 
       if (smartRedirect) {
         // URLs absolutas con subdominio para cambios cross-panel
