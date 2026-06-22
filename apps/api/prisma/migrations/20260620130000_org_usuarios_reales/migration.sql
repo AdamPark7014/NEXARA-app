@@ -107,6 +107,12 @@ DECLARE
   pw      TEXT := '$2b$10$NEXARA.placeholder.hash.replace.on.first.login.AAAAAAA';
 BEGIN
   SELECT id INTO role_id FROM "Role" WHERE "orgRoleKey" = 'ing_campo' LIMIT 1;
+  
+  -- Fallback a CEO si el rol ing_campo no existe
+  IF role_id IS NULL THEN
+    SELECT id INTO role_id FROM "Role" WHERE "orgRoleKey" = 'ceo' LIMIT 1;
+  END IF;
+  
   SELECT id INTO dept_id FROM "Department" WHERE nombre = 'Ingeniería';
 
   INSERT INTO "User" (nombre, email, "passwordHash", "roleId", "roleKey", "departmentId", puesto, "estadoRRHH", "isActive")
