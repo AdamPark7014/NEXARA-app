@@ -8,7 +8,7 @@ import { io, Socket } from "socket.io-client";
 import { useUser } from "./UserContext";
 import { hasPermission, PERMISSIONS } from "../lib/permissions";
 import { getDeviceIdentityHeaders } from "@/lib/device-identity";
-import { getUserHomeUrl } from "@/lib/panel-home";
+import { getUserHomeUrl, getUserHomeUrlAbsolute } from "@/lib/panel-home";
 
 type PanelLoginProps = {
   redirectTo: string;
@@ -171,12 +171,9 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
       setUser(userData);
 
       if (smartRedirect) {
-        const homeUrl = getUserHomeUrl(userData);
-        if (homeUrl.startsWith("http")) {
-          window.location.assign(homeUrl);
-        } else {
-          router.replace(homeUrl);
-        }
+        // URLs absolutas con subdominio para cambios cross-panel
+        const homeUrl = getUserHomeUrlAbsolute(userData);
+        window.location.assign(homeUrl);
         return;
       }
 
