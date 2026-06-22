@@ -1,155 +1,122 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
+import EmptyState from "@/components/ui/EmptyState";
+import { useUser } from "@/components/UserContext";
+import { buildApiUrl } from "@/lib/api-base";
 
-type Evidence = {
-  id: string;
-  ot: string;
-  cliente: string;
-  tipo: "Foto antes" | "Foto después" | "Hoja de servicio" | "Firma" | "Video" | "Acta";
-  capturada: string;
-  estado: "Sincronizada" | "Pendiente" | "Rechazada";
-  notas?: string;
-};
+interface Evidence {
+  id: number;
+  tipoEvidencia: string;
+  archivoUrl: string;
+  estatus: string;
+  comentarios?: string | null;
+  subidoEn: string;
+  actividad?: { id: number; anNumber?: string; titulo?: string } | null;
+}
 
-const EVIDENCES: Evidence[] = [
-  { id: "E-9821", ot: "OT-3421", cliente: "TOKS Centro", tipo: "Foto antes", capturada: "Hoy 09:05", estado: "Sincronizada" },
-  { id: "E-9822", ot: "OT-3421", cliente: "TOKS Centro", tipo: "Foto después", capturada: "Hoy 10:48", estado: "Sincronizada" },
-  { id: "E-9823", ot: "OT-3421", cliente: "TOKS Centro", tipo: "Hoja de servicio", capturada: "Hoy 10:55", estado: "Sincronizada" },
-  { id: "E-9824", ot: "OT-3421", cliente: "TOKS Centro", tipo: "Firma", capturada: "Hoy 11:00", estado: "Sincronizada" },
-  { id: "E-9825", ot: "OT-3422", cliente: "Soriana Plaza Reforma", tipo: "Foto antes", capturada: "Hoy 12:10", estado: "Sincronizada" },
-  { id: "E-9826", ot: "OT-3422", cliente: "Soriana Plaza Reforma", tipo: "Video", capturada: "Hoy 13:22", estado: "Pendiente", notas: "Sin red, esperando WiFi" },
-  { id: "E-9827", ot: "OT-3418", cliente: "Constructora Reyes", tipo: "Hoja de servicio", capturada: "Ayer 16:20", estado: "Rechazada", notas: "Faltan datos del POS-7" },
-];
+async function apiFetch(path: string, token: string, init: RequestInit = {}) {
+  const res = await fetch(buildApiUrl(path), { ...init, headers: { Authorization: `Bearer ${token}`, ...(init.headers as Record<string, string> ?? {}) } });
+  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+  if (res.status === 204) return null;
+  const t = await res.text();
+  return t ? JSON.parse(t) : null;
+}
+
+function tipoIcon(tipo: string): string {
+  const t = tipo.toLowerCase();
+  if (t.includes("foto")) return "📸";
+  if (t.includes("video")) return "🎥";
+  if (t.includes("firma")) return "✍️";
+  return "📄";
+}
+
+function tipoGradient(tipo: string): string {
+  const t = tipo.toLowerCase();
+  if (t.includes("foto")) return "linear-gradient(135deg, #1e293b, #475569)";
+  if (t.includes("video")) return "linear-gradient(135deg, #581c87, #7c3aed)";
+  return "linear-gradient(135deg, #064e3b, #047857)";
+}
 
 export default function MyEvidencesPage() {
-  const pendientes = EVIDENCES.filter((e) => e.estado === "Pendiente").length;
-  const rechazadas = EVIDENCES.filter((e) => e.estado === "Rechazada").length;
+  const { user } = useUser();
+  const token = user?.token ?? "";
+
+  const [items, setItems] = useState<Evidence[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!token) return;
+    setLoading(true); setError(null);
+    try {
+      const data = await apiFetch("evidences?limit=60", token);
+      setItems(Array.isArray(data) ? data : (data?.data ?? []));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al cargar tus evidencias");
+    } finally { setLoading(false); }
+  }, [token]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const pendientes = items.filter((e) => e.estatus === "Pendiente").length;
+  const rechazadas = items.filter((e) => e.estatus === "Rechazada").length;
+
+  const estadoVariant = (s: string): "positive" | "warning" | "danger" => s === "Aprobada" ? "positive" : s === "Rechazada" ? "danger" : "warning";
 
   return (
     <>
       <PageHeader
         eyebrow="OPS · Campo"
         title="Mis evidencias"
-        subtitle="Fotos, videos, hojas de servicio y firmas capturadas en mis OT."
-        actions={
-          <>
-            <Button variant="secondary" iconLeft="🔄">
-              Sincronizar
-            </Button>
-            <Button variant="primary" iconLeft="📸">
-              Capturar nueva
-            </Button>
-          </>
-        }
+        subtitle="Fotos, videos, hojas de servicio y firmas capturadas en tus OT — agrégalas desde el detalle de cada actividad."
+        actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
       />
 
       {(pendientes > 0 || rechazadas > 0) && (
-        <div
-          style={{
-            display: "flex",
-            gap: 12,
-            marginBottom: 18,
-            padding: 14,
-            background: "color-mix(in srgb, var(--warning) 8%, transparent)",
-            border: "1px solid color-mix(in srgb, var(--warning) 30%, transparent)",
-            borderRadius: 12,
-          }}
-        >
+        <div style={{ display: "flex", gap: 12, marginBottom: 18, padding: 14, background: "color-mix(in srgb, var(--warning) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--warning) 30%, transparent)", borderRadius: 12 }}>
           <span style={{ fontSize: 20 }}>⚠️</span>
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 3 }}>
-              Tienes pendientes
-            </div>
-            <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-              {pendientes} evidencias sin sincronizar · {rechazadas} rechazadas por revisar
-            </div>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 3 }}>Tienes pendientes</div>
+            <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>{pendientes} evidencias sin aprobar · {rechazadas} rechazadas por revisar</div>
           </div>
         </div>
       )}
 
-      <Section title="Capturas recientes" subtitle="Las últimas 48 horas">
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-            gap: 12,
-          }}
-        >
-          {EVIDENCES.map((e) => (
-            <article
-              key={e.id}
-              style={{
-                background: "var(--surface)",
-                border: "1px solid var(--border)",
-                borderRadius: 12,
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  height: 120,
-                  background:
-                    e.tipo === "Foto antes" || e.tipo === "Foto después"
-                      ? "linear-gradient(135deg, #1e293b, #475569)"
-                      : e.tipo === "Video"
-                        ? "linear-gradient(135deg, #581c87, #7c3aed)"
-                        : "linear-gradient(135deg, #064e3b, #047857)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 40,
-                  color: "white",
-                  position: "relative",
-                }}
-              >
-                {e.tipo.startsWith("Foto") ? "📸" : e.tipo === "Video" ? "🎥" : e.tipo === "Firma" ? "✍️" : "📄"}
-                <div style={{ position: "absolute", top: 8, right: 8 }}>
-                  <Tag
-                    variant={
-                      e.estado === "Sincronizada"
-                        ? "positive"
-                        : e.estado === "Pendiente"
-                          ? "warning"
-                          : "danger"
-                    }
-                  >
-                    {e.estado}
-                  </Tag>
-                </div>
-              </div>
-              <div style={{ padding: 12 }}>
-                <div style={{ fontWeight: 700, fontSize: 12.5, marginBottom: 4 }}>
-                  {e.tipo}
-                </div>
-                <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                  {e.ot} · {e.cliente}
-                </div>
-                <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 4 }}>
-                  {e.capturada}
-                </div>
-                {e.notas && (
-                  <div
-                    style={{
-                      marginTop: 8,
-                      padding: "6px 8px",
-                      fontSize: 11,
-                      background: "color-mix(in srgb, var(--surface-2) 60%, transparent)",
-                      borderRadius: 6,
-                      color: "var(--text-secondary)",
-                      fontStyle: "italic",
-                    }}
-                  >
-                    {e.notas}
+      <Section title="Capturas recientes">
+        {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando tus evidencias." />}
+        {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
+        {!loading && !error && items.length === 0 && <EmptyState icon="📷" title="Sin evidencias" description="Sube tu primera evidencia desde el detalle de una actividad." />}
+        {!loading && !error && items.length > 0 && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+            {items.map((e) => (
+              <article key={e.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+                <a href={buildApiUrl(e.archivoUrl)} target="_blank" rel="noreferrer" style={{ display: "block", textDecoration: "none" }}>
+                  <div style={{ height: 120, background: tipoGradient(e.tipoEvidencia), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40, color: "white", position: "relative" }}>
+                    {tipoIcon(e.tipoEvidencia)}
+                    <div style={{ position: "absolute", top: 8, right: 8 }}>
+                      <Tag variant={estadoVariant(e.estatus)}>{e.estatus}</Tag>
+                    </div>
                   </div>
-                )}
-              </div>
-            </article>
-          ))}
-        </div>
+                </a>
+                <div style={{ padding: 12 }}>
+                  <div style={{ fontWeight: 700, fontSize: 12.5, marginBottom: 4 }}>{e.tipoEvidencia}</div>
+                  <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{e.actividad?.anNumber ?? `Act-${e.actividad?.id}`} · {e.actividad?.titulo?.slice(0, 30) ?? ""}</div>
+                  <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 4 }}>{new Date(e.subidoEn).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
+                  {e.comentarios && (
+                    <div style={{ marginTop: 8, padding: "6px 8px", fontSize: 11, background: "color-mix(in srgb, var(--surface-2) 60%, transparent)", borderRadius: 6, color: "var(--text-secondary)", fontStyle: "italic" }}>
+                      {e.comentarios}
+                    </div>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </Section>
     </>
   );

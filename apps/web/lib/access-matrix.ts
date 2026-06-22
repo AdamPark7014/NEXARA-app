@@ -69,7 +69,7 @@ export const PANEL_META: Record<PanelId, PanelMeta> = {
     tagline: "Administración, finanzas, RH y gobierno corporativo",
     accent: "#0ea5e9",
     icon: "⚙️",
-    entryPath: "/dashboard",
+    entryPath: "/executive",
   },
   [PANELS.CRM]: {
     id: PANELS.CRM,

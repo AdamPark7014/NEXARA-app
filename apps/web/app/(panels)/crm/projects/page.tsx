@@ -7,6 +7,7 @@ import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
+import { useRbacGuard } from "@/lib/useRbacGuard";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface SalesProject {
@@ -37,6 +38,7 @@ const emptyForm = { nombre: "", descripcion: "", estado: "ACTIVO", montoContrato
 
 export default function CrmProjectsPage() {
   const { user } = useUser();
+  const { canCreate, canEdit } = useRbacGuard();
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<SalesProject[]>([]);
@@ -97,7 +99,7 @@ export default function CrmProjectsPage() {
     { key: "fechaEntrega", label: "Entrega", accessor: p => p.fechaEntrega ? new Date(p.fechaEntrega).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "—", width: 90 },
     { key: "estado", label: "Estado", render: p => <Tag variant={statusVariant(p.estado)}>{(p.estado ?? "—").replace(/_/g, " ")}</Tag>, width: 120 },
     { key: "id", label: "", render: p => (
-      <button onClick={() => openEdit(p)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 8px" }}>✎</button>
+      canEdit ? <button onClick={() => openEdit(p)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 8px" }}>✎</button> : null
     ), width: 40 },
   ];
 
@@ -107,7 +109,7 @@ export default function CrmProjectsPage() {
         eyebrow="CRM · Proyectos"
         title="Proyectos comerciales"
         subtitle="Venta ganada → proyecto con contrato, entregables, costo y facturación."
-        actions={<Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo proyecto</Button>}
+        actions={canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo proyecto</Button> : undefined}
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14, marginBottom: 20 }}>

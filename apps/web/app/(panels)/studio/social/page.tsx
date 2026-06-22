@@ -7,6 +7,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
+import { useRbacGuard } from "@/lib/useRbacGuard";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface SocialPost {
@@ -47,6 +48,7 @@ const EMPTY_FORM = { red: "Instagram", titulo: "", contenido: "", cuando: "", es
 
 export default function StudioSocialPage() {
   const { user } = useUser();
+  const { canCreate, canEdit, canDelete } = useRbacGuard();
   const token = user?.token ?? "";
 
   const [items, setItems]     = useState<SocialPost[]>([]);
@@ -142,7 +144,7 @@ export default function StudioSocialPage() {
         title="Redes sociales"
         subtitle="Calendario editorial y posts programados para las cuentas de NEXARA."
         actions={
-          <Button variant="primary" iconLeft="✏️" onClick={openNew}>Crear post</Button>
+          canCreate ? <Button variant="primary" iconLeft="✏️" onClick={openNew}>Crear post</Button> : undefined
         }
       />
 
@@ -224,8 +226,8 @@ export default function StudioSocialPage() {
                 >
                   {["Borrador", "Programado", "Publicado", "Cancelado"].map(s => <option key={s}>{s}</option>)}
                 </select>
-                <button onClick={() => openEdit(p)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>
-                <button onClick={() => remove(p.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--danger)", padding: "4px 6px" }}>✕</button>
+                {canEdit && <button onClick={() => openEdit(p)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>}
+                {canDelete && <button onClick={() => remove(p.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--danger)", padding: "4px 6px" }}>✕</button>}
               </article>
             ))}
           </div>

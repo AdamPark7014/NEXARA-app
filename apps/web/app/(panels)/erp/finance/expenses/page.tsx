@@ -7,6 +7,7 @@ import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
+import { useRbacGuard } from "@/lib/useRbacGuard";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface Expense {
@@ -37,6 +38,7 @@ const emptyForm = { concepto: "", monto: 0, categoria: "Servicios", estado: "BOR
 
 export default function ExpensesPage() {
   const { user } = useUser();
+  const { canCreate, canEdit, canDelete } = useRbacGuard();
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<Expense[]>([]);
@@ -107,8 +109,8 @@ export default function ExpensesPage() {
     { key: "estado", label: "Estado", render: e => <Tag variant={estadoVariant(e.estado)}>{(e.estado ?? "—").replace(/_/g, " ")}</Tag>, width: 160 },
     { key: "id", label: "", render: e => (
       <div style={{ display: "flex", gap: 4 }}>
-        <button onClick={() => openEdit(e)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>
-        <button onClick={() => remove(e.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>
+        {canEdit && <button onClick={() => openEdit(e)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>}
+        {canDelete && <button onClick={() => remove(e.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>}
       </div>
     ), width: 60 },
   ];
@@ -119,7 +121,7 @@ export default function ExpensesPage() {
         eyebrow="ERP · Finanzas"
         title="Gastos · Administración"
         subtitle="Captura y autorización de gastos no operativos: renta, servicios, suscripciones, recurrentes."
-        actions={<Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo gasto</Button>}
+        actions={canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo gasto</Button> : undefined}
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
