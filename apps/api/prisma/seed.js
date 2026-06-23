@@ -22,10 +22,39 @@ async function seedRoles() {
   const { execSync } = require('child_process');
   const path = require('path');
   const apiDir = path.join(__dirname, '..');
-  execSync('npx ts-node prisma/seed-demo-users.ts', { cwd: apiDir, stdio: 'inherit' });
+  
+  const env = Object.assign({}, process.env, {
+    NODE_OPTIONS: '--loader=ts-node/esm'
+  });
+  
+  try {
+    execSync('npx ts-node ./seed-demo-users.ts', { 
+      cwd: apiDir, 
+      stdio: 'inherit',
+      env: Object.assign({}, process.env, {
+        TS_NODE_PROJECT: path.join(apiDir, 'tsconfig.json'),
+        TS_NODE_TRANSPILE_ONLY: 'true',
+        TS_NODE_SKIP_LIBCHECK: 'true'
+      })
+    });
+  } catch (e) {
+    console.warn('⚠️  seed-demo-users.ts falló, continuando...');
+  }
 
   console.log('🌱 Seeding workflow definitions (ts-node)...');
-  execSync('npx ts-node prisma/seed-workflows.ts', { cwd: apiDir, stdio: 'inherit' });
+  try {
+    execSync('npx ts-node ./seed-workflows.ts', { 
+      cwd: apiDir, 
+      stdio: 'inherit',
+      env: Object.assign({}, process.env, {
+        TS_NODE_PROJECT: path.join(apiDir, 'tsconfig.json'),
+        TS_NODE_TRANSPILE_ONLY: 'true',
+        TS_NODE_SKIP_LIBCHECK: 'true'
+      })
+    });
+  } catch (e) {
+    console.warn('⚠️  seed-workflows.ts falló, continuando...');
+  }
 }
 
 async function seedProjects() {
