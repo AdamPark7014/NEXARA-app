@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Adaptive icon foreground: 108dp canvas, safe zone = center 66dp circle.
+  Inset of 26dp on each side keeps the logo centered and away from mask clipping.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:top="26dp"
+        android:bottom="26dp"
+        android:left="26dp"
+        android:right="26dp">
+        <bitmap
+            android:src="@drawable/logo_nexara"
+            android:gravity="center"
+            android:tileMode="disabled" />
+    </item>
+</layer-list>

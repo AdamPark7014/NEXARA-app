@@ -1,0 +1,81 @@
+# Node modules
+node_modules/
+
+# Build outputs
+/dist/
+dist/
+/.next/
+.next/
+/.expo/
+/build/
+.turbo/
+
+# Environment files
+.env
+.env.*
+apps/*/.env
+# Plantillas de ejemplo (sí se versionan)
+!.env.example
+!apps/web/.env.example
+!apps/api/.env.example
+!apps/mobile/android/key.properties.example
+
+# Android release signing (no versionar secretos)
+apps/mobile/android/key.properties
+apps/mobile/android/nexara-gradle-out/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Prisma
+prisma/dev.db
+prisma/dev.db-journal
+
+# Coverage
+coverage/
+
+# IDEs
+.vscode/
+.idea/
+
+# Expo
+.expo/
+.expo-shared/
+
+# Misc
+*.local
+*.log
+*.tsbuildinfo
+
+# Uploads and temp
+uploads/
+temp/
+
+# Android nativo (apps/mobile-native) — salidas de Gradle; no versionar
+apps/mobile-native/android/**/build/
+apps/mobile-native/android/.gradle/
+apps/mobile-native/android/.kotlin/
+apps/mobile-native/android/.idea/
+apps/mobile-native/android/local.properties
+apps/mobile-native/android/**/*.apk
+apps/mobile-native/android/**/*.aab
+apps/mobile-native/android/key.properties
+apps/mobile-native/android/**/*.jks
+apps/mobile-native/android/**/*.keystore
+
+# iOS nativo (apps/mobile-native/ios) — derivados de Xcode / SwiftPM
+apps/mobile-native/ios/**/build/
+apps/mobile-native/ios/**/DerivedData/
+apps/mobile-native/ios/**/.swiftpm/
+apps/mobile-native/ios/**/xcuserdata/
+apps/mobile-native/ios/**/*.xcworkspace/xcuserdata/
+apps/mobile-native/ios/Pods/
+apps/mobile-native/ios/**/*.ipa
+apps/mobile-native/ios/**/GoogleService-Info.plist

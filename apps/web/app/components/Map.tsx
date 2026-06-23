@@ -1,0 +1,266 @@
+"use client";
+import React, { useEffect, useRef, useState } from "react";
+import styles from "./Map.module.css";
+
+const GOOGLE_MAPS_SCRIPT_ID = "google-maps-script";
+const GOOGLE_MAPS_API_KEY =
+  process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "AIzaSyDOJ7TFUE5F1vD_qVh9ofKOSS5gd2mbnyE";
+const GOOGLE_MAPS_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || "";
+
+const NEXARA_MAP_STYLES = [
+  { elementType: "geometry", stylers: [{ color: "#0b1918" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#9fd9cb" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#0b1918" }] },
+  { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#18413b" }] },
+  { featureType: "landscape.natural", elementType: "geometry", stylers: [{ color: "#102725" }] },
+  { featureType: "poi", elementType: "geometry", stylers: [{ color: "#13332f" }] },
+  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#123a33" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#24524a" }] },
+  { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#2a5f56" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#2f776a" }] },
+  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1a4e46" }] },
+  { featureType: "transit", elementType: "geometry", stylers: [{ color: "#1a3d38" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#113838" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#8bd8c6" }] },
+] as const;
+
+// Tipos para Google Maps
+interface GoogleMapsOptions {
+  zoom: number;
+  center: { lat: number; lng: number };
+  mapId?: string;
+  mapTypeControl: boolean;
+  fullscreenControl: boolean;
+  streetViewControl: boolean;
+  zoomControl: boolean;
+}
+interface GoogleMarkerOptions {
+  position: { lat: number; lng: number };
+  map: unknown;
+  title?: string;
+  animation?: number;
+}
+interface GoogleInfoWindowOptions {
+  content: string;
+}
+interface GoogleMapsAPI {
+  Map?: new (element: HTMLDivElement, options: GoogleMapsOptions) => unknown;
+  Marker: new (options: GoogleMarkerOptions) => unknown;
+  InfoWindow: new (options: GoogleInfoWindowOptions) => unknown;
+  Animation: { DROP: number };
+  importLibrary?: (library: string) => Promise<{ Map?: new (element: HTMLDivElement, options: GoogleMapsOptions) => unknown }>;
+  marker?: {
+    AdvancedMarkerElement?: new (options: GoogleMarkerOptions) => unknown;
+  };
+}
+
+declare global {
+  interface Window {
+    google?: {
+      maps: GoogleMapsAPI;
+    };
+    initMap?: () => void;
+  }
+}
+
+export default function Map() {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstance = useRef<unknown>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (mapInstance.current || typeof window === "undefined") return;
+
+    const loadGoogleMapsScript = () => {
+      if (window.google?.maps) return Promise.resolve();
+      if (!GOOGLE_MAPS_API_KEY) return Promise.reject(new Error("API key no configurada"));
+
+      const injectScript = () =>
+        new Promise<void>((resolve, reject) => {
+          const script = document.createElement("script");
+          script.id = GOOGLE_MAPS_SCRIPT_ID;
+          script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&v=weekly&libraries=places,marker&loading=async`;
+          script.async = true;
+          script.defer = true;
+          script.onload = () => {
+            window.setTimeout(() => {
+              if (window.google?.maps) {
+                resolve();
+              } else {
+                reject(new Error("Google Maps no se inicializó correctamente"));
+              }
+            }, 120);
+          };
+          script.onerror = () => reject(new Error("Error al cargar Google Maps API"));
+          document.head.appendChild(script);
+        });
+
+      const removeExistingScript = () => {
+        const stale = document.getElementById(GOOGLE_MAPS_SCRIPT_ID);
+        stale?.parentElement?.removeChild(stale);
+      };
+
+      return new Promise<void>((resolve, reject) => {
+        const existingScript = document.getElementById(GOOGLE_MAPS_SCRIPT_ID) as HTMLScriptElement | null;
+
+        if (existingScript) {
+          if (window.google?.maps) {
+            resolve();
+            return;
+          }
+
+          const start = Date.now();
+          const checkGoogle = window.setInterval(() => {
+            if (window.google?.maps) {
+              window.clearInterval(checkGoogle);
+              resolve();
+              return;
+            }
+
+            if (Date.now() - start > 12000) {
+              window.clearInterval(checkGoogle);
+              removeExistingScript();
+              injectScript().then(resolve).catch(reject);
+            }
+          }, 120);
+
+          existingScript.addEventListener("error", () => {
+            window.clearInterval(checkGoogle);
+            removeExistingScript();
+            injectScript().then(resolve).catch(reject);
+          }, { once: true });
+
+          return;
+        }
+
+        injectScript().then(resolve).catch(reject);
+      });
+    };
+
+    const resolveMapConstructor = async (maps: GoogleMapsAPI) => {
+      if (typeof maps.Map === "function") return maps.Map;
+      if (typeof maps.importLibrary === "function") {
+        const mapsLibrary = await maps.importLibrary("maps");
+        if (typeof mapsLibrary?.Map === "function") return mapsLibrary.Map;
+      }
+      return null;
+    };
+
+    const waitForMapConstructor = async (maps: GoogleMapsAPI) => {
+      for (let attempt = 0; attempt < 25; attempt += 1) {
+        const MapConstructor = await resolveMapConstructor(maps);
+        if (MapConstructor) return MapConstructor;
+        await new Promise((r) => window.setTimeout(r, 120));
+      }
+      return null;
+    };
+
+    let cancelled = false;
+    const initializeMap = async () => {
+      try {
+        await loadGoogleMapsScript();
+        if (cancelled || !mapRef.current) return;
+
+        const maps = window.google?.maps;
+        if (!maps) {
+          setError("Google Maps API no disponible");
+          return;
+        }
+
+        const MapConstructor = await waitForMapConstructor(maps);
+        if (!MapConstructor) {
+          throw new Error("Google Maps Map no disponible");
+        }
+
+        if (typeof maps.importLibrary === "function" && !maps.marker?.AdvancedMarkerElement) {
+          await maps.importLibrary("marker");
+        }
+
+        const location = { lat: 19.073802875589788, lng: -98.2778382565653 };
+        mapInstance.current = new MapConstructor(mapRef.current, {
+          zoom: 18,
+          center: location,
+          ...(GOOGLE_MAPS_MAP_ID ? { mapId: GOOGLE_MAPS_MAP_ID } : {}),
+          ...(!GOOGLE_MAPS_MAP_ID ? { styles: NEXARA_MAP_STYLES } : {}),
+          mapTypeControl: true,
+          fullscreenControl: true,
+          streetViewControl: true,
+          zoomControl: true,
+        });
+
+        const currentMap = mapInstance.current;
+        const mapsAny = window.google?.maps as any;
+        const canUseAdvancedMarker = Boolean(GOOGLE_MAPS_MAP_ID && mapsAny?.marker?.AdvancedMarkerElement);
+        const marker = canUseAdvancedMarker
+          ? new mapsAny.marker.AdvancedMarkerElement({
+              position: location,
+              map: currentMap,
+              title: "NEXARA",
+            })
+          : new mapsAny.Marker({
+              position: location,
+              map: currentMap,
+              title: "NEXARA",
+              animation: mapsAny.Animation?.DROP,
+            });
+
+        const infoWindow = new mapsAny.InfoWindow({
+          content: `
+            <div class="nexara-map-info">
+              <img src="/logo-nexara.png" alt="NEXARA" class="nexara-map-logo" />
+              <h3 class="nexara-map-title">NEXARA</h3>
+              <p class="nexara-map-subtitle">Soluciones Tecnológicas</p>
+              <button class="nexara-map-btn" onclick="window.location.href='https://maps.app.goo.gl/34XSHPwUSeMAB7x69'">
+                Ver ubicación
+              </button>
+            </div>
+          `,
+          maxWidth: 280,
+        });
+
+        const openInfoWindow = () => {
+          (infoWindow as { open: (options: { anchor: unknown; map: unknown }) => void }).open({
+            anchor: marker,
+            map: currentMap,
+          });
+        };
+
+        if (canUseAdvancedMarker && typeof (marker as { addEventListener?: (eventName: string, listener: () => void) => void }).addEventListener === "function") {
+          (marker as { addEventListener: (eventName: string, listener: () => void) => void }).addEventListener("gmp-click", openInfoWindow);
+        } else {
+          (marker as { addListener?: (event: string, handler: () => void) => void }).addListener?.("click", openInfoWindow);
+        }
+
+        openInfoWindow();
+      } catch (err) {
+        console.error("Error al inicializar el mapa:", err);
+        setError("Error al cargar el mapa");
+      }
+    };
+
+    void initializeMap();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (error) {
+    return (
+      <div className={styles.mapContainer}>
+        <div className={styles.mapError}>
+          <p>{error}</p>
+          <p style={{ fontSize: "0.85rem", marginTop: "8px", opacity: 0.7 }}>
+            Verifica que tu API key esté habilitada y configurada en Google Cloud Console
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.mapContainer}>
+      <div className={styles.mapWrapper} ref={mapRef} />
+    </div>
+  );
+}

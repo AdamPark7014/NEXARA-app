@@ -1,0 +1,561 @@
+/* ═══════════════════════════════════════════════════════════
+   NEXARA · Landing — Design System
+   Paleta:      Tinta #14211C · Pino #1F5F4E · Papel #FAF9F6
+   Tipografía:  Fraunces (display) · Inter (body) · JetBrains Mono (data)
+   Espaciado:   base-8px · secciones clamp(48–80px) top
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Página body (entre las dos bandas oscuras) ─────────── */
+.homeBody {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 0 clamp(20px, 4vw, 56px);
+  background: #FAF9F6;
+}
+
+/* ════════════════════════════════════════════════════════════
+   BANDA MÉTRICAS — fondo Tinta, fusión directa con el hero
+   ════════════════════════════════════════════════════════════ */
+
+/* !important: anula :where(section){max-width} de globals.scss */
+.metricsBand {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  background: #14211C;
+  padding: clamp(44px, 5.5vw, 64px) clamp(20px, 4vw, 56px);
+}
+
+.metricsInner {
+  max-width: 1140px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.metricItem {
+  position: relative;
+  text-align: center;
+  padding: 0 clamp(16px, 2.5vw, 36px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.metricItem + .metricItem::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8%;
+  height: 84%;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Fraunces italic weight 300 — número con carácter, no con peso */
+.metricValue {
+  font-family: 'Fraunces', var(--ds-font-serif, Georgia, serif);
+  font-size: clamp(36px, 4vw, 54px);
+  font-weight: 300;
+  font-style: italic;
+  color: #ffffff;
+  line-height: 1;
+  letter-spacing: -0.025em;
+}
+
+/* Etiqueta de dato: legible pero subordinada */
+.metricLabel {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.4;
+  max-width: 16ch;
+  text-align: center;
+}
+
+/* ════════════════════════════════════════════════════════════
+   ENCABEZADO DE SECCIÓN — patrón compartido
+   ════════════════════════════════════════════════════════════ */
+
+.sectionHead {
+  padding: clamp(48px, 6vw, 80px) 0 clamp(28px, 3.5vw, 44px);
+  max-width: 640px;
+}
+
+/* Eyebrow: JetBrains Mono, línea izquierda Pino — sin pill */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #1F5F4E;
+  margin-bottom: 18px;
+}
+
+.eyebrow::before {
+  content: '';
+  display: inline-block;
+  width: 24px;
+  height: 1px;
+  background: #1F5F4E;
+  flex-shrink: 0;
+}
+
+/* Título: Fraunces 300 — deliberadamente ligero para no competir con Pino */
+.sectionTitle {
+  font-family: 'Fraunces', var(--ds-font-serif, Georgia, serif);
+  font-size: clamp(26px, 3.6vw, 44px);
+  font-weight: 300;
+  line-height: 1.16;
+  color: #14211C;
+  letter-spacing: -0.022em;
+  margin: 0 0 14px;
+  text-wrap: balance;
+}
+
+/* Acento: itálica Pino — una sola frase por página */
+.accent {
+  font-style: italic;
+  color: #1F5F4E;
+}
+
+.sectionLead {
+  font-family: 'Manrope', var(--nx-font-body, system-ui), sans-serif;
+  font-size: 15px;
+  line-height: 1.7;
+  color: #5B6660;
+  margin: 0;
+  max-width: 58ch;
+}
+
+/* Variante centrada — sectores e industrias */
+.centered {
+  text-align: center;
+  margin-inline: auto;
+}
+
+.centered .eyebrow {
+  justify-content: center;
+}
+
+.centered .eyebrow::after {
+  content: '';
+  display: inline-block;
+  width: 24px;
+  height: 1px;
+  background: #1F5F4E;
+  flex-shrink: 0;
+}
+
+.centered .sectionLead {
+  margin-inline: auto;
+}
+
+/* ════════════════════════════════════════════════════════════
+   SERVICIOS — lista editorial
+   ════════════════════════════════════════════════════════════ */
+
+.serviciosList {
+  border-top: 1px solid #E3E5DF;
+  padding-bottom: clamp(56px, 7vw, 88px);
+  overflow-x: clip;
+}
+
+.servicioRow {
+  display: grid;
+  grid-template-columns: 108px 1fr 28px;
+  align-items: center;
+  gap: 0 clamp(24px, 3.5vw, 44px);
+  padding: 24px 12px;
+  margin: 0 -12px;
+  border-bottom: 1px solid #E3E5DF;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 6px;
+  transition: background 140ms ease;
+}
+
+.servicioRow:hover {
+  background: #F1F0EA;
+}
+
+.servicioRow:focus-visible {
+  outline: 2px solid #1F5F4E;
+  outline-offset: -2px;
+}
+
+/* Meta: solo la categoría — el número es ruido */
+.servicioMeta {
+  display: flex;
+  align-items: flex-start;
+  padding-top: 2px;
+}
+
+/* Número de orden oculto — la posición en la lista ya lo dice */
+.servicioNum {
+  display: none;
+}
+
+/* Categoría: etiqueta Musgo compacta */
+.servicioCat {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #1F5F4E;
+  background: #DCE6DD;
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* Título: Fraunces 400 — más peso que la sección pero menos que un H2 */
+.servicioTitle {
+  font-family: 'Fraunces', var(--ds-font-serif, Georgia, serif);
+  font-size: 19px;
+  font-weight: 400;
+  color: #14211C;
+  margin: 0 0 5px;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  transition: color 140ms ease;
+}
+
+.servicioRow:hover .servicioTitle {
+  color: #1F5F4E;
+}
+
+.servicioText {
+  font-family: 'Manrope', var(--nx-font-body, system-ui), sans-serif;
+  font-size: 13px;
+  line-height: 1.65;
+  color: #5B6660;
+  margin: 0;
+  max-width: 58ch;
+}
+
+/* Flecha: aparece con deslizamiento, visible solo en hover */
+.servicioArrow {
+  font-size: 16px;
+  color: #1F5F4E;
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: opacity 140ms ease, transform 140ms ease;
+  justify-self: end;
+}
+
+.servicioRow:hover .servicioArrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* ════════════════════════════════════════════════════════════
+   PROCESO — 4 pasos estructurados
+   ════════════════════════════════════════════════════════════ */
+
+.procesoSection {
+  border-top: 1px solid #E3E5DF;
+  padding-top: 0;
+  padding-bottom: clamp(56px, 7vw, 88px);
+}
+
+/* No repetir sectionHead padding-top en proceso — ya tiene el border-top */
+.procesoSection .sectionHead {
+  padding-top: clamp(40px, 5vw, 64px);
+}
+
+.procesoGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0 clamp(24px, 3.5vw, 48px);
+}
+
+/* Borde Musgo — estructural, no de énfasis */
+.procesoStep {
+  padding: clamp(20px, 2.5vw, 28px) 0 clamp(20px, 2.5vw, 28px) 0;
+  border-top: 1px solid #DCE6DD;
+}
+
+/* Número gran Fraunces italic — decorativo, no funcional */
+.procesoNum {
+  font-family: 'Fraunces', var(--ds-font-serif, Georgia, serif);
+  font-size: clamp(34px, 3.8vw, 46px);
+  font-weight: 300;
+  font-style: italic;
+  color: #B8C9BD;
+  display: block;
+  line-height: 1;
+  margin-bottom: 16px;
+  letter-spacing: -0.025em;
+}
+
+.procesoTitle {
+  font-family: 'Manrope', var(--nx-font-body, system-ui), sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #14211C;
+  margin: 0 0 7px;
+  letter-spacing: -0.005em;
+  line-height: 1.3;
+}
+
+.procesoText {
+  font-family: 'Manrope', var(--nx-font-body, system-ui), sans-serif;
+  font-size: 13px;
+  line-height: 1.65;
+  color: #5B6660;
+  margin: 0;
+}
+
+/* ════════════════════════════════════════════════════════════
+   INDUSTRIAS — chips, sección más compacta
+   ════════════════════════════════════════════════════════════ */
+
+.industriasSection {
+  border-top: 1px solid #E3E5DF;
+  padding-bottom: clamp(56px, 7vw, 88px);
+}
+
+/* Cabecera más compacta para la sección de industrias */
+.industriasSection .sectionHead {
+  padding-top: clamp(36px, 4.5vw, 56px);
+  padding-bottom: clamp(20px, 2.5vw, 32px);
+  max-width: 480px;
+}
+
+.industriasFlow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+/* Chips de industria: sin píldora, estilo inline limpio */
+.industriaChip {
+  font-family: 'Manrope', var(--nx-font-body, system-ui), sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  color: #14211C;
+  border: 1px solid #E3E5DF;
+  padding: 8px 18px;
+  border-radius: 6px;
+  letter-spacing: 0.01em;
+  background: transparent;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+  cursor: default;
+  user-select: none;
+}
+
+.industriaChip:hover {
+  background: #F1F0EA;
+  border-color: #9FB0A8;
+  color: #14211C;
+}
+
+/* ════════════════════════════════════════════════════════════
+   BANDA CTA — fondo Tinta, cierre de página
+   ════════════════════════════════════════════════════════════ */
+
+/* !important: anula :where(section){max-width} de globals.scss */
+.ctaBand {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  background: #14211C;
+  padding: clamp(64px, 8vw, 104px) clamp(20px, 4vw, 56px);
+  text-align: center;
+}
+
+.ctaInner {
+  max-width: 600px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ctaEyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.45);
+  margin-bottom: 20px;
+}
+
+/* Título grande — Fraunces 300, el mayor de la página */
+.ctaTitle {
+  font-family: 'Fraunces', var(--ds-font-serif, Georgia, serif);
+  font-size: clamp(30px, 4.8vw, 54px);
+  font-weight: 300;
+  line-height: 1.12;
+  color: #ffffff;
+  letter-spacing: -0.025em;
+  margin: 0 0 18px;
+  text-wrap: balance;
+}
+
+/* Acento en Musgo — en paleta, legible sobre Tinta */
+.ctaAccent {
+  font-style: italic;
+  color: #DCE6DD;
+}
+
+.ctaText {
+  font-family: 'Manrope', var(--nx-font-body, system-ui), sans-serif;
+  font-size: 15px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.58);
+  margin: 0 0 40px;
+  max-width: 50ch;
+}
+
+.ctaActions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ════════════════════════════════════════════════════════════
+   BOTONES
+   ════════════════════════════════════════════════════════════ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-family: 'Manrope', var(--nx-font-body, system-ui), sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+  letter-spacing: 0.005em;
+  cursor: pointer;
+}
+
+.btn:focus-visible {
+  outline: 2px solid #1F5F4E;
+  outline-offset: 2px;
+}
+
+/* Primario: Pino sólido */
+.btnPrimary {
+  background: #1F5F4E;
+  color: #FAF9F6;
+  border: 1px solid #1F5F4E;
+}
+
+.btnPrimary:hover {
+  background: #2F7A65;
+  border-color: #2F7A65;
+  transform: translateY(-1px);
+}
+
+/* Ghost: sobre fondo oscuro */
+.btnGhost {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.btnGhost:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
+}
+
+.btnArrow {
+  transition: transform 140ms ease;
+  line-height: 1;
+  font-size: 15px;
+}
+
+.btn:hover .btnArrow {
+  transform: translateX(4px);
+}
+
+/* ════════════════════════════════════════════════════════════
+   RESPONSIVO
+   ════════════════════════════════════════════════════════════ */
+
+@media (max-width: 900px) {
+  .metricsInner {
+    grid-template-columns: repeat(2, 1fr);
+    row-gap: clamp(28px, 4vw, 40px);
+  }
+
+  .metricItem + .metricItem::before { display: none; }
+  .metricItem:nth-child(2)::before  { display: block; }
+
+  .servicioRow {
+    grid-template-columns: 90px 1fr 24px;
+    gap: 0 16px;
+  }
+
+  .procesoGrid {
+    grid-template-columns: repeat(2, 1fr);
+    row-gap: 0;
+    column-gap: clamp(20px, 3vw, 36px);
+  }
+
+  .procesoStep {
+    padding-bottom: clamp(16px, 2.5vw, 24px);
+  }
+}
+
+@media (max-width: 600px) {
+  .homeBody { padding: 0 20px; }
+
+  .sectionHead { padding-top: 48px; padding-bottom: 28px; }
+  .procesoSection .sectionHead { padding-top: 36px; }
+  .industriasSection .sectionHead { padding-top: 32px; padding-bottom: 20px; }
+
+  .servicioRow {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    padding: 20px 0;
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .servicioRow:hover { background: transparent; }
+  .servicioArrow { display: none; }
+
+  .procesoGrid { grid-template-columns: 1fr; }
+
+  .ctaActions {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .btn {
+    justify-content: center;
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .servicioRow,
+  .servicioArrow,
+  .btn,
+  .industriaChip {
+    transition: none;
+  }
+}
