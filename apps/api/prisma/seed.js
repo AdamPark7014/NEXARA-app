@@ -20,10 +20,12 @@ async function seedRoles() {
 
   console.log('🌱 Seeding ERP org role templates + demo users (ts-node)...');
   const { execSync } = require('child_process');
-  execSync('npx ts-node ./seed-demo-users.ts', { cwd: __dirname, stdio: 'inherit' });
+  const path = require('path');
+  const apiDir = path.join(__dirname, '..');
+  execSync('npx ts-node prisma/seed-demo-users.ts', { cwd: apiDir, stdio: 'inherit' });
 
   console.log('🌱 Seeding workflow definitions (ts-node)...');
-  execSync('npx ts-node ./seed-workflows.ts', { cwd: __dirname, stdio: 'inherit' });
+  execSync('npx ts-node prisma/seed-workflows.ts', { cwd: apiDir, stdio: 'inherit' });
 }
 
 async function seedProjects() {
