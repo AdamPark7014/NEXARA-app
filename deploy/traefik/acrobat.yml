@@ -1,0 +1,51 @@
+## Traefik routing for Acrobat
+##
+## Hostnames con cert Let's Encrypt ya emitidos:
+##   - acrobat.mx          (apex / marketing)
+##   - www.acrobat.mx      (alias)
+##   - app.acrobat.mx      (aplicación principal)
+##   - coach.acrobat.mx    (panel para coaches)
+##   - gimnasta.acrobat.mx (panel para gimnastas)
+##
+## Todo va al mismo backend (acrobat-app-app-1:80). El propio Laravel
+## distingue el panel según el hostname.
+
+http:
+  routers:
+    # HTTP -> HTTPS (todos los hosts de Acrobat)
+    acrobat-http:
+      rule: 'Host(`acrobat.mx`,`www.acrobat.mx`,`app.acrobat.mx`,`coach.acrobat.mx`,`gimnasta.acrobat.mx`)'
+      entryPoints: [web]
+      middlewares: [redirect-https-acrobat]
+      service: dummy
+
+    acrobat-https:
+      rule: 'Host(`acrobat.mx`,`www.acrobat.mx`,`app.acrobat.mx`,`coach.acrobat.mx`,`gimnasta.acrobat.mx`)'
+      service: acrobat-app
+      entryPoints: [websecure]
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: acrobat.mx
+            sans:
+              - www.acrobat.mx
+              - app.acrobat.mx
+              - coach.acrobat.mx
+              - gimnasta.acrobat.mx
+
+  middlewares:
+    redirect-https-acrobat:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+  services:
+    acrobat-app:
+      loadBalancer:
+        servers:
+          - url: http://acrobat-app-app-1:80
+
+    dummy:
+      loadBalancer:
+        servers:
+          - url: http://localhost

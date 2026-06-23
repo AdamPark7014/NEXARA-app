@@ -1,0 +1,189 @@
+.loading {
+	padding: 1rem;
+	text-align: center;
+}
+
+.root {
+	display: grid;
+	gap: 1rem;
+}
+
+.panel {
+	display: grid;
+	gap: 0.8rem;
+}
+
+.title {
+	margin: 0;
+}
+
+.error {
+	color: var(--danger);
+	font-weight: 700;
+}
+
+.filterRow {
+	display: flex;
+	gap: 0.55rem;
+	flex-wrap: wrap;
+	align-items: center;
+}
+
+.filterSelect {
+	min-width: 180px;
+}
+
+.counter,
+.smallMuted,
+.metaText {
+	color: var(--text-secondary);
+}
+
+.counter,
+.smallMuted,
+.metaText {
+	font-size: 0.82rem;
+}
+
+.empty {
+	text-align: center;
+	color: var(--text-secondary);
+	padding: 1.1rem;
+}
+
+.tableWrap {
+	overflow-x: auto;
+}
+
+.table {
+	width: 100%;
+	border-collapse: collapse;
+	min-width: 900px;
+}
+
+.rowBorder {
+	border-bottom: 1px solid var(--border);
+}
+
+.th,
+.td {
+	text-align: left;
+	padding: 0.68rem;
+}
+
+.th {
+	font-size: 0.76rem;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--text-tertiary);
+}
+
+.userName,
+.toolName {
+	font-weight: 700;
+}
+
+.statusBadge,
+.mobileStatus {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 999px;
+	padding: 0.2rem 0.62rem;
+	font-size: 0.73rem;
+	font-weight: 700;
+	border: 1px solid transparent;
+}
+
+.statusPending {
+	color: #b56e0a;
+	background: color-mix(in srgb, var(--warning) 18%, transparent);
+}
+
+.statusApproved,
+.statusInUse {
+	color: #0e7f60;
+	background: color-mix(in srgb, var(--success) 18%, transparent);
+}
+
+.statusReturned {
+	color: var(--text-secondary);
+	background: color-mix(in srgb, var(--border) 38%, transparent);
+}
+
+.statusDamaged,
+.statusRejected {
+	color: #9f2f2b;
+	background: color-mix(in srgb, var(--danger) 18%, transparent);
+}
+
+.mobileList {
+	display: grid;
+	gap: 0.7rem;
+}
+
+.mobileCard {
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	padding: 0.7rem;
+	background: var(--surface);
+}
+
+.mobileTop {
+	display: flex;
+	justify-content: space-between;
+	gap: 0.6rem;
+	align-items: flex-start;
+}
+
+.mobileTopMain {
+	min-width: 0;
+}
+
+.mobileToolName {
+	font-weight: 800;
+}
+
+.mobileRequester {
+	color: var(--text-secondary);
+	font-size: 0.83rem;
+}
+
+.mobileMetaGrid {
+	margin-top: 0.55rem;
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 0.45rem;
+}
+
+.mobileMetaItem {
+	display: grid;
+	gap: 0.15rem;
+}
+
+.mobileMetaFull {
+	grid-column: 1 / -1;
+}
+
+.mobileMetaLabel {
+	font-size: 0.68rem;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--text-tertiary);
+	font-weight: 800;
+}
+
+.mobileMetaValue {
+	font-size: 0.84rem;
+}
+
+.mobileReason {
+	color: var(--text-secondary);
+}
+
+@media (max-width: 900px) {
+	.mobileMetaGrid {
+		grid-template-columns: 1fr;
+	}
+}
+

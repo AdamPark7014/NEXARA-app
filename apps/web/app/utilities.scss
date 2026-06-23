@@ -1,0 +1,137 @@
+:where(.card, .panel, .tile) {
+  background: linear-gradient(162deg, color-mix(in srgb, var(--surface) 98%, #fff), color-mix(in srgb, var(--surface-2) 88%, transparent));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elev-1);
+  padding: var(--space-5);
+  backdrop-filter: blur(6px);
+}
+
+:where(.button-primary, .btn, button.primary, input[type="submit"]) {
+  background: linear-gradient(138deg, var(--primary) 0%, var(--secondary) 100%);
+  color: #fff;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: var(--control-padding-y) calc(var(--control-padding-x) + 0.2rem);
+  min-height: var(--control-height);
+  font-weight: 650;
+  letter-spacing: 0.008em;
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--primary) 22%, transparent);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+:where(.button-primary, .btn, button.primary, input[type="submit"]):focus-visible {
+  box-shadow: var(--ring-soft), 0 12px 22px color-mix(in srgb, var(--primary) 24%, transparent);
+}
+
+:where(.button-primary, .btn, button.primary, input[type="submit"]):hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 12px 24px color-mix(in srgb, var(--primary) 26%, transparent);
+  filter: saturate(1.06) brightness(1.03);
+}
+
+:where(.button-secondary, button.secondary, input[type="button"].secondary) {
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--control-padding-y) calc(var(--control-padding-x) + 0.2rem);
+  min-height: var(--control-height);
+  font-weight: 600;
+  transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+:where(.button-secondary, button.secondary, input[type="button"].secondary):focus-visible {
+  box-shadow: var(--ring-soft);
+}
+
+:where(.button-secondary, button.secondary, input[type="button"].secondary):hover {
+  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--surface-2) 94%, transparent);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+
+body.dark :where(.button-secondary, button.secondary, input[type="button"].secondary) {
+  background: color-mix(in srgb, var(--surface-2) 94%, transparent);
+}
+
+:where(input, select, textarea, .input) {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface) 96%, var(--surface-2));
+  padding: var(--control-padding-y) var(--control-padding-x);
+  min-height: var(--control-height);
+  color: var(--text-primary);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+:where(input, select, textarea, .input)::placeholder {
+  color: var(--text-tertiary);
+  opacity: 0.82;
+}
+
+:where(input, select, textarea, .input):focus-visible {
+  border-color: color-mix(in srgb, var(--primary) 58%, var(--border));
+  box-shadow: var(--ring-soft);
+  background: color-mix(in srgb, var(--surface) 99%, #fff);
+  outline: none;
+}
+
+:where(.table, .card table, .panel table, .tile table) {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 35%, transparent);
+}
+
+:where(.table th, .table td, .card th, .card td, .panel th, .panel td, .tile th, .tile td) {
+  padding: var(--table-cell-y) var(--table-cell-x);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  text-align: left;
+}
+
+:where(.table th, .card th, .panel th, .tile th) {
+  background: color-mix(in srgb, var(--surface-2) 68%, transparent);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+:where(.table tbody tr:nth-child(even), .card tbody tr:nth-child(even), .panel tbody tr:nth-child(even), .tile tbody tr:nth-child(even)) {
+  background: color-mix(in srgb, var(--surface-2) 35%, transparent);
+}
+
+:where(.table tbody tr:hover, .card tbody tr:hover, .panel tbody tr:hover, .tile tbody tr:hover) {
+  background: color-mix(in srgb, var(--primary) 7%, var(--surface));
+}
+
+:where(.status-success, .badge-success, .alert-success) {
+  background: var(--state-success-bg);
+  color: var(--state-success-text);
+  border: 1px solid var(--state-success-border);
+}
+
+:where(.status-warning, .badge-warning, .alert-warning) {
+  background: var(--state-warning-bg);
+  color: var(--state-warning-text);
+  border: 1px solid var(--state-warning-border);
+}
+
+:where(.status-danger, .badge-danger, .alert-danger, .status-error, .badge-error, .alert-error) {
+  background: var(--state-danger-bg);
+  color: var(--state-danger-text);
+  border: 1px solid var(--state-danger-border);
+}
+
+:where(.status-info, .badge-info, .alert-info) {
+  background: var(--state-info-bg);
+  color: var(--state-info-text);
+  border: 1px solid var(--state-info-border);
+}

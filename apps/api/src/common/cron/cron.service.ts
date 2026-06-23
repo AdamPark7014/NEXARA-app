@@ -1,0 +1,215 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import { PrismaService } from '../../prisma/prisma.service.js';
+import { EmailService } from '../email/email.service.js';
+import { NotificationHierarchyService } from '../../notifications/notification-hierarchy.service.js';
+import { MaintenanceContractsService } from '../../maintenance-contracts/maintenance-contracts.service.js';
+
+@Injectable()
+export class CronService {
+  private readonly logger = new Logger(CronService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly email: EmailService,
+    private readonly notificationHierarchy: NotificationHierarchyService,
+    private readonly maintenanceContracts: MaintenanceContractsService,
+  ) {}
+
+  // ── Contratos de mantenimiento — generar OT cada hora ───────────
+  @Cron('15 * * * *', { name: 'maintenance-contracts-auto-ot' })
+  async handleMaintenanceContractsAutoOt() {
+    this.logger.log('Procesando contratos de mantenimiento (auto-OT)...');
+    try {
+      const result = await this.maintenanceContracts.runAutoGenerationCycle();
+      if (result.generated > 0) {
+        this.logger.log(`Auto-OT generadas: ${result.generated} de ${result.processed} visitas`);
+      }
+    } catch (error) {
+      this.logger.error('Auto-OT contratos falló', error as Error);
+    }
+  }
+
+  // ── Facturas vencidas — cada día 8AM ─────────────────────────────
+  @Cron('0 8 * * *', { name: 'overdue-invoices' })
+  async handleOverdueInvoices() {
+    this.logger.log('Verificando facturas vencidas...');
+    const overdue = await this.prisma.invoice.findMany({
+      where: {
+        status: { in: ['SENT', 'PARTIALLY_PAID'] },
+        dueDate: { lt: new Date() },
+        isCancelled: false,
+      },
+      include: { client: true, createdBy: true },
+    });
+
+    for (const inv of overdue) {
+      const days = Math.floor((Date.now() - inv.dueDate.getTime()) / 86400000);
+      if (inv.createdBy?.email) {
+        await this.email.sendInvoiceOverdue(
+          inv.createdBy.email,
+          inv.invoiceNumber,
+          inv.client?.name || inv.receptorName || 'Sin cliente',
+          Number(inv.totalAmount),
+          days,
+        );
+      }
+    }
+    this.logger.log(`Facturas vencidas procesadas: ${overdue.length}`);
+  }
+
+  // ── Órdenes de compra próximas a vencer — cada día 9AM ──────────
+  @Cron('0 9 * * *', { name: 'po-reminders' })
+  async handlePOReminders() {
+    this.logger.log('Verificando órdenes de compra próximas...');
+    const threeDaysFromNow = new Date(Date.now() + 3 * 86400000);
+    const upcoming = await this.prisma.purchaseOrder.findMany({
+      where: {
+        status: { in: ['DRAFT', 'CONFIRMED', 'PARTIALLY_RECEIVED'] },
+        expectedDate: { lte: threeDaysFromNow, gte: new Date() },
+      },
+      include: { supplier: true, createdBy: true },
+    });
+
+    for (const po of upcoming) {
+      if (po.createdBy?.email && po.expectedDate) {
+        await this.email.sendPurchaseOrderReminder(
+          po.createdBy.email,
+          po.poNumber,
+          po.supplier?.name || 'Sin proveedor',
+          po.expectedDate,
+        );
+      }
+    }
+    this.logger.log(`PO reminders enviados: ${upcoming.length}`);
+  }
+
+  // ── Mantenimiento preventivo — cada día 7AM ─────────────────────
+  @Cron('0 7 * * *', { name: 'maintenance-reminders' })
+  async handleMaintenanceReminders() {
+    this.logger.log('Verificando mantenimientos pendientes...');
+    const sevenDaysFromNow = new Date(Date.now() + 7 * 86400000);
+    const upcoming = await this.prisma.maintenanceOrder.findMany({
+      where: {
+        status: 'PLANNED',
+        plannedDate: { lte: sevenDaysFromNow, gte: new Date() },
+      },
+      include: { asset: true, assignedTo: true },
+    });
+
+    for (const order of upcoming) {
+      if ((order.assignedTo as any)?.email && order.plannedDate) {
+        await this.email.sendMaintenanceDue(
+          (order.assignedTo as any).email,
+          (order.asset as any)?.name || 'Equipo',
+          order.type || 'Preventivo',
+          order.plannedDate,
+        );
+      }
+    }
+    this.logger.log(`Maintenance reminders: ${upcoming.length}`);
+  }
+
+  // ── Limpieza de logs de auditoría > 90 días — domingo 3AM ──────
+  @Cron('0 3 * * 0', { name: 'audit-cleanup' })
+  async handleAuditCleanup() {
+    this.logger.log('Limpiando logs de auditoría antiguos...');
+    const cutoff = new Date(Date.now() - 90 * 86400000);
+    const result = await this.prisma.auditLog.deleteMany({
+      where: { createdAt: { lt: cutoff } },
+    });
+    this.logger.log(`Audit logs eliminados: ${result.count}`);
+  }
+
+  // ── Alertas de margen de proyectos — cada día 10AM ─────────────
+  @Cron('0 10 * * *', { name: 'project-margin-alerts' })
+  async handleProjectMarginAlerts() {
+    this.logger.log('Verificando proyectos con riesgo de margen...');
+    const activeProjects = await this.prisma.salesProject.findMany({
+      where: { status: { in: ['IN_PROGRESS', 'PLANNED'] } },
+      include: { opportunity: { select: { ownerId: true, title: true } } },
+    });
+
+    let alertsSent = 0;
+    for (const project of activeProjects) {
+      const opProject = await this.prisma.operationalProject.findFirst({
+        where: { salesProjectId: project.id },
+        select: { id: true },
+      });
+      if (!opProject) continue;
+
+      const acts = await this.prisma.activity.findMany({
+        where: { projectId: opProject.id, deletedAt: null },
+        select: { id: true },
+      });
+      const activityIds = acts.map((a) => a.id);
+
+      const [viaticAgg, expAgg, viaticProjAgg] = await Promise.all([
+        activityIds.length
+          ? this.prisma.viatico.aggregate({ where: { actividadId: { in: activityIds } }, _sum: { montoSolicitado: true } })
+          : Promise.resolve({ _sum: { montoSolicitado: null } }),
+        activityIds.length
+          ? this.prisma.expense.aggregate({ where: { actividadId: { in: activityIds }, deletedAt: null }, _sum: { montoSolicitado: true } })
+          : Promise.resolve({ _sum: { montoSolicitado: null } }),
+        this.prisma.viatico.aggregate({ where: { projectId: project.id }, _sum: { montoSolicitado: true } }),
+      ]);
+
+      const actualViaticos =
+        Number(viaticAgg._sum.montoSolicitado || 0) + Number(viaticProjAgg._sum.montoSolicitado || 0);
+      const actualOperativo = Number(expAgg._sum.montoSolicitado || 0);
+      const budget = Number(project.budget) || 0;
+      const totalActual = Number(project.costProducts) + actualViaticos + actualOperativo;
+      const marginActual = budget - totalActual;
+      const marginPercent = budget > 0 ? (marginActual / budget) * 100 : 0;
+
+      let severity: 'overspend' | 'low_margin' | null = null;
+      if (marginPercent < 0) severity = 'overspend';
+      else if (marginPercent < 10) severity = 'low_margin';
+
+      if (severity) {
+        await this.notificationHierarchy.notifyProjectMarginAlert({
+          projectId: project.id,
+          projectName: project.name || project.opportunity?.title || `Proyecto ${project.id}`,
+          ownerId: project.opportunity?.ownerId,
+          marginPercent,
+          severity,
+          actualMargin: marginActual,
+          budget,
+        });
+        alertsSent += 1;
+      }
+    }
+    this.logger.log(`Alertas de margen emitidas: ${alertsSent}`);
+  }
+
+  // ── KPI Snapshot — cada hora ────────────────────────────────────
+  @Cron(CronExpression.EVERY_HOUR, { name: 'kpi-snapshot' })
+  async handleKpiSnapshot() {
+    const [
+      activeActivities,
+      pendingPOs,
+      overdueInvoices,
+    ] = await Promise.all([
+      this.prisma.activity.count({ where: { estatus: 'EN_PROGRESO' } }),
+      this.prisma.purchaseOrder.count({ where: { status: { in: ['DRAFT', 'CONFIRMED'] } } }),
+      this.prisma.invoice.count({ where: { status: { in: ['SENT', 'PARTIALLY_PAID'] }, dueDate: { lt: new Date() }, isCancelled: false } }),
+    ]);
+
+    const today = new Date();
+    await this.prisma.kpiSnapshot.create({
+      data: {
+        kpiName: 'hourly_summary',
+        kpiCategory: 'operations',
+        value: 0,
+        periodStart: today,
+        periodEnd: today,
+        metadata: {
+          activeActivities,
+          pendingPOs,
+          overdueInvoices,
+          timestamp: new Date().toISOString(),
+        },
+      },
+    });
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "name": "web",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "prebuild": "node ../../scripts/clear-build-cache.js web",
+    "build": "node ../../scripts/next-build-resilient.js",
+    "build:lowmem": "cross-env NEXT_IGNORE_TYPE_ERRORS=1 node --max-old-space-size=1536 ../../node_modules/next/dist/bin/next build",
+    "start": "next start -p 3000"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.3.7",
+    "@mui/material": "^7.3.7",
+    "@mui/styled-engine": "^7.3.7",
+    "@mui/system": "^7.3.7",
+    "@react-pdf-viewer/core": "^3.12.0",
+    "axios": "^1.13.2",
+    "next": "^14.2.35",
+    "pdfjs-dist": "^3.11.174",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-easy-crop": "^5.5.6",
+    "recharts": "^3.6.0",
+    "socket.io-client": "^4.7.5",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@types/react": "^18.2.55",
+    "@types/react-dom": "^18.2.17",
+    "cross-env": "^7.0.3",
+    "sass": "^1.83.4",
+    "typescript": "^5.0.0"
+  }
+}

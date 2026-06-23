@@ -1,0 +1,158 @@
+name: nexara
+
+services:
+  traefik:
+    image: traefik:v2.11
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - "--api.insecure=false"
+      - "--api.dashboard=true"
+      - "--log.level=INFO"
+      - "--accesslog=true"
+      # Modo `directory` (no `filename`) para que Traefik cargue TODOS los
+      # routers de los proyectos hospedados en este servidor: nexara.yml,
+      # acrobat.yml, zynoratek.yml. Los archivos *-v3.yml/-debug.yml fueron
+      # renombrados a *.yml.disabled para que Traefik los ignore (sólo lee
+      # extensiones .yml/.yaml/.toml).
+      - "--providers.file.directory=/traefik-config"
+      - "--providers.file.watch=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.email=admin@${WEB_DOMAIN}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./acme.json:/acme.json
+      # Montar el directorio entero (no el archivo individual) para que el
+      # bind mount sobreviva a `git pull` (que cambia el inode al
+      # reescribir el archivo).
+      - ./traefik:/traefik-config:ro
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.middlewares.https-redirect.redirectscheme.scheme=https
+      - traefik.http.middlewares.https-redirect.redirectscheme.permanent=true
+      - traefik.http.routers.dashboard.rule=Host(`traefik.${WEB_DOMAIN}`)
+      - traefik.http.routers.dashboard.entrypoints=web,websecure
+      - traefik.http.routers.dashboard.middlewares=https-redirect@docker
+      - traefik.http.routers.dashboard.tls.certresolver=letsencrypt
+      - traefik.http.routers.dashboard.service=api@internal
+    networks:
+      - proxy
+
+  db:
+    image: postgres:16
+    container_name: nexara-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - nexara-postgres-data:/var/lib/postgresql/data
+    networks:
+      - internal
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.api
+    container_name: nexara-api
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+      WEB_URL: ${WEB_URL}
+      PUBLIC_WEB_URL: ${WEB_URL}
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${FIREBASE_SERVICE_ACCOUNT_JSON}
+      WEB_PUSH_VAPID_PUBLIC_KEY: ${WEB_PUSH_VAPID_PUBLIC_KEY}
+      WEB_PUSH_VAPID_PRIVATE_KEY: ${WEB_PUSH_VAPID_PRIVATE_KEY}
+      WEB_PUSH_CONTACT: ${WEB_PUSH_CONTACT}
+      BREVO_API_KEY: ${BREVO_API_KEY}
+      BREVO_SENDER_EMAIL: ${BREVO_SENDER_EMAIL}
+      BREVO_SENDER_NAME: ${BREVO_SENDER_NAME}
+      BREVO_NEWSLETTER_LIST_ID: ${BREVO_NEWSLETTER_LIST_ID}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_SECURE: ${SMTP_SECURE}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+      HIKVISION_URL: ${HIKVISION_URL:-http://hikcentral:54483}
+      HIKVISION_PORT: ${HIKVISION_PORT:-54483}
+      HIKVISION_USERNAME: ${HIKVISION_USERNAME:-admin}
+      HIKVISION_PASSWORD: ${HIKVISION_PASSWORD:-password}
+      HIKVISION_TIMEOUT: ${HIKVISION_TIMEOUT:-10000}
+    volumes:
+      - ../uploads:/app/uploads
+    networks:
+      - internal
+      - proxy
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.web
+      args:
+        NEXT_PUBLIC_API_URL: ${WEB_NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_SOCKET_URL: ${WEB_NEXT_PUBLIC_SOCKET_URL}
+        NEXT_PUBLIC_BASE_URL: ${WEB_NEXT_PUBLIC_BASE_URL}
+        NEXT_PUBLIC_API_ASSET_ORIGIN: ${WEB_NEXT_PUBLIC_API_ASSET_ORIGIN}
+        NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API: ${WEB_NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API}
+        NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${WEB_NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+        NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID: ${WEB_NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID}
+        NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY: ${WEB_NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY}
+        NEXT_PUBLIC_WEB_PUSH_CONSENT_MODE: ${WEB_NEXT_PUBLIC_WEB_PUSH_CONSENT_MODE}
+        NEXT_PUBLIC_GA_MEASUREMENT_ID: ${WEB_NEXT_PUBLIC_GA_MEASUREMENT_ID}
+        NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: ${WEB_NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION}
+        NEXT_PUBLIC_BING_SITE_VERIFICATION: ${WEB_NEXT_PUBLIC_BING_SITE_VERIFICATION}
+        NEXT_PUBLIC_CONTACT_PHONE: ${WEB_NEXT_PUBLIC_CONTACT_PHONE}
+        NEXT_PUBLIC_CONTACT_EMAIL: ${WEB_NEXT_PUBLIC_CONTACT_EMAIL}
+        NEXT_PUBLIC_CITY: ${WEB_NEXT_PUBLIC_CITY}
+        NEXT_PUBLIC_STATE: ${WEB_NEXT_PUBLIC_STATE}
+    container_name: nexara-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${WEB_NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_SOCKET_URL: ${WEB_NEXT_PUBLIC_SOCKET_URL}
+      NEXT_PUBLIC_BASE_URL: ${WEB_NEXT_PUBLIC_BASE_URL}
+      NEXT_PUBLIC_API_ASSET_ORIGIN: ${WEB_NEXT_PUBLIC_API_ASSET_ORIGIN}
+      NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API: ${WEB_NEXT_PUBLIC_ALLOW_CROSS_ORIGIN_API}
+      NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${WEB_NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+      NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID: ${WEB_NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID}
+      NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY: ${WEB_NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY}
+      NEXT_PUBLIC_WEB_PUSH_CONSENT_MODE: ${WEB_NEXT_PUBLIC_WEB_PUSH_CONSENT_MODE}
+      NEXT_PUBLIC_GA_MEASUREMENT_ID: ${WEB_NEXT_PUBLIC_GA_MEASUREMENT_ID}
+      NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: ${WEB_NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION}
+      NEXT_PUBLIC_BING_SITE_VERIFICATION: ${WEB_NEXT_PUBLIC_BING_SITE_VERIFICATION}
+      NEXT_PUBLIC_CONTACT_PHONE: ${WEB_NEXT_PUBLIC_CONTACT_PHONE}
+      NEXT_PUBLIC_CONTACT_EMAIL: ${WEB_NEXT_PUBLIC_CONTACT_EMAIL}
+      NEXT_PUBLIC_CITY: ${WEB_NEXT_PUBLIC_CITY}
+      NEXT_PUBLIC_STATE: ${WEB_NEXT_PUBLIC_STATE}
+      API_INTERNAL_URL: http://nexara-api:3001/api
+    labels:
+      - traefik.enable=false
+    networks:
+      - internal
+      - proxy
+
+volumes:
+  nexara-postgres-data:
+
+networks:
+  internal:
+  proxy:
+    external: true

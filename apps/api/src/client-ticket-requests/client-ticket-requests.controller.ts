@@ -1,0 +1,52 @@
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Query, UseGuards, BadRequestException } from '@nestjs/common';
+import { ClientTicketStatus } from '@prisma/client';
+import { RBAC, RbacGuard } from '../common/rbac.guard.js';
+import { UrlAccessGuard } from '../common/rbac/url-access.guard.js';
+import { PERMISSIONS } from '../common/permissions.js';
+import { ClientTicketRequestsService } from './client-ticket-requests.service.js';
+import { ClientTicketRequestsQueryDto } from './dto/client-ticket-requests-query.dto.js';
+
+@Controller('client-ticket-requests')
+@UseGuards(UrlAccessGuard, RbacGuard)
+export class ClientTicketRequestsController {
+  constructor(private readonly service: ClientTicketRequestsService) {}
+
+  private normalizeStatus(value?: string) {
+    if (!value) return undefined;
+    const normalized = value.toUpperCase();
+    return (Object.values(ClientTicketStatus) as string[]).includes(normalized)
+      ? (normalized as ClientTicketStatus)
+      : undefined;
+  }
+
+  @Get()
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  findAll(@Query() query: ClientTicketRequestsQueryDto) {
+    return this.service.findAll(this.normalizeStatus(query.status), query);
+  }
+
+  @Patch(':id/assign')
+  @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
+  assign(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { activityId?: number },
+  ) {
+    const activityId = Number(body.activityId);
+    if (!activityId || Number.isNaN(activityId)) {
+      throw new BadRequestException('activityId invalido');
+    }
+    return this.service.assign(id, activityId);
+  }
+
+  @Patch(':id/status')
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  updateStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { status?: string },
+  ) {
+    if (!body.status) throw new BadRequestException('status requerido');
+    const status = this.normalizeStatus(body.status);
+    if (!status) throw new BadRequestException('status invalido');
+    return this.service.updateStatus(id, status);
+  }
+}
