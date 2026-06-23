@@ -1,3 +1,0 @@
--- Historical placeholder migration.
--- This migration exists in the development database history but was missing from the repository.
--- Kept as a no-op so Prisma can reconcile migration names without altering the schema.
