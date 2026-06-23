@@ -12,5 +12,6 @@
 import NexaraHome, { metadata as nexaraMetadata } from "./nexara/page";
 
 export const metadata = nexaraMetadata;
+export const dynamic = 'force-dynamic';
 
 export default NexaraHome;
