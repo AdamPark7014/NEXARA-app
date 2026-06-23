@@ -33,85 +33,125 @@ type DemoUser = {
 };
 
 /**
- * Equipo real de NEXARA (alineado con la sección pública "Nosotros").
+ * Equipo real de NEXARA (alineado con el organigrama oficial).
+ * Solo usuarios presentes en el organigrama V2 2026.
  */
 const DEMO_USERS: DemoUser[] = [
   // ── Dirección General ─────────────────────────────────────────────────
   {
-    nombre: 'Christian Del Pozo',
+    nombre: 'Christian Eduardo Del Pozo Sánchez',
     email: 'gerencia@nexara.com.mx',
     orgRoleKey: ORG_ROLE_KEYS.CEO,
     departmentName: 'Dirección General',
     employeeNumber: 'NX-001',
   },
-  {
-    nombre: 'Adam Del Pozo',
-    email: 'developer@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.CEO, // dev con permisos plenos
-    departmentName: 'Dirección General',
-    employeeNumber: 'NX-002',
-  },
 
-  // ── Direcciones ───────────────────────────────────────────────────────
-  {
-    nombre: 'Lizeth Antele Antonio',
-    email: 'lizeth.antele@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.DIRECTOR_ADMIN,
-    departmentName: 'Administración',
-    employeeNumber: 'NX-030',
-  },
-  {
-    nombre: 'Luis Joel Aguilar',
-    email: 'direccion.operaciones@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.DIRECTOR_OPS,
-    departmentName: 'Operaciones',
-    employeeNumber: 'NX-020',
-  },
+  // ── Administración ────────────────────────────────────────────────────
   {
     nombre: 'Karen Elizalde Sarmiento',
     email: 'ventas@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.DIRECTOR_COMMERCIAL,
-    departmentName: 'Ventas',
-    employeeNumber: 'NX-031',
+    orgRoleKey: ORG_ROLE_KEYS.DIRECTOR_ADMIN,
+    departmentName: 'Administración',
+    employeeNumber: 'NX-101',
+  },
+  {
+    nombre: 'Mónica García Guzmán',
+    email: 'monica.garcia@nexara.com.mx',
+    orgRoleKey: ORG_ROLE_KEYS.SPECIALIST,
+    departmentName: 'Administración',
+    employeeNumber: 'NX-102',
   },
 
-  // ── Mandos medios y especialistas ─────────────────────────────────────
+  // ── Área Creativa ─────────────────────────────────────────────────────
   {
-    nombre: 'Alejandro Gonzales Bustamante',
+    nombre: 'Daniela Galindo Almanzán',
+    email: 'redes@nexara.com.mx',
+    orgRoleKey: ORG_ROLE_KEYS.SPECIALIST,
+    departmentName: 'Área Creativa',
+    employeeNumber: 'NX-201',
+  },
+
+  // ── Operaciones ───────────────────────────────────────────────────────
+  {
+    nombre: 'Luis Job Aguilar Castillo',
+    email: 'direction.operaciones@nexara.com.mx',
+    orgRoleKey: ORG_ROLE_KEYS.DIRECTOR_OPS,
+    departmentName: 'Operaciones',
+    employeeNumber: 'NX-301',
+  },
+  {
+    nombre: 'David Morales Zenón',
     email: 'operaciones@nexara.com.mx',
     orgRoleKey: ORG_ROLE_KEYS.PROJECT_MANAGER,
     departmentName: 'Operaciones',
-    employeeNumber: 'NX-040',
-  },
-  {
-    nombre: 'Carolina Juarez Alvarez',
-    email: 'soporte@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.SENIOR_ENGINEER,
-    departmentName: 'Ingeniería de campo',
-    employeeNumber: 'NX-050',
+    employeeNumber: 'NX-302',
   },
 
-  // ── Operativos ────────────────────────────────────────────────────────
+  // ── Arquitectura e Infraestructura ────────────────────────────────────
   {
-    nombre: 'Julio Cesar Rivera Vazquez',
-    email: 'julio.rivera@nexara.com.mx',
+    nombre: 'Josué Teodulo Cervantes Abellano',
+    email: 'infraestructura@nexara.com.mx',
+    orgRoleKey: ORG_ROLE_KEYS.SENIOR_ENGINEER,
+    departmentName: 'Arquitectura',
+    employeeNumber: 'NX-401',
+  },
+
+  // ── Ingeniería ────────────────────────────────────────────────────────
+  {
+    nombre: 'José Juan Tapa Reyes',
+    email: 'jose.tapa@nexara.com.mx',
     orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
-    departmentName: 'Ingeniería de campo',
-    employeeNumber: 'NX-060',
+    departmentName: 'Ingeniería',
+    employeeNumber: 'NX-501',
   },
   {
-    nombre: 'David Morales Zenon',
-    email: 'david.morales@nexara.com.mx',
+    nombre: 'Juan Carrillo Carrete',
+    email: 'juan.carrillo@nexara.com.mx',
     orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
-    departmentName: 'Ingeniería de campo',
-    employeeNumber: 'NX-061',
+    departmentName: 'Ingeniería',
+    employeeNumber: 'NX-502',
   },
   {
-    nombre: 'Israel Ramos Lima',
-    email: 'israel.ramos@nexara.com.mx',
+    nombre: 'Isaías García Bustamante',
+    email: 'isaias.garcia@nexara.com.mx',
     orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
-    departmentName: 'Ingeniería de campo',
-    employeeNumber: 'NX-062',
+    departmentName: 'Ingeniería',
+    employeeNumber: 'NX-503',
+  },
+  {
+    nombre: 'María Sánchez Espinoza',
+    email: 'maria.sanchez@nexara.com.mx',
+    orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
+    departmentName: 'Ingeniería',
+    employeeNumber: 'NX-504',
+  },
+  {
+    nombre: 'Daniela Arévez Álvarez',
+    email: 'daniela.arevez@nexara.com.mx',
+    orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
+    departmentName: 'Ingeniería',
+    employeeNumber: 'NX-505',
+  },
+  {
+    nombre: 'Juana Sierra Gallardo',
+    email: 'juana.sierra@nexara.com.mx',
+    orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
+    departmentName: 'Ingeniería',
+    employeeNumber: 'NX-506',
+  },
+  {
+    nombre: 'María González Bustamante',
+    email: 'maria.gonzalez@nexara.com.mx',
+    orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
+    departmentName: 'Ingeniería',
+    employeeNumber: 'NX-507',
+  },
+  {
+    nombre: 'Melisa Ramos Lima',
+    email: 'melisa.ramos@nexara.com.mx',
+    orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
+    departmentName: 'Ingeniería',
+    employeeNumber: 'NX-508',
   },
 ];
 
