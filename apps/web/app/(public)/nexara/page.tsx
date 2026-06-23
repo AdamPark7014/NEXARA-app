@@ -45,6 +45,8 @@ export const metadata: Metadata = {
   },
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function NexaraPage() {
   const [metricasData, serviciosData, procesoData, industriasData, ctaData] =
     await Promise.all([
