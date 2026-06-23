@@ -5,9 +5,9 @@ services:
     container_name: nexara-db-dev
     restart: unless-stopped
     environment:
-      POSTGRES_USER: nexara
-      POSTGRES_PASSWORD: Nx@r4_Secure_2024!
-      POSTGRES_DB: nexara
+      POSTGRES_USER: nexara_user
+      POSTGRES_PASSWORD: bb3030adpozoont
+      POSTGRES_DB: nexara_db
     ports:
       - "5432:5432"
     volumes:
@@ -46,7 +46,7 @@ services:
       - "4000:3001"
     environment:
       NODE_ENV: development
-      DATABASE_URL: postgresql://nexara:Nx%40r4_Secure_2024!@db:5432/nexara?schema=public
+      DATABASE_URL: postgresql://nexara_user:bb3030adpozoont@db:5432/nexara_db?schema=public
       REDIS_URL: redis://redis:6379
       JWT_SECRET: dev-secret-key-change-in-production
       HIKVISION_URL: http://localhost:54483
