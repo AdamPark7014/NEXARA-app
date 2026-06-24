@@ -13,12 +13,12 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import { hashSync } from 'bcryptjs';
+import bcryptjs from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 const DEMO_PASSWORD = process.env.SEED_DEMO_PASSWORD || 'Nexara2026!';
-const DEMO_PASSWORD_HASH = hashSync(DEMO_PASSWORD, 10);
+const DEMO_PASSWORD_HASH = bcryptjs.hashSync(DEMO_PASSWORD, 10);
 
 // ORG_ROLE_KEYS inline (sin dependencias externas)
 const ORG_ROLE_KEYS = {
