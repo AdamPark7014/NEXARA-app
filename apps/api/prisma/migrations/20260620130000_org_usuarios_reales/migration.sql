@@ -32,7 +32,6 @@ SELECT 'Karen Elizalde Sarmiento', 'ventas@nexara.com.mx',
   r.id, 'coord_ventas', d.id, 'Coordinadora de Ventas y Administración', 'Activo', true
 FROM "Role" r CROSS JOIN "Department" d
 WHERE r."orgRoleKey" = 'coord_ventas' AND d.nombre = 'Administración'
-LIMIT 1
 ON CONFLICT (email) DO UPDATE SET
   nombre = 'Karen Elizalde Sarmiento',
   "roleKey" = 'coord_ventas',
@@ -45,7 +44,6 @@ SELECT 'Mónica García Guzmán', 'soluciones@nexara.com.mx',
   r.id, 'administrativo', d.id, 'Coordinadora Administrativa', 'Activo', true
 FROM "Role" r CROSS JOIN "Department" d
 WHERE r."orgRoleKey" = 'administrativo' AND d.nombre = 'Administración'
-LIMIT 1
 ON CONFLICT (email) DO UPDATE SET
   nombre = 'Mónica García Guzmán',
   "roleKey" = 'administrativo',
@@ -58,7 +56,6 @@ SELECT 'Daniela Galindo Almazán', 'redes@nexara.com.mx',
   r.id, 'lider_diseno', d.id, 'Líder de Área Creativa', 'Activo', true
 FROM "Role" r CROSS JOIN "Department" d
 WHERE r."orgRoleKey" = 'lider_diseno' AND d.nombre = 'Área Creativa'
-LIMIT 1
 ON CONFLICT (email) DO UPDATE SET
   nombre = 'Daniela Galindo Almazán',
   "roleKey" = 'lider_diseno',
@@ -71,7 +68,6 @@ SELECT 'Josué Teodulo Cervantes Arellano', 'infraestructura@nexara.com.mx',
   r.id, 'arquitecto', d.id, 'Arquitecto / Director Técnico', 'Activo', true
 FROM "Role" r CROSS JOIN "Department" d
 WHERE r."orgRoleKey" = 'arquitecto' AND d.nombre = 'Operaciones'
-LIMIT 1
 ON CONFLICT (email) DO UPDATE SET
   nombre = 'Josué Teodulo Cervantes Arellano',
   "roleKey" = 'arquitecto',
