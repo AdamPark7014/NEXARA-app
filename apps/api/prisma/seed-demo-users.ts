@@ -174,6 +174,14 @@ async function ensureDepartment(name: string): Promise<number> {
 
 async function seedDemoUsers() {
   console.log('🌱 [demo-users] Upsert de usuarios demo…');
+  
+  // ⚠️ DEBUG: Verificar que el hash se genera correctamente
+  const testPassword = 'Nexara2026!';
+  const testHash = bcryptjs.hashSync(testPassword, 10);
+  console.log(`   📌 Test hash generado: ${testHash}`);
+  const isValid = await bcryptjs.compare(testPassword, testHash);
+  console.log(`   📌 Comparación test: ${isValid ? '✅' : '❌'}`);
+  
   let created = 0;
   let updated = 0;
 
