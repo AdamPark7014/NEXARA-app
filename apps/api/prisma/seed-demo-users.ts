@@ -13,11 +13,12 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { hashSync } from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 const DEMO_PASSWORD = process.env.SEED_DEMO_PASSWORD || 'Nexara2026!';
-let DEMO_PASSWORD_HASH: string;
+const DEMO_PASSWORD_HASH = hashSync(DEMO_PASSWORD, 10);
 
 // ORG_ROLE_KEYS inline (sin dependencias externas)
 const ORG_ROLE_KEYS = {
@@ -233,8 +234,6 @@ async function seedDemoUsers() {
 }
 
 async function main() {
-  const bcrypt = await import('bcryptjs');
-  DEMO_PASSWORD_HASH = bcrypt.hashSync(DEMO_PASSWORD, 10);
   await seedDemoUsers();
 }
 
