@@ -1,20 +1,16 @@
 "use client";
 
-import AppShell from "@/components/app-shell/AppShell";
 import { ToastViewport } from "@/components/Toast";
 import { usePathname } from "next/navigation";
 
 export default function ErpLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  if (pathname && (pathname.includes("/login") || pathname.includes("/auth"))) {
-    return <>{children}</>;
-  }
-
+  // TEMPORALMENTE: retorna solo children para evitar error de AppShell
   return (
     <>
       <ToastViewport />
-      <AppShell panel="erp">{children}</AppShell>
+      {children}
     </>
   );
 }
