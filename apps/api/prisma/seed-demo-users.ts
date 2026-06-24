@@ -21,15 +21,16 @@ const DEMO_PASSWORD = process.env.SEED_DEMO_PASSWORD || 'Nexara2026!';
 const DEMO_PASSWORD_HASH = bcryptjs.hashSync(DEMO_PASSWORD, 10);
 
 // ORG_ROLE_KEYS inline (sin dependencias externas)
+// Mapeados a los roles existentes en la BD
 const ORG_ROLE_KEYS = {
   CEO: 'ceo',
-  DIRECTOR_ADMIN: 'director_admin',
-  DIRECTOR_OPS: 'director_ops',
-  DIRECTOR_COMMERCIAL: 'director_commercial',
-  PROJECT_MANAGER: 'project_manager',
-  SENIOR_ENGINEER: 'senior_engineer',
-  FIELD_ENGINEER: 'field_engineer',
-  SPECIALIST: 'specialist',
+  DIRECTOR_ADMIN: 'coord_admin',
+  DIRECTOR_OPS: 'coord_operaciones',
+  DIRECTOR_COMMERCIAL: 'coord_admin', // fallback
+  PROJECT_MANAGER: 'coord_operaciones', // usa coord_operaciones
+  SENIOR_ENGINEER: 'arquitecto',
+  FIELD_ENGINEER: 'ing_campo',
+  SPECIALIST: 'administrativo',
 } as const;
 
 type OrgRoleKey = typeof ORG_ROLE_KEYS[keyof typeof ORG_ROLE_KEYS];
@@ -176,28 +177,11 @@ async function seedDemoUsers() {
   let created = 0;
   let updated = 0;
 
-  // Mapeo de roles a sus nombres en BD
-  const roleMap: Record<OrgRoleKey, string> = {
-    [ORG_ROLE_KEYS.CEO]: 'CEO',
-    [ORG_ROLE_KEYS.DIRECTOR_ADMIN]: 'DIRECTOR_ADMIN',
-    [ORG_ROLE_KEYS.DIRECTOR_OPS]: 'DIRECTOR_OPS',
-    [ORG_ROLE_KEYS.DIRECTOR_COMMERCIAL]: 'DIRECTOR_COMMERCIAL',
-    [ORG_ROLE_KEYS.PROJECT_MANAGER]: 'PROJECT_MANAGER',
-    [ORG_ROLE_KEYS.SENIOR_ENGINEER]: 'SENIOR_ENGINEER',
-    [ORG_ROLE_KEYS.FIELD_ENGINEER]: 'FIELD_ENGINEER',
-    [ORG_ROLE_KEYS.SPECIALIST]: 'SPECIALIST',
-  };
-
   for (const u of DEMO_USERS) {
-    const roleName = roleMap[u.orgRoleKey];
-    if (!roleName) {
-      console.warn(`   ⚠️  Sin mapeo para ${u.orgRoleKey} — se omite ${u.email}`);
-      continue;
-    }
-
-    const role = await prisma.role.findUnique({ where: { nombre: roleName } });
+    // Buscar role por orgRoleKey
+    const role = await prisma.role.findUnique({ where: { orgRoleKey: u.orgRoleKey } });
     if (!role) {
-      console.warn(`   ⚠️  Rol ${roleName} no existe en DB — se omite ${u.email}`);
+      console.warn(`   ⚠️  Rol ${u.orgRoleKey} no existe en DB — se omite ${u.email}`);
       continue;
     }
     const departmentId = await ensureDepartment(u.departmentName);
