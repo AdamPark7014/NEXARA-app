@@ -1,134 +1,168 @@
 /**
- * Seed de usuarios demo NEXARA — equipo real + 1 usuario por cada rol nuevo.
+ * Seed de usuarios demo NEXARA — equipo real alineado con organigrama.
  *
  * Crea/actualiza:
- *  - 13 plantillas ORG_ROLE_TEMPLATES (Roles)
- *  - Departamentos (Dirección General, Ventas, Operaciones, Administración…)
- *  - 1 usuario real por cada rol del ERP tech-services
+ *  - Departamentos (Dirección General, Administración, Operaciones, Ingeniería…)
+ *  - Usuarios reales del equipo NEXARA con sus roles
  *  - Password universal demo: "Nexara2026!" (cambiar en producción)
  *
  * Es idempotente: puede correrse N veces sin duplicar nada.
  *
  * Run:
- *   cd apps/api && npx ts-node prisma/seed-demo-users.ts
+ *   npm run prisma:seed
  */
 
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
-import { ORG_ROLE_TEMPLATES, ORG_ROLE_KEYS, type OrgRoleKey, type OrgRoleTemplate } from '../src/common/org-roles.ts';
 
 const prisma = new PrismaClient();
 
 const DEMO_PASSWORD = process.env.SEED_DEMO_PASSWORD || 'Nexara2026!';
 const DEMO_PASSWORD_HASH = bcrypt.hashSync(DEMO_PASSWORD, 10);
 
+// ORG_ROLE_KEYS inline (sin dependencias externas)
+const ORG_ROLE_KEYS = {
+  CEO: 'ceo',
+  DIRECTOR_ADMIN: 'director_admin',
+  DIRECTOR_OPS: 'director_ops',
+  DIRECTOR_COMMERCIAL: 'director_commercial',
+  PROJECT_MANAGER: 'project_manager',
+  SENIOR_ENGINEER: 'senior_engineer',
+  FIELD_ENGINEER: 'field_engineer',
+  SPECIALIST: 'specialist',
+} as const;
+
+type OrgRoleKey = typeof ORG_ROLE_KEYS[keyof typeof ORG_ROLE_KEYS];
+
 type DemoUser = {
   nombre: string;
   email: string;
   orgRoleKey: OrgRoleKey;
-  /** Departamento — si no existe se crea. */
   departmentName: string;
-  /** Número de empleado opcional (solo informativo). */
   employeeNumber?: string;
 };
 
 /**
- * Equipo real de NEXARA (alineado con la sección pública "Nosotros").
+ * Equipo real de NEXARA (alineado con el organigrama oficial).
  */
 const DEMO_USERS: DemoUser[] = [
   // ── Dirección General ─────────────────────────────────────────────────
   {
-    nombre: 'Christian Del Pozo',
+    nombre: 'Christian Eduardo Del Pozo Sánchez',
     email: 'gerencia@nexara.com.mx',
     orgRoleKey: ORG_ROLE_KEYS.CEO,
     departmentName: 'Dirección General',
     employeeNumber: 'NX-001',
   },
-  {
-    nombre: 'Adam Del Pozo',
-    email: 'developer@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.CEO, // dev con permisos plenos
-    departmentName: 'Dirección General',
-    employeeNumber: 'NX-002',
-  },
 
-  // ── Direcciones ───────────────────────────────────────────────────────
-  {
-    nombre: 'Lizeth Antele Antonio',
-    email: 'lizeth.antele@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.DIRECTOR_ADMIN,
-    departmentName: 'Administración',
-    employeeNumber: 'NX-030',
-  },
-  {
-    nombre: 'Luis Joel Aguilar',
-    email: 'direccion.operaciones@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.DIRECTOR_OPS,
-    departmentName: 'Operaciones',
-    employeeNumber: 'NX-020',
-  },
+  // ── Administración ────────────────────────────────────────────────────
   {
     nombre: 'Karen Elizalde Sarmiento',
     email: 'ventas@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.DIRECTOR_COMMERCIAL,
-    departmentName: 'Ventas',
-    employeeNumber: 'NX-031',
+    orgRoleKey: ORG_ROLE_KEYS.DIRECTOR_ADMIN,
+    departmentName: 'Administración',
+    employeeNumber: 'NX-101',
+  },
+  {
+    nombre: 'Mónica García Guzmán',
+    email: 'monica.garcia@nexara.com.mx',
+    orgRoleKey: ORG_ROLE_KEYS.SPECIALIST,
+    departmentName: 'Administración',
+    employeeNumber: 'NX-102',
   },
 
-  // ── Mandos medios y especialistas ─────────────────────────────────────
+  // ── Área Creativa ─────────────────────────────────────────────────────
   {
-    nombre: 'Alejandro Gonzales Bustamante',
+    nombre: 'Daniela Galindo Almanzán',
+    email: 'redes@nexara.com.mx',
+    orgRoleKey: ORG_ROLE_KEYS.SPECIALIST,
+    departmentName: 'Área Creativa',
+    employeeNumber: 'NX-201',
+  },
+
+  // ── Operaciones ───────────────────────────────────────────────────────
+  {
+    nombre: 'Luis Job Aguilar Castillo',
+    email: 'direction.operaciones@nexara.com.mx',
+    orgRoleKey: ORG_ROLE_KEYS.DIRECTOR_OPS,
+    departmentName: 'Operaciones',
+    employeeNumber: 'NX-301',
+  },
+  {
+    nombre: 'David Morales Zenón',
     email: 'operaciones@nexara.com.mx',
     orgRoleKey: ORG_ROLE_KEYS.PROJECT_MANAGER,
     departmentName: 'Operaciones',
-    employeeNumber: 'NX-040',
-  },
-  {
-    nombre: 'Carolina Juarez Alvarez',
-    email: 'soporte@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.SENIOR_ENGINEER,
-    departmentName: 'Ingeniería de campo',
-    employeeNumber: 'NX-050',
+    employeeNumber: 'NX-302',
   },
 
-  // ── Operativos ────────────────────────────────────────────────────────
+  // ── Arquitectura e Infraestructura ────────────────────────────────────
   {
-    nombre: 'Julio Cesar Rivera Vazquez',
-    email: 'julio.rivera@nexara.com.mx',
+    nombre: 'Josué Teodulo Cervantes Abellano',
+    email: 'infraestructura@nexara.com.mx',
+    orgRoleKey: ORG_ROLE_KEYS.SENIOR_ENGINEER,
+    departmentName: 'Arquitectura',
+    employeeNumber: 'NX-401',
+  },
+
+  // ── Ingeniería ────────────────────────────────────────────────────────
+  {
+    nombre: 'José Juan Tapa Reyes',
+    email: 'jose.tapa@nexara.com.mx',
     orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
-    departmentName: 'Ingeniería de campo',
-    employeeNumber: 'NX-060',
+    departmentName: 'Ingeniería',
+    employeeNumber: 'NX-501',
   },
   {
-    nombre: 'David Morales Zenon',
-    email: 'david.morales@nexara.com.mx',
+    nombre: 'Juan Carrillo Carrete',
+    email: 'juan.carrillo@nexara.com.mx',
     orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
-    departmentName: 'Ingeniería de campo',
-    employeeNumber: 'NX-061',
+    departmentName: 'Ingeniería',
+    employeeNumber: 'NX-502',
   },
   {
-    nombre: 'Israel Ramos Lima',
-    email: 'israel.ramos@nexara.com.mx',
+    nombre: 'Isaías García Bustamante',
+    email: 'isaias.garcia@nexara.com.mx',
     orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
-    departmentName: 'Ingeniería de campo',
-    employeeNumber: 'NX-062',
+    departmentName: 'Ingeniería',
+    employeeNumber: 'NX-503',
+  },
+  {
+    nombre: 'María Sánchez Espinoza',
+    email: 'maria.sanchez@nexara.com.mx',
+    orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
+    departmentName: 'Ingeniería',
+    employeeNumber: 'NX-504',
+  },
+  {
+    nombre: 'Daniela Arévez Álvarez',
+    email: 'daniela.arevez@nexara.com.mx',
+    orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
+    departmentName: 'Ingeniería',
+    employeeNumber: 'NX-505',
+  },
+  {
+    nombre: 'Juana Sierra Gallardo',
+    email: 'juana.sierra@nexara.com.mx',
+    orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
+    departmentName: 'Ingeniería',
+    employeeNumber: 'NX-506',
+  },
+  {
+    nombre: 'María González Bustamante',
+    email: 'maria.gonzalez@nexara.com.mx',
+    orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
+    departmentName: 'Ingeniería',
+    employeeNumber: 'NX-507',
+  },
+  {
+    nombre: 'Melisa Ramos Lima',
+    email: 'melisa.ramos@nexara.com.mx',
+    orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
+    departmentName: 'Ingeniería',
+    employeeNumber: 'NX-508',
   },
 ];
-
-async function seedRoleTemplates() {
-  console.log('🌱 [demo-users] Upsert de plantillas de rol ERP…');
-  let count = 0;
-  for (const template of ORG_ROLE_TEMPLATES) {
-    const { orgRoleKey, nombre, nivelAutoridad, flags } = template;
-    await prisma.role.upsert({
-      where: { nombre },
-      update: { orgRoleKey, nivelAutoridad, ...flags },
-      create: { nombre, orgRoleKey, nivelAutoridad, ...flags },
-    });
-    count += 1;
-  }
-  console.log(`   ✅ ${count} roles ERP sincronizados.`);
-}
 
 async function ensureDepartment(name: string): Promise<number> {
   const existing = await prisma.department.findUnique({ where: { nombre: name } });
@@ -142,15 +176,28 @@ async function seedDemoUsers() {
   let created = 0;
   let updated = 0;
 
+  // Mapeo de roles a sus nombres en BD
+  const roleMap: Record<OrgRoleKey, string> = {
+    [ORG_ROLE_KEYS.CEO]: 'CEO',
+    [ORG_ROLE_KEYS.DIRECTOR_ADMIN]: 'DIRECTOR_ADMIN',
+    [ORG_ROLE_KEYS.DIRECTOR_OPS]: 'DIRECTOR_OPS',
+    [ORG_ROLE_KEYS.DIRECTOR_COMMERCIAL]: 'DIRECTOR_COMMERCIAL',
+    [ORG_ROLE_KEYS.PROJECT_MANAGER]: 'PROJECT_MANAGER',
+    [ORG_ROLE_KEYS.SENIOR_ENGINEER]: 'SENIOR_ENGINEER',
+    [ORG_ROLE_KEYS.FIELD_ENGINEER]: 'FIELD_ENGINEER',
+    [ORG_ROLE_KEYS.SPECIALIST]: 'SPECIALIST',
+  };
+
   for (const u of DEMO_USERS) {
-    const template = ORG_ROLE_TEMPLATES.find((t: OrgRoleTemplate) => t.orgRoleKey === u.orgRoleKey);
-    if (!template) {
-      console.warn(`   ⚠️  Sin plantilla para ${u.orgRoleKey} — se omite ${u.email}`);
+    const roleName = roleMap[u.orgRoleKey];
+    if (!roleName) {
+      console.warn(`   ⚠️  Sin mapeo para ${u.orgRoleKey} — se omite ${u.email}`);
       continue;
     }
-    const role = await prisma.role.findUnique({ where: { nombre: template.nombre } });
+
+    const role = await prisma.role.findUnique({ where: { nombre: roleName } });
     if (!role) {
-      console.warn(`   ⚠️  Rol ${template.nombre} no existe en DB — se omite ${u.email}`);
+      console.warn(`   ⚠️  Rol ${roleName} no existe en DB — se omite ${u.email}`);
       continue;
     }
     const departmentId = await ensureDepartment(u.departmentName);
@@ -186,29 +233,8 @@ async function seedDemoUsers() {
   console.log(`   🔑 Password demo: ${DEMO_PASSWORD}`);
 }
 
-async function printSummary() {
-  console.log('\n📋 Resumen final por rol:');
-  for (const template of ORG_ROLE_TEMPLATES) {
-    const role = await prisma.role.findUnique({ where: { nombre: template.nombre } });
-    if (!role) continue;
-    const users = await prisma.user.findMany({
-      where: { roleId: role.id },
-      select: { nombre: true, email: true },
-      orderBy: { id: 'asc' },
-    });
-    if (users.length === 0) continue;
-    const lead = users[0];
-    const extra = users.length > 1 ? ` (+${users.length - 1})` : '';
-    console.log(
-      `   · ${template.label.padEnd(32)} → ${lead.nombre}${extra} <${lead.email}>`,
-    );
-  }
-}
-
 async function main() {
-  await seedRoleTemplates();
   await seedDemoUsers();
-  await printSummary();
 }
 
 main()
