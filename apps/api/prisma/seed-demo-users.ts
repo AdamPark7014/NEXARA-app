@@ -179,7 +179,7 @@ async function seedDemoUsers() {
 
   for (const u of DEMO_USERS) {
     // Buscar role por orgRoleKey
-    const role = await prisma.role.findUnique({ where: { orgRoleKey: u.orgRoleKey } });
+    const role = await prisma.role.findFirst({ where: { orgRoleKey: u.orgRoleKey } });
     if (!role) {
       console.warn(`   ⚠️  Rol ${u.orgRoleKey} no existe en DB — se omite ${u.email}`);
       continue;
