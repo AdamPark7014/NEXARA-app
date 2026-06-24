@@ -1,50 +1,8 @@
 name: nexara
 
 services:
-  traefik:
-    image: traefik:v2.11
-    container_name: traefik
-    restart: unless-stopped
-    command:
-      - "--api.insecure=false"
-      - "--api.dashboard=true"
-      - "--log.level=INFO"
-      - "--accesslog=true"
-      # Modo `directory` (no `filename`) para que Traefik cargue TODOS los
-      # routers de los proyectos hospedados en este servidor: nexara.yml,
-      # acrobat.yml, zynoratek.yml. Los archivos *-v3.yml/-debug.yml fueron
-      # renombrados a *.yml.disabled para que Traefik los ignore (sólo lee
-      # extensiones .yml/.yaml/.toml).
-      - "--providers.file.directory=/traefik-config"
-      - "--providers.file.watch=true"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.letsencrypt.acme.email=admin@${WEB_DOMAIN}"
-      - "--certificatesresolvers.letsencrypt.acme.storage=/acme.json"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./acme.json:/acme.json
-      # Montar el directorio entero (no el archivo individual) para que el
-      # bind mount sobreviva a `git pull` (que cambia el inode al
-      # reescribir el archivo).
-      - ./traefik:/traefik-config:ro
-    labels:
-      - traefik.enable=true
-      - traefik.docker.network=proxy
-      - traefik.http.middlewares.https-redirect.redirectscheme.scheme=https
-      - traefik.http.middlewares.https-redirect.redirectscheme.permanent=true
-      - traefik.http.routers.dashboard.rule=Host(`traefik.${WEB_DOMAIN}`)
-      - traefik.http.routers.dashboard.entrypoints=web,websecure
-      - traefik.http.routers.dashboard.middlewares=https-redirect@docker
-      - traefik.http.routers.dashboard.tls.certresolver=letsencrypt
-      - traefik.http.routers.dashboard.service=api@internal
-    networks:
-      - proxy
+  # NOTE: Traefik is managed globally via traefik-main container.
+  # This compose only defines services: db, api, web
 
   db:
     image: postgres:16
