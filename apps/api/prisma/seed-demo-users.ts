@@ -230,6 +230,22 @@ async function seedDemoUsers() {
 
 async function main() {
   await seedDemoUsers();
+  
+  // ⚠️ DEBUG: Verificar que el usuario CEO fue actualizado correctamente
+  const ceoUser = await prisma.user.findUnique({ where: { email: 'gerencia@nexara.com.mx' } });
+  if (ceoUser) {
+    console.log(`\n📊 Verificación CEO:`);
+    console.log(`   ID: ${ceoUser.id}`);
+    console.log(`   Email: ${ceoUser.email}`);
+    console.log(`   Nombre: ${ceoUser.nombre}`);
+    console.log(`   RoleID: ${ceoUser.roleId}`);
+    console.log(`   PasswordHash length: ${ceoUser.passwordHash.length} chars`);
+    console.log(`   PasswordHash (primeros 50): ${ceoUser.passwordHash.substring(0, 50)}...`);
+    
+    // Verificar que el hash es válido
+    const isValid = await bcryptjs.compare('Nexara2026!', ceoUser.passwordHash);
+    console.log(`   Contraseña valida: ${isValid ? '✅' : '❌'}`);
+  }
 }
 
 main()
