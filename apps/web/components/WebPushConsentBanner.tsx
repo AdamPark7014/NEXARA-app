@@ -11,14 +11,7 @@ const STORAGE_SNOOZE = "nexara_web_push_snooze_v1";
  * El botón principal llama a Notification.requestPermission() aquí; luego se dispara la suscripción push.
  */
 export default function WebPushConsentBanner() {
-  let user = null;
-  try {
-    const { user: contextUser } = useUser();
-    user = contextUser;
-  } catch {
-    // Hook no disponible en este contexto (ej: durante SSR o contexto incompleto)
-    return null;
-  }
+  const { user } = useUser();
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const mode = process.env.NEXT_PUBLIC_WEB_PUSH_CONSENT_MODE?.trim().toLowerCase();
