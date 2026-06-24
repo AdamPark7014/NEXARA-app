@@ -196,7 +196,7 @@ async function seedDemoUsers() {
 
     const existing = await prisma.user.findUnique({ where: { email: u.email } });
     if (existing) {
-      await prisma.user.update({
+      const updated_user = await prisma.user.update({
         where: { email: u.email },
         data: {
           nombre: u.nombre,
@@ -206,9 +206,10 @@ async function seedDemoUsers() {
           employeeNumber: u.employeeNumber ?? existing.employeeNumber,
         },
       });
+      console.log(`   ✏️ ${u.email} actualizado (hash: ${DEMO_PASSWORD_HASH.substring(0, 20)}...)`);
       updated += 1;
     } else {
-      await prisma.user.create({
+      const created_user = await prisma.user.create({
         data: {
           nombre: u.nombre,
           email: u.email,
@@ -218,6 +219,7 @@ async function seedDemoUsers() {
           employeeNumber: u.employeeNumber,
         },
       });
+      console.log(`   ✨ ${u.email} creado (ID: ${created_user.id}, hash: ${DEMO_PASSWORD_HASH.substring(0, 20)}...)`);
       created += 1;
     }
   }
