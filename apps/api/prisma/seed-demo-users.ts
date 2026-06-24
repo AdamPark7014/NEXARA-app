@@ -192,6 +192,7 @@ async function seedDemoUsers() {
         where: { email: u.email },
         data: {
           nombre: u.nombre,
+          passwordHash: DEMO_PASSWORD_HASH,
           roleId: role.id,
           departmentId,
           employeeNumber: u.employeeNumber ?? existing.employeeNumber,
