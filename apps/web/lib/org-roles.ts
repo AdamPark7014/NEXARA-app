@@ -1,6 +1,5 @@
 /** Espejo web de apps/api/src/common/org-roles.ts — roles organizacionales ERP. */
 
-import { orgRoleKeyFromV2 } from '@/lib/rbac/role-mapping';
 
 export const ORG_ROLE_KEYS = {
   CEO: 'ceo',
@@ -348,10 +347,47 @@ export const ORG_ROLE_META: Record<OrgRoleKey, OrgRoleMeta> = {
   },
 };
 
+function orgRoleKeyFromV2Local(v2Key: string): OrgRoleKey | null {
+  switch (v2Key) {
+    case 'super_admin':
+    case 'ceo':
+      return ORG_ROLE_KEYS.CEO;
+    case 'arquitecto':
+      return ORG_ROLE_KEYS.ARQUITECTO;
+    case 'dir_admin':
+      return ORG_ROLE_KEYS.DIRECTOR_ADMIN;
+    case 'dir_operaciones':
+      return ORG_ROLE_KEYS.DIRECTOR_OPS;
+    case 'coord_ventas':
+      return ORG_ROLE_KEYS.SALES_MANAGER;
+    case 'vendedor':
+      return ORG_ROLE_KEYS.SALES_REP;
+    case 'coord_operaciones':
+      return ORG_ROLE_KEYS.COORD_OPERACIONES;
+    case 'ing_campo':
+      return ORG_ROLE_KEYS.FIELD_ENGINEER;
+    case 'ing_soporte':
+      return ORG_ROLE_KEYS.SUPPORT_AGENT;
+    case 'lider_diseno':
+    case 'disenador':
+      return ORG_ROLE_KEYS.DESIGNER;
+    case 'administrativo':
+      return ORG_ROLE_KEYS.ADMIN_STAFF;
+    case 'contabilidad':
+      return ORG_ROLE_KEYS.ACCOUNTANT;
+    case 'rh':
+      return ORG_ROLE_KEYS.HR_SPECIALIST;
+    case 'coord_admin':
+      return ORG_ROLE_KEYS.ADMIN_STAFF;
+    default:
+      return null;
+  }
+}
+
 export function resolveOrgRoleKey(roleName?: string | null, orgRoleKey?: string | null): OrgRoleKey | null {
   if (orgRoleKey) {
     if (orgRoleKey in ORG_ROLE_META) return orgRoleKey as OrgRoleKey;
-    const fromV2 = orgRoleKeyFromV2(orgRoleKey);
+    const fromV2 = orgRoleKeyFromV2Local(orgRoleKey);
     if (fromV2) return fromV2;
   }
 
