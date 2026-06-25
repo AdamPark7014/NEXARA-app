@@ -7,8 +7,8 @@ import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
 import { buildApiUrl } from "@/lib/api-base";
+import { useCrmManagerGuard } from "@/lib/useCrmManagerGuard";
 
 interface OrderTemplate {
   id: number;
@@ -35,7 +35,7 @@ const emptyForm = { name: "", description: "", companyName: "", companyEmail: ""
 
 export default function TemplatesPage() {
   const { user } = useUser();
-  const { canCreate, canDelete } = useRbacGuard();
+  const cfg = useCrmManagerGuard();
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<OrderTemplate[]>([]);
@@ -102,28 +102,30 @@ export default function TemplatesPage() {
       ),
     },
     { key: "companyName", label: "Empresa", accessor: (t) => t.companyName ?? "—", width: 180 },
-    ...((canCreate) ? [{
+    ...((cfg.canCreate) ? [{
       key: "acciones" as keyof OrderTemplate, label: "",
       render: (t: OrderTemplate) => (
         <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
           {!t.isDefault && <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); void setDefault(t); }}>Predeterminar</Button>}
-          {canDelete && <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); void remove(t); }}>Eliminar</Button>}
+          {cfg.canDelete && <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); void remove(t); }}>Eliminar</Button>}
         </div>
       ),
       width: 220,
     }] : []),
   ];
 
+  if (!cfg.canAccess) return null;
+
   return (
     <>
       <PageHeader
         eyebrow="CRM · Catálogo"
         title="Plantillas"
-        subtitle="Diseños reutilizables para PDF de cotización: logo, colores corporativos y datos fiscales."
+        subtitle={cfg.subtitle}
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nueva plantilla</Button>}
+            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nueva plantilla</Button>}
           </>
         }
       />

@@ -64,7 +64,7 @@ export type PanelMeta = {
 export const PANEL_META: Record<PanelId, PanelMeta> = {
   [PANELS.ERP]: {
     id: PANELS.ERP,
-    publicSubdomain: "erp",
+    publicSubdomain: "core",
     name: "NEXARA ERP",
     tagline: "Administración, finanzas, RH y gobierno corporativo",
     accent: "#0ea5e9",
@@ -73,7 +73,7 @@ export const PANEL_META: Record<PanelId, PanelMeta> = {
   },
   [PANELS.CRM]: {
     id: PANELS.CRM,
-    publicSubdomain: "crm",
+    publicSubdomain: "sales",
     name: "NEXARA CRM",
     tagline: "Pipeline comercial, cotizaciones y clientes",
     accent: "#10b981",
@@ -169,6 +169,7 @@ export type ModuleId =
   | "news"
   // CRM
   | "crm-leads"
+  | "crm-dashboard"
   | "crm-opportunities"
   | "crm-pipeline"
   | "crm-clients"
@@ -477,6 +478,12 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   // ════════════════════════════════════════════════════════════════
   // CRM — Pipeline comercial
   // ════════════════════════════════════════════════════════════════
+  "crm-dashboard": {
+    id: "crm-dashboard", panel: PANELS.CRM, path: "/dashboard",
+    label: "Resumen comercial", description: "KPIs, pipeline y actividad del equipo",
+    icon: "📈", allowedRoles: SALES_TEAM,
+    group: "Pipeline", visible: true,
+  },
   "crm-leads": {
     id: "crm-leads", panel: PANELS.CRM, path: "/leads",
     label: "Leads", description: "Prospectos sin calificar",
@@ -916,8 +923,26 @@ export function getHomePanel(role: OrgRoleKey | null, isSuperAdmin = false): Pan
   return ROLE_HOME_PANEL[role] ?? PANELS.ERP;
 }
 
+/** Rutas HOME explícitas por rol org (evita que todos los de ERP caigan en /executive). */
+const ORG_ROLE_HOME_PATH: Partial<Record<OrgRoleKey, string>> = {
+  [R.CEO]: "/erp/executive",
+  [R.FIELD_ENGINEER]: "/ops/my-activities",
+};
+
 /** Devuelve ruta HOME completa: /erp/dashboard, /crm/dashboard, etc. */
 export function getHomeUrl(role: OrgRoleKey | null, isSuperAdmin = false): string {
+  if (isSuperAdmin) return "/erp/executive";
+  if (!role) return "/erp/dashboard";
+
+  const explicit = ORG_ROLE_HOME_PATH[role];
+  if (explicit) return explicit;
+
   const panel = getHomePanel(role, isSuperAdmin);
-  return `/${panel}${PANEL_META[panel].entryPath}`;
+  if (panel === PANELS.LAB) return "/lab";
+  // PANEL_META.erp.entryPath es /executive (branding subdominio); home operativo = dashboard.
+  if (panel === PANELS.ERP) return "/erp/dashboard";
+
+  const entry = PANEL_META[panel].entryPath;
+  if (!entry || entry === "/") return `/${panel}`;
+  return `/${panel}${entry}`;
 }

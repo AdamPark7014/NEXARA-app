@@ -150,7 +150,7 @@ export class AlertsService {
               message: `Margen real de ${realMarginPct.toFixed(1)}% (umbral ${MARGIN_ALERT_THRESHOLD_PERCENT}%). Revisa costos reales vs presupuesto.`,
               entityType: 'SalesProject',
               relatedEntityId: p.id,
-              relatedUrl: `/proyectos/${p.id}`,
+              relatedUrl: `/ops/projects/${p.id}`,
               priority: realMarginPct < 0 ? 'high' : 'normal',
             },
             {
@@ -227,7 +227,7 @@ export class AlertsService {
             message,
             entityType: 'MaintenanceContractVisit',
             relatedEntityId: v.id,
-            relatedUrl: `/maintenance/contracts/${v.contract?.id}`,
+            relatedUrl: `/ops/maintenance?woId=${v.contract?.id}`,
             priority: overdue ? 'high' : 'normal',
           },
           {
@@ -289,7 +289,7 @@ export class AlertsService {
             message: `${productName} en ${wh}: ${qty} / mínimo ${min}. Genera requisición de compra.`,
             entityType: 'StockLevel',
             relatedEntityId: level.id,
-            relatedUrl: `/warehouse/stock/${level.productId}`,
+            relatedUrl: `/erp/warehouse?productId=${level.productId}`,
             priority: qty <= 0 ? 'high' : 'normal',
           },
           {

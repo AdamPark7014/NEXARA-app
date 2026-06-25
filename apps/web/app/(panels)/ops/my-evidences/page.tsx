@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -8,6 +10,7 @@ import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
+import { getEvidencesSectionConfig } from "@/lib/section-views";
 
 interface Evidence {
   id: number;
@@ -44,7 +47,17 @@ function tipoGradient(tipo: string): string {
 
 export default function MyEvidencesPage() {
   const { user } = useUser();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activityFilter = searchParams.get("activityId");
+  const cfg = useMemo(() => getEvidencesSectionConfig(user), [user]);
   const token = user?.token ?? "";
+
+  useEffect(() => {
+    if (cfg.viewMode === "manage" && cfg.defaultScope === "team") {
+      router.replace("/ops/evidences");
+    }
+  }, [cfg, router]);
 
   const [items, setItems] = useState<Evidence[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,14 +79,21 @@ export default function MyEvidencesPage() {
   const pendientes = items.filter((e) => e.estatus === "Pendiente").length;
   const rechazadas = items.filter((e) => e.estatus === "Rechazada").length;
 
+  const visibleItems = useMemo(() => {
+    if (!activityFilter) return items;
+    const aid = Number(activityFilter);
+    if (Number.isNaN(aid)) return items;
+    return items.filter((e) => e.actividad?.id === aid);
+  }, [items, activityFilter]);
+
   const estadoVariant = (s: string): "positive" | "warning" | "danger" => s === "Aprobada" ? "positive" : s === "Rechazada" ? "danger" : "warning";
 
   return (
     <>
       <PageHeader
         eyebrow="OPS · Campo"
-        title="Mis evidencias"
-        subtitle="Fotos, videos, hojas de servicio y firmas capturadas en tus OT — agrégalas desde el detalle de cada actividad."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
       />
 
@@ -88,12 +108,18 @@ export default function MyEvidencesPage() {
       )}
 
       <Section title="Capturas recientes">
+        {activityFilter && (
+          <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
+            Filtrando por actividad <strong>#{activityFilter}</strong>.{" "}
+            <Link href="/ops/my-evidences" style={{ color: "var(--primary)" }}>Ver todas</Link>
+          </p>
+        )}
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando tus evidencias." />}
         {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
-        {!loading && !error && items.length === 0 && <EmptyState icon="📷" title="Sin evidencias" description="Sube tu primera evidencia desde el detalle de una actividad." />}
-        {!loading && !error && items.length > 0 && (
+        {!loading && !error && visibleItems.length === 0 && <EmptyState icon="📷" title="Sin evidencias" description="Sube tu primera evidencia desde el detalle de una actividad." />}
+        {!loading && !error && visibleItems.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
-            {items.map((e) => (
+            {visibleItems.map((e) => (
               <article key={e.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
                 <a href={buildApiUrl(e.archivoUrl)} target="_blank" rel="noreferrer" style={{ display: "block", textDecoration: "none" }}>
                   <div style={{ height: 120, background: tipoGradient(e.tipoEvidencia), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40, color: "white", position: "relative" }}>

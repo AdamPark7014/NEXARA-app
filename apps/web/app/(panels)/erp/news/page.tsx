@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import Button from "@/components/ui/Button";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 type Tab = "comunicados" | "newsletter";
@@ -74,7 +74,7 @@ function TabButton({ active, onClick, icon, label, count }: { active: boolean; o
 
 export default function ComunicacionesInternasPage() {
   const { user } = useUser();
-  const { canCreate, canEdit, canDelete, canApprove } = useRbacGuard();
+  const cfg = useMemo(() => getErpGovernanceSectionConfig(user, "news"), [user]);
   const token = user?.token ?? "";
 
   const [tab, setTab]         = useState<Tab>("comunicados");
@@ -191,15 +191,15 @@ export default function ComunicacionesInternasPage() {
       key: "id", label: "", width: 120,
       render: c => (
         <div style={{ display: "flex", gap: 4 }}>
-          {c.estado !== "Enviado" && canApprove && (
+          {c.estado !== "Enviado" && cfg.canApprove && (
             <button onClick={() => enviar(c.id)} title="Enviar ahora" style={{
               fontSize: 11, padding: "3px 7px", borderRadius: 6, cursor: "pointer",
               background: "color-mix(in srgb, var(--primary) 12%, transparent)",
               color: "var(--primary)", border: "1px solid color-mix(in srgb, var(--primary) 30%, transparent)", fontWeight: 600,
             }}>Enviar</button>
           )}
-          {canEdit && <button onClick={() => openEdit(c)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--text-tertiary)", padding: "3px 6px" }}>✎</button>}
-          {canDelete && <button onClick={() => remove(c.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--danger)", padding: "3px 6px" }}>✕</button>}
+          {cfg.canEdit && <button onClick={() => openEdit(c)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--text-tertiary)", padding: "3px 6px" }}>✎</button>}
+          {cfg.canDelete && <button onClick={() => remove(c.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--danger)", padding: "3px 6px" }}>✕</button>}
         </div>
       ),
     },
@@ -212,7 +212,7 @@ export default function ComunicacionesInternasPage() {
         title="Noticias internas"
         subtitle="Comunicados al equipo y newsletter mensual de NEXARA."
         actions={
-          canCreate ? <Button variant="primary" iconLeft="📣" onClick={openNew}>Nuevo comunicado</Button> : undefined
+          cfg.canCreate ? <Button variant="primary" iconLeft="📣" onClick={openNew}>Nuevo comunicado</Button> : undefined
         }
       />
 

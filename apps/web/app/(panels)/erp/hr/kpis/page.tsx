@@ -8,6 +8,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
+import { useHrManagementGuard } from "@/lib/useHrManagementGuard";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface HrEmpleado {
@@ -36,6 +37,7 @@ async function apiFetch(path: string, token: string) {
 
 export default function HrKpisPage() {
   const { user } = useUser();
+  const cfg = useHrManagementGuard();
   const token = user?.token ?? "";
 
   const [staff, setStaff] = useState<HrEmpleado[]>([]);
@@ -90,7 +92,7 @@ export default function HrKpisPage() {
     <>
       <PageHeader
         eyebrow="ERP · Personas"
-        title="KPIs de personas"
+        title={cfg.title}
         subtitle="Productividad operativa y rotación del equipo — la salud humana de NEXARA, no solo la financiera."
         actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
       />

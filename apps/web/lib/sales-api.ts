@@ -10,6 +10,7 @@ export type SalesLead = {
   status: string;
   score: number;
   notes?: string | null;
+  owner?: { id: number; nombre: string; email?: string | null } | null;
 };
 
 export type SalesOpportunityNote = {
@@ -41,6 +42,9 @@ export type SalesOpportunity = {
   value: number;
   probability: number;
   expectedCloseDate?: string | null;
+  closedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
   clientName?: string | null;
   clientId?: number | null;
   ownerId?: number | null;
@@ -50,6 +54,62 @@ export type SalesOpportunity = {
   evidences?: SalesOpportunityEvidence[];
   quotes?: SalesOpportunityQuote[];
 };
+
+/** Etapas activas del pipeline (sin WON/LOST). */
+export const PIPELINE_STAGES = [
+  { id: "DISCOVERY", label: "Discovery", color: "#94a3b8", description: "Detectar necesidad real" },
+  { id: "QUALIFICATION", label: "Calificado", color: "#0ea5e9", description: "Presupuesto y autoridad confirmados" },
+  { id: "PROPOSAL", label: "Cotización", color: "#6366f1", description: "Propuesta formal enviada" },
+  { id: "NEGOTIATION", label: "Negociación", color: "#f59e0b", description: "Ajustando precio o alcance" },
+  { id: "CLOSING", label: "Cierre", color: "#10b981", description: "Firma o PO en proceso" },
+] as const;
+
+export const ALL_OPPORTUNITY_STAGES = [
+  ...PIPELINE_STAGES,
+  { id: "WON", label: "Ganada" },
+  { id: "LOST", label: "Perdida" },
+] as const;
+
+const STAGE_LABELS: Record<string, string> = Object.fromEntries(
+  ALL_OPPORTUNITY_STAGES.map((s) => [s.id, s.label]),
+);
+
+export function formatOpportunityStage(stage?: string | null): string {
+  if (!stage) return "—";
+  return STAGE_LABELS[stage] ?? stage;
+}
+
+export function isClosedOpportunityStage(stage?: string | null): boolean {
+  return stage === "WON" || stage === "LOST";
+}
+
+export function isHotOpportunityStage(stage?: string | null): boolean {
+  return stage === "NEGOTIATION" || stage === "CLOSING";
+}
+
+const QUOTE_STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Borrador",
+  SENT: "Enviada",
+  APPROVED: "Firmada",
+};
+
+export function formatQuoteStatus(status?: string | null): string {
+  if (!status) return "—";
+  return QUOTE_STATUS_LABELS[status] ?? status;
+}
+
+const LEAD_STATUS_LABELS: Record<string, string> = {
+  NEW: "Nuevo",
+  QUALIFIED: "Calificado",
+  NURTURING: "En seguimiento",
+  LOST: "Descartado",
+  CONVERTED: "Convertido",
+};
+
+export function formatLeadStatus(status?: string | null): string {
+  if (!status) return "—";
+  return LEAD_STATUS_LABELS[status] ?? status;
+}
 
 export type SalesProject = {
   id: number;
@@ -128,14 +188,35 @@ export type SalesProjectDetail = {
   projectType?: string | null;
   scopeSummary?: string | null;
   siteCount?: number | null;
-  budget: number;
-  costProducts: number;
-  costViáticos: number;
-  costOperativo: number;
-  margin: number;
+  budget: number | string;
+  costProducts: number | string;
+  costViaticos: number | string;
+  costOperativo: number | string;
+  margin: number | string;
   status: string;
-  opportunity?: { id: number; title: string } | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  opportunityId?: number;
+  opportunity?: {
+    id: number;
+    title: string;
+    stage?: string;
+    client?: { id: number; name: string; legalName?: string | null } | null;
+    owner?: { id: number; nombre: string } | null;
+  } | null;
 };
+
+const SALES_PROJECT_STATUS_LABELS: Record<string, string> = {
+  PLANNED: "Planeado",
+  IN_PROGRESS: "En ejecución",
+  CLOSED: "Cerrado",
+  ON_HOLD: "En pausa",
+};
+
+export function formatSalesProjectStatus(status?: string | null): string {
+  if (!status) return "—";
+  return SALES_PROJECT_STATUS_LABELS[status] ?? status.replace(/_/g, " ");
+}
 
 export type SalesProjectOrderLine = {
   id: number;
@@ -497,6 +578,42 @@ export const getSalesOpportunity = async (token: string, id: number) => {
   return apiRequest<SalesOpportunity>(`ventas/oportunidades/${id}`, { token, method: "GET" }, "No se pudo cargar la oportunidad");
 };
 
+export const getSalesClient = async (token: string, id: number) => {
+  return apiRequest<
+    SalesClient & {
+      opportunities?: Array<{ id: number; title: string; stage: string; value: number | string }>;
+    }
+  >(`ventas/clientes/${id}`, { token, method: "GET" }, "No se pudo cargar el cliente");
+};
+
+export const updateSalesClient = async (
+  token: string,
+  id: number,
+  payload: Partial<{
+    name: string;
+    legalName: string;
+    taxId: string;
+    fiscalAddress: string;
+    billingEmail: string;
+    billingPhone: string;
+    industry: string;
+    website: string;
+    status: string;
+    notes: string;
+  }>,
+) => {
+  return apiRequest<SalesClient>(
+    `ventas/clientes/${id}`,
+    {
+      token,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+    "No se pudo actualizar el cliente",
+  );
+};
+
 export const createSalesOpportunity = async (
   token: string,
   payload: {
@@ -530,6 +647,38 @@ export const updateSalesOpportunityStage = async (token: string, opportunityId: 
       body: JSON.stringify({ stage }),
     },
     "Error al actualizar etapa",
+  );
+};
+
+export const updateSalesOpportunity = async (
+  token: string,
+  id: number,
+  payload: Partial<{
+    title: string;
+    description: string;
+    stage: string;
+    value: number;
+    probability: number;
+    expectedCloseDate: string;
+  }>,
+) => {
+  return apiRequest<SalesOpportunity>(
+    `ventas/oportunidades/${id}`,
+    {
+      token,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+    "No se pudo actualizar la oportunidad",
+  );
+};
+
+export const deleteSalesOpportunity = async (token: string, id: number) => {
+  return apiRequest<void>(
+    `ventas/oportunidades/${id}`,
+    { token, method: "DELETE" },
+    "No se pudo eliminar la oportunidad",
   );
 };
 
@@ -687,7 +836,11 @@ export const listSalesProjects = async (token: string, filters?: { ownerId?: num
   if (filters?.ownerId) search.set("ownerId", String(filters.ownerId));
   const path = `ventas/proyectos${search.toString() ? `?${search.toString()}` : ""}`;
   const data = await apiRequest<unknown>(path, { token, method: "GET" }, "No se pudieron cargar los proyectos");
-  return Array.isArray(data) ? (data as SalesProjectDetail[]) : [];
+  if (Array.isArray(data)) return data as SalesProjectDetail[];
+  if (data && typeof data === "object" && Array.isArray((data as { data?: unknown }).data)) {
+    return (data as { data: SalesProjectDetail[] }).data;
+  }
+  return [];
 };
 
 export const createSalesProject = async (
@@ -698,11 +851,13 @@ export const createSalesProject = async (
     projectType?: string;
     scopeSummary?: string;
     siteCount?: number;
-    budget: number;
-    costProducts: number;
-    costViáticos: number;
-    costOperativo: number;
-    status: string;
+    budget?: number;
+    costProducts?: number;
+    costViaticos?: number;
+    costOperativo?: number;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
   },
 ) => {
   return apiRequest<SalesProjectDetail>(
@@ -714,6 +869,35 @@ export const createSalesProject = async (
       body: JSON.stringify(payload),
     },
     "No se pudo crear el proyecto",
+  );
+};
+
+export const updateSalesProject = async (
+  token: string,
+  id: number,
+  payload: Partial<{
+    name: string;
+    projectType: string;
+    scopeSummary: string;
+    siteCount: number;
+    budget: number;
+    costProducts: number;
+    costViaticos: number;
+    costOperativo: number;
+    status: string;
+    startDate: string;
+    endDate: string;
+  }>,
+) => {
+  return apiRequest<SalesProjectDetail>(
+    `ventas/proyectos/${id}`,
+    {
+      token,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+    "No se pudo actualizar el proyecto",
   );
 };
 

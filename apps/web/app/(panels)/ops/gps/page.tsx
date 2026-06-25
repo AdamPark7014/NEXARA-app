@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface LocationRecord {
@@ -38,7 +38,8 @@ function minutesAgo(iso?: string): string {
 
 export default function GpsPage() {
   const { user } = useUser();
-  const { canViewAll } = useRbacGuard();
+  const cfg = useMemo(() => getOpsTeamSectionConfig(user, "gps"), [user]);
+  const canViewAll = cfg.defaultScope === "team";
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<LocationRecord[]>([]);

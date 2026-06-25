@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -8,7 +8,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface Contract {
@@ -40,7 +40,7 @@ async function apiFetch(path: string, token: string, init: RequestInit = {}) {
 
 export default function MaintenanceContractsPage() {
   const { user } = useUser();
-  const { canEdit } = useRbacGuard();
+  const cfg = useMemo(() => getOpsTeamSectionConfig(user, "maintenance-contracts"), [user]);
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<Contract[]>([]);
@@ -96,7 +96,7 @@ export default function MaintenanceContractsPage() {
     { key: "nextVisitDate", label: "Próx. visita", render: (c) => <span style={{ fontSize: 12 }}>{c.nextVisitDate ? new Date(c.nextVisitDate).toLocaleDateString("es-MX") : "—"}</span>, width: 100 },
     {
       key: "status", label: "Estado",
-      render: (c) => canEdit ? (
+      render: (c) => cfg.canEdit ? (
         <select value={c.status} onChange={(e) => void setStatus(c, e.target.value)} style={{ fontSize: 12, border: "1px solid var(--border)", borderRadius: 6, padding: "3px 6px", background: "var(--surface)", color: "var(--foreground)" }}>
           {["DRAFT", "ACTIVE", "PAUSED", "EXPIRED", "CANCELLED"].map((s) => <option key={s} value={s}>{s}</option>)}
         </select>

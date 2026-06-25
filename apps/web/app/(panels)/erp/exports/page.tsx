@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 const ENTITIES = [
@@ -18,7 +18,7 @@ const ENTITIES = [
 
 export default function ExportsPage() {
   const { user } = useUser();
-  const { canViewAll } = useRbacGuard();
+  const cfg = useMemo(() => getErpFinanceSectionConfig(user, "exports"), [user]);
   const token = user?.token ?? "";
 
   const [from, setFrom] = useState(() => new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
@@ -58,7 +58,7 @@ export default function ExportsPage() {
         subtitle="Centro único para reportes CSV globales del ERP, listos para Hacienda, auditoría externa o licitación."
       />
 
-      {!canViewAll && (
+      {cfg.viewMode !== "manage" && (
         <div style={{ padding: "10px 14px", background: "var(--state-warning-bg)", border: "1px solid var(--state-warning-border)", borderRadius: 10, marginBottom: 16, fontSize: 13, color: "var(--state-warning-text)" }}>
           ⚠️ Las exportaciones que solicites solo incluirán los datos a los que tienes acceso según tu rol.
         </div>

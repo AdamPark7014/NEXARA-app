@@ -22,6 +22,7 @@ import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
+import { getStudioSectionConfig } from "@/lib/section-views";
 import {
   createHeroSlide,
   deleteHeroSlide,
@@ -37,6 +38,7 @@ const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 export default function StudioHeroPage() {
   const { user, isContextReady } = useUser();
+  const cfg = useMemo(() => getStudioSectionConfig(user, "news"), [user]);
   const token = user?.token ?? "";
 
   const [slides, setSlides] = useState<HeroSlide[]>([]);
@@ -388,15 +390,17 @@ export default function StudioHeroPage() {
                     >
                       {slide.isActive ? "Ocultar" : "Mostrar"}
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => onDelete(slide)}
-                      disabled={isPending}
-                      style={{ color: "var(--danger)" }}
-                    >
-                      Eliminar
-                    </Button>
+                    {cfg.canDelete && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onDelete(slide)}
+                        disabled={isPending}
+                        style={{ color: "var(--danger)" }}
+                      >
+                        Eliminar
+                      </Button>
+                    )}
                   </div>
                 </article>
               );

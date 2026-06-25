@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
 import { buildApiUrl } from "@/lib/api-base";
+import { filterRowsByScope, getErpExpensesSectionConfig } from "@/lib/section-views";
 
 interface Expense {
   id: number;
@@ -38,7 +38,7 @@ const emptyForm = { concepto: "", monto: 0, categoria: "Servicios", estado: "BOR
 
 export default function ExpensesPage() {
   const { user } = useUser();
-  const { canCreate, canEdit, canDelete } = useRbacGuard();
+  const cfg = useMemo(() => getErpExpensesSectionConfig(user), [user]);
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<Expense[]>([]);
@@ -57,6 +57,11 @@ export default function ExpensesPage() {
   }, [token]);
 
   useEffect(() => { load(); }, [load]);
+
+  const visibleItems = useMemo(
+    () => filterRowsByScope(items, user, cfg.defaultScope),
+    [items, user, cfg.defaultScope],
+  );
 
   const openNew = () => { setEditing(null); setForm({ ...emptyForm }); setShowForm(true); };
   const openEdit = (e: Expense) => {
@@ -87,9 +92,9 @@ export default function ExpensesPage() {
     } catch { /* skip */ }
   };
 
-  const totalMes = items.filter(e => e.estado === "PAGADO" || e.estado === "APROBADO").reduce((s, e) => s + (e.monto ?? 0), 0);
-  const pendientes = items.filter(e => e.estado === "PENDIENTE_APROBACION").length;
-  const recurrentes = items.filter(e => e.esRecurrente).length;
+  const totalMes = visibleItems.filter(e => e.estado === "PAGADO" || e.estado === "APROBADO").reduce((s, e) => s + (e.monto ?? 0), 0);
+  const pendientes = visibleItems.filter(e => e.estado === "PENDIENTE_APROBACION").length;
+  const recurrentes = visibleItems.filter(e => e.esRecurrente).length;
 
   const estadoVariant = (s?: string): "accent" | "warning" | "neutral" | "danger" =>
     s === "PAGADO" || s === "APROBADO" ? "neutral" : s === "RECHAZADO" ? "danger" : s === "PENDIENTE_APROBACION" ? "accent" : "warning";
@@ -109,8 +114,8 @@ export default function ExpensesPage() {
     { key: "estado", label: "Estado", render: e => <Tag variant={estadoVariant(e.estado)}>{(e.estado ?? "—").replace(/_/g, " ")}</Tag>, width: 160 },
     { key: "id", label: "", render: e => (
       <div style={{ display: "flex", gap: 4 }}>
-        {canEdit && <button onClick={() => openEdit(e)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>}
-        {canDelete && <button onClick={() => remove(e.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>}
+        {cfg.canEdit && <button onClick={() => openEdit(e)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>}
+        {cfg.canDelete && <button onClick={() => remove(e.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>}
       </div>
     ), width: 60 },
   ];
@@ -119,9 +124,9 @@ export default function ExpensesPage() {
     <>
       <PageHeader
         eyebrow="ERP · Finanzas"
-        title="Gastos · Administración"
-        subtitle="Captura y autorización de gastos no operativos: renta, servicios, suscripciones, recurrentes."
-        actions={canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo gasto</Button> : undefined}
+        title={cfg.title}
+        subtitle={cfg.subtitle}
+        actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo gasto</Button> : undefined}
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
@@ -167,11 +172,11 @@ export default function ExpensesPage() {
         </div>
       )}
 
-      <Section title={loading ? "Cargando…" : `${items.length} gastos`}>
+      <Section title={loading ? "Cargando…" : `${visibleItems.length} gastos`}>
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
         ) : (
-          <DataTable columns={columns} rows={items} rowKey={e => e.id} emptyTitle="Sin gastos" emptyDescription="Registra el primer gasto administrativo." />
+          <DataTable columns={columns} rows={visibleItems} rowKey={e => e.id} emptyTitle="Sin gastos" emptyDescription="Registra el primer gasto administrativo." />
         )}
       </Section>
     </>

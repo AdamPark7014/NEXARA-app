@@ -7,7 +7,7 @@ import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface KbCategory { id: number; name: string; slug: string }
@@ -39,7 +39,7 @@ const emptyForm = { title: "", excerpt: "", content: "", categoryId: "", visibil
 
 export default function KbPage() {
   const { user } = useUser();
-  const { canCreate, canDelete } = useRbacGuard();
+  const cfg = useMemo(() => getErpGovernanceSectionConfig(user, "kb"), [user]);
   const token = user?.token ?? "";
 
   const [articles, setArticles] = useState<KbArticle[]>([]);
@@ -130,14 +130,14 @@ export default function KbPage() {
     { key: "visibility", label: "Visibilidad", render: (a) => <Tag variant={a.visibility === "RESTRICTED" ? "warning" : "default"}>{a.visibility}</Tag>, width: 120 },
     { key: "status", label: "Estado", render: (a) => <Tag variant={a.status === "PUBLISHED" ? "positive" : "warning"}>{a.status}</Tag>, width: 110 },
     { key: "viewCount", label: "Vistas", accessor: (a) => a.viewCount ?? 0, width: 80 },
-    ...(canCreate ? [{
+    ...(cfg.canCreate ? [{
       key: "acciones" as keyof KbArticle, label: "",
       render: (a: KbArticle) => (
         <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
           <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); void togglePublish(a); }}>
             {a.status === "PUBLISHED" ? "Despublicar" : "Publicar"}
           </Button>
-          {canDelete && <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); void remove(a); }}>Eliminar</Button>}
+          {cfg.canDelete && <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); void remove(a); }}>Eliminar</Button>}
         </div>
       ),
       width: 200,
@@ -153,7 +153,7 @@ export default function KbPage() {
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nuevo artículo</Button>}
+            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nuevo artículo</Button>}
           </>
         }
       />

@@ -4,7 +4,7 @@
  * NEXARA · TabBar
  * ----------------
  * Barra de pestañas accesible reutilizable para los layouts tabulados
- * de Phase 4 (/core/actividades/[id], /core/clientes/[id], /sales/oportunidades/[id]).
+ * Barra de pestañas para layouts con rutas dinámicas (p. ej. detalle de oportunidad).
  *
  * - Detecta la pestaña activa por `pathname` (match exacto o prefijo).
  * - Mantiene navegación con `next/link` para no romper streaming.

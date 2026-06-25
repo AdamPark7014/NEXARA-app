@@ -136,7 +136,7 @@ export class ServiceClientsService {
     const from = process.env['SMTP_VENTAS_USER'] || process.env['SMTP_FROM'] || 'ventas@nexara.com.mx';
     const baseUrl = (process.env['PUBLIC_WEB_URL'] || 'https://nexara.com.mx').replace(/\/+$/, '');
     const logoUrl = (process.env['EMAIL_LOGO_URL'] || `${baseUrl}/logo-nexara.png`).trim();
-    const portalUrl = `${baseUrl}/panel/tickets`;
+    const portalUrl = `${baseUrl}/tickets`;
 
     const html = `
       <div style="background-color:#f5f7fb;padding:24px 12px;">
@@ -195,7 +195,7 @@ export class ServiceClientsService {
     const from = process.env['SMTP_FROM'] || 'no-reply@nexara.com';
     const baseUrl = (process.env['PUBLIC_WEB_URL'] || 'https://nexara.com.mx').replace(/\/+$/, '');
     const logoUrl = (process.env['EMAIL_LOGO_URL'] || `${baseUrl}/logo-nexara.png`).trim();
-    const portalUrl = `${baseUrl}/panel/tickets`;
+    const portalUrl = `${baseUrl}/tickets`;
 
     const html = `
       <div style="background-color:#f5f7fb;padding:24px 12px;">

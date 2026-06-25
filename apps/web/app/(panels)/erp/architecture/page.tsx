@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -13,12 +14,28 @@ import {
   type PanelId,
 } from "@/lib/access-matrix";
 import { ORG_ROLE_META, type OrgRoleKey } from "@/lib/org-roles";
+import { useUser } from "@/components/UserContext";
+import { resolveV2RoleKey } from "@/lib/user-access";
+import { ROLES, type RoleKey } from "@/lib/rbac";
+
+const ERP_ADMIN_ROLES = new Set<RoleKey>([ROLES.CEO, ROLES.DIR_ADMIN, ROLES.COORD_ADMIN, ROLES.DIR_OPERACIONES]);
 
 /**
  * Vista de arquitectura: mapa visual del ERP NEXARA con flujo end-to-end
  * de datos, paneles consolidados y roles que habitan cada módulo.
  */
 export default function ArchitecturePage() {
+  const { user } = useUser();
+  const router = useRouter();
+
+  // Mapa de arquitectura — solo administración. Contiene estructura interna del sistema.
+  useEffect(() => {
+    if (!user) return;
+    if (user.isSuperAdmin) return;
+    const v2 = resolveV2RoleKey(user);
+    if (v2 && !ERP_ADMIN_ROLES.has(v2)) router.replace("/erp/dashboard");
+  }, [user, router]);
+
   const [selectedPanel, setSelectedPanel] = useState<PanelId | "all">("all");
 
   const modulesByPanel = useMemo(() => {

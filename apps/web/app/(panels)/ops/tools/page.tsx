@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface ToolRequest {
@@ -36,8 +37,10 @@ const emptyForm = { herramienta: "", cantidad: 1, tipo: "Préstamo", observacion
 
 export default function ToolsPage() {
   const { user } = useUser();
-  const { canCreate, canEdit, canDelete } = useRbacGuard();
+  const cfg = useMemo(() => getOpsTeamSectionConfig(user, "tools"), [user]);
   const token = user?.token ?? "";
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
 
   const [items, setItems] = useState<ToolRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,6 +98,13 @@ export default function ToolsPage() {
 
   const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface)", color: "var(--foreground)", fontSize: 13, boxSizing: "border-box" };
 
+  const visibleItems = useMemo(() => {
+    if (!highlightId) return items;
+    const id = Number(highlightId);
+    if (Number.isNaN(id)) return items;
+    return [...items].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+  }, [items, highlightId]);
+
   const columns: Column<ToolRequest>[] = [
     { key: "id", label: "ID", render: t => <Tag variant="accent">#{t.id}</Tag>, width: 70 },
     { key: "herramienta", label: "Herramienta / Kit", render: t => (
@@ -113,8 +123,8 @@ export default function ToolsPage() {
     ), width: 140 },
     { key: "id", label: "", render: t => (
       <div style={{ display: "flex", gap: 4 }}>
-        {canEdit && <button onClick={() => openEdit(t)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>}
-        {canDelete && <button onClick={() => remove(t.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>}
+        {cfg.canEdit && <button onClick={() => openEdit(t)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>}
+        {cfg.canDelete && <button onClick={() => remove(t.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>}
       </div>
     ), width: 60 },
   ];
@@ -125,7 +135,7 @@ export default function ToolsPage() {
         eyebrow="OPS · Campo"
         title="Herramientas y kits"
         subtitle="Préstamo y devolución de equipo de trabajo: probadores, taladros, escaleras, equipo de altura."
-        actions={canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva solicitud</Button> : undefined}
+        actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva solicitud</Button> : undefined}
       />
 
       {showForm && (
@@ -155,11 +165,16 @@ export default function ToolsPage() {
         </div>
       )}
 
-      <Section title={loading ? "Cargando…" : `${items.length} solicitudes`}>
+      <Section title={loading ? "Cargando…" : `${visibleItems.length} solicitudes`}>
+        {highlightId && (
+          <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
+            Mostrando solicitud <strong>#{highlightId}</strong> desde enlace directo.
+          </p>
+        )}
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
         ) : (
-          <DataTable columns={columns} rows={items} rowKey={t => t.id} emptyTitle="Sin solicitudes" emptyDescription="Crea la primera solicitud de herramienta o kit." />
+          <DataTable columns={columns} rows={visibleItems} rowKey={t => t.id} emptyTitle="Sin solicitudes" emptyDescription="Crea la primera solicitud de herramienta o kit." />
         )}
       </Section>
     </>

@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
+import { getActivitiesSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface ActivityRow {
@@ -49,7 +51,15 @@ function isThisWeek(iso: string): boolean {
 
 export default function MyActivitiesPage() {
   const { user } = useUser();
+  const router = useRouter();
   const token = user?.token ?? "";
+  const cfg = useMemo(() => getActivitiesSectionConfig(user), [user]);
+
+  useEffect(() => {
+    if (cfg.viewMode === "manage" && cfg.defaultScope === "team") {
+      router.replace("/ops/activities");
+    }
+  }, [cfg, router]);
 
   const [tab, setTab] = useState<"hoy" | "semana" | "todas">("hoy");
   const [items, setItems] = useState<ActivityRow[]>([]);
@@ -100,8 +110,8 @@ export default function MyActivitiesPage() {
     <>
       <PageHeader
         eyebrow="OPS · Campo"
-        title="Mis actividades"
-        subtitle="Tu ruta del día. Sube evidencias y firma cada OT para cerrarla en tiempo."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
       />
 
@@ -155,10 +165,14 @@ export default function MyActivitiesPage() {
 
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-                  <Tag variant="accent">{a.anNumber}</Tag>
+                  <Link href={`/ops/activities/${a.id}`} style={{ textDecoration: "none" }}>
+                    <Tag variant="accent">{a.anNumber}</Tag>
+                  </Link>
                   <Tag variant={estadoVariant(a.estatus)}>{a.estatus}</Tag>
                 </div>
-                <div style={{ fontFamily: "var(--nx-font-display)", fontWeight: 700, fontSize: 15.5 }}>{a.client?.name ?? a.branchName ?? "—"}</div>
+                <Link href={`/ops/activities/${a.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+                  <div style={{ fontFamily: "var(--nx-font-display)", fontWeight: 700, fontSize: 15.5 }}>{a.client?.name ?? a.branchName ?? "—"}</div>
+                </Link>
                 {a.branchAddress && <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 3 }}>📍 {a.branchAddress}</div>}
                 <div style={{ fontSize: 12.5, color: "var(--text-primary)", marginTop: 6 }}>{a.titulo}</div>
                 <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}>
@@ -175,7 +189,10 @@ export default function MyActivitiesPage() {
                 {a.estatus === "En Proceso" && (
                   <Button variant="primary" iconLeft="✓" onClick={() => void updateStatus(a, "Finalizado")}>Finalizar</Button>
                 )}
-                <Link href="/ops/activities" style={{ textDecoration: "none" }}>
+                <Link href={`/ops/activities/${a.id}`} style={{ textDecoration: "none" }}>
+                  <Button variant="ghost" size="sm">Ver detalle</Button>
+                </Link>
+                <Link href="/ops/my-evidences" style={{ textDecoration: "none" }}>
                   <Button variant="secondary" iconLeft="📸" size="sm">Subir evidencia</Button>
                 </Link>
               </div>

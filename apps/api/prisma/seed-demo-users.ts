@@ -24,13 +24,14 @@ const DEMO_PASSWORD_HASH = bcryptjs.hashSync(DEMO_PASSWORD, 10);
 // Mapeados a los roles existentes en la BD
 const ORG_ROLE_KEYS = {
   CEO: 'ceo',
-  DIRECTOR_ADMIN: 'coord_admin',
-  DIRECTOR_OPS: 'coord_operaciones',
-  DIRECTOR_COMMERCIAL: 'coord_admin', // fallback
-  PROJECT_MANAGER: 'coord_operaciones', // usa coord_operaciones
-  SENIOR_ENGINEER: 'arquitecto',
-  FIELD_ENGINEER: 'ing_campo',
-  SPECIALIST: 'administrativo',
+  DIRECTOR_ADMIN: 'director_admin',
+  DIRECTOR_OPS: 'director_ops',
+  DIRECTOR_COMMERCIAL: 'director_commercial',
+  PROJECT_MANAGER: 'project_manager',
+  SENIOR_ENGINEER: 'senior_engineer',
+  FIELD_ENGINEER: 'field_engineer',
+  DESIGNER: 'designer',
+  ADMIN_STAFF: 'admin_staff',
 } as const;
 
 type OrgRoleKey = typeof ORG_ROLE_KEYS[keyof typeof ORG_ROLE_KEYS];
@@ -67,7 +68,7 @@ const DEMO_USERS: DemoUser[] = [
   {
     nombre: 'Mónica García Guzmán',
     email: 'monica.garcia@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.SPECIALIST,
+    orgRoleKey: ORG_ROLE_KEYS.ADMIN_STAFF,
     departmentName: 'Administración',
     employeeNumber: 'NX-102',
   },
@@ -76,7 +77,7 @@ const DEMO_USERS: DemoUser[] = [
   {
     nombre: 'Daniela Galindo Almanzán',
     email: 'redes@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.SPECIALIST,
+    orgRoleKey: ORG_ROLE_KEYS.DESIGNER,
     departmentName: 'Área Creativa',
     employeeNumber: 'NX-201',
   },

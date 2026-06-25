@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -8,8 +9,8 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
 import { buildApiUrl } from "@/lib/api-base";
+import { useCrmManagerGuard } from "@/lib/useCrmManagerGuard";
 
 interface Tender {
   id: number;
@@ -39,8 +40,10 @@ const emptyForm = { title: "", tenderType: "PUBLIC_GOV", conveningEntity: "", bu
 
 export default function TendersPage() {
   const { user } = useUser();
-  const { canCreate, canEdit } = useRbacGuard();
+  const cfg = useCrmManagerGuard();
   const token = user?.token ?? "";
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
 
   const [items, setItems] = useState<Tender[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,6 +64,8 @@ export default function TendersPage() {
   }, [token]);
 
   useEffect(() => { void load(); }, [load]);
+
+  if (!cfg.canAccess) return null;
 
   const abiertas = items.filter((t) => !["AWARDED", "LOST", "CANCELLED", "DISQUALIFIED"].includes(t.status)).length;
   const ganadas = items.filter((t) => t.status === "AWARDED").length;
@@ -106,6 +111,13 @@ export default function TendersPage() {
 
   const inp: React.CSSProperties = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13 };
 
+  const visibleItems = useMemo(() => {
+    if (!highlightId) return items;
+    const id = Number(highlightId);
+    if (Number.isNaN(id)) return items;
+    return [...items].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+  }, [items, highlightId]);
+
   const columns: Column<Tender>[] = [
     { key: "tenderNumber", label: "Folio", render: (t) => <code style={{ fontSize: 11.5 }}>{t.tenderNumber}</code>, width: 120 },
     {
@@ -121,14 +133,14 @@ export default function TendersPage() {
     { key: "submissionDeadline", label: "Cierre", render: (t) => <span style={{ fontSize: 12 }}>{t.submissionDeadline ? new Date(t.submissionDeadline).toLocaleDateString("es-MX") : "—"}</span>, width: 100 },
     {
       key: "status", label: "Estado",
-      render: (t) => canEdit ? (
+      render: (t) => cfg.canEdit ? (
         <select value={t.status} onChange={(e) => void setStatus(t, e.target.value)} style={{ fontSize: 12, border: "1px solid var(--border)", borderRadius: 6, padding: "3px 6px", background: "var(--surface)", color: "var(--foreground)" }}>
           {STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
         </select>
       ) : <Tag variant={statusVariant(t.status)}>{t.status.replace(/_/g, " ")}</Tag>,
       width: 160,
     },
-    ...(canEdit ? [{
+    ...(cfg.canEdit ? [{
       key: "acciones" as keyof Tender, label: "",
       render: (t: Tender) => t.status === "AWARDED" ? <Button size="sm" variant="primary" onClick={(e) => { e.stopPropagation(); void promote(t); }}>→ Oportunidad</Button> : null,
       width: 140,
@@ -139,12 +151,12 @@ export default function TendersPage() {
     <>
       <PageHeader
         eyebrow="CRM · Proyectos"
-        title="Licitaciones públicas y privadas"
-        subtitle="Compranet, gobierno y RFP de privados. Calendario de cierres y propuestas en preparación."
+        title="Licitaciones · Gestión"
+        subtitle={cfg.subtitle}
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nueva licitación</Button>}
+            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nueva licitación</Button>}
           </>
         }
       />
@@ -155,10 +167,15 @@ export default function TendersPage() {
         <KpiCard label="Pipeline en licitación" value={`$${(pipelineValue / 1000000).toFixed(1)}M`} icon="💰" />
       </div>
 
-      <Section title={loading ? "Cargando…" : `${items.length} licitaciones`}>
+      <Section title={loading ? "Cargando…" : `${visibleItems.length} licitaciones`}>
+        {highlightId && (
+          <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
+            Mostrando licitación <strong>#{highlightId}</strong> desde enlace directo.
+          </p>
+        )}
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando licitaciones." />}
         {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
-        {!loading && !error && <DataTable columns={columns} rows={items} rowKey={(t) => t.id} emptyTitle="Sin licitaciones" emptyDescription="Registra la primera licitación en seguimiento." />}
+        {!loading && !error && <DataTable columns={columns} rows={visibleItems} rowKey={(t) => t.id} emptyTitle="Sin licitaciones" emptyDescription="Registra la primera licitación en seguimiento." />}
       </Section>
 
       {showForm && (

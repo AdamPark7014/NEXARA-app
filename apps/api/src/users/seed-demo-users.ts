@@ -268,7 +268,7 @@ async function main() {
     const passMaintenance = demoPasswordHash;
     const passSupport = demoPasswordHash;
     const passNoc = demoPasswordHash;
-    const passAdminStaff = 'NexaraAdmin2026!';
+    const passAdminStaff = 'Nexara2026!';
 
     console.log('[SEED] Creando/sincronizando usuarios con jerarquía ERP...');
 

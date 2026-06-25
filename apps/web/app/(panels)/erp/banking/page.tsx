@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -8,7 +8,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface BankAccount {
@@ -49,7 +49,7 @@ const emptyForm = { name: "", bankName: "", accountNumber: "", clabe: "", curren
 
 export default function BankingPage() {
   const { user } = useUser();
-  const { canApprove, isDirector } = useRbacGuard();
+  const cfg = useMemo(() => getErpFinanceSectionConfig(user, "banking"), [user]);
   const token = user?.token ?? "";
 
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
@@ -123,7 +123,7 @@ export default function BankingPage() {
     },
     { key: "amount", label: "Monto", align: "right" as const, render: (t) => <span style={{ color: t.isDebit ? "var(--danger)" : "var(--success)", fontWeight: 700 }}>{t.isDebit ? "-" : "+"}<Money value={Number(t.amount)} /></span>, width: 130 },
     { key: "reconciliationStatus", label: "Estado", render: (t) => <Tag variant={t.reconciliationStatus === "MATCHED" ? "positive" : "warning"}>{t.reconciliationStatus === "MATCHED" ? "Conciliado" : "Pendiente"}</Tag>, width: 110 },
-    ...(canApprove ? [{
+    ...(cfg.canApprove ? [{
       key: "acciones" as keyof BankTransaction, label: "",
       render: (t: BankTransaction) => t.reconciliationStatus !== "MATCHED" ? <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); void reconcile(t); }}>Conciliar</Button> : null,
       width: 100,
@@ -139,7 +139,7 @@ export default function BankingPage() {
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {isDirector && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nueva cuenta</Button>}
+            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nueva cuenta</Button>}
           </>
         }
       />

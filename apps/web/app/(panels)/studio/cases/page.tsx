@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface CaseStudy {
@@ -36,7 +36,7 @@ const EMPTY_FORM = { titulo: "", cliente: "", vertical: "Servicios", impacto: ""
 
 export default function StudioCasesPage() {
   const { user } = useUser();
-  const { canCreate, canEdit, canDelete } = useRbacGuard();
+  const cfg = useMemo(() => getStudioSectionConfig(user, "cases"), [user]);
   const token = user?.token ?? "";
 
   const [items, setItems]     = useState<CaseStudy[]>([]);
@@ -119,7 +119,7 @@ export default function StudioCasesPage() {
         title="Casos de éxito"
         subtitle="Historias de clientes reales. Se muestran en /casos del sitio público cuando están publicados."
         actions={
-          canCreate ? <Button variant="primary" iconLeft="🏆" onClick={openNew}>Nuevo caso</Button> : undefined
+          cfg.canCreate ? <Button variant="primary" iconLeft="🏆" onClick={openNew}>Nuevo caso</Button> : undefined
         }
       />
 
@@ -203,7 +203,7 @@ export default function StudioCasesPage() {
                     >
                       {c.publicado ? "Despublicar" : "Publicar"}
                     </button>
-                    {canEdit && (
+                    {cfg.canEdit && (
                       <button
                         onClick={() => openEdit(c)}
                         style={{ fontSize: 11, padding: "5px 10px", borderRadius: 7, cursor: "pointer", border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)" }}
@@ -211,7 +211,7 @@ export default function StudioCasesPage() {
                         ✎
                       </button>
                     )}
-                    {canDelete && (
+                    {cfg.canDelete && (
                       <button
                         onClick={() => remove(c.id)}
                         style={{ fontSize: 11, padding: "5px 10px", borderRadius: 7, cursor: "pointer", border: "1px solid var(--danger)", background: "color-mix(in srgb, var(--danger) 8%, transparent)", color: "var(--danger)" }}

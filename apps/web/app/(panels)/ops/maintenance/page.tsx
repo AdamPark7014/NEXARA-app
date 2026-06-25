@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface WorkOrder {
@@ -38,7 +38,7 @@ const emptyForm = { title: "", description: "", priority: "MEDIA", status: "PEND
 
 export default function MaintenancePage() {
   const { user } = useUser();
-  const { canCreate, canEdit, canDelete } = useRbacGuard();
+  const cfg = useMemo(() => getOpsTeamSectionConfig(user, "maintenance"), [user]);
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<WorkOrder[]>([]);
@@ -124,8 +124,8 @@ export default function MaintenancePage() {
     ), width: 200 },
     { key: "id", label: "", render: w => (
       <div style={{ display: "flex", gap: 4 }}>
-        {canEdit && <button onClick={() => openEdit(w)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>}
-        {canDelete && <button onClick={() => remove(w.id)} title="Cancelar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>}
+        {cfg.canEdit && <button onClick={() => openEdit(w)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>}
+        {cfg.canDelete && <button onClick={() => remove(w.id)} title="Cancelar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>}
       </div>
     ), width: 60 },
   ];
@@ -136,7 +136,7 @@ export default function MaintenancePage() {
         eyebrow="OPS · Mantenimiento"
         title="Órdenes de mantenimiento"
         subtitle="Correctivo, preventivo y predictivo de activos: equipos, vehículos e instalaciones."
-        actions={canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva OT</Button> : undefined}
+        actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva OT</Button> : undefined}
       />
 
       {showForm && (

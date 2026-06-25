@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface ContactMsg {
@@ -58,7 +58,7 @@ function fmtDate(iso: string) {
 
 export default function StudioContactsPage() {
   const { user } = useUser();
-  const { canDelete } = useRbacGuard();
+  const cfg = useMemo(() => getStudioSectionConfig(user, "contacts"), [user]);
   const token = user?.token ?? "";
 
   const [items, setItems]     = useState<ContactMsg[]>([]);
@@ -143,7 +143,7 @@ export default function StudioContactsPage() {
     {
       key: "id", label: "",
       render: (c) => (
-        canDelete ? (
+        cfg.canDelete ? (
         <button
           onClick={() => remove(c.id)}
           title="Eliminar"

@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import { Tag } from "@/components/ui/DataTable";
 import Button from "@/components/ui/Button";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
+import { normalizeLegacyPath } from "@/lib/legacy-path-remap";
 
 interface Notif {
   id: number;
@@ -46,6 +48,7 @@ const CATEGORY_ICON: Record<string, string> = {
 export default function NotificationsCenterPage() {
   const { user } = useUser();
   const token = user?.token ?? "";
+  const router = useRouter();
 
   const [notifs, setNotifs]   = useState<Notif[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,6 +93,14 @@ export default function NotificationsCenterPage() {
     } catch { /* ignore */ }
   };
 
+  const openNotif = (n: Notif) => {
+    if (!n.isRead) void markRead(n.id);
+    if (n.relatedUrl) {
+      const path = normalizeLegacyPath(n.relatedUrl.split("?")[0]) + (n.relatedUrl.includes("?") ? "?" + n.relatedUrl.split("?").slice(1).join("?") : "");
+      router.push(path);
+    }
+  };
+
   const unread = notifs.filter(n => !n.isRead).length;
 
   return (
@@ -127,9 +138,11 @@ export default function NotificationsCenterPage() {
           {notifs.map(n => (
             <article
               key={n.id}
+              onClick={() => n.relatedUrl && openNotif(n)}
               style={{
                 display: "grid", gridTemplateColumns: "auto 1fr auto auto", gap: 14, alignItems: "center",
                 padding: 14,
+                cursor: n.relatedUrl ? "pointer" : "default",
                 background: !n.isRead ? "color-mix(in srgb, var(--primary) 5%, transparent)" : "var(--surface)",
                 border: "1px solid var(--border)",
                 borderLeft: !n.isRead ? "3px solid var(--primary)" : "1px solid var(--border)",
@@ -145,12 +158,13 @@ export default function NotificationsCenterPage() {
                 <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 4 }}>
                   {timeAgo(n.createdAt)} · <Tag variant="neutral">{n.category}</Tag>
                   {n.priority === "high" && <> · <Tag variant="danger">ALTA</Tag></>}
+                  {n.relatedUrl && <> · <span style={{ color: "var(--primary)" }}>Abrir →</span></>}
                 </div>
               </div>
 
               {!n.isRead && (
                 <button
-                  onClick={() => markRead(n.id)}
+                  onClick={(e) => { e.stopPropagation(); void markRead(n.id); }}
                   title="Marcar como leída"
                   style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--primary)", padding: "4px 8px" }}
                 >
@@ -159,7 +173,7 @@ export default function NotificationsCenterPage() {
               )}
 
               <button
-                onClick={() => remove(n.id)}
+                onClick={(e) => { e.stopPropagation(); void remove(n.id); }}
                 title="Eliminar notificación"
                 style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "var(--text-tertiary)", padding: "4px 8px" }}
               >

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { useHrManagementGuard } from "@/lib/useHrManagementGuard";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface Fine {
@@ -37,8 +38,10 @@ const emptyForm = { tipo: "TARDANZA", descripcion: "", monto: 0, aplicaDescuento
 
 export default function FinesPage() {
   const { user } = useUser();
-  const { canEdit: isManager, isDirector } = useRbacGuard();
+  const cfg = useHrManagementGuard();
   const token = user?.token ?? "";
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
 
   const [items, setItems] = useState<Fine[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,6 +91,13 @@ export default function FinesPage() {
 
   const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface)", color: "var(--foreground)", fontSize: 13, boxSizing: "border-box" };
 
+  const visibleItems = useMemo(() => {
+    if (!highlightId) return items;
+    const id = Number(highlightId);
+    if (Number.isNaN(id)) return items;
+    return [...items].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+  }, [items, highlightId]);
+
   const columns: Column<Fine>[] = [
     { key: "id", label: "ID", render: f => <Tag variant="danger">#{f.id}</Tag>, width: 70 },
     { key: "user", label: "Empleado", render: f => <span style={{ fontWeight: 600, fontSize: 13 }}>{f.user?.nombre ?? "—"}</span>, width: 150 },
@@ -98,8 +108,8 @@ export default function FinesPage() {
     { key: "estado", label: "Estado", render: f => <Tag variant={f.estado === "APLICADO" ? "neutral" : f.estado === "CANCELADO" ? "danger" : "warning"}>{f.estado ?? "—"}</Tag>, width: 100 },
     { key: "id", label: "", render: f => (
       <div style={{ display: "flex", gap: 4 }}>
-        {isManager && <button onClick={() => openEdit(f)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>}
-        {isDirector && <button onClick={() => remove(f.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>}
+        {cfg.canEdit && <button onClick={() => openEdit(f)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>}
+        {cfg.canApprove && <button onClick={() => remove(f.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>}
       </div>
     ), width: 60 },
   ];
@@ -110,7 +120,7 @@ export default function FinesPage() {
         eyebrow="ERP · Personas"
         title="Multas e incidencias"
         subtitle="Sanciones administrativas con bitácora: faltas, daño a vehículo, herramienta perdida, comportamiento."
-        actions={isManager ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva sanción</Button> : undefined}
+        actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva sanción</Button> : undefined}
       />
 
       {showForm && (
@@ -146,11 +156,16 @@ export default function FinesPage() {
         </div>
       )}
 
-      <Section title={loading ? "Cargando…" : `${items.length} sanciones`}>
+      <Section title={loading ? "Cargando…" : `${visibleItems.length} sanciones`}>
+        {highlightId && (
+          <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
+            Mostrando sanción <strong>#{highlightId}</strong> desde enlace directo.
+          </p>
+        )}
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
         ) : (
-          <DataTable columns={columns} rows={items} rowKey={f => f.id} emptyTitle="Sin sanciones registradas" emptyDescription="Registra una incidencia cuando sea necesario." />
+          <DataTable columns={columns} rows={visibleItems} rowKey={f => f.id} emptyTitle="Sin sanciones registradas" emptyDescription="Registra una incidencia cuando sea necesario." />
         )}
       </Section>
     </>

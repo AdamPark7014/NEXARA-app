@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import KpiCard from "@/components/ui/KpiCard";
@@ -9,8 +9,8 @@ import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
 import { buildApiUrl } from "@/lib/api-base";
+import { filterRowsByScope, getOpsDashboardSectionConfig } from "@/lib/section-views";
 
 interface ActivityRow {
   id: number;
@@ -40,7 +40,7 @@ async function apiFetch(path: string, token: string) {
 
 export default function OpsDashboardPage() {
   const { user } = useUser();
-  const { canViewAll } = useRbacGuard();
+  const cfg = useMemo(() => getOpsDashboardSectionConfig(user), [user]);
   const token = user?.token ?? "";
 
   const [activities, setActivities] = useState<ActivityRow[]>([]);
@@ -54,21 +54,30 @@ export default function OpsDashboardPage() {
     try {
       const [actData, alertData] = await Promise.all([
         apiFetch("activities", token),
-        apiFetch("noc/alerts", token).catch(() => []),
+        cfg.viewMode === "execute"
+          ? Promise.resolve([])
+          : apiFetch("noc/alerts", token).catch(() => []),
       ]);
       setActivities(Array.isArray(actData) ? actData : (actData?.data ?? []));
       setAlerts(Array.isArray(alertData) ? alertData : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar el panel de operaciones");
     } finally { setLoading(false); }
-  }, [token]);
+  }, [token, cfg.viewMode]);
 
   useEffect(() => { void load(); }, [load]);
 
+  const scopedActivities = useMemo(
+    () => filterRowsByScope(activities, user, cfg.defaultScope),
+    [activities, user, cfg.defaultScope],
+  );
+
   const today = new Date().toDateString();
-  const ots = activities.filter((a) => a.fechaEntregaEsperada && new Date(a.fechaEntregaEsperada).toDateString() === today);
-  const enCurso = activities.filter((a) => a.estatus === "En Proceso").length;
-  const completadasHoy = activities.filter((a) => a.estatus === "Finalizado" && a.fechaEntregaEsperada && new Date(a.fechaEntregaEsperada).toDateString() === today).length;
+  const ots = scopedActivities.filter((a) => a.fechaEntregaEsperada && new Date(a.fechaEntregaEsperada).toDateString() === today);
+  const enCurso = scopedActivities.filter((a) => a.estatus === "En Proceso").length;
+  const completadasHoy = scopedActivities.filter((a) => a.estatus === "Finalizado" && a.fechaEntregaEsperada && new Date(a.fechaEntregaEsperada).toDateString() === today).length;
+  const showTeam = cfg.defaultScope === "team";
+  const showNoc = cfg.viewMode !== "execute";
 
   const estadoVariant = (e: string): "positive" | "warning" | "default" => e === "Finalizado" ? "positive" : e === "En Proceso" ? "warning" : "default";
   const sevColor: Record<string, string> = { critical: "var(--danger)", warning: "var(--warning)", info: "var(--text-tertiary)" };
@@ -77,12 +86,16 @@ export default function OpsDashboardPage() {
     <>
       <PageHeader
         eyebrow="OPS · Operación diaria"
-        title={canViewAll ? "Centro de operaciones" : "Mi día"}
-        subtitle="OT del día, alertas de monitoreo y estado del equipo en campo."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            <Link href="/ops/my-activities" style={{ textDecoration: "none" }}><Button variant="primary" iconLeft="🧰">Mis actividades</Button></Link>
+            {cfg.viewMode === "execute" && (
+              <Link href="/ops/my-activities" style={{ textDecoration: "none" }}>
+                <Button variant="primary" iconLeft="🧰">Mis actividades</Button>
+              </Link>
+            )}
           </>
         }
       />
@@ -96,10 +109,10 @@ export default function OpsDashboardPage() {
             <KpiCard label="OT de hoy" value={ots.length} icon="📋" />
             <KpiCard label="En curso" value={enCurso} variant="warning" icon="⏳" />
             <KpiCard label="Completadas hoy" value={completadasHoy} variant="positive" icon="✓" />
-            <KpiCard label="Alertas activas" value={alerts.length} variant={alerts.length > 0 ? "danger" : "positive"} icon="🚨" />
+            <KpiCard label="Alertas activas" value={showNoc ? alerts.length : "—"} variant={showNoc && alerts.length > 0 ? "danger" : "positive"} icon="🚨" />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: showNoc ? "2fr 1fr" : "1fr", gap: 16 }}>
             <Section title="OT del día">
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {ots.map((a) => (
@@ -107,7 +120,7 @@ export default function OpsDashboardPage() {
                     <Tag variant="accent">{a.anNumber}</Tag>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: 13 }}>{a.client?.name ?? a.branchName ?? "—"}</div>
-                      <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{a.titulo} {canViewAll && a.responsable ? `· ${a.responsable.nombre}` : ""}</div>
+                      <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{a.titulo}{showTeam && a.responsable ? ` · ${a.responsable.nombre}` : ""}</div>
                     </div>
                     <Tag variant={estadoVariant(a.estatus)}>{a.estatus}</Tag>
                   </div>
@@ -116,6 +129,7 @@ export default function OpsDashboardPage() {
               </div>
             </Section>
 
+            {showNoc && (
             <Section title="Alertas de monitoreo">
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {alerts.slice(0, 8).map((al) => (
@@ -127,6 +141,7 @@ export default function OpsDashboardPage() {
                 {alerts.length === 0 && <EmptyState icon="✅" title="Sin alertas" description="Todos los sitios operativos." />}
               </div>
             </Section>
+            )}
           </div>
         </>
       )}

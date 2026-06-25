@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import KpiCard from "@/components/ui/KpiCard";
@@ -9,6 +10,8 @@ import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
+import { resolveV2RoleKey } from "@/lib/user-access";
+import { ROLES, type RoleKey } from "@/lib/rbac";
 
 type Severity = "info" | "warning" | "critical";
 
@@ -64,9 +67,20 @@ const SEVERITY_META: Record<Severity, { label: string; icon: string; bg: string;
 
 type SevFilter = "all" | Severity;
 
+const ERP_AUDIT_ROLES = new Set<RoleKey>([ROLES.CEO, ROLES.DIR_ADMIN, ROLES.COORD_ADMIN, ROLES.DIR_OPERACIONES]);
+
 export default function AuditPage() {
   const { user } = useUser();
+  const router = useRouter();
   const token = user?.token ?? "";
+
+  // Log de auditoría — solo administración y dirección.
+  useEffect(() => {
+    if (!user) return;
+    if (user.isSuperAdmin) return;
+    const v2 = resolveV2RoleKey(user);
+    if (v2 && !ERP_AUDIT_ROLES.has(v2)) router.replace("/erp/dashboard");
+  }, [user, router]);
 
   const [rows, setRows] = useState<AuditRow[]>([]);
   const [loading, setLoading] = useState(true);

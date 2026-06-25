@@ -3,4 +3,4 @@
  */
 export * from './roles';
 export * from './page-matrix';
-export * from './navigation';
+export * from './role-mapping';

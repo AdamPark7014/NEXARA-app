@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface ServiceClient {
@@ -37,7 +37,7 @@ const emptyForm = { nombre: "", contacto: "", telefono: "", direccion: "", tipo:
 
 export default function ServiceClientsPage() {
   const { user } = useUser();
-  const { canCreate, canEdit, canDelete } = useRbacGuard();
+  const cfg = useMemo(() => getOpsTeamSectionConfig(user, "service-clients"), [user]);
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<ServiceClient[]>([]);
@@ -107,8 +107,8 @@ export default function ServiceClientsPage() {
     { key: "estado", label: "Estado", render: c => <Tag variant={c.estado === "Activo" ? "accent" : "neutral"}>{c.estado ?? "—"}</Tag>, width: 90 },
     { key: "id", label: "", render: c => (
       <div style={{ display: "flex", gap: 4 }}>
-        {canEdit && <button onClick={() => openEdit(c)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>}
-        {canDelete && <button onClick={() => remove(c.id)} title="Dar de baja" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>}
+        {cfg.canEdit && <button onClick={() => openEdit(c)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>}
+        {cfg.canDelete && <button onClick={() => remove(c.id)} title="Dar de baja" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>}
       </div>
     ), width: 60 },
   ];
@@ -119,7 +119,7 @@ export default function ServiceClientsPage() {
         eyebrow="OPS · Clientes en servicio"
         title="Clientes en servicio"
         subtitle="Base de clientes con contratos de mantenimiento activos y visitas programadas."
-        actions={canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Agregar cliente</Button> : undefined}
+        actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Agregar cliente</Button> : undefined}
       />
 
       {showForm && (

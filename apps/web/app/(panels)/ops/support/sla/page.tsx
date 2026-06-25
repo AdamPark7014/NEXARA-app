@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -9,6 +10,8 @@ import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
+import { resolveV2RoleKey } from "@/lib/user-access";
+import { ROLES } from "@/lib/rbac";
 
 interface Breach {
   id: number;
@@ -36,7 +39,14 @@ async function apiFetch(path: string, token: string) {
 
 export default function SupportSlaPage() {
   const { user } = useUser();
+  const router = useRouter();
   const token = user?.token ?? "";
+
+  // SLA — solo managers/soporte. ing_campo ve su dashboard operativo.
+  useEffect(() => {
+    const v2 = resolveV2RoleKey(user);
+    if (!user?.isSuperAdmin && v2 === ROLES.ING_CAMPO) router.replace("/ops/dashboard");
+  }, [user, router]);
 
   const [stats, setStats] = useState<SlaStats | null>(null);
   const [loading, setLoading] = useState(true);

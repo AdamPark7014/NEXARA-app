@@ -376,7 +376,7 @@ export class NotificationsService {
               message: `La cotización ${quote.quoteNumber} para ${quote.clientCompany || quote.clientName || 'cliente'} expirará en ${daysUntilExpiry} día(s).`,
               relatedEntityId: quote.id,
               entityType: 'Cotizacion',
-              relatedUrl: `/panel/ventas/cotizaciones/${quote.id}`,
+              relatedUrl: `/crm/quotes/${quote.id}`,
             });
           }
 
@@ -391,7 +391,7 @@ export class NotificationsService {
                 message: `La cotización ${quote.quoteNumber} expirará en ${daysUntilExpiry} día(s).`,
                 relatedEntityId: quote.id,
                 entityType: 'Cotizacion',
-                relatedUrl: `/panel/ventas/cotizaciones/${quote.id}`,
+                relatedUrl: `/crm/quotes/${quote.id}`,
               });
             }
           }
@@ -450,7 +450,7 @@ export class NotificationsService {
             message: `La cotización ${quote.quoteNumber} ha expirado y ya no es válida.`,
             relatedEntityId: quote.id,
             entityType: 'Cotizacion',
-            relatedUrl: `/panel/ventas/cotizaciones/${quote.id}`,
+            relatedUrl: `/crm/quotes/${quote.id}`,
           });
         }
 
@@ -465,7 +465,7 @@ export class NotificationsService {
               message: `La cotización ${quote.quoteNumber} ha expirado.`,
               relatedEntityId: quote.id,
               entityType: 'Cotizacion',
-              relatedUrl: `/panel/ventas/cotizaciones/${quote.id}`,
+              relatedUrl: `/crm/quotes/${quote.id}`,
             });
           }
         }
@@ -503,7 +503,7 @@ export class NotificationsService {
           message: `${clientName} (${signerEmail}) ha firmado la cotización ${quote.quoteNumber}.`,
           relatedEntityId: quote.id,
           entityType: 'Cotizacion',
-          relatedUrl: `/panel/ventas/cotizaciones/${quote.id}`,
+          relatedUrl: `/crm/quotes/${quote.id}`,
         });
       }
 
@@ -517,7 +517,7 @@ export class NotificationsService {
             message: `${clientName} ha firmado la cotización ${quote.quoteNumber}.`,
             relatedEntityId: quote.id,
             entityType: 'Cotizacion',
-            relatedUrl: `/panel/ventas/cotizaciones/${quote.id}`,
+            relatedUrl: `/crm/quotes/${quote.id}`,
           });
         }
       }
@@ -556,7 +556,7 @@ export class NotificationsService {
           message: `Se ha creado la orden ${orderId} para el proyecto "${order.project.name}".`,
           relatedEntityId: projectId,
           entityType: 'SalesProject',
-          relatedUrl: `/panel/ventas/proyectos/${projectId}`,
+          relatedUrl: `/crm/projects/${projectId}`,
         });
       }
     } catch (error) {
@@ -585,7 +585,7 @@ export class NotificationsService {
         message: `Tu viático de $${amount.toLocaleString('es-MX')} ha sido aprobado.`,
         relatedEntityId: viaticId,
         entityType: 'Viatico',
-        relatedUrl: `/panel/viaticos/${viaticId}`,
+        relatedUrl: `/erp/finance/viatics?highlight=${viaticId}`,
       });
     } catch (error) {
       this.logger.error('Error notifying viatico approved:', error);
@@ -612,7 +612,7 @@ export class NotificationsService {
         message: reason || 'Tu viático ha sido rechazado. Contacta a tu supervisor para más información.',
         relatedEntityId: viaticId,
         entityType: 'Viatico',
-        relatedUrl: `/panel/viaticos/${viaticId}`,
+        relatedUrl: `/erp/finance/viatics?highlight=${viaticId}`,
       });
     } catch (error) {
       this.logger.error('Error notifying viatico rejected:', error);

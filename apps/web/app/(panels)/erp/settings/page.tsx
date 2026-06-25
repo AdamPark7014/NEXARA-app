@@ -7,7 +7,7 @@ import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface SettingRow {
@@ -32,7 +32,7 @@ const emptyForm = { key: "", value: "", category: "general", label: "" };
 
 export default function SettingsPage() {
   const { user } = useUser();
-  const { isCeo } = useRbacGuard();
+  const cfg = useMemo(() => getErpGovernanceSectionConfig(user, "settings"), [user]);
   const token = user?.token ?? "";
 
   const [settings, setSettings] = useState<SettingRow[]>([]);
@@ -104,7 +104,7 @@ export default function SettingsPage() {
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {isCeo && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nueva configuración</Button>}
+            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nueva configuración</Button>}
           </>
         }
       />
@@ -123,8 +123,8 @@ export default function SettingsPage() {
                   <div style={{ fontWeight: 600, fontSize: 13 }}>{s.label ?? s.key}</div>
                   <div style={{ fontSize: 12, color: "var(--text-tertiary)", wordBreak: "break-all" }}>{s.value}</div>
                 </div>
-                {isCeo && <Button size="sm" variant="ghost" onClick={() => void editValue(s)}>✎ Editar</Button>}
-                {isCeo && <Button size="sm" variant="danger" onClick={() => void remove(s)}>✕</Button>}
+                {cfg.canCreate && <Button size="sm" variant="ghost" onClick={() => void editValue(s)}>✎ Editar</Button>}
+                {cfg.canCreate && <Button size="sm" variant="danger" onClick={() => void remove(s)}>✕</Button>}
               </div>
             ))}
           </div>

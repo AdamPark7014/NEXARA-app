@@ -264,7 +264,7 @@ export class WorkflowService {
         message: `Tienes una solicitud de aprobación: ${workflowName} — ${entityType} #${entityId}`,
         entityType,
         relatedEntityId: entityId,
-        relatedUrl: `/approvals/${instanceId}`,
+        relatedUrl: `/erp/approvals?highlight=${instanceId}`,
       } as any);
     } catch {
       // silent

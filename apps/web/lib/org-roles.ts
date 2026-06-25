@@ -1,5 +1,7 @@
 /** Espejo web de apps/api/src/common/org-roles.ts — roles organizacionales ERP. */
 
+import { orgRoleKeyFromV2 } from '@/lib/rbac/role-mapping';
+
 export const ORG_ROLE_KEYS = {
   CEO: 'ceo',
   DIRECTOR_ADMIN: 'director_admin',
@@ -347,18 +349,29 @@ export const ORG_ROLE_META: Record<OrgRoleKey, OrgRoleMeta> = {
 };
 
 export function resolveOrgRoleKey(roleName?: string | null, orgRoleKey?: string | null): OrgRoleKey | null {
-  if (orgRoleKey && orgRoleKey in ORG_ROLE_META) return orgRoleKey as OrgRoleKey;
+  if (orgRoleKey) {
+    if (orgRoleKey in ORG_ROLE_META) return orgRoleKey as OrgRoleKey;
+    const fromV2 = orgRoleKeyFromV2(orgRoleKey);
+    if (fromV2) return fromV2;
+  }
+
   const normalized = String(roleName || '').toLowerCase();
   if (/ceo|dueño|dueno|gerencia|superadmin/.test(normalized)) return ORG_ROLE_KEYS.CEO;
-  if (/director.*admin|administrativ/.test(normalized)) return ORG_ROLE_KEYS.DIRECTOR_ADMIN;
+  if (/arquitecto|director.*t[eé]cnic/.test(normalized)) return ORG_ROLE_KEYS.ARQUITECTO;
+  if (/director.*admin/.test(normalized)) return ORG_ROLE_KEYS.DIRECTOR_ADMIN;
+  if (/coordinador.*admin/.test(normalized)) return ORG_ROLE_KEYS.ADMIN_STAFF;
+  if (/^administrativ|personal administrativ/.test(normalized)) return ORG_ROLE_KEYS.ADMIN_STAFF;
   if (/director.*oper|operacion/.test(normalized)) return ORG_ROLE_KEYS.DIRECTOR_OPS;
+  if (/coordinador.*oper|coord.*operacion/.test(normalized)) return ORG_ROLE_KEYS.COORD_OPERACIONES;
   if (/director.*comer|comercial/.test(normalized)) return ORG_ROLE_KEYS.DIRECTOR_COMMERCIAL;
-  if (/gerente.*vent|sales manager/.test(normalized)) return ORG_ROLE_KEYS.SALES_MANAGER;
+  if (/gerente.*vent|sales manager|coordinador.*vent/.test(normalized)) return ORG_ROLE_KEYS.SALES_MANAGER;
   if (/ejecutivo.*vent|vendedor|panel ventas/.test(normalized)) return ORG_ROLE_KEYS.SALES_REP;
   if (/jefe.*proyect|project manager/.test(normalized)) return ORG_ROLE_KEYS.PROJECT_MANAGER;
   if (/ingenier.*senior|senior/.test(normalized)) return ORG_ROLE_KEYS.SENIOR_ENGINEER;
+  if (/ingenier.*soporte|soporte t[eé]cnico/.test(normalized)) return ORG_ROLE_KEYS.SUPPORT_AGENT;
   if (/ingenier/.test(normalized)) return ORG_ROLE_KEYS.FIELD_ENGINEER;
-  if (/diseñ|design|marketing/.test(normalized)) return ORG_ROLE_KEYS.DESIGNER;
+  if (/l[ií]der.*dise|lider_diseno/.test(normalized)) return ORG_ROLE_KEYS.DESIGNER;
+  if (/diseñ|design|marketing|redes/.test(normalized)) return ORG_ROLE_KEYS.DESIGNER;
   if (/contador|contabil/.test(normalized)) return ORG_ROLE_KEYS.ACCOUNTANT;
   if (/rrhh|recursos humanos|rh/.test(normalized)) return ORG_ROLE_KEYS.HR_SPECIALIST;
   if (/almacen|warehouse/.test(normalized)) return ORG_ROLE_KEYS.WAREHOUSE_MANAGER;
@@ -367,7 +380,7 @@ export function resolveOrgRoleKey(roleName?: string | null, orgRoleKey?: string 
   if (/soporte|support|helpdesk/.test(normalized)) return ORG_ROLE_KEYS.SUPPORT_AGENT;
   if (/jefe.*noc|noc.*lead|noc.*jef/.test(normalized)) return ORG_ROLE_KEYS.NOC_LEAD;
   if (/noc|monitor/.test(normalized)) return ORG_ROLE_KEYS.NOC_OPERATOR;
-  if (/administrativ|backoffice|consola usuario/.test(normalized)) return ORG_ROLE_KEYS.ADMIN_STAFF;
+  if (/backoffice|consola usuario/.test(normalized)) return ORG_ROLE_KEYS.ADMIN_STAFF;
   return null;
 }
 

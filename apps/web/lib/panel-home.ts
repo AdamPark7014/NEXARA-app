@@ -14,10 +14,10 @@
  *    o que Dirección Comercial vea evidencias de campo en su sidebar.
  */
 
-import { resolveOrgRoleKey } from "@/lib/org-roles";
 import { hasPermission, PERMISSIONS, type UserPermissions } from "@/lib/permissions";
-import { getHomeUrl, getHomePanel, PANEL_META, type PanelId } from "@/lib/access-matrix";
-import { encodeHandoff } from "@/lib/cross-panel-handoff";
+import { PANEL_META, type PanelId } from "@/lib/access-matrix";
+import { buildCrossPanelUrl } from "@/lib/cross-panel-handoff";
+import { getUserHomePanel, getUserHomePath } from "@/lib/user-access";
 
 export type PanelHome = {
   /** Panel canónico (erp, crm, ops, studio, lab). */
@@ -31,22 +31,20 @@ export type PanelHome = {
  * Si no logramos identificar su rol, cae a ERP/dashboard.
  */
 export function getUserHome(
-  user: (UserPermissions & { role?: string | null; orgRoleKey?: string | null }) | null | undefined,
+  user: (UserPermissions & { role?: string | null; orgRoleKey?: string | null; roleKey?: string | null }) | null | undefined,
 ): PanelHome {
   if (!user) return { panel: "erp", path: "/login" };
 
   const isSuperAdmin = Boolean(user.isSuperAdmin);
 
-  // Developer técnico con acceso explícito a Lab → aterriza en Lab
   if (isSuperAdmin && hasPermission(user, PERMISSIONS.LAB_ACCESS)) {
-    return { panel: "lab", path: PANEL_META.lab.entryPath };
+    return { panel: "lab", path: "/lab" };
   }
 
-  const roleKey = resolveOrgRoleKey(user.role, user.orgRoleKey);
-  const panel = getHomePanel(roleKey, isSuperAdmin);
-  const path = getHomeUrl(roleKey, isSuperAdmin);
-
-  return { panel, path };
+  return {
+    panel: getUserHomePanel(user),
+    path: getUserHomePath(user),
+  };
 }
 
 /**
@@ -57,56 +55,19 @@ export function getUserHome(
  *     ceo      → https://core.nexara.com.mx/executive
  */
 export function getUserHomeUrlAbsolute(
-  user: (UserPermissions & { role?: string | null; orgRoleKey?: string | null }) | null | undefined,
+  user: (UserPermissions & { role?: string | null; orgRoleKey?: string | null; roleKey?: string | null }) | null | undefined,
 ): string {
   if (!user) return 'https://core.nexara.com.mx/login';
 
-  const isSuperAdmin = Boolean(user.isSuperAdmin);
-  const roleKey = resolveOrgRoleKey(user.role, user.orgRoleKey);
-  const panel = getHomePanel(roleKey, isSuperAdmin);
-  const path = getHomeUrl(roleKey, isSuperAdmin);
+  const panel = getUserHomePanel(user);
+  const path = getUserHomePath(user);
+  const userJson = JSON.stringify(user);
 
-  // Mapeo panel → subdominio canónico
-  const SUBDOMAIN_MAP: Record<string, string> = {
-    erp: 'core',
-    crm: 'sales',
-    ops: 'ops',
-    studio: 'studio',
-    lab: 'lab',
-  };
-
-  const subdomain = SUBDOMAIN_MAP[panel] || 'core';
-  const protocol = typeof window !== 'undefined' ? window.location.protocol : 'https:';
-  const host = typeof window !== 'undefined' ? window.location.hostname : 'nexara.com.mx';
-
-  /**
-   * Añade el handoff ?_nxt= cuando el destino es un subdominio diferente.
-   * El middleware lee este param para dejar pasar la request aunque nx_session
-   * aún no exista en ese subdominio, y UserContext lo consume para rehidratar
-   * la sesión (mismo mecanismo que usa el PanelSwitcher).
-   */
-  const addHandoff = (base: string, currentSub: string): string => {
-    if (currentSub === subdomain) return path; // mismo subdominio → ruta relativa
-    try {
-      const encoded = encodeHandoff(JSON.stringify(user));
-      return encoded ? `${base}?_nxt=${encoded}` : base;
-    } catch {
-      return base;
-    }
-  };
-
-  // En desarrollo (localhost): usar puerto si aplica
-  if (host.includes('localhost')) {
-    const port = typeof window !== 'undefined' ? window.location.port : '';
-    const currentSub = host.split('.')[0];
-    const base = `${protocol}//${subdomain}.localhost${port ? `:${port}` : ''}${path}`;
-    return addHandoff(base, currentSub);
+  if (typeof window === 'undefined') {
+    return `https://${panel === 'erp' ? 'core' : panel === 'crm' ? 'sales' : panel}.nexara.com.mx${path}`;
   }
 
-  // Producción (nexara.com.mx)
-  const currentSub = host.split('.')[0];
-  const base = `${protocol}//${subdomain}.nexara.com.mx${path}`;
-  return addHandoff(base, currentSub);
+  return buildCrossPanelUrl(panel, path, userJson);
 }
 
 /**
@@ -114,17 +75,13 @@ export function getUserHomeUrlAbsolute(
  * Devuelve siempre paths del nuevo modelo (/erp/dashboard, /crm/dashboard…).
  */
 export function getUserHomeUrl(
-  user: (UserPermissions & { role?: string | null; orgRoleKey?: string | null }) | null | undefined,
+  user: (UserPermissions & { role?: string | null; orgRoleKey?: string | null; roleKey?: string | null }) | null | undefined,
 ): string {
   return getUserHome(user).path;
 }
 
-/**
- * Verifica si el usuario está en su panel HOME en este momento.
- * Útil para no mostrar el switcher cuando ya estás donde debes estar.
- */
 export function isOnHomePanel(
-  user: (UserPermissions & { role?: string | null; orgRoleKey?: string | null }) | null | undefined,
+  user: (UserPermissions & { role?: string | null; orgRoleKey?: string | null; roleKey?: string | null }) | null | undefined,
   currentPanel: PanelId,
 ): boolean {
   return getUserHome(user).panel === currentPanel;

@@ -18,12 +18,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   PANEL_META,
-  getAllowedModules,
   getModuleUrl,
   type ModuleEntry,
   type PanelId,
 } from "@/lib/access-matrix";
-import type { OrgRoleKey } from "@/lib/org-roles";
+import {
+  getUserAllowedModules,
+  getUserAllowedPanels,
+  getUserPanelSwitchPath,
+} from "@/lib/user-access";
+import { buildCrossPanelUrl } from "@/lib/cross-panel-handoff";
+import type { UserAccessInput } from "@/lib/user-access";
 
 type Action = {
   id: string;
@@ -40,8 +45,7 @@ type Action = {
 type Props = {
   open: boolean;
   onClose: () => void;
-  orgRoleKey: OrgRoleKey | null;
-  isSuperAdmin: boolean;
+  user: UserAccessInput | null;
   onToggleDark: () => void;
   onLogout: () => void;
 };
@@ -176,8 +180,7 @@ function scoreMatch(haystack: string, tokens: string[]): number {
 export default function CommandPalette({
   open,
   onClose,
-  orgRoleKey,
-  isSuperAdmin,
+  user,
   onToggleDark,
   onLogout,
 }: Props) {
@@ -196,7 +199,7 @@ export default function CommandPalette({
   }, [open]);
 
   const modules = useMemo<Action[]>(() => {
-    const list = getAllowedModules(orgRoleKey, isSuperAdmin)
+    const list = getUserAllowedModules(user)
       .filter((m) => m.visible !== false)
       .map<Action>((m) => ({
         id: `mod:${m.id}`,
@@ -209,7 +212,7 @@ export default function CommandPalette({
         keywords: [m.id, m.path],
       }));
     return list;
-  }, [orgRoleKey, isSuperAdmin]);
+  }, [user]);
 
   const globalActions = useMemo<Action[]>(() => {
     const acc: Action[] = [
@@ -232,7 +235,8 @@ export default function CommandPalette({
         keywords: ["salir", "logout", "exit"],
       },
     ];
-    Object.values(PANEL_META).forEach((p) => {
+    const userJson = user ? JSON.stringify(user) : null;
+    getUserAllowedPanels(user).forEach((p) => {
       acc.push({
         id: `panel:${p.id}`,
         label: `Ir a ${p.name}`,
@@ -240,12 +244,12 @@ export default function CommandPalette({
         icon: p.icon,
         group: "Saltar a panel",
         panel: p.id,
-        url: `/${p.id}${p.entryPath}`,
+        url: buildCrossPanelUrl(p.id, getUserPanelSwitchPath(user, p.id), userJson),
         keywords: [p.id, p.publicSubdomain],
       });
     });
     return acc;
-  }, [onToggleDark, onLogout]);
+  }, [onToggleDark, onLogout, user]);
 
   const allActions = useMemo<Action[]>(() => [...modules, ...globalActions], [modules, globalActions]);
 
@@ -324,7 +328,11 @@ export default function CommandPalette({
     if (a.onSelect) {
       a.onSelect();
     } else if (a.url) {
-      router.push(a.url);
+      if (a.id.startsWith("panel:")) {
+        window.location.assign(a.url);
+      } else {
+        router.push(a.url);
+      }
     }
   }
 
@@ -630,7 +638,7 @@ export default function CommandPalette({
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
     <kbd
-      style={{
+        style={{
         display: "inline-block",
         padding: "1px 6px",
         borderRadius: 5,

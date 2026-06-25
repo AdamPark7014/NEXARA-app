@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -8,7 +8,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface Candidate {
@@ -40,7 +40,7 @@ const STAGE_LABEL: Record<string, string> = {
 
 export default function RecruitingPage() {
   const { user } = useUser();
-  const { canCreate, canEdit } = useRbacGuard();
+  const cfg = useMemo(() => getOpsTeamSectionConfig(user, "recruiting"), [user]);
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<Candidate[]>([]);
@@ -126,7 +126,7 @@ export default function RecruitingPage() {
       render: (c) => (
         <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
           <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); window.open(buildApiUrl(`cvs/${c.id}/preview`), "_blank"); }}>Ver CV</Button>
-          {canEdit && !c.stage.endsWith("REJECTED") && c.stage !== "APPROVED" && (
+          {cfg.canEdit && !c.stage.endsWith("REJECTED") && c.stage !== "APPROVED" && (
             <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); void move(c, `${c.stage.split("_")[0]}_REJECTED`.replace("INBOX_REJECTED", "RECRUITER_REJECTED")); }}>Rechazar</Button>
           )}
         </div>
@@ -144,7 +144,7 @@ export default function RecruitingPage() {
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nuevo candidato</Button>}
+            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nuevo candidato</Button>}
           </>
         }
       />

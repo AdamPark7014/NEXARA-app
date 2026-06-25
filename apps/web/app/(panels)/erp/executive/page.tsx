@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -8,6 +9,8 @@ import KpiCard from "@/components/ui/KpiCard";
 import Button from "@/components/ui/Button";
 import { Tag, Money } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
+import { resolveV2RoleKey } from "@/lib/user-access";
+import { ROLES, type RoleKey } from "@/lib/rbac";
 
 /**
  * Vista ejecutiva — pantalla home del CEO / Dueño.
@@ -21,9 +24,20 @@ import { useUser } from "@/components/UserContext";
 
 type Alert = { icon: string; title: string; desc: string; href: string; urgency: "danger" | "warning"; cta: string };
 
+const ERP_EXECUTIVE_ROLES = new Set<RoleKey>([ROLES.CEO, ROLES.DIR_ADMIN, ROLES.DIR_OPERACIONES]);
+
 export default function ExecutivePage() {
   const { token, user } = useUser();
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
+
+  // Vista ejecutiva — solo CEO / Dirección. Redirigir a dashboard si el rol no aplica.
+  useEffect(() => {
+    if (!user) return;
+    if (user.isSuperAdmin) return;
+    const v2 = resolveV2RoleKey(user);
+    if (v2 && !ERP_EXECUTIVE_ROLES.has(v2)) router.replace("/erp/dashboard");
+  }, [user, router]);
 
   useEffect(() => {
     setMounted(true);

@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import { resolveV2RoleKey } from "@/lib/user-access";
+import { ROLES } from "@/lib/rbac";
 
 interface Vehicle {
   id: number;
@@ -36,8 +39,17 @@ const emptyForm = { marca: "", modelo: "", placas: "", year: new Date().getFullY
 
 export default function VehiclesPage() {
   const { user } = useUser();
-  const { canCreate, canEdit, canDelete } = useRbacGuard();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
+  const cfg = useMemo(() => getOpsTeamSectionConfig(user, "vehicles"), [user]);
   const token = user?.token ?? "";
+
+  // ing_campo no gestiona flotilla — tiene su propia vista de vehículos asignados
+  useEffect(() => {
+    const v2 = resolveV2RoleKey(user);
+    if (v2 === ROLES.ING_CAMPO) router.replace("/ops/my-vehicles");
+  }, [user, router]);
 
   const [items, setItems] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,6 +99,13 @@ export default function VehiclesPage() {
 
   const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface)", color: "var(--foreground)", fontSize: 13, boxSizing: "border-box" };
 
+  const visibleVehicles = useMemo(() => {
+    if (!highlightId) return items;
+    const id = Number(highlightId);
+    if (Number.isNaN(id)) return items;
+    return [...items].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+  }, [items, highlightId]);
+
   const columns: Column<Vehicle>[] = [
     { key: "placas", label: "Placas", render: v => <Tag variant="accent">{v.placas ?? "—"}</Tag>, width: 110 },
     { key: "marca", label: "Vehículo", render: v => (
@@ -100,8 +119,8 @@ export default function VehiclesPage() {
     { key: "poliza", label: "Póliza", accessor: v => v.poliza ?? "—", width: 130 },
     { key: "id", label: "", render: v => (
       <div style={{ display: "flex", gap: 4 }}>
-        {canEdit && <button onClick={() => openEdit(v)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>}
-        {canDelete && <button onClick={() => remove(v.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>}
+        {cfg.canEdit && <button onClick={() => openEdit(v)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>}
+        {cfg.canDelete && <button onClick={() => remove(v.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>}
       </div>
     ), width: 60 },
   ];
@@ -112,7 +131,7 @@ export default function VehiclesPage() {
         eyebrow="OPS · Campo"
         title="Flotilla de vehículos"
         subtitle="Gestión de las unidades asignadas a cuadrillas: placas, póliza, verificación y estado."
-        actions={canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Agregar vehículo</Button> : undefined}
+        actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Agregar vehículo</Button> : undefined}
       />
 
       {showForm && (
@@ -145,11 +164,16 @@ export default function VehiclesPage() {
         </div>
       )}
 
-      <Section title={loading ? "Cargando…" : `${items.length} unidades`}>
+      <Section title={loading ? "Cargando…" : `${visibleVehicles.length} unidades`}>
+        {highlightId && (
+          <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
+            Mostrando vehículo <strong>#{highlightId}</strong> desde enlace directo.
+          </p>
+        )}
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
         ) : (
-          <DataTable columns={columns} rows={items} rowKey={v => v.id} emptyTitle="Sin vehículos" emptyDescription="Registra el primer vehículo de la flotilla." />
+          <DataTable columns={columns} rows={visibleVehicles} rowKey={v => v.id} emptyTitle="Sin vehículos" emptyDescription="Registra el primer vehículo de la flotilla." />
         )}
       </Section>
     </>

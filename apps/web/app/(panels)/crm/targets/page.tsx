@@ -8,8 +8,8 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
 import { buildApiUrl } from "@/lib/api-base";
+import { useCrmManagerGuard } from "@/lib/useCrmManagerGuard";
 
 interface Performance {
   targetId: number;
@@ -47,7 +47,7 @@ const emptyForm = {
 
 export default function TargetsPage() {
   const { user } = useUser();
-  const { isDirector } = useRbacGuard();
+  const cfg = useCrmManagerGuard();
   const token = user?.token ?? "";
 
   const [perf, setPerf] = useState<{ year: number; month: number; performance: Performance[]; totals: { revenueTarget: number; revenueAchieved: number; totalCommissions: number; avgAttainmentPct: number } } | null>(null);
@@ -74,6 +74,8 @@ export default function TargetsPage() {
   }, [token]);
 
   useEffect(() => { void load(); }, [load]);
+
+  if (!cfg.canAccess) return null;
 
   const submit = async () => {
     if (!token || !form.ownerId || !form.revenueTarget) return;
@@ -103,7 +105,7 @@ export default function TargetsPage() {
     { key: "revenueAchieved", label: "Logrado", render: (p) => <Money value={p.revenueAchieved} />, width: 120 },
     { key: "attainmentPct", label: "% cumplimiento", render: (p) => <Tag variant={p.attainmentPct >= 100 ? "positive" : p.attainmentPct >= 60 ? "warning" : "danger"}>{p.attainmentPct}%</Tag>, width: 130 },
     { key: "commission", label: "Comisión", render: (p) => <Money value={p.commission} />, width: 120 },
-    ...(isDirector ? [{
+    ...(cfg.canCreate ? [{
       key: "acciones" as keyof Performance, label: "",
       render: (p: Performance) => <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); void remove(p); }}>Eliminar</Button>,
       width: 100,
@@ -114,12 +116,12 @@ export default function TargetsPage() {
     <>
       <PageHeader
         eyebrow="CRM · Equipo y métricas"
-        title="Cuotas y metas"
-        subtitle="Cumplimiento real vs objetivo del mes en curso, con comisión calculada automáticamente."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {isDirector && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nueva cuota</Button>}
+            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nueva cuota</Button>}
           </>
         }
       />

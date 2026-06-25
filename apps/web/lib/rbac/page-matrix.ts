@@ -16,29 +16,18 @@
  * Aliases legacy (`/core`, `/sales`) se normalizan automáticamente vía
  * `normalizePathToCanonical()` para no romper bookmarks viejos.
  */
-import { ROLES, type RoleKey } from './roles';
+import { ROLES, SELF_ATTENDANCE_PATHS, type RoleKey } from './roles';
+import { normalizeLegacyPath } from '@/lib/legacy-path-remap';
 
 export type PageRule = string; // path con comodines: /erp/**, /crm/quotes/*, /erp/users/:id
 
 /**
- * Mapeo de prefijos legacy → canónico. Mantiene compatibilidad con la
- * documentación previa (`/core/...`, `/sales/...`, `/portal/...`) sin tener
- * que reescribir cada referencia.
+ * Mapeo legacy documentado en `lib/legacy-path-remap.ts`.
  */
-const LEGACY_PANEL_PREFIX_MAP: Record<string, string> = {
-  '/core': '/erp',
-  '/sales': '/crm',
-  '/portal': '/tickets',
-};
 
 /** Normaliza un pathname al prefijo de panel canónico (`/erp`, `/crm`, etc.). */
 export function normalizePathToCanonical(pathname: string): string {
-  const clean = pathname.split('?')[0].replace(/\/+$/, '') || '/';
-  for (const [legacy, canonical] of Object.entries(LEGACY_PANEL_PREFIX_MAP)) {
-    if (clean === legacy) return canonical;
-    if (clean.startsWith(`${legacy}/`)) return `${canonical}${clean.slice(legacy.length)}`;
-  }
-  return clean;
+  return normalizeLegacyPath(pathname);
 }
 
 /**
@@ -55,6 +44,18 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/crm/**',
     '/ops/**',
     '/studio/**',
+    '/lab/**',
+  ],
+
+  // ─── ARQUITECTO — OPS supervisor + ERP parcial ────────────────────────
+  [ROLES.ARQUITECTO]: [
+    '/ops/**',
+    '/erp/dashboard',
+    '/erp/calendar',
+    '/erp/notifications-center',
+    '/erp/my-profile',
+    '/crm/quotes/**',
+    ...SELF_ATTENDANCE_PATHS,
   ],
 
   // ─── DIR. OPERACIONES — visión global, aprobaciones operativas ────────
@@ -89,6 +90,10 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/crm/dashboard',
     '/crm/quotes/**',
     '/crm/reports',
+    '/crm/team',
+    '/crm/targets',
+    '/crm/templates',
+    '/crm/tenders',
   ],
 
   // ─── COORD ADMIN — segundo nivel administrativo ───────────────────────
@@ -110,6 +115,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/erp/notifications-center',
     '/erp/my-profile',
     '/erp/news',
+    ...SELF_ATTENDANCE_PATHS,
   ],
 
   // ─── ADMINISTRATIVO — operación día a día ─────────────────────────────
@@ -125,56 +131,34 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/erp/notifications-center',
     '/erp/my-profile',
     '/erp/news',
+    ...SELF_ATTENDANCE_PATHS,
   ],
 
   // ─── COORD OPERACIONES — supervisa campo / project manager ────────────
   [ROLES.COORD_OPERACIONES]: [
-    '/ops',
-    '/ops/dashboard',
-    '/ops/activities',
-    '/ops/evidences',
-    '/ops/projects',
-    '/ops/vehicles',
-    '/ops/maintenance/**',
-    '/ops/support/**',
-    '/ops/noc',
-    '/ops/gps',
-    '/ops/assets',
-    '/ops/service-clients',
-    '/ops/tools',
-    '/ops/recruiting',
+    '/ops/**',
     '/erp/calendar',
     '/erp/dashboard',
     '/erp/notifications-center',
     '/erp/my-profile',
     '/crm/quotes',
+    ...SELF_ATTENDANCE_PATHS,
   ],
 
   // ─── ING. CAMPO — solo lo suyo ────────────────────────────────────────
   [ROLES.ING_CAMPO]: [
-    '/ops',
-    '/ops/dashboard',
-    '/ops/my-activities',
-    '/ops/my-evidences',
-    '/ops/my-viatics',
-    '/ops/my-vehicles',
-    '/ops/tools',
+    '/ops/**',
     '/erp/notifications-center',
     '/erp/my-profile',
+    ...SELF_ATTENDANCE_PATHS,
   ],
 
   // ─── ING. SOPORTE — tickets, NOC, mantenimiento ───────────────────────
   [ROLES.ING_SOPORTE]: [
-    '/ops',
-    '/ops/dashboard',
-    '/ops/support/**',
-    '/ops/noc',
-    '/ops/maintenance/**',
-    '/ops/assets',
-    '/ops/service-clients',
-    '/ops/activities',
+    '/ops/**',
     '/erp/notifications-center',
     '/erp/my-profile',
+    ...SELF_ATTENDANCE_PATHS,
   ],
 
   // ─── COORD VENTAS — gerente comercial ─────────────────────────────────
@@ -183,23 +167,15 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/erp/dashboard',
     '/erp/notifications-center',
     '/erp/my-profile',
+    ...SELF_ATTENDANCE_PATHS,
   ],
 
   // ─── VENDEDOR — su pipeline ──────────────────────────────────────────
   [ROLES.VENDEDOR]: [
-    '/crm',
-    '/crm/dashboard',
-    '/crm/leads',
-    '/crm/clients',
-    '/crm/opportunities',
-    '/crm/quotes',
-    '/crm/templates',
-    '/crm/agenda',
-    '/crm/products',
-    '/crm/targets',
-    '/crm/pipeline',
+    '/crm/**',
     '/erp/notifications-center',
     '/erp/my-profile',
+    ...SELF_ATTENDANCE_PATHS,
   ],
 
   // ─── LÍDER DISEÑO — Studio completo ───────────────────────────────────
@@ -208,20 +184,16 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/erp/dashboard',
     '/erp/notifications-center',
     '/erp/my-profile',
+    ...SELF_ATTENDANCE_PATHS,
   ],
 
   // ─── DISEÑADOR — Studio core ──────────────────────────────────────────
   [ROLES.DISENADOR]: [
-    '/studio',
-    '/studio/dashboard',
-    '/studio/pages',
-    '/studio/news',
-    '/studio/social',
-    '/studio/cases',
-    '/studio/contacts',
-    '/studio/leads',
+    '/studio/**',
+    '/erp/calendar',
     '/erp/notifications-center',
     '/erp/my-profile',
+    ...SELF_ATTENDANCE_PATHS,
   ],
 
   // ─── RH ───────────────────────────────────────────────────────────────

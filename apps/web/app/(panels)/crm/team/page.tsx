@@ -9,6 +9,7 @@ import DataTable from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
+import { useCrmManagerGuard } from "@/lib/useCrmManagerGuard";
 
 interface Performance {
   targetId: number;
@@ -30,6 +31,7 @@ async function apiFetch(path: string, token: string) {
 
 export default function TeamPage() {
   const { user } = useUser();
+  const cfg = useCrmManagerGuard();
   const token = user?.token ?? "";
 
   const [rows, setRows] = useState<Performance[]>([]);
@@ -48,6 +50,8 @@ export default function TeamPage() {
   }, [token]);
 
   useEffect(() => { void load(); }, [load]);
+
+  if (!cfg.canAccess) return null;
 
   const columns: Column<Performance>[] = [
     {
@@ -70,8 +74,8 @@ export default function TeamPage() {
     <>
       <PageHeader
         eyebrow="CRM · Equipo y métricas"
-        title="Equipo de ventas"
-        subtitle="Ranking del mes en curso: oportunidades, clientes nuevos, ventas y cumplimiento de cuota por ejecutivo."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
       />
 

@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface CompanyProfile {
@@ -37,9 +37,8 @@ const emptyForm = { legalName: "", tradeName: "", rfc: "", fiscalRegime: "", con
 
 export default function CompaniesPage() {
   const { user } = useUser();
-  const { canManageUsers, isCeo } = useRbacGuard();
+  const cfg = useMemo(() => getErpGovernanceSectionConfig(user, "companies"), [user]);
   const token = user?.token ?? "";
-  const canManage = canManageUsers || isCeo;
 
   const [items, setItems] = useState<CompanyProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,7 +117,7 @@ export default function CompaniesPage() {
     { key: "fiscalRegime", label: "Régimen", accessor: (c) => c.fiscalRegime ?? "—", width: 100 },
     { key: "contactEmail", label: "Contacto", accessor: (c) => c.contactEmail ?? "—", width: 180 },
     { key: "isActive", label: "Estado", render: (c) => <Tag variant={c.isActive ? "positive" : "danger"}>{c.isActive ? "Activa" : "Inactiva"}</Tag>, width: 100 },
-    ...(canManage ? [{
+    ...(cfg.canAssign ? [{
       key: "acciones" as keyof CompanyProfile, label: "",
       render: (c: CompanyProfile) => (
         <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
@@ -140,7 +139,7 @@ export default function CompaniesPage() {
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {canManage && <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva empresa</Button>}
+            {cfg.canAssign && <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva empresa</Button>}
           </>
         }
       />

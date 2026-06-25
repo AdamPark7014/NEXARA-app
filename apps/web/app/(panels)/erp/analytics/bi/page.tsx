@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -9,6 +10,13 @@ import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
+import { resolveV2RoleKey } from "@/lib/user-access";
+import { ROLES, type RoleKey } from "@/lib/rbac";
+
+const ERP_BI_ROLES = new Set<RoleKey>([
+  ROLES.CEO, ROLES.DIR_ADMIN, ROLES.DIR_OPERACIONES,
+  ROLES.COORD_VENTAS, ROLES.COORD_OPERACIONES,
+]);
 
 interface MarginRow { projectType: string; count: number; budget: number; cost: number; margin: number; marginPercent: number }
 interface EngineerRow { engineerId: number; engineerName: string; totalActivities: number; completed: number; completionRate: number; avgEfficiency: number | null; avgDurationMin: number | null }
@@ -22,7 +30,16 @@ async function apiFetch(path: string, token: string) {
 
 export default function BiPage() {
   const { user } = useUser();
+  const router = useRouter();
   const token = user?.token ?? "";
+
+  // Business Intelligence — solo dirección y coordinadores con visibilidad financiera.
+  useEffect(() => {
+    if (!user) return;
+    if (user.isSuperAdmin) return;
+    const v2 = resolveV2RoleKey(user);
+    if (v2 && !ERP_BI_ROLES.has(v2)) router.replace("/erp/dashboard");
+  }, [user, router]);
 
   const [margin, setMargin] = useState<MarginRow[]>([]);
   const [engineers, setEngineers] = useState<EngineerRow[]>([]);

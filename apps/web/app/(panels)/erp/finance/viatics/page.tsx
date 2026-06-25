@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import KpiCard from "@/components/ui/KpiCard";
@@ -8,7 +9,7 @@ import Button from "@/components/ui/Button";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { filterRowsByScope, getErpViaticsAdminSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface Viatico {
@@ -47,8 +48,11 @@ type FormMode = "create" | "approve" | null;
 
 export default function ViaticosPage() {
   const { user } = useUser();
-  const { canCreate, canApprove, canViewAll, canDelete, nivel } = useRbacGuard();
+  const cfg = useMemo(() => getErpViaticsAdminSectionConfig(user), [user]);
+  const canViewAll = cfg.defaultScope === "team";
   const token = user?.token ?? "";
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
 
   const [items, setItems] = useState<Viatico[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,22 +80,32 @@ export default function ViaticosPage() {
 
   useEffect(() => { void load(); }, [load]);
 
+  const visibleItems = useMemo(
+    () => filterRowsByScope(items, user, cfg.defaultScope),
+    [items, user, cfg.defaultScope],
+  );
+
   const filtered = useMemo(() => {
+    let rows = visibleItems;
+    if (highlightId) {
+      const id = Number(highlightId);
+      if (!Number.isNaN(id)) rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+    }
     const q = filter.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
+    if (!q) return rows;
+    return rows.filter(
       (v) =>
         (v.concepto ?? "").toLowerCase().includes(q) ||
         (v.usuario?.nombre ?? "").toLowerCase().includes(q) ||
         (v.actividad?.folio ?? "").toLowerCase().includes(q) ||
         (v.estatus ?? "").toLowerCase().includes(q),
     );
-  }, [items, filter]);
+  }, [visibleItems, filter, highlightId]);
 
-  const pendientes = items.filter((v) => v.estatus === "Pendiente" || v.estatus === "Aprobado_Coordinador").length;
-  const aprobados = items.filter((v) => v.estatus === "Aprobado" || v.estatus === "Pagado").length;
-  const totalMonto = items.reduce((s, v) => s + (Number(v.montoSolicitado) || 0), 0);
-  const pendienteMonto = items
+  const pendientes = visibleItems.filter((v) => v.estatus === "Pendiente" || v.estatus === "Aprobado_Coordinador").length;
+  const aprobados = visibleItems.filter((v) => v.estatus === "Aprobado" || v.estatus === "Pagado").length;
+  const totalMonto = visibleItems.reduce((s, v) => s + (Number(v.montoSolicitado) || 0), 0);
+  const pendienteMonto = visibleItems
     .filter((v) => v.estatus !== "Rechazado")
     .reduce((s, v) => s + (Number(v.montoSolicitado) || 0), 0);
 
@@ -196,10 +210,10 @@ export default function ViaticosPage() {
       key: "acciones" as keyof Viatico, label: "",
       render: (v) => (
         <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
-          {canApprove && (v.estatus === "Pendiente" || v.estatus === "Aprobado_Coordinador") && (
+          {cfg.canApprove && (v.estatus === "Pendiente" || v.estatus === "Aprobado_Coordinador") && (
             <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openApprove(v); }}>Revisar</Button>
           )}
-          {canDelete && (
+          {cfg.canDelete && (
             <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); void softDelete(v); }}>✕</Button>
           )}
         </div>
@@ -212,15 +226,13 @@ export default function ViaticosPage() {
     <>
       <PageHeader
         eyebrow="ERP · Finanzas"
-        title="Viáticos"
-        subtitle={canViewAll
-          ? "Gestión y aprobación de viáticos del equipo. El flujo va de coordinador OPS → administración → banca."
-          : "Tus solicitudes de viáticos. Adjunta comprobante y espera la aprobación de tu coordinador."}
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         variant="hero"
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {canCreate && (
+            {cfg.canCreate && (
               <Button variant="primary" iconLeft="💸" onClick={openCreate}>Solicitar viático</Button>
             )}
           </>
@@ -246,6 +258,11 @@ export default function ViaticosPage() {
       </div>
 
       <Section title={loading ? "Cargando…" : `${filtered.length} viáticos`}>
+        {highlightId && (
+          <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
+            Mostrando viático <strong>#{highlightId}</strong> desde enlace directo.
+          </p>
+        )}
         {loading && <EmptyState icon="⏳" title="Cargando viáticos…" description="Consultando solicitudes desde la API." />}
         {!loading && error && (
           <EmptyState
@@ -261,7 +278,7 @@ export default function ViaticosPage() {
             rows={filtered}
             rowKey={(v) => v.id}
             emptyTitle="Sin viáticos"
-            emptyDescription={canCreate ? "Solicita tu primer viático con el botón de arriba." : "No hay viáticos registrados."}
+            emptyDescription={cfg.canCreate ? "Solicita tu primer viático con el botón de arriba." : "No hay viáticos registrados."}
           />
         )}
       </Section>
