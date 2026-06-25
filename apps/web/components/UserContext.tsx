@@ -190,11 +190,15 @@ const SESSION_COOKIE = 'nx_session';
 const setSessionCookie = (active: boolean) => {
 	if (typeof document === 'undefined') return;
 	const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+	const isProduction = typeof window !== 'undefined' && window.location.hostname.includes('nexara.com.mx');
 	const secureFlag = isHttps ? '; Secure' : '';
+	// Compartir nx_session entre todos los subdominios en producción para que el
+	// middleware auth-gate la vea al navegar cross-subdomain (ej. sales → core).
+	const domainFlag = isProduction ? '; Domain=.nexara.com.mx' : '';
 	if (active) {
-		document.cookie = `${SESSION_COOKIE}=1; Path=/; SameSite=Lax; Max-Age=86400${secureFlag}`;
+		document.cookie = `${SESSION_COOKIE}=1; Path=/; SameSite=Lax; Max-Age=86400${domainFlag}${secureFlag}`;
 	} else {
-		document.cookie = `${SESSION_COOKIE}=; Path=/; SameSite=Lax; Max-Age=0${secureFlag}`;
+		document.cookie = `${SESSION_COOKIE}=; Path=/; SameSite=Lax; Max-Age=0${domainFlag}${secureFlag}`;
 	}
 };
 

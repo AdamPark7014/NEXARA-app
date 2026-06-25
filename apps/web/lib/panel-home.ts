@@ -17,6 +17,7 @@
 import { resolveOrgRoleKey } from "@/lib/org-roles";
 import { hasPermission, PERMISSIONS, type UserPermissions } from "@/lib/permissions";
 import { getHomeUrl, getHomePanel, PANEL_META, type PanelId } from "@/lib/access-matrix";
+import { encodeHandoff } from "@/lib/cross-panel-handoff";
 
 export type PanelHome = {
   /** Panel canónico (erp, crm, ops, studio, lab). */
@@ -78,14 +79,34 @@ export function getUserHomeUrlAbsolute(
   const protocol = typeof window !== 'undefined' ? window.location.protocol : 'https:';
   const host = typeof window !== 'undefined' ? window.location.hostname : 'nexara.com.mx';
 
+  /**
+   * Añade el handoff ?_nxt= cuando el destino es un subdominio diferente.
+   * El middleware lee este param para dejar pasar la request aunque nx_session
+   * aún no exista en ese subdominio, y UserContext lo consume para rehidratar
+   * la sesión (mismo mecanismo que usa el PanelSwitcher).
+   */
+  const addHandoff = (base: string, currentSub: string): string => {
+    if (currentSub === subdomain) return path; // mismo subdominio → ruta relativa
+    try {
+      const encoded = encodeHandoff(JSON.stringify(user));
+      return encoded ? `${base}?_nxt=${encoded}` : base;
+    } catch {
+      return base;
+    }
+  };
+
   // En desarrollo (localhost): usar puerto si aplica
   if (host.includes('localhost')) {
     const port = typeof window !== 'undefined' ? window.location.port : '';
-    return `${protocol}//${subdomain}.localhost${port ? `:${port}` : ''}${path}`;
+    const currentSub = host.split('.')[0];
+    const base = `${protocol}//${subdomain}.localhost${port ? `:${port}` : ''}${path}`;
+    return addHandoff(base, currentSub);
   }
 
   // Producción (nexara.com.mx)
-  return `${protocol}//${subdomain}.nexara.com.mx${path}`;
+  const currentSub = host.split('.')[0];
+  const base = `${protocol}//${subdomain}.nexara.com.mx${path}`;
+  return addHandoff(base, currentSub);
 }
 
 /**

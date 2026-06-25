@@ -172,6 +172,28 @@ export default function AppShell({ panel, children }: AppShellProps) {
       .filter((g) => g.items.length > 0);
   }, [navQuery, sidebarGroups]);
 
+  // Gate de acceso jerárquico con preferencia RBAC v2.
+  //   - Si el usuario tiene `roleKey` v2 → consultamos `canOpenPage()` con la
+  //     matriz canónica de paths (`page-matrix.ts`).
+  //   - Si todavía sólo tiene rol legacy → caemos al `canAccessUrl()` previo
+  //     basado en `access-matrix.ts` (no rompe usuarios sin migrar).
+  const accessGuardWarning = useMemo(() => {
+    const path = pathname || "/";
+    if (v2RoleKey) return !canOpenPage(v2RoleKey, path);
+    return !canAccessUrl(orgRoleKey, path, isSuperAdmin);
+  }, [v2RoleKey, orgRoleKey, isSuperAdmin, pathname]);
+
+  // Si el rol del usuario no puede ver la URL actual, redirigirlo a su home
+  // (en vez de mostrar la página con un warning).
+  useEffect(() => {
+    if (!isContextReady || !user) return;
+    if (isSuperAdmin) return;
+    if (!accessGuardWarning) return;
+    if (!homeUrl) return;
+    if (pathname && pathname.startsWith(homeUrl)) return; // ya estamos en home
+    router.replace(homeUrl);
+  }, [isContextReady, user, isSuperAdmin, accessGuardWarning, homeUrl, pathname, router]);
+
   if (!user) {
     return (
       <div
@@ -277,28 +299,6 @@ export default function AppShell({ panel, children }: AppShellProps) {
     logout?.();
     router.replace("/login");
   };
-
-  // Gate de acceso jerárquico con preferencia RBAC v2.
-  //   - Si el usuario tiene `roleKey` v2 → consultamos `canOpenPage()` con la
-  //     matriz canónica de paths (`page-matrix.ts`).
-  //   - Si todavía sólo tiene rol legacy → caemos al `canAccessUrl()` previo
-  //     basado en `access-matrix.ts` (no rompe usuarios sin migrar).
-  const accessGuardWarning = useMemo(() => {
-    const path = pathname || "/";
-    if (v2RoleKey) return !canOpenPage(v2RoleKey, path);
-    return !canAccessUrl(orgRoleKey, path, isSuperAdmin);
-  }, [v2RoleKey, orgRoleKey, isSuperAdmin, pathname]);
-
-  // Si el rol del usuario no puede ver la URL actual, redirigirlo a su home
-  // (en vez de mostrar la página con un warning).
-  useEffect(() => {
-    if (!isContextReady || !user) return;
-    if (isSuperAdmin) return;
-    if (!accessGuardWarning) return;
-    if (!homeUrl) return;
-    if (pathname && pathname.startsWith(homeUrl)) return; // ya estamos en home
-    router.replace(homeUrl);
-  }, [isContextReady, user, isSuperAdmin, accessGuardWarning, homeUrl, pathname, router]);
 
   return (
     <div

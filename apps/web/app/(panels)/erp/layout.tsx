@@ -1,14 +1,20 @@
-/**
- * ERP Panel Layout — Server Component (no "use client").
- * Envuelve todas las páginas del panel ERP con el ToastViewport.
- * AppShell se re-habilita en cada página individualmente cuando sea necesario.
- *
- * NOTA: mantener este layout como Server Component evita el hydration mismatch
- * que ocurría cuando era "use client" con usePathname().
- */
+"use client";
+
+import AppShell from "@/components/app-shell/AppShell";
 import { ToastViewport } from "@/components/Toast";
+import { usePathname } from "next/navigation";
 
 export default function ErpLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+
+  if (pathname && (pathname.includes("/login") || pathname.includes("/auth"))) {
+    return <>{children}</>;
+  }
+
   return (
     <>
-      <ToastViewpo
+      <ToastViewport />
+      <AppShell panel="erp">{children}</AppShell>
+    </>
+  );
+}

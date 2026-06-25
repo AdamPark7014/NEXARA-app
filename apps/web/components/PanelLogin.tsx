@@ -166,7 +166,9 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
       if (typeof document !== "undefined") {
         const isHttps = window.location.protocol === "https:";
         const secureFlag = isHttps ? "; Secure" : "";
-        document.cookie = `nx_session=1; Path=/; SameSite=Lax; Max-Age=86400${secureFlag}`;
+        const isProduction = window.location.hostname.includes("nexara.com.mx");
+        const domainFlag = isProduction ? "; Domain=.nexara.com.mx" : "";
+        document.cookie = `nx_session=1; Path=/; SameSite=Lax; Max-Age=86400${domainFlag}${secureFlag}`;
       }
 
       setUser(userData);
