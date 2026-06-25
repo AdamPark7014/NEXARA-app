@@ -587,6 +587,33 @@ export function middleware(request: NextRequest) {
       return applySecurityHeaders(NextResponse.redirect(url, 308));
     }
 
+    // ── Cross-panel canonical redirect ──
+    // Si ya viene una ruta con prefijo explícito de panel distinto al host
+    // actual, no la reescribimos como subruta del panel actual (eso termina
+    // en 404 tipo /crm/erp/...); redirigimos al subdominio canónico correcto.
+    if (request.method === 'GET' || request.method === 'HEAD') {
+      const knownPanelPrefixes = ['/erp', '/crm', '/ops', '/studio', '/lab', '/tickets'];
+      const explicitPanelPrefix = knownPanelPrefixes.find(
+        (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+      );
+
+      const currentPanelPrefix = '/' + internalPrefix.split('/').filter(Boolean)[0];
+      if (
+        explicitPanelPrefix &&
+        explicitPanelPrefix !== currentPanelPrefix &&
+        !isLocalhost &&
+        hostWithoutPort.endsWith('.nexara.com.mx')
+      ) {
+        const targetSub = CANONICAL_BY_INTERNAL_PREFIX[explicitPanelPrefix];
+        if (targetSub && subdomain !== targetSub) {
+          const url = request.nextUrl.clone();
+          url.hostname = `${targetSub}.nexara.com.mx`;
+          url.port = '';
+          return applySecurityHeaders(NextResponse.redirect(url, 308));
+        }
+      }
+    }
+
     // Cuando entramos por subdominio: redirigir paths legacy (/console/X, /ventas/Y…)
     // al nuevo modelo antes de hacer el rewrite (también cubre el caso console → ops).
     if (request.method === 'GET' || request.method === 'HEAD') {
