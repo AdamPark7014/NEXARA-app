@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import KpiCard from "@/components/ui/KpiCard";
@@ -8,8 +9,8 @@ import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
 import { buildApiUrl } from "@/lib/api-base";
+import { getHrSectionConfig } from "@/lib/section-views";
 
 type HrEmpleado = {
   id: number;
@@ -62,7 +63,8 @@ const emptyCreateForm = { nombre: "", email: "", password: "", roleId: "", depar
 
 export default function HrPage() {
   const { user } = useUser();
-  const { canManageUsers } = useRbacGuard();
+  const router = useRouter();
+  const cfg = useMemo(() => getHrSectionConfig(user), [user]);
   const [state, setState] = useState<HrState>({ kind: "loading" });
   const [editing, setEditing] = useState<HrEmpleado | null>(null);
   const [editForm, setEditForm] = useState<Partial<HrEmpleado>>({});
@@ -94,6 +96,12 @@ export default function HrPage() {
   }, [user?.token]);
 
   useEffect(() => { void fetchStaff(); }, [fetchStaff]);
+
+  useEffect(() => {
+    if (!cfg.canAccess) {
+      router.replace("/erp/hr/attendance");
+    }
+  }, [cfg.canAccess, router]);
 
   const filtered = useMemo(() => {
     if (state.kind !== "ready") return [];
@@ -256,7 +264,7 @@ export default function HrPage() {
       render: (e) => (
         <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
           <Button size="sm" variant="ghost" iconLeft="✏️" onClick={(ev) => { ev.stopPropagation(); openEdit(e); }}>Editar</Button>
-          {canManageUsers && (
+          {cfg.canEdit && (
             <>
               <Button
                 size="sm"
@@ -279,12 +287,14 @@ export default function HrPage() {
 
   const inp: React.CSSProperties = { padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13 };
 
+  if (!cfg.canAccess) return null;
+
   return (
     <>
       <PageHeader
         eyebrow="ERP · Personas"
-        title="Recursos Humanos"
-        subtitle="Plantilla, vacaciones, incidencias y onboarding. Fuente de verdad del personal NEXARA — sincronizado en tiempo real."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         variant="hero"
         meta={
           state.kind === "ready" ? (
@@ -298,7 +308,7 @@ export default function HrPage() {
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void fetchStaff()}>Actualizar</Button>
-            {canManageUsers && (
+            {cfg.canCreate && (
               <Button variant="primary" iconLeft="👤" onClick={openCreate}>Alta de personal</Button>
             )}
           </>

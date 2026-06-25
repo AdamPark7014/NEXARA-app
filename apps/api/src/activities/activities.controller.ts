@@ -50,7 +50,7 @@ export class ActivitiesController {
     let result: any;
     if (user.isSuperAdmin) {
       result = await this.activitiesService.findAll();
-    } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
+    } else if (this.isOpsManager(user)) {
       const scopeUsers = await this.usersService.findUsersForConsoleActivityScope();
       const allowedUserIds = scopeUsers.map((u: { id: number }) => u.id);
       result = await this.activitiesService.findByAllowedUsers(allowedUserIds);
@@ -147,7 +147,7 @@ export class ActivitiesController {
 
     if (user.isSuperAdmin) {
       return this.activitiesService.findAll(query);
-    } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
+    } else if (this.isOpsManager(user)) {
       const scopeUsers = await this.usersService.findUsersForConsoleActivityScope();
       const allowedUserIds = scopeUsers.map((u: { id: number }) => u.id);
       return this.activitiesService.findByAllowedUsers(allowedUserIds);
@@ -191,5 +191,19 @@ export class ActivitiesController {
   @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })
   remove(@Param('id') id: string) {
     return this.activitiesService.remove(+id);
+  }
+
+  /**
+   * Determina si el usuario tiene scope de equipo para actividades.
+   * Cubre tanto el modelo legacy (CONSOLE_ADMIN) como v2 (roleKey de manager).
+   */
+  private isOpsManager(user: any): boolean {
+    if (!user) return false;
+    if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) return true;
+    const V2_OPS_MANAGER_ROLES = new Set([
+      'ceo', 'dir_admin', 'dir_operaciones', 'arquitecto',
+      'coord_operaciones', 'coord_admin',
+    ]);
+    return Boolean(user.roleKey && V2_OPS_MANAGER_ROLES.has(user.roleKey));
   }
 }

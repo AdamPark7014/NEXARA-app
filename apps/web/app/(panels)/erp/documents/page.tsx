@@ -8,7 +8,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface DocCategory { id: number; name: string }
@@ -40,7 +40,7 @@ const emptyForm = { title: "", description: "", categoryId: "", fileUrl: "" };
 
 export default function DocumentsPage() {
   const { user } = useUser();
-  const { canCreate, canApprove } = useRbacGuard();
+  const cfg = useMemo(() => getErpGovernanceSectionConfig(user, "documents"), [user]);
   const token = user?.token ?? "";
 
   const [docs, setDocs] = useState<ManagedDoc[]>([]);
@@ -137,10 +137,10 @@ export default function DocumentsPage() {
       render: (d) => (
         <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
           {d.fileUrl && <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); window.open(buildApiUrl(d.fileUrl!), "_blank"); }}>Ver</Button>}
-          {canApprove && d.status === "PENDING_APPROVAL" && (
+          {cfg.canApprove && d.status === "PENDING_APPROVAL" && (
             <Button size="sm" variant="primary" onClick={(e) => { e.stopPropagation(); void approve(d); }}>Aprobar</Button>
           )}
-          {canApprove && d.status !== "ARCHIVED" && (
+          {cfg.canApprove && d.status !== "ARCHIVED" && (
             <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); void archive(d); }}>Archivar</Button>
           )}
         </div>
@@ -158,7 +158,7 @@ export default function DocumentsPage() {
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nuevo documento</Button>}
+            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nuevo documento</Button>}
           </>
         }
       />

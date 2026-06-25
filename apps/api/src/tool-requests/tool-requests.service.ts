@@ -176,7 +176,8 @@ export class ToolRequestsService {
 
     if (currentUser?.isSuperAdmin) {
       where = undefined;
-    } else if (currentUser?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
+    } else if (currentUser?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) || currentUser?.permissions?.includes(PERMISSIONS.TOOLS_MANAGE)) {
+      // Admin consola o manager v2 (coord_operaciones, etc.): ve solicitudes de su departamento
       where = {
         usuario: {
           AND: [

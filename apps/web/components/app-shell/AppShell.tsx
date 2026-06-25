@@ -24,20 +24,30 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import { useTheme } from "@/components/ThemeContext";
-import { getOrgRoleLabel, resolveOrgRoleKey } from "@/lib/org-roles";
 import {
   MODULES,
   PANEL_META,
-  buildSidebar,
-  canAccessUrl,
-  getAllowedPanels,
-  getHomeUrl,
   getModuleUrl,
   type ModuleEntry,
   type ModuleId,
   type PanelId,
+  type PanelMeta,
 } from "@/lib/access-matrix";
-import { canOpenPage, type RoleKey } from "@/lib/rbac";
+import {
+  buildUserSidebar,
+  canUserAccessPanel,
+  canUserAccessPath,
+  getUserAllowedPanels,
+  getUserHomePanel,
+  getUserHomePath,
+  getUserPanelEntryPath,
+  getUserPanelSwitchPath,
+  getUserRoleLabel,
+  resolveDisplayOrgRoleKey,
+  resolveV2RoleKey,
+} from "@/lib/user-access";
+import { getUserHomeUrlAbsolute } from "@/lib/panel-home";
+import type { User } from "@/components/UserContext";
 import { buildCrossPanelUrl } from "@/lib/cross-panel-handoff";
 import styles from "./AppShell.module.scss";
 import CommandPalette from "./CommandPalette";
@@ -129,23 +139,33 @@ export default function AppShell({ panel, children }: AppShellProps) {
 
   const orgRoleKey = useMemo(() => {
     if (!user) return null;
-    return resolveOrgRoleKey(user.role, (user as { orgRoleKey?: string }).orgRoleKey);
+    return resolveDisplayOrgRoleKey(user);
   }, [user]);
 
   const isSuperAdmin = Boolean(user?.isSuperAdmin);
-  const v2RoleKey = (user as { roleKey?: string } | null)?.roleKey as RoleKey | undefined;
+  const v2RoleKey = resolveV2RoleKey(user);
 
   const sidebarGroups = useMemo(
-    () => buildSidebar(panel, orgRoleKey, isSuperAdmin),
-    [panel, orgRoleKey, isSuperAdmin],
+    () => buildUserSidebar(panel, user),
+    [panel, user],
   );
 
   const allowedPanels = useMemo(
-    () => getAllowedPanels(orgRoleKey, isSuperAdmin),
-    [orgRoleKey, isSuperAdmin],
+    () => getUserAllowedPanels(user),
+    [user],
   );
 
-  const homeUrl = useMemo(() => getHomeUrl(orgRoleKey, isSuperAdmin), [orgRoleKey, isSuperAdmin]);
+  const homeUrl = useMemo(() => getUserHomePath(user), [user]);
+  const canAccessPanel = useMemo(() => canUserAccessPanel(user, panel), [user, panel]);
+  const panelEntryPath = useMemo(() => getUserPanelEntryPath(user, panel), [user, panel]);
+  const notificationsUrl = useMemo(() => {
+    const target = `/${panel}/notifications-center`;
+    return canUserAccessPath(user, target) ? target : null;
+  }, [user, panel]);
+  const profileUrl = useMemo(() => {
+    const target = `/${panel}/my-profile`;
+    return canUserAccessPath(user, target) ? target : null;
+  }, [user, panel]);
 
   // Si el user está logueado PERO no tiene ningún rol resoluble, su sidebar
   // queda vacío y la experiencia es ambigua: parece "público sin login".
@@ -172,27 +192,23 @@ export default function AppShell({ panel, children }: AppShellProps) {
       .filter((g) => g.items.length > 0);
   }, [navQuery, sidebarGroups]);
 
-  // Gate de acceso jerárquico con preferencia RBAC v2.
-  //   - Si el usuario tiene `roleKey` v2 → consultamos `canOpenPage()` con la
-  //     matriz canónica de paths (`page-matrix.ts`).
-  //   - Si todavía sólo tiene rol legacy → caemos al `canAccessUrl()` previo
-  //     basado en `access-matrix.ts` (no rompe usuarios sin migrar).
   const accessGuardWarning = useMemo(() => {
     const path = pathname || "/";
-    if (v2RoleKey) return !canOpenPage(v2RoleKey, path);
-    return !canAccessUrl(orgRoleKey, path, isSuperAdmin);
-  }, [v2RoleKey, orgRoleKey, isSuperAdmin, pathname]);
+    return !canUserAccessPath(user, path);
+  }, [user, pathname]);
 
-  // Si el rol del usuario no puede ver la URL actual, redirigirlo a su home
-  // (en vez de mostrar la página con un warning).
+  // Ruta bloqueada dentro de un panel permitido → redirigir a la entrada del panel
+  // (no al home global, evita saltos cross-panel y parpadeos).
   useEffect(() => {
     if (!isContextReady || !user) return;
     if (isSuperAdmin) return;
+    if (!canAccessPanel) return;
     if (!accessGuardWarning) return;
-    if (!homeUrl) return;
-    if (pathname && pathname.startsWith(homeUrl)) return; // ya estamos en home
-    router.replace(homeUrl);
-  }, [isContextReady, user, isSuperAdmin, accessGuardWarning, homeUrl, pathname, router]);
+    const target = panelEntryPath ?? homeUrl;
+    if (!target) return;
+    if (pathname === target || pathname?.startsWith(`${target}/`)) return;
+    router.replace(target);
+  }, [isContextReady, user, isSuperAdmin, canAccessPanel, accessGuardWarning, panelEntryPath, homeUrl, pathname, router]);
 
   if (!user) {
     return (
@@ -300,6 +316,20 @@ export default function AppShell({ panel, children }: AppShellProps) {
     router.replace("/login");
   };
 
+  // Panel completo sin permiso (p.ej. administrativo en /crm o diseño en /erp sin rutas)
+  if (!isSuperAdmin && user && !canAccessPanel) {
+    return (
+      <PanelAccessDenied
+        panelMeta={panelMeta}
+        user={user}
+        homeUrlAbsolute={getUserHomeUrlAbsolute(user)}
+        roleLabel={getUserRoleLabel(user)}
+        allowedPanels={allowedPanels}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
   return (
     <div
       className={styles.shell}
@@ -337,7 +367,12 @@ export default function AppShell({ panel, children }: AppShellProps) {
         </div>
 
         <nav className={styles.menu} aria-label="Menú principal">
-          {filteredGroups.map((group) => (
+          {filteredGroups.length === 0 ? (
+            <div style={{ padding: "12px 14px", fontSize: 12.5, color: "var(--text-tertiary)", lineHeight: 1.45 }}>
+              No hay secciones disponibles en este panel para tu rol.
+            </div>
+          ) : (
+            filteredGroups.map((group) => (
             <div key={group.id} className={styles.group}>
               <p className={styles.groupTitle}>{group.title}</p>
               {group.items.map((item) => {
@@ -358,7 +393,8 @@ export default function AppShell({ panel, children }: AppShellProps) {
                 );
               })}
             </div>
-          ))}
+          ))
+          )}
         </nav>
 
         <div className={styles.userBlock} ref={userMenuRef}>
@@ -368,7 +404,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
           <div className={styles.userInfo}>
             <div className={styles.userName}>{user.nombre || user.email}</div>
             <div className={styles.userRole}>
-              {isSuperAdmin ? "Superadmin" : user.role || "Equipo NEXARA"}
+              {getUserRoleLabel(user)}
             </div>
           </div>
           <button
@@ -412,7 +448,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
                 Cuenta
               </div>
               <Link
-                href={`/${panel}/my-profile`}
+                href={profileUrl ?? homeUrl}
                 onClick={() => setUserMenuOpen(false)}
                 style={menuItemStyle()}
               >
@@ -462,7 +498,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
           {collapsed ? "›" : "‹"}
         </button>
 
-        <Breadcrumbs panel={panel} pathname={pathname || ""} />
+        <Breadcrumbs panel={panel} pathname={pathname || ""} panelHome={panelEntryPath} />
 
         <div className={styles.topbarActions}>
           {(isSuperAdmin || orgRoleKey) && (
@@ -480,7 +516,7 @@ export default function AppShell({ panel, children }: AppShellProps) {
               }
             >
               <span aria-hidden="true">●</span>
-              <span>{getOrgRoleLabel(user.role, orgRoleKey, isSuperAdmin) || "Equipo"}</span>
+              <span>{getUserRoleLabel(user)}</span>
             </div>
           )}
 
@@ -505,7 +541,11 @@ export default function AppShell({ panel, children }: AppShellProps) {
                     const isCurrent = p.id === panel;
                     const isHome = homeUrl.startsWith(`/${p.id}`);
                     const userJson = user ? JSON.stringify(user) : null;
-                    const panelHref = buildCrossPanelUrl(p.id, p.entryPath, userJson);
+                    const panelHref = buildCrossPanelUrl(
+                      p.id,
+                      getUserPanelSwitchPath(user, p.id),
+                      userJson,
+                    );
                     return (
                       <a
                         key={p.id}
@@ -560,31 +600,17 @@ export default function AppShell({ panel, children }: AppShellProps) {
             {darkMode ? "☀️" : "🌙"}
           </button>
 
-          <Link href={`/${panel}/notifications-center`} className={styles.iconBtn} title="Notificaciones">
-            🔔
-          </Link>
+          {notificationsUrl && (
+            <Link href={notificationsUrl} className={styles.iconBtn} title="Notificaciones">
+              🔔
+            </Link>
+          )}
         </div>
       </header>
 
       {/* ───────── MAIN ───────── */}
       <main className={styles.main}>
         <div className={styles.contentInner}>
-          {accessGuardWarning && !isSuperAdmin && (
-            <div
-              role="alert"
-              style={{
-                padding: "14px 18px",
-                background: "var(--state-warning-bg)",
-                border: "1px solid var(--state-warning-border)",
-                color: "var(--state-warning-text)",
-                borderRadius: 12,
-                marginBottom: 18,
-                fontSize: 13.5,
-              }}
-            >
-              ⚠️ Tu rol no tiene acceso a esta URL. Si crees que es un error, contacta a tu administrador.
-            </div>
-          )}
           {children}
         </div>
       </main>
@@ -592,11 +618,110 @@ export default function AppShell({ panel, children }: AppShellProps) {
       <CommandPalette
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
-        orgRoleKey={orgRoleKey}
-        isSuperAdmin={isSuperAdmin}
+        user={user}
         onToggleDark={toggleDarkMode}
         onLogout={handleLogout}
       />
+    </div>
+  );
+}
+
+function PanelAccessDenied({
+  panelMeta,
+  user,
+  homeUrlAbsolute,
+  roleLabel,
+  allowedPanels,
+  onLogout,
+}: {
+  panelMeta: PanelMeta;
+  user: User;
+  /** URL absoluta del panel home del usuario (puede ser cross-subdomain). */
+  homeUrlAbsolute: string;
+  roleLabel: string;
+  allowedPanels: PanelMeta[];
+  onLogout: () => void;
+}) {
+  // Auto-redirect al panel correcto después de 4 segundos.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      window.location.assign(homeUrlAbsolute);
+    }, 4000);
+    return () => clearTimeout(t);
+  }, [homeUrlAbsolute]);
+
+  return (
+    <div
+      className={styles.shell}
+      style={{ "--panel-accent": panelMeta.accent } as React.CSSProperties}
+      data-auth-state="panel-denied"
+    >
+      <main className={styles.main}>
+        <div
+          className={styles.contentInner}
+          style={{
+            minHeight: "70vh",
+            display: "grid",
+            placeItems: "center",
+            padding: 24,
+          }}
+        >
+          <div style={{ textAlign: "center", maxWidth: 480 }}>
+            <div style={{ fontSize: 40, marginBottom: 14 }}>🚫</div>
+            <div style={{ fontWeight: 700, fontSize: 20, color: "var(--text-primary)", marginBottom: 8 }}>
+              No tienes acceso a este panel
+            </div>
+            <div style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.55, marginBottom: 20 }}>
+              Estás autenticado como <strong>{user.nombre || user.email}</strong>
+              {roleLabel ? <> ({roleLabel})</> : null}. Tu rol no incluye módulos en{" "}
+              <strong>{panelMeta.name.replace(/^NEXARA\s+/i, "")}</strong>.
+              <br />
+              <span style={{ fontSize: 12.5, opacity: 0.75 }}>
+                Serás redirigido a tu panel en unos segundos…
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+              {/* Anchor nativo — necesario para navegar cross-subdomain */}
+              <a
+                href={homeUrlAbsolute}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 10,
+                  background: "var(--primary)",
+                  color: "#fff",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  textDecoration: "none",
+                }}
+              >
+                Ir a mi panel ({allowedPanels[0]?.name.replace(/^NEXARA\s+/i, "") ?? "inicio"})
+              </a>
+              <button
+                type="button"
+                onClick={onLogout}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 10,
+                  border: "1px solid var(--nx-panel-hairline)",
+                  background: "var(--surface)",
+                  color: "var(--text-primary)",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Cerrar sesión
+              </button>
+            </div>
+            {allowedPanels.length > 1 && (
+              <div style={{ marginTop: 22, fontSize: 12.5, color: "var(--text-tertiary)" }}>
+                Paneles disponibles:{" "}
+                {allowedPanels.map((p) => p.name.replace(/^NEXARA\s+/i, "")).join(" · ")}
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
     </div>
   );
 }
@@ -640,7 +765,16 @@ const MODULES_BY_URL: Map<string, ModuleEntry> = (() => {
  * usa su `label` y `icon` canónicos. Para segmentos genéricos, se humaniza
  * el slug con un diccionario de tecnicismos (NOC, SLA, KPIs, AI, etc.).
  */
-function Breadcrumbs({ panel, pathname }: { panel: PanelId; pathname: string }) {
+function Breadcrumbs({
+  panel,
+  pathname,
+  panelHome,
+}: {
+  panel: PanelId;
+  pathname: string;
+  panelHome: string | null;
+}) {
+  const homeHref = panelHome ?? `/${panel}/dashboard`;
   const segments = pathname
     .split("/")
     .filter(Boolean)
@@ -657,7 +791,7 @@ function Breadcrumbs({ panel, pathname }: { panel: PanelId; pathname: string }) 
   const accumulated: string[] = [];
   return (
     <div className={styles.breadcrumbs}>
-      <Link href={`/${panel}${PANEL_META[panel].entryPath}`}>{PANEL_META[panel].name}</Link>
+      <Link href={homeHref}>{PANEL_META[panel].name}</Link>
       {segments.map((seg, idx) => {
         accumulated.push(seg);
         const isLast = idx === segments.length - 1;

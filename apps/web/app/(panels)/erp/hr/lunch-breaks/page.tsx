@@ -8,7 +8,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getAttendanceViewMode } from "@/lib/user-access";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface LunchBreak {
@@ -36,7 +36,8 @@ function durationMinutes(start: string, end?: string | null): number | null {
 
 export default function LunchBreaksPage() {
   const { user } = useUser();
-  const { canViewAll } = useRbacGuard();
+  const viewMode = useMemo(() => getAttendanceViewMode(user), [user]);
+  const canViewAll = viewMode !== "register";
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<LunchBreak[]>([]);

@@ -40,6 +40,26 @@ export class VentasService {
     return isSalesTeamLeadUser(user);
   }
 
+  /**
+   * Devuelve true si el usuario debe ver métricas del equipo completo.
+   * Cubre tanto roles legacy (v1) como v2 (roleKey).
+   * - SuperAdmin / Console admin / Sales team lead → team view
+   * - v2 tier >= 70 (coord_ventas, coordinadores, directores, CEO) → team view
+   * - Resto (vendedor, etc.) → solo sus propios registros
+   */
+  private isSalesTeamManager(user?: any): boolean {
+    if (!user) return false;
+    if (this.isSuperAdminUser(user)) return true;
+    if (this.isConsoleAdminUser(user)) return true;
+    // v2 role check: coord_ventas y cualquier rol de tier >= 70
+    const V2_MANAGER_ROLES = new Set([
+      'ceo', 'dir_admin', 'dir_operaciones', 'arquitecto',
+      'coord_ventas', 'coord_operaciones', 'coord_admin',
+    ]);
+    if (user.roleKey && V2_MANAGER_ROLES.has(user.roleKey)) return true;
+    return false;
+  }
+
   private canAccessOwner(user: any, ownerId?: number | null) {
     if (!ownerId) return true;
     if (this.isSuperAdminUser(user)) return true;
@@ -1889,8 +1909,10 @@ export class VentasService {
       startDate.setMonth(0, 1);
     }
 
-    // Get closed projects and sales
-    const ownerFilter = !this.isSuperAdminUser(user) && user?.id ? { owner: { id: user.id } } : undefined;
+    // Managers y roles de jerarquía superior ven métricas del equipo completo.
+    // Vendedores individuales (v2: 'vendedor') ven solo sus propios registros.
+    const isManager = this.isSalesTeamManager(user);
+    const ownerFilter = !isManager && user?.id ? { owner: { id: user.id } } : undefined;
 
     const projects = await this.prisma.salesProject.findMany({
       where: {
@@ -1922,7 +1944,7 @@ export class VentasService {
     const clients = await this.prisma.salesClient.findMany({
       where: {
         createdAt: { gte: startDate },
-        ...(ownerFilter ? { ownerId: user.id } : {}),
+        ...(!isManager && user?.id ? { ownerId: user.id } : {}),
       },
     });
 
@@ -2099,7 +2121,8 @@ export class VentasService {
 
   async getExecutiveInsights(period: 'week' | 'month' | 'year', user?: any) {
     const startDate = this.getPeriodStart(period);
-    const ownerFilter = !this.isSuperAdminUser(user) && user?.id ? { ownerId: user.id } : undefined;
+    const isManager = this.isSalesTeamManager(user);
+    const ownerFilter = !isManager && user?.id ? { ownerId: user.id } : undefined;
     const now = new Date();
     const recentActivityStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
@@ -2346,7 +2369,8 @@ export class VentasService {
 
   async getManagerCockpit(period: 'week' | 'month' | 'year', user?: any) {
     const startDate = this.getPeriodStart(period);
-    const ownerFilter = !this.isSuperAdminUser(user) && user?.id ? { ownerId: user.id } : undefined;
+    const isManager = this.isSalesTeamManager(user);
+    const ownerFilter = !isManager && user?.id ? { ownerId: user.id } : undefined;
     const now = new Date();
     const recentActivityStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 

@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import KpiCard from "@/components/ui/KpiCard";
 import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface SocialPost {
@@ -48,7 +48,7 @@ const EMPTY_FORM = { red: "Instagram", titulo: "", contenido: "", cuando: "", es
 
 export default function StudioSocialPage() {
   const { user } = useUser();
-  const { canCreate, canEdit, canDelete } = useRbacGuard();
+  const cfg = useMemo(() => getStudioSectionConfig(user, "social"), [user]);
   const token = user?.token ?? "";
 
   const [items, setItems]     = useState<SocialPost[]>([]);
@@ -144,7 +144,7 @@ export default function StudioSocialPage() {
         title="Redes sociales"
         subtitle="Calendario editorial y posts programados para las cuentas de NEXARA."
         actions={
-          canCreate ? <Button variant="primary" iconLeft="✏️" onClick={openNew}>Crear post</Button> : undefined
+          cfg.canCreate ? <Button variant="primary" iconLeft="✏️" onClick={openNew}>Crear post</Button> : undefined
         }
       />
 
@@ -226,8 +226,8 @@ export default function StudioSocialPage() {
                 >
                   {["Borrador", "Programado", "Publicado", "Cancelado"].map(s => <option key={s}>{s}</option>)}
                 </select>
-                {canEdit && <button onClick={() => openEdit(p)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>}
-                {canDelete && <button onClick={() => remove(p.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--danger)", padding: "4px 6px" }}>✕</button>}
+                {cfg.canEdit && <button onClick={() => openEdit(p)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>}
+                {cfg.canDelete && <button onClick={() => remove(p.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--danger)", padding: "4px 6px" }}>✕</button>}
               </article>
             ))}
           </div>

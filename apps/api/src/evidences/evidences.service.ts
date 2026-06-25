@@ -93,27 +93,40 @@ export class EvidencesService {
     return Boolean(user.permissions?.includes(permission));
   }
 
+  /** Roles v2 que tienen scope de equipo en evidencias (equivalente a CONSOLE_ADMIN legacy). */
+  private static readonly V2_EVIDENCES_MANAGER_ROLES = new Set([
+    'ceo', 'dir_admin', 'dir_operaciones', 'arquitecto',
+    'coord_operaciones', 'coord_admin',
+  ]);
+
+  private isEvidencesManager(user: { permissions?: string[]; isSuperAdmin?: boolean; roleKey?: string }): boolean {
+    if (user.isSuperAdmin) return true;
+    if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) return true;
+    return Boolean(user.roleKey && EvidencesService.V2_EVIDENCES_MANAGER_ROLES.has(user.roleKey));
+  }
+
   private async getAccessibleUserIds(currentUser: {
     id: number;
     departmentId: number;
     permissions?: string[];
     isSuperAdmin?: boolean;
+    roleKey?: string;
   }) {
     if (currentUser.isSuperAdmin) {
       // Superadmin: ve todos EXCEPTO otros superadmins
-      const users = await this.prisma['user'].findMany({ 
+      const users = await this.prisma['user'].findMany({
         where: {
           email: {
             notIn: ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'],
           },
         },
-        select: { id: true } 
+        select: { id: true }
       });
       return users.map((u) => u.id);
     }
 
-    if (this.hasPermission(currentUser, PERMISSIONS.CONSOLE_ADMIN)) {
-      // Admin consola: ve a él mismo + usuarios normales sin accesoConsoleAdmin
+    if (this.isEvidencesManager(currentUser)) {
+      // Admin consola o manager v2: ve a él mismo + usuarios normales sin accesoConsoleAdmin
       const users = await this.prisma['user'].findMany({
         where: {
           departmentId: currentUser.departmentId,
@@ -146,6 +159,7 @@ export class EvidencesService {
     departmentId: number;
     permissions?: string[];
     isSuperAdmin?: boolean;
+    roleKey?: string;
   }, query?: PaginationQueryDto) {
     const userIds = await this.getAccessibleUserIds(currentUser);
     const where = { userId: { in: userIds } };

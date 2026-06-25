@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
-import { resolveOrgRoleKey } from "@/lib/org-roles";
+import { getActivitiesSectionConfig } from "@/lib/section-views";
 
 interface Activity {
   id: number;
@@ -50,41 +52,40 @@ const inp: React.CSSProperties = {
   fontSize: 13, boxSizing: "border-box",
 };
 
-function useOpsPermissions() {
+function useActivitiesConfig() {
   const { user } = useUser();
-  const nivel = user?.nivelAutoridad ?? 0;
-  const orgKey = resolveOrgRoleKey(user?.role ?? "", user?.orgRoleKey);
-  const isSuperOrCeo = user?.isSuperAdmin || nivel >= 5;
-  const isManager = isSuperOrCeo || nivel >= 4 ||
-    orgKey === "director_ops" || orgKey === "project_manager" || (orgKey as string) === "arquitecto";
-  return {
-    canCreate: nivel >= 2 || isManager,
-    canEdit:   nivel >= 3 || isManager,
-    canDelete: isSuperOrCeo || nivel >= 4,
-    canApproveEvidence: isManager,
-    isManager,
-  };
+  return useMemo(() => getActivitiesSectionConfig(user), [user]);
 }
 
 type TabId = "actividades" | "evidencias";
 
 export default function ActivitiesPage() {
   const { user } = useUser();
+  const router = useRouter();
   const token = user?.token ?? "";
-  const perms = useOpsPermissions();
+  const cfg = useActivitiesConfig();
 
-  // Ingenieros de campo ven solo sus propias actividades por defecto.
-  // Managers pueden alternar entre "mis actividades" y "todas".
-  const [showOnlyMine, setShowOnlyMine] = useState(!perms.isManager);
+  useEffect(() => {
+    if (cfg.viewMode === "execute") {
+      router.replace("/ops/my-activities");
+    }
+  }, [cfg.viewMode, router]);
 
-  const [tab, setTab]           = useState<TabId>("actividades");
-  const [items, setItems]       = useState<Activity[]>([]);
-  const [loading, setLoading]   = useState(true);
+  const [showOnlyMine, setShowOnlyMine] = useState(
+    cfg.viewMode === "manage_execute" ? false : cfg.defaultScope === "self",
+  );
+  const [tab, setTab] = useState<TabId>("actividades");
+  const [items, setItems] = useState<Activity[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing]   = useState<Activity | null>(null);
-  const [form, setForm]         = useState({ ...emptyForm });
-  const [evids, setEvids]         = useState<Evidence[]>([]);
+  const [editing, setEditing] = useState<Activity | null>(null);
+  const [form, setForm] = useState({ ...emptyForm });
+  const [evids, setEvids] = useState<Evidence[]>([]);
   const [evLoading, setEvLoading] = useState(false);
+
+  const canToggleScope = cfg.viewMode === "manage_execute";
+  // Derivado de cfg — evita referencias a `perms` que quedaron del refactor anterior
+  const isManager = cfg.viewMode !== "execute";
 
   const loadActivities = useCallback(async () => {
     if (!token) return;
@@ -161,7 +162,11 @@ export default function ActivitiesPage() {
   };
 
   const actColumns: Column<Activity>[] = [
-    { key: "anNumber", label: "OT", render: (a) => <Tag variant="accent">{a.anNumber ?? `ACT-${a.id}`}</Tag>, width: 100 },
+    { key: "anNumber", label: "OT", render: (a) => (
+      <Link href={`/ops/activities/${a.id}`} style={{ textDecoration: "none" }}>
+        <Tag variant="accent">{a.anNumber ?? `ACT-${a.id}`}</Tag>
+      </Link>
+    ), width: 100 },
     { key: "clienteNombre", label: "Cliente / Proyecto", render: (a) => (
       <div>
         <div style={{ fontWeight: 700, fontSize: 13 }}>{a.clienteNombre ?? "—"}</div>
@@ -171,7 +176,7 @@ export default function ActivitiesPage() {
     { key: "assignedUser", label: "Ingeniero", accessor: (a) => a.assignedUser?.nombre ?? "Sin asignar", width: 140 },
     { key: "fechaProgramada", label: "Fecha", accessor: (a) => a.fechaProgramada ? new Date(a.fechaProgramada).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "—", width: 100 },
     { key: "estado", label: "Estado", render: (a) => (
-      perms.canEdit ? (
+      cfg.canEdit ? (
         <select value={a.estado ?? "PROGRAMADA"} onChange={(e) => patchEstado(a.id, e.target.value)}
           style={{ fontSize: 12, border: "1px solid var(--border)", borderRadius: 6, padding: "3px 6px", background: "var(--surface)", color: "var(--foreground)", cursor: "pointer" }}>
           {ESTADOS.map(s => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
@@ -182,11 +187,11 @@ export default function ActivitiesPage() {
         </Tag>
       )
     ), width: 150 },
-    ...(perms.canEdit ? [{
+    ...(cfg.canEdit ? [{
       key: "id" as const, label: "" as const, render: (a: Activity) => (
         <div style={{ display: "flex", gap: 4 }}>
           <button onClick={() => openEdit(a)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>
-          {perms.canDelete && (
+          {cfg.canDelete && (
             <button onClick={() => remove(a.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>
           )}
         </div>
@@ -210,7 +215,7 @@ export default function ActivitiesPage() {
         <Tag variant={e.estado === "APROBADA" ? "positive" : e.estado === "RECHAZADA" ? "danger" : "warning"}>
           {(e.estado ?? "—").replace(/_/g, " ")}
         </Tag>
-        {perms.canApproveEvidence && e.estado === "PENDIENTE_REVISION" && (
+        {cfg.canApprove && e.estado === "PENDIENTE_REVISION" && (
           <>
             <button onClick={() => patchEvState(e.id, "APROBADA")}  style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>✓</button>
             <button onClick={() => patchEvState(e.id, "RECHAZADA")} style={{ fontSize: 11, background: "var(--danger)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>✕</button>
@@ -218,7 +223,7 @@ export default function ActivitiesPage() {
         )}
       </div>
     ), width: 220 },
-    ...(perms.canDelete ? [{
+    ...(cfg.canDelete ? [{
       key: "id" as const, label: "" as const,
       render: (e: Evidence) => (
         <button onClick={() => removeEvidence(e.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 8px" }}>✕</button>
@@ -248,15 +253,17 @@ export default function ActivitiesPage() {
     fontFamily: "inherit",
   });
 
+  if (cfg.viewMode === "execute") return null;
+
   return (
     <>
       <PageHeader
         eyebrow="OPS · Campo"
-        title="Actividades y Evidencias"
-        subtitle="Órdenes de trabajo activas y revisión de evidencias en una sola vista."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={
           <>
-            {tab === "actividades" && perms.canCreate && (
+            {tab === "actividades" && cfg.canCreate && (
               <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva OT</Button>
             )}
             {tab === "evidencias" && (
@@ -278,7 +285,7 @@ export default function ActivitiesPage() {
           )}
         </button>
         {/* Managers pueden alternar entre su vista y la de todo el equipo */}
-        {perms.isManager && (
+        {canToggleScope && (
           <div style={{ marginLeft: "auto", display: "flex", gap: 6, padding: "0 0 8px" }}>
             <button
               onClick={() => setShowOnlyMine(true)}
@@ -305,9 +312,9 @@ export default function ActivitiesPage() {
           </div>
         )}
         {/* Ingenieros de campo: siempre ven solo las suyas */}
-        {!perms.isManager && (
+        {!canToggleScope && (
           <span style={{ marginLeft: "auto", padding: "0 12px 8px", fontSize: 11, color: "var(--text-tertiary)" }}>
-            👤 Solo tus actividades asignadas
+            👥 Vista del equipo completo
           </span>
         )}
       </div>
@@ -346,7 +353,7 @@ export default function ActivitiesPage() {
               </div>
             </div>
           )}
-          <Section title={loading ? "Cargando…" : `${visibleItems.length} órdenes de trabajo${showOnlyMine && perms.isManager ? " (tuyas)" : ""}`}>
+          <Section title={loading ? "Cargando…" : `${visibleItems.length} órdenes de trabajo${showOnlyMine && canToggleScope ? " (tuyas)" : ""}`}>
             {loading ? (
               <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
             ) : (
@@ -357,7 +364,7 @@ export default function ActivitiesPage() {
       )}
 
       {tab === "evidencias" && (
-        <Section title={evLoading ? "Cargando…" : `${visibleEvids.length} evidencias${showOnlyMine && perms.isManager ? " (tuyas)" : ""}`}>
+        <Section title={evLoading ? "Cargando…" : `${visibleEvids.length} evidencias${showOnlyMine && canToggleScope ? " (tuyas)" : ""}`}>
           {evLoading ? (
             <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
           ) : (

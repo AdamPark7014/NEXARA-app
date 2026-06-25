@@ -1,82 +1,98 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
-import { buildApiUrl } from "@/lib/api-base";
-
-interface Quote {
-  id: number;
-  folio?: string;
-  concepto?: string;
-  montoTotal?: number;
-  estado?: string;
-  fechaEmision?: string;
-  vigencia?: string;
-  cliente?: { razonSocial?: string };
-  createdBy?: { nombre?: string };
-}
-
-const ESTADOS = ["Borrador", "Enviada", "Firmada", "Rechazada", "Vencida"];
-
-async function apiFetch(path: string, token: string, opts?: RequestInit) {
-  const res = await fetch(buildApiUrl(path), {
-    ...opts,
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(opts?.headers ?? {}) },
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
+import { getCrmSalesSectionConfig } from "@/lib/section-views";
+import { formatQuoteStatus, listSalesQuotes, type SalesQuote } from "@/lib/sales-api";
 
 export default function QuotesPage() {
   const { user } = useUser();
+  const cfg = useMemo(() => getCrmSalesSectionConfig(user, "quotes"), [user]);
   const token = user?.token ?? "";
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
 
-  const [items, setItems] = useState<Quote[]>([]);
+  const [items, setItems] = useState<SalesQuote[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     try {
-      const data = await apiFetch("ventas/cotizaciones", token);
-      setItems(Array.isArray(data) ? data : (data.data ?? []));
-    } catch { /* skip */ } finally { setLoading(false); }
+      setItems(await listSalesQuotes(token));
+    } catch {
+      /* skip */
+    } finally {
+      setLoading(false);
+    }
   }, [token]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const total = items.reduce((s, q) => s + (q.montoTotal ?? 0), 0);
-  const firmadas = items.filter(q => q.estado === "Firmada").reduce((s, q) => s + (q.montoTotal ?? 0), 0);
-  const pendientes = items.filter(q => ["Borrador", "Enviada"].includes(q.estado ?? "")).length;
+  const visible = useMemo(() => {
+    let rows = items;
+    if (highlightId) {
+      const id = Number(highlightId);
+      if (!Number.isNaN(id)) {
+        rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+      }
+    }
+    return rows;
+  }, [items, highlightId]);
 
-  const estadoVariant = (e?: string): "accent" | "warning" | "neutral" | "danger" =>
-    e === "Firmada" ? "neutral" : e === "Rechazada" || e === "Vencida" ? "danger" : e === "Enviada" ? "accent" : "warning";
+  const total = visible.reduce((s, q) => s + Number(q.total ?? 0), 0);
+  const firmadas = visible.filter((q) => q.status === "APPROVED").reduce((s, q) => s + Number(q.total ?? 0), 0);
+  const pendientes = visible.filter((q) => ["DRAFT", "SENT"].includes(q.status ?? "")).length;
 
-  const columns: Column<Quote>[] = [
-    { key: "folio", label: "Folio", render: q => <code style={{ fontSize: 11.5 }}>{q.folio ?? `COT-${q.id}`}</code>, width: 120 },
-    { key: "cliente", label: "Cliente / Concepto", render: q => (
-      <div>
-        <div style={{ fontWeight: 700, fontSize: 13 }}>{q.cliente?.razonSocial ?? "—"}</div>
-        <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{q.concepto?.slice(0, 50)}</div>
-      </div>
-    )},
-    { key: "montoTotal", label: "Monto", render: q => <Money value={q.montoTotal ?? 0} />, width: 120 },
-    { key: "estado", label: "Estado", render: q => <Tag variant={estadoVariant(q.estado)}>{q.estado ?? "—"}</Tag>, width: 100 },
-    { key: "fechaEmision", label: "Emitida", accessor: q => q.fechaEmision ? new Date(q.fechaEmision).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "—", width: 90 },
-    { key: "createdBy", label: "Ejecutivo", accessor: q => q.createdBy?.nombre ?? "—", width: 130 },
+  const estadoVariant = (status?: string): "accent" | "warning" | "neutral" | "danger" =>
+    status === "APPROVED" ? "neutral" : status === "SENT" ? "accent" : "warning";
+
+  const columns: Column<SalesQuote>[] = [
+    {
+      key: "quoteNumber",
+      label: "Folio",
+      render: (q) => (
+        <Link href={`/crm/quotes/${q.id}`} style={{ fontSize: 11.5, color: "var(--primary)", fontWeight: 600, textDecoration: "none" }}>
+          <code>{q.quoteNumber ?? `COT-${q.id}`}</code>
+        </Link>
+      ),
+      width: 120,
+    },
+    {
+      key: "clientName",
+      label: "Cliente / Proyecto",
+      render: (q) => (
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 13 }}>{q.clientCompany ?? q.clientName ?? "—"}</div>
+          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{q.projectName?.slice(0, 50)}</div>
+        </div>
+      ),
+    },
+    { key: "total", label: "Monto", render: (q) => <Money value={Number(q.total ?? 0)} />, width: 120 },
+    { key: "status", label: "Estado", render: (q) => <Tag variant={estadoVariant(q.status)}>{formatQuoteStatus(q.status)}</Tag>, width: 100 },
+    {
+      key: "issueDate",
+      label: "Emitida",
+      accessor: (q) => (q.issueDate ? new Date(q.issueDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "—"),
+      width: 90,
+    },
   ];
 
   return (
     <>
       <PageHeader
         eyebrow="CRM · Ventas"
-        title="Cotizaciones"
-        subtitle="Registro de propuestas comerciales emitidas. Para generar una nueva, hazlo desde una Oportunidad."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={<Button variant="ghost" onClick={load}>Actualizar</Button>}
       />
 
@@ -86,11 +102,22 @@ export default function QuotesPage() {
         <KpiCard label="Pendientes" value={pendientes} />
       </div>
 
-      <Section title={loading ? "Cargando…" : `${items.length} cotizaciones`}>
+      <Section title={loading ? "Cargando…" : `${visible.length} cotizaciones`}>
+        {highlightId && (
+          <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 12 }}>
+            Mostrando cotización <strong>#{highlightId}</strong> desde enlace directo.
+          </p>
+        )}
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
         ) : (
-          <DataTable columns={columns} rows={items} rowKey={q => q.id} emptyTitle="Sin cotizaciones" emptyDescription="Las cotizaciones se generan desde una oportunidad." />
+          <DataTable
+            columns={columns}
+            rows={visible}
+            rowKey={(q) => q.id}
+            emptyTitle="Sin cotizaciones"
+            emptyDescription="Las cotizaciones se generan desde una oportunidad."
+          />
         )}
       </Section>
     </>

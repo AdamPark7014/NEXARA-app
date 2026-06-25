@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
@@ -41,6 +42,7 @@ type DemoApproval = {
 type RealApproval = {
   id: string;
   approvalId: number;
+  instanceId: number;
   type: string;
   titulo: string;
   detalle: string;
@@ -139,6 +141,7 @@ const toApprovalRow = (approval: PendingApproval): RealApproval => {
   return {
     id: `AP-${approval.id}`,
     approvalId: approval.id,
+    instanceId: inst.id,
     type: labelForEntityType(inst.entityType),
     titulo: `${inst.workflow?.name ?? labelForEntityType(inst.entityType)} · #${inst.entityId}`,
     detalle: `Solicitud iniciada para ${labelForEntityType(inst.entityType)} #${inst.entityId}.`,
@@ -152,6 +155,9 @@ const toApprovalRow = (approval: PendingApproval): RealApproval => {
 
 export default function ApprovalsPage() {
   const { user } = useUser();
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
+  const highlightRef = useRef<HTMLDivElement | null>(null);
   const [filter, setFilter] = useState<"all" | "Alta" | "Media" | "Baja">("all");
   const [data, setData] = useState<ApprovalRow[]>(DEMO_APPROVALS);
   const [loading, setLoading] = useState(true);
@@ -193,9 +199,27 @@ export default function ApprovalsPage() {
   }, [user?.token]);
 
   const list = useMemo(() => {
-    if (filter === "all") return data;
-    return data.filter((a) => a.prioridad === filter);
-  }, [data, filter]);
+    let rows = filter === "all" ? data : data.filter((a) => a.prioridad === filter);
+    if (highlightId) {
+      const id = Number(highlightId);
+      if (!Number.isNaN(id)) {
+        rows = [...rows].sort((a, b) => {
+          const aHit = "instanceId" in a && a.instanceId === id;
+          const bHit = "instanceId" in b && b.instanceId === id;
+          if (aHit && !bHit) return -1;
+          if (!aHit && bHit) return 1;
+          return 0;
+        });
+      }
+    }
+    return rows;
+  }, [data, filter, highlightId]);
+
+  useEffect(() => {
+    if (highlightId && highlightRef.current) {
+      highlightRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [highlightId, list, loading]);
 
   const handleDecide = async (row: ApprovalRow, decision: "APPROVED" | "REJECTED") => {
     if (row.approvalId == null) {
@@ -329,12 +353,22 @@ export default function ApprovalsPage() {
         />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {list.map((a) => (
+          {highlightId && (
+            <p style={{ fontSize: 12, color: "var(--text-secondary)", margin: 0 }}>
+              Solicitud de workflow <strong>#{highlightId}</strong> desde enlace directo.
+            </p>
+          )}
+          {list.map((a) => {
+            const isHighlighted = Boolean(
+              highlightId && "instanceId" in a && a.instanceId === Number(highlightId),
+            );
+            return (
             <article
               key={a.id}
+              ref={isHighlighted ? highlightRef : undefined}
               style={{
-                background: "var(--surface)",
-                border: "1px solid var(--border)",
+                background: isHighlighted ? "color-mix(in srgb, var(--primary) 6%, var(--surface))" : "var(--surface)",
+                border: isHighlighted ? "2px solid var(--primary)" : "1px solid var(--border)",
                 borderRadius: 16,
                 padding: 18,
                 display: "grid",
@@ -588,7 +622,8 @@ export default function ApprovalsPage() {
                 </ol>
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
       )}
     </>

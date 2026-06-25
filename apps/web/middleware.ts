@@ -1,141 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-/**
- * Traduce segmentos legacy en español a sus equivalentes canónicos del
- * access-matrix (Fase 2.3 — consolidación a 5 paneles).
- *
- * Ejemplos:
- *   /crm/cotizaciones  →  /crm/quotes
- *   /crm/clientes      →  /crm/clients
- *   /ops/viaticos      →  /ops/viatics
- *   /erp/multas        →  /erp/hr/fines
- *   /erp/cvs           →  /ops/recruiting
- *
- * Esto evita romper enlaces externos viejos en correos, redes y bookmarks.
- */
-function remapLegacySlugs(pathname: string): string {
-  const SEGMENT_ALIASES: Record<string, string> = {
-    // CRM (español → inglés canónico)
-    cotizaciones: 'quotes',
-    plantillas: 'templates',
-    proyectos: 'projects',
-    licitaciones: 'tenders',
-    productos: 'products',
-    clientes: 'clients',
-    oportunidades: 'opportunities',
-    cuotas: 'targets',
-    reportes: 'reports',
-    'sales-team': 'team',
-    // OPS
-    viaticos: 'viatics',
-    'mis-viaticos': 'my-viatics',
-    'mis-actividades': 'my-activities',
-    'mis-evidencias': 'my-evidences',
-    'mis-vehiculos': 'my-vehicles',
-    vehiculos: 'vehicles',
-    actividades: 'activities',
-    evidencias: 'evidences',
-    herramientas: 'tools',
-    mantenimiento: 'maintenance',
-    monitoreo: 'noc',
-    soporte: 'support',
-    reclutamiento: 'recruiting',
-    'service-clients': 'service-clients',
-    // ERP / People
-    asistencia: 'attendance',
-    'mis-vacaciones': 'my-vacation',
-    multas: 'fines',
-    organigrama: 'orgchart',
-    'kpis-rh': 'kpis',
-    nomina: 'employee-payments',
-    gastos: 'expenses',
-    bancos: 'banking',
-    contabilidad: 'accounting',
-    facturacion: 'invoicing',
-    almacen: 'warehouse',
-    compras: 'procurement',
-    auditoria: 'audit',
-    documentos: 'documents',
-    exportaciones: 'exports',
-    notificaciones: 'notifications-center',
-    calendario: 'calendar',
-    'mi-perfil': 'my-profile',
-    'mi-equipo': 'team',
-    'mi-area': 'orgchart',
-    // Studio
-    paginas: 'pages',
-    casos: 'cases',
-    noticias: 'news',
-    redes: 'social',
-    contactos: 'contacts',
-    boletin: 'newsletter',
-    // Re-mapeos especiales: páginas que ya no existen en su carpeta antigua
-    cvs: 'recruiting', // gestión de CVs → reclutamiento técnico en OPS
-  };
-
-  // Re-mapeos cross-panel (cuando el path entero cambia de hogar)
-  const CROSS_PANEL_REMAPS: Array<[RegExp, string]> = [
-    // CVs (gestión de hojas de vida) ahora vive en OPS · Reclutamiento
-    [/^\/erp\/cvs(\/.*)?$/, '/ops/recruiting'],
-    [/^\/erp\/recruiting(\/.*)?$/, '/ops/recruiting'],
-    // Cotizaciones bajo ERP → CRM (es una vista comercial, no admin)
-    [/^\/erp\/cotizaciones(\/.*)?$/, '/crm/quotes'],
-    [/^\/erp\/quotes(\/.*)?$/, '/crm/quotes'],
-    // Multas en /erp/multas (legacy) → /erp/hr/fines
-    [/^\/erp\/multas(\/?.*)$/, '/erp/hr/fines'],
-    [/^\/erp\/fines(\/?.*)$/, '/erp/hr/fines'],
-    // Asistencia / vacaciones / kpis-rh sueltos → submódulo de hr
-    [/^\/erp\/asistencia(\/?.*)$/, '/erp/hr/attendance'],
-    [/^\/erp\/attendance(\/?.*)$/, '/erp/hr/attendance'],
-    [/^\/erp\/lunch-breaks(\/?.*)$/, '/erp/hr/lunch-breaks'],
-    [/^\/erp\/my-lunch-breaks(\/?.*)$/, '/erp/hr/lunch-breaks'],
-    [/^\/erp\/my-vacation(\/?.*)$/, '/erp/hr/attendance'],
-    [/^\/erp\/team(\/?.*)$/, '/erp/hr/orgchart'],
-    [/^\/erp\/my-area(\/?.*)$/, '/erp/hr/orgchart'],
-    // /erp/viaticos → /erp/finance/viatics
-    [/^\/erp\/viaticos(\/?.*)$/, '/erp/finance/viatics'],
-    [/^\/erp\/viatics(\/?.*)$/, '/erp/finance/viatics'],
-    // /erp/gastos → /erp/finance/expenses
-    [/^\/erp\/expenses(\/?.*)$/, '/erp/finance/expenses'],
-    [/^\/erp\/employee-payments(\/?.*)$/, '/erp/finance/employee-payments'],
-    // contact-messages legacy → studio/contacts
-    [/^\/erp\/contact-messages(\/?.*)$/, '/studio/contacts'],
-    // accounting/reports → solo /erp/accounting
-    [/^\/erp\/accounting\/reports(\/?.*)$/, '/erp/accounting'],
-    [/^\/erp\/procurement\/dashboard(\/?.*)$/, '/erp/procurement'],
-    // operacion/work-projects → ops/projects
-    [/^\/ops\/work-projects(\/?.*)$/, '/ops/projects'],
-    [/^\/ops\/assets\/depreciation(\/?.*)$/, '/ops/assets'],
-    // financial-dashboard → executive
-    [/^\/erp\/financial-dashboard(\/?.*)$/, '/erp/executive'],
-    // dashboard duplicados
-    [/^\/erp\/dashboard\/dashboard(\/?.*)$/, '/erp/dashboard'],
-    // Newsletter consolidada con comunicados en /erp/news (tabs)
-    [/^\/erp\/newsletter(\/?.*)$/, '/erp/news'],
-    // Stock visto dentro de Almacén (sin pestaña separada)
-    [/^\/erp\/warehouse\/stock(\/?.*)$/, '/erp/warehouse'],
-  ];
-
-  for (const [pattern, target] of CROSS_PANEL_REMAPS) {
-    const match = pathname.match(pattern);
-    if (match) {
-      const rest = match[1] || '';
-      return `${target}${rest && rest !== '/' ? rest : ''}`;
-    }
-  }
-
-  // Reemplazos de segmentos individuales
-  const segments = pathname.split('/').filter(Boolean);
-  if (segments.length < 2) return pathname;
-  const panel = segments[0];
-  if (!['erp', 'crm', 'ops', 'studio', 'lab'].includes(panel)) return pathname;
-
-  const remapped = segments.map((seg, idx) => {
-    if (idx === 0) return seg;
-    return SEGMENT_ALIASES[seg] || seg;
-  });
-  return '/' + remapped.join('/');
-}
+import { normalizeLegacyPath, remapLegacySlugs } from '@/lib/legacy-path-remap';
 
 /**
  * Middleware para manejar subdominios dinámicos
@@ -409,7 +273,7 @@ export function middleware(request: NextRequest) {
   // El portal cliente (`/tickets`) tiene su propio gate dentro del layout
   // porque permite registro/login desde la misma URL.
   if (request.method === 'GET' || request.method === 'HEAD') {
-    const isPanelPath = /^\/(erp|crm|ops|studio|lab|console|consola|contabilidad|people|operacion|noc|support|ventas|web)(\/.*)?$/.test(requestPathname);
+    const isPanelPath = /^\/(erp|crm|ops|studio|lab|core|sales|console|consola|contabilidad|people|operacion|noc|support|ventas|web)(\/.*)?$/.test(requestPathname);
     const accept = (request.headers.get('accept') || '').toLowerCase();
     const isHtmlNav = accept.includes('text/html');
     if (isPanelPath && isHtmlNav) {
@@ -454,41 +318,14 @@ export function middleware(request: NextRequest) {
   //   - lab            → lab  (mismo nombre, sin cambio)
   //   - tickets        → tickets  (portal externo, NO se toca)
   if (request.method === 'GET' || request.method === 'HEAD') {
-    const LEGACY_PREFIX_MAP: Array<[RegExp, string]> = [
-      // console y contabilidad → ambos viven dentro de /erp
-      [/^\/console(\/.*)?$/, '/erp'],
-      [/^\/contabilidad(\/.*)?$/, '/erp'],
-      // people → /erp/hr (RH consolidado bajo ERP)
-      [/^\/people\/?$/, '/erp/hr'],
-      [/^\/people(\/.*)$/, '/erp/hr'],
-      // operacion → /ops
-      [/^\/operacion(\/.*)?$/, '/ops'],
-      // noc legacy → /ops/noc (NOC ya es submódulo de OPS)
-      [/^\/noc\/?$/, '/ops/noc'],
-      [/^\/noc(\/.*)$/, '/ops/noc'],
-      // support legacy → /ops/support
-      [/^\/support\/?$/, '/ops/support'],
-      [/^\/support(\/.*)$/, '/ops/support'],
-      // ventas → /crm
-      [/^\/ventas(\/.*)?$/, '/crm'],
-      // web → /studio
-      [/^\/web(\/.*)?$/, '/studio'],
-    ];
-
-    for (const [pattern, newPrefix] of LEGACY_PREFIX_MAP) {
-      const match = requestPathname.match(pattern);
-      if (!match) continue;
-      const rest = match[1] || '';
-      // No redirigir cuando entramos por subdominio (rewrite interno);
-      // esos casos los maneja el bloque de subdominio más abajo.
+    const canonicalPath = normalizeLegacyPath(requestPathname);
+    if (canonicalPath !== requestPathname) {
       const url = request.nextUrl.clone();
-      url.pathname = `${newPrefix}${rest}`;
-      // Mapeos de slug específicos legacy → canónico nuevo
-      url.pathname = remapLegacySlugs(url.pathname);
+      url.pathname = canonicalPath;
       return applySecurityHeaders(NextResponse.redirect(url, 308));
     }
 
-    // ── Path ya nuevo pero con segmentos en español (p.ej. /crm/cotizaciones) ──
+    // Slug español en path ya canónico (/crm/cotizaciones → /crm/quotes)
     // Si después del remap el path cambia, hacemos redirect 308 al canónico.
     if (/^\/(erp|crm|ops|studio|lab)\//.test(requestPathname)) {
       const remapped = remapLegacySlugs(requestPathname);

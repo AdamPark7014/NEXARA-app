@@ -64,7 +64,7 @@ export class TicketAlertsService {
               message,
               entityType: 'Activity',
               relatedEntityId: activity.id,
-              relatedUrl: `/operacion/activities`,
+              relatedUrl: `/ops/activities`,
             })
             .catch((err) => this.logger.warn(`SLA notify: ${err?.message || err}`)),
         ),

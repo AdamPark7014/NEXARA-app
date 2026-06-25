@@ -1,5 +1,5 @@
 /**
- * Debe coincidir con `@media (max-width: 900px)` en `app/(subdomains)/console/console.module.css`
+ * Debe coincidir con `@media (max-width: 900px)` en estilos del drawer del sidebar.
  * para drawers laterales, overlay y `data-mobile` / `data-open` del sidebar de consola.
  * Mantener alineado con `apps/mobile/lib/panel-drawer-breakpoint.ts`.
  */

@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getViaticsSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface Viatic {
@@ -18,7 +20,8 @@ interface Viatic {
   fecha?: string;
   tipo?: string;
   user?: { nombre?: string };
-  activity?: { anNumber?: string };
+  activity?: { id?: number; anNumber?: string };
+  actividadId?: number;
 }
 
 const ESTADOS = ["PENDIENTE_COORD", "PENDIENTE_ADMIN", "APROBADO", "RECHAZADO"];
@@ -34,8 +37,15 @@ async function apiFetch(path: string, token: string, opts?: RequestInit) {
 
 export default function OpsViaticsPage() {
   const { user } = useUser();
-  const { canApprove } = useRbacGuard();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
+  const cfg = useMemo(() => getViaticsSectionConfig(user), [user]);
   const token = user?.token ?? "";
+
+  useEffect(() => {
+    if (cfg.viewMode === "execute") router.replace("/ops/my-viatics");
+  }, [cfg.viewMode, router]);
 
   const [items, setItems] = useState<Viatic[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,10 +73,25 @@ export default function OpsViaticsPage() {
   const totalAprobado = items.filter(v => v.estado === "APROBADO").reduce((s, v) => s + (v.monto ?? 0), 0);
   const totalPendiente = items.filter(v => v.estado?.startsWith("PENDIENTE")).reduce((s, v) => s + (v.monto ?? 0), 0);
 
+  const visibleItems = useMemo(() => {
+    if (!highlightId) return items;
+    const id = Number(highlightId);
+    if (Number.isNaN(id)) return items;
+    return [...items].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+  }, [items, highlightId]);
+
+  void ESTADOS; // used for future estado filter
+
   const columns: Column<Viatic>[] = [
     { key: "id", label: "ID", render: v => <Tag variant="accent">V-{v.id}</Tag>, width: 80 },
     { key: "user", label: "Ingeniero", accessor: v => v.user?.nombre ?? "—", width: 140 },
-    { key: "activity", label: "OT", accessor: v => v.activity?.anNumber ?? "—", width: 100 },
+    { key: "activity", label: "OT", render: v => {
+      const activityId = v.activity?.id ?? v.actividadId;
+      const label = v.activity?.anNumber ?? (activityId ? `ACT-${activityId}` : "—");
+      return activityId ? (
+        <Link href={`/ops/activities/${activityId}`} style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)", textDecoration: "none" }}>{label}</Link>
+      ) : label;
+    }, width: 100 },
     { key: "concepto", label: "Concepto", render: v => <span style={{ fontSize: 13 }}>{v.concepto ?? "—"}</span> },
     { key: "monto", label: "Monto", render: v => <Money value={v.monto ?? 0} />, width: 110 },
     { key: "fecha", label: "Fecha", accessor: v => v.fecha ? new Date(v.fecha).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "—", width: 90 },
@@ -75,13 +100,13 @@ export default function OpsViaticsPage() {
         <Tag variant={v.estado === "APROBADO" ? "neutral" : v.estado === "RECHAZADO" ? "danger" : "warning"}>
           {(v.estado ?? "—").replace(/_/g, " ")}
         </Tag>
-        {v.estado === "PENDIENTE_COORD" && canApprove && (
+        {v.estado === "PENDIENTE_COORD" && cfg.canApprove && (
           <>
             <button onClick={() => patchEstado(v.id, "PENDIENTE_ADMIN")} style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>✓ Coord</button>
             <button onClick={() => patchEstado(v.id, "RECHAZADO")} style={{ fontSize: 11, background: "var(--danger)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>✕</button>
           </>
         )}
-        {v.estado === "PENDIENTE_ADMIN" && canApprove && (
+        {v.estado === "PENDIENTE_ADMIN" && cfg.canApprove && (
           <>
             <button onClick={() => patchEstado(v.id, "APROBADO")} style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>✓ Admin</button>
             <button onClick={() => patchEstado(v.id, "RECHAZADO")} style={{ fontSize: 11, background: "var(--danger)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>✕</button>
@@ -95,8 +120,8 @@ export default function OpsViaticsPage() {
     <>
       <PageHeader
         eyebrow="OPS · Finanzas campo"
-        title="Viáticos"
-        subtitle="Gastos de campo: gasolina, casetas, comida, hospedaje. Aprobación de coordinador → administración."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={<Button variant="ghost" onClick={load}>Actualizar</Button>}
       />
 
@@ -106,11 +131,16 @@ export default function OpsViaticsPage() {
         <KpiCard label="Aprobado ($)" value={`$${(totalAprobado / 1000).toFixed(0)}k`} />
       </div>
 
-      <Section title={loading ? "Cargando…" : `${items.length} viáticos`}>
+      <Section title={loading ? "Cargando…" : `${visibleItems.length} viáticos`}>
+        {highlightId && (
+          <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
+            Mostrando viático <strong>#{highlightId}</strong> desde enlace directo.
+          </p>
+        )}
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
         ) : (
-          <DataTable columns={columns} rows={items} rowKey={v => v.id} emptyTitle="Sin viáticos" emptyDescription="No hay gastos de campo registrados." />
+          <DataTable columns={columns} rows={visibleItems} rowKey={v => v.id} emptyTitle="Sin viáticos" emptyDescription="No hay gastos de campo registrados." />
         )}
       </Section>
     </>

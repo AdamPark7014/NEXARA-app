@@ -8,7 +8,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface Payment {
@@ -40,7 +40,7 @@ const emptyForm = { userId: "", periodFrom: "", periodTo: "", amount: 0, note: "
 
 export default function EmployeePaymentsPage() {
   const { user } = useUser();
-  const { isDirector } = useRbacGuard();
+  const cfg = useMemo(() => getErpFinanceSectionConfig(user, "employee-payments"), [user]);
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<Payment[]>([]);
@@ -103,7 +103,7 @@ export default function EmployeePaymentsPage() {
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {isDirector && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Registrar pago</Button>}
+            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Registrar pago</Button>}
           </>
         }
       />

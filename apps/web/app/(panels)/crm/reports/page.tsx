@@ -9,6 +9,7 @@ import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
+import { useCrmManagerGuard } from "@/lib/useCrmManagerGuard";
 
 interface Metrics {
   totalRevenue: number;
@@ -42,6 +43,7 @@ type Period = "week" | "month" | "year";
 
 export default function ReportsPage() {
   const { user } = useUser();
+  const cfg = useCrmManagerGuard();
   const token = user?.token ?? "";
 
   const [period, setPeriod] = useState<Period>("month");
@@ -67,6 +69,8 @@ export default function ReportsPage() {
 
   useEffect(() => { void load(); }, [load]);
 
+  if (!cfg.canAccess) return null;
+
   const statusVariant = (s: string): "positive" | "warning" | "danger" =>
     s === "on-track" ? "positive" : s === "risk" ? "warning" : "danger";
 
@@ -82,8 +86,8 @@ export default function ReportsPage() {
     <>
       <PageHeader
         eyebrow="CRM · Equipo y métricas"
-        title="Reportes comerciales"
-        subtitle="Pipeline, conversión y desempeño por ejecutivo — para Dirección Comercial y CEO."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={
           <>
             <select value={period} onChange={(e) => setPeriod(e.target.value as Period)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}>

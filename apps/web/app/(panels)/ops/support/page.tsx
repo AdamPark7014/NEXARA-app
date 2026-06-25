@@ -7,7 +7,7 @@ import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface TicketRequest {
@@ -40,7 +40,8 @@ async function apiFetch(path: string, token: string, init: RequestInit = {}) {
 
 export default function SupportInboxPage() {
   const { user } = useUser();
-  const { canApprove, canViewAll } = useRbacGuard();
+  const cfg = useMemo(() => getOpsTeamSectionConfig(user, "support"), [user]);
+  const canViewAll = cfg.defaultScope === "team";
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<TicketRequest[]>([]);
@@ -114,7 +115,7 @@ export default function SupportInboxPage() {
     {
       key: "acciones" as keyof TicketRequest, label: "",
       render: (t) => (
-        canApprove ? (
+        cfg.canApprove ? (
           <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
             {t.status === "NEW" && (
               <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); void patchStatus(t, "ASSIGNED"); }}>Asignar</Button>
@@ -127,7 +128,7 @@ export default function SupportInboxPage() {
       ),
       width: 160,
     },
-  ], [canApprove]);
+  ], [cfg.canApprove]);
 
   return (
     <>

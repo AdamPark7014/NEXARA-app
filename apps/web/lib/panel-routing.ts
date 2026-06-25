@@ -1,6 +1,7 @@
 import { PERMISSIONS, hasAnyPermission, hasPermission, type UserPermissions } from "@/lib/permissions";
-import { ORG_ROLE_KEYS, resolveOrgRoleKey, type OrgRoleKey } from "@/lib/org-roles";
+import { ORG_ROLE_KEYS, resolveOrgRoleKey } from "@/lib/org-roles";
 import { getAllowedPanels, PANEL_META, LEGACY_PANEL_MAP, type PanelId, type PanelMeta } from "@/lib/access-matrix";
+import { getUserAllowedPanels } from "@/lib/user-access";
 
 export type PanelKey =
   | "console"
@@ -48,35 +49,35 @@ const PANEL_ORDER: MobilePanelOption[] = [
     icon: "⚙️",
     name: "Administración",
     description: "RRHH, finanzas, inventario, configuración y BI.",
-    entryPath: "/console/dashboard",
+    entryPath: "/erp/dashboard",
   },
   {
     key: "operacion",
     icon: "🚀",
     name: "Operación",
     description: "Helpdesk, instalaciones, activos y servicio en campo.",
-    entryPath: "/operacion/dashboard",
+    entryPath: "/ops/dashboard",
   },
   {
     key: "ventas",
     icon: "📈",
     name: "Ventas",
     description: "Pipeline comercial, leads y oportunidades.",
-    entryPath: "/ventas/dashboard",
+    entryPath: "/crm/dashboard",
   },
   {
     key: "contabilidad",
     icon: "💼",
     name: "Contabilidad",
     description: "Pagos, viáticos, horas y control financiero.",
-    entryPath: "/contabilidad/dashboard",
+    entryPath: "/erp/accounting",
   },
   {
     key: "web",
     icon: "🌐",
     name: "Web",
     description: "Gestión de contenido, clientes y proyectos web.",
-    entryPath: "/web/dashboard",
+    entryPath: "/studio/dashboard",
   },
   {
     key: "tickets",
@@ -90,21 +91,21 @@ const PANEL_ORDER: MobilePanelOption[] = [
     icon: "🆘",
     name: "Helpdesk Interno",
     description: "Tickets de IT, accesos y RH para el propio equipo Nexara.",
-    entryPath: "/support",
+    entryPath: "/ops/support",
   },
   {
     key: "noc",
     icon: "📡",
     name: "NOC · Monitoreo",
     description: "Uptime de cámaras, POS, IoT y alertas críticas 24/7.",
-    entryPath: "/noc",
+    entryPath: "/ops/noc",
   },
   {
     key: "people",
     icon: "👥",
     name: "People · RRHH",
     description: "Mi asistencia, vacaciones, organigrama y KPIs de RH.",
-    entryPath: "/people",
+    entryPath: "/erp/hr",
   },
   {
     key: "lab",
@@ -195,9 +196,13 @@ export const getAccessiblePanels = (
     ]) || orgKey === ORG_ROLE_KEYS.ACCOUNTANT || orgKey === ORG_ROLE_KEYS.DIRECTOR_ADMIN,
     web: hasPermission(user, PERMISSIONS.PANEL_WEB) || orgKey === ORG_ROLE_KEYS.DESIGNER,
     tickets: false,
-    // Paneles satélite: support y people son de acceso amplio (cualquier empleado).
-    support: hasPermission(user, PERMISSIONS.PANEL_SUPPORT) || true,
-    people: hasPermission(user, PERMISSIONS.PANEL_PEOPLE) || true,
+    // Paneles satélite: solo si el rol tiene permiso explícito.
+    support: hasPermission(user, PERMISSIONS.PANEL_SUPPORT)
+      || orgKey === ORG_ROLE_KEYS.SUPPORT_AGENT
+      || orgKey === ORG_ROLE_KEYS.MAINTENANCE_COORDINATOR,
+    people: hasPermission(user, PERMISSIONS.PANEL_PEOPLE)
+      || orgKey === ORG_ROLE_KEYS.HR_SPECIALIST
+      || orgKey === ORG_ROLE_KEYS.ADMIN_STAFF,
     // NOC: NOC team + dirección operaciones + senior eng + support agents
     noc: hasAnyPermission(user, [PERMISSIONS.PANEL_NOC, PERMISSIONS.NOC_VIEW, PERMISSIONS.CONSOLE_ADMIN])
       || orgKey === ORG_ROLE_KEYS.DIRECTOR_OPS || orgKey === ORG_ROLE_KEYS.NOC_LEAD
@@ -249,12 +254,9 @@ export const clearActivePanel = () => {
  * `PanelSwitcher` legacy, usa `getAccessiblePanels` arriba.
  */
 export const getAccessiblePanelsV2 = (
-  user: (UserPermissions & { role?: string; orgRoleKey?: string | null }) | null | undefined,
+  user: (UserPermissions & { role?: string; orgRoleKey?: string | null; roleKey?: string | null }) | null | undefined,
 ): PanelMeta[] => {
-  if (!user) return [];
-  const isSuperAdmin = Boolean(user.isSuperAdmin);
-  const roleKey = resolveOrgRoleKey(user.role, user.orgRoleKey);
-  return getAllowedPanels(roleKey, isSuperAdmin);
+  return getUserAllowedPanels(user);
 };
 
 /**

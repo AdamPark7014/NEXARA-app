@@ -268,6 +268,59 @@ export class AuthService {
     return Array.from(new Set(permissions));
   }
 
+  /**
+   * Enriquece la lista de permisos legacy con los que corresponden al
+   * `roleKey` v2 del usuario. Permite que v2 users sin flags de BD
+   * (accesoBI, accesoRRHH, etc.) accedan correctamente a los endpoints
+   * protegidos por `RbacGuard`.
+   */
+  private addV2RolePermissions(permissions: string[], roleKey: string | null | undefined): string[] {
+    if (!roleKey) return permissions;
+    const set = new Set(permissions);
+
+    // ── BI / Analytics ─────────────────────────────────────────────
+    const V2_BI_ROLES = new Set(['ceo', 'dir_admin', 'dir_operaciones', 'coord_ventas', 'coord_operaciones', 'coord_admin', 'arquitecto']);
+    if (V2_BI_ROLES.has(roleKey)) {
+      set.add(PERMISSIONS.BI_VIEW);
+      set.add(PERMISSIONS.BI_MANAGE);
+      set.add(PERMISSIONS.EXECUTIVE_DASHBOARD);
+    }
+
+    // ── RH / HR ────────────────────────────────────────────────────
+    const V2_HR_ROLES = new Set(['ceo', 'dir_admin', 'coord_admin']);
+    if (V2_HR_ROLES.has(roleKey)) {
+      set.add(PERMISSIONS.HR_VIEW);
+      set.add(PERMISSIONS.HR_MANAGE);
+      set.add(PERMISSIONS.HR_APPROVE_LEAVE);
+    }
+
+    // ── Contabilidad / Finanzas ─────────────────────────────────────
+    const V2_ACCOUNTING_ROLES = new Set(['ceo', 'dir_admin', 'coord_admin']);
+    if (V2_ACCOUNTING_ROLES.has(roleKey)) {
+      set.add(PERMISSIONS.CONTABILIDAD_VIEW);
+      set.add(PERMISSIONS.CONTABILIDAD_MANAGE);
+    }
+
+    // ── Actividades y evidencias (scope de equipo) ──────────────────
+    // Solo permisos específicos — no se otorga CONSOLE_ADMIN completo para evitar
+    // conceder USERS_MANAGE, ROLES_MANAGE, PANEL_VENTAS, etc.
+    const V2_OPS_MANAGER_ROLES = new Set(['ceo', 'dir_admin', 'dir_operaciones', 'arquitecto', 'coord_operaciones', 'coord_admin']);
+    if (V2_OPS_MANAGER_ROLES.has(roleKey)) {
+      set.add(PERMISSIONS.ACTIVITIES_MANAGE);
+      set.add(PERMISSIONS.ACTIVITIES_VIEW);
+      set.add(PERMISSIONS.ACTIVITIES_EXPORT);
+      set.add(PERMISSIONS.EVIDENCES_REVIEW);
+      set.add(PERMISSIONS.EVIDENCES_VIEW);
+      set.add(PERMISSIONS.VEHICLES_REVIEW);
+      set.add(PERMISSIONS.VEHICLES_INVENTORY);
+      set.add(PERMISSIONS.TOOLS_MANAGE);
+      set.add(PERMISSIONS.TOOLS_INVENTORY);
+      set.add(PERMISSIONS.VIATICS_MANAGE);
+    }
+
+    return Array.from(set);
+  }
+
   private pickRoleFlags(role: any) {
     if (!role) {
       return {
@@ -416,7 +469,10 @@ export class AuthService {
   async login(loginDto: LoginDto, req?: any) {
     const user = await this.validateUser(loginDto.email, loginDto.password);
     const isSuperAdmin = this.isSuperAdmin(user.email);
-    const permissions = this.buildPermissions(user.role, isSuperAdmin);
+    const permissions = this.addV2RolePermissions(
+      this.buildPermissions(user.role, isSuperAdmin),
+      user.roleKey,
+    );
     const userAgent = req?.headers?.['user-agent'] || req?.headers?.['User-Agent'];
     const detectedDevice = detectDeviceFromUserAgent(userAgent, req?.headers);
 

@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface JournalEntry {
@@ -37,8 +38,10 @@ const emptyForm = { description: "", type: "DIARIO", date: new Date().toISOStrin
 
 export default function AccountingPage() {
   const { user } = useUser();
-  const { canCreate, canApprove, isDirector } = useRbacGuard();
+  const cfg = useMemo(() => getErpFinanceSectionConfig(user, "accounting"), [user]);
   const token = user?.token ?? "";
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
 
   const [items, setItems] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,6 +93,13 @@ export default function AccountingPage() {
 
   const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface)", color: "var(--foreground)", fontSize: 13, boxSizing: "border-box" };
 
+  const visibleItems = useMemo(() => {
+    if (!highlightId) return items;
+    const id = Number(highlightId);
+    if (Number.isNaN(id)) return items;
+    return [...items].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+  }, [items, highlightId]);
+
   const columns: Column<JournalEntry>[] = [
     { key: "reference", label: "Referencia", render: e => <code style={{ fontSize: 11.5 }}>{e.reference ?? `P-${e.id}`}</code>, width: 130 },
     { key: "description", label: "Concepto", render: e => (
@@ -104,10 +114,10 @@ export default function AccountingPage() {
     { key: "status", label: "Estado", render: e => (
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <Tag variant={statusVariant(e.status)}>{e.status ?? "BORRADOR"}</Tag>
-        {(e.status === "DRAFT" || e.status === "BORRADOR") && canApprove && (
+        {(e.status === "DRAFT" || e.status === "BORRADOR") && cfg.canApprove && (
           <button onClick={() => postEntry(e.id)} style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>Contabilizar</button>
         )}
-        {(e.status === "POSTED" || e.status === "CONTABILIZADA") && isDirector && (
+        {(e.status === "POSTED" || e.status === "CONTABILIZADA") && cfg.canDelete && (
           <button onClick={() => reverseEntry(e.id)} style={{ fontSize: 11, background: "var(--danger)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>Reversar</button>
         )}
       </div>
@@ -120,7 +130,7 @@ export default function AccountingPage() {
         eyebrow="ERP · Finanzas"
         title="Contabilidad · Pólizas"
         subtitle="Libro diario de pólizas contables: ingresos, egresos, ajustes y diarios."
-        actions={canCreate ? <Button variant="primary" iconLeft="+" onClick={() => { setForm({ ...emptyForm }); setShowForm(true); }}>Nueva póliza</Button> : undefined}
+        actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={() => { setForm({ ...emptyForm }); setShowForm(true); }}>Nueva póliza</Button> : undefined}
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
@@ -160,11 +170,16 @@ export default function AccountingPage() {
         </div>
       )}
 
-      <Section title={loading ? "Cargando…" : `${items.length} pólizas`}>
+      <Section title={loading ? "Cargando…" : `${visibleItems.length} pólizas`}>
+        {highlightId && (
+          <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
+            Mostrando póliza <strong>#{highlightId}</strong> desde enlace directo.
+          </p>
+        )}
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
         ) : (
-          <DataTable columns={columns} rows={items} rowKey={e => e.id} emptyTitle="Sin pólizas" emptyDescription="Registra la primera póliza contable." />
+          <DataTable columns={columns} rows={visibleItems} rowKey={e => e.id} emptyTitle="Sin pólizas" emptyDescription="Registra la primera póliza contable." />
         )}
       </Section>
     </>

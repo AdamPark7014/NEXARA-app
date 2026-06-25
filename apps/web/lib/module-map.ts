@@ -397,36 +397,34 @@ export function getDownstream(moduleId: ModuleId): ModuleNode[] {
 }
 
 /**
- * Ruta principal de cada módulo (panel + path).
- * Usado por la paleta de comandos, la vista de arquitectura y cualquier
- * widget que muestre "Abrir módulo X". Single source of truth: no dupliques
- * este mapa en otros archivos.
+ * Ruta principal de cada módulo (panel canónico + path en `(panels)/*`).
+ * Usado por documentación interna y widgets de arquitectura.
  */
 export const MODULE_DEFAULT_ROUTE: Record<ModuleId, { panel: PanelSlug; path: string }> = {
-  crm: { panel: "ventas", path: "/crm" },
-  quotes: { panel: "ventas", path: "/cotizaciones" },
-  catalog: { panel: "ventas", path: "/productos" },
-  "sales-projects": { panel: "ventas", path: "/proyectos" },
-  "operational-projects": { panel: "operacion", path: "/projects" },
-  activities: { panel: "operacion", path: "/activities" },
-  evidences: { panel: "operacion", path: "/evidences" },
-  viatics: { panel: "operacion", path: "/viatics" },
-  vehicles: { panel: "operacion", path: "/vehicles" },
-  gps: { panel: "operacion", path: "/gps" },
-  warehouse: { panel: "console", path: "/warehouse" },
-  procurement: { panel: "console", path: "/procurement" },
-  maintenance: { panel: "operacion", path: "/maintenance" },
-  noc: { panel: "noc", path: "/" },
-  support: { panel: "support", path: "/" },
-  tickets: { panel: "tickets", path: "/" },
-  accounting: { panel: "contabilidad", path: "/accounting" },
-  invoicing: { panel: "contabilidad", path: "/invoicing" },
-  banking: { panel: "contabilidad", path: "/banking" },
-  hr: { panel: "console", path: "/hr" },
-  attendance: { panel: "console", path: "/attendance" },
-  documents: { panel: "console", path: "/documents" },
-  bi: { panel: "console", path: "/analytics/bi" },
-  web: { panel: "web", path: "/dashboard" },
+  crm: { panel: "ventas", path: "/crm/leads" },
+  quotes: { panel: "ventas", path: "/crm/quotes" },
+  catalog: { panel: "ventas", path: "/crm/products" },
+  "sales-projects": { panel: "ventas", path: "/crm/projects" },
+  "operational-projects": { panel: "operacion", path: "/ops/projects" },
+  activities: { panel: "operacion", path: "/ops/activities" },
+  evidences: { panel: "operacion", path: "/ops/evidences" },
+  viatics: { panel: "operacion", path: "/ops/viatics" },
+  vehicles: { panel: "operacion", path: "/ops/vehicles" },
+  gps: { panel: "operacion", path: "/ops/gps" },
+  warehouse: { panel: "console", path: "/erp/warehouse" },
+  procurement: { panel: "console", path: "/erp/procurement" },
+  maintenance: { panel: "operacion", path: "/ops/maintenance" },
+  noc: { panel: "noc", path: "/ops/noc" },
+  support: { panel: "support", path: "/ops/support" },
+  tickets: { panel: "tickets", path: "/tickets" },
+  accounting: { panel: "contabilidad", path: "/erp/accounting" },
+  invoicing: { panel: "contabilidad", path: "/erp/invoicing" },
+  banking: { panel: "contabilidad", path: "/erp/banking" },
+  hr: { panel: "console", path: "/erp/hr" },
+  attendance: { panel: "people", path: "/erp/hr/attendance" },
+  documents: { panel: "console", path: "/erp/documents" },
+  bi: { panel: "console", path: "/erp/analytics/bi" },
+  web: { panel: "web", path: "/studio/dashboard" },
 };
 
 /** Devuelve la ruta canónica de un módulo (panel + path). */

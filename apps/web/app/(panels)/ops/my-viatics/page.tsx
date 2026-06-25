@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -8,7 +9,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getViaticsSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface Viatico {
@@ -35,8 +36,13 @@ const emptyForm = { concepto: "", montoSolicitado: 0 };
 
 export default function MyViaticsPage() {
   const { user } = useUser();
-  const { canCreate } = useRbacGuard();
+  const router = useRouter();
+  const cfg = useMemo(() => getViaticsSectionConfig(user), [user]);
   const token = user?.token ?? "";
+
+  useEffect(() => {
+    if (cfg.viewMode === "manage") router.replace("/ops/viatics");
+  }, [cfg.viewMode, router]);
 
   const [items, setItems] = useState<Viatico[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,12 +99,12 @@ export default function MyViaticsPage() {
     <>
       <PageHeader
         eyebrow="OPS · Campo"
-        title="Mis viáticos"
-        subtitle="Solicita anticipos y revisa el estado de tus comprobaciones. Tu coordinador y administración aprueban el flujo."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Solicitar viático</Button>}
+            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Solicitar viático</Button>}
           </>
         }
       />

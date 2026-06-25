@@ -45,8 +45,8 @@ export class VehiclesController {
   async findAll(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
     if (user.isSuperAdmin) {
       return this.vehiclesService.findAll(query);
-    } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
-      // Admin consola: ve sus propios vehículos + vehículos de usuarios normales
+    } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) || user.permissions?.includes(PERMISSIONS.VEHICLES_REVIEW)) {
+      // Admin consola o manager v2: ve sus propios vehículos + vehículos de usuarios normales
       const allDeptUsers = await this.usersService.findByDepartment(user.departmentId);
       const allowedUserIds = [
         user.id,
@@ -134,7 +134,7 @@ export class VehiclesController {
 
     const record = await this.vehiclesService.findOne(+id);
     if (!record) throw new BadRequestException('Solicitud no encontrada');
-    if (!user.isSuperAdmin && !user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) && record.solicitanteId !== user.id) {
+    if (!user.isSuperAdmin && !user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) && !user.permissions?.includes(PERMISSIONS.VEHICLES_REVIEW) && record.solicitanteId !== user.id) {
       throw new ForbiddenException('No puedes modificar esta solicitud');
     }
 
@@ -175,7 +175,7 @@ export class VehiclesController {
   ) {
     const record = await this.vehiclesService.findOne(+id);
     if (!record) throw new BadRequestException('Solicitud no encontrada');
-    if (!user.isSuperAdmin && !user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) && record.solicitanteId !== user.id) {
+    if (!user.isSuperAdmin && !user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) && !user.permissions?.includes(PERMISSIONS.VEHICLES_REVIEW) && record.solicitanteId !== user.id) {
       throw new ForbiddenException('No puedes modificar esta solicitud');
     }
 
@@ -256,8 +256,8 @@ export class VehiclesController {
     let result: any;
     if (user.isSuperAdmin) {
       result = await this.vehiclesService.findAll();
-    } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
-      // Admin consola: ve sus propios vehículos + vehículos de usuarios normales
+    } else if (user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) || user.permissions?.includes(PERMISSIONS.VEHICLES_REVIEW)) {
+      // Admin consola o manager v2: ve sus propios vehículos + vehículos de usuarios normales
       const allDeptUsers = await this.usersService.findByDepartment(user.departmentId);
       const allowedUserIds = [
         user.id,

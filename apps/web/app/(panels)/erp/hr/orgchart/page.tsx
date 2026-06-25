@@ -5,7 +5,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { useHrManagementGuard } from "@/lib/useHrManagementGuard";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface OrgNode {
@@ -217,7 +217,7 @@ function Node({ node, depth = 0, allUsers, token, onRefresh, canEditOrg }: NodeP
 
 export default function OrgChartPage() {
   const { user } = useUser();
-  const { canManageUsers } = useRbacGuard();
+  const cfg = useHrManagementGuard();
   const token = user?.token ?? "";
 
   const [roots, setRoots]     = useState<OrgNode[]>([]);
@@ -247,7 +247,7 @@ export default function OrgChartPage() {
       <PageHeader
         eyebrow="ERP · Personas"
         title="Organigrama"
-        subtitle={canManageUsers ? "Jerarquía de reporte en NEXARA. Haz clic en ✎ en cualquier nodo para reasignar su manager." : "Jerarquía de reporte en NEXARA. Solo Dirección puede reasignar managers."}
+        subtitle={cfg.canAssign ? "Jerarquía de reporte en NEXARA. Haz clic en ✎ en cualquier nodo para reasignar su manager." : "Jerarquía de reporte en NEXARA. Solo Dirección puede reasignar managers."}
       />
 
       {error && (
@@ -278,7 +278,7 @@ export default function OrgChartPage() {
                 allUsers={allUsers}
                 token={token}
                 onRefresh={load}
-                canEditOrg={canManageUsers}
+                canEditOrg={cfg.canAssign}
               />
             ))}
           </div>

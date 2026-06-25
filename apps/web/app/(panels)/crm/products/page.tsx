@@ -8,73 +8,81 @@ import Button from "@/components/ui/Button";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { buildApiUrl } from "@/lib/api-base";
+import { listCatalogProducts, type CatalogProduct } from "@/lib/catalog-api";
 
-interface StockItem {
-  id: number;
-  sku?: string;
-  nombre?: string;
-  categoria?: string;
-  existencia?: number;
-  minimo?: number;
-  costo?: number;
-}
-
-async function apiFetch(path: string, token: string) {
-  const res = await fetch(buildApiUrl(path), { headers: { Authorization: `Bearer ${token}` } });
-  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
-  return res.json();
-}
-
-// Margen de venta sugerido sobre costo de almacén
 const MARGIN = 1.35;
+
+function stockTotal(p: CatalogProduct): number {
+  return (p.stockLevels ?? []).reduce((s, l) => s + Number(l.quantity ?? 0), 0);
+}
 
 export default function ProductsPage() {
   const { user } = useUser();
   const token = user?.token ?? "";
 
-  const [items, setItems] = useState<StockItem[]>([]);
+  const [items, setItems] = useState<CatalogProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
     if (!token) return;
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError(null);
     try {
-      const data = await apiFetch("warehouse", token);
-      setItems(Array.isArray(data) ? data : (data?.data ?? []));
+      const res = await listCatalogProducts(token, { take: 200 });
+      setItems(res.data ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar el catálogo");
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   }, [token]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return items;
-    return items.filter((p) => (p.nombre ?? "").toLowerCase().includes(q) || (p.sku ?? "").toLowerCase().includes(q));
+    return items.filter((p) => (p.name ?? "").toLowerCase().includes(q) || (p.sku ?? "").toLowerCase().includes(q));
   }, [items, search]);
 
-  const columns: Column<StockItem>[] = [
+  const columns: Column<CatalogProduct>[] = [
     { key: "sku", label: "SKU", render: (p) => <code style={{ fontSize: 11.5 }}>{p.sku ?? "—"}</code>, width: 120 },
     {
-      key: "nombre", label: "Producto",
+      key: "name",
+      label: "Producto",
       render: (p) => (
         <div>
-          <div style={{ fontWeight: 600, fontSize: 13 }}>{p.nombre ?? "—"}</div>
-          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{p.categoria ?? "—"}</div>
+          <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name ?? "—"}</div>
+          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{p.brand?.name ?? p.category ?? "—"}</div>
         </div>
       ),
     },
-    { key: "categoria", label: "Categoría", render: (p) => <Tag variant="default">{p.categoria ?? "—"}</Tag>, width: 120 },
-    { key: "precio" as keyof StockItem, label: "Precio sugerido", align: "right" as const, render: (p) => <Money value={(p.costo ?? 0) * MARGIN} />, width: 130 },
+    { key: "category", label: "Categoría", render: (p) => <Tag variant="default">{p.category ?? "—"}</Tag>, width: 120 },
     {
-      key: "existencia", label: "Stock", align: "center" as const,
+      key: "price",
+      label: "Precio lista",
+      align: "right",
+      render: (p) => <Money value={Number(p.price ?? 0)} />,
+      width: 110,
+    },
+    {
+      key: "suggested",
+      label: "Precio sugerido",
+      align: "right",
+      render: (p) => <Money value={Number(p.price ?? 0) * MARGIN} />,
+      width: 130,
+    },
+    {
+      key: "stock",
+      label: "Stock",
+      align: "center",
       render: (p) => {
-        const stock = p.existencia ?? 0;
-        return <Tag variant={stock === 0 ? "danger" : stock < (p.minimo ?? 0) ? "warning" : "positive"}>{stock}</Tag>;
+        const stock = stockTotal(p);
+        return <Tag variant={stock === 0 ? "danger" : stock < 5 ? "warning" : "positive"}>{stock}</Tag>;
       },
       width: 90,
     },
@@ -85,25 +93,30 @@ export default function ProductsPage() {
       <PageHeader
         eyebrow="CRM · Catálogo y clientes"
         title="Catálogo de productos y servicios"
-        subtitle="Maestro de SKUs vinculado al almacén de ERP. Precio sugerido = costo + margen estándar. Las cotizaciones se construyen desde este catálogo."
+        subtitle="Maestro de SKUs del catálogo comercial. El stock físico se gestiona en ERP › Almacén."
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
             <Link href="/erp/warehouse" style={{ textDecoration: "none" }}>
-              <Button variant="primary" iconLeft="📦">Gestionar en Almacén</Button>
+              <Button variant="primary" iconLeft="📦">Ver inventario</Button>
             </Link>
           </>
         }
       />
 
       <div style={{ marginBottom: 12 }}>
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por SKU o nombre…" style={{ width: "100%", maxWidth: 360, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }} />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por SKU o nombre…"
+          style={{ width: "100%", maxWidth: 360, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}
+        />
       </div>
 
-      <Section title={loading ? "Cargando…" : `${filtered.length} SKUs`} subtitle="Precio sugerido con margen estándar — ajusta en la cotización si aplica.">
-        {loading && <EmptyState icon="⏳" title="Cargando catálogo…" description="Consultando inventario del almacén." />}
+      <Section title={loading ? "Cargando…" : `${filtered.length} SKUs`}>
+        {loading && <EmptyState icon="⏳" title="Cargando catálogo…" description="Consultando productos." />}
         {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
-        {!loading && !error && <DataTable columns={columns} rows={filtered} rowKey={(p) => p.id} emptyTitle="Catálogo vacío" emptyDescription="Agrega productos desde ERP › Almacén." />}
+        {!loading && !error && <DataTable columns={columns} rows={filtered} rowKey={(p) => p.id} emptyTitle="Catálogo vacío" emptyDescription="Los productos se administran en el módulo de catálogo." />}
       </Section>
     </>
   );

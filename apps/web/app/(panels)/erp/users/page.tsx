@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -17,7 +18,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 
 /* ─── tipos ─────────────────────────────────────────────────────────── */
 interface ApiUser {
@@ -78,7 +79,9 @@ const emptyForm = { nombre: "", email: "", password: "", roleId: "", departmentI
 export default function UsersPage() {
   const { user: currentUser } = useUser();
   const token = currentUser?.token ?? "";
-  const perms = useRbacGuard();
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
+  const cfg = useMemo(() => getErpGovernanceSectionConfig(currentUser, "users"), [currentUser]);
 
   const [users,   setUsers]   = useState<ApiUser[]>([]);
   const [roles,   setRoles]   = useState<ApiRole[]>([]);
@@ -195,6 +198,13 @@ export default function UsersPage() {
     };
   }, [users]);
 
+  const visibleUsers = useMemo(() => {
+    if (!highlightId) return users;
+    const id = Number(highlightId);
+    if (Number.isNaN(id)) return users;
+    return [...users].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+  }, [users, highlightId]);
+
   /* ── columnas ────────────────────────────────────────────────────── */
   const columns: Column<ApiUser>[] = [
     {
@@ -218,13 +228,13 @@ export default function UsersPage() {
     { key: "lastLoginAt", label: "Último acceso",
       accessor: u => u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "Nunca",
       width: 130 },
-    ...(perms.canManageUsers ? [{
+    ...(cfg.canAssign ? [{
       key: "id" as const, label: "Acciones" as const,
       render: (u: ApiUser) => (
         <div style={{ display: "flex", gap: 4 }}>
           <button onClick={() => openEdit(u)} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, cursor: "pointer", fontSize: 11.5, padding: "3px 8px", color: "var(--text-secondary)" }}>✎ Editar</button>
           <button onClick={() => openPassword(u)} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, cursor: "pointer", fontSize: 11.5, padding: "3px 8px", color: "var(--text-secondary)" }}>🔑</button>
-          {perms.isDirector && (
+          {cfg.canApprove && (
             <button onClick={() => toggleActive(u)} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, cursor: "pointer", fontSize: 11.5, padding: "3px 8px", color: u.isActive ? "var(--danger)" : "var(--success)" }}>
               {u.isActive ? "✕ Des." : "✓ Act."}
             </button>
@@ -253,7 +263,7 @@ export default function UsersPage() {
         eyebrow="ERP · RRHH"
         title="Gestión de usuarios"
         subtitle="Administración de cuentas, roles, departamentos y contraseñas del equipo NEXARA."
-        actions={perms.canManageUsers ? <Button variant="primary" iconLeft="+" onClick={openCreate}>Nuevo usuario</Button> : undefined}
+        actions={cfg.canAssign ? <Button variant="primary" iconLeft="+" onClick={openCreate}>Nuevo usuario</Button> : undefined}
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 24 }}>
@@ -269,10 +279,15 @@ export default function UsersPage() {
         </div>
       )}
 
-      <Section title={loading ? "Cargando…" : `${users.length} usuarios`}>
+      <Section title={loading ? "Cargando…" : `${visibleUsers.length} usuarios`}>
+        {highlightId && (
+          <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
+            Mostrando usuario <strong>#{highlightId}</strong> desde enlace directo.
+          </p>
+        )}
         {loading
           ? <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
-          : <DataTable columns={columns} rows={users} rowKey={u => u.id} emptyTitle="Sin usuarios" emptyDescription="Crea el primer usuario con el botón +" />
+          : <DataTable columns={columns} rows={visibleUsers} rowKey={u => u.id} emptyTitle="Sin usuarios" emptyDescription="Crea el primer usuario con el botón +" />
         }
       </Section>
 

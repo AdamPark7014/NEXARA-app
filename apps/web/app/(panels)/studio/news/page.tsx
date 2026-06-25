@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface NewsPost {
@@ -30,7 +30,7 @@ async function apiFetch(path: string, token: string, init: RequestInit = {}) {
 
 export default function StudioNewsPage() {
   const { user } = useUser();
-  const { canCreate, canDelete } = useRbacGuard();
+  const cfg = useMemo(() => getStudioSectionConfig(user, "news"), [user]);
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<NewsPost[]>([]);
@@ -107,14 +107,14 @@ export default function StudioNewsPage() {
     },
     { key: "status", label: "Estado", render: (n) => <Tag variant={n.status === "PUBLISHED" ? "positive" : "warning"}>{n.status}</Tag>, width: 120 },
     { key: "publishedAt", label: "Publicado", render: (n) => <span style={{ fontSize: 12 }}>{n.publishedAt ? new Date(n.publishedAt).toLocaleDateString("es-MX") : "—"}</span>, width: 110 },
-    ...(canCreate ? [{
+    ...(cfg.canCreate ? [{
       key: "acciones" as keyof NewsPost, label: "",
       render: (n: NewsPost) => (
         <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
           <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); void togglePublish(n); }}>
             {n.status === "PUBLISHED" ? "Despublicar" : "Publicar"}
           </Button>
-          {canDelete && <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); void remove(n); }}>Eliminar</Button>}
+          {cfg.canDelete && <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); void remove(n); }}>Eliminar</Button>}
         </div>
       ),
       width: 200,
@@ -130,7 +130,7 @@ export default function StudioNewsPage() {
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nueva publicación</Button>}
+            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nueva publicación</Button>}
           </>
         }
       />

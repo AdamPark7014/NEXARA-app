@@ -301,8 +301,8 @@ export class ToolRequestsController {
       throw new ForbiddenException('Solicitud no encontrada');
     }
     
-    // Usuario solo puede ver sus propias solicitudes, admin puede ver todas
-    const isAdmin = user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN);
+    // Usuario solo puede ver sus propias solicitudes, manager puede ver todas
+    const isAdmin = user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) || user.permissions?.includes(PERMISSIONS.TOOLS_MANAGE);
     if (!isAdmin && request.usuarioId !== user.id) {
       throw new UnauthorizedException('No tienes permiso para ver esta solicitud');
     }

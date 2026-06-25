@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
-import { getAccessiblePanels, setActivePanel, type PanelKey } from "@/lib/panel-routing";
+import { buildCrossPanelUrl } from "@/lib/cross-panel-handoff";
+import { getUserAllowedPanels, getUserPanelSwitchPath } from "@/lib/user-access";
 import styles from "./page.module.css";
 
 const getGreeting = () => {
@@ -33,6 +34,9 @@ export default function PanelHubPage() {
     ? "Vista de dirección general. Selecciona el panel estratégico que deseas gestionar."
     : "Tu jornada está lista. Selecciona el panel en el que deseas trabajar.";
 
+  const panels = useMemo(() => getUserAllowedPanels(user), [user]);
+  const userJson = useMemo(() => (user ? JSON.stringify(user) : null), [user]);
+
   useEffect(() => {
     if (!isContextReady) return;
     if (!user) {
@@ -40,15 +44,17 @@ export default function PanelHubPage() {
     }
   }, [router, user, isContextReady]);
 
-  const panels = useMemo(() => getAccessiblePanels(user), [user]);
-
   useEffect(() => {
     if (!isContextReady || !user) return;
     if (panels.length !== 1) return;
     const onlyPanel = panels[0];
-    setActivePanel(onlyPanel.key);
-    router.replace(onlyPanel.entryPath);
-  }, [isContextReady, user, panels, router]);
+    const url = buildCrossPanelUrl(
+      onlyPanel.id,
+      getUserPanelSwitchPath(user, onlyPanel.id),
+      userJson,
+    );
+    window.location.assign(url);
+  }, [isContextReady, user, panels, userJson]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 1000);
@@ -59,7 +65,7 @@ export default function PanelHubPage() {
     const normalized = query.trim().toLowerCase();
     if (!normalized) return panels;
     return panels.filter((panel) => {
-      const haystack = `${panel.name} ${panel.description}`.toLowerCase();
+      const haystack = `${panel.name} ${panel.tagline}`.toLowerCase();
       return haystack.includes(normalized);
     });
   }, [panels, query]);
@@ -72,9 +78,13 @@ export default function PanelHubPage() {
     return null;
   }
 
-  const handleEnterPanel = (panelKey: PanelKey, entryPath: string) => {
-    setActivePanel(panelKey);
-    router.push(entryPath);
+  const handleEnterPanel = (panelId: typeof panels[number]["id"]) => {
+    const url = buildCrossPanelUrl(
+      panelId,
+      getUserPanelSwitchPath(user, panelId),
+      userJson,
+    );
+    window.location.assign(url);
   };
 
   return (
@@ -115,16 +125,16 @@ export default function PanelHubPage() {
           </div>
           <div className={styles.grid}>
           {filteredPanels.map((panel) => (
-            <article key={panel.key} className={styles.card}>
+            <article key={panel.id} className={styles.card}>
               <div className={styles.cardHeader}>
                 <h2 className={styles.cardTitle}><span className={styles.cardIcon}>{panel.icon}</span>{panel.name}</h2>
                 <span className={styles.pill}>Disponible</span>
               </div>
-              <p className={styles.cardDescription}>{panel.description}</p>
+              <p className={styles.cardDescription}>{panel.tagline}</p>
               <button
                 type="button"
                 className={styles.enterButton}
-                onClick={() => handleEnterPanel(panel.key, panel.entryPath)}
+                onClick={() => handleEnterPanel(panel.id)}
               >
                 Abrir panel
               </button>

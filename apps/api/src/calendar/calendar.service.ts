@@ -115,7 +115,7 @@ export class CalendarService {
         ownerId: a.ownerId,
         ownerName: a.owner?.nombre || null,
         color: a.status === 'COMPLETED' ? '#16a34a' : a.dueDate < new Date() ? '#dc2626' : '#8b5cf6',
-        url: a.opportunityId ? `/oportunidades?id=${a.opportunityId}` : a.leadId ? `/leads?id=${a.leadId}` : a.tenderId ? `/licitaciones/${a.tenderId}` : undefined,
+        url: a.opportunityId ? `/crm/opportunities/${a.opportunityId}` : a.leadId ? `/crm/leads?highlight=${a.leadId}` : a.tenderId ? `/crm/tenders?highlight=${a.tenderId}` : undefined,
         metadata: { lead: a.lead, opportunity: a.opportunity, tender: a.tender, status: a.status },
       });
     });

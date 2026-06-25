@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -8,8 +8,8 @@ import KpiCard from "@/components/ui/KpiCard";
 import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
 import { buildApiUrl } from "@/lib/api-base";
+import { getCrmSalesSectionConfig } from "@/lib/section-views";
 
 interface CrmActivity {
   id: number;
@@ -48,7 +48,7 @@ const emptyForm = { subject: "", description: "", activityType: "TASK", dueDate:
 
 export default function AgendaPage() {
   const { user } = useUser();
-  const { canDelete } = useRbacGuard();
+  const cfg = useMemo(() => getCrmSalesSectionConfig(user, "agenda"), [user]);
   const token = user?.token ?? "";
 
   const [agenda, setAgenda] = useState<MyAgenda | null>(null);
@@ -115,7 +115,7 @@ export default function AgendaPage() {
       </div>
       {danger && <Tag variant="danger">Vencida</Tag>}
       <Button size="sm" variant="secondary" onClick={() => void complete(a)}>✓ Completar</Button>
-      {canDelete && <Button size="sm" variant="danger" onClick={() => void remove(a)}>✕</Button>}
+      {cfg.canDelete && <Button size="sm" variant="danger" onClick={() => void remove(a)}>✕</Button>}
     </div>
   );
 
@@ -123,12 +123,12 @@ export default function AgendaPage() {
     <>
       <PageHeader
         eyebrow="CRM · Pipeline"
-        title="Agenda comercial"
-        subtitle="Llamadas, visitas, demos y seguimientos pendientes — conectada a leads, oportunidades y licitaciones."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nueva actividad</Button>
+            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nueva actividad</Button>}
           </>
         }
       />

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import KpiCard from "@/components/ui/KpiCard";
@@ -8,7 +9,7 @@ import Button from "@/components/ui/Button";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { useRbacGuard } from "@/lib/useRbacGuard";
+import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface InvoiceRow {
@@ -36,8 +37,11 @@ async function apiFetch(path: string, token: string, init: RequestInit = {}) {
 
 export default function InvoicingPage() {
   const { user } = useUser();
-  const { canApprove, canDelete } = useRbacGuard();
+  const cfg = useMemo(() => getErpFinanceSectionConfig(user, "invoicing"), [user]);
   const token = user?.token ?? "";
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("highlight");
+  const invoiceRef = searchParams.get("invoiceRef");
 
   const [items, setItems] = useState<InvoiceRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,6 +61,19 @@ export default function InvoicingPage() {
   }, [token, filter]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const visibleItems = useMemo(() => {
+    let rows = items;
+    if (highlightId) {
+      const id = Number(highlightId);
+      if (!Number.isNaN(id)) rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+    }
+    if (invoiceRef) {
+      const ref = invoiceRef.toLowerCase();
+      rows = rows.filter((f) => f.invoiceNumber.toLowerCase().includes(ref));
+    }
+    return rows;
+  }, [items, highlightId, invoiceRef]);
 
   const facturadoMes = items.filter((f) => f.type === "INCOME" && f.status !== "CANCELLED").reduce((s, f) => s + Number(f.totalAmount), 0);
   const porTimbrar = items.filter((f) => f.status === "DRAFT").length;
@@ -94,12 +111,12 @@ export default function InvoicingPage() {
     { key: "totalAmount", label: "Monto", align: "right" as const, render: (f) => <Money value={Number(f.totalAmount)} />, width: 130 },
     { key: "issueDate", label: "Fecha", render: (f) => <span style={{ fontSize: 12 }}>{new Date(f.issueDate).toLocaleDateString("es-MX")}</span>, width: 100 },
     { key: "status", label: "Estado", render: (f) => <Tag variant={statusVariant(f.status)}>{f.status.replace(/_/g, " ")}</Tag>, width: 130 },
-    ...(canApprove ? [{
+    ...(cfg.canApprove ? [{
       key: "acciones" as keyof InvoiceRow, label: "",
       render: (f: InvoiceRow) => (
         <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
           {f.status === "DRAFT" && <Button size="sm" variant="primary" onClick={(e) => { e.stopPropagation(); void stamp(f); }}>Timbrar</Button>}
-          {canDelete && f.status !== "CANCELLED" && <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); void cancel(f); }}>Cancelar</Button>}
+          {cfg.canDelete && f.status !== "CANCELLED" && <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); void cancel(f); }}>Cancelar</Button>}
         </div>
       ),
       width: 180,
@@ -131,10 +148,18 @@ export default function InvoicingPage() {
         <KpiCard label="Vencidas" value={vencidas} variant={vencidas > 0 ? "danger" : "positive"} icon="🛡️" />
       </div>
 
-      <Section title={loading ? "Cargando…" : `${items.length} CFDI`}>
+      <Section title={loading ? "Cargando…" : `${visibleItems.length} CFDI`}>
+        {(highlightId || invoiceRef) && (
+          <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
+            {highlightId && <>Mostrando factura <strong>#{highlightId}</strong></>}
+            {highlightId && invoiceRef && " · "}
+            {invoiceRef && <>Folio <strong>{invoiceRef}</strong></>}
+            {" "}desde enlace directo.
+          </p>
+        )}
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando facturación." />}
         {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
-        {!loading && !error && <DataTable columns={columns} rows={items} rowKey={(f) => f.id} emptyTitle="Sin facturas" emptyDescription="Las facturas se generan desde un proyecto de ventas cerrado." />}
+        {!loading && !error && <DataTable columns={columns} rows={visibleItems} rowKey={(f) => f.id} emptyTitle="Sin facturas" emptyDescription="Las facturas se generan desde un proyecto de ventas cerrado." />}
       </Section>
     </>
   );
