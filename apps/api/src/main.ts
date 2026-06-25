@@ -302,9 +302,8 @@ async function bootstrap() {
     response.setHeader('X-RateLimit-Reset', `${Math.ceil(Date.now() / 1000) + Math.ceil(limiterResult.retryAfterMs / 1000)}`);
 
     if (!limiterResult.allowed) {
-      if (isAuthPath) {
-        ipPenaltyBox.addStrike(ip, 2);
-      }
+      // Auth rate-limit should return 429 only; escalating to IP ban causes
+      // long lockouts for legitimate users after repeated login attempts.
       const retrySeconds = Math.max(1, Math.ceil(limiterResult.retryAfterMs / 1000));
       response.setHeader('Retry-After', `${retrySeconds}`);
       response.status(429).json({
