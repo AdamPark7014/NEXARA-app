@@ -43,13 +43,21 @@ interface GoodsReceipt {
   receivedBy?: { nombre?: string };
 }
 
-async function apiFetch(path: string, token: string, opts?: RequestInit) {
+async function apiFetch<T = unknown>(path: string, token: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(buildApiUrl(path), {
     ...opts,
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(opts?.headers ?? {}) },
   });
   if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return res.json() as Promise<T>;
+}
+
+function unwrapList<T>(data: unknown): T[] {
+  if (Array.isArray(data)) return data as T[];
+  if (data && typeof data === "object" && Array.isArray((data as { data?: unknown }).data)) {
+    return (data as { data: T[] }).data;
+  }
+  return [];
 }
 
 function sortHighlight<T extends { id: number }>(rows: T[], idParam: string | null) {
@@ -137,15 +145,12 @@ export default function ProcurementPage() {
     setLoading(true);
     try {
       if (tab === "orders") {
-        const data = await apiFetch("procurement/purchase-orders", token);
-        setOrders(Array.isArray(data) ? data : (data.data ?? []));
+        setOrders(unwrapList<PurchaseOrder>(await apiFetch("procurement/purchase-orders", token)));
       } else if (tab === "requisitions") {
-        const data = await apiFetch("procurement/requisitions", token);
-        setRequisitions(Array.isArray(data) ? data : (data.data ?? []));
+        setRequisitions(unwrapList<Requisition>(await apiFetch("procurement/requisitions", token)));
       } else {
         const qs = poId ? `?purchaseOrderId=${poId}` : "";
-        const data = await apiFetch(`procurement/goods-receipts${qs}`, token);
-        setReceipts(Array.isArray(data) ? data : (data.data ?? []));
+        setReceipts(unwrapList<GoodsReceipt>(await apiFetch(`procurement/goods-receipts${qs}`, token)));
       }
     } catch {
       /* skip */
