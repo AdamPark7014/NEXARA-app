@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, Res, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, Res, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { Response } from 'express';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
@@ -73,6 +73,29 @@ export class InventoriesController {
     @Body() body: any,
   ) {
     return this.inventoriesService.syncByActivity(activityId, body, user?.id);
+  }
+
+  @Post('sync')
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.CONSOLE_ADMIN,
+      PERMISSIONS.ASSETS_MANAGE,
+    ],
+  })
+  syncManual(
+    @CurrentUser() user: any,
+    @Body() body: { clientId?: number; branchId?: number; title?: string; notes?: string; items?: any[]; completed?: boolean },
+  ) {
+    const clientId = Number(body?.clientId);
+    const branchId = Number(body?.branchId);
+    if (!clientId || Number.isNaN(clientId) || !branchId || Number.isNaN(branchId)) {
+      throw new BadRequestException('clientId y branchId son requeridos');
+    }
+    return this.inventoriesService.syncManualSnapshot(
+      { clientId, branchId, createdByType: 'CONSOLE' },
+      body || {},
+      user?.id,
+    );
   }
 
   @Get(':id')

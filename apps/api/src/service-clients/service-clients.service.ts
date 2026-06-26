@@ -762,4 +762,33 @@ export class ServiceClientsService {
       // no-op: email failure should not block flow
     }
   }
+
+  // ── Branch management ─────────────────────────────────────────────
+  async createBranch(clientId: number, dto: {
+    name: string;
+    branchNumber?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+  }) {
+    return this.db.serviceClientBranch.create({
+      data: {
+        clientId,
+        name: dto.name.trim(),
+        branchNumber: dto.branchNumber?.trim() || null,
+        address: dto.address?.trim() || null,
+        city: dto.city?.trim() || null,
+        state: dto.state?.trim() || null,
+        country: dto.country?.trim() || null,
+      },
+    });
+  }
+
+  async listBranches(clientId: number) {
+    return this.db.serviceClientBranch.findMany({
+      where: { clientId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 }

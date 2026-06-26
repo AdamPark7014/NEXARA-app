@@ -47,6 +47,15 @@ async function apiFetch(path: string, token: string, init: RequestInit = {}) {
 
 const emptyForm = { name: "", bankName: "", accountNumber: "", clabe: "", currentBalance: 0 };
 
+const emptyTxForm = {
+  transactionDate: new Date().toISOString().slice(0, 10),
+  description: "",
+  amount: 0,
+  isDebit: true,
+  counterpartyName: "",
+  concept: "",
+};
+
 export default function BankingPage() {
   const { user } = useUser();
   const cfg = useMemo(() => getErpFinanceSectionConfig(user, "banking"), [user]);
@@ -61,6 +70,9 @@ export default function BankingPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
   const [saving, setSaving] = useState(false);
+  const [showTxForm, setShowTxForm] = useState(false);
+  const [txForm, setTxForm] = useState({ ...emptyTxForm });
+  const [savingTx, setSavingTx] = useState(false);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -98,6 +110,33 @@ export default function BankingPage() {
     } catch (e) {
       alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
     } finally { setSaving(false); }
+  };
+
+  const importTransaction = async () => {
+    if (!token || !selected || !txForm.description.trim() || !txForm.amount) return;
+    setSavingTx(true);
+    try {
+      await apiFetch(`accounting/banking/accounts/${selected.id}/transactions/import`, token, {
+        method: "POST",
+        body: JSON.stringify({
+          transactions: [{
+            transactionDate: txForm.transactionDate,
+            description: txForm.description.trim(),
+            amount: txForm.amount,
+            isDebit: txForm.isDebit,
+            counterpartyName: txForm.counterpartyName.trim() || undefined,
+            concept: txForm.concept.trim() || undefined,
+          }],
+        }),
+      });
+      setShowTxForm(false);
+      setTxForm({ ...emptyTxForm });
+      const data = await apiFetch(`accounting/banking/accounts/${selected.id}/transactions`, token);
+      setTxs(Array.isArray(data) ? data : []);
+      void load();
+    } catch (e) {
+      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+    } finally { setSavingTx(false); }
   };
 
   const reconcile = async (tx: BankTransaction) => {
@@ -171,7 +210,12 @@ export default function BankingPage() {
           </Section>
 
           {selected && (
-            <Section title={loadingTx ? "Cargando movimientos…" : `Movimientos · ${selected.name}`}>
+            <Section
+              title={loadingTx ? "Cargando movimientos…" : `Movimientos · ${selected.name}`}
+              actions={cfg.canCreate ? (
+                <Button variant="primary" size="sm" iconLeft="+" onClick={() => setShowTxForm(true)}>Registrar movimiento</Button>
+              ) : undefined}
+            >
               {loadingTx
                 ? <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
                 : <DataTable columns={txColumns} rows={txs} rowKey={(t) => t.id} emptyTitle="Sin movimientos" emptyDescription="No hay transacciones registradas para esta cuenta." />
@@ -179,6 +223,37 @@ export default function BankingPage() {
             </Section>
           )}
         </>
+      )}
+
+      {showTxForm && selected && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setShowTxForm(false)}>
+          <div style={{ background: "var(--surface)", borderRadius: 16, padding: 28, width: 440, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.24)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Registrar movimiento · {selected.name}</div>
+            <div style={{ display: "grid", gap: 14 }}>
+              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Fecha</span>
+                <input type="date" value={txForm.transactionDate} onChange={(e) => setTxForm((f) => ({ ...f, transactionDate: e.target.value }))} style={inp} /></label>
+              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Descripción</span>
+                <input value={txForm.description} onChange={(e) => setTxForm((f) => ({ ...f, description: e.target.value }))} placeholder="SPEI recibido, comisión bancaria…" style={inp} /></label>
+              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Monto ($)</span>
+                <input type="number" min={0} step="0.01" value={txForm.amount} onChange={(e) => setTxForm((f) => ({ ...f, amount: Number(e.target.value) }))} style={inp} /></label>
+              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Tipo</span>
+                <select value={txForm.isDebit ? "debit" : "credit"} onChange={(e) => setTxForm((f) => ({ ...f, isDebit: e.target.value === "debit" }))} style={inp}>
+                  <option value="debit">Cargo (salida)</option>
+                  <option value="credit">Abono (entrada)</option>
+                </select></label>
+              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Contraparte</span>
+                <input value={txForm.counterpartyName} onChange={(e) => setTxForm((f) => ({ ...f, counterpartyName: e.target.value }))} style={inp} /></label>
+              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Concepto</span>
+                <input value={txForm.concept} onChange={(e) => setTxForm((f) => ({ ...f, concept: e.target.value }))} style={inp} /></label>
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
+              <Button variant="secondary" onClick={() => setShowTxForm(false)}>Cancelar</Button>
+              <Button variant="primary" onClick={() => void importTransaction()} disabled={savingTx || !txForm.description.trim() || !txForm.amount}>
+                {savingTx ? "Guardando…" : "Registrar"}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showForm && (

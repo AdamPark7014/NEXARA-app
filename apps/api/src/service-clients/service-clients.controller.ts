@@ -134,6 +134,24 @@ export class ServiceClientsController {
 
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @Get(':id/branches')
+  listBranches(@Param('id', ParseIntPipe) id: number) {
+    return this.serviceClientsService.listBranches(id);
+  }
+
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @Post(':id/branches')
+  createBranch(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { name: string; branchNumber?: string; address?: string; city?: string; state?: string; country?: string },
+  ) {
+    if (!body?.name) throw new BadRequestException('Nombre de sucursal requerido');
+    return this.serviceClientsService.createBranch(id, body);
+  }
+
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
   @Put(':id')
   @UseInterceptors(FileInterceptor('logo', {
     storage: diskStorage({

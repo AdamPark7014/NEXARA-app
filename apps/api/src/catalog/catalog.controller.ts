@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CatalogService } from './catalog.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
@@ -17,6 +17,13 @@ const CATALOG_ACCESS = [
 @Controller('catalog')
 export class CatalogController {
   constructor(private readonly catalogService: CatalogService) {}
+
+  @Post('products')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CATALOG_MANAGE] })
+  createProduct(@Body() dto: { sku: string; name: string; category?: string; price?: number; description?: string }) {
+    return this.catalogService.createProduct(dto);
+  }
 
   @Get('products')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
