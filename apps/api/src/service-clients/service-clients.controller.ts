@@ -87,14 +87,28 @@ export class ServiceClientsController {
   }
 
   @UseGuards(RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.CONSOLE_ADMIN,
+      PERMISSIONS.SUPPORT_VIEW,
+      PERMISSIONS.MAINTENANCE_VIEW,
+      PERMISSIONS.ASSETS_VIEW,
+    ],
+  })
   @Get()
   findAll(@Query() query: PaginationQueryDto) {
     return this.serviceClientsService.findAll(query);
   }
 
   @UseGuards(RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.CONSOLE_ADMIN,
+      PERMISSIONS.SUPPORT_VIEW,
+      PERMISSIONS.MAINTENANCE_VIEW,
+      PERMISSIONS.ASSETS_VIEW,
+    ],
+  })
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.serviceClientsService.findOne(id);

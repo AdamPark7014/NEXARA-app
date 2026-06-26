@@ -10,7 +10,16 @@ export class SlaTrackerController {
   constructor(private readonly service: SlaTrackerService) {}
 
   @Get('stats')
-  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.ACTIVITIES_VIEW] })
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.CONSOLE_ADMIN,
+      PERMISSIONS.CONSOLE_ACCESS,
+      PERMISSIONS.ACTIVITIES_VIEW,
+      PERMISSIONS.SUPPORT_VIEW,
+      PERMISSIONS.SUPPORT_MANAGE,
+      PERMISSIONS.NOC_VIEW,
+    ],
+  })
   stats(@Query('from') from?: string, @Query('to') to?: string, @Query('clientId') clientId?: string) {
     return this.service.getStats({
       from: from ? new Date(from) : undefined,

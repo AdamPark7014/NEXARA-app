@@ -33,7 +33,14 @@ export class EvidencesController {
 
   @Get()
   @UseGuards(RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.EVIDENCES_VIEW] })
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.EVIDENCES_VIEW,
+      PERMISSIONS.EVIDENCES_REVIEW,
+      PERMISSIONS.CONSOLE_ACCESS,
+      PERMISSIONS.CONSOLE_ADMIN,
+    ],
+  })
   findAll(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
     return this.evidencesService.findForHierarchy(user, query);
   }
