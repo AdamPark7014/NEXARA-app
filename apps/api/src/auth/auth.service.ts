@@ -401,6 +401,40 @@ export class AuthService {
       set.add(PERMISSIONS.ASSETS_MANAGE);
     }
 
+    // ── Ingeniero de campo ───────────────────────────────────────────
+    if (roleKey === 'ing_campo') {
+      set.add(PERMISSIONS.CONSOLE_ACCESS);
+      set.add(PERMISSIONS.ACTIVITIES_VIEW);
+      set.add(PERMISSIONS.EVIDENCES_VIEW);
+      set.add(PERMISSIONS.EVIDENCES_CREATE);
+      set.add(PERMISSIONS.VIATICS_VIEW);
+      set.add(PERMISSIONS.VIATICS_CREATE);
+      set.add(PERMISSIONS.VEHICLES_VIEW);
+      set.add(PERMISSIONS.VEHICLES_REQUEST);
+      set.add(PERMISSIONS.TOOLS_VIEW);
+      set.add(PERMISSIONS.TOOLS_REQUEST);
+      set.add(PERMISSIONS.ATTENDANCE_VIEW);
+      set.add(PERMISSIONS.GPS_VIEW);
+    }
+
+    // ── Ingeniero de soporte / NOC ───────────────────────────────────
+    if (roleKey === 'ing_soporte') {
+      set.add(PERMISSIONS.CONSOLE_ACCESS);
+      set.add(PERMISSIONS.ACTIVITIES_VIEW);
+      set.add(PERMISSIONS.ACTIVITIES_MANAGE);
+      set.add(PERMISSIONS.EVIDENCES_VIEW);
+      set.add(PERMISSIONS.EVIDENCES_REVIEW);
+      set.add(PERMISSIONS.NOC_VIEW);
+      set.add(PERMISSIONS.NOC_MANAGE);
+      set.add(PERMISSIONS.MAINTENANCE_VIEW);
+      set.add(PERMISSIONS.MAINTENANCE_MANAGE);
+      set.add(PERMISSIONS.ASSETS_VIEW);
+      set.add(PERMISSIONS.PANEL_NOC);
+      set.add(PERMISSIONS.PANEL_SUPPORT);
+      set.add(PERMISSIONS.SUPPORT_VIEW);
+      set.add(PERMISSIONS.SUPPORT_MANAGE);
+    }
+
     return Array.from(set);
   }
 
