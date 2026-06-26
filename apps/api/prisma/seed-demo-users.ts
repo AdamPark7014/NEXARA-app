@@ -168,13 +168,25 @@ const DEMO_USERS: DemoUser[] = [
 
 const ORG_ROLE_KEY_BY_V2: Record<string, string> = {
   ceo: 'ceo',
-  arquitecto: 'project_manager',
+  arquitecto: 'arquitecto',
   coord_admin: 'director_admin',
   administrativo: 'admin_staff',
   lider_diseno: 'designer',
   coord_operaciones: 'project_manager',
   ing_campo: 'field_engineer',
   ing_soporte: 'senior_engineer',
+};
+
+/** Búsqueda por nombre cuando orgRoleKey no coincide (DB team migration vs catálogo legacy). */
+const ROLE_NOMBRE_HINTS: Record<string, string[]> = {
+  ceo: ['CEO', 'Director General', 'Dueño'],
+  coord_admin: ['Coordinador Administrativo', 'Coord. Admin', 'Director Administrativo'],
+  administrativo: ['Administrativo', 'Admin Staff', 'Personal Administrativo'],
+  lider_diseno: ['Líder de Diseño', 'Lider de Diseno', 'Creativa', 'Diseñador'],
+  coord_operaciones: ['Coordinador de Operaciones', 'Jefe de Proyectos', 'Project Manager'],
+  ing_campo: ['Ingeniero de Campo', 'Field Engineer'],
+  ing_soporte: ['Ingeniero Senior', 'Soporte', 'Senior Engineer'],
+  arquitecto: ['Arquitecto'],
 };
 
 async function ensureDepartment(name: string): Promise<number> {
@@ -185,16 +197,25 @@ async function ensureDepartment(name: string): Promise<number> {
 }
 
 async function resolveRole(v2RoleKey: string) {
-  if (v2RoleKey === 'arquitecto') {
+  // 1) orgRoleKey = clave v2 (migración seed_nexara_team: coord_admin, ing_campo, …)
+  const byV2Org = await prisma.role.findFirst({ where: { orgRoleKey: v2RoleKey } });
+  if (byV2Org) return byV2Org;
+
+  // 2) catálogo legacy org-roles (director_admin, field_engineer, …)
+  const legacyOrg = ORG_ROLE_KEY_BY_V2[v2RoleKey];
+  if (legacyOrg && legacyOrg !== v2RoleKey) {
+    const byLegacy = await prisma.role.findFirst({ where: { orgRoleKey: legacyOrg } });
+    if (byLegacy) return byLegacy;
+  }
+
+  // 3) nombre aproximado
+  const hints = ROLE_NOMBRE_HINTS[v2RoleKey] ?? [];
+  for (const hint of hints) {
     const byName = await prisma.role.findFirst({
-      where: { nombre: { contains: 'Arquitecto', mode: 'insensitive' } },
+      where: { nombre: { contains: hint, mode: 'insensitive' } },
     });
     if (byName) return byName;
   }
-
-  const orgRoleKey = ORG_ROLE_KEY_BY_V2[v2RoleKey] ?? v2RoleKey;
-  const byOrg = await prisma.role.findFirst({ where: { orgRoleKey } });
-  if (byOrg) return byOrg;
 
   return null;
 }
