@@ -62,3 +62,44 @@ export function updateOperationalProjectStatus(token: string, id: number, status
     "No se pudo actualizar el estado",
   );
 }
+
+export function createOperationalProject(
+  token: string,
+  payload: {
+    title: string;
+    description?: string;
+    scopeSummary?: string;
+    vendorId: number;
+    clientId: number;
+    startDate: string;
+    endDate?: string;
+    siteCount?: number;
+  },
+) {
+  return opsProjectRequest<OperationalProject>(
+    "operational-projects",
+    token,
+    { method: "POST", body: JSON.stringify(payload) },
+    "No se pudo crear el proyecto",
+  );
+}
+
+export type CreateOperationalProjectPayload = {
+  title: string;
+  clientId: number;
+  vendorId: number;
+  startDate: string;
+  projectType?: string;
+  description?: string;
+  scopeSummary?: string;
+  endDate?: string;
+};
+
+export function createOperationalProject(token: string, dto: CreateOperationalProjectPayload) {
+  return opsProjectRequest<OperationalProject>(
+    "operational-projects",
+    token,
+    { method: "POST", body: JSON.stringify(dto) },
+    "No se pudo crear el proyecto",
+  );
+}

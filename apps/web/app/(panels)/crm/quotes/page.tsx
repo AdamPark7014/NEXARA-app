@@ -10,7 +10,12 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { getCrmSalesSectionConfig } from "@/lib/section-views";
-import { formatQuoteStatus, listSalesQuotes, type SalesQuote } from "@/lib/sales-api";
+import { formatQuoteStatus, listSalesQuotes, createSalesQuote, type SalesQuote } from "@/lib/sales-api";
+
+const inp: React.CSSProperties = {
+  width: "100%", padding: "8px 10px", border: "1px solid var(--border)",
+  borderRadius: 8, background: "var(--surface)", color: "var(--foreground)", fontSize: 13, boxSizing: "border-box",
+};
 
 export default function QuotesPage() {
   const { user } = useUser();
@@ -21,6 +26,17 @@ export default function QuotesPage() {
 
   const [items, setItems] = useState<SalesQuote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    clientCompany: "",
+    clientName: "",
+    clientEmail: "",
+    projectName: "",
+    itemName: "",
+    qty: 1,
+    unitPrice: 0,
+  });
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -37,6 +53,30 @@ export default function QuotesPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const save = async () => {
+    if (!token || !form.clientCompany.trim() || !form.itemName.trim() || form.unitPrice <= 0) return;
+    setSaving(true);
+    try {
+      const quoteNumber = `COT-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 900 + 100)}`;
+      await createSalesQuote(token, {
+        quoteNumber,
+        issueDate: new Date().toISOString().slice(0, 10),
+        validUntil: new Date(Date.now() + 15 * 86400000).toISOString().slice(0, 10),
+        clientCompany: form.clientCompany.trim(),
+        clientName: form.clientName.trim() || undefined,
+        clientEmail: form.clientEmail.trim() || undefined,
+        projectName: form.projectName.trim() || undefined,
+        items: [{ name: form.itemName.trim(), qty: form.qty, unitPrice: form.unitPrice }],
+      });
+      setShowForm(false);
+      void load();
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "No se pudo crear la cotización");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const visible = useMemo(() => {
     let rows = items;
@@ -93,7 +133,14 @@ export default function QuotesPage() {
         eyebrow="CRM · Ventas"
         title={cfg.title}
         subtitle={cfg.subtitle}
-        actions={<Button variant="ghost" onClick={load}>Actualizar</Button>}
+        actions={
+          <div style={{ display: "flex", gap: 8 }}>
+            {cfg.canCreate && (
+              <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nueva cotización</Button>
+            )}
+            <Button variant="ghost" onClick={load}>Actualizar</Button>
+          </div>
+        }
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
@@ -101,6 +148,46 @@ export default function QuotesPage() {
         <KpiCard label="Firmado / ganado" value={`$${(firmadas / 1000000).toFixed(1)}M`} />
         <KpiCard label="Pendientes" value={pendientes} />
       </div>
+
+      {showForm && (
+        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 18 }}>
+          <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>Nueva cotización</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Empresa / Cliente *</span>
+              <input value={form.clientCompany} onChange={(e) => setForm((f) => ({ ...f, clientCompany: e.target.value }))} style={inp} />
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Contacto</span>
+              <input value={form.clientName} onChange={(e) => setForm((f) => ({ ...f, clientName: e.target.value }))} style={inp} />
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Email</span>
+              <input type="email" value={form.clientEmail} onChange={(e) => setForm((f) => ({ ...f, clientEmail: e.target.value }))} style={inp} />
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Proyecto</span>
+              <input value={form.projectName} onChange={(e) => setForm((f) => ({ ...f, projectName: e.target.value }))} style={inp} />
+            </label>
+            <label style={{ gridColumn: "1 / -1", display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Concepto principal *</span>
+              <input value={form.itemName} onChange={(e) => setForm((f) => ({ ...f, itemName: e.target.value }))} placeholder="Instalación y puesta en marcha" style={inp} />
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Cantidad</span>
+              <input type="number" min={1} value={form.qty} onChange={(e) => setForm((f) => ({ ...f, qty: +e.target.value }))} style={inp} />
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Precio unitario *</span>
+              <input type="number" min={0} step="0.01" value={form.unitPrice || ""} onChange={(e) => setForm((f) => ({ ...f, unitPrice: +e.target.value }))} style={inp} />
+            </label>
+          </div>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14 }}>
+            <Button variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void save()} disabled={saving}>{saving ? "Guardando…" : "Crear cotización"}</Button>
+          </div>
+        </div>
+      )}
 
       <Section title={loading ? "Cargando…" : `${visible.length} cotizaciones`}>
         {highlightId && (

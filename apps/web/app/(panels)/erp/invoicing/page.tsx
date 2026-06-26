@@ -47,6 +47,20 @@ export default function InvoicingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"" | "INCOME" | "EXPENSE">("");
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    type: "INCOME" as "INCOME" | "EXPENSE",
+    receptorName: "",
+    receptorRfc: "",
+    issueDate: new Date().toISOString().slice(0, 10),
+    dueDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+    description: "",
+    quantity: 1,
+    unitPrice: 0,
+  });
+
+  const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface)", color: "var(--foreground)", fontSize: 13, boxSizing: "border-box" };
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -96,6 +110,30 @@ export default function InvoicingPage() {
     } catch (e) { alert(`Error al cancelar: ${e instanceof Error ? e.message : "desconocido"}`); }
   };
 
+  const saveInvoice = async () => {
+    if (!token || !form.receptorName.trim() || !form.description.trim() || form.unitPrice <= 0) return;
+    setSaving(true);
+    try {
+      await apiFetch("accounting/invoices", token, {
+        method: "POST",
+        body: JSON.stringify({
+          type: form.type === "INCOME" ? "ACCOUNTS_RECEIVABLE" : "ACCOUNTS_PAYABLE",
+          issueDate: form.issueDate,
+          dueDate: form.dueDate,
+          receptorName: form.receptorName.trim(),
+          receptorRfc: form.receptorRfc.trim() || undefined,
+          items: [{ description: form.description.trim(), quantity: form.quantity, unitPrice: form.unitPrice, taxRate: 16 }],
+        }),
+      });
+      setShowForm(false);
+      void load();
+    } catch (e) {
+      alert(`Error: ${e instanceof Error ? e.message : "No se pudo crear"}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const statusVariant = (s: string): "positive" | "warning" | "danger" | "default" => {
     if (s === "PAID") return "positive";
     if (s === "CANCELLED" || s === "OVERDUE") return "danger";
@@ -131,6 +169,9 @@ export default function InvoicingPage() {
         subtitle={cfg.subtitle}
         actions={
           <>
+            {cfg.canCreate && (
+              <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nueva factura</Button>
+            )}
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
             <select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}>
               <option value="">Todos los tipos</option>
@@ -147,6 +188,53 @@ export default function InvoicingPage() {
         <KpiCard label="Canceladas" value={canceladas} variant={canceladas > 0 ? "danger" : "default"} icon="✗" />
         <KpiCard label="Vencidas" value={vencidas} variant={vencidas > 0 ? "danger" : "positive"} icon="🛡️" />
       </div>
+
+      {showForm && (
+        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 18 }}>
+          <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>Nueva factura (borrador CFDI)</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Tipo</span>
+              <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as "INCOME" | "EXPENSE" }))} style={inp}>
+                <option value="INCOME">Ingreso (cliente)</option>
+                <option value="EXPENSE">Egreso (proveedor)</option>
+              </select>
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>RFC receptor</span>
+              <input value={form.receptorRfc} onChange={(e) => setForm((f) => ({ ...f, receptorRfc: e.target.value }))} placeholder="XAXX010101000" style={inp} />
+            </label>
+            <label style={{ gridColumn: "1 / -1", display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Nombre cliente / proveedor *</span>
+              <input value={form.receptorName} onChange={(e) => setForm((f) => ({ ...f, receptorName: e.target.value }))} style={inp} />
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Emisión</span>
+              <input type="date" value={form.issueDate} onChange={(e) => setForm((f) => ({ ...f, issueDate: e.target.value }))} style={inp} />
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Vencimiento</span>
+              <input type="date" value={form.dueDate} onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))} style={inp} />
+            </label>
+            <label style={{ gridColumn: "1 / -1", display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Concepto *</span>
+              <input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Servicio de instalación CCTV" style={inp} />
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Cantidad</span>
+              <input type="number" min={1} value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: +e.target.value }))} style={inp} />
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Precio unitario *</span>
+              <input type="number" min={0} step="0.01" value={form.unitPrice || ""} onChange={(e) => setForm((f) => ({ ...f, unitPrice: +e.target.value }))} style={inp} />
+            </label>
+          </div>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14 }}>
+            <Button variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void saveInvoice()} disabled={saving}>{saving ? "Guardando…" : "Crear borrador"}</Button>
+          </div>
+        </div>
+      )}
 
       <Section title={loading ? "Cargando…" : `${visibleItems.length} CFDI`}>
         {(highlightId || invoiceRef) && (

@@ -76,6 +76,22 @@ const REQ_STATUS: Record<string, string> = {
   CANCELLED: "Cancelada",
 };
 
+const PRIORITIES = ["NORMAL", "URGENT", "CRITICAL"] as const;
+const PRIORITY_LABEL: Record<string, string> = { NORMAL: "Normal", URGENT: "Urgente", CRITICAL: "Crítica" };
+
+type ReqItem = { description: string; quantity: number; estimatedCost: string };
+type PoItem  = { description: string; quantity: number; unitPrice: string };
+
+const emptyReqForm = { title: "", priority: "NORMAL" };
+const emptyReqItem: ReqItem = { description: "", quantity: 1, estimatedCost: "" };
+const emptyPoForm  = { supplierName: "", expectedDate: "" };
+const emptyPoItem: PoItem  = { description: "", quantity: 1, unitPrice: "" };
+
+const inp: React.CSSProperties = {
+  width: "100%", padding: "7px 9px", border: "1px solid var(--border)",
+  borderRadius: 7, background: "var(--surface)", color: "var(--foreground)", fontSize: 12.5, boxSizing: "border-box",
+};
+
 export default function ProcurementPage() {
   const { user } = useUser();
   const cfg = useMemo(() => getErpInventorySectionConfig(user, "procurement"), [user]);
@@ -91,6 +107,24 @@ export default function ProcurementPage() {
   const [requisitions, setRequisitions] = useState<Requisition[]>([]);
   const [receipts, setReceipts] = useState<GoodsReceipt[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // ── Create Requisición ──────────────────────────────────────────────────
+  const [showReqForm, setShowReqForm] = useState(false);
+  const [reqForm, setReqForm] = useState({ ...emptyReqForm });
+  const [reqItems, setReqItems] = useState<ReqItem[]>([{ ...emptyReqItem }]);
+  const [savingReq, setSavingReq] = useState(false);
+
+  // ── Create OC ──────────────────────────────────────────────────────────
+  const [showPoForm, setShowPoForm] = useState(false);
+  const [poForm, setPoForm] = useState({ ...emptyPoForm });
+  const [poItems, setPoItems] = useState<PoItem[]>([{ ...emptyPoItem }]);
+  const [savingPo, setSavingPo] = useState(false);
+
+  // ── Recepción de mercancía ─────────────────────────────────────────────
+  const [showReceiptForm, setShowReceiptForm] = useState(false);
+  const [receiptPoId, setReceiptPoId] = useState("");
+  const [receiptNotes, setReceiptNotes] = useState("");
+  const [savingReceipt, setSavingReceipt] = useState(false);
 
   const setTab = (next: ProcTab) => {
     const p = new URLSearchParams();
@@ -135,6 +169,65 @@ export default function ProcurementPage() {
     return rows;
   }, [receipts, highlightId]);
 
+  const saveReq = async () => {
+    if (!token || !reqForm.title.trim()) return;
+    const items = reqItems.filter(i => i.description.trim());
+    if (!items.length) return;
+    setSavingReq(true);
+    try {
+      await apiFetch("procurement/requisitions", token, {
+        method: "POST",
+        body: JSON.stringify({
+          title: reqForm.title.trim(),
+          priority: reqForm.priority,
+          items: items.map(i => ({
+            description: i.description.trim(),
+            quantity: Number(i.quantity),
+            estimatedCost: i.estimatedCost ? Number(i.estimatedCost) : undefined,
+          })),
+        }),
+      });
+      setShowReqForm(false);
+      setReqForm({ ...emptyReqForm });
+      setReqItems([{ ...emptyReqItem }]);
+      void load();
+    } catch (e) {
+      window.alert("Error: " + (e instanceof Error ? e.message : "No se pudo crear"));
+    } finally {
+      setSavingReq(false);
+    }
+  };
+
+  const savePo = async () => {
+    if (!token || !poForm.supplierName.trim()) return;
+    const items = poItems.filter(i => i.description.trim() && Number(i.unitPrice) > 0);
+    if (!items.length) return;
+    setSavingPo(true);
+    try {
+      await apiFetch("procurement/purchase-orders", token, {
+        method: "POST",
+        body: JSON.stringify({
+          supplierName: poForm.supplierName.trim(),
+          orderDate: new Date().toISOString().slice(0, 10),
+          expectedDate: poForm.expectedDate || undefined,
+          items: items.map(i => ({
+            description: i.description.trim(),
+            quantity: Number(i.quantity),
+            unitPrice: Number(i.unitPrice),
+          })),
+        }),
+      });
+      setShowPoForm(false);
+      setPoForm({ ...emptyPoForm });
+      setPoItems([{ ...emptyPoItem }]);
+      void load();
+    } catch (e) {
+      window.alert("Error: " + (e instanceof Error ? e.message : "No se pudo crear"));
+    } finally {
+      setSavingPo(false);
+    }
+  };
+
   const approvePo = async (id: number) => {
     if (!token) return;
     try {
@@ -152,6 +245,41 @@ export default function ProcurementPage() {
       void load();
     } catch {
       /* skip */
+    }
+  };
+
+  const saveReceipt = async () => {
+    if (!token || !receiptPoId) return;
+    setSavingReceipt(true);
+    try {
+      const po = await apiFetch<{ items?: { id: number; quantity: number | string }[] }>(
+        `procurement/purchase-orders/${receiptPoId}`, token,
+      );
+      const poItems = po.items ?? [];
+      if (!poItems.length) {
+        window.alert("La OC no tiene partidas para recibir.");
+        return;
+      }
+      await apiFetch("procurement/goods-receipts", token, {
+        method: "POST",
+        body: JSON.stringify({
+          purchaseOrderId: Number(receiptPoId),
+          receiptDate: new Date().toISOString().slice(0, 10),
+          notes: receiptNotes.trim() || undefined,
+          items: poItems.map((i) => ({
+            purchaseOrderItemId: i.id,
+            quantityReceived: Number(i.quantity),
+          })),
+        }),
+      });
+      setShowReceiptForm(false);
+      setReceiptPoId("");
+      setReceiptNotes("");
+      void load();
+    } catch (e) {
+      window.alert("Error: " + (e instanceof Error ? e.message : "No se pudo registrar"));
+    } finally {
+      setSavingReceipt(false);
     }
   };
 
@@ -258,8 +386,89 @@ export default function ProcurementPage() {
         eyebrow="ERP · Compras"
         title={cfg.title}
         subtitle={cfg.subtitle}
-        actions={<Button variant="ghost" onClick={() => void load()}>Actualizar</Button>}
+        actions={
+          <>
+            <Button variant="ghost" onClick={() => void load()}>Actualizar</Button>
+            {cfg.canCreate && tab === "requisitions" && (
+              <Button variant="primary" iconLeft="+" onClick={() => { setShowReqForm(true); setShowPoForm(false); }}>Nueva requisición</Button>
+            )}
+            {cfg.canCreate && tab === "orders" && (
+              <Button variant="primary" iconLeft="+" onClick={() => { setShowPoForm(true); setShowReqForm(false); }}>Nueva OC</Button>
+            )}
+            {cfg.canCreate && tab === "receipts" && (
+              <Button variant="primary" iconLeft="+" onClick={() => setShowReceiptForm(true)}>Registrar recepción</Button>
+            )}
+          </>
+        }
       />
+
+      {/* ── Formulario: Nueva Requisición ─────────────────────────────── */}
+      {showReqForm && (
+        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 18 }}>
+          <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>Nueva requisición</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Título *</label>
+              <input value={reqForm.title} onChange={e => setReqForm(f => ({ ...f, title: e.target.value }))} placeholder="Ej. Cables y conectores para obra Pachuca" style={inp} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Prioridad</label>
+              <select value={reqForm.priority} onChange={e => setReqForm(f => ({ ...f, priority: e.target.value }))} style={inp}>
+                {PRIORITIES.map(p => <option key={p} value={p}>{PRIORITY_LABEL[p]}</option>)}
+              </select>
+            </div>
+          </div>
+          <p style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text-secondary)", margin: "0 0 6px" }}>Artículos</p>
+          {reqItems.map((item, idx) => (
+            <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: 6, marginBottom: 6 }}>
+              <input value={item.description} onChange={e => setReqItems(prev => prev.map((it, i) => i === idx ? { ...it, description: e.target.value } : it))} placeholder="Descripción del artículo" style={inp} />
+              <input type="number" min={1} value={item.quantity} onChange={e => setReqItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: +e.target.value } : it))} placeholder="Cant." style={{ ...inp, width: 70 }} />
+              <input type="number" min={0} value={item.estimatedCost} onChange={e => setReqItems(prev => prev.map((it, i) => i === idx ? { ...it, estimatedCost: e.target.value } : it))} placeholder="Costo est." style={{ ...inp, width: 110 }} />
+              {reqItems.length > 1 && (
+                <button onClick={() => setReqItems(prev => prev.filter((_, i) => i !== idx))} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--danger)", padding: "0 4px" }}>✕</button>
+              )}
+            </div>
+          ))}
+          <button onClick={() => setReqItems(prev => [...prev, { ...emptyReqItem }])} style={{ fontSize: 12, color: "var(--primary)", background: "none", border: "none", cursor: "pointer", padding: "4px 0", marginBottom: 10 }}>+ Agregar artículo</button>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <Button variant="ghost" onClick={() => setShowReqForm(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void saveReq()} disabled={savingReq}>{savingReq ? "Guardando…" : "Crear requisición"}</Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Formulario: Nueva OC ──────────────────────────────────────── */}
+      {showPoForm && (
+        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 18 }}>
+          <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>Nueva orden de compra</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Proveedor *</label>
+              <input value={poForm.supplierName} onChange={e => setPoForm(f => ({ ...f, supplierName: e.target.value }))} placeholder="Nombre del proveedor" style={inp} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Fecha entrega est.</label>
+              <input type="date" value={poForm.expectedDate} onChange={e => setPoForm(f => ({ ...f, expectedDate: e.target.value }))} style={inp} />
+            </div>
+          </div>
+          <p style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text-secondary)", margin: "0 0 6px" }}>Artículos</p>
+          {poItems.map((item, idx) => (
+            <div key={idx} style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: 6, marginBottom: 6 }}>
+              <input value={item.description} onChange={e => setPoItems(prev => prev.map((it, i) => i === idx ? { ...it, description: e.target.value } : it))} placeholder="Descripción del artículo" style={inp} />
+              <input type="number" min={1} value={item.quantity} onChange={e => setPoItems(prev => prev.map((it, i) => i === idx ? { ...it, quantity: +e.target.value } : it))} placeholder="Cant." style={{ ...inp, width: 70 }} />
+              <input type="number" min={0} value={item.unitPrice} onChange={e => setPoItems(prev => prev.map((it, i) => i === idx ? { ...it, unitPrice: e.target.value } : it))} placeholder="Precio unit." style={{ ...inp, width: 110 }} />
+              {poItems.length > 1 && (
+                <button onClick={() => setPoItems(prev => prev.filter((_, i) => i !== idx))} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--danger)", padding: "0 4px" }}>✕</button>
+              )}
+            </div>
+          ))}
+          <button onClick={() => setPoItems(prev => [...prev, { ...emptyPoItem }])} style={{ fontSize: 12, color: "var(--primary)", background: "none", border: "none", cursor: "pointer", padding: "4px 0", marginBottom: 10 }}>+ Agregar artículo</button>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <Button variant="ghost" onClick={() => setShowPoForm(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void savePo()} disabled={savingPo}>{savingPo ? "Guardando…" : "Crear OC"}</Button>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         <button type="button" style={tabStyle(tab === "requisitions")} onClick={() => setTab("requisitions")}>
@@ -285,6 +494,27 @@ export default function ProcurementPage() {
             Ver todas
           </Link>
         </p>
+      )}
+
+      {showReceiptForm && (
+        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 16 }}>
+          <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>Registrar recepción de mercancía</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Orden de compra (ID) *</label>
+              <input value={receiptPoId} onChange={(e) => setReceiptPoId(e.target.value)} placeholder="Ej. 12" style={inp} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Notas</label>
+              <input value={receiptNotes} onChange={(e) => setReceiptNotes(e.target.value)} placeholder="Observaciones" style={inp} />
+            </div>
+          </div>
+          <p style={{ fontSize: 11.5, color: "var(--text-tertiary)", margin: "8px 0 0" }}>Se reciben todas las partidas de la OC al 100%.</p>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
+            <Button variant="ghost" onClick={() => setShowReceiptForm(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void saveReceipt()} disabled={savingReceipt}>{savingReceipt ? "Registrando…" : "Registrar entrada"}</Button>
+          </div>
+        </div>
       )}
 
       <Section
