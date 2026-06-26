@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -10,6 +10,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { useCrmManagerGuard } from "@/lib/useCrmManagerGuard";
+import { getCrmManagerSubmoduleConfig } from "@/lib/section-views";
 
 interface Performance {
   targetId: number;
@@ -32,6 +33,7 @@ async function apiFetch(path: string, token: string) {
 export default function TeamPage() {
   const { user } = useUser();
   const cfg = useCrmManagerGuard();
+  const viewCfg = useMemo(() => getCrmManagerSubmoduleConfig(user, "team"), [user]);
   const token = user?.token ?? "";
 
   const [rows, setRows] = useState<Performance[]>([]);
@@ -74,8 +76,8 @@ export default function TeamPage() {
     <>
       <PageHeader
         eyebrow="CRM · Equipo y métricas"
-        title={cfg.title}
-        subtitle={cfg.subtitle}
+        title={viewCfg.title}
+        subtitle={viewCfg.subtitle}
         actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
       />
 

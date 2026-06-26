@@ -1,15 +1,13 @@
 /**
- * Seed de usuarios demo NEXARA — equipo real alineado con organigrama.
+ * Seed de usuarios demo NEXARA — equipo oficial (organigrama v1).
  *
- * Crea/actualiza:
- *  - Departamentos (Dirección General, Administración, Operaciones, Ingeniería…)
- *  - Usuarios reales del equipo NEXARA con sus roles
- *  - Password universal demo: "Nexara2026!" (cambiar en producción)
- *
+ * Crea/actualiza los 16 miembros del equipo con contraseña demo universal.
  * Es idempotente: puede correrse N veces sin duplicar nada.
  *
+ * Password demo: Nexara2026!
+ *
  * Run:
- *   npm run prisma:seed
+ *   cd apps/api && npm run prisma:seed
  */
 
 import { PrismaClient } from '@prisma/client';
@@ -20,151 +18,164 @@ const prisma = new PrismaClient();
 const DEMO_PASSWORD = process.env.SEED_DEMO_PASSWORD || 'Nexara2026!';
 const DEMO_PASSWORD_HASH = bcryptjs.hashSync(DEMO_PASSWORD, 10);
 
-// ORG_ROLE_KEYS inline (sin dependencias externas)
-// Mapeados a los roles existentes en la BD
-const ORG_ROLE_KEYS = {
-  CEO: 'ceo',
-  DIRECTOR_ADMIN: 'director_admin',
-  DIRECTOR_OPS: 'director_ops',
-  DIRECTOR_COMMERCIAL: 'director_commercial',
-  PROJECT_MANAGER: 'project_manager',
-  SENIOR_ENGINEER: 'senior_engineer',
-  FIELD_ENGINEER: 'field_engineer',
-  DESIGNER: 'designer',
-  ADMIN_STAFF: 'admin_staff',
-} as const;
-
-type OrgRoleKey = typeof ORG_ROLE_KEYS[keyof typeof ORG_ROLE_KEYS];
+/** Hash placeholder de la migración seed_nexara_team — no permite login. */
+const PLACEHOLDER_PASSWORD_HASH =
+  '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p6ez6kxOEfRkNpDlHlOYIi';
 
 type DemoUser = {
   nombre: string;
   email: string;
-  orgRoleKey: OrgRoleKey;
+  roleKey: string;
   departmentName: string;
   employeeNumber?: string;
+  puesto?: string;
 };
 
 /**
- * Equipo real de NEXARA (alineado con el organigrama oficial).
+ * Equipo oficial NEXARA — alineado con migration 20260620120000_seed_nexara_team.
+ * soporte@nexara.com.mx usa ing_soporte (no ing_campo).
  */
 const DEMO_USERS: DemoUser[] = [
-  // ── Dirección General ─────────────────────────────────────────────────
   {
     nombre: 'Christian Eduardo Del Pozo Sánchez',
     email: 'gerencia@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.CEO,
+    roleKey: 'ceo',
     departmentName: 'Dirección General',
     employeeNumber: 'NX-001',
+    puesto: 'Director General',
   },
-
-  // ── Administración ────────────────────────────────────────────────────
+  {
+    nombre: 'Adam Del Pozo',
+    email: 'developer@nexara.com.mx',
+    roleKey: 'ceo',
+    departmentName: 'Dirección General',
+    employeeNumber: 'NX-002',
+    puesto: 'Developer / Super Admin',
+  },
+  {
+    nombre: 'Josué Teodulo Cervantes Arellano',
+    email: 'infraestructura@nexara.com.mx',
+    roleKey: 'arquitecto',
+    departmentName: 'Arquitectura',
+    employeeNumber: 'NX-003',
+    puesto: 'Arquitecto / Director Técnico',
+  },
   {
     nombre: 'Karen Elizalde Sarmiento',
     email: 'ventas@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.DIRECTOR_ADMIN,
+    roleKey: 'coord_admin',
     departmentName: 'Administración',
     employeeNumber: 'NX-101',
+    puesto: 'Coordinadora Administrativa',
   },
   {
     nombre: 'Mónica García Guzmán',
-    email: 'monica.garcia@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.ADMIN_STAFF,
+    email: 'soluciones@nexara.com.mx',
+    roleKey: 'administrativo',
     departmentName: 'Administración',
     employeeNumber: 'NX-102',
+    puesto: 'Ejecutiva Administrativa',
   },
-
-  // ── Área Creativa ─────────────────────────────────────────────────────
   {
-    nombre: 'Daniela Galindo Almanzán',
+    nombre: 'Daniela Galindo Almazán',
     email: 'redes@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.DESIGNER,
+    roleKey: 'lider_diseno',
     departmentName: 'Área Creativa',
     employeeNumber: 'NX-201',
+    puesto: 'Líder de Área Creativa',
   },
-
-  // ── Operaciones ───────────────────────────────────────────────────────
   {
-    nombre: 'Luis Job Aguilar Castillo',
-    email: 'direction.operaciones@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.DIRECTOR_OPS,
+    nombre: 'Luis Joel Aguilar Castillo',
+    email: 'direccion.operaciones@nexara.com.mx',
+    roleKey: 'coord_operaciones',
     departmentName: 'Operaciones',
     employeeNumber: 'NX-301',
+    puesto: 'Coordinador de Operaciones',
   },
   {
     nombre: 'David Morales Zenón',
     email: 'operaciones@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.PROJECT_MANAGER,
+    roleKey: 'coord_operaciones',
     departmentName: 'Operaciones',
     employeeNumber: 'NX-302',
+    puesto: 'Coordinador de Operaciones',
   },
-
-  // ── Arquitectura e Infraestructura ────────────────────────────────────
   {
-    nombre: 'Josué Teodulo Cervantes Abellano',
-    email: 'infraestructura@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.SENIOR_ENGINEER,
-    departmentName: 'Arquitectura',
+    nombre: 'José Iván Tapia Reyes',
+    email: 'ivan.tapia@nexara.com.mx',
+    roleKey: 'ing_campo',
+    departmentName: 'Ingeniería',
     employeeNumber: 'NX-401',
-  },
-
-  // ── Ingeniería ────────────────────────────────────────────────────────
-  {
-    nombre: 'José Juan Tapa Reyes',
-    email: 'jose.tapa@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
-    departmentName: 'Ingeniería',
-    employeeNumber: 'NX-501',
+    puesto: 'Ingeniero de Campo',
   },
   {
-    nombre: 'Juan Carrillo Carrete',
-    email: 'juan.carrillo@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
+    nombre: 'Iván Camargo Cañete',
+    email: 'administracion.ventas@nexara.com.mx',
+    roleKey: 'ing_campo',
     departmentName: 'Ingeniería',
-    employeeNumber: 'NX-502',
+    employeeNumber: 'NX-402',
+    puesto: 'Ingeniero de Campo',
   },
   {
     nombre: 'Isaías García Bustamante',
     email: 'isaias.garcia@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
+    roleKey: 'ing_campo',
     departmentName: 'Ingeniería',
-    employeeNumber: 'NX-503',
+    employeeNumber: 'NX-403',
+    puesto: 'Ingeniero de Campo',
   },
   {
-    nombre: 'María Sánchez Espinoza',
-    email: 'maria.sanchez@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
+    nombre: 'Joan Sebastián Sánchez Espinoza',
+    email: 'joan.sanchez@nexara.com.mx',
+    roleKey: 'ing_campo',
     departmentName: 'Ingeniería',
-    employeeNumber: 'NX-504',
+    employeeNumber: 'NX-404',
+    puesto: 'Ingeniero de Campo',
   },
   {
-    nombre: 'Daniela Arévez Álvarez',
-    email: 'daniela.arevez@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
+    nombre: 'Carolina Juárez Álvarez',
+    email: 'soporte@nexara.com.mx',
+    roleKey: 'ing_soporte',
     departmentName: 'Ingeniería',
-    employeeNumber: 'NX-505',
+    employeeNumber: 'NX-405',
+    puesto: 'Ingeniera de Soporte',
   },
   {
-    nombre: 'Juana Sierra Gallardo',
-    email: 'juana.sierra@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
+    nombre: 'Ariadna Sierra Gallardo',
+    email: 'ariadna.sierra@nexara.com.mx',
+    roleKey: 'ing_campo',
     departmentName: 'Ingeniería',
-    employeeNumber: 'NX-506',
+    employeeNumber: 'NX-406',
+    puesto: 'Ingeniera de Campo',
   },
   {
-    nombre: 'María González Bustamante',
-    email: 'maria.gonzalez@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
+    nombre: 'Alejandro González Bustamante',
+    email: 'alejandro.gonzalez@nexara.com.mx',
+    roleKey: 'ing_campo',
     departmentName: 'Ingeniería',
-    employeeNumber: 'NX-507',
+    employeeNumber: 'NX-407',
+    puesto: 'Ingeniero de Campo',
   },
   {
-    nombre: 'Melisa Ramos Lima',
-    email: 'melisa.ramos@nexara.com.mx',
-    orgRoleKey: ORG_ROLE_KEYS.FIELD_ENGINEER,
+    nombre: 'Israel Ramos Lima',
+    email: 'israel.ramos@nexara.com.mx',
+    roleKey: 'ing_campo',
     departmentName: 'Ingeniería',
-    employeeNumber: 'NX-508',
+    employeeNumber: 'NX-408',
+    puesto: 'Ingeniero de Campo',
   },
 ];
+
+const ORG_ROLE_KEY_BY_V2: Record<string, string> = {
+  ceo: 'ceo',
+  arquitecto: 'project_manager',
+  coord_admin: 'director_admin',
+  administrativo: 'admin_staff',
+  lider_diseno: 'designer',
+  coord_operaciones: 'project_manager',
+  ing_campo: 'field_engineer',
+  ing_soporte: 'senior_engineer',
+};
 
 async function ensureDepartment(name: string): Promise<number> {
   const existing = await prisma.department.findUnique({ where: { nombre: name } });
@@ -173,80 +184,103 @@ async function ensureDepartment(name: string): Promise<number> {
   return created.id;
 }
 
+async function resolveRole(roleKey: string) {
+  const byKey = await prisma.role.findFirst({ where: { roleKey } });
+  if (byKey) return byKey;
+
+  const orgRoleKey = ORG_ROLE_KEY_BY_V2[roleKey];
+  if (orgRoleKey) {
+    const byOrg = await prisma.role.findFirst({ where: { orgRoleKey } });
+    if (byOrg) return byOrg;
+  }
+
+  if (roleKey === 'arquitecto') {
+    const byName = await prisma.role.findFirst({
+      where: { nombre: { contains: 'Arquitecto', mode: 'insensitive' } },
+    });
+    if (byName) return byName;
+  }
+
+  return null;
+}
+
 async function seedDemoUsers() {
   console.log('🌱 [demo-users] Upsert de usuarios demo…');
-  
-  // ⚠️ DEBUG: Verificar que el hash se genera correctamente
-  const testPassword = 'Nexara2026!';
-  const testHash = bcryptjs.hashSync(testPassword, 10);
-  console.log(`   📌 Test hash generado: ${testHash}`);
-  const isValid = await bcryptjs.compare(testPassword, testHash);
-  console.log(`   📌 Comparación test: ${isValid ? '✅' : '❌'}`);
-  
+
   let created = 0;
   let updated = 0;
+  let passwordsFixed = 0;
 
   for (const u of DEMO_USERS) {
-    // Buscar role por orgRoleKey
-    const role = await prisma.role.findFirst({ where: { orgRoleKey: u.orgRoleKey } });
+    const role = await resolveRole(u.roleKey);
     if (!role) {
-      console.warn(`   ⚠️  Rol ${u.orgRoleKey} no existe en DB — se omite ${u.email}`);
+      console.warn(`   ⚠️  Rol ${u.roleKey} no existe en DB — se omite ${u.email}`);
       continue;
     }
     const departmentId = await ensureDepartment(u.departmentName);
 
     const existing = await prisma.user.findUnique({ where: { email: u.email } });
+    const needsPasswordFix =
+      !existing ||
+      existing.passwordHash === PLACEHOLDER_PASSWORD_HASH ||
+      !(await bcryptjs.compare(DEMO_PASSWORD, existing.passwordHash));
+
     if (existing) {
-      const updated_user = await prisma.user.update({
+      await prisma.user.update({
         where: { email: u.email },
         data: {
           nombre: u.nombre,
           passwordHash: DEMO_PASSWORD_HASH,
           roleId: role.id,
+          roleKey: u.roleKey,
           departmentId,
           employeeNumber: u.employeeNumber ?? existing.employeeNumber,
+          puesto: u.puesto ?? existing.puesto,
+          isActive: true,
         },
       });
-      console.log(`   ✏️ ${u.email} actualizado (hash: ${DEMO_PASSWORD_HASH.substring(0, 20)}...)`);
+      if (needsPasswordFix) passwordsFixed += 1;
+      console.log(`   ✏️  ${u.email} actualizado (${u.roleKey})`);
       updated += 1;
     } else {
-      const created_user = await prisma.user.create({
+      await prisma.user.create({
         data: {
           nombre: u.nombre,
           email: u.email,
           passwordHash: DEMO_PASSWORD_HASH,
           roleId: role.id,
+          roleKey: u.roleKey,
           departmentId,
           employeeNumber: u.employeeNumber,
+          puesto: u.puesto,
+          isActive: true,
         },
       });
-      console.log(`   ✨ ${u.email} creado (ID: ${created_user.id}, hash: ${DEMO_PASSWORD_HASH.substring(0, 20)}...)`);
+      console.log(`   ✨ ${u.email} creado (${u.roleKey})`);
       created += 1;
     }
   }
 
-  console.log(`   ✅ ${created} usuarios creados · ${updated} actualizados`);
+  console.log(`   ✅ ${created} creados · ${updated} actualizados · ${passwordsFixed} passwords corregidos`);
   console.log(`   🔑 Password demo: ${DEMO_PASSWORD}`);
+}
+
+async function verifyLogin(email: string) {
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    console.log(`   ❌ ${email} — no existe en DB`);
+    return;
+  }
+  const ok = await bcryptjs.compare(DEMO_PASSWORD, user.passwordHash);
+  console.log(`   ${ok ? '✅' : '❌'} ${email} — login ${ok ? 'OK' : 'FALLA'} (roleKey: ${user.roleKey ?? '—'})`);
 }
 
 async function main() {
   await seedDemoUsers();
-  
-  // ⚠️ DEBUG: Verificar que el usuario CEO fue actualizado correctamente
-  const ceoUser = await prisma.user.findUnique({ where: { email: 'gerencia@nexara.com.mx' } });
-  if (ceoUser) {
-    console.log(`\n📊 Verificación CEO:`);
-    console.log(`   ID: ${ceoUser.id}`);
-    console.log(`   Email: ${ceoUser.email}`);
-    console.log(`   Nombre: ${ceoUser.nombre}`);
-    console.log(`   RoleID: ${ceoUser.roleId}`);
-    console.log(`   PasswordHash length: ${ceoUser.passwordHash.length} chars`);
-    console.log(`   PasswordHash (primeros 50): ${ceoUser.passwordHash.substring(0, 50)}...`);
-    
-    // Verificar que el hash es válido
-    const isValid = await bcryptjs.compare('Nexara2026!', ceoUser.passwordHash);
-    console.log(`   Contraseña valida: ${isValid ? '✅' : '❌'}`);
-  }
+  console.log('\n📊 Verificación de login demo:');
+  await verifyLogin('soporte@nexara.com.mx');
+  await verifyLogin('gerencia@nexara.com.mx');
+  await verifyLogin('operaciones@nexara.com.mx');
 }
 
 main()

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -40,8 +41,27 @@ const STAGE_LABEL: Record<string, string> = {
 
 export default function RecruitingPage() {
   const { user } = useUser();
+  const router = useRouter();
   const cfg = useMemo(() => getOpsTeamSectionConfig(user, "recruiting"), [user]);
   const token = user?.token ?? "";
+
+  // Only RH, HR managers, and OPS directors have access to recruiting
+  const hasAccess = useMemo(() => {
+    if (!user) return false;
+    if (user.isSuperAdmin) return true;
+    const p = user.permissions ?? [];
+    return (
+      p.includes("cvs.manage") ||
+      p.includes("cvs.admin.review") ||
+      p.includes("console.admin")
+    );
+  }, [user]);
+
+  useEffect(() => {
+    if (user && !hasAccess) {
+      router.replace("/ops/dashboard");
+    }
+  }, [user, hasAccess, router]);
 
   const [items, setItems] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);

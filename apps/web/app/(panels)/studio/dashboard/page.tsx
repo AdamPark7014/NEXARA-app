@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import KpiCard from "@/components/ui/KpiCard";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
+import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 const RED_COLOR: Record<string, string> = {
@@ -33,6 +34,7 @@ async function apiFetch(path: string, token: string) {
 
 export default function StudioDashboardPage() {
   const { user } = useUser();
+  const cfg = useMemo(() => getStudioSectionConfig(user, "dashboard"), [user]);
   const token = user?.token ?? "";
 
   const [contacts, setContacts]   = useState<number | null>(null);
@@ -81,8 +83,8 @@ export default function StudioDashboardPage() {
     <>
       <PageHeader
         eyebrow="STUDIO · Marca y marketing"
-        title="Construyendo la marca NEXARA"
-        subtitle="Sitio público, redes sociales, casos de éxito y captación de leads. Aquí se cuenta la historia que ventas convierte."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         variant="hero"
         meta={
           <>

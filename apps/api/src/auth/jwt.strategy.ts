@@ -2,6 +2,8 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuthService } from './auth.service.js';
+import { isSuperAdminEmail } from '../common/platform-accounts.js';
 
 const jwtSecret = process.env.JWT_SECRET;
 if (!jwtSecret) {
@@ -10,7 +12,10 @@ if (!jwtSecret) {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly authService: AuthService,
+  ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -60,29 +65,24 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: {
-        id: true,
-        roleId: true,
-        departmentId: true,
-        // RBAC v2 — leemos siempre el roleKey fresco de BD para que los
-        // cambios desde /erp/users surtan efecto sin requerir re-login.
-        roleKey: true,
-        role: { select: { orgRoleKey: true } },
-      },
+      include: { role: true },
     });
 
     if (!user) {
       throw new UnauthorizedException('Usuario inactivo o inexistente');
     }
 
+    const isSuperAdmin = Boolean(payload.isSuperAdmin) || isSuperAdminEmail(user.email);
+    const effectiveRoleKey = this.authService.resolveEffectiveRoleKey(user);
+    const permissions = this.authService.resolveUserPermissions(user, isSuperAdmin);
+
     return {
       id: payload.sub,
       roleId: payload.roleId,
-      departmentId: payload.departmentId,
-      permissions: payload.permissions || [],
-      isSuperAdmin: Boolean(payload.isSuperAdmin),
-      // RBAC v2: el guard híbrido usa estos para evaluar url-matrix.ts.
-      roleKey: user.roleKey ?? payload.roleKey ?? null,
+      departmentId: payload.departmentId ?? user.departmentId,
+      permissions,
+      isSuperAdmin,
+      roleKey: effectiveRoleKey,
       orgRoleKey: user.role?.orgRoleKey ?? payload.orgRoleKey ?? null,
       clientId: payload.clientId,
       isClient: false,

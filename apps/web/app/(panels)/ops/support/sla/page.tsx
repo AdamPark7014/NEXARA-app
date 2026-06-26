@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -9,6 +9,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
+import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES } from "@/lib/rbac";
@@ -39,6 +40,7 @@ async function apiFetch(path: string, token: string) {
 
 export default function SupportSlaPage() {
   const { user } = useUser();
+  const cfg = useMemo(() => getOpsTeamSectionConfig(user, "support-sla"), [user]);
   const router = useRouter();
   const token = user?.token ?? "";
 
@@ -80,8 +82,8 @@ export default function SupportSlaPage() {
     <>
       <PageHeader
         eyebrow="OPS · Soporte"
-        title="Cumplimiento de SLA"
-        subtitle="Últimos 30 días: tiempo de respuesta, tiempo de resolución y tickets que rompieron el acuerdo de servicio."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
       />
 

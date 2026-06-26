@@ -10,6 +10,7 @@ import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getActivitiesSectionConfig } from "@/lib/section-views";
+import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface ActivityRow {
@@ -54,12 +55,7 @@ export default function MyActivitiesPage() {
   const router = useRouter();
   const token = user?.token ?? "";
   const cfg = useMemo(() => getActivitiesSectionConfig(user), [user]);
-
-  useEffect(() => {
-    if (cfg.viewMode === "manage" && cfg.defaultScope === "team") {
-      router.replace("/ops/activities");
-    }
-  }, [cfg, router]);
+  useOpsCanonicalRoute(user, "activities");
 
   const [tab, setTab] = useState<"hoy" | "semana" | "todas">("hoy");
   const [items, setItems] = useState<ActivityRow[]>([]);

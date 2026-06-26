@@ -8,8 +8,10 @@ import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
+import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getViaticsSectionConfig } from "@/lib/section-views";
+import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface Viatic {
@@ -41,22 +43,22 @@ export default function OpsViaticsPage() {
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight");
   const cfg = useMemo(() => getViaticsSectionConfig(user), [user]);
+  useOpsCanonicalRoute(user, "viatics");
   const token = user?.token ?? "";
-
-  useEffect(() => {
-    if (cfg.viewMode === "execute") router.replace("/ops/my-viatics");
-  }, [cfg.viewMode, router]);
 
   const [items, setItems] = useState<Viatic[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
-    setLoading(true);
+    setLoading(true); setError(null);
     try {
       const data = await apiFetch("viatics", token);
       setItems(Array.isArray(data) ? data : (data.data ?? []));
-    } catch { /* skip */ } finally { setLoading(false); }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al cargar viaticos");
+    } finally { setLoading(false); }
   }, [token]);
 
   useEffect(() => { load(); }, [load]);
@@ -66,7 +68,7 @@ export default function OpsViaticsPage() {
     try {
       await apiFetch(`viatics/${id}`, token, { method: "PATCH", body: JSON.stringify({ estado }) });
       setItems(prev => prev.map(v => v.id === id ? { ...v, estado } : v));
-    } catch { /* skip */ }
+    } catch (e) { alert(e instanceof Error ? e.message : "Error al actualizar viatico"); }
   };
 
   const pendientes = items.filter(v => v.estado?.startsWith("PENDIENTE")).length;
@@ -131,16 +133,18 @@ export default function OpsViaticsPage() {
         <KpiCard label="Aprobado ($)" value={`$${(totalAprobado / 1000).toFixed(0)}k`} />
       </div>
 
-      <Section title={loading ? "Cargando…" : `${visibleItems.length} viáticos`}>
+      <Section title={loading ? "Cargando…" : `${visibleItems.length} viaticos`}>
         {highlightId && (
           <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
-            Mostrando viático <strong>#{highlightId}</strong> desde enlace directo.
+            Mostrando viatico <strong>#{highlightId}</strong> desde enlace directo.
           </p>
         )}
-        {loading ? (
-          <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
-        ) : (
-          <DataTable columns={columns} rows={visibleItems} rowKey={v => v.id} emptyTitle="Sin viáticos" emptyDescription="No hay gastos de campo registrados." />
+        {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando viaticos de campo." />}
+        {!loading && error && (
+          <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />
+        )}
+        {!loading && !error && (
+          <DataTable columns={columns} rows={visibleItems} rowKey={v => v.id} emptyTitle="Sin viaticos" emptyDescription="No hay gastos de campo registrados." />
         )}
       </Section>
     </>

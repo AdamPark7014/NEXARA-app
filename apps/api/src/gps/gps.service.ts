@@ -81,24 +81,29 @@ export class GpsService {
     return Array.from(byUser.values());
   }
 
-  private hasPermission(user: { permissions?: string[]; isSuperAdmin?: boolean } | null | undefined, permission: string) {
+  private hasPermission(
+    user: { permissions?: string[]; isSuperAdmin?: boolean } | null | undefined,
+    permission: string,
+  ) {
     if (!user) return false;
     if (user.isSuperAdmin) return true;
     return Boolean(user.permissions?.includes(permission));
   }
 
-  async findTeamLocations(requester: { id: number; departmentId?: number; permissions?: string[]; isSuperAdmin?: boolean }) {
+  async findTeamLocations(requester: {
+    id: number;
+    departmentId?: number;
+    permissions?: string[];
+    isSuperAdmin?: boolean;
+  }) {
     const today = this.getTodayDateOnly();
-    const canSeeAll = this.hasPermission(requester, PERMISSIONS.CONSOLE_ADMIN)
-      || this.hasPermission(requester, PERMISSIONS.GPS_MANAGE);
+    const canSeeAll =
+      this.hasPermission(requester, PERMISSIONS.CONSOLE_ADMIN) ||
+      this.hasPermission(requester, PERMISSIONS.GPS_MANAGE);
+
     const userFilter: any = {
       locationConsent: true,
-      attendanceDays: {
-        some: {
-          date: today,
-          isOpen: true,
-        },
-      },
+      attendanceDays: { some: { date: today, isOpen: true } },
     };
 
     if (!canSeeAll && requester.departmentId) {
@@ -114,7 +119,7 @@ export class GpsService {
 
     const locations = await this.prisma['locationTracking'].findMany({
       where: {
-        usuarioId: { in: allowedUsers.map((user) => user.id) },
+        usuarioId: { in: allowedUsers.map((u) => u.id) },
         estaActivo: true,
       },
       orderBy: { ultimaActualizacion: 'desc' },
@@ -125,6 +130,29 @@ export class GpsService {
     });
 
     return this.pickLatestByUser(locations);
+  }
+
+  /** All GPS points for userId on a given date (YYYY-MM-DD), ordered asc. Used for trajectory view. */
+  async getMyTrajectory(userId: number, date?: string) {
+    let targetDate: Date;
+    if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      const parts = date.split('-').map(Number);
+      targetDate = new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0);
+    } else {
+      targetDate = new Date();
+    }
+    const start = new Date(targetDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(targetDate);
+    end.setHours(23, 59, 59, 999);
+
+    return this.prisma['locationTracking'].findMany({
+      where: {
+        usuarioId: userId,
+        ultimaActualizacion: { gte: start, lte: end },
+      },
+      orderBy: { ultimaActualizacion: 'asc' },
+    });
   }
 
   findOne(id: number) {

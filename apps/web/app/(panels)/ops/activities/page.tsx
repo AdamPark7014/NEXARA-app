@@ -10,6 +10,7 @@ import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { getActivitiesSectionConfig } from "@/lib/section-views";
+import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 
 interface Activity {
   id: number;
@@ -64,12 +65,7 @@ export default function ActivitiesPage() {
   const router = useRouter();
   const token = user?.token ?? "";
   const cfg = useActivitiesConfig();
-
-  useEffect(() => {
-    if (cfg.viewMode === "execute") {
-      router.replace("/ops/my-activities");
-    }
-  }, [cfg.viewMode, router]);
+  useOpsCanonicalRoute(user, "activities");
 
   const [showOnlyMine, setShowOnlyMine] = useState(
     cfg.viewMode === "manage_execute" ? false : cfg.defaultScope === "self",

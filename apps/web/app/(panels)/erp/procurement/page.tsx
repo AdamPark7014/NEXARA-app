@@ -256,8 +256,8 @@ export default function ProcurementPage() {
     <>
       <PageHeader
         eyebrow="ERP · Compras"
-        title="Compras y abastecimiento"
-        subtitle="Requisiciones, órdenes de compra y recepciones de mercancía."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={<Button variant="ghost" onClick={() => void load()}>Actualizar</Button>}
       />
 

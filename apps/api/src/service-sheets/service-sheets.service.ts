@@ -54,10 +54,12 @@ export class ServiceSheetsService {
     const departmentId = user?.departmentId;
     const userId = user?.id;
 
+    const isOpsManager = isConsoleAdmin || Boolean(user?.permissions?.includes?.(PERMISSIONS.ACTIVITIES_MANAGE));
+
     let where: Prisma.ServiceSheetWhereInput | undefined;
     if (isSuperAdmin) {
       where = undefined;
-    } else if (isConsoleAdmin && departmentId) {
+    } else if (isOpsManager && departmentId) {
       where = {
         activity: {
           responsable: {

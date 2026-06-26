@@ -6,6 +6,46 @@ import * as bcrypt from 'bcryptjs';
 import { PERMISSIONS } from '../common/permissions.js';
 import { NotificationType } from '@prisma/client';
 import { detectDeviceFromUserAgent } from '../common/device-detector.js';
+import {
+  isPlatformOwnerEmail,
+  isSuperAdminEmail,
+} from '../common/platform-accounts.js';
+import { LEGACY_TO_V2, ROLES, type RoleKey } from '../common/rbac/roles.v2.js';
+
+type UserWithRole = {
+  roleKey?: string | null;
+  role?: {
+    orgRoleKey?: string | null;
+    accesoConsole?: boolean;
+    accesoConsoleAdmin?: boolean;
+    accesoActividades?: boolean;
+    accesoEvidencias?: boolean;
+    accesoViaticos?: boolean;
+    accesoVehiculos?: boolean;
+    accesoAsistencia?: boolean;
+    accesoGps?: boolean;
+    accesoGestionUsuarios?: boolean;
+    accesoGestionWeb?: boolean;
+    accesoGestionCvs?: boolean;
+    accesoPanelVentas?: boolean;
+    accesoContabilidad?: boolean;
+    accesoCotizaciones?: boolean;
+    accesoInventario?: boolean;
+    accesoCompras?: boolean;
+    accesoMantenimiento?: boolean;
+    accesoDocumentos?: boolean;
+    accesoAuditoria?: boolean;
+    accesoBI?: boolean;
+    accesoBanca?: boolean;
+    accesoMultas?: boolean;
+    accesoClientes?: boolean;
+    accesoLunchBreaks?: boolean;
+    accesoRRHH?: boolean;
+    accesoCatalogo?: boolean;
+    accesoGestionTienda?: boolean;
+  } | null;
+  email?: string;
+};
 
 @Injectable()
 export class AuthService {
@@ -17,10 +57,38 @@ export class AuthService {
   ) {}
 
   private isSuperAdmin(email: string) {
-    return ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'].includes(email.trim().toLowerCase());
+    return isSuperAdminEmail(email);
   }
 
-  private buildPermissions(role: any, isSuperAdmin = false) {
+  private isPlatformOwner(email: string) {
+    return isPlatformOwnerEmail(email);
+  }
+
+  /** roleKey del usuario o inferido desde Role.orgRoleKey (v2). */
+  resolveEffectiveRoleKey(user: UserWithRole): RoleKey | null {
+    const validKeys = new Set<string>(Object.values(ROLES));
+    if (user.roleKey && validKeys.has(user.roleKey)) {
+      return user.roleKey as RoleKey;
+    }
+    const orgKey = user.role?.orgRoleKey;
+    if (orgKey && validKeys.has(orgKey)) {
+      return orgKey as RoleKey;
+    }
+    if (orgKey && LEGACY_TO_V2[orgKey]) {
+      return LEGACY_TO_V2[orgKey];
+    }
+    return null;
+  }
+
+  /** Permisos efectivos — flags de BD + enriquecimiento v2. */
+  resolveUserPermissions(user: UserWithRole, isSuperAdmin = false): string[] {
+    return this.addV2RolePermissions(
+      this.buildPermissions(user.role, isSuperAdmin),
+      this.resolveEffectiveRoleKey(user),
+    );
+  }
+
+  private buildPermissions(role: UserWithRole['role'], isSuperAdmin = false) {
     const permissions: string[] = [];
     const isConsoleUser = Boolean(role?.accesoConsole);
     const isConsoleAdmin = Boolean(role?.accesoConsoleAdmin);
@@ -292,6 +360,13 @@ export class AuthService {
       set.add(PERMISSIONS.HR_VIEW);
       set.add(PERMISSIONS.HR_MANAGE);
       set.add(PERMISSIONS.HR_APPROVE_LEAVE);
+      set.add(PERMISSIONS.CVS_ADMIN_REVIEW);
+    }
+    // RH role: recruiter access (technical screening + CV management)
+    if (roleKey === 'rh') {
+      set.add(PERMISSIONS.HR_VIEW);
+      set.add(PERMISSIONS.HR_MANAGE);
+      set.add(PERMISSIONS.CVS_MANAGE);
     }
 
     // ── Contabilidad / Finanzas ─────────────────────────────────────
@@ -311,11 +386,19 @@ export class AuthService {
       set.add(PERMISSIONS.ACTIVITIES_EXPORT);
       set.add(PERMISSIONS.EVIDENCES_REVIEW);
       set.add(PERMISSIONS.EVIDENCES_VIEW);
+      set.add(PERMISSIONS.EVIDENCES_CREATE);
       set.add(PERMISSIONS.VEHICLES_REVIEW);
       set.add(PERMISSIONS.VEHICLES_INVENTORY);
       set.add(PERMISSIONS.TOOLS_MANAGE);
       set.add(PERMISSIONS.TOOLS_INVENTORY);
       set.add(PERMISSIONS.VIATICS_MANAGE);
+      set.add(PERMISSIONS.ATTENDANCE_MANAGE);
+      set.add(PERMISSIONS.ATTENDANCE_VIEW);
+      set.add(PERMISSIONS.GPS_MANAGE);
+      set.add(PERMISSIONS.MAINTENANCE_VIEW);
+      set.add(PERMISSIONS.MAINTENANCE_MANAGE);
+      set.add(PERMISSIONS.ASSETS_VIEW);
+      set.add(PERMISSIONS.ASSETS_MANAGE);
     }
 
     return Array.from(set);
@@ -391,7 +474,7 @@ export class AuthService {
       roleId: user.roleId,
       // RBAC v2: clave canónica de rol (roles.v2.ts). Coexiste con roleId
       // legacy hasta que terminemos la migración de toda la base de usuarios.
-      roleKey: user.roleKey ?? null,
+      roleKey: this.resolveEffectiveRoleKey(user) ?? user.roleKey ?? null,
       orgRoleKey: user.role?.orgRoleKey ?? null,
       nivelAutoridad: user.role?.nivelAutoridad ?? 0,
       roleFlags: this.pickRoleFlags(user.role),
@@ -399,6 +482,7 @@ export class AuthService {
       departmentId: user.departmentId,
       permissions,
       isSuperAdmin,
+      isPlatformOwner: this.isPlatformOwner(user.email),
       avatarUrl: user.avatarUrl,
       ...(loginDevice ? { loginDevice } : {}),
     };
@@ -469,10 +553,8 @@ export class AuthService {
   async login(loginDto: LoginDto, req?: any) {
     const user = await this.validateUser(loginDto.email, loginDto.password);
     const isSuperAdmin = this.isSuperAdmin(user.email);
-    const permissions = this.addV2RolePermissions(
-      this.buildPermissions(user.role, isSuperAdmin),
-      user.roleKey,
-    );
+    const effectiveRoleKey = this.resolveEffectiveRoleKey(user);
+    const permissions = this.resolveUserPermissions(user, isSuperAdmin);
     const userAgent = req?.headers?.['user-agent'] || req?.headers?.['User-Agent'];
     const detectedDevice = detectDeviceFromUserAgent(userAgent, req?.headers);
 
@@ -484,11 +566,12 @@ export class AuthService {
       roleId: user.roleId,
       // RBAC v2: el guard híbrido lee `roleKey` para resolver permisos
       // contra `url-matrix.ts`. Si es null, cae al modelo legacy.
-      roleKey: user.roleKey ?? null,
+      roleKey: this.resolveEffectiveRoleKey(user) ?? user.roleKey ?? null,
       orgRoleKey: user.role?.orgRoleKey ?? null,
       departmentId: user.departmentId,
       permissions,
       isSuperAdmin,
+      isPlatformOwner: this.isPlatformOwner(user.email),
     };
 
     await this.createLoginNotification(user.id, detectedDevice);
@@ -512,7 +595,7 @@ export class AuthService {
     }
 
     const isSuperAdmin = this.isSuperAdmin(user.email);
-    const permissions = this.buildPermissions(user.role, isSuperAdmin);
+    const permissions = this.resolveUserPermissions(user, isSuperAdmin);
     return this.mapSessionUser(user, permissions, isSuperAdmin);
   }
 

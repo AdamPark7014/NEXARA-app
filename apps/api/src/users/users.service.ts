@@ -354,10 +354,11 @@ export class UsersService {
 
       const hasConsoleAdminPermission = Boolean(currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN));
       const hasUsersManagePermission = Boolean(currentUser.permissions?.includes(PERMISSIONS.USERS_MANAGE));
+      const hasActivitiesManagePermission = Boolean(currentUser.permissions?.includes(PERMISSIONS.ACTIVITIES_MANAGE));
       // Fallback por rol para compatibilidad con cuentas antiguas
       const isConsoleAdminByRole = userInDb.role?.accesoConsoleAdmin === true;
       const canAssignByHierarchy = hasConsoleAdminPermission || hasUsersManagePermission || isConsoleAdminByRole;
-      
+
       if (canAssignByHierarchy) {
         // Admin/supervisor de consola puede asignar a cualquier usuario operativo (incluye otros admins), excepto superadmins de plataforma
         return this.prisma['user'].findMany({
@@ -365,6 +366,22 @@ export class UsersService {
             AND: [
               { id: { not: currentUser.id } },
               { email: { notIn: superAdminEmails } },
+            ],
+          },
+          select: { id: true, nombre: true, email: true, role: true, avatarUrl: true },
+          orderBy: { nombre: 'asc' },
+        });
+      }
+
+      if (hasActivitiesManagePermission) {
+        // v2 OPS manager: puede asignar actividades solo a compañeros del mismo departamento sin permisos de consola
+        return this.prisma['user'].findMany({
+          where: {
+            AND: [
+              { id: { not: currentUser.id } },
+              { email: { notIn: superAdminEmails } },
+              { departmentId: currentUser.departmentId },
+              { role: { accesoConsoleAdmin: false } },
             ],
           },
           select: { id: true, nombre: true, email: true, role: true, avatarUrl: true },

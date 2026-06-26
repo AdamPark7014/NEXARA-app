@@ -131,8 +131,8 @@ export default function WarehousePage() {
     <>
       <PageHeader
         eyebrow="ERP · Almacén"
-        title="Inventario / Almacén"
-        subtitle="Niveles de stock por producto y ubicación. Los movimientos se registran vía módulo de stock."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={<Button variant="ghost" onClick={load}>Actualizar</Button>}
       />
 

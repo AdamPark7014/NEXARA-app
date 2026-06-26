@@ -80,7 +80,11 @@ export class ViaticosService {
 
     if (currentUser?.isSuperAdmin) {
       where = undefined;
-    } else if (currentUser?.permissions?.includes('CONSOLE_ADMIN')) {
+    } else if (
+      currentUser?.permissions?.includes('CONSOLE_ADMIN') ||
+      currentUser?.permissions?.includes('viaticos.manage')
+    ) {
+      // Legacy admin or v2 OPS manager: team scope within same department
       where = {
         User: {
           AND: [

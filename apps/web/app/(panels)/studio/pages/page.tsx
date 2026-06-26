@@ -6,12 +6,13 @@
  * Guarda en: PUT /api/studio/page-content/:section
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
+import { getStudioSectionConfig } from "@/lib/section-views";
 import { toast } from "@/components/Toast";
 import {
   getPageSection,
@@ -40,6 +41,7 @@ const TABS: { id: ActiveTab; label: string; section: HomeSection }[] = [
 
 export default function StudioPagesPage() {
   const { user, isContextReady } = useUser();
+  const cfg = useMemo(() => getStudioSectionConfig(user, "pages"), [user]);
   const token = user?.token ?? "";
   const [activeTab, setActiveTab] = useState<ActiveTab>("metricas");
   const [saving, setSaving] = useState(false);
@@ -111,8 +113,8 @@ export default function StudioPagesPage() {
     <>
       <PageHeader
         eyebrow="STUDIO · Contenido"
-        title="Editor del sitio publico"
-        subtitle="Edita el contenido de cada seccion de la landing page."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         variant="hero"
         meta={
           <>

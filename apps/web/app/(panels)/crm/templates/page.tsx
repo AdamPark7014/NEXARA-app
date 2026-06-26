@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -9,6 +9,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { useCrmManagerGuard } from "@/lib/useCrmManagerGuard";
+import { getCrmManagerSubmoduleConfig } from "@/lib/section-views";
 
 interface OrderTemplate {
   id: number;
@@ -36,6 +37,7 @@ const emptyForm = { name: "", description: "", companyName: "", companyEmail: ""
 export default function TemplatesPage() {
   const { user } = useUser();
   const cfg = useCrmManagerGuard();
+  const viewCfg = useMemo(() => getCrmManagerSubmoduleConfig(user, "templates"), [user]);
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<OrderTemplate[]>([]);
@@ -120,8 +122,8 @@ export default function TemplatesPage() {
     <>
       <PageHeader
         eyebrow="CRM · Catálogo"
-        title="Plantillas"
-        subtitle={cfg.subtitle}
+        title={viewCfg.title}
+        subtitle={viewCfg.subtitle}
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>

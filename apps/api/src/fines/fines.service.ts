@@ -85,7 +85,11 @@ export class FinesService {
 
     if (currentUser?.isSuperAdmin) {
       where = undefined;
-    } else if (currentUser?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
+    } else if (
+      currentUser?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) ||
+      currentUser?.permissions?.includes(PERMISSIONS.ACTIVITIES_MANAGE)
+    ) {
+      // Legacy admin or v2 OPS manager: team scope within same department
       where = {
         usuario: {
           AND: [

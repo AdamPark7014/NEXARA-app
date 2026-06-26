@@ -141,8 +141,8 @@ export default function StudioSocialPage() {
     <>
       <PageHeader
         eyebrow="STUDIO · Contenido"
-        title="Redes sociales"
-        subtitle="Calendario editorial y posts programados para las cuentas de NEXARA."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={
           cfg.canCreate ? <Button variant="primary" iconLeft="✏️" onClick={openNew}>Crear post</Button> : undefined
         }

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, ForbiddenException } from '@nestjs/common';
 import { GpsService } from './gps.service.js';
 import { CreateGpsDto } from './dto/create-gps.dto.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
@@ -14,9 +14,9 @@ export class GpsController {
   @Post()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.GPS_VIEW] })
-  create(@CurrentUser() user: any, @Body() createGpsDto: CreateGpsDto) { 
+  create(@CurrentUser() user: any, @Body() createGpsDto: CreateGpsDto) {
     if (createGpsDto.usuarioId && createGpsDto.usuarioId !== user.id) {
-      throw new ForbiddenException('Solo puedes registrar tu propia ubicación');
+      throw new ForbiddenException('Solo puedes registrar tu propia ubicacion');
     }
     return this.gpsService.create({
       ...createGpsDto,
@@ -29,6 +29,13 @@ export class GpsController {
   @RBAC({ permissions: [PERMISSIONS.GPS_VIEW] })
   findMe(@CurrentUser() user: any) {
     return this.gpsService.findMe(user.id);
+  }
+
+  @Get('trajectory')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.GPS_VIEW] })
+  getMyTrajectory(@CurrentUser() user: any, @Query('date') date?: string) {
+    return this.gpsService.getMyTrajectory(user.id, date);
   }
 
   @Get('team')
@@ -55,11 +62,11 @@ export class GpsController {
     if (location.usuarioId === user.id) return location;
 
     if (!user.isSuperAdmin && !user.permissions?.includes(PERMISSIONS.GPS_MANAGE)) {
-      throw new ForbiddenException('No tienes permisos para ver esta ubicación');
+      throw new ForbiddenException('No tienes permisos para ver esta ubicacion');
     }
 
     if (!location.usuario?.locationConsent) {
-      throw new ForbiddenException('El usuario no comparte su ubicación');
+      throw new ForbiddenException('El usuario no comparte su ubicacion');
     }
 
     if (!user.isSuperAdmin && user.departmentId && location.usuario?.departmentId !== user.departmentId) {

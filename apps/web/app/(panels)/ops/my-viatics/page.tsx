@@ -10,6 +10,7 @@ import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getViaticsSectionConfig } from "@/lib/section-views";
+import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface Viatico {
@@ -38,11 +39,8 @@ export default function MyViaticsPage() {
   const { user } = useUser();
   const router = useRouter();
   const cfg = useMemo(() => getViaticsSectionConfig(user), [user]);
+  useOpsCanonicalRoute(user, "viatics");
   const token = user?.token ?? "";
-
-  useEffect(() => {
-    if (cfg.viewMode === "manage") router.replace("/ops/viatics");
-  }, [cfg.viewMode, router]);
 
   const [items, setItems] = useState<Viatico[]>([]);
   const [loading, setLoading] = useState(true);

@@ -38,7 +38,7 @@ const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 export default function StudioHeroPage() {
   const { user, isContextReady } = useUser();
-  const cfg = useMemo(() => getStudioSectionConfig(user, "news"), [user]);
+  const cfg = useMemo(() => getStudioSectionConfig(user, "hero"), [user]);
   const token = user?.token ?? "";
 
   const [slides, setSlides] = useState<HeroSlide[]>([]);
@@ -182,8 +182,8 @@ export default function StudioHeroPage() {
     <>
       <PageHeader
         eyebrow="STUDIO · Contenido"
-        title="Banner del inicio"
-        subtitle="Imágenes que aparecen rotando en el carrusel del home (nexara.com.mx). El texto y los CTAs viven en el componente; aquí solo se gestionan las fotos."
+        title={cfg.title}
+        subtitle={`${cfg.subtitle} Aquí solo se gestionan las fotos del carrusel.`}
         variant="hero"
         meta={
           <>

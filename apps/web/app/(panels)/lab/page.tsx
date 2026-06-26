@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import KpiCard from "@/components/ui/KpiCard";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
+import { useUser } from "@/components/UserContext";
+import { getLabSectionConfig } from "@/lib/section-views";
 
 const TOOLS = [
   {
@@ -35,12 +38,14 @@ const TOOLS = [
 ];
 
 export default function LabHome() {
+  const { user } = useUser();
+  const cfg = useMemo(() => getLabSectionConfig(user, "home"), [user]);
   return (
     <>
       <PageHeader
         eyebrow="LAB · Sandbox técnico"
-        title="NEXARA Lab"
-        subtitle="Espacio interno para experimentar con APIs, feature flags, modelos de IA y nuevas integraciones antes de llevarlas a producción."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         variant="hero"
         meta={
           <>

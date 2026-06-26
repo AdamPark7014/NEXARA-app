@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -8,6 +8,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
+import { getLabSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface AiResult {
@@ -89,6 +90,7 @@ const inp: React.CSSProperties = {
 
 export default function AiSandboxPage() {
   const { user } = useUser();
+  const cfg = useMemo(() => getLabSectionConfig(user, "ai"), [user]);
   const token = user?.token ?? "";
 
   const [model, setModel] = useState(MODELS[0].id);
@@ -165,8 +167,8 @@ export default function AiSandboxPage() {
     <>
       <PageHeader
         eyebrow="LAB · AI Sandbox"
-        title="Prompt Playground"
-        subtitle="Prueba modelos de IA contra el motor de NEXARA antes de llevarlos a producción. Los resultados no se persisten en la DB."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         variant="hero"
         meta={
           <>

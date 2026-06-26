@@ -663,8 +663,8 @@ export const MODULES: Record<ModuleId, ModuleEntry> = {
   "ops-maintenance-contracts": {
     id: "ops-maintenance-contracts", panel: PANELS.OPS, path: "/maintenance/contracts",
     label: "Contratos de servicio", description: "SLA, vigencias y alcance",
-    icon: "📑", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.MAINTENANCE_COORDINATOR],
-    group: "Servicio continuo", visible: true,
+    icon: "📑", allowedRoles: [R.CEO, R.DIRECTOR_OPS, R.MAINTENANCE_COORDINATOR, R.PROJECT_MANAGER],
+    group: "Servicio continuo", visible: false,
   },
   "ops-assets": {
     id: "ops-assets", panel: PANELS.OPS, path: "/assets",
@@ -917,27 +917,34 @@ export const ROLE_HOME_PANEL: Record<OrgRoleKey, PanelId> = {
   [R.NOC_OPERATOR]: PANELS.OPS,
 };
 
-export function getHomePanel(role: OrgRoleKey | null, isSuperAdmin = false): PanelId {
-  if (isSuperAdmin) return PANELS.ERP;
-  if (!role) return PANELS.ERP;
-  return ROLE_HOME_PANEL[role] ?? PANELS.ERP;
-}
-
 /** Rutas HOME explícitas por rol org (evita que todos los de ERP caigan en /executive). */
 const ORG_ROLE_HOME_PATH: Partial<Record<OrgRoleKey, string>> = {
   [R.CEO]: "/erp/executive",
   [R.FIELD_ENGINEER]: "/ops/my-activities",
 };
 
+export function getHomePanel(role: OrgRoleKey | null, isSuperAdmin = false, isPlatformOwner = false, isDeveloperSuperAdmin = false): PanelId {
+  if (isDeveloperSuperAdmin) return PANELS.LAB;
+  if (isPlatformOwner || isSuperAdmin) return PANELS.ERP;
+  if (!role) return PANELS.ERP;
+  return ROLE_HOME_PANEL[role] ?? PANELS.ERP;
+}
+
 /** Devuelve ruta HOME completa: /erp/dashboard, /crm/dashboard, etc. */
-export function getHomeUrl(role: OrgRoleKey | null, isSuperAdmin = false): string {
-  if (isSuperAdmin) return "/erp/executive";
+export function getHomeUrl(
+  role: OrgRoleKey | null,
+  isSuperAdmin = false,
+  isPlatformOwner = false,
+  isDeveloperSuperAdmin = false,
+): string {
+  if (isDeveloperSuperAdmin) return "/lab";
+  if (isPlatformOwner || isSuperAdmin) return "/erp/executive";
   if (!role) return "/erp/dashboard";
 
   const explicit = ORG_ROLE_HOME_PATH[role];
   if (explicit) return explicit;
 
-  const panel = getHomePanel(role, isSuperAdmin);
+  const panel = getHomePanel(role, isSuperAdmin, isPlatformOwner, isDeveloperSuperAdmin);
   if (panel === PANELS.LAB) return "/lab";
   // PANEL_META.erp.entryPath es /executive (branding subdominio); home operativo = dashboard.
   if (panel === PANELS.ERP) return "/erp/dashboard";

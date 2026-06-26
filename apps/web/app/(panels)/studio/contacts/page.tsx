@@ -161,8 +161,8 @@ export default function StudioContactsPage() {
     <>
       <PageHeader
         eyebrow="STUDIO · Captación"
-        title="Contactos web"
-        subtitle="Formularios y mensajes que llegan por el sitio público y redes sociales. De aquí pasan al CRM."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={
           <Button variant="primary" iconLeft="→" onClick={() => {
             const news = items.filter(c => c.status === "NEW");

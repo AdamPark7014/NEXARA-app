@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -10,6 +10,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { useCrmManagerGuard } from "@/lib/useCrmManagerGuard";
+import { getCrmManagerSubmoduleConfig } from "@/lib/section-views";
 
 interface Performance {
   targetId: number;
@@ -48,6 +49,7 @@ const emptyForm = {
 export default function TargetsPage() {
   const { user } = useUser();
   const cfg = useCrmManagerGuard();
+  const viewCfg = useMemo(() => getCrmManagerSubmoduleConfig(user, "targets"), [user]);
   const token = user?.token ?? "";
 
   const [perf, setPerf] = useState<{ year: number; month: number; performance: Performance[]; totals: { revenueTarget: number; revenueAchieved: number; totalCommissions: number; avgAttainmentPct: number } } | null>(null);
@@ -116,8 +118,8 @@ export default function TargetsPage() {
     <>
       <PageHeader
         eyebrow="CRM · Equipo y métricas"
-        title={cfg.title}
-        subtitle={cfg.subtitle}
+        title={viewCfg.title}
+        subtitle={viewCfg.subtitle}
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>

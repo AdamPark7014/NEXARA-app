@@ -74,7 +74,7 @@ const CROSS_PANEL_REMAPS: Array<[RegExp, string]> = [
   [/^\/panel\/asistencia(\/?.*)$/, '/erp/hr/attendance'],
   [/^\/panel\/vehiculos(\/?.*)$/, '/ops/vehicles'],
   [/^\/panel\/herramientas(\/?.*)$/, '/ops/tools'],
-  [/^\/panel\/actividades(\/?.*)$/, '/ops/my-activities'],
+  [/^\/panel\/actividades(\/?.*)$/, '/ops/activities'],
   [/^\/panel\/multas(\/?.*)$/, '/erp/hr/fines'],
   [/^\/panel\/ventas(\/.*)?$/, '/crm'],
   [/^\/panel\/tickets(\/?.*)$/, '/tickets$1'],

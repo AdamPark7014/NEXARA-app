@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -8,159 +8,417 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
-import { getAttendanceViewMode } from "@/lib/user-access";
+import { getAttendanceSectionConfig } from "@/lib/user-access";
 
 const AttendanceForm = dynamic(() => import("@/components/AttendanceForm"), { ssr: false });
 
-interface AttendanceRecord {
-  id: number;
-  user?: { nombre?: string };
-  checkIn?: string;
-  checkOut?: string;
-  fecha?: string;
-  horasTrabajadas?: number;
-  estado?: string;
-  location?: string;
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface AttendanceDay {
+  isOpen?: boolean;
+  lastEntryAt?: string | null;
+  totalMinutes?: number;
 }
 
-async function apiFetch(path: string, token: string, opts?: RequestInit) {
+interface TeamMember {
+  userId?: number;
+  nombre?: string;
+  user?: { id?: number; nombre?: string; avatarUrl?: string | null; role?: { nombre?: string } | null };
+  attendances?: { type: string; timestamp: string }[];
+  totalMinutes?: number;
+  checkIn?: string;
+  checkOut?: string;
+  estado?: "PRESENTE" | "COMPLETO" | "AUSENTE";
+}
+
+interface WeekDay {
+  date?: string;
+  totalMinutes?: number;
+  isOpen?: boolean;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+async function apiFetch<T = unknown>(path: string, token: string): Promise<T> {
   const res = await fetch(buildApiUrl(path), {
-    ...opts,
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(opts?.headers ?? {}) },
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
   return res.json();
 }
 
-function AttendanceManagementTable({ token, dateFilter }: { token: string; dateFilter: string }) {
-  const [items, setItems] = useState<AttendanceRecord[]>([]);
+function fmtTime(iso?: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+}
+
+function fmtMinutes(m?: number): string {
+  if (!m) return "0h";
+  const h = Math.floor(m / 60);
+  const min = m % 60;
+  return h > 0 ? `${h}h${min > 0 ? ` ${min}m` : ""}` : `${min}m`;
+}
+
+function fmtElapsed(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  const hh = Math.floor(s / 3600).toString().padStart(2, "0");
+  const mm = Math.floor((s % 3600) / 60).toString().padStart(2, "0");
+  const ss = (s % 60).toString().padStart(2, "0");
+  return `${hh}:${mm}:${ss}`;
+}
+
+const DAY_LABELS = ["L", "M", "X", "J", "V", "S", "D"];
+
+function getWeekDates(): string[] {
+  const today = new Date();
+  const dow = (today.getDay() + 6) % 7;
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() - dow + i);
+    return d.toLocaleDateString("sv-SE");
+  });
+}
+
+// ─── Employee Status Hero ─────────────────────────────────────────────────────
+
+function EmployeeStatusHero({ token, gpsConsent }: { token: string; gpsConsent: boolean }) {
+  const [day, setDay] = useState<AttendanceDay | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const loadDay = useCallback(async () => {
+    if (!token) return;
+    try {
+      const d = await apiFetch<AttendanceDay>("attendance/current", token);
+      setDay(d ?? null);
+    } catch { /* skip */ }
+  }, [token]);
+
+  useEffect(() => { void loadDay(); }, [loadDay]);
+
+  useEffect(() => {
+    const onUpdate = () => void loadDay();
+    window.addEventListener("attendance:updated", onUpdate);
+    return () => window.removeEventListener("attendance:updated", onUpdate);
+  }, [loadDay]);
+
+  useEffect(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (day?.isOpen && day.lastEntryAt) {
+      const start = new Date(day.lastEntryAt).getTime();
+      timerRef.current = setInterval(() => setElapsed(Date.now() - start), 1000);
+      setElapsed(Date.now() - start);
+    } else {
+      setElapsed(0);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [day?.isOpen, day?.lastEntryAt]);
+
+  const isOpen = Boolean(day?.isOpen);
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: 10.5, fontWeight: 600, color: "var(--text-tertiary)",
+    textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 5,
+  };
+
+  return (
+    <div style={{
+      background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16,
+      padding: "20px 24px", marginBottom: 20, display: "flex", alignItems: "center",
+      gap: 32, flexWrap: "wrap",
+    }}>
+      <div>
+        <div style={labelStyle}>Estado hoy</div>
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 7,
+          padding: "5px 14px", borderRadius: 999, fontSize: 11.5, fontWeight: 700,
+          background: isOpen ? "#dcfce7" : "var(--surface-2)",
+          color: isOpen ? "#15803d" : "var(--text-secondary)",
+        }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: isOpen ? "#22c55e" : "#94a3b8", display: "inline-block" }} />
+          {isOpen ? "EN JORNADA" : day ? "JORNADA CERRADA" : "SIN REGISTRO HOY"}
+        </div>
+      </div>
+
+      <div>
+        <div style={labelStyle}>Tiempo transcurrido</div>
+        <div style={{ fontFamily: "monospace", fontSize: 28, fontWeight: 800, letterSpacing: "0.05em", color: isOpen ? "var(--foreground)" : "var(--text-tertiary)" }}>
+          {isOpen ? fmtElapsed(elapsed) : day?.totalMinutes ? fmtMinutes(day.totalMinutes) : "—"}
+        </div>
+        {!isOpen && day?.totalMinutes ? (
+          <div style={{ fontSize: 10.5, color: "var(--text-tertiary)", marginTop: 1 }}>Total del dia</div>
+        ) : null}
+      </div>
+
+      <div>
+        <div style={labelStyle}>Entrada</div>
+        <div style={{ fontSize: 22, fontWeight: 700 }}>{fmtTime(day?.lastEntryAt)}</div>
+      </div>
+
+      <div style={{ marginLeft: "auto" }}>
+        <div style={labelStyle}>GPS</div>
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 7,
+          padding: "5px 14px", borderRadius: 999, fontSize: 11.5, fontWeight: 700,
+          background: gpsConsent && isOpen ? "#eff6ff" : "var(--surface-2)",
+          color: gpsConsent && isOpen ? "#1d4ed8" : "var(--text-secondary)",
+        }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: gpsConsent && isOpen ? "#3b82f6" : "#94a3b8", display: "inline-block" }} />
+          {gpsConsent && isOpen ? "Activo · Compartiendo" : "Inactivo"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Weekly Bar ───────────────────────────────────────────────────────────────
+
+function WeeklyBar({ token }: { token: string }) {
+  const [days, setDays] = useState<WeekDay[]>([]);
+  const [totalMin, setTotalMin] = useState(0);
+
+  useEffect(() => {
+    if (!token) return;
+    const week = getWeekDates();
+    apiFetch<{ totalMinutes?: number; days?: WeekDay[] }>(
+      `attendance/range?from=${week[0]}&to=${week[6]}`, token
+    ).then(d => { setTotalMin(d?.totalMinutes ?? 0); setDays(d?.days ?? []); }).catch(() => {});
+  }, [token]);
+
+  const weekDates = getWeekDates();
+  const today = new Date().toLocaleDateString("sv-SE");
+  const maxMin = Math.max(...days.map(d => d.totalMinutes ?? 0), 1);
+
+  return (
+    <Section title={`Esta semana · ${fmtMinutes(totalMin)} registradas`}>
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-end", minHeight: 100, paddingBottom: 28, position: "relative" }}>
+        {weekDates.map((dateStr, i) => {
+          const found = days.find(d => d.date === dateStr);
+          const min = found?.totalMinutes ?? 0;
+          const pct = Math.min(96, (min / maxMin) * 96);
+          const isToday = dateStr === today;
+          const isFuture = dateStr > today;
+          return (
+            <div key={dateStr} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", height: 80 }}>
+              <div style={{ flex: 1, width: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+                <div style={{
+                  width: "100%", height: min > 0 ? `${pct}%` : 4, minHeight: 4, borderRadius: 4,
+                  background: isFuture ? "var(--surface-2)" : isToday ? "var(--primary, #3b82f6)" : min > 0 ? "#93c5fd" : "var(--surface-2)",
+                  transition: "height 0.4s ease",
+                }} />
+              </div>
+              <div style={{ fontSize: 10, fontWeight: isToday ? 700 : 500, color: isToday ? "var(--primary, #3b82f6)" : "var(--text-tertiary)", marginTop: 4 }}>
+                {DAY_LABELS[i]}
+              </div>
+              {min > 0 && <div style={{ fontSize: 9.5, color: "var(--text-tertiary)" }}>{fmtMinutes(min)}</div>}
+            </div>
+          );
+        })}
+      </div>
+    </Section>
+  );
+}
+
+// ─── Team Card ────────────────────────────────────────────────────────────────
+
+function TeamCard({ member }: { member: TeamMember }) {
+  const name = member.user?.nombre ?? member.nombre ?? "—";
+  const role = member.user?.role?.nombre ?? "";
+  const estado = member.estado ?? "AUSENTE";
+  const ci = member.checkIn;
+  const co = member.checkOut;
+
+  const colors: Record<string, { border: string; dot: string; text: string; bg: string }> = {
+    PRESENTE: { border: "#3b82f6", dot: "#3b82f6", text: "#1d4ed8", bg: "#eff6ff" },
+    COMPLETO: { border: "#22c55e", dot: "#16a34a", text: "#15803d", bg: "#f0fdf4" },
+    AUSENTE:  { border: "var(--border)", dot: "#94a3b8", text: "var(--text-secondary)", bg: "var(--surface-2)" },
+  };
+  const c = colors[estado];
+
+  return (
+    <div style={{ background: "var(--surface)", border: `1.5px solid ${c.border}`, borderRadius: 12, padding: "14px 16px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 13 }}>{name}</div>
+          {role && <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>{role}</div>}
+        </div>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 999, fontSize: 10.5, fontWeight: 700, background: c.bg, color: c.text }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: c.dot, display: "inline-block" }} />
+          {estado === "PRESENTE" ? "En jornada" : estado === "COMPLETO" ? "Completo" : "Ausente"}
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 16, fontSize: 12, color: "var(--text-secondary)" }}>
+        <div><span style={{ marginRight: 3 }}>↓</span><span style={{ fontWeight: 600, color: "var(--foreground)" }}>{fmtTime(ci)}</span></div>
+        <div><span style={{ marginRight: 3 }}>↑</span><span style={{ fontWeight: 600, color: "var(--foreground)" }}>{fmtTime(co)}</span></div>
+        {(member.totalMinutes ?? 0) > 0 && (
+          <div style={{ marginLeft: "auto", color: "var(--text-tertiary)" }}>{fmtMinutes(member.totalMinutes)}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Team View ────────────────────────────────────────────────────────────────
+
+function TeamAttendanceView({ token, dateFilter }: { token: string; dateFilter: string }) {
+  const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<"grid" | "table">("grid");
 
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     try {
-      const data = await apiFetch(`attendance/hierarchy/range?from=${dateFilter}&to=${dateFilter}`, token);
-      const users = Array.isArray(data?.users) ? data.users : Array.isArray(data) ? data : data?.data ?? [];
-      const rows: AttendanceRecord[] = users.map((u: {
-        user?: { id?: number; nombre?: string };
-        userId?: number;
-        nombre?: string;
-        attendances?: { type: string; timestamp: string }[];
-        totalMinutes?: number;
-      }, idx: number) => {
-        const checkIn = u.attendances?.find((a) => a.type === "CHECK_IN")?.timestamp;
-        const checkOut = u.attendances?.find((a) => a.type === "CHECK_OUT")?.timestamp;
-        return {
-          id: u.user?.id ?? u.userId ?? idx,
-          user: { nombre: u.user?.nombre ?? u.nombre },
-          checkIn,
-          checkOut,
-          horasTrabajadas: u.totalMinutes ? u.totalMinutes / 60 : undefined,
-          estado: checkIn && checkOut ? "COMPLETO" : checkIn ? "PRESENTE" : "AUSENTE",
-        };
+      const raw = await apiFetch<{ users?: TeamMember[] } | TeamMember[]>(
+        `attendance/hierarchy/range?from=${dateFilter}&to=${dateFilter}`, token
+      );
+      const arr: TeamMember[] = Array.isArray(raw) ? raw : ((raw as { users?: TeamMember[] })?.users ?? []);
+      const ORDER = { PRESENTE: 0, COMPLETO: 1, AUSENTE: 2 } as const;
+      const mapped = arr.map(u => {
+        const ci = u.attendances?.find(a => a.type === "CHECK_IN")?.timestamp;
+        const co = u.attendances?.find(a => a.type === "CHECK_OUT")?.timestamp;
+        const estado: "PRESENTE" | "COMPLETO" | "AUSENTE" = ci && co ? "COMPLETO" : ci ? "PRESENTE" : "AUSENTE";
+        return { ...u, checkIn: ci, checkOut: co, estado };
       });
-      setItems(rows);
-    } catch {
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
+      mapped.sort((a, b) => (ORDER[a.estado ?? "AUSENTE"] ?? 2) - (ORDER[b.estado ?? "AUSENTE"] ?? 2));
+      setMembers(mapped);
+    } catch { setMembers([]); }
+    finally { setLoading(false); }
   }, [token, dateFilter]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
-  const presentes = items.filter((a) => a.checkIn && !a.checkOut).length;
-  const completados = items.filter((a) => a.checkIn && a.checkOut).length;
-  const ausentes = items.filter((a) => !a.checkIn).length;
+  const presentes = members.filter(m => m.estado === "PRESENTE").length;
+  const completos = members.filter(m => m.estado === "COMPLETO").length;
+  const ausentes  = members.filter(m => m.estado === "AUSENTE").length;
 
-  const columns: Column<AttendanceRecord>[] = [
-    { key: "user", label: "Empleado", render: (a) => <span style={{ fontWeight: 600, fontSize: 13 }}>{a.user?.nombre ?? "—"}</span>, width: 160 },
-    { key: "checkIn", label: "Entrada", accessor: (a) => a.checkIn ? new Date(a.checkIn).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }) : "—", width: 100 },
-    { key: "checkOut", label: "Salida", accessor: (a) => a.checkOut ? new Date(a.checkOut).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }) : "—", width: 100 },
-    { key: "horasTrabajadas", label: "Horas", accessor: (a) => a.horasTrabajadas ? `${a.horasTrabajadas.toFixed(1)}h` : "—", width: 80 },
-    { key: "location", label: "Ubicación", accessor: (a) => a.location ?? "—" },
-    { key: "estado", label: "Estado", render: (a) => (
-      <Tag variant={a.estado === "COMPLETO" ? "neutral" : a.estado === "PRESENTE" ? "accent" : "danger"}>
-        {a.checkIn && a.checkOut ? "Completo" : a.checkIn ? "Presente" : "Ausente"}
-      </Tag>
-    ), width: 100 },
+  const cols: Column<TeamMember>[] = [
+    {
+      key: "user", label: "Empleado",
+      render: m => (
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 13 }}>{m.user?.nombre ?? m.nombre ?? "—"}</div>
+          <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{m.user?.role?.nombre ?? ""}</div>
+        </div>
+      ),
+    },
+    { key: "checkIn",      label: "Entrada",  accessor: m => fmtTime(m.checkIn),        width: 90 },
+    { key: "checkOut",     label: "Salida",   accessor: m => fmtTime(m.checkOut),       width: 90 },
+    { key: "totalMinutes", label: "Horas",    accessor: m => fmtMinutes(m.totalMinutes), width: 80 },
+    {
+      key: "estado", label: "Estado", width: 120,
+      render: m => (
+        <Tag variant={m.estado === "COMPLETO" ? "positive" : m.estado === "PRESENTE" ? "accent" : "danger"}>
+          {m.estado === "COMPLETO" ? "Completo" : m.estado === "PRESENTE" ? "En jornada" : "Ausente"}
+        </Tag>
+      ),
+    },
   ];
+
+  const btnStyle = (active: boolean): React.CSSProperties => ({
+    padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer",
+    fontSize: 12, fontWeight: 600,
+    background: active ? "var(--primary, #3b82f6)" : "var(--surface-2)",
+    color: active ? "#fff" : "var(--text-secondary)",
+  });
 
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
-        <KpiCard label="Presentes" value={presentes} />
-        <KpiCard label="Jornada completa" value={completados} />
-        <KpiCard label="Ausentes" value={ausentes} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 12, marginBottom: 20 }}>
+        <KpiCard label="Total equipo" value={members.length} />
+        <KpiCard label="En jornada"   value={presentes} />
+        <KpiCard label="Completaron"  value={completos} />
+        <KpiCard label="Ausentes"     value={ausentes} />
       </div>
 
-      <Section title={loading ? "Cargando…" : `${items.length} registros — ${new Date(dateFilter + "T12:00:00").toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" })}`}>
-        {loading ? (
-          <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
-        ) : (
-          <DataTable columns={columns} rows={items} rowKey={(a) => a.id} emptyTitle="Sin registros" emptyDescription="No hay check-ins registrados para esta fecha." />
-        )}
-      </Section>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        <button style={btnStyle(view === "grid")}  onClick={() => setView("grid")}>Tarjetas</button>
+        <button style={btnStyle(view === "table")} onClick={() => setView("table")}>Tabla</button>
+        <button onClick={() => void load()} style={{ marginLeft: "auto", padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)", cursor: "pointer", fontSize: 12, background: "var(--surface)", color: "var(--text-secondary)" }}>
+          ↺ Actualizar
+        </button>
+      </div>
+
+      {loading ? (
+        <div style={{ padding: 48, textAlign: "center", color: "var(--text-tertiary)", fontSize: 13 }}>Cargando asistencia…</div>
+      ) : members.length === 0 ? (
+        <div style={{ padding: 48, textAlign: "center", color: "var(--text-tertiary)", fontSize: 13 }}>Sin registros para esta fecha.</div>
+      ) : view === "grid" ? (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 12 }}>
+          {members.map((m, i) => <TeamCard key={m.user?.id ?? m.userId ?? i} member={m} />)}
+        </div>
+      ) : (
+        <DataTable<TeamMember>
+          columns={cols}
+          rows={members}
+          rowKey={(m) => m.user?.id ?? m.userId ?? `${m.checkIn ?? ""}-${m.checkOut ?? ""}`}
+          emptyTitle="Sin registros"
+          emptyDescription="No hay asistencia registrada para esta fecha."
+        />
+      )}
     </>
   );
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function AttendancePage() {
   const { user } = useUser();
   const token = user?.token ?? "";
-  const viewMode = useMemo(() => getAttendanceViewMode(user), [user]);
-  const [dateFilter, setDateFilter] = useState(new Date().toISOString().slice(0, 10));
+  const attCfg = useMemo(() => getAttendanceSectionConfig(user), [user]);
+  const viewMode = attCfg.viewMode;
+  const [dateFilter, setDateFilter] = useState(new Date().toLocaleDateString("sv-SE"));
+  const [gpsConsent, setGpsConsent] = useState(false);
 
-  const headerCopy = useMemo(() => {
-    if (viewMode === "manage") {
-      return {
-        title: "Asistencia · Gestión",
-        subtitle: "Supervisión de jornadas del equipo. El CEO y dirección revisan sin registrar su propia entrada aquí.",
-      };
-    }
-    if (viewMode === "manage_register") {
-      return {
-        title: "Asistencia · Gestión",
-        subtitle: "Registra tu jornada y supervisa al equipo desde la misma sección.",
-      };
-    }
-    return {
-      title: "Mi asistencia",
-      subtitle: "Registra tu entrada y salida del día. Para ingenieros de campo, geolocalizado al sitio de la OT.",
+  useEffect(() => {
+    const onGps = (e: Event) => {
+      const ce = e as CustomEvent<{ enabled: boolean }>;
+      setGpsConsent(Boolean(ce.detail?.enabled));
     };
-  }, [viewMode]);
+    window.addEventListener("gps:consent", onGps);
+    return () => window.removeEventListener("gps:consent", onGps);
+  }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch(buildApiUrl("gps/me"), { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(d => setGpsConsent(Boolean(d?.consent)))
+      .catch(() => {});
+  }, [token]);
+
+  const isManager = attCfg.canManageTeam;
+  const canRegister = attCfg.canRegisterSelf;
 
   return (
     <>
       <PageHeader
         eyebrow="ERP · Personas"
-        title={headerCopy.title}
-        subtitle={headerCopy.subtitle}
-        actions={
-          viewMode !== "register" ? (
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input
-                type="date"
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-                style={{ padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}
-              />
-            </div>
-          ) : undefined
-        }
+        title={attCfg.title}
+        subtitle={attCfg.subtitle}
+        actions={isManager ? (
+          <input
+            type="date"
+            value={dateFilter}
+            onChange={e => setDateFilter(e.target.value)}
+            max={new Date().toLocaleDateString("sv-SE")}
+            style={{ padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}
+          />
+        ) : undefined}
       />
 
-      {(viewMode === "register" || viewMode === "manage_register") && (
-        <div style={{ marginBottom: 24 }}>
-          <Section title="Registro personal">
-            <AttendanceForm />
-          </Section>
-        </div>
+      {canRegister && <EmployeeStatusHero token={token} gpsConsent={gpsConsent} />}
+
+      {canRegister && (
+        <Section title="Registrar jornada" subtitle="Captura foto y ubicacion quedan registradas automaticamente.">
+          <AttendanceForm />
+        </Section>
       )}
 
-      {(viewMode === "manage" || viewMode === "manage_register") && token && (
-        <AttendanceManagementTable token={token} dateFilter={dateFilter} />
+      {viewMode === "register" && <WeeklyBar token={token} />}
+
+      {(viewMode === "manage" || viewMode === "manage_register") && (
+        <TeamAttendanceView token={token} dateFilter={dateFilter} />
       )}
     </>
   );

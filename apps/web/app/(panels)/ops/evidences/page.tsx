@@ -7,9 +7,12 @@ import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
+import KpiCard from "@/components/ui/KpiCard";
+import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
-import { getEvidencesSectionConfig } from "@/lib/section-views";
+import { getEvidencesSectionConfig, getEvidencesCanonicalPath } from "@/lib/section-views";
+import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 
 interface Evidence {
   id: number;
@@ -40,24 +43,22 @@ export default function EvidencesReviewPage() {
   const searchParams = useSearchParams();
   const activityFilter = searchParams.get("activityId");
   const cfg = useMemo(() => getEvidencesSectionConfig(user), [user]);
+  useOpsCanonicalRoute(user, "evidences");
   const token = user?.token ?? "";
-
-  useEffect(() => {
-    if (cfg.viewMode === "execute") {
-      router.replace("/ops/my-evidences");
-    }
-  }, [cfg.viewMode, router]);
 
   const [items, setItems] = useState<Evidence[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
-    setLoading(true);
+    setLoading(true); setError(null);
     try {
       const data = await apiFetch("evidences?limit=60", token);
       setItems(Array.isArray(data) ? data : (data.data ?? []));
-    } catch { /* skip */ } finally { setLoading(false); }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al cargar evidencias");
+    } finally { setLoading(false); }
   }, [token]);
 
   useEffect(() => { load(); }, [load]);
@@ -67,7 +68,7 @@ export default function EvidencesReviewPage() {
     try {
       await apiFetch(`evidences/${id}`, token, { method: "PATCH", body: JSON.stringify({ estado }) });
       setItems(prev => prev.map(e => e.id === id ? { ...e, estado } : e));
-    } catch { /* skip */ }
+    } catch (e) { alert(e instanceof Error ? e.message : "Error al actualizar estado"); }
   };
 
   const remove = async (id: number) => {
@@ -75,7 +76,7 @@ export default function EvidencesReviewPage() {
     try {
       await apiFetch(`evidences/${id}`, token, { method: "DELETE" });
       setItems(prev => prev.filter(e => e.id !== id));
-    } catch { /* skip */ }
+    } catch (e) { alert(e instanceof Error ? e.message : "Error al eliminar"); }
   };
 
   const pending = items.filter(e => e.estado === "PENDIENTE_REVISION").length;
@@ -141,17 +142,28 @@ export default function EvidencesReviewPage() {
         }
       />
 
+      {!loading && !error && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
+          <KpiCard label="Total" value={items.length} icon="📸" />
+          <KpiCard label="Pendientes revision" value={pending} variant={pending > 0 ? "warning" : "positive"} icon="⏳" />
+          <KpiCard label="Aprobadas" value={items.filter(e => e.estado === "APROBADA").length} icon="✅" />
+          <KpiCard label="Rechazadas" value={items.filter(e => e.estado === "RECHAZADA").length} variant={items.filter(e => e.estado === "RECHAZADA").length > 0 ? "danger" : "default"} icon="❌" />
+        </div>
+      )}
+
       <Section title={loading ? "Cargando…" : `${visibleItems.length} evidencias`}>
         {activityFilter && (
           <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
             Filtrando por actividad <strong>#{activityFilter}</strong>.{" "}
-            <Link href="/ops/evidences" style={{ color: "var(--primary)" }}>Ver todas</Link>
+            <Link href={getEvidencesCanonicalPath(user)} style={{ color: "var(--primary)" }}>Ver todas</Link>
           </p>
         )}
-        {loading ? (
-          <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
-        ) : (
-          <DataTable columns={columns} rows={visibleItems} rowKey={e => e.id} emptyTitle="Sin evidencias pendientes" emptyDescription="No hay evidencias en cola de revisión." />
+        {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando evidencias." />}
+        {!loading && error && (
+          <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />
+        )}
+        {!loading && !error && (
+          <DataTable columns={columns} rows={visibleItems} rowKey={e => e.id} emptyTitle="Sin evidencias pendientes" emptyDescription="No hay evidencias en cola de revision." />
         )}
       </Section>
     </>

@@ -6,6 +6,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
+import { getApprovalsSectionConfig } from "@/lib/section-views";
 import {
   listMyPendingApprovals,
   decideApproval,
@@ -155,6 +156,7 @@ const toApprovalRow = (approval: PendingApproval): RealApproval => {
 
 export default function ApprovalsPage() {
   const { user } = useUser();
+  const cfg = useMemo(() => getApprovalsSectionConfig(user), [user]);
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight");
   const highlightRef = useRef<HTMLDivElement | null>(null);
@@ -258,8 +260,8 @@ export default function ApprovalsPage() {
     <>
       <PageHeader
         eyebrow="ERP · Gobierno corporativo"
-        title="Aprobaciones jerárquicas"
-        subtitle="Flujo automático por nivel: cada solicitud pasa por su cadena de aprobadores. Tú ves solo lo que requiere tu firma."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void fetchPending()} disabled={loading}>

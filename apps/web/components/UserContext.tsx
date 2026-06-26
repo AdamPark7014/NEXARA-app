@@ -50,6 +50,7 @@ export interface User {
 	avatarUrl?: string;
 	permissions: string[];
 	isSuperAdmin?: boolean;
+	isPlatformOwner?: boolean;
 	loginDevice?: string;
 	/** Sesión sin validar token: solo UI offline (token puede estar vencido). */
 	offlineDegraded?: boolean;
@@ -91,6 +92,7 @@ const normalizeUser = (value: unknown): User | null => {
 			? candidate.permissions.filter((item): item is string => typeof item === 'string')
 			: [],
 		isSuperAdmin: Boolean(candidate.isSuperAdmin),
+		isPlatformOwner: Boolean(candidate.isPlatformOwner),
 		loginDevice: candidate.loginDevice,
 		offlineDegraded: Boolean(candidate.offlineDegraded),
 	};

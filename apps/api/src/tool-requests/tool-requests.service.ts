@@ -693,7 +693,10 @@ export class ToolRequestsService {
     userId?: number,
   ) {
     const isSuperAdmin = await this.isSuperAdminByEmail(currentUser.id, currentUser);
-    const isAdmin = Boolean(currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN));
+    const isAdmin = Boolean(
+      currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) ||
+      currentUser.permissions?.includes(PERMISSIONS.TOOLS_MANAGE),
+    );
 
     if (!isSuperAdmin && !isAdmin) {
       return [];
