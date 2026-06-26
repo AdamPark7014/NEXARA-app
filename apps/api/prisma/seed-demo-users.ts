@@ -184,22 +184,17 @@ async function ensureDepartment(name: string): Promise<number> {
   return created.id;
 }
 
-async function resolveRole(roleKey: string) {
-  const byKey = await prisma.role.findFirst({ where: { roleKey } });
-  if (byKey) return byKey;
-
-  const orgRoleKey = ORG_ROLE_KEY_BY_V2[roleKey];
-  if (orgRoleKey) {
-    const byOrg = await prisma.role.findFirst({ where: { orgRoleKey } });
-    if (byOrg) return byOrg;
-  }
-
-  if (roleKey === 'arquitecto') {
+async function resolveRole(v2RoleKey: string) {
+  if (v2RoleKey === 'arquitecto') {
     const byName = await prisma.role.findFirst({
       where: { nombre: { contains: 'Arquitecto', mode: 'insensitive' } },
     });
     if (byName) return byName;
   }
+
+  const orgRoleKey = ORG_ROLE_KEY_BY_V2[v2RoleKey] ?? v2RoleKey;
+  const byOrg = await prisma.role.findFirst({ where: { orgRoleKey } });
+  if (byOrg) return byOrg;
 
   return null;
 }
