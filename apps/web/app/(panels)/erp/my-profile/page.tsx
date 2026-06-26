@@ -103,7 +103,7 @@ export default function MyProfilePage() {
       <PageHeader
         eyebrow="ERP · Mi cuenta"
         title="Mi perfil"
-        subtitle="Tus datos personales, contacto de emergencia y documentos de identidad. Visible solo para RH y Dirección."
+        subtitle="Tus datos personales, contacto de emergencia y documentos de identidad."
         meta={profile && (
           <>
             <Tag variant="accent" dot>{profile.role?.nombre ?? "—"}</Tag>
@@ -124,7 +124,7 @@ export default function MyProfilePage() {
             </div>
           </Section>
 
-          <Section title="Datos personales" subtitle="Solo tú y RH/Dirección pueden ver y editar esta información.">
+          <Section title="Datos personales" subtitle="Solo tú y RH/Dirección pueden ver esta información.">
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <label style={{ display: "grid", gap: 4 }}><span style={lbl}>Teléfono</span>
                 <input value={form.telefono ?? ""} onChange={(e) => setForm((f) => ({ ...f, telefono: e.target.value }))} style={inp} /></label>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -11,6 +12,8 @@ import { useUser } from "@/components/UserContext";
 import { getAttendanceViewMode } from "@/lib/user-access";
 import { getLunchBreaksSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+
+const LunchBreakForm = dynamic(() => import("@/components/LunchBreakForm"), { ssr: false });
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -611,6 +614,17 @@ export default function LunchBreaksPage() {
             </div>
           ) : (
             <BreakStatusHero todayBreak={todayBreak} />
+          )}
+          {!loadingMy && (
+            <Section
+              title={todayBreak?.status === "IN_PROGRESS" ? "Registrar regreso" : "Registrar salida a comida"}
+              subtitle="Captura foto al salir y al regresar de tu hora de comida."
+            >
+              <LunchBreakForm
+                isCheckin={todayBreak?.status !== "IN_PROGRESS"}
+                onSuccess={() => void loadMyBreaks()}
+              />
+            </Section>
           )}
           {!loadingMy && <MyHistoryList items={myBreaks} />}
         </>

@@ -103,14 +103,14 @@ export class UsersController {
 
   @Get()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.HR_VIEW] })
   async findAll(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
     return this.usersService.findAllVisible(user, query);
   }
 
   @Get('assignable')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.ACTIVITIES_MANAGE] })
   async findAssignable(@CurrentUser() user: any) {
     // Cargar rol completo del usuario actual
     const userWithRole = await this.usersService.findOne(user.id);
@@ -171,14 +171,14 @@ export class UsersController {
 
   @Get('profile/me')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.PEOPLE_VIEW] })
   getMyProfile(@CurrentUser() user: any) {
     return this.usersService.getProfile(user.id);
   }
 
   @Patch('profile/me')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.PEOPLE_VIEW] })
   async updateMyProfile(@CurrentUser() user: any, @Body() body: any) {
     return this.usersService.upsertProfile(user.id, {
       telefono: body.telefono || null,
@@ -200,7 +200,7 @@ export class UsersController {
 
   @Post('profile/me/documents')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.PEOPLE_VIEW] })
   @UseInterceptors(FilesInterceptor('files', 10, { dest: getUserDocsUploadDir(__dirname) }))
   async uploadMyDocuments(
     @CurrentUser() user: any,

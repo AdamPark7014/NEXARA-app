@@ -137,6 +137,15 @@ export class UsersService {
     );
   }
 
+  /** Lista de usuarios visible (lectura) — incluye RRHH/coordinación sin permiso de edición. */
+  private canViewUsersDirectory(currentUser: { permissions?: string[]; isSuperAdmin?: boolean }) {
+    if (this.canManageUsers(currentUser)) return true;
+    return Boolean(
+      currentUser.permissions?.includes(PERMISSIONS.HR_VIEW) ||
+      currentUser.permissions?.includes(PERMISSIONS.HR_MANAGE),
+    );
+  }
+
   private isProtectedSuperAdminEmail(email?: string | null) {
     const normalized = String(email || '').toLowerCase();
     return this.superAdminEmails.includes(normalized);
@@ -152,7 +161,7 @@ export class UsersService {
     let where: any;
     if (currentUser.isSuperAdmin) {
       where = excludeSuperAdmins;
-    } else if (this.canManageUsers(currentUser)) {
+    } else if (this.canViewUsersDirectory(currentUser)) {
       where = { AND: [{ role: { accesoConsoleAdmin: false } }, excludeSuperAdmins] };
     } else {
       where = { id: currentUser.id, ...excludeSuperAdmins };
@@ -607,7 +616,7 @@ export class UsersService {
 
   async getOrgchart() {
     const users = await this.prisma['user'].findMany({
-      where: { isActive: true },
+      where: { isActive: true, email: { notIn: this.superAdminEmails } },
       select: {
         id: true,
         nombre: true,
