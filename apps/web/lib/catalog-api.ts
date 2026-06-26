@@ -60,3 +60,19 @@ export const listCatalogCategories = async (token: string) => {
 export const getCatalogProduct = async (token: string, id: number) => {
   return catalogRequest<CatalogProduct>(`catalog/products/${id}`, token, "Producto no encontrado");
 };
+
+export const createCatalogProduct = async (
+  token: string,
+  dto: { sku: string; name: string; category?: string; price?: number; description?: string },
+): Promise<CatalogProduct> => {
+  const res = await fetch(buildApiUrl("catalog/products"), {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(dto),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(typeof data?.message === "string" ? data.message : `HTTP ${res.status}`);
+  }
+  return res.json();
+};

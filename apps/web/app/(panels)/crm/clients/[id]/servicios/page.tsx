@@ -1,37 +1,209 @@
 "use client";
 
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import EmptyState from "@/components/ui/EmptyState";
-import { DetailError, DetailField, DetailFieldGrid, DetailSection } from "@/components/detail/DetailFrame";
+import Button from "@/components/ui/Button";
+import { Tag, Money } from "@/components/ui/DataTable";
+import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
 import { useClientDetail } from "@/components/crm/ClientDetailShell";
+import { useUser } from "@/components/UserContext";
+import { buildApiUrl } from "@/lib/api-base";
+import { canAccessMaintenanceContracts } from "@/lib/section-views";
+
+interface Contract {
+  id: number;
+  contractNumber: string;
+  title: string;
+  frequency: string;
+  monthlyFee: number | string;
+  status: string;
+  nextVisitDate?: string | null;
+  branch?: { id: number; name: string } | null;
+  _count?: { visits: number };
+}
+
+const STATUS_LABEL: Record<string, string> = { DRAFT: "Borrador", ACTIVE: "Activo", PAUSED: "Pausado", EXPIRED: "Vencido", CANCELLED: "Cancelado" };
+const FREQ_LABEL: Record<string, string> = { WEEKLY: "Semanal", BIWEEKLY: "Quincenal", MONTHLY: "Mensual", BIMONTHLY: "Bimestral", QUARTERLY: "Trimestral", SEMIANNUAL: "Semestral", ANNUAL: "Anual" };
+const FREQUENCIES = ["MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL"] as const;
+
+const inp: React.CSSProperties = {
+  width: "100%", padding: "7px 9px", border: "1px solid var(--border)",
+  borderRadius: 7, background: "var(--surface)", color: "var(--foreground)", fontSize: 12.5, boxSizing: "border-box",
+};
+
+const emptyForm = { title: "", frequency: "MONTHLY", startDate: new Date().toISOString().slice(0, 10), monthlyFee: "" };
+
+async function apiFetch(path: string, token: string, opts?: RequestInit) {
+  const res = await fetch(buildApiUrl(path), {
+    ...opts,
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(opts?.headers ?? {}) },
+  });
+  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+  return res.json();
+}
 
 export default function ClientServicesPage() {
-  const { client, error, reload } = useClientDetail();
+  const { client, error: clientError, reload: reloadClient } = useClientDetail();
+  const { user } = useUser();
+  const token = user?.token ?? "";
+  const scId = client?.serviceClient?.id;
+  const canCreate = useMemo(() => canAccessMaintenanceContracts(user), [user]);
 
-  if (error) return <DetailError message={error} onRetry={reload} />;
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ ...emptyForm });
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!token || !scId) return;
+    setLoading(true); setError(null);
+    try {
+      const data = await apiFetch(`maintenance-contracts?clientId=${scId}&limit=50`, token);
+      setContracts(Array.isArray(data) ? data : (data?.data ?? []));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al cargar contratos");
+    } finally { setLoading(false); }
+  }, [token, scId]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const save = async () => {
+    if (!token || !scId || !form.title.trim()) return;
+    setSaving(true);
+    try {
+      const created = await apiFetch("maintenance-contracts", token, {
+        method: "POST",
+        body: JSON.stringify({
+          clientId: scId,
+          title: form.title.trim(),
+          frequency: form.frequency,
+          startDate: form.startDate,
+          monthlyFee: form.monthlyFee ? Number(form.monthlyFee) : 0,
+        }),
+      });
+      setContracts((prev) => [created, ...prev]);
+      setShowForm(false);
+      setForm({ ...emptyForm });
+    } catch (e) {
+      window.alert("Error: " + (e instanceof Error ? e.message : "No se pudo crear"));
+    } finally { setSaving(false); }
+  };
+
+  if (clientError) return <DetailError message={clientError} onRetry={reloadClient} />;
   if (!client) return null;
 
-  if (!client.serviceClientId) {
+  if (!client.serviceClient) {
     return (
       <EmptyState
-        icon="🛠️"
-        title="Servicios no provisionados"
-        description="Este cliente aún no tiene handoff a operaciones. Provisiónalo desde Datos."
+        icon="🔧"
+        title="Sin cuenta operativa"
+        description="Activa el cliente en operaciones desde la pestaña Datos para gestionar contratos de servicio."
       />
     );
   }
 
+  const statusVariant = (s: string): "positive" | "warning" | "danger" | "default" =>
+    s === "ACTIVE" ? "positive" : s === "EXPIRED" || s === "CANCELLED" ? "danger" : s === "PAUSED" ? "warning" : "default";
+
+  const mrr = contracts.filter((c) => c.status === "ACTIVE").reduce((s, c) => s + Number(c.monthlyFee ?? 0), 0);
+
   return (
-    <DetailSection title="Servicios y operación">
-      <DetailFieldGrid>
-        <DetailField label="ID servicio" value={client.serviceClientId} />
-        <DetailField label="Cuenta OPS" value={client.serviceClient?.name} />
-      </DetailFieldGrid>
-      <p style={{ marginTop: 16, fontSize: 13 }}>
-        <Link href="/ops/service-clients" style={{ color: "var(--primary)", fontWeight: 600 }}>
-          Abrir módulo de clientes de servicio →
-        </Link>
-      </p>
+    <DetailSection title="Contratos de servicio">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+          {contracts.filter((c) => c.status === "ACTIVE").length} activo(s)
+          {mrr > 0 && <> · <strong>MRR ${mrr.toLocaleString("es-MX")}</strong></>}
+        </span>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Button variant="ghost" size="sm" onClick={() => void load()}>Actualizar</Button>
+          {canCreate && (
+            <Button variant="primary" size="sm" iconLeft="+" onClick={() => setShowForm(true)}>Nuevo contrato</Button>
+          )}
+          <Link href="/ops/maintenance/contracts" style={{ textDecoration: "none" }}>
+            <Button variant="secondary" size="sm">Ver todos</Button>
+          </Link>
+        </div>
+      </div>
+
+      {showForm && (
+        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10, padding: 16, marginBottom: 16 }}>
+          <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>Nuevo contrato · {client.serviceClient.name}</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Nombre *</label>
+              <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Mantenimiento preventivo mensual" style={inp} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Frecuencia</label>
+              <select value={form.frequency} onChange={(e) => setForm((f) => ({ ...f, frequency: e.target.value }))} style={inp}>
+                {FREQUENCIES.map((fq) => <option key={fq} value={fq}>{FREQ_LABEL[fq]}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Inicio</label>
+              <input type="date" value={form.startDate} onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))} style={inp} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Cuota mensual (MXN)</label>
+              <input type="number" min="0" value={form.monthlyFee} onChange={(e) => setForm((f) => ({ ...f, monthlyFee: e.target.value }))} style={inp} />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
+            <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}>Cancelar</Button>
+            <Button variant="primary" size="sm" onClick={() => void save()} disabled={saving || !form.title.trim()}>
+              {saving ? "Creando…" : "Crear contrato"}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {loading && <EmptyState icon="⏳" title="Cargando contratos…" description="" />}
+      {!loading && error && <EmptyState icon="⚠️" title="Error al cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
+
+      {!loading && !error && contracts.length === 0 && (
+        <EmptyState
+          icon="📋"
+          title="Sin contratos de servicio"
+          description="Este cliente aún no tiene contratos de mantenimiento. Puedes crear uno desde OPS → Contratos."
+          action={
+            <Link href="/ops/maintenance/contracts" style={{ textDecoration: "none" }}>
+              <Button size="sm" variant="primary">Crear contrato de servicio</Button>
+            </Link>
+          }
+        />
+      )}
+
+      {!loading && !error && contracts.length > 0 && (
+        <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+          {contracts.map((c) => (
+            <li key={c.id} style={{ padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>{c.title}</div>
+                  <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 2 }}>
+                    <code style={{ fontSize: 11 }}>{c.contractNumber}</code>
+                    {" · "}{FREQ_LABEL[c.frequency] ?? c.frequency}
+                    {c.branch && ` · ${c.branch.name}`}
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                  <Money value={Number(c.monthlyFee ?? 0)} />
+                  <Tag variant={statusVariant(c.status)}>{STATUS_LABEL[c.status] ?? c.status}</Tag>
+                </div>
+              </div>
+              {c.nextVisitDate && (
+                <div style={{ fontSize: 11.5, color: "var(--text-secondary)", marginTop: 6 }}>
+                  Próxima visita: {new Date(c.nextVisitDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })}
+                  {c._count?.visits != null && ` · ${c._count.visits} visita(s) realizadas`}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </DetailSection>
   );
 }

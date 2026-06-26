@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
 import { Money, Tag } from "@/components/ui/DataTable";
@@ -86,7 +87,16 @@ export default function PipelinePage() {
         eyebrow="CRM · Pipeline"
         title={cfg.title}
         subtitle={`${scopedItems.length} oportunidades · $${(totalPipeline / 1000000).toFixed(1)}M en juego. ${cfg.canEdit ? "Arrastra una tarjeta para cambiar de etapa." : "Vista de solo lectura."}`}
-        actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
+        actions={
+          <>
+            <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
+            {cfg.canCreate && (
+              <Link href="/crm/opportunities?new=1" style={{ textDecoration: "none" }}>
+                <Button variant="primary" iconLeft="+">Nueva oportunidad</Button>
+              </Link>
+            )}
+          </>
+        }
       />
 
       {loading && <EmptyState icon="⏳" title="Cargando pipeline…" description="Consultando oportunidades." />}

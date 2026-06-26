@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -35,6 +36,7 @@ const emptyForm = {
 
 export default function OpportunitiesPage() {
   const { user } = useUser();
+  const searchParams = useSearchParams();
   const cfg = useMemo(() => getCrmSalesSectionConfig(user, "opportunities"), [user]);
   const token = user?.token ?? "";
 
@@ -43,6 +45,14 @@ export default function OpportunitiesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<SalesOpportunity | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
+
+  useEffect(() => {
+    if (searchParams.get("new") === "1" && cfg.canCreate) {
+      setEditing(null);
+      setForm({ ...emptyForm });
+      setShowForm(true);
+    }
+  }, [searchParams, cfg.canCreate]);
 
   const load = useCallback(async () => {
     if (!token) return;

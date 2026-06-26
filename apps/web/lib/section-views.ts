@@ -1370,9 +1370,11 @@ export function getOpsTeamSectionConfig(
   }
 
   if (module === 'maintenance-contracts') {
+    const canManage = canAccessMaintenanceContracts(user);
     return {
       ...base,
-      canCreate: false,
+      canCreate: canManage && base.canCreate,
+      canEdit: canManage && base.canEdit,
       canDelete: false,
       title: copy.title,
       subtitle: copy.subtitle,

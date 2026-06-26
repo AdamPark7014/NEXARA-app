@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 
 export type CatalogProductQuery = {
@@ -59,6 +59,28 @@ export class CatalogService {
           take: 5,
         },
       },
+    });
+  }
+
+  async createProduct(dto: {
+    sku: string;
+    name: string;
+    category?: string;
+    price?: number;
+    description?: string;
+  }) {
+    const existing = await this.prisma.product.findFirst({ where: { sku: dto.sku.trim().toUpperCase() } });
+    if (existing) throw new ConflictException(`Ya existe un producto con SKU ${dto.sku}`);
+    return this.prisma.product.create({
+      data: {
+        sku: dto.sku.trim().toUpperCase(),
+        name: dto.name.trim(),
+        category: dto.category?.trim() || null,
+        price: dto.price ?? null,
+        description: dto.description?.trim() || null,
+        activo: true,
+      },
+      include: { brand: { select: { id: true, name: true } } },
     });
   }
 
