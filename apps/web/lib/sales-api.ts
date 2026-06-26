@@ -750,6 +750,43 @@ export const listSalesQuotes = async (token: string, filters?: { clientName?: st
   return Array.isArray(data) ? (data as SalesQuote[]) : [];
 };
 
+export const createSalesQuote = async (
+  token: string,
+  payload: {
+    quoteNumber: string;
+    issueDate: string;
+    validUntil?: string;
+    clientName?: string;
+    clientCompany?: string;
+    clientEmail?: string;
+    projectName?: string;
+    items: Array<{ name: string; qty: number; unitPrice: number; discount?: number; tax?: number; description?: string }>;
+  },
+) => {
+  return apiRequest<unknown>(
+    "cotizaciones",
+    {
+      token,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...payload,
+        currency: "MXN",
+        status: "DRAFT",
+        items: payload.items.map((i) => ({
+          name: i.name,
+          qty: i.qty,
+          unitPrice: i.unitPrice,
+          discount: i.discount ?? 0,
+          tax: i.tax ?? 16,
+          description: i.description,
+        })),
+      }),
+    },
+    "No se pudo crear la cotización",
+  );
+};
+
 export const linkSalesQuoteToOpportunity = async (
   token: string,
   cotizacionId: number,

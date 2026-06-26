@@ -57,8 +57,24 @@ export function mapStockLevelToRow(level: StockLevelRow) {
     nombre: level.product?.name ?? "—",
     categoria: level.product?.category ?? "—",
     ubicacion: level.location?.code ?? level.location?.name ?? level.warehouse?.name ?? "—",
+    warehouseId: level.warehouse?.id,
     existencia: qty,
     minimo: min,
     costo: Number(level.product?.price ?? 0),
   };
+}
+
+export async function listWarehouses(token: string) {
+  return stockRequest<Array<{ id: number; name: string; code?: string }>>("warehouse", token, {}, "No se pudieron cargar almacenes");
+}
+
+export async function listCatalogProducts(token: string) {
+  return stockRequest<Array<{ id: number; name: string; sku: string }>>("catalog/products?take=200", token, {}, "No se pudieron cargar productos");
+}
+
+export async function createStockMovement(
+  token: string,
+  payload: { type: string; productId: number; toWarehouseId: number; quantity: number; unitCost?: number; reference?: string; notes?: string },
+) {
+  return stockRequest<unknown>("stock/movements", token, { method: "POST", body: JSON.stringify(payload) }, "No se pudo registrar el movimiento");
 }

@@ -10,7 +10,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { getErpInventorySectionConfig } from "@/lib/section-views";
-import { listStockLevels, mapStockLevelToRow, updateStockLevelConfig } from "@/lib/stock-api";
+import { listStockLevels, mapStockLevelToRow, updateStockLevelConfig, listWarehouses, listCatalogProducts, createStockMovement } from "@/lib/stock-api";
 
 type StockRow = ReturnType<typeof mapStockLevelToRow>;
 
@@ -25,8 +25,13 @@ export default function WarehousePage() {
   const [items, setItems] = useState<StockRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [showMovementForm, setShowMovementForm] = useState(false);
   const [editing, setEditing] = useState<StockRow | null>(null);
   const [minimo, setMinimo] = useState(5);
+  const [products, setProducts] = useState<{ id: number; name: string; sku: string }[]>([]);
+  const [warehouses, setWarehouses] = useState<{ id: number; name: string }[]>([]);
+  const [movement, setMovement] = useState({ productId: "", warehouseId: "", quantity: 1, unitCost: "", reference: "" });
+  const [savingMovement, setSavingMovement] = useState(false);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -44,6 +49,34 @@ export default function WarehousePage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!token || !showMovementForm) return;
+    void listCatalogProducts(token).then(setProducts).catch(() => setProducts([]));
+    void listWarehouses(token).then(setWarehouses).catch(() => setWarehouses([]));
+  }, [token, showMovementForm]);
+
+  const saveMovement = async () => {
+    if (!token || !movement.productId || !movement.warehouseId || movement.quantity <= 0) return;
+    setSavingMovement(true);
+    try {
+      await createStockMovement(token, {
+        type: "IN",
+        productId: Number(movement.productId),
+        toWarehouseId: Number(movement.warehouseId),
+        quantity: movement.quantity,
+        unitCost: movement.unitCost ? Number(movement.unitCost) : undefined,
+        reference: movement.reference.trim() || undefined,
+      });
+      setShowMovementForm(false);
+      setMovement({ productId: "", warehouseId: "", quantity: 1, unitCost: "", reference: "" });
+      void load();
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Error al registrar entrada");
+    } finally {
+      setSavingMovement(false);
+    }
+  };
 
   const openEdit = (s: StockRow) => {
     setEditing(s);
@@ -133,7 +166,14 @@ export default function WarehousePage() {
         eyebrow="ERP · Almacén"
         title={cfg.title}
         subtitle={cfg.subtitle}
-        actions={<Button variant="ghost" onClick={load}>Actualizar</Button>}
+        actions={
+          <div style={{ display: "flex", gap: 8 }}>
+            {cfg.canCreate && (
+              <Button variant="primary" iconLeft="+" onClick={() => setShowMovementForm(true)}>Entrada de stock</Button>
+            )}
+            <Button variant="ghost" onClick={load}>Actualizar</Button>
+          </div>
+        }
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
@@ -150,6 +190,44 @@ export default function WarehousePage() {
           <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
             <Button variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
             <Button variant="primary" onClick={save}>Guardar</Button>
+          </div>
+        </div>
+      )}
+
+      {showMovementForm && (
+        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20 }}>
+          <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>Entrada de inventario</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Producto *</span>
+              <select value={movement.productId} onChange={(e) => setMovement((m) => ({ ...m, productId: e.target.value }))} style={inp}>
+                <option value="">Seleccionar…</option>
+                {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
+              </select>
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Almacén destino *</span>
+              <select value={movement.warehouseId} onChange={(e) => setMovement((m) => ({ ...m, warehouseId: e.target.value }))} style={inp}>
+                <option value="">Seleccionar…</option>
+                {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+              </select>
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Cantidad *</span>
+              <input type="number" min={1} value={movement.quantity} onChange={(e) => setMovement((m) => ({ ...m, quantity: +e.target.value }))} style={inp} />
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Costo unitario</span>
+              <input type="number" min={0} step="0.01" value={movement.unitCost} onChange={(e) => setMovement((m) => ({ ...m, unitCost: e.target.value }))} style={inp} />
+            </label>
+            <label style={{ gridColumn: "1 / -1", display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Referencia</span>
+              <input value={movement.reference} onChange={(e) => setMovement((m) => ({ ...m, reference: e.target.value }))} placeholder="OC-000123, ajuste inicial…" style={inp} />
+            </label>
+          </div>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
+            <Button variant="ghost" onClick={() => setShowMovementForm(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void saveMovement()} disabled={savingMovement}>{savingMovement ? "Registrando…" : "Registrar entrada"}</Button>
           </div>
         </div>
       )}
