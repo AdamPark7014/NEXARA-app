@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -27,6 +27,19 @@ interface ActivityRow {
   fechaFinalizacion?: string | null;
   client?: { name: string } | null;
 }
+
+interface EvidenceRow {
+  id: number;
+  tipoEvidencia: string;
+  archivoUrl: string;
+  estatus: string;
+  comentarios?: string | null;
+  subidoEn: string;
+  actividad?: { id: number; anNumber?: string; titulo?: string } | null;
+}
+
+type ViewTab = "actividades" | "evidencias";
+type RangeTab = "hoy" | "semana" | "todas";
 
 async function apiFetch(path: string, token: string, init: RequestInit = {}) {
   const res = await fetch(buildApiUrl(path), {
@@ -53,13 +66,17 @@ function isThisWeek(iso: string): boolean {
 export default function MyActivitiesPage() {
   const { user } = useUser();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const token = user?.token ?? "";
   const cfg = useMemo(() => getActivitiesSectionConfig(user), [user]);
   useOpsCanonicalRoute(user, "activities");
 
-  const [tab, setTab] = useState<"hoy" | "semana" | "todas">("hoy");
+  const viewTab: ViewTab = searchParams.get("tab") === "evidencias" ? "evidencias" : "actividades";
+  const [rangeTab, setRangeTab] = useState<RangeTab>("hoy");
   const [items, setItems] = useState<ActivityRow[]>([]);
+  const [evidences, setEvidences] = useState<EvidenceRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [evLoading, setEvLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -73,13 +90,25 @@ export default function MyActivitiesPage() {
     } finally { setLoading(false); }
   }, [token]);
 
+  const loadEvidences = useCallback(async () => {
+    if (!token) return;
+    setEvLoading(true);
+    try {
+      const data = await apiFetch("evidences?limit=60", token);
+      setEvidences(Array.isArray(data) ? data : (data?.data ?? []));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al cargar tus evidencias");
+    } finally { setEvLoading(false); }
+  }, [token]);
+
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => { if (viewTab === "evidencias") void loadEvidences(); }, [viewTab, loadEvidences]);
 
   const filtered = useMemo(() => {
-    if (tab === "hoy") return items.filter((a) => isToday(a.fechaEntregaEsperada || a.fechaAsignacion));
-    if (tab === "semana") return items.filter((a) => isThisWeek(a.fechaEntregaEsperada || a.fechaAsignacion));
+    if (rangeTab === "hoy") return items.filter((a) => isToday(a.fechaEntregaEsperada || a.fechaAsignacion));
+    if (rangeTab === "semana") return items.filter((a) => isThisWeek(a.fechaEntregaEsperada || a.fechaAsignacion));
     return items;
-  }, [items, tab]);
+  }, [items, rangeTab]);
 
   const counts = {
     completadas: filtered.filter((a) => a.estatus === "Finalizado").length,
@@ -128,13 +157,33 @@ export default function MyActivitiesPage() {
         ))}
       </div>
 
+      <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid var(--border)", marginBottom: 16, gap: 4 }}>
+        {(["actividades", "evidencias"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => router.replace(t === "evidencias" ? "/ops/my-activities?tab=evidencias" : "/ops/my-activities")}
+            style={{
+              padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", border: "none",
+              borderBottom: viewTab === t ? "2px solid var(--primary)" : "2px solid transparent",
+              background: "transparent", color: viewTab === t ? "var(--primary)" : "var(--text-secondary)",
+              fontFamily: "inherit", textTransform: "capitalize",
+            }}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {viewTab === "actividades" && (
+      <>
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         {(["hoy", "semana", "todas"] as const).map((t) => (
-          <button key={t} type="button" onClick={() => setTab(t)} style={{
+          <button key={t} type="button" onClick={() => setRangeTab(t)} style={{
             padding: "7px 16px", fontSize: 12.5, fontWeight: 600, borderRadius: 999,
-            border: tab === t ? "1px solid var(--primary)" : "1px solid var(--border)",
-            background: tab === t ? "color-mix(in srgb, var(--primary) 10%, transparent)" : "var(--surface)",
-            color: tab === t ? "var(--primary)" : "var(--text-primary)", cursor: "pointer", fontFamily: "inherit", textTransform: "capitalize",
+            border: rangeTab === t ? "1px solid var(--primary)" : "1px solid var(--border)",
+            background: rangeTab === t ? "color-mix(in srgb, var(--primary) 10%, transparent)" : "var(--surface)",
+            color: rangeTab === t ? "var(--primary)" : "var(--text-primary)", cursor: "pointer", fontFamily: "inherit", textTransform: "capitalize",
           }}>
             {t}
           </button>
@@ -188,13 +237,41 @@ export default function MyActivitiesPage() {
                 <Link href={`/ops/activities/${a.id}`} style={{ textDecoration: "none" }}>
                   <Button variant="ghost" size="sm">Ver detalle</Button>
                 </Link>
-                <Link href="/ops/my-evidences" style={{ textDecoration: "none" }}>
+                <Link href={`/ops/activities/${a.id}/evidences`} style={{ textDecoration: "none" }}>
                   <Button variant="secondary" iconLeft="📸" size="sm">Subir evidencia</Button>
                 </Link>
               </div>
             </article>
           ))}
         </div>
+      )}
+      </>
+      )}
+
+      {viewTab === "evidencias" && (
+        <Section title="Mis evidencias">
+          {evLoading && <EmptyState icon="⏳" title="Cargando…" description="Consultando tus evidencias." />}
+          {!evLoading && evidences.length === 0 && (
+            <EmptyState icon="📷" title="Sin evidencias" description="Sube evidencias desde el detalle de cada actividad asignada." />
+          )}
+          {!evLoading && evidences.length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+              {evidences.map((e) => (
+                <article key={e.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: 12 }}>
+                  <div style={{ fontWeight: 700, fontSize: 12.5 }}>{e.tipoEvidencia}</div>
+                  <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 4 }}>
+                    {e.actividad?.anNumber ?? `Act-${e.actividad?.id}`} · {e.estatus}
+                  </div>
+                  {e.actividad?.id && (
+                    <Link href={`/ops/activities/${e.actividad.id}/evidences`} style={{ fontSize: 11.5, color: "var(--primary)" }}>
+                      Ver actividad
+                    </Link>
+                  )}
+                </article>
+              ))}
+            </div>
+          )}
+        </Section>
       )}
     </>
   );

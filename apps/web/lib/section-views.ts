@@ -75,12 +75,12 @@ const OPS_SELF_MODULE: Record<OpsNavPair, ModuleId> = {
 
 const OPS_UNIFIED_COPY: Record<OpsNavPair, { team: { label: string; description: string }; self: { label: string; description: string } }> = {
   activities: {
-    team: { label: 'Actividades', description: 'Asignar OT, supervisar avance y cerrar trabajo del equipo.' },
-    self: { label: 'Actividades', description: 'Tus OT del día — iniciar, evidenciar y cerrar.' },
+    team: { label: 'Actividades', description: 'OT del equipo — asignar, revisar evidencias y cerrar trabajo.' },
+    self: { label: 'Actividades', description: 'Tus OT — iniciar, subir evidencias y cerrar en sitio.' },
   },
   evidences: {
-    team: { label: 'Evidencias', description: 'Revisar y aprobar evidencias del equipo de campo.' },
-    self: { label: 'Evidencias', description: 'Fotos, firmas y hojas de servicio de tus OT.' },
+    team: { label: 'Actividades', description: 'OT del equipo — revisar evidencias en la pestaña Evidencias.' },
+    self: { label: 'Actividades', description: 'Tus OT — evidencias desde el detalle de cada actividad.' },
   },
   viatics: {
     team: { label: 'Viáticos', description: 'Revisar y autorizar solicitudes del equipo.' },
@@ -134,9 +134,15 @@ function opsPairFromModuleId(id: ModuleId): OpsNavPair | null {
 
 function opsCanonicalRelativePath(user: UserAccessInput | null | undefined, pair: OpsNavPair): string {
   const nav = resolveOpsPairNav(user, pair);
+  // Evidencias vive dentro de Actividades (pestaña), no como módulo aparte.
+  if (pair === 'evidences') {
+    const actNav = nav ?? resolveOpsPairNav(user, 'activities');
+    const base = actNav === 'self' ? '/my-activities' : '/activities';
+    return `${base}?tab=evidencias`;
+  }
   const paths: Record<OpsNavPair, { team: string; self: string }> = {
     activities: { team: '/activities', self: '/my-activities' },
-    evidences: { team: '/evidences', self: '/my-evidences' },
+    evidences: { team: '/activities', self: '/my-activities' },
     viatics: { team: '/viatics', self: '/my-viatics' },
     vehicles: { team: '/vehicles', self: '/my-vehicles' },
   };
@@ -174,9 +180,9 @@ export function shouldShowModuleInSidebar(
     case 'ops-my-activities':
       return resolveOpsPairNav(user, 'activities') === 'self';
     case 'ops-evidences':
-      return resolveOpsPairNav(user, 'evidences') === 'team';
     case 'ops-my-evidences':
-      return resolveOpsPairNav(user, 'evidences') === 'self';
+      // Evidencias integradas en Actividades (pestaña) — no duplicar menú.
+      return false;
     case 'ops-viatics':
       return resolveOpsPairNav(user, 'viatics') === 'team';
     case 'ops-my-viatics':
@@ -334,24 +340,22 @@ export function adaptModulePresentation(
 
   const copy: Partial<Record<ModuleId, { label: string; description: string }>> = {
     'ops-activities': {
-      label: EXECUTIVE.has(v2) ? 'Actividades · Asignación' : 'Actividades · Equipo',
-      description: EXECUTIVE.has(v2)
-        ? 'Asignar y supervisar OT del equipo (sin OT propias)'
-        : 'Vista global — asignar, editar y dar seguimiento',
+      label: isSupportRole(v2)
+        ? 'Actividades'
+        : EXECUTIVE.has(v2)
+          ? 'Actividades · Asignación'
+          : 'Actividades · Equipo',
+      description: isSupportRole(v2)
+        ? 'OT del equipo — revisar y aprobar evidencias en la pestaña Evidencias'
+        : EXECUTIVE.has(v2)
+          ? 'Asignar y supervisar OT del equipo (evidencias incluidas)'
+          : 'Vista global — OT, evidencias y seguimiento del equipo',
     },
     'ops-my-activities': {
-      label: 'Mis actividades',
+      label: 'Actividades',
       description: OPS_MANAGERS.has(v2)
-        ? 'Tus OT asignadas — ejecutar y subir evidencias'
-        : 'Mis OT del día — iniciar, evidenciar y cerrar',
-    },
-    'ops-evidences': {
-      label: 'Evidencias · Revisión',
-      description: 'Aprobar o rechazar evidencias del equipo',
-    },
-    'ops-my-evidences': {
-      label: 'Mis evidencias',
-      description: 'Fotos, firmas y hojas de servicio de tus OT',
+        ? 'Tus OT — ejecutar y subir evidencias desde cada actividad'
+        : 'Tus OT del día — iniciar, evidenciar y cerrar',
     },
     'ops-viatics': {
       label: 'Viáticos · Aprobación',

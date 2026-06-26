@@ -127,6 +127,10 @@ const CROSS_PANEL_REMAPS: Array<[RegExp, string]> = [
   // ── /ops/* español ─────────────────────────────────────────────────────
   [/^\/ops\/mis-actividades(\/?.*)$/, '/ops/my-activities'],
   [/^\/ops\/actividades(\/.*)?$/, '/ops/activities'],
+  [/^\/ops\/evidences(\/?.*)$/, '/ops/activities?tab=evidencias'],
+  [/^\/ops\/my-evidences(\/?.*)$/, '/ops/my-activities?tab=evidencias'],
+  [/^\/ops\/evidencias(\/?.*)$/, '/ops/activities?tab=evidencias'],
+  [/^\/ops\/mis-evidencias(\/?.*)$/, '/ops/my-activities?tab=evidencias'],
   [/^\/ops\/mis-viaticos(\/?.*)$/, '/ops/my-viatics'],
   [/^\/ops\/asistencia(\/?.*)$/, '/erp/hr/attendance'],
   [/^\/ops\/mis-vehiculos(\/?.*)$/, '/ops/my-vehicles'],
