@@ -63,27 +63,6 @@ export function updateOperationalProjectStatus(token: string, id: number, status
   );
 }
 
-export function createOperationalProject(
-  token: string,
-  payload: {
-    title: string;
-    description?: string;
-    scopeSummary?: string;
-    vendorId: number;
-    clientId: number;
-    startDate: string;
-    endDate?: string;
-    siteCount?: number;
-  },
-) {
-  return opsProjectRequest<OperationalProject>(
-    "operational-projects",
-    token,
-    { method: "POST", body: JSON.stringify(payload) },
-    "No se pudo crear el proyecto",
-  );
-}
-
 export type CreateOperationalProjectPayload = {
   title: string;
   clientId: number;
@@ -93,6 +72,7 @@ export type CreateOperationalProjectPayload = {
   description?: string;
   scopeSummary?: string;
   endDate?: string;
+  siteCount?: number;
 };
 
 export function createOperationalProject(token: string, dto: CreateOperationalProjectPayload) {
