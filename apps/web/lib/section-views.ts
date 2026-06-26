@@ -645,6 +645,7 @@ export type AttendanceSectionConfig = {
   viewMode: ReturnType<typeof getAttendanceViewMode>;
   title: string;
   subtitle: string;
+  visibilityHint: string;
   canRegisterSelf: boolean;
   canManageTeam: boolean;
 };
@@ -663,6 +664,7 @@ export function getAttendanceSectionConfig(
       canManageTeam: true,
       title: 'Asistencia · Gestión',
       subtitle: 'Supervisión de jornadas del equipo en tiempo real.',
+      visibilityHint: 'Dueño, Dirección y RRHH ven la asistencia de todo el equipo. Los colaboradores solo registran y consultan la suya.',
     };
   }
   if (viewMode === 'manage_register') {
@@ -672,6 +674,7 @@ export function getAttendanceSectionConfig(
       canManageTeam: true,
       title: 'Asistencia',
       subtitle: 'Registra tu jornada y supervisa al equipo de campo.',
+      visibilityHint: 'Coordinadores y RRHH ven su equipo y registran su propia jornada. El resto del personal solo ve la suya.',
     };
   }
   return {
@@ -680,6 +683,7 @@ export function getAttendanceSectionConfig(
     canManageTeam: false,
     title: 'Mi asistencia',
     subtitle: 'Registra tu entrada y salida diaria.',
+    visibilityHint: 'Solo puedes ver y registrar tu propia asistencia.',
   };
 }
 
@@ -1614,7 +1618,9 @@ export function getErpGovernanceSectionConfig(
     };
   }
   if (module === 'users' || module === 'companies') {
-    const canManage = EXECUTIVE.has(v2) || v2 === ROLES.DIR_ADMIN || v2 === ROLES.RH;
+    const canManageUsers = EXECUTIVE.has(v2) || v2 === ROLES.DIR_ADMIN || v2 === ROLES.RH;
+    const canManageCompanies = canManageUsers || v2 === ROLES.COORD_ADMIN;
+    const canManage = module === 'companies' ? canManageCompanies : canManageUsers;
     return {
       viewMode: canManage ? 'manage' : 'execute',
       defaultScope: 'team',
@@ -1624,7 +1630,9 @@ export function getErpGovernanceSectionConfig(
       canAssign: canManage,
       canApprove: EXECUTIVE.has(v2) || v2 === ROLES.DIR_ADMIN,
       title: copy.title,
-      subtitle: copy.subtitle,
+      subtitle: module === 'users' && !canManage
+        ? 'Consulta del directorio — la edición es para Dirección y RH.'
+        : copy.subtitle,
     };
   }
   if (ERP_ADMIN.has(v2)) {

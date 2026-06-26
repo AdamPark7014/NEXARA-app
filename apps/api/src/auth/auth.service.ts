@@ -376,6 +376,13 @@ export class AuthService {
       set.add(PERMISSIONS.CONTABILIDAD_MANAGE);
     }
 
+    // ── Gobierno ERP (empresas del grupo) ───────────────────────────
+    const V2_COMPANY_GOV_ROLES = new Set(['ceo', 'dir_admin', 'coord_admin', 'administrativo']);
+    if (V2_COMPANY_GOV_ROLES.has(roleKey)) {
+      set.add(PERMISSIONS.COMPANY_SETTINGS_VIEW);
+      set.add(PERMISSIONS.COMPANY_SETTINGS_MANAGE);
+    }
+
     // ── Actividades y evidencias (scope de equipo) ──────────────────
     // Solo permisos específicos — no se otorga CONSOLE_ADMIN completo para evitar
     // conceder USERS_MANAGE, ROLES_MANAGE, PANEL_VENTAS, etc.

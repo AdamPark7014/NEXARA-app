@@ -35,7 +35,7 @@ async function apiFetch(path: string, token: string, init: RequestInit = {}) {
   return t ? JSON.parse(t) : null;
 }
 
-const emptyForm = { title: "", excerpt: "", content: "", categoryId: "", visibility: "INTERNAL", tags: "" };
+const emptyForm = { title: "", content: "", categoryId: "", visibility: "INTERNAL", tags: "" };
 
 export default function KbPage() {
   const { user } = useUser();
@@ -78,15 +78,16 @@ export default function KbPage() {
     if (!token || !form.title || !form.content) return;
     setSaving(true);
     try {
+      const excerpt = form.content.trim().slice(0, 160).replace(/\s+/g, " ");
       await apiFetch("kb/articles", token, {
         method: "POST",
         body: JSON.stringify({
-          title: form.title,
-          excerpt: form.excerpt || undefined,
-          content: form.content,
+          title: form.title.trim(),
+          excerpt: excerpt || undefined,
+          content: form.content.trim(),
           categoryId: form.categoryId ? Number(form.categoryId) : undefined,
           visibility: form.visibility,
-          tags: form.tags || undefined,
+          tags: form.tags.trim() || undefined,
           status: "PUBLISHED",
         }),
       });
@@ -169,33 +170,106 @@ export default function KbPage() {
       </Section>
 
       {showForm && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setShowForm(false)}>
-          <div style={{ background: "var(--surface)", borderRadius: 16, padding: 28, width: 520, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.24)", border: "1px solid var(--border)", maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Nuevo artículo</div>
-            <div style={{ display: "grid", gap: 14 }}>
-              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Título</span>
-                <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Instalación CCTV residencial — checklist" style={inp} /></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Resumen</span>
-                <input value={form.excerpt} onChange={(e) => setForm((f) => ({ ...f, excerpt: e.target.value }))} style={inp} /></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Contenido (Markdown)</span>
-                <textarea value={form.content} onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))} rows={8} style={{ ...inp, resize: "vertical", fontFamily: "monospace" }} /></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Categoría</span>
-                <select value={form.categoryId} onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))} style={inp}>
-                  <option value="">— Sin categoría —</option>
-                  {cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Visibilidad</span>
-                <select value={form.visibility} onChange={(e) => setForm((f) => ({ ...f, visibility: e.target.value }))} style={inp}>
-                  <option value="PUBLIC">Pública</option>
-                  <option value="INTERNAL">Interna (todo el equipo)</option>
-                  <option value="RESTRICTED">Restringida (Dirección)</option>
-                </select></label>
-              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Tags (separados por coma)</span>
-                <input value={form.tags} onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))} placeholder="cctv, instalacion, checklist" style={inp} /></label>
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 1000,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 16,
+          }}
+          onClick={() => setShowForm(false)}
+        >
+          <div
+            role="dialog"
+            aria-labelledby="kb-new-title"
+            style={{
+              background: "var(--surface)",
+              borderRadius: 14,
+              width: "100%",
+              maxWidth: 520,
+              maxHeight: "min(88vh, 560px)",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 20px 48px rgba(0,0,0,0.22)",
+              border: "1px solid var(--border)",
+              overflow: "hidden",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ padding: "18px 20px 12px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+              <div id="kb-new-title" style={{ fontSize: 15, fontWeight: 700 }}>Nuevo artículo</div>
+              <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 4 }}>
+                Procedimiento o guía para el equipo. Se publica de inmediato en la wiki interna.
+              </div>
             </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
+
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "grid", gap: 12 }}>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Título *</span>
+                <input
+                  value={form.title}
+                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                  placeholder="Ej. Instalación CCTV residencial — checklist"
+                  style={inp}
+                  autoFocus
+                />
+              </label>
+
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Contenido *</span>
+                <textarea
+                  value={form.content}
+                  onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
+                  placeholder="Pasos, requisitos, notas técnicas… (Markdown permitido)"
+                  rows={5}
+                  style={{ ...inp, resize: "vertical", minHeight: 96, maxHeight: 180, fontFamily: "inherit", lineHeight: 1.45 }}
+                />
+              </label>
+
+              <div style={{ display: "grid", gridTemplateColumns: cats.length > 0 ? "1fr 1fr" : "1fr", gap: 12 }}>
+                {cats.length > 0 && (
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Categoría</span>
+                    <select value={form.categoryId} onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))} style={inp}>
+                      <option value="">Sin categoría</option>
+                      {cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </label>
+                )}
+                <label style={{ display: "grid", gap: 4 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Quién puede verlo</span>
+                  <select value={form.visibility} onChange={(e) => setForm((f) => ({ ...f, visibility: e.target.value }))} style={inp}>
+                    <option value="INTERNAL">Todo el equipo</option>
+                    <option value="RESTRICTED">Solo dirección</option>
+                    <option value="PUBLIC">Público (portal)</option>
+                  </select>
+                </label>
+              </div>
+
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Etiquetas (opcional)</span>
+                <input
+                  value={form.tags}
+                  onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
+                  placeholder="cctv, instalación, checklist"
+                  style={inp}
+                />
+              </label>
+            </div>
+
+            <div style={{
+              display: "flex", gap: 10, padding: "12px 20px 16px",
+              justifyContent: "flex-end", borderTop: "1px solid var(--border)", flexShrink: 0,
+              background: "var(--surface)",
+            }}>
               <Button variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
-              <Button variant="primary" onClick={() => void submit()} disabled={saving || !form.title || !form.content}>{saving ? "Guardando…" : "Publicar"}</Button>
+              <Button
+                variant="primary"
+                onClick={() => void submit()}
+                disabled={saving || !form.title.trim() || !form.content.trim()}
+              >
+                {saving ? "Guardando…" : "Publicar artículo"}
+              </Button>
             </div>
           </div>
         </div>

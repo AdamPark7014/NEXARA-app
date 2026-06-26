@@ -21,14 +21,32 @@ interface AttendanceDay {
 }
 
 interface TeamMember {
-  userId?: number;
-  nombre?: string;
-  user?: { id?: number; nombre?: string; avatarUrl?: string | null; role?: { nombre?: string } | null };
+  userId: number;
+  nombre: string;
+  email?: string;
+  department?: string;
+  roleName?: string;
   attendances?: { type: string; timestamp: string }[];
   totalMinutes?: number;
   checkIn?: string;
   checkOut?: string;
   estado?: "PRESENTE" | "COMPLETO" | "AUSENTE";
+}
+
+interface HierarchyRangeResponse {
+  users?: ApiAttendanceUser[];
+  totalUsers?: number;
+}
+
+interface ApiAttendanceUser {
+  userId: number;
+  userName?: string;
+  email?: string;
+  department?: string;
+  roleName?: string;
+  totalMinutes?: number;
+  days?: { date: string; totalMinutes?: number; isOpen?: boolean }[];
+  attendances?: { type: string; timestamp: string }[];
 }
 
 interface WeekDay {
@@ -57,6 +75,45 @@ function fmtMinutes(m?: number): string {
   const h = Math.floor(m / 60);
   const min = m % 60;
   return h > 0 ? `${h}h${min > 0 ? ` ${min}m` : ""}` : `${min}m`;
+}
+
+function getLatestByType(
+  list: { type: string; timestamp: string }[] | undefined,
+  type: "entrada" | "salida",
+): string | undefined {
+  const filtered = (list ?? []).filter((a) => a.type === type);
+  if (filtered.length === 0) return undefined;
+  return filtered.reduce((max, a) => (a.timestamp > max.timestamp ? a : max)).timestamp;
+}
+
+function resolveEstado(
+  checkIn?: string,
+  checkOut?: string,
+  isOpen?: boolean,
+): "PRESENTE" | "COMPLETO" | "AUSENTE" {
+  if (isOpen) return "PRESENTE";
+  if (checkIn && checkOut) return "COMPLETO";
+  if (checkIn) return "PRESENTE";
+  return "AUSENTE";
+}
+
+function mapApiUser(raw: ApiAttendanceUser, dateFilter: string): TeamMember {
+  const checkIn = getLatestByType(raw.attendances, "entrada");
+  const checkOut = getLatestByType(raw.attendances, "salida");
+  const dayInfo = raw.days?.find((d) => d.date === dateFilter);
+  const totalMinutes = dayInfo?.totalMinutes ?? raw.totalMinutes ?? 0;
+  return {
+    userId: raw.userId,
+    nombre: raw.userName?.trim() || raw.email || `Usuario #${raw.userId}`,
+    email: raw.email,
+    department: raw.department,
+    roleName: raw.roleName,
+    attendances: raw.attendances,
+    totalMinutes,
+    checkIn,
+    checkOut,
+    estado: resolveEstado(checkIn, checkOut, dayInfo?.isOpen),
+  };
 }
 
 function fmtElapsed(ms: number): string {
@@ -222,8 +279,9 @@ function WeeklyBar({ token }: { token: string }) {
 // ─── Team Card ────────────────────────────────────────────────────────────────
 
 function TeamCard({ member }: { member: TeamMember }) {
-  const name = member.user?.nombre ?? member.nombre ?? "—";
-  const role = member.user?.role?.nombre ?? "";
+  const name = member.nombre;
+  const role = member.roleName ?? "";
+  const dept = member.department ?? "";
   const estado = member.estado ?? "AUSENTE";
   const ci = member.checkIn;
   const co = member.checkOut;
@@ -240,7 +298,11 @@ function TeamCard({ member }: { member: TeamMember }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
         <div>
           <div style={{ fontWeight: 700, fontSize: 13 }}>{name}</div>
-          {role && <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>{role}</div>}
+          {(role || dept) && (
+            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>
+              {[role, dept].filter(Boolean).join(" · ")}
+            </div>
+          )}
         </div>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 999, fontSize: 10.5, fontWeight: 700, background: c.bg, color: c.text }}>
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: c.dot, display: "inline-block" }} />
@@ -260,7 +322,7 @@ function TeamCard({ member }: { member: TeamMember }) {
 
 // ─── Team View ────────────────────────────────────────────────────────────────
 
-function TeamAttendanceView({ token, dateFilter }: { token: string; dateFilter: string }) {
+function TeamAttendanceView({ token, dateFilter, visibilityHint }: { token: string; dateFilter: string; visibilityHint?: string }) {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"grid" | "table">("grid");
@@ -269,17 +331,12 @@ function TeamAttendanceView({ token, dateFilter }: { token: string; dateFilter: 
     if (!token) return;
     setLoading(true);
     try {
-      const raw = await apiFetch<{ users?: TeamMember[] } | TeamMember[]>(
+      const raw = await apiFetch<HierarchyRangeResponse | ApiAttendanceUser[]>(
         `attendance/hierarchy/range?from=${dateFilter}&to=${dateFilter}`, token
       );
-      const arr: TeamMember[] = Array.isArray(raw) ? raw : ((raw as { users?: TeamMember[] })?.users ?? []);
+      const arr: ApiAttendanceUser[] = Array.isArray(raw) ? raw : (raw.users ?? []);
       const ORDER = { PRESENTE: 0, COMPLETO: 1, AUSENTE: 2 } as const;
-      const mapped = arr.map(u => {
-        const ci = u.attendances?.find(a => a.type === "CHECK_IN")?.timestamp;
-        const co = u.attendances?.find(a => a.type === "CHECK_OUT")?.timestamp;
-        const estado: "PRESENTE" | "COMPLETO" | "AUSENTE" = ci && co ? "COMPLETO" : ci ? "PRESENTE" : "AUSENTE";
-        return { ...u, checkIn: ci, checkOut: co, estado };
-      });
+      const mapped = arr.map((u) => mapApiUser(u, dateFilter));
       mapped.sort((a, b) => (ORDER[a.estado ?? "AUSENTE"] ?? 2) - (ORDER[b.estado ?? "AUSENTE"] ?? 2));
       setMembers(mapped);
     } catch { setMembers([]); }
@@ -294,11 +351,13 @@ function TeamAttendanceView({ token, dateFilter }: { token: string; dateFilter: 
 
   const cols: Column<TeamMember>[] = [
     {
-      key: "user", label: "Empleado",
+      key: "nombre", label: "Empleado",
       render: m => (
         <div>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>{m.user?.nombre ?? m.nombre ?? "—"}</div>
-          <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{m.user?.role?.nombre ?? ""}</div>
+          <div style={{ fontWeight: 700, fontSize: 13 }}>{m.nombre}</div>
+          <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+            {[m.roleName, m.department].filter(Boolean).join(" · ") || m.email || "—"}
+          </div>
         </div>
       ),
     },
@@ -323,15 +382,15 @@ function TeamAttendanceView({ token, dateFilter }: { token: string; dateFilter: 
   });
 
   return (
-    <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 12, marginBottom: 20 }}>
+    <Section title="Equipo del día" subtitle={visibilityHint}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, marginBottom: 14 }}>
         <KpiCard label="Total equipo" value={members.length} />
         <KpiCard label="En jornada"   value={presentes} />
         <KpiCard label="Completaron"  value={completos} />
         <KpiCard label="Ausentes"     value={ausentes} />
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
         <button style={btnStyle(view === "grid")}  onClick={() => setView("grid")}>Tarjetas</button>
         <button style={btnStyle(view === "table")} onClick={() => setView("table")}>Tabla</button>
         <button onClick={() => void load()} style={{ marginLeft: "auto", padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)", cursor: "pointer", fontSize: 12, background: "var(--surface)", color: "var(--text-secondary)" }}>
@@ -345,18 +404,19 @@ function TeamAttendanceView({ token, dateFilter }: { token: string; dateFilter: 
         <div style={{ padding: 48, textAlign: "center", color: "var(--text-tertiary)", fontSize: 13 }}>Sin registros para esta fecha.</div>
       ) : view === "grid" ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 12 }}>
-          {members.map((m, i) => <TeamCard key={m.user?.id ?? m.userId ?? i} member={m} />)}
+          {members.map((m) => <TeamCard key={m.userId} member={m} />)}
         </div>
       ) : (
         <DataTable<TeamMember>
           columns={cols}
           rows={members}
-          rowKey={(m) => m.user?.id ?? m.userId ?? `${m.checkIn ?? ""}-${m.checkOut ?? ""}`}
+          rowKey={(m) => m.userId}
+          density="compact"
           emptyTitle="Sin registros"
           emptyDescription="No hay asistencia registrada para esta fecha."
         />
       )}
-    </>
+    </Section>
   );
 }
 
@@ -418,7 +478,7 @@ export default function AttendancePage() {
       {viewMode === "register" && <WeeklyBar token={token} />}
 
       {(viewMode === "manage" || viewMode === "manage_register") && (
-        <TeamAttendanceView token={token} dateFilter={dateFilter} />
+        <TeamAttendanceView token={token} dateFilter={dateFilter} visibilityHint={attCfg.visibilityHint} />
       )}
     </>
   );
