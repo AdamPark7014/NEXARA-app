@@ -2,14 +2,14 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
-import { getActivitiesSectionConfig } from "@/lib/section-views";
+import { getActivitiesSectionConfig, getEvidencesSectionConfig, getActivitiesCanonicalPath } from "@/lib/section-views";
 import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 
 interface Activity {
@@ -63,14 +63,18 @@ type TabId = "actividades" | "evidencias";
 export default function ActivitiesPage() {
   const { user } = useUser();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const token = user?.token ?? "";
   const cfg = useActivitiesConfig();
+  const evCfg = useMemo(() => getEvidencesSectionConfig(user), [user]);
   useOpsCanonicalRoute(user, "activities");
 
   const [showOnlyMine, setShowOnlyMine] = useState(
     cfg.viewMode === "manage_execute" ? false : cfg.defaultScope === "self",
   );
-  const [tab, setTab] = useState<TabId>("actividades");
+  const [tab, setTab] = useState<TabId>(
+    searchParams.get("tab") === "evidencias" ? "evidencias" : "actividades",
+  );
   const [items, setItems] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -102,6 +106,14 @@ export default function ActivitiesPage() {
   }, [token]);
 
   useEffect(() => { loadActivities(); }, [loadActivities]);
+  useEffect(() => {
+    if (searchParams.get("tab") === "evidencias") setTab("evidencias");
+  }, [searchParams]);
+  useEffect(() => {
+    if (cfg.viewMode === "execute") {
+      router.replace(getActivitiesCanonicalPath(user));
+    }
+  }, [cfg.viewMode, router, user]);
   useEffect(() => { if (tab === "evidencias") loadEvidences(); }, [tab, loadEvidences]);
 
   const openNew  = () => { setEditing(null); setForm({ ...emptyForm }); setShowForm(true); };
@@ -211,7 +223,7 @@ export default function ActivitiesPage() {
         <Tag variant={e.estado === "APROBADA" ? "positive" : e.estado === "RECHAZADA" ? "danger" : "warning"}>
           {(e.estado ?? "—").replace(/_/g, " ")}
         </Tag>
-        {cfg.canApprove && e.estado === "PENDIENTE_REVISION" && (
+        {evCfg.canApprove && e.estado === "PENDIENTE_REVISION" && (
           <>
             <button onClick={() => patchEvState(e.id, "APROBADA")}  style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>✓</button>
             <button onClick={() => patchEvState(e.id, "RECHAZADA")} style={{ fontSize: 11, background: "var(--danger)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>✕</button>
@@ -219,7 +231,7 @@ export default function ActivitiesPage() {
         )}
       </div>
     ), width: 220 },
-    ...(cfg.canDelete ? [{
+    ...(evCfg.canDelete ? [{
       key: "id" as const, label: "" as const,
       render: (e: Evidence) => (
         <button onClick={() => removeEvidence(e.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 8px" }}>✕</button>

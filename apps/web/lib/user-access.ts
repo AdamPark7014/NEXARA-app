@@ -295,7 +295,7 @@ export function getUserHomePath(user: UserAccessInput | null | undefined): strin
 
     // Rutas especiales por rol
     if (v2 === ROLES.CEO) return '/erp/executive';
-    if (v2 === ROLES.ING_CAMPO || v2 === ROLES.COORD_OPERACIONES) return getActivitiesCanonicalPath(user);
+    if (v2 === ROLES.ING_CAMPO || v2 === ROLES.ING_SOPORTE || v2 === ROLES.COORD_OPERACIONES) return getActivitiesCanonicalPath(user);
     if (v2 === ROLES.VENDEDOR) return '/crm/dashboard';
     if (v2 === ROLES.LIDER_DISENO || v2 === ROLES.DISENADOR) return '/studio/dashboard';
     if (v2 === ROLES.CLIENTE) return '/tickets';
