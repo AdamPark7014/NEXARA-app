@@ -50,7 +50,7 @@ export class ActivitiesController {
     let result: any;
     if (user.isSuperAdmin) {
       result = await this.activitiesService.findAll();
-    } else if (this.isOpsManager(user)) {
+    } else if (this.hasTeamActivitiesScope(user)) {
       const scopeUsers = await this.usersService.findUsersForConsoleActivityScope();
       const allowedUserIds = scopeUsers.map((u: { id: number }) => u.id);
       result = await this.activitiesService.findByAllowedUsers(allowedUserIds);
@@ -147,7 +147,7 @@ export class ActivitiesController {
 
     if (user.isSuperAdmin) {
       return this.activitiesService.findAll(query);
-    } else if (this.isOpsManager(user)) {
+    } else if (this.hasTeamActivitiesScope(user)) {
       const scopeUsers = await this.usersService.findUsersForConsoleActivityScope();
       const allowedUserIds = scopeUsers.map((u: { id: number }) => u.id);
       return this.activitiesService.findByAllowedUsers(allowedUserIds);
@@ -205,5 +205,11 @@ export class ActivitiesController {
       'coord_operaciones', 'coord_admin',
     ]);
     return Boolean(user.roleKey && V2_OPS_MANAGER_ROLES.has(user.roleKey));
+  }
+
+  /** Vista de OT del equipo: managers OPS + ingeniero de soporte/NOC. */
+  private hasTeamActivitiesScope(user: any): boolean {
+    if (this.isOpsManager(user)) return true;
+    return user?.roleKey === 'ing_soporte';
   }
 }
