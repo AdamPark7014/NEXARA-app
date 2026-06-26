@@ -116,8 +116,8 @@ export default function StudioCasesPage() {
     <>
       <PageHeader
         eyebrow="STUDIO · Contenido"
-        title="Casos de éxito"
-        subtitle="Historias de clientes reales. Se muestran en /casos del sitio público cuando están publicados."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={
           cfg.canCreate ? <Button variant="primary" iconLeft="🏆" onClick={openNew}>Nuevo caso</Button> : undefined
         }

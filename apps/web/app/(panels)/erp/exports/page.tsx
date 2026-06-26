@@ -54,8 +54,8 @@ export default function ExportsPage() {
     <>
       <PageHeader
         eyebrow="ERP · Auditoría"
-        title="Exportaciones"
-        subtitle="Centro único para reportes CSV globales del ERP, listos para Hacienda, auditoría externa o licitación."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
       />
 
       {cfg.viewMode !== "manage" && (

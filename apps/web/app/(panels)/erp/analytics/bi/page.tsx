@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -9,6 +9,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
+import { getBiSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES, type RoleKey } from "@/lib/rbac";
@@ -30,6 +31,7 @@ async function apiFetch(path: string, token: string) {
 
 export default function BiPage() {
   const { user } = useUser();
+  const cfg = useMemo(() => getBiSectionConfig(user), [user]);
   const router = useRouter();
   const token = user?.token ?? "";
 
@@ -96,8 +98,8 @@ export default function BiPage() {
     <>
       <PageHeader
         eyebrow="ERP · Tablero"
-        title="Business Intelligence"
-        subtitle="Rentabilidad por línea de negocio, eficiencia operativa y ROI por cliente — últimos 12 meses / 90 días."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
       />
 

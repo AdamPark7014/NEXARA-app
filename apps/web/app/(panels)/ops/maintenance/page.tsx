@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
+import KpiCard from "@/components/ui/KpiCard";
+import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
-import { getOpsTeamSectionConfig } from "@/lib/section-views";
+import { canAccessMaintenanceContracts, getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface WorkOrder {
@@ -39,21 +42,25 @@ const emptyForm = { title: "", description: "", priority: "MEDIA", status: "PEND
 export default function MaintenancePage() {
   const { user } = useUser();
   const cfg = useMemo(() => getOpsTeamSectionConfig(user, "maintenance"), [user]);
+  const showContracts = useMemo(() => canAccessMaintenanceContracts(user), [user]);
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<WorkOrder | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
 
   const load = useCallback(async () => {
     if (!token) return;
-    setLoading(true);
+    setLoading(true); setError(null);
     try {
       const data = await apiFetch("maintenance/work-orders", token);
       setItems(Array.isArray(data) ? data : (data.data ?? []));
-    } catch { /* skip */ } finally { setLoading(false); }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al cargar ordenes de mantenimiento");
+    } finally { setLoading(false); }
   }, [token]);
 
   useEffect(() => { load(); }, [load]);
@@ -76,15 +83,15 @@ export default function MaintenancePage() {
         setItems(prev => [created, ...prev]);
       }
       setShowForm(false);
-    } catch { /* skip */ }
+    } catch (e) { alert(e instanceof Error ? e.message : "Error al guardar orden"); }
   };
 
   const remove = async (id: number) => {
-    if (!token || !confirm("¿Eliminar esta OT de mantenimiento?")) return;
+    if (!token || !confirm("Cancelar esta OT de mantenimiento?")) return;
     try {
       await apiFetch(`maintenance/work-orders/${id}`, token, { method: "PATCH", body: JSON.stringify({ status: "CANCELADA" }) });
       setItems(prev => prev.filter(w => w.id !== id));
-    } catch { /* skip */ }
+    } catch (e) { alert(e instanceof Error ? e.message : "Error al cancelar orden"); }
   };
 
   const patchStatus = async (id: number, action: "start" | "complete") => {
@@ -92,7 +99,7 @@ export default function MaintenancePage() {
     try {
       const updated = await apiFetch(`maintenance/work-orders/${id}/${action}`, token, { method: "PATCH" });
       setItems(prev => prev.map(w => w.id === id ? { ...w, ...updated } : w));
-    } catch { /* skip */ }
+    } catch (e) { alert(e instanceof Error ? e.message : "Error al actualizar estado"); }
   };
 
   const statusVariant = (s?: string): "accent" | "warning" | "neutral" | "danger" =>
@@ -134,9 +141,18 @@ export default function MaintenancePage() {
     <>
       <PageHeader
         eyebrow="OPS · Mantenimiento"
-        title="Órdenes de mantenimiento"
-        subtitle="Correctivo, preventivo y predictivo de activos: equipos, vehículos e instalaciones."
-        actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva OT</Button> : undefined}
+        title={cfg.title}
+        subtitle={cfg.subtitle}
+        actions={
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {showContracts && (
+              <Link href="/ops/maintenance/contracts">
+                <Button variant="ghost">Contratos de servicio</Button>
+              </Link>
+            )}
+            {cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva OT</Button> : undefined}
+          </div>
+        }
       />
 
       {showForm && (
@@ -170,11 +186,22 @@ export default function MaintenancePage() {
         </div>
       )}
 
-      <Section title={loading ? "Cargando…" : `${items.length} órdenes`}>
-        {loading ? (
-          <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
-        ) : (
-          <DataTable columns={columns} rows={items} rowKey={w => w.id} emptyTitle="Sin órdenes de mantenimiento" emptyDescription="Crea la primera orden de trabajo." />
+      {!loading && !error && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
+          <KpiCard label="Pendientes" value={items.filter(w => w.status === "PENDIENTE").length} variant="warning" icon="⏳" />
+          <KpiCard label="En progreso" value={items.filter(w => w.status === "EN_PROGRESO").length} variant="accent" icon="🔧" />
+          <KpiCard label="Completadas" value={items.filter(w => w.status === "COMPLETADA").length} icon="✅" />
+          <KpiCard label="Criticas" value={items.filter(w => w.priority === "CRITICA").length} variant={items.filter(w => w.priority === "CRITICA").length > 0 ? "danger" : "default"} icon="🚨" />
+        </div>
+      )}
+
+      <Section title={loading ? "Cargando…" : `${items.length} ordenes`}>
+        {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando ordenes de mantenimiento." />}
+        {!loading && error && (
+          <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />
+        )}
+        {!loading && !error && (
+          <DataTable columns={columns} rows={items} rowKey={w => w.id} emptyTitle="Sin ordenes de mantenimiento" emptyDescription="Crea la primera orden de trabajo." />
         )}
       </Section>
     </>

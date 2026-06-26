@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import KpiCard from "@/components/ui/KpiCard";
 import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
+import { useUser } from "@/components/UserContext";
+import { getLabSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface TerminusResult {
@@ -29,6 +31,8 @@ async function timedFetch(url: string): Promise<{ ok: boolean; ms: number; body?
 }
 
 export default function LabHealthPage() {
+  const { user } = useUser();
+  const cfg = useMemo(() => getLabSectionConfig(user, "health"), [user]);
   const [checks, setChecks] = useState<Array<{ name: string; ok: boolean; ms: number; detail?: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
@@ -66,8 +70,8 @@ export default function LabHealthPage() {
     <>
       <PageHeader
         eyebrow="LAB · Sandbox"
-        title="Health API"
-        subtitle="Estado en vivo del backend NestJS: base de datos, memoria y disco. Se actualiza cada 30s."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar ahora</Button>}
       />
 

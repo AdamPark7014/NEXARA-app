@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { useHrManagementGuard } from "@/lib/useHrManagementGuard";
+import { getHrSubmoduleConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface OrgNode {
@@ -218,6 +219,7 @@ function Node({ node, depth = 0, allUsers, token, onRefresh, canEditOrg }: NodeP
 export default function OrgChartPage() {
   const { user } = useUser();
   const cfg = useHrManagementGuard();
+  const viewCfg = useMemo(() => getHrSubmoduleConfig(user, "orgchart"), [user]);
   const token = user?.token ?? "";
 
   const [roots, setRoots]     = useState<OrgNode[]>([]);
@@ -246,8 +248,10 @@ export default function OrgChartPage() {
     <>
       <PageHeader
         eyebrow="ERP · Personas"
-        title="Organigrama"
-        subtitle={cfg.canAssign ? "Jerarquía de reporte en NEXARA. Haz clic en ✎ en cualquier nodo para reasignar su manager." : "Jerarquía de reporte en NEXARA. Solo Dirección puede reasignar managers."}
+        title={viewCfg.title}
+        subtitle={cfg.canAssign
+          ? `${viewCfg.subtitle} Haz clic en ✎ en cualquier nodo para reasignar su manager.`
+          : `${viewCfg.subtitle} Solo Dirección puede reasignar managers.`}
       />
 
       {error && (

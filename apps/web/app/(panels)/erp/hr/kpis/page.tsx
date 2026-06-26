@@ -9,6 +9,7 @@ import DataTable, { type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { useHrManagementGuard } from "@/lib/useHrManagementGuard";
+import { getHrSubmoduleConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface HrEmpleado {
@@ -38,6 +39,7 @@ async function apiFetch(path: string, token: string) {
 export default function HrKpisPage() {
   const { user } = useUser();
   const cfg = useHrManagementGuard();
+  const viewCfg = useMemo(() => getHrSubmoduleConfig(user, "kpis"), [user]);
   const token = user?.token ?? "";
 
   const [staff, setStaff] = useState<HrEmpleado[]>([]);
@@ -49,11 +51,26 @@ export default function HrKpisPage() {
     if (!token) return;
     setLoading(true); setError(null);
     try {
-      const [staffData, engData] = await Promise.all([
-        apiFetch("users/hr-staff?limit=200", token),
+      const fetchAllStaff = async (): Promise<HrEmpleado[]> => {
+        const pageSize = 100;
+        let page = 1;
+        const all: HrEmpleado[] = [];
+        while (true) {
+          const staffData = await apiFetch(`users/hr-staff?limit=${pageSize}&page=${page}`, token);
+          const rows = Array.isArray(staffData) ? staffData : (staffData?.data ?? []);
+          all.push(...rows);
+          const total = staffData?.meta?.total ?? rows.length;
+          if (all.length >= total || rows.length < pageSize) break;
+          page += 1;
+        }
+        return all;
+      };
+
+      const [staffRows, engData] = await Promise.all([
+        fetchAllStaff(),
         apiFetch("analytics/bi/engineers?limit=15", token).catch(() => []),
       ]);
-      setStaff(Array.isArray(staffData) ? staffData : (staffData?.data ?? []));
+      setStaff(staffRows);
       setEngineers(Array.isArray(engData) ? engData : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar KPIs de personas");
@@ -92,8 +109,8 @@ export default function HrKpisPage() {
     <>
       <PageHeader
         eyebrow="ERP · Personas"
-        title={cfg.title}
-        subtitle="Productividad operativa y rotación del equipo — la salud humana de NEXARA, no solo la financiera."
+        title={viewCfg.title}
+        subtitle={viewCfg.subtitle}
         actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
       />
 

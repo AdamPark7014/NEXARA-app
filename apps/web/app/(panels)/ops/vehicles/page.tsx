@@ -7,10 +7,9 @@ import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
-import { getOpsTeamSectionConfig } from "@/lib/section-views";
+import { getVehiclesSectionConfig } from "@/lib/section-views";
+import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 import { buildApiUrl } from "@/lib/api-base";
-import { resolveV2RoleKey } from "@/lib/user-access";
-import { ROLES } from "@/lib/rbac";
 
 interface Vehicle {
   id: number;
@@ -42,14 +41,9 @@ export default function VehiclesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight");
-  const cfg = useMemo(() => getOpsTeamSectionConfig(user, "vehicles"), [user]);
+  const cfg = useMemo(() => getVehiclesSectionConfig(user), [user]);
+  useOpsCanonicalRoute(user, "vehicles");
   const token = user?.token ?? "";
-
-  // ing_campo no gestiona flotilla — tiene su propia vista de vehículos asignados
-  useEffect(() => {
-    const v2 = resolveV2RoleKey(user);
-    if (v2 === ROLES.ING_CAMPO) router.replace("/ops/my-vehicles");
-  }, [user, router]);
 
   const [items, setItems] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -129,8 +123,8 @@ export default function VehiclesPage() {
     <>
       <PageHeader
         eyebrow="OPS · Campo"
-        title="Flotilla de vehículos"
-        subtitle="Gestión de las unidades asignadas a cuadrillas: placas, póliza, verificación y estado."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Agregar vehículo</Button> : undefined}
       />
 

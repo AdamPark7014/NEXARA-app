@@ -138,7 +138,6 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.COORD_OPERACIONES]: [
     '/ops/**',
     '/erp/calendar',
-    '/erp/dashboard',
     '/erp/notifications-center',
     '/erp/my-profile',
     '/crm/quotes',
@@ -178,18 +177,24 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     ...SELF_ATTENDANCE_PATHS,
   ],
 
-  // ─── LÍDER DISEÑO — Studio completo ───────────────────────────────────
+  // ─── LÍDER DISEÑO — Studio + material comercial (CRM) + cuenta ERP ─────
   [ROLES.LIDER_DISENO]: [
     '/studio/**',
-    '/erp/dashboard',
+    '/crm/quotes/**',
+    '/crm/products/**',
+    '/crm/templates',
+    '/crm/templates/**',
+    '/erp/calendar',
     '/erp/notifications-center',
     '/erp/my-profile',
     ...SELF_ATTENDANCE_PATHS,
   ],
 
-  // ─── DISEÑADOR — Studio core ──────────────────────────────────────────
+  // ─── DISEÑADOR — Studio + apoyo en cotizaciones ───────────────────────
   [ROLES.DISENADOR]: [
     '/studio/**',
+    '/crm/quotes/**',
+    '/crm/products/**',
     '/erp/calendar',
     '/erp/notifications-center',
     '/erp/my-profile',

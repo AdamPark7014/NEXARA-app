@@ -134,8 +134,8 @@ export default function BankingPage() {
     <>
       <PageHeader
         eyebrow="ERP · Finanzas"
-        title="Banca"
-        subtitle="Cuentas bancarias, movimientos SPEI y conciliación bancaria."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>

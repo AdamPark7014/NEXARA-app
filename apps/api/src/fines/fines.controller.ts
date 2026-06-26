@@ -22,10 +22,20 @@ import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 export class FinesController {
   constructor(private readonly finesService: FinesService) {}
 
+  /** v2 OPS managers have ACTIVITIES_MANAGE; legacy admins have CONSOLE_ADMIN. */
+  private isOpsManager(user: any): boolean {
+    if (!user) return false;
+    if (user.isSuperAdmin) return true;
+    return (
+      Boolean(user.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) ||
+      Boolean(user.permissions?.includes(PERMISSIONS.ACTIVITIES_MANAGE))
+    );
+  }
+
   @Post()
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.ACTIVITIES_MANAGE] })
   async create(@Body() data: CreateFineDto, @CurrentUser() user: any) {
-    if (!user?.isSuperAdmin && !user?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
+    if (!this.isOpsManager(user)) {
       throw new ForbiddenException('No autorizado para crear multas');
     }
     return this.finesService.create(data);
@@ -34,14 +44,9 @@ export class FinesController {
   @Get()
   @UseGuards(AuthGuard('jwt'))
   async findAll(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
-    // Solo admins ven todas las multas
-    if (
-      !user?.isSuperAdmin &&
-      !user?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)
-    ) {
+    if (!this.isOpsManager(user)) {
       return this.finesService.findByUser(user?.id || 0);
     }
-    // Pasar el usuario para aplicar filtros jerárquicos
     return this.finesService.findAll(user, query);
   }
 
@@ -52,12 +57,7 @@ export class FinesController {
     @CurrentUser() user: any,
   ) {
     const id = parseInt(usuarioId, 10);
-    // Solo pueden ver sus propias multas o admins pueden ver las de otros
-    if (
-      id !== user?.id &&
-      !user?.isSuperAdmin &&
-      !user?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)
-    ) {
+    if (id !== user?.id && !this.isOpsManager(user)) {
       throw new ForbiddenException('No autorizado');
     }
     return this.finesService.findByUser(id);
@@ -71,26 +71,19 @@ export class FinesController {
     @CurrentUser() user: any,
   ) {
     const id = parseInt(usuarioId, 10);
-    if (
-      id !== user?.id &&
-      !user?.isSuperAdmin &&
-      !user?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)
-    ) {
+    if (id !== user?.id && !this.isOpsManager(user)) {
       throw new ForbiddenException('No autorizado');
     }
     return this.finesService.findByUserAndType(id, tipo);
   }
 
   @Get('type/:tipo')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.ACTIVITIES_MANAGE] })
   async findByType(
     @Param('tipo') tipo: string,
     @CurrentUser() user: any,
   ) {
-    if (
-      !user?.isSuperAdmin &&
-      !user?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)
-    ) {
+    if (!this.isOpsManager(user)) {
       throw new ForbiddenException('No autorizado');
     }
     return this.finesService.findByType(tipo);
@@ -103,55 +96,37 @@ export class FinesController {
     @CurrentUser() user: any,
   ) {
     const id = parseInt(usuarioId, 10);
-    if (
-      id !== user?.id &&
-      !user?.isSuperAdmin &&
-      !user?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)
-    ) {
+    if (id !== user?.id && !this.isOpsManager(user)) {
       throw new ForbiddenException('No autorizado');
     }
 
     const types = ['actividad', 'vehiculo', 'asistencia', 'herramienta'];
-    const stats: Record<
-      string,
-      {
-        count: number;
-        total: number;
-      }
-    > = {};
-
+    const stats: Record<string, { count: number; total: number }> = {};
     for (const type of types) {
       const count = await this.finesService.getCountByUser(id, type);
       const total = await this.finesService.getTotalByUser(id, type);
       stats[type] = { count, total };
     }
-
     return stats;
   }
 
   @Patch(':id')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.ACTIVITIES_MANAGE] })
   async update(
     @Param('id') id: string,
     @Body() data: UpdateFineDto,
     @CurrentUser() user: any,
   ) {
-    if (
-      !user?.isSuperAdmin &&
-      !user?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)
-    ) {
+    if (!this.isOpsManager(user)) {
       throw new ForbiddenException('No autorizado');
     }
     return this.finesService.update(parseInt(id, 10), data);
   }
 
   @Delete(':id')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.ACTIVITIES_MANAGE] })
   async delete(@Param('id') id: string, @CurrentUser() user: any) {
-    if (
-      !user?.isSuperAdmin &&
-      !user?.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)
-    ) {
+    if (!this.isOpsManager(user)) {
       throw new ForbiddenException('No autorizado');
     }
     return this.finesService.delete(parseInt(id, 10));

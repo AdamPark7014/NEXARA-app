@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -10,7 +10,8 @@ import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
-import { resolveV2RoleKey } from "@/lib/user-access";
+import { getOpsTeamSectionConfig } from "@/lib/section-views";
+import { getActivitiesCanonicalPath, resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES } from "@/lib/rbac";
 
 interface Snapshot {
@@ -34,13 +35,16 @@ async function apiFetch(path: string, token: string) {
 
 export default function AssetsPage() {
   const { user } = useUser();
+  const cfg = useMemo(() => getOpsTeamSectionConfig(user, "assets"), [user]);
   const router = useRouter();
   const token = user?.token ?? "";
 
   // ing_campo no gestiona activos en campo — redirigir al dashboard
   useEffect(() => {
     const v2 = resolveV2RoleKey(user);
-    if (!user?.isSuperAdmin && v2 === ROLES.ING_CAMPO) router.replace("/ops/dashboard");
+    if (!user?.isSuperAdmin && v2 === ROLES.ING_CAMPO) {
+      router.replace(getActivitiesCanonicalPath(user));
+    }
   }, [user, router]);
 
   const [items, setItems] = useState<Snapshot[]>([]);
@@ -89,8 +93,8 @@ export default function AssetsPage() {
     <>
       <PageHeader
         eyebrow="OPS · Servicio continuo"
-        title="Activos en campo"
-        subtitle="Inventario por cliente y sucursal: equipo desplegado, diferencias detectadas en cada visita de mantenimiento."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
       />
 

@@ -30,7 +30,9 @@ import { getApiAssetOrigin } from "@/lib/api-base";
 
 type PanelUser = UserPermissions & {
   nombre?: string | null;
+  email?: string | null;
   role?: string | null;
+  isPlatformOwner?: boolean;
   avatarUrl?: string | null;
 };
 
@@ -98,7 +100,10 @@ const sanitizeRoleLabel = (value?: string | null) => {
 export const getRoleLabel = (user: PanelUser | null | undefined) => {
   if (!user) return "Invitado";
 
-  const orgLabel = getOrgRoleLabel(user.role, user.orgRoleKey, user.isSuperAdmin);
+  const orgLabel = getOrgRoleLabel(user.role, user.orgRoleKey, user.isSuperAdmin, {
+    email: user.email,
+    isPlatformOwner: user.isPlatformOwner,
+  });
   if (orgLabel) return orgLabel;
 
   const roleRaw = sanitizeRoleLabel(user.role);

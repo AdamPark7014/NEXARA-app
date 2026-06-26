@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -8,6 +8,8 @@ import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
+import { getVehiclesSectionConfig } from "@/lib/section-views";
+import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 
 interface Vehicle {
   id: number;
@@ -31,6 +33,8 @@ async function apiFetch(path: string, token: string, init: RequestInit = {}) {
 
 export default function MyVehiclesPage() {
   const { user } = useUser();
+  useOpsCanonicalRoute(user, "vehicles");
+  const cfg = useMemo(() => getVehiclesSectionConfig(user), [user]);
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<Vehicle[]>([]);
@@ -64,8 +68,8 @@ export default function MyVehiclesPage() {
     <>
       <PageHeader
         eyebrow="OPS · Campo"
-        title="Mis vehículos"
-        subtitle="Unidad(es) asignadas a ti. Reporta incidentes directo a Administración."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
       />
 

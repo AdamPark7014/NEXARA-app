@@ -8,6 +8,7 @@ import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
+import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface Subscriber {
@@ -26,6 +27,7 @@ async function apiFetch(path: string, token: string) {
 
 export default function StudioNewsletterPage() {
   const { user } = useUser();
+  const cfg = useMemo(() => getStudioSectionConfig(user, "newsletter"), [user]);
   const token = user?.token ?? "";
 
   const [subs, setSubs] = useState<Subscriber[]>([]);
@@ -77,8 +79,8 @@ export default function StudioNewsletterPage() {
     <>
       <PageHeader
         eyebrow="STUDIO · Contenido"
-        title="Newsletter público"
-        subtitle="Suscriptores captados desde el sitio público — exporta la lista para tu próxima campaña."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load(search)}>Actualizar</Button>

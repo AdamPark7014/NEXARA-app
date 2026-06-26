@@ -18,13 +18,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   PANEL_META,
-  getModuleUrl,
   type ModuleEntry,
   type PanelId,
 } from "@/lib/access-matrix";
 import {
   getUserAllowedModules,
   getUserAllowedPanels,
+  getModuleEntryUrl,
   getUserPanelSwitchPath,
 } from "@/lib/user-access";
 import { buildCrossPanelUrl } from "@/lib/cross-panel-handoff";
@@ -208,7 +208,7 @@ export default function CommandPalette({
         icon: m.icon ?? "•",
         group: `${PANEL_LABEL[m.panel]} · ${m.group ?? "General"}`,
         panel: m.panel,
-        url: getModuleUrl(m.id),
+        url: getModuleEntryUrl(m),
         keywords: [m.id, m.path],
       }));
     return list;

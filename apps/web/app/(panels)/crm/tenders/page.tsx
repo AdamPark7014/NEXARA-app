@@ -11,6 +11,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { useCrmManagerGuard } from "@/lib/useCrmManagerGuard";
+import { getCrmManagerSubmoduleConfig } from "@/lib/section-views";
 
 interface Tender {
   id: number;
@@ -41,6 +42,7 @@ const emptyForm = { title: "", tenderType: "PUBLIC_GOV", conveningEntity: "", bu
 export default function TendersPage() {
   const { user } = useUser();
   const cfg = useCrmManagerGuard();
+  const viewCfg = useMemo(() => getCrmManagerSubmoduleConfig(user, "tenders"), [user]);
   const token = user?.token ?? "";
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight");
@@ -151,8 +153,8 @@ export default function TendersPage() {
     <>
       <PageHeader
         eyebrow="CRM · Proyectos"
-        title="Licitaciones · Gestión"
-        subtitle={cfg.subtitle}
+        title={viewCfg.title}
+        subtitle={viewCfg.subtitle}
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>

@@ -29,6 +29,13 @@ export function resolveV2RoleKey(user: UserAccessInput | null | undefined): Role
   }
 
   const orgKey = resolveOrgRoleKey(user.role, user.orgRoleKey);
+  if (orgKey === ORG_ROLE_KEYS.DESIGNER) {
+    const hint = `${user.role || ''} ${user.orgRoleKey || ''}`.toLowerCase();
+    if (hint.includes('lider_diseno') || /l[ií]der.*dise/.test(hint)) {
+      return ROLES.LIDER_DISENO;
+    }
+    return ROLES.DISENADOR;
+  }
   if (orgKey) return v2RoleKeyFromOrg(orgKey);
 
   return null;

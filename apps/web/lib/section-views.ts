@@ -38,6 +38,7 @@ const ERP_ADMIN = new Set<RoleKey>([ROLES.CEO, ROLES.DIR_ADMIN, ROLES.COORD_ADMI
 const FINANCE_ROLES = new Set<RoleKey>([ROLES.CEO, ROLES.DIR_ADMIN, ROLES.COORD_ADMIN, ROLES.CONTABILIDAD, ROLES.DIR_OPERACIONES]);
 const HR_ONLY = new Set<RoleKey>([ROLES.RH]);
 const WAREHOUSE_ROLES = new Set<RoleKey>([ROLES.CEO, ROLES.DIR_ADMIN, ROLES.COORD_ADMIN, ROLES.DIR_OPERACIONES]);
+const DESIGN_TEAM = new Set<RoleKey>([ROLES.LIDER_DISENO, ROLES.DISENADOR]);
 
 function isOpsManager(role: RoleKey): boolean {
   return EXECUTIVE.has(role) || OPS_MANAGERS.has(role);
@@ -55,6 +56,108 @@ function tier(role: RoleKey): number {
   return ROLE_TIER[role] ?? 0;
 }
 
+/** Pares OPS que comparten un solo ítem de menú (vista equipo vs propia). */
+export type OpsNavPair = 'activities' | 'evidences' | 'viatics' | 'vehicles';
+
+const OPS_TEAM_MODULE: Record<OpsNavPair, ModuleId> = {
+  activities: 'ops-activities',
+  evidences: 'ops-evidences',
+  viatics: 'ops-viatics',
+  vehicles: 'ops-vehicles',
+};
+
+const OPS_SELF_MODULE: Record<OpsNavPair, ModuleId> = {
+  activities: 'ops-my-activities',
+  evidences: 'ops-my-evidences',
+  viatics: 'ops-my-viatics',
+  vehicles: 'ops-my-vehicles',
+};
+
+const OPS_UNIFIED_COPY: Record<OpsNavPair, { team: { label: string; description: string }; self: { label: string; description: string } }> = {
+  activities: {
+    team: { label: 'Actividades', description: 'Asignar OT, supervisar avance y cerrar trabajo del equipo.' },
+    self: { label: 'Actividades', description: 'Tus OT del día — iniciar, evidenciar y cerrar.' },
+  },
+  evidences: {
+    team: { label: 'Evidencias', description: 'Revisar y aprobar evidencias del equipo de campo.' },
+    self: { label: 'Evidencias', description: 'Fotos, firmas y hojas de servicio de tus OT.' },
+  },
+  viatics: {
+    team: { label: 'Viáticos', description: 'Revisar y autorizar solicitudes del equipo.' },
+    self: { label: 'Viáticos', description: 'Solicitar y comprobar tus gastos de campo.' },
+  },
+  vehicles: {
+    team: { label: 'Vehículos', description: 'Gestión de flotilla y asignación a cuadrillas.' },
+    self: { label: 'Vehículos', description: 'Unidades asignadas a ti y entregas.' },
+  },
+};
+
+/** ¿Vista de equipo, propia o sin acceso para un par OPS? */
+export function resolveOpsPairNav(
+  user: UserAccessInput | null | undefined,
+  pair: OpsNavPair,
+): 'team' | 'self' | null {
+  const v2 = resolveV2RoleKey(user);
+  if (!v2) return null;
+  if (user?.isSuperAdmin) return 'team';
+
+  switch (pair) {
+    case 'activities':
+      if (isFieldRole(v2)) return 'self';
+      if (isOpsManager(v2) || isSupportRole(v2)) return 'team';
+      return null;
+    case 'evidences':
+      if (isFieldRole(v2)) return 'self';
+      if (isOpsManager(v2) || isSupportRole(v2)) return 'team';
+      return null;
+    case 'viatics':
+      if (isFieldRole(v2)) return 'self';
+      if (isOpsManager(v2)) return 'team';
+      return null;
+    case 'vehicles':
+      if (isFieldRole(v2)) return 'self';
+      // Arquitecto supervisa OT/evidencias pero no gestiona flotilla.
+      if (v2 === ROLES.ARQUITECTO) return null;
+      if (isOpsManager(v2) || v2 === ROLES.ADMINISTRATIVO) return 'team';
+      return null;
+    default:
+      return null;
+  }
+}
+
+function opsPairFromModuleId(id: ModuleId): OpsNavPair | null {
+  for (const pair of Object.keys(OPS_TEAM_MODULE) as OpsNavPair[]) {
+    if (id === OPS_TEAM_MODULE[pair] || id === OPS_SELF_MODULE[pair]) return pair;
+  }
+  return null;
+}
+
+function opsCanonicalRelativePath(user: UserAccessInput | null | undefined, pair: OpsNavPair): string {
+  const nav = resolveOpsPairNav(user, pair);
+  const paths: Record<OpsNavPair, { team: string; self: string }> = {
+    activities: { team: '/activities', self: '/my-activities' },
+    evidences: { team: '/evidences', self: '/my-evidences' },
+    viatics: { team: '/viatics', self: '/my-viatics' },
+    vehicles: { team: '/vehicles', self: '/my-vehicles' },
+  };
+  return nav === 'self' ? paths[pair].self : paths[pair].team;
+}
+
+/** ¿Puede ver contratos de mantenimiento (pestaña/enlace desde /ops/maintenance)? */
+export function canAccessMaintenanceContracts(
+  user: UserAccessInput | null | undefined,
+): boolean {
+  const v2 = resolveV2RoleKey(user);
+  if (!v2) return false;
+  if (user?.isSuperAdmin) return true;
+  return (
+    EXECUTIVE.has(v2)
+    || v2 === ROLES.DIR_OPERACIONES
+    || v2 === ROLES.COORD_OPERACIONES
+    || v2 === ROLES.ING_SOPORTE
+  );
+}
+
 /** ¿Mostrar este módulo en el sidebar del panel actual? */
 export function shouldShowModuleInSidebar(
   user: UserAccessInput | null | undefined,
@@ -67,21 +170,21 @@ export function shouldShowModuleInSidebar(
 
   switch (module.id as ModuleId) {
     case 'ops-activities':
-      return isOpsManager(v2) || isSupportRole(v2);
+      return resolveOpsPairNav(user, 'activities') === 'team';
     case 'ops-my-activities':
-      return isFieldRole(v2) || OPS_MANAGERS.has(v2);
+      return resolveOpsPairNav(user, 'activities') === 'self';
     case 'ops-evidences':
-      return isOpsManager(v2) || isSupportRole(v2);
+      return resolveOpsPairNav(user, 'evidences') === 'team';
     case 'ops-my-evidences':
-      return isFieldRole(v2) || OPS_MANAGERS.has(v2);
+      return resolveOpsPairNav(user, 'evidences') === 'self';
     case 'ops-viatics':
-      return isOpsManager(v2);
+      return resolveOpsPairNav(user, 'viatics') === 'team';
     case 'ops-my-viatics':
-      return isFieldRole(v2) || OPS_MANAGERS.has(v2);
+      return resolveOpsPairNav(user, 'viatics') === 'self';
     case 'ops-vehicles':
-      return isOpsManager(v2);
+      return resolveOpsPairNav(user, 'vehicles') === 'team';
     case 'ops-my-vehicles':
-      return isFieldRole(v2) || OPS_MANAGERS.has(v2);
+      return resolveOpsPairNav(user, 'vehicles') === 'self';
     case 'ops-gps':
       return isOpsManager(v2);
     case 'ops-tools':
@@ -94,20 +197,36 @@ export function shouldShowModuleInSidebar(
     case 'ops-support-inbox':
     case 'ops-support-sla':
       return EXECUTIVE.has(v2) || OPS_MANAGERS.has(v2) || isSupportRole(v2);
-    case 'ops-maintenance':
     case 'ops-maintenance-contracts':
+      // Contratos accesibles desde /ops/maintenance (pestaña/enlace), no duplicar menú.
+      return false;
+    case 'ops-maintenance':
     case 'ops-service-clients':
     case 'ops-assets':
       return EXECUTIVE.has(v2) || OPS_MANAGERS.has(v2) || isSupportRole(v2);
     case 'ops-cvs':
       return EXECUTIVE.has(v2) || OPS_MANAGERS.has(v2) || v2 === ROLES.RH;
     case 'attendance':
-      return true;
+      return v2 !== ROLES.CLIENTE;
+    case 'lunch-breaks':
+      return HR_ONLY.has(v2) || HR_MANAGERS.has(v2);
     case 'viatics-admin':
       return HR_MANAGERS.has(v2) || EXECUTIVE.has(v2) || v2 === ROLES.COORD_ADMIN || v2 === ROLES.DIR_OPERACIONES;
     case 'expenses-admin':
-      return tier(v2) >= 45 && v2 !== ROLES.ING_CAMPO && v2 !== ROLES.ING_SOPORTE;
-    // ERP — tablero ejecutivo solo dirección
+      return FINANCE_ROLES.has(v2) || v2 === ROLES.ADMINISTRATIVO;
+    // ERP — tablero ejecutivo y resumen corporativo solo dirección
+    case 'dashboard': {
+      if (DESIGN_TEAM.has(v2)) return false;
+      const minimalErp = new Set<RoleKey>([
+        ROLES.COORD_OPERACIONES,
+        ROLES.ING_CAMPO,
+        ROLES.ING_SOPORTE,
+        ROLES.VENDEDOR,
+        ROLES.LIDER_DISENO,
+        ROLES.DISENADOR,
+      ]);
+      return !minimalErp.has(v2);
+    }
     case 'executive':
       return ERP_EXECUTIVE.has(v2);
     case 'users':
@@ -119,25 +238,87 @@ export function shouldShowModuleInSidebar(
     case 'invoicing':
     case 'banking':
     case 'employee-payments':
-      return FINANCE_ROLES.has(v2);
+      return FINANCE_ROLES.has(v2) || v2 === ROLES.RH;
     case 'hr':
-    case 'lunch-breaks':
     case 'fines':
     case 'kpis-hr':
       return HR_ONLY.has(v2) || HR_MANAGERS.has(v2) || EXECUTIVE.has(v2);
     case 'warehouse':
-    case 'procurement':
       return WAREHOUSE_ROLES.has(v2) || v2 === ROLES.ADMINISTRATIVO;
-    // CRM — gerente vs vendedor
+    case 'procurement':
+      return WAREHOUSE_ROLES.has(v2);
+    // CRM — gerente vs vendedor vs diseño
     case 'crm-sales-team':
     case 'crm-targets':
     case 'crm-tenders':
-    case 'crm-templates':
       return SALES_MANAGERS.has(v2);
+    case 'crm-templates':
+      return SALES_MANAGERS.has(v2) || v2 === ROLES.LIDER_DISENO;
+    case 'crm-quotes':
+      return (
+        DESIGN_TEAM.has(v2)
+        || SALES_MANAGERS.has(v2)
+        || SALES_REP.has(v2)
+        || v2 === ROLES.ING_SOPORTE
+        || v2 === ROLES.COORD_OPERACIONES
+        || v2 === ROLES.CONTABILIDAD
+      );
+    case 'crm-products':
+      return DESIGN_TEAM.has(v2) || SALES_MANAGERS.has(v2) || SALES_REP.has(v2);
+    case 'crm-pipeline':
+    case 'crm-agenda':
+    case 'crm-clients':
+    case 'crm-leads':
+      return SALES_MANAGERS.has(v2) || SALES_REP.has(v2);
+    case 'crm-opportunities':
+      return EXECUTIVE.has(v2) || SALES_MANAGERS.has(v2);
+    case 'crm-dashboard':
+      return SALES_MANAGERS.has(v2) || SALES_REP.has(v2);
     case 'crm-reports':
       return SALES_MANAGERS.has(v2) || v2 === ROLES.DIR_ADMIN;
     case 'crm-projects':
       return SALES_MANAGERS.has(v2) || SALES_REP.has(v2) || v2 === ROLES.COORD_OPERACIONES;
+    case 'approvals':
+      return (
+        tier(v2) >= 45
+        && v2 !== ROLES.ING_CAMPO
+        && v2 !== ROLES.ING_SOPORTE
+        && !DESIGN_TEAM.has(v2)
+        && v2 !== ROLES.VENDEDOR
+      );
+    case 'bi':
+      return ERP_EXECUTIVE.has(v2) || v2 === ROLES.DIR_OPERACIONES;
+    case 'kb':
+      return tier(v2) >= 50 && !DESIGN_TEAM.has(v2) && v2 !== ROLES.ING_CAMPO && v2 !== ROLES.VENDEDOR;
+    case 'documents':
+      return tier(v2) >= 45 && v2 !== ROLES.ING_CAMPO && v2 !== ROLES.VENDEDOR && !DESIGN_TEAM.has(v2);
+    case 'exports':
+      return FINANCE_ROLES.has(v2);
+    case 'news':
+      return ERP_ADMIN.has(v2) || v2 === ROLES.ADMINISTRATIVO || v2 === ROLES.COORD_ADMIN;
+    case 'companies':
+      return ERP_ADMIN.has(v2) || v2 === ROLES.ADMINISTRATIVO || v2 === ROLES.COORD_ADMIN;
+    case 'orgchart':
+      return EXECUTIVE.has(v2) || HR_MANAGERS.has(v2) || v2 === ROLES.RH || tier(v2) >= 70;
+    case 'calendar':
+    case 'my-profile':
+    case 'notifications-center':
+      return v2 !== ROLES.CLIENTE;
+    case 'studio-dashboard':
+    case 'studio-hero':
+    case 'studio-pages':
+    case 'studio-cases':
+    case 'studio-news':
+    case 'studio-social':
+    case 'studio-newsletter':
+      return DESIGN_TEAM.has(v2) || EXECUTIVE.has(v2);
+    case 'studio-contacts':
+    case 'studio-leads':
+      return DESIGN_TEAM.has(v2) || EXECUTIVE.has(v2) || SALES_MANAGERS.has(v2);
+    case 'lab-home':
+    case 'lab-ai':
+    case 'lab-health':
+      return EXECUTIVE.has(v2) || v2 === ROLES.SUPER_ADMIN;
     default:
       return module.visible !== false;
   }
@@ -192,20 +373,139 @@ export function adaptModulePresentation(
       label: 'GPS en vivo',
       description: 'Rastreo de cuadrillas en tiempo real',
     },
+    'ops-tools': isFieldRole(v2)
+      ? { label: 'Herramientas', description: 'Solicita y da seguimiento a kits asignados.' }
+      : { label: 'Herramientas', description: 'Inventario, préstamos y solicitudes del equipo.' },
+    'ops-maintenance': canAccessMaintenanceContracts(user)
+      ? { label: 'Mantenimiento', description: 'Órdenes de trabajo y contratos de servicio (SLA).' }
+      : { label: 'Mantenimiento', description: 'Visitas preventivas, correctivas y OT de activos.' },
+    'viatics-admin': {
+      label: 'Viáticos · Finanzas',
+      description: 'Aprobación administrativa y contable de viáticos de campo.',
+    },
+    warehouse: {
+      label: 'Almacén',
+      description: 'Stock, ubicaciones y despacho de equipo.',
+    },
+    procurement: {
+      label: 'Compras',
+      description: 'Requisiciones, órdenes de compra y proveedores.',
+    },
     attendance: EXECUTIVE.has(v2)
       ? { label: 'Asistencia · Gestión', description: 'Supervisión de jornadas del equipo' }
       : HR_MANAGERS.has(v2)
         ? { label: 'Asistencia · Gestión', description: 'Registrar y gestionar jornadas' }
         : { label: 'Mi asistencia', description: 'Registrar tu entrada y salida' },
     'crm-pipeline': SALES_REP.has(v2)
-      ? { label: 'Mi pipeline', description: 'Tus oportunidades activas por etapa' }
-      : { label: 'Kanban del pipeline', description: 'Vista visual del equipo por etapa' },
+      ? { label: 'Pipeline', description: 'Tus oportunidades activas por etapa' }
+      : { label: 'Pipeline', description: 'Kanban del equipo — supervisa cierre por etapa' },
     'crm-leads': SALES_REP.has(v2)
-      ? { label: 'Mis leads', description: 'Prospectos asignados a ti' }
+      ? { label: 'Leads', description: 'Prospectos asignados a ti' }
       : { label: 'Leads', description: 'Prospectos del equipo comercial' },
+    'crm-opportunities': { label: 'Oportunidades', description: 'Listado detallado del pipeline comercial' },
+    'crm-agenda': SALES_REP.has(v2)
+      ? { label: 'Agenda', description: 'Tus llamadas, visitas y seguimientos' }
+      : { label: 'Agenda', description: 'Actividades comerciales del equipo' },
+    'crm-clients': { label: 'Clientes', description: 'Cartera de cuentas y contactos' },
+    'crm-quotes': DESIGN_TEAM.has(v2)
+      ? { label: 'Cotizaciones', description: 'Propuestas comerciales y diseño de solución' }
+      : SALES_REP.has(v2)
+        ? { label: 'Cotizaciones', description: 'Tus propuestas en curso' }
+        : { label: 'Cotizaciones', description: 'Documentos comerciales del equipo' },
+    'crm-projects': SALES_REP.has(v2)
+      ? { label: 'Proyectos', description: 'Negocios ganados que tienes asignados' }
+      : { label: 'Proyectos', description: 'Handoff comercial → operaciones' },
+    'crm-dashboard': SALES_REP.has(v2)
+      ? { label: 'Mi dashboard', description: 'Resumen de tu pipeline y metas' }
+      : { label: 'Dashboard comercial', description: 'KPIs del equipo y embudo de ventas' },
   };
 
   const hit = copy[module.id as ModuleId];
+  const pair = opsPairFromModuleId(module.id as ModuleId);
+  if (pair) {
+    const nav = resolveOpsPairNav(user, pair);
+    if (!nav) return module;
+    const unified = OPS_UNIFIED_COPY[pair][nav];
+    return {
+      ...module,
+      ...unified,
+      path: opsCanonicalRelativePath(user, pair),
+    };
+  }
+
+  if (module.id === 'warehouse' || module.id === 'procurement') {
+    const inv = getErpInventorySectionConfig(user, module.id);
+    return { ...module, label: inv.title, description: inv.subtitle };
+  }
+
+  const crmSalesKey = CRM_SIDEBAR_MODULE_MAP[module.id as ModuleId];
+  if (crmSalesKey) {
+    const cfg = getCrmSalesSectionConfig(user, crmSalesKey);
+    const hitCrm = copy[module.id as ModuleId];
+    return {
+      ...module,
+      label: hitCrm?.label ?? cfg.title,
+      description: hitCrm?.description ?? cfg.subtitle,
+    };
+  }
+
+  const crmMgrKey = CRM_MGR_SIDEBAR_MAP[module.id as ModuleId];
+  if (crmMgrKey) {
+    const cfg = getCrmManagerSubmoduleConfig(user, crmMgrKey);
+    return { ...module, label: cfg.title, description: cfg.subtitle };
+  }
+
+  const govKey = ERP_GOV_SIDEBAR_MAP[module.id as ModuleId];
+  if (govKey) {
+    const cfg = getErpGovernanceSectionConfig(user, govKey);
+    return { ...module, label: cfg.title, description: cfg.subtitle };
+  }
+
+  const studioKey = STUDIO_SIDEBAR_MAP[module.id as ModuleId];
+  if (studioKey) {
+    const cfg = getStudioSectionConfig(user, studioKey);
+    return { ...module, label: cfg.title, description: cfg.subtitle };
+  }
+
+  if (module.id === 'exports' || module.id === 'accounting' || module.id === 'banking' || module.id === 'invoicing' || module.id === 'employee-payments') {
+    const fin = getErpFinanceSectionConfig(user, module.id === 'employee-payments' ? 'employee-payments' : module.id as ErpFinanceModule);
+    return { ...module, label: fin.title, description: fin.subtitle };
+  }
+
+  if (module.id === 'approvals') {
+    const cfg = getApprovalsSectionConfig(user);
+    return { ...module, label: cfg.title, description: cfg.subtitle };
+  }
+
+  if (module.id === 'bi') {
+    const cfg = getBiSectionConfig(user);
+    return { ...module, label: cfg.title, description: cfg.subtitle };
+  }
+
+  if (module.id === 'orgchart') {
+    const cfg = getHrSubmoduleConfig(user, 'orgchart');
+    return { ...module, label: cfg.title, description: cfg.subtitle };
+  }
+
+  if (module.id === 'lunch-breaks') {
+    const cfg = getLunchBreaksSectionConfig(user);
+    return { ...module, label: cfg.title, description: cfg.subtitle };
+  }
+
+  if (module.id === 'lab-home' || module.id === 'lab-ai' || module.id === 'lab-health') {
+    const labKey = module.id === 'lab-home' ? 'home' : module.id === 'lab-ai' ? 'ai' : 'health';
+    const cfg = getLabSectionConfig(user, labKey);
+    return { ...module, label: cfg.title, description: cfg.subtitle };
+  }
+
+  if (module.id === 'fines') {
+    return { ...module, label: 'Multas e incidencias', description: 'Sanciones administrativas del personal.' };
+  }
+
+  if (module.id === 'kpis-hr') {
+    return { ...module, label: 'KPIs de personas', description: 'Productividad, rotación y clima laboral.' };
+  }
+
   return hit ? { ...module, ...hit } : module;
 }
 
@@ -332,24 +632,67 @@ export function getAttendanceViewMode(
   const v2 = resolveV2RoleKey(user);
   if (!user || user.isSuperAdmin) return 'manage';
   if (!v2) return 'register';
-  if (EXECUTIVE.has(v2)) return 'manage';
-  if (HR_MANAGERS.has(v2)) return 'manage_register';
+  if (EXECUTIVE.has(v2) || v2 === ROLES.DIR_OPERACIONES) return 'manage';
+  if (HR_MANAGERS.has(v2) || v2 === ROLES.COORD_OPERACIONES) return 'manage_register';
   return 'register';
 }
 
+export type AttendanceSectionConfig = {
+  viewMode: ReturnType<typeof getAttendanceViewMode>;
+  title: string;
+  subtitle: string;
+  canRegisterSelf: boolean;
+  canManageTeam: boolean;
+};
+
+export function getAttendanceSectionConfig(
+  user: UserAccessInput | null | undefined,
+): AttendanceSectionConfig {
+  const viewMode = getAttendanceViewMode(user);
+  const canRegisterSelf = viewMode === 'register' || viewMode === 'manage_register';
+  const canManageTeam = viewMode === 'manage' || viewMode === 'manage_register';
+
+  if (viewMode === 'manage') {
+    return {
+      viewMode,
+      canRegisterSelf: false,
+      canManageTeam: true,
+      title: 'Asistencia · Gestión',
+      subtitle: 'Supervisión de jornadas del equipo en tiempo real.',
+    };
+  }
+  if (viewMode === 'manage_register') {
+    return {
+      viewMode,
+      canRegisterSelf: true,
+      canManageTeam: true,
+      title: 'Asistencia',
+      subtitle: 'Registra tu jornada y supervisa al equipo de campo.',
+    };
+  }
+  return {
+    viewMode,
+    canRegisterSelf: true,
+    canManageTeam: false,
+    title: 'Mi asistencia',
+    subtitle: 'Registra tu entrada y salida diaria.',
+  };
+}
+
 export function getActivitiesCanonicalPath(user: UserAccessInput | null | undefined): string {
-  const cfg = getActivitiesSectionConfig(user);
-  return cfg.viewMode === 'execute' ? '/ops/my-activities' : '/ops/activities';
+  return `/ops${opsCanonicalRelativePath(user, 'activities')}`;
 }
 
 export function getEvidencesCanonicalPath(user: UserAccessInput | null | undefined): string {
-  const cfg = getEvidencesSectionConfig(user);
-  return cfg.viewMode === 'execute' ? '/ops/my-evidences' : '/ops/evidences';
+  return `/ops${opsCanonicalRelativePath(user, 'evidences')}`;
 }
 
 export function getViaticsCanonicalPath(user: UserAccessInput | null | undefined): string {
-  const cfg = getViaticsSectionConfig(user);
-  return cfg.viewMode === 'execute' ? '/ops/my-viatics' : '/ops/viatics';
+  return `/ops${opsCanonicalRelativePath(user, 'viatics')}`;
+}
+
+export function getVehiclesCanonicalPath(user: UserAccessInput | null | undefined): string {
+  return `/ops${opsCanonicalRelativePath(user, 'vehicles')}`;
 }
 
 // ─── CRM ───────────────────────────────────────────────────────────────────
@@ -415,7 +758,71 @@ export function getCrmManagerSectionConfig(user: UserAccessInput | null | undefi
   };
 }
 
+type CrmManagerModule = 'team' | 'targets' | 'tenders' | 'reports' | 'templates';
+
+const CRM_MGR_COPY: Record<CrmManagerModule, { title: string; subtitle: string }> = {
+  team: {
+    title: 'Equipo comercial',
+    subtitle: 'Ranking y desempeño de ejecutivos del mes.',
+  },
+  targets: {
+    title: 'Cuotas y metas',
+    subtitle: 'Asignación de objetivos mensuales y seguimiento de cumplimiento.',
+  },
+  tenders: {
+    title: 'Licitaciones · Gestión',
+    subtitle: 'RFPs, concursos públicos y propuestas formales.',
+  },
+  reports: {
+    title: 'Reportes comerciales',
+    subtitle: 'Métricas consolidadas del pipeline y cartera.',
+  },
+  templates: {
+    title: 'Plantillas de cotización',
+    subtitle: 'Formatos y branding para documentos comerciales.',
+  },
+};
+
+const CRM_MGR_SIDEBAR_MAP: Partial<Record<ModuleId, CrmManagerModule>> = {
+  'crm-sales-team': 'team',
+  'crm-targets': 'targets',
+  'crm-tenders': 'tenders',
+  'crm-reports': 'reports',
+  'crm-templates': 'templates',
+};
+
+export function getCrmManagerSubmoduleConfig(
+  user: UserAccessInput | null | undefined,
+  module: CrmManagerModule = 'team',
+): SectionConfig & { canAccess: boolean } {
+  const base = getCrmManagerSectionConfig(user);
+  const copy = CRM_MGR_COPY[module];
+  return {
+    viewMode: base.viewMode,
+    defaultScope: base.defaultScope,
+    canCreate: base.canCreate,
+    canEdit: base.canEdit,
+    canDelete: base.canDelete,
+    canAssign: base.canAssign,
+    canApprove: base.canApprove,
+    canAccess: base.canAccess,
+    title: copy.title,
+    subtitle: copy.subtitle,
+  };
+}
+
 type CrmSalesModule = 'leads' | 'pipeline' | 'opportunities' | 'agenda' | 'clients' | 'quotes' | 'projects';
+
+const CRM_SIDEBAR_MODULE_MAP: Partial<Record<ModuleId, CrmSalesModule>> = {
+  'crm-leads': 'leads',
+  'crm-pipeline': 'pipeline',
+  'crm-opportunities': 'opportunities',
+  'crm-agenda': 'agenda',
+  'crm-clients': 'clients',
+  'crm-quotes': 'quotes',
+  'crm-projects': 'projects',
+  'crm-dashboard': 'opportunities',
+};
 
 const CRM_SALES_COPY: Record<CrmSalesModule, { manager: { title: string; subtitle: string }; rep: { title: string; subtitle: string } }> = {
   leads: {
@@ -481,6 +888,21 @@ export function getCrmSalesSectionConfig(
       subtitle: copy.manager.subtitle,
     };
   }
+  if (DESIGN_TEAM.has(v2) && (module === 'quotes' || module === 'projects')) {
+    return {
+      viewMode: 'manage_execute',
+      defaultScope: 'team',
+      canCreate: module === 'quotes',
+      canEdit: true,
+      canDelete: false,
+      canAssign: false,
+      canApprove: false,
+      title: module === 'quotes' ? 'Cotizaciones · Diseño' : copy.manager.title,
+      subtitle: module === 'quotes'
+        ? 'Elabora propuestas visuales y técnicas para el equipo comercial.'
+        : copy.manager.subtitle,
+    };
+  }
   if (module === 'projects' && v2 === ROLES.COORD_OPERACIONES) {
     return {
       viewMode: 'manage',
@@ -504,6 +926,49 @@ export function getCrmSalesSectionConfig(
     canApprove: false,
     title: copy.rep.title,
     subtitle: copy.rep.subtitle,
+  };
+}
+
+export function getCrmCatalogSectionConfig(
+  user: UserAccessInput | null | undefined,
+): SectionConfig {
+  const v2 = resolveV2RoleKey(user);
+  if (!v2 || user?.isSuperAdmin) {
+    return {
+      viewMode: 'manage',
+      defaultScope: 'team',
+      canCreate: true,
+      canEdit: true,
+      canDelete: false,
+      canAssign: false,
+      canApprove: false,
+      title: 'Catálogo de productos',
+      subtitle: 'SKUs comerciales, precios sugeridos y disponibilidad.',
+    };
+  }
+  if (DESIGN_TEAM.has(v2)) {
+    return {
+      viewMode: 'manage_execute',
+      defaultScope: 'team',
+      canCreate: false,
+      canEdit: false,
+      canDelete: false,
+      canAssign: false,
+      canApprove: false,
+      title: 'Catálogo · Referencia',
+      subtitle: 'Consulta productos y paquetes para armar cotizaciones.',
+    };
+  }
+  return {
+    viewMode: 'manage',
+    defaultScope: 'team',
+    canCreate: tier(v2) >= 70,
+    canEdit: true,
+    canDelete: false,
+    canAssign: false,
+    canApprove: false,
+    title: 'Catálogo de productos',
+    subtitle: 'Maestro comercial — el stock físico vive en ERP › Almacén.',
   };
 }
 
@@ -660,7 +1125,6 @@ export function canAccessHrManagement(user: UserAccessInput | null | undefined):
   return HR_PAGE_ROLES.has(v2);
 }
 
-/** RRHH plantilla — solo RH y dirección; el resto va a asistencia. */
 export function getHrSectionConfig(user: UserAccessInput | null | undefined): SectionConfig & { canAccess: boolean } {
   const canAccess = canAccessHrManagement(user);
   const v2 = resolveV2RoleKey(user);
@@ -720,6 +1184,42 @@ export function getHrSectionConfig(user: UserAccessInput | null | undefined): Se
   };
 }
 
+type HrSubmodule = 'fines' | 'kpis' | 'orgchart';
+
+const HR_SUB_COPY: Record<HrSubmodule, { title: string; subtitle: string }> = {
+  fines: {
+    title: 'Multas e incidencias',
+    subtitle: 'Sanciones administrativas: faltas, daños y comportamiento.',
+  },
+  kpis: {
+    title: 'KPIs de personas',
+    subtitle: 'Productividad operativa, rotación y capacitación del equipo.',
+  },
+  orgchart: {
+    title: 'Organigrama',
+    subtitle: 'Jerarquía corporativa y líneas de reporte.',
+  },
+};
+
+export function getHrSubmoduleConfig(
+  user: UserAccessInput | null | undefined,
+  module: HrSubmodule = 'fines',
+): SectionConfig {
+  const base = getHrSectionConfig(user);
+  const copy = HR_SUB_COPY[module];
+  return {
+    viewMode: base.viewMode,
+    defaultScope: base.defaultScope,
+    canCreate: base.canCreate,
+    canEdit: base.canEdit,
+    canDelete: base.canDelete,
+    canAssign: base.canAssign,
+    canApprove: base.canApprove,
+    title: copy.title,
+    subtitle: copy.subtitle,
+  };
+}
+
 export function getCrmManagerCanonicalPath(): string {
   return '/crm/dashboard';
 }
@@ -763,7 +1263,9 @@ type OpsTeamModule =
   | 'maintenance'
   | 'maintenance-contracts'
   | 'service-clients'
+  | 'assets'
   | 'support'
+  | 'support-sla'
   | 'gps'
   | 'recruiting';
 
@@ -774,7 +1276,9 @@ const OPS_TEAM_COPY: Record<OpsTeamModule, { title: string; subtitle: string }> 
   maintenance: { title: 'Mantenimiento', subtitle: 'Órdenes de mantenimiento preventivo y correctivo.' },
   'maintenance-contracts': { title: 'Contratos de mantenimiento', subtitle: 'Acuerdos de servicio y SLA con clientes.' },
   'service-clients': { title: 'Clientes de servicio', subtitle: 'Cuentas con contrato de soporte o mantenimiento.' },
+  assets: { title: 'Activos en campo', subtitle: 'Equipos instalados por cliente y sucursal.' },
   support: { title: 'Tickets de soporte', subtitle: 'Bandeja de solicitudes y escalaciones del equipo.' },
+  'support-sla': { title: 'Cumplimiento de SLA', subtitle: 'Tiempo de respuesta y resolución — últimos 30 días.' },
   gps: { title: 'GPS en vivo', subtitle: 'Rastreo de cuadrillas y unidades en tiempo real.' },
   recruiting: { title: 'Reclutamiento', subtitle: 'Pipeline de candidatos y vacantes operativas.' },
 };
@@ -833,6 +1337,30 @@ export function getOpsTeamSectionConfig(
     };
   }
 
+  if (module === 'vehicles' && v2 && isFieldRole(v2)) {
+    return {
+      viewMode: 'execute',
+      defaultScope: 'self',
+      canCreate: false,
+      canEdit: false,
+      canDelete: false,
+      canAssign: false,
+      canApprove: false,
+      title: 'Mis vehículos',
+      subtitle: 'Unidades asignadas a ti — reporta incidentes y entregas.',
+    };
+  }
+
+  if (module === 'maintenance') {
+    return {
+      ...base,
+      title: copy.title,
+      subtitle: canAccessMaintenanceContracts(user)
+        ? 'Órdenes de trabajo y contratos de servicio (SLA).'
+        : copy.subtitle,
+    };
+  }
+
   if (module === 'maintenance-contracts') {
     return {
       ...base,
@@ -844,6 +1372,10 @@ export function getOpsTeamSectionConfig(
   }
 
   return { ...base, title: copy.title, subtitle: copy.subtitle };
+}
+
+export function getVehiclesSectionConfig(user: UserAccessInput | null | undefined): SectionConfig {
+  return getOpsTeamSectionConfig(user, 'vehicles');
 }
 
 // ─── ERP · inventario / compras ────────────────────────────────────────────
@@ -1011,6 +1543,26 @@ export function getErpFinanceSectionConfig(
   };
 }
 
+// ─── ERP · aprobaciones ──────────────────────────────────────────────────────
+
+export function getApprovalsSectionConfig(user: UserAccessInput | null | undefined): SectionConfig {
+  const v2 = resolveV2RoleKey(user);
+  const manage = !v2 || user?.isSuperAdmin || tier(v2) >= 70;
+  return {
+    viewMode: manage ? 'manage' : 'execute',
+    defaultScope: 'self',
+    canCreate: false,
+    canEdit: true,
+    canDelete: false,
+    canAssign: false,
+    canApprove: true,
+    title: 'Aprobaciones jerárquicas',
+    subtitle: manage
+      ? 'Firmas pendientes y flujo jerárquico del equipo.'
+      : 'Solicitudes que requieren tu visto bueno.',
+  };
+}
+
 // ─── ERP · gobierno / comunicación interna ─────────────────────────────────
 
 type ErpGovernanceModule = 'users' | 'companies' | 'settings' | 'documents' | 'kb' | 'news';
@@ -1099,10 +1651,60 @@ export function getErpGovernanceSectionConfig(
 
 // ─── Studio · marketing ────────────────────────────────────────────────────
 
-type StudioModule = 'social' | 'news' | 'cases' | 'contacts';
+type StudioModule =
+  | 'social'
+  | 'news'
+  | 'cases'
+  | 'contacts'
+  | 'dashboard'
+  | 'hero'
+  | 'pages'
+  | 'leads'
+  | 'newsletter';
+
+const STUDIO_SIDEBAR_MAP: Partial<Record<ModuleId, StudioModule>> = {
+  'studio-dashboard': 'dashboard',
+  'studio-hero': 'hero',
+  'studio-pages': 'pages',
+  'studio-cases': 'cases',
+  'studio-news': 'news',
+  'studio-social': 'social',
+  'studio-newsletter': 'newsletter',
+  'studio-contacts': 'contacts',
+  'studio-leads': 'leads',
+};
+
+const ERP_GOV_SIDEBAR_MAP: Partial<Record<ModuleId, ErpGovernanceModule>> = {
+  users: 'users',
+  companies: 'companies',
+  settings: 'settings',
+  documents: 'documents',
+  kb: 'kb',
+  news: 'news',
+};
 
 const STUDIO_MANAGERS = new Set<RoleKey>([ROLES.LIDER_DISENO, ROLES.CEO, ROLES.DIR_ADMIN]);
 const STUDIO_COPY: Record<StudioModule, { manager: { title: string; subtitle: string }; creator: { title: string; subtitle: string } }> = {
+  dashboard: {
+    manager: { title: 'Studio', subtitle: 'Marca, sitio público, redes y captación de leads.' },
+    creator: { title: 'Studio', subtitle: 'Tu espacio de diseño y contenido.' },
+  },
+  hero: {
+    manager: { title: 'Banner del inicio', subtitle: 'Carrusel principal del sitio público.' },
+    creator: { title: 'Banner del inicio', subtitle: 'Propuestas de carrusel para revisión.' },
+  },
+  pages: {
+    manager: { title: 'Páginas públicas', subtitle: 'Secciones principales del sitio nexara.com.mx.' },
+    creator: { title: 'Páginas públicas', subtitle: 'Bloques de contenido que estás editando.' },
+  },
+  leads: {
+    manager: { title: 'Leads del sitio', subtitle: 'Prospectos captados por marketing — handoff a CRM.' },
+    creator: { title: 'Leads del sitio', subtitle: 'Prospectos recientes del formulario web.' },
+  },
+  newsletter: {
+    manager: { title: 'Newsletter público', subtitle: 'Boletín a clientes y suscriptores del sitio.' },
+    creator: { title: 'Newsletter', subtitle: 'Borradores del boletín externo.' },
+  },
   social: {
     manager: { title: 'Redes sociales', subtitle: 'Calendario editorial y publicaciones del equipo.' },
     creator: { title: 'Mis publicaciones', subtitle: 'Borradores y posts programados por ti.' },
@@ -1176,5 +1778,80 @@ export function getStudioSectionConfig(
     canApprove: false,
     title: copy.manager.title,
     subtitle: copy.manager.subtitle,
+  };
+}
+
+// ─── ERP · comidas ───────────────────────────────────────────────────────────
+
+export function getLunchBreaksSectionConfig(user: UserAccessInput | null | undefined): SectionConfig {
+  const viewMode = getAttendanceViewMode(user);
+  const isManager = viewMode !== 'register';
+  return {
+    viewMode: isManager ? 'manage' : 'execute',
+    defaultScope: isManager ? 'team' : 'self',
+    canCreate: viewMode === 'register' || viewMode === 'manage_register',
+    canEdit: isManager,
+    canDelete: false,
+    canAssign: false,
+    canApprove: false,
+    title: 'Comidas y descansos',
+    subtitle: isManager
+      ? 'Supervisión del horario de comida del personal.'
+      : 'Tu historial de comidas y estado del día.',
+  };
+}
+
+// ─── ERP · BI ────────────────────────────────────────────────────────────────
+
+export function getBiSectionConfig(user: UserAccessInput | null | undefined): SectionConfig {
+  const v2 = resolveV2RoleKey(user);
+  const canManage = !v2 || user?.isSuperAdmin || ERP_EXECUTIVE.has(v2) || v2 === ROLES.DIR_OPERACIONES;
+  return {
+    viewMode: canManage ? 'manage' : 'execute',
+    defaultScope: 'team',
+    canCreate: false,
+    canEdit: false,
+    canDelete: false,
+    canAssign: false,
+    canApprove: false,
+    title: 'Business Intelligence',
+    subtitle: 'Rentabilidad por línea de negocio, eficiencia operativa y ROI — últimos 12 meses.',
+  };
+}
+
+// ─── LAB · sandbox ─────────────────────────────────────────────────────────
+
+type LabModule = 'home' | 'ai' | 'health';
+
+const LAB_COPY: Record<LabModule, { title: string; subtitle: string }> = {
+  home: {
+    title: 'NEXARA Lab',
+    subtitle: 'Sandbox para APIs, feature flags, modelos de IA e integraciones antes de producción.',
+  },
+  ai: {
+    title: 'Prompt Playground',
+    subtitle: 'Prueba modelos de IA contra el motor de NEXARA — resultados no persistidos en DB.',
+  },
+  health: {
+    title: 'Health API',
+    subtitle: 'Estado en vivo del backend: base de datos, memoria y disco.',
+  },
+};
+
+export function getLabSectionConfig(
+  user: UserAccessInput | null | undefined,
+  module: LabModule = 'home',
+): SectionConfig {
+  const copy = LAB_COPY[module];
+  return {
+    viewMode: 'manage',
+    defaultScope: 'team',
+    canCreate: module === 'ai',
+    canEdit: true,
+    canDelete: false,
+    canAssign: false,
+    canApprove: false,
+    title: copy.title,
+    subtitle: copy.subtitle,
   };
 }

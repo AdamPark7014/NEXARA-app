@@ -8,6 +8,7 @@ import Button from "@/components/ui/Button";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
+import { getCrmCatalogSectionConfig } from "@/lib/section-views";
 import { listCatalogProducts, type CatalogProduct } from "@/lib/catalog-api";
 
 const MARGIN = 1.35;
@@ -18,6 +19,7 @@ function stockTotal(p: CatalogProduct): number {
 
 export default function ProductsPage() {
   const { user } = useUser();
+  const cfg = useMemo(() => getCrmCatalogSectionConfig(user), [user]);
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<CatalogProduct[]>([]);
@@ -91,15 +93,17 @@ export default function ProductsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="CRM · Catálogo y clientes"
-        title="Catálogo de productos y servicios"
-        subtitle="Maestro de SKUs del catálogo comercial. El stock físico se gestiona en ERP › Almacén."
+        eyebrow="CRM · Catálogo"
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            <Link href="/erp/warehouse" style={{ textDecoration: "none" }}>
-              <Button variant="primary" iconLeft="📦">Ver inventario</Button>
-            </Link>
+            {cfg.viewMode !== 'execute' && (
+              <Link href="/erp/warehouse" style={{ textDecoration: "none" }}>
+                <Button variant="primary" iconLeft="📦">Ver inventario</Button>
+              </Link>
+            )}
           </>
         }
       />

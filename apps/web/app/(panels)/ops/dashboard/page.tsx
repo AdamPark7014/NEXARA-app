@@ -10,7 +10,7 @@ import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
-import { filterRowsByScope, getOpsDashboardSectionConfig } from "@/lib/section-views";
+import { filterRowsByScope, getOpsDashboardSectionConfig, getActivitiesCanonicalPath } from "@/lib/section-views";
 
 interface ActivityRow {
   id: number;
@@ -92,7 +92,7 @@ export default function OpsDashboardPage() {
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
             {cfg.viewMode === "execute" && (
-              <Link href="/ops/my-activities" style={{ textDecoration: "none" }}>
+              <Link href={getActivitiesCanonicalPath(user)} style={{ textDecoration: "none" }}>
                 <Button variant="primary" iconLeft="🧰">Mis actividades</Button>
               </Link>
             )}

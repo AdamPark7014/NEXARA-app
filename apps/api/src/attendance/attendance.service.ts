@@ -510,8 +510,20 @@ export class AttendanceService {
       });
     }
 
-    // Usuario con attendance.manage pero sin privilegios de consola:
-    // solo puede consultar su propia información.
+    // v2 OPS managers have ATTENDANCE_MANAGE but not CONSOLE_ADMIN —
+    // give them department-level scope (same as console admin, filtered later).
+    if (canManageAttendance) {
+      return this.prisma.user.findMany({
+        where: {
+          departmentId: currentUser.departmentId,
+          role: { accesoConsoleAdmin: false },
+        },
+        include: { role: true, department: true },
+        orderBy: { nombre: 'asc' },
+      });
+    }
+
+    // Fallback: solo su propia información.
     return this.prisma.user.findMany({
       where: { id: currentUser.id },
       include: { role: true, department: true },
@@ -553,12 +565,15 @@ export class AttendanceService {
       accessibleUsers = accessibleUsers.filter(
         (user) => !this.isSuperAdminEmail(user.email),
       );
-    } else if (currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN)) {
-      // Admin consola (no superadmin): solo él mismo + usuarios normales sin permisos de admin
+    } else if (
+      currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) ||
+      currentUser.permissions?.includes(PERMISSIONS.ATTENDANCE_MANAGE)
+    ) {
+      // Admin consola o v2 manager: solo él mismo + usuarios normales sin permisos de admin
       accessibleUsers = accessibleUsers.filter(
-        (user) => 
-          user.id === currentUser.id || // Él mismo
-          (!user.role?.accesoConsoleAdmin && !this.isSuperAdminEmail(user.email)) // Usuarios normales sin accesoConsoleAdmin
+        (user) =>
+          user.id === currentUser.id ||
+          (!user.role?.accesoConsoleAdmin && !this.isSuperAdminEmail(user.email)),
       );
     }
 

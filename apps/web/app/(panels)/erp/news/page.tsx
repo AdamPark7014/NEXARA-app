@@ -209,8 +209,8 @@ export default function ComunicacionesInternasPage() {
     <>
       <PageHeader
         eyebrow="ERP · Comunicación"
-        title="Noticias internas"
-        subtitle="Comunicados al equipo y newsletter mensual de NEXARA."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={
           cfg.canCreate ? <Button variant="primary" iconLeft="📣" onClick={openNew}>Nuevo comunicado</Button> : undefined
         }

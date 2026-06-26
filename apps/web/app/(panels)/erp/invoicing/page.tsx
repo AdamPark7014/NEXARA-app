@@ -127,8 +127,8 @@ export default function InvoicingPage() {
     <>
       <PageHeader
         eyebrow="ERP · Finanzas"
-        title="Facturación CFDI"
-        subtitle="Timbrado, cancelaciones y complementos de pago en línea con el SAT."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>

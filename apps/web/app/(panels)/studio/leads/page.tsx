@@ -9,6 +9,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
+import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 
 interface ContactMessage {
@@ -31,6 +32,7 @@ async function apiFetch(path: string, token: string) {
 
 export default function StudioLeadsPage() {
   const { user } = useUser();
+  const cfg = useMemo(() => getStudioSectionConfig(user, "leads"), [user]);
   const token = user?.token ?? "";
 
   const [messages, setMessages] = useState<ContactMessage[]>([]);
@@ -41,8 +43,18 @@ export default function StudioLeadsPage() {
     if (!token) return;
     setLoading(true); setError(null);
     try {
-      const data = await apiFetch("contact-messages?limit=300", token);
-      setMessages(Array.isArray(data) ? data : (data?.data ?? []));
+      const pageSize = 100;
+      let page = 1;
+      const all: ContactMessage[] = [];
+      while (true) {
+        const data = await apiFetch(`contact-messages?limit=${pageSize}&page=${page}`, token);
+        const rows = Array.isArray(data) ? data : (data?.data ?? []);
+        all.push(...rows);
+        const total = data?.meta?.total ?? rows.length;
+        if (all.length >= total || rows.length < pageSize) break;
+        page += 1;
+      }
+      setMessages(all);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar leads del sitio");
     } finally { setLoading(false); }
@@ -79,8 +91,8 @@ export default function StudioLeadsPage() {
     <>
       <PageHeader
         eyebrow="STUDIO · Captación"
-        title="Leads del sitio"
-        subtitle="Embudo de captación desde el formulario público, por canal de origen."
+        title={cfg.title}
+        subtitle={cfg.subtitle}
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>

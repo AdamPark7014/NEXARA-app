@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -10,6 +10,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { useCrmManagerGuard } from "@/lib/useCrmManagerGuard";
+import { getCrmManagerSubmoduleConfig } from "@/lib/section-views";
 
 interface Metrics {
   totalRevenue: number;
@@ -44,6 +45,7 @@ type Period = "week" | "month" | "year";
 export default function ReportsPage() {
   const { user } = useUser();
   const cfg = useCrmManagerGuard();
+  const viewCfg = useMemo(() => getCrmManagerSubmoduleConfig(user, "reports"), [user]);
   const token = user?.token ?? "";
 
   const [period, setPeriod] = useState<Period>("month");
@@ -86,8 +88,8 @@ export default function ReportsPage() {
     <>
       <PageHeader
         eyebrow="CRM · Equipo y métricas"
-        title={cfg.title}
-        subtitle={cfg.subtitle}
+        title={viewCfg.title}
+        subtitle={viewCfg.subtitle}
         actions={
           <>
             <select value={period} onChange={(e) => setPeriod(e.target.value as Period)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}>

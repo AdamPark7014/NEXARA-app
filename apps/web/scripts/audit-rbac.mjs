@@ -21,20 +21,20 @@ const PAGE_MATRIX = {
   dir_admin: ['/erp/**', '/crm/dashboard', '/crm/quotes/**', '/crm/reports', '/crm/team', '/crm/targets', '/crm/templates', '/crm/tenders'],
   coord_admin: ['/erp', '/erp/dashboard', '/erp/approvals', '/erp/companies', '/erp/calendar', '/erp/documents', '/erp/accounting', '/erp/banking', '/erp/invoicing', '/erp/finance/**', '/erp/procurement', '/erp/warehouse', '/erp/users', '/erp/exports', '/erp/notifications-center', '/erp/my-profile', '/erp/news', ...SELF_ATTENDANCE],
   administrativo: ['/erp', '/erp/dashboard', '/erp/approvals', '/erp/companies', '/erp/calendar', '/erp/documents', '/erp/finance/viatics', '/erp/finance/expenses', '/erp/notifications-center', '/erp/my-profile', '/erp/news', ...SELF_ATTENDANCE],
-  coord_operaciones: ['/ops/**', '/erp/calendar', '/erp/dashboard', '/erp/notifications-center', '/erp/my-profile', '/crm/quotes', ...SELF_ATTENDANCE],
+  coord_operaciones: ['/ops/**', '/erp/calendar', '/erp/notifications-center', '/erp/my-profile', '/crm/quotes', ...SELF_ATTENDANCE],
   ing_campo: ['/ops/**', '/erp/notifications-center', '/erp/my-profile', ...SELF_ATTENDANCE],
   ing_soporte: ['/ops/**', '/erp/notifications-center', '/erp/my-profile', ...SELF_ATTENDANCE],
   coord_ventas: ['/crm/**', '/erp/dashboard', '/erp/notifications-center', '/erp/my-profile', ...SELF_ATTENDANCE],
   vendedor: ['/crm/**', '/erp/notifications-center', '/erp/my-profile', ...SELF_ATTENDANCE],
-  lider_diseno: ['/studio/**', '/erp/dashboard', '/erp/notifications-center', '/erp/my-profile', ...SELF_ATTENDANCE],
-  disenador: ['/studio/**', '/erp/notifications-center', '/erp/my-profile', '/erp/calendar', ...SELF_ATTENDANCE],
+  lider_diseno: ['/studio/**', '/crm/quotes/**', '/crm/products/**', '/crm/templates', '/crm/templates/**', '/erp/calendar', '/erp/notifications-center', '/erp/my-profile', ...SELF_ATTENDANCE],
+  disenador: ['/studio/**', '/crm/quotes/**', '/crm/products/**', '/erp/calendar', '/erp/notifications-center', '/erp/my-profile', ...SELF_ATTENDANCE],
   rh: ['/erp', '/erp/dashboard', '/erp/hr/**', '/erp/finance/employee-payments', '/erp/calendar', '/erp/documents', '/erp/notifications-center', '/erp/my-profile', '/ops/recruiting'],
   contabilidad: ['/erp', '/erp/dashboard', '/erp/accounting', '/erp/banking', '/erp/invoicing', '/erp/finance/**', '/erp/exports', '/erp/calendar', '/erp/documents', '/erp/notifications-center', '/erp/my-profile', '/crm/quotes'],
   cliente: ['/tickets', '/tickets/**'],
 };
 
 const ROLE_HOME = {
-  super_admin: '/erp/executive', ceo: '/erp/executive', arquitecto: '/ops/dashboard',
+  super_admin: '/lab', ceo: '/erp/executive', arquitecto: '/ops/dashboard',
   dir_operaciones: '/erp/dashboard', dir_admin: '/erp/dashboard', coord_admin: '/erp/dashboard',
   administrativo: '/erp/dashboard', coord_operaciones: '/ops/dashboard', ing_campo: '/ops/my-activities',
   ing_soporte: '/ops/dashboard', coord_ventas: '/crm/dashboard', vendedor: '/crm/dashboard',
@@ -43,8 +43,8 @@ const ROLE_HOME = {
 };
 
 const PANEL_SWITCH_HOME = {
-  erp: { ceo: '/erp/executive', administrativo: '/erp/dashboard', disenador: '/erp/my-profile' },
-  crm: { ceo: '/crm/dashboard', vendedor: '/crm/dashboard', administrativo: null },
+  erp: { ceo: '/erp/executive', administrativo: '/erp/dashboard', disenador: '/erp/my-profile', lider_diseno: '/erp/my-profile' },
+  crm: { ceo: '/crm/dashboard', vendedor: '/crm/dashboard', administrativo: null, lider_diseno: '/crm/quotes', disenador: '/crm/quotes' },
   ops: { ceo: '/ops/dashboard', ing_campo: '/ops/my-activities' },
   studio: { disenador: '/studio/dashboard', ceo: '/studio/dashboard' },
   lab: { ceo: '/lab' },
@@ -134,7 +134,7 @@ for (const role of Object.keys(ROLES)) {
       report.push(`❌ ${role}: should be DENIED on ${panel}`);
       issues++;
     }
-    if (role === 'lider_diseno' && panel === 'crm' && allowed) {
+    if ((role === 'lider_diseno' || role === 'disenador') && panel === 'ops' && allowed) {
       report.push(`❌ ${role}: should be DENIED on ${panel}`);
       issues++;
     }
@@ -161,6 +161,14 @@ for (const role of Object.keys(ROLES)) {
   }
   if (role === 'ing_campo' && shouldShowInSidebar(role, 'ops-activities')) {
     report.push(`❌ ing_campo: must NOT see ops-activities in sidebar`);
+    issues++;
+  }
+  if ((role === 'lider_diseno' || role === 'disenador') && canOpenPage(role, '/ops/vehicles')) {
+    report.push(`❌ ${role}: must NOT access /ops/vehicles`);
+    issues++;
+  }
+  if ((role === 'lider_diseno' || role === 'disenador') && canOpenPage(role, '/erp/dashboard')) {
+    report.push(`❌ ${role}: must NOT access /erp/dashboard`);
     issues++;
   }
 

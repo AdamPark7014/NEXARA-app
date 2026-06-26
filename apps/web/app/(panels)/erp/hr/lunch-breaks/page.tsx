@@ -9,22 +9,35 @@ import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getAttendanceViewMode } from "@/lib/user-access";
+import { getLunchBreaksSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface LunchBreak {
   id: number;
   date: string;
   checkinTime: string;
   checkoutTime?: string | null;
-  status: string;
+  status: "IN_PROGRESS" | "COMPLETED";
   isCheckinLate: boolean;
   isCheckoutLate: boolean;
   notes?: string | null;
-  user?: { id: number; nombre: string; department?: { nombre: string } | null };
+  user?: {
+    id: number;
+    nombre: string;
+    email?: string;
+    department?: { nombre: string } | null;
+    role?: { name: string } | null;
+  };
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
 async function apiFetch(path: string, token: string) {
-  const res = await fetch(buildApiUrl(path), { headers: { Authorization: `Bearer ${token}` } });
+  const res = await fetch(buildApiUrl(path), {
+    headers: { Authorization: `Bearer ${token}` },
+  });
   if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
   return res.json();
 }
@@ -34,53 +47,385 @@ function durationMinutes(start: string, end?: string | null): number | null {
   return Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000);
 }
 
-export default function LunchBreaksPage() {
-  const { user } = useUser();
-  const viewMode = useMemo(() => getAttendanceViewMode(user), [user]);
-  const canViewAll = viewMode !== "register";
-  const token = user?.token ?? "";
+function fmtTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+}
 
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function isSameDay(iso: string) {
+  return iso.slice(0, 10) === todayIso();
+}
+
+// ─── Employee: Today's break status hero ─────────────────────────────────────
+
+function BreakStatusHero({ todayBreak }: { todayBreak: LunchBreak | null }) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (todayBreak?.status !== "IN_PROGRESS") return;
+    const tick = () => {
+      const diff = Math.floor((Date.now() - new Date(todayBreak.checkinTime).getTime()) / 1000);
+      setElapsed(diff);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [todayBreak]);
+
+  const elapsedMin = Math.floor(elapsed / 60);
+  const elapsedSec = elapsed % 60;
+
+  const isOver60 = elapsedMin >= 60;
+  const duration = todayBreak ? durationMinutes(todayBreak.checkinTime, todayBreak.checkoutTime) : null;
+
+  let statusLabel = "Sin registro hoy";
+  let statusColor = "#6b7280";
+  let bgColor = "var(--surface)";
+  let borderColor = "var(--border)";
+  let icon = "🍽️";
+
+  if (todayBreak?.status === "IN_PROGRESS") {
+    statusLabel = "En comida ahora";
+    statusColor = isOver60 ? "#ef4444" : "#f59e0b";
+    bgColor = isOver60 ? "#fef2f2" : "#fffbeb";
+    borderColor = isOver60 ? "#fca5a5" : "#fcd34d";
+    icon = isOver60 ? "⚠️" : "⏳";
+  } else if (todayBreak?.status === "COMPLETED") {
+    statusLabel = "Comida completada";
+    statusColor = "#22c55e";
+    bgColor = "#f0fdf4";
+    borderColor = "#86efac";
+    icon = "✅";
+  }
+
+  return (
+    <div
+      style={{
+        border: `1.5px solid ${borderColor}`,
+        borderRadius: 14,
+        background: bgColor,
+        padding: "20px 24px",
+        marginBottom: 20,
+        display: "flex",
+        alignItems: "center",
+        gap: 20,
+        flexWrap: "wrap",
+      }}
+    >
+      <span style={{ fontSize: 40 }}>{icon}</span>
+
+      <div style={{ flex: 1, minWidth: 180 }}>
+        <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 2 }}>Estado de hoy</div>
+        <div style={{ fontSize: 20, fontWeight: 700, color: statusColor }}>{statusLabel}</div>
+        {todayBreak?.isCheckinLate && (
+          <div style={{ fontSize: 12, color: "#f59e0b", marginTop: 4 }}>
+            ⚠️ Entrada fuera de horario ({fmtTime(todayBreak.checkinTime)})
+          </div>
+        )}
+        {todayBreak?.isCheckoutLate && (
+          <div style={{ fontSize: 12, color: "#ef4444", marginTop: 2 }}>
+            ⚠️ Regreso tardio ({todayBreak.checkoutTime ? fmtTime(todayBreak.checkoutTime) : "—"})
+          </div>
+        )}
+      </div>
+
+      {todayBreak?.status === "IN_PROGRESS" && (
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }}>Tiempo transcurrido</div>
+          <div style={{ fontSize: 28, fontWeight: 800, fontVariantNumeric: "tabular-nums", color: isOver60 ? "#ef4444" : "#f59e0b" }}>
+            {String(elapsedMin).padStart(2, "0")}:{String(elapsedSec).padStart(2, "0")}
+          </div>
+          {isOver60 && <div style={{ fontSize: 11, color: "#ef4444" }}>Excede 60 min</div>}
+        </div>
+      )}
+
+      {todayBreak && (
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+          <div style={{ textAlign: "center", minWidth: 80 }}>
+            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 4 }}>Entrada</div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>{fmtTime(todayBreak.checkinTime)}</div>
+          </div>
+          {todayBreak.checkoutTime && (
+            <div style={{ textAlign: "center", minWidth: 80 }}>
+              <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 4 }}>Salida</div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>{fmtTime(todayBreak.checkoutTime)}</div>
+            </div>
+          )}
+          {duration !== null && (
+            <div style={{ textAlign: "center", minWidth: 80 }}>
+              <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 4 }}>Duracion</div>
+              <div
+                style={{
+                  display: "inline-block",
+                  padding: "3px 10px",
+                  borderRadius: 99,
+                  fontSize: 14,
+                  fontWeight: 700,
+                  background: duration > 60 ? "#fee2e2" : "#dcfce7",
+                  color: duration > 60 ? "#ef4444" : "#16a34a",
+                }}
+              >
+                {duration} min
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Employee: My history list ────────────────────────────────────────────────
+
+function MyHistoryList({ items }: { items: LunchBreak[] }) {
+  const past = items.filter((b) => !isSameDay(b.date)).slice(0, 14);
+  if (!past.length) return null;
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <Section title="Historial reciente">
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {past.map((b) => {
+          const dur = durationMinutes(b.checkinTime, b.checkoutTime);
+          const isLate = b.isCheckinLate || b.isCheckoutLate;
+          return (
+            <div
+              key={b.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                padding: "10px 14px",
+                borderRadius: 10,
+                background: "var(--surface)",
+                border: `1px solid ${isLate ? "#fcd34d" : "var(--border)"}`,
+              }}
+            >
+              <span style={{ fontSize: 20 }}>
+                {b.status === "COMPLETED" ? (isLate ? "⚠️" : "✅") : "⏳"}
+              </span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{fmtDate(b.date)}</div>
+                <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                  {fmtTime(b.checkinTime)}
+                  {b.checkoutTime ? ` → ${fmtTime(b.checkoutTime)}` : " → en curso"}
+                </div>
+              </div>
+              {dur !== null ? (
+                <span
+                  style={{
+                    padding: "2px 8px",
+                    borderRadius: 99,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    background: dur > 60 ? "#fee2e2" : "#dcfce7",
+                    color: dur > 60 ? "#ef4444" : "#16a34a",
+                  }}
+                >
+                  {dur} min
+                </span>
+              ) : (
+                <span style={{ fontSize: 12, color: "#f59e0b", fontWeight: 600 }}>En curso</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Section>
+    </div>
+  );
+}
+
+// ─── Manager: Team break card ─────────────────────────────────────────────────
+
+function TeamBreakCard({ member }: { member: LunchBreak }) {
+  const dur = durationMinutes(member.checkinTime, member.checkoutTime);
+  const isInProgress = member.status === "IN_PROGRESS";
+  const isLate = member.isCheckinLate || member.isCheckoutLate;
+
+  let borderColor = "#86efac";
+  let bgChip = "#dcfce7";
+  let textChip = "#16a34a";
+  let chipLabel = "Completada";
+
+  if (isInProgress) {
+    borderColor = isLate ? "#fca5a5" : "#fcd34d";
+    bgChip = isLate ? "#fee2e2" : "#fffbeb";
+    textChip = isLate ? "#ef4444" : "#d97706";
+    chipLabel = "En comida";
+  }
+
+  return (
+    <div
+      style={{
+        border: `1.5px solid ${borderColor}`,
+        borderRadius: 12,
+        padding: "14px 16px",
+        background: "var(--surface)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 14 }}>{member.user?.nombre ?? "—"}</div>
+          <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+            {member.user?.department?.nombre ?? member.user?.role?.name ?? ""}
+          </div>
+        </div>
+        <span
+          style={{
+            padding: "3px 10px",
+            borderRadius: 99,
+            fontSize: 11,
+            fontWeight: 700,
+            background: bgChip,
+            color: textChip,
+          }}
+        >
+          {chipLabel}
+        </span>
+      </div>
+
+      <div style={{ display: "flex", gap: 14 }}>
+        <div>
+          <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginBottom: 2 }}>Entrada</div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>
+            {fmtTime(member.checkinTime)}
+            {member.isCheckinLate && " ⚠️"}
+          </div>
+        </div>
+        {member.checkoutTime && (
+          <div>
+            <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginBottom: 2 }}>Regreso</div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>
+              {fmtTime(member.checkoutTime)}
+              {member.isCheckoutLate && " ⚠️"}
+            </div>
+          </div>
+        )}
+        {dur !== null && (
+          <div>
+            <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginBottom: 2 }}>Duracion</div>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: dur > 60 ? "#ef4444" : "#16a34a",
+              }}
+            >
+              {dur} min
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Manager: Team view ───────────────────────────────────────────────────────
+
+function TeamLunchView({ token, dateFilter }: { token: string; dateFilter: string }) {
   const [items, setItems] = useState<LunchBreak[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [viewType, setViewType] = useState<"cards" | "table">("cards");
 
   const load = useCallback(async () => {
-    if (!token) return;
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError(null);
     try {
-      const data = await apiFetch(canViewAll ? "lunch-breaks" : "lunch-breaks/my-breaks", token);
-      setItems(Array.isArray(data) ? data : []);
+      const endpoint = dateFilter === todayIso()
+        ? "lunch-breaks/today"
+        : `lunch-breaks?startDate=${dateFilter}&endDate=${dateFilter}`;
+      const data = await apiFetch(endpoint, token);
+      const arr: LunchBreak[] = Array.isArray(data) ? data : [];
+      // Sort: IN_PROGRESS late → IN_PROGRESS → COMPLETED late → COMPLETED
+      arr.sort((a, b) => {
+        const score = (x: LunchBreak) => {
+          if (x.status === "IN_PROGRESS") return x.isCheckinLate ? 0 : 1;
+          return x.isCheckoutLate ? 2 : 3;
+        };
+        return score(a) - score(b);
+      });
+      setItems(arr);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar comidas y descansos");
-    } finally { setLoading(false); }
-  }, [token, canViewAll]);
+      setError(e instanceof Error ? e.message : "Error al cargar");
+    } finally {
+      setLoading(false);
+    }
+  }, [token, dateFilter]);
 
   useEffect(() => { void load(); }, [load]);
 
   const stats = useMemo(() => {
-    const withDuration = items.map((b) => durationMinutes(b.checkinTime, b.checkoutTime)).filter((d): d is number => d !== null);
-    const avg = withDuration.length ? Math.round(withDuration.reduce((s, d) => s + d, 0) / withDuration.length) : 0;
+    const durs = items.map((b) => durationMinutes(b.checkinTime, b.checkoutTime)).filter((d): d is number => d !== null);
+    const avg = durs.length ? Math.round(durs.reduce((s, d) => s + d, 0) / durs.length) : 0;
     const over60 = items.filter((b) => { const d = durationMinutes(b.checkinTime, b.checkoutTime); return d !== null && d > 60; }).length;
     const inProgress = items.filter((b) => b.status === "IN_PROGRESS").length;
-    return { avg, over60, inProgress };
+    const lateCount = items.filter((b) => b.isCheckinLate || b.isCheckoutLate).length;
+    return { avg, over60, inProgress, lateCount };
   }, [items]);
 
-  const columns: Column<LunchBreak>[] = [
-    ...(canViewAll ? [{
-      key: "user" as keyof LunchBreak, label: "Persona",
-      render: (b: LunchBreak) => (
+  const cols: Column<LunchBreak>[] = [
+    {
+      key: "user" as keyof LunchBreak,
+      label: "Persona",
+      render: (b) => (
         <div>
           <div style={{ fontWeight: 600, fontSize: 13 }}>{b.user?.nombre ?? "—"}</div>
-          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{b.user?.department?.nombre ?? ""}</div>
+          <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{b.user?.department?.nombre ?? ""}</div>
         </div>
       ),
       width: 180,
-    }] : []),
-    { key: "date", label: "Fecha", render: (b) => <span style={{ fontSize: 12 }}>{new Date(b.date).toLocaleDateString("es-MX")}</span>, width: 100 },
-    { key: "checkinTime", label: "Entrada", render: (b) => <span style={{ fontSize: 12 }}>{new Date(b.checkinTime).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}{b.isCheckinLate && " ⚠️"}</span>, width: 100 },
-    { key: "checkoutTime", label: "Salida", render: (b) => <span style={{ fontSize: 12 }}>{b.checkoutTime ? new Date(b.checkoutTime).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }) + (b.isCheckoutLate ? " ⚠️" : "") : "—"}</span>, width: 100 },
+    },
     {
-      key: "duration" as keyof LunchBreak, label: "Duración",
+      key: "status",
+      label: "Estado",
+      render: (b) => (
+        <Tag variant={b.status === "IN_PROGRESS" ? "warning" : "positive"}>
+          {b.status === "IN_PROGRESS" ? "En comida" : "Completada"}
+        </Tag>
+      ),
+      width: 120,
+    },
+    {
+      key: "checkinTime",
+      label: "Entrada",
+      render: (b) => (
+        <span style={{ fontSize: 12 }}>
+          {fmtTime(b.checkinTime)}
+          {b.isCheckinLate && <span style={{ marginLeft: 4, color: "#f59e0b" }}>⚠️</span>}
+        </span>
+      ),
+      width: 100,
+    },
+    {
+      key: "checkoutTime",
+      label: "Regreso",
+      render: (b) => (
+        <span style={{ fontSize: 12 }}>
+          {b.checkoutTime ? (
+            <>
+              {fmtTime(b.checkoutTime)}
+              {b.isCheckoutLate && <span style={{ marginLeft: 4, color: "#ef4444" }}>⚠️</span>}
+            </>
+          ) : "—"}
+        </span>
+      ),
+      width: 100,
+    },
+    {
+      key: "id" as keyof LunchBreak,
+      label: "Duracion",
       render: (b) => {
         const d = durationMinutes(b.checkinTime, b.checkoutTime);
         if (d === null) return <Tag variant="warning">En curso</Tag>;
@@ -88,29 +433,192 @@ export default function LunchBreaksPage() {
       },
       width: 110,
     },
-    { key: "notes", label: "Notas", accessor: (b) => b.notes ?? "—" },
+    {
+      key: "notes",
+      label: "Notas",
+      render: (b) => <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{b.notes ?? "—"}</span>,
+    },
   ];
+
+  return (
+    <>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          gap: 12,
+          marginBottom: 20,
+        }}
+      >
+        <KpiCard label="Promedio hoy" value={`${stats.avg} min`} icon="🍽️" />
+        <KpiCard label="Mas de 60 min" value={stats.over60} variant={stats.over60 > 0 ? "warning" : "positive"} icon="⏰" />
+        <KpiCard label="En comida ahora" value={stats.inProgress} icon="⏳" />
+        <KpiCard label="Tardanzas" value={stats.lateCount} variant={stats.lateCount > 0 ? "danger" : "positive"} icon="⚠️" />
+      </div>
+
+      <Section
+        title={loading ? "Cargando equipo…" : `${items.length} registros`}
+        actions={
+          <div style={{ display: "flex", gap: 8 }}>
+            <Button
+              size="sm"
+              variant={viewType === "cards" ? "primary" : "ghost"}
+              onClick={() => setViewType("cards")}
+            >
+              Tarjetas
+            </Button>
+            <Button
+              size="sm"
+              variant={viewType === "table" ? "primary" : "ghost"}
+              onClick={() => setViewType("table")}
+            >
+              Tabla
+            </Button>
+            <Button size="sm" variant="ghost" iconLeft="🔄" onClick={() => void load()}>
+              Actualizar
+            </Button>
+          </div>
+        }
+      >
+        {loading && (
+          <EmptyState icon="⏳" title="Cargando…" description="Consultando registros del equipo." />
+        )}
+        {!loading && error && (
+          <EmptyState
+            icon="⚠️"
+            title="No se pudo cargar"
+            description={error}
+            action={
+              <Button size="sm" variant="secondary" onClick={() => void load()}>
+                Reintentar
+              </Button>
+            }
+          />
+        )}
+        {!loading && !error && items.length === 0 && (
+          <EmptyState
+            icon="🍽️"
+            title="Sin registros"
+            description="Nadie ha registrado comida para esta fecha."
+          />
+        )}
+        {!loading && !error && items.length > 0 && viewType === "cards" && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+              gap: 12,
+            }}
+          >
+            {items.map((m) => (
+              <TeamBreakCard key={m.id} member={m} />
+            ))}
+          </div>
+        )}
+        {!loading && !error && items.length > 0 && viewType === "table" && (
+          <DataTable<LunchBreak>
+            columns={cols}
+            rows={items}
+            rowKey={(b) => b.id}
+            emptyTitle="Sin registros"
+            emptyDescription="No hay comidas registradas para esta fecha."
+          />
+        )}
+      </Section>
+    </>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default function LunchBreaksPage() {
+  const { user } = useUser();
+  const viewMode = useMemo(() => getAttendanceViewMode(user), [user]);
+  const headerCfg = useMemo(() => getLunchBreaksSectionConfig(user), [user]);
+  const isManager = viewMode !== "register";
+  const canRegister = viewMode === "register" || viewMode === "manage_register";
+  const token = user?.token ?? "";
+
+  const [myBreaks, setMyBreaks] = useState<LunchBreak[]>([]);
+  const [loadingMy, setLoadingMy] = useState(true);
+  const [dateFilter, setDateFilter] = useState(todayIso());
+
+  const loadMyBreaks = useCallback(async () => {
+    if (!token || !canRegister) return;
+    setLoadingMy(true);
+    try {
+      const data = await apiFetch("lunch-breaks/my-breaks", token);
+      setMyBreaks(Array.isArray(data) ? data : []);
+    } catch {
+      // silent — hero shows no data gracefully
+    } finally {
+      setLoadingMy(false);
+    }
+  }, [token, canRegister]);
+
+  useEffect(() => { void loadMyBreaks(); }, [loadMyBreaks]);
+
+  const todayBreak = useMemo(
+    () => myBreaks.find((b) => isSameDay(b.date)) ?? null,
+    [myBreaks],
+  );
 
   return (
     <>
       <PageHeader
         eyebrow="ERP · Personas"
-        title="Comidas y descansos"
-        subtitle={canViewAll ? "Control de horario de comida del personal en campo y oficina." : "Tu historial de comidas registradas desde la app móvil."}
-        actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
+        title={headerCfg.title}
+        subtitle={headerCfg.subtitle}
+        actions={
+          isManager ? (
+            <input
+              type="date"
+              value={dateFilter}
+              max={todayIso()}
+              onChange={(e) => setDateFilter(e.target.value)}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 8,
+                border: "1px solid var(--border)",
+                background: "var(--surface)",
+                color: "var(--text-primary)",
+                fontSize: 13,
+                cursor: "pointer",
+              }}
+            />
+          ) : (
+            <Button variant="ghost" iconLeft="🔄" onClick={() => void loadMyBreaks()}>
+              Actualizar
+            </Button>
+          )
+        }
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <KpiCard label="Duración promedio" value={`${stats.avg} min`} icon="🍽️" />
-        <KpiCard label="Más de 60 min" value={stats.over60} variant={stats.over60 > 0 ? "warning" : "positive"} icon="⚠️" />
-        <KpiCard label="En curso ahora" value={stats.inProgress} icon="⏳" />
-      </div>
+      {canRegister && (
+        <>
+          {loadingMy ? (
+            <div
+              style={{
+                border: "1.5px solid var(--border)",
+                borderRadius: 14,
+                padding: "20px 24px",
+                marginBottom: 20,
+                color: "var(--text-tertiary)",
+                fontSize: 13,
+              }}
+            >
+              Cargando estado de hoy...
+            </div>
+          ) : (
+            <BreakStatusHero todayBreak={todayBreak} />
+          )}
+          {!loadingMy && <MyHistoryList items={myBreaks} />}
+        </>
+      )}
 
-      <Section title={loading ? "Cargando…" : `${items.length} registros`}>
-        {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando registros de comida." />}
-        {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
-        {!loading && !error && <DataTable columns={columns} rows={items} rowKey={(b) => b.id} emptyTitle="Sin registros" emptyDescription="Los checkin/checkout se registran desde la app móvil del ingeniero." />}
-      </Section>
+      {isManager && (
+        <TeamLunchView token={token} dateFilter={dateFilter} />
+      )}
     </>
   );
 }

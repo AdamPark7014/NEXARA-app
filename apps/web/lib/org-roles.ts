@@ -1,6 +1,9 @@
 /** Espejo web de apps/api/src/common/org-roles.ts — roles organizacionales ERP. */
-
-
+import {
+  isTechnicalSuperAdmin,
+  resolveIsPlatformOwner,
+  type PlatformAccountUser,
+} from '@/lib/platform-accounts';
 export const ORG_ROLE_KEYS = {
   CEO: 'ceo',
   DIRECTOR_ADMIN: 'director_admin',
@@ -420,15 +423,32 @@ export function resolveOrgRoleKey(roleName?: string | null, orgRoleKey?: string 
   return null;
 }
 
-export function getOrgRoleLabel(roleName?: string | null, orgRoleKey?: string | null, isSuperAdmin = false): string {
-  if (isSuperAdmin) return 'Dueño / CEO';
+export function getOrgRoleLabel(
+  roleName?: string | null,
+  orgRoleKey?: string | null,
+  isSuperAdmin = false,
+  ctx?: PlatformAccountUser,
+): string {
+  const account = { isSuperAdmin, ...ctx };
+  if (resolveIsPlatformOwner(account)) return 'Dueño / CEO';
+  if (isTechnicalSuperAdmin(account)) return 'Super Admin · Desarrollador';
   const key = resolveOrgRoleKey(roleName, orgRoleKey);
   if (key) return ORG_ROLE_META[key].label;
   return '';
 }
 
-export function getOrgRoleMeta(roleName?: string | null, orgRoleKey?: string | null, isSuperAdmin = false): OrgRoleMeta | null {
-  if (isSuperAdmin) return ORG_ROLE_META[ORG_ROLE_KEYS.CEO];
+export function getOrgRoleMeta(
+  roleName?: string | null,
+  orgRoleKey?: string | null,
+  isSuperAdmin = false,
+  ctx?: PlatformAccountUser,
+): OrgRoleMeta | null {
+  const account = { isSuperAdmin, ...ctx };
+  if (resolveIsPlatformOwner(account)) return ORG_ROLE_META[ORG_ROLE_KEYS.CEO];
+  if (isTechnicalSuperAdmin(account)) {
+    const key = resolveOrgRoleKey(roleName, orgRoleKey);
+    return key ? ORG_ROLE_META[key] : null;
+  }
   const key = resolveOrgRoleKey(roleName, orgRoleKey);
   return key ? ORG_ROLE_META[key] : null;
 }

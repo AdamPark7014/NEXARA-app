@@ -84,8 +84,8 @@ export const ROLE_EXTRA_PANELS: Record<RoleKey, PanelKey[]> = {
   ing_soporte: ['ops', 'core'],
   coord_ventas: ['sales', 'core'],
   vendedor: ['sales'],
-  lider_diseno: ['studio', 'core'],
-  disenador: ['studio'],
+  lider_diseno: ['studio', 'core', 'sales'],
+  disenador: ['studio', 'core', 'sales'],
   cliente: ['portal'],
 };
 

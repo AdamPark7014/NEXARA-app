@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useMemo } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -110,9 +111,16 @@ export default function MaintenanceContractsPage() {
     <>
       <PageHeader
         eyebrow="OPS · Servicio continuo"
-        title="Contratos de mantenimiento"
-        subtitle="Cláusulas, SLA por equipo, cronograma de visitas y facturación recurrente de cada contrato."
-        actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
+        title={cfg.title}
+        subtitle={cfg.subtitle}
+        actions={
+          <div style={{ display: "flex", gap: 8 }}>
+            <Link href="/ops/maintenance">
+              <Button variant="ghost">← Órdenes de mantenimiento</Button>
+            </Link>
+            <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
+          </div>
+        }
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>

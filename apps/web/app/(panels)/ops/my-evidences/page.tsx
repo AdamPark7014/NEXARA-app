@@ -10,7 +10,8 @@ import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
-import { getEvidencesSectionConfig } from "@/lib/section-views";
+import { getEvidencesSectionConfig, getEvidencesCanonicalPath } from "@/lib/section-views";
+import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 
 interface Evidence {
   id: number;
@@ -51,13 +52,8 @@ export default function MyEvidencesPage() {
   const searchParams = useSearchParams();
   const activityFilter = searchParams.get("activityId");
   const cfg = useMemo(() => getEvidencesSectionConfig(user), [user]);
+  useOpsCanonicalRoute(user, "evidences");
   const token = user?.token ?? "";
-
-  useEffect(() => {
-    if (cfg.viewMode === "manage" && cfg.defaultScope === "team") {
-      router.replace("/ops/evidences");
-    }
-  }, [cfg, router]);
 
   const [items, setItems] = useState<Evidence[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,7 +107,7 @@ export default function MyEvidencesPage() {
         {activityFilter && (
           <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
             Filtrando por actividad <strong>#{activityFilter}</strong>.{" "}
-            <Link href="/ops/my-evidences" style={{ color: "var(--primary)" }}>Ver todas</Link>
+            <Link href={getEvidencesCanonicalPath(user)} style={{ color: "var(--primary)" }}>Ver todas</Link>
           </p>
         )}
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando tus evidencias." />}

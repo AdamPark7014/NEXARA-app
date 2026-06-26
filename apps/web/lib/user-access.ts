@@ -20,6 +20,9 @@ import {
   adaptModulePresentation,
   canAccessCrmManagerPages,
   canAccessHrManagement,
+  canAccessMaintenanceContracts,
+  getActivitiesCanonicalPath,
+  getAttendanceSectionConfig,
   getAttendanceViewMode,
   getCrmManagerSectionConfig,
   getCrmSalesSectionConfig,
@@ -39,13 +42,20 @@ import {
   type RoleKey,
 } from '@/lib/rbac';
 import {
+  isTechnicalSuperAdmin,
+  resolveIsPlatformOwner,
+} from '@/lib/platform-accounts';
+import {
   ORG_TO_V2,
   V2_TO_ORG,
   resolveV2RoleKey,
-  type UserAccessInput,
+  type UserAccessInput as RoleMappingUserInput,
 } from '@/lib/rbac/role-mapping';
 
-export type { UserAccessInput };
+export type UserAccessInput = RoleMappingUserInput & {
+  email?: string | null;
+  isPlatformOwner?: boolean;
+};
 
 const V2_PANEL_TO_ID: Record<PanelKey, PanelId> = {
   core: 'erp',
@@ -57,10 +67,13 @@ const V2_PANEL_TO_ID: Record<PanelKey, PanelId> = {
 
 export { resolveV2RoleKey };
 
-/** Org role para badges — nunca sobre-promueve administrativo a director. */
+/** Org role para badges — dueño solo Christian; Adam usa su rol org real. */
 export function resolveDisplayOrgRoleKey(user: UserAccessInput | null | undefined): OrgRoleKey | null {
   if (!user) return null;
-  if (user.isSuperAdmin) return 'ceo';
+  if (resolveIsPlatformOwner(user)) return 'ceo';
+  if (isTechnicalSuperAdmin(user)) {
+    return resolveOrgRoleKey(user.role, user.orgRoleKey);
+  }
 
   const v2 = resolveV2RoleKey(user);
   if (v2) {
@@ -98,6 +111,12 @@ function canUserAccessModule(user: UserAccessInput, module: ModuleEntry): boolea
   if (orgRole && !module.allowedRoles.includes(orgRole)) return false;
 
   return true;
+}
+
+/** URL canónica de un módulo (respeta path adaptado por rol en sidebar/paleta). */
+export function getModuleEntryUrl(module: ModuleEntry): string {
+  const p = module.path ?? '/';
+  return `/${module.panel}${p === '/' ? '' : p.startsWith('/') ? p : `/${p}`}`;
 }
 
 /** Sidebar filtrado con las mismas reglas que el guard de ruta. */
@@ -154,6 +173,16 @@ export function canUserAccessPanel(
   if (!user) return false;
   if (user.isSuperAdmin) return true;
 
+  const v2 = resolveV2RoleKey(user);
+  if (v2) {
+    const prefix = `/${panel}`;
+    const rules = PAGE_MATRIX[v2] ?? [];
+    const hasPanelRules = rules.some(
+      (rule) => rule === `${prefix}/**` || rule === prefix || rule.startsWith(`${prefix}/`),
+    );
+    if (!hasPanelRules) return false;
+  }
+
   if (buildUserSidebar(panel, user).length > 0) return true;
   return getUserPanelEntryPath(user, panel) !== null;
 }
@@ -184,9 +213,9 @@ export function getUserPanelEntryPath(
     const candidates = new Set<string>([
       `${prefix}/dashboard`,
       `${prefix}/my-profile`,
-      `${prefix}/my-activities`,
       prefix,
     ]);
+    if (panel === 'ops') candidates.add(getActivitiesCanonicalPath(user));
     for (const rule of rules) {
       if (!rule.startsWith(prefix)) continue;
       candidates.add(rule.replace(/\/\*\*$/, '').replace(/\/\*$/, ''));
@@ -238,7 +267,8 @@ export function getUserAllowedPanels(user: UserAccessInput | null | undefined) {
 /** Panel HOME canónico del usuario. */
 export function getUserHomePanel(user: UserAccessInput | null | undefined): PanelId {
   if (!user) return 'erp';
-  if (user.isSuperAdmin) return 'erp';
+  if (isTechnicalSuperAdmin(user)) return 'lab';
+  if (user.isSuperAdmin || resolveIsPlatformOwner(user)) return 'erp';
 
   const v2 = resolveV2RoleKey(user);
   if (v2) {
@@ -247,7 +277,7 @@ export function getUserHomePanel(user: UserAccessInput | null | undefined): Pane
   }
 
   const orgKey = resolveOrgRoleKey(user.role, user.orgRoleKey);
-  const url = getOrgHomeUrl(orgKey, false);
+  const url = getOrgHomeUrl(orgKey, false, resolveIsPlatformOwner(user), isTechnicalSuperAdmin(user));
   const match = url.match(/^\/(erp|crm|ops|studio|lab)/);
   return (match?.[1] as PanelId) ?? 'erp';
 }
@@ -255,6 +285,8 @@ export function getUserHomePanel(user: UserAccessInput | null | undefined): Pane
 /** Ruta HOME post-login. */
 export function getUserHomePath(user: UserAccessInput | null | undefined): string {
   if (!user) return '/login';
+  if (isTechnicalSuperAdmin(user)) return '/lab';
+  if (resolveIsPlatformOwner(user)) return '/erp/executive';
   if (user.isSuperAdmin) return '/erp/executive';
 
   const v2 = resolveV2RoleKey(user);
@@ -262,8 +294,8 @@ export function getUserHomePath(user: UserAccessInput | null | undefined): strin
     const panel = getUserHomePanel(user);
 
     // Rutas especiales por rol
-    if (v2 === ROLES.CEO || v2 === ROLES.SUPER_ADMIN) return '/erp/executive';
-    if (v2 === ROLES.ING_CAMPO) return '/ops/my-activities';
+    if (v2 === ROLES.CEO) return '/erp/executive';
+    if (v2 === ROLES.ING_CAMPO || v2 === ROLES.COORD_OPERACIONES) return getActivitiesCanonicalPath(user);
     if (v2 === ROLES.VENDEDOR) return '/crm/dashboard';
     if (v2 === ROLES.LIDER_DISENO || v2 === ROLES.DISENADOR) return '/studio/dashboard';
     if (v2 === ROLES.CLIENTE) return '/tickets';
@@ -276,12 +308,14 @@ export function getUserHomePath(user: UserAccessInput | null | undefined): strin
   }
 
   const orgKey = resolveOrgRoleKey(user.role, user.orgRoleKey);
-  return getOrgHomeUrl(orgKey, false);
+  return getOrgHomeUrl(orgKey, false, resolveIsPlatformOwner(user), isTechnicalSuperAdmin(user));
 }
 
 export function getUserRoleLabel(user: UserAccessInput | null | undefined): string {
   if (!user) return '';
-  if (user.isSuperAdmin) return 'Super Administrador';
+  if (resolveIsPlatformOwner(user)) return 'Dueño / CEO';
+  if (isTechnicalSuperAdmin(user)) return 'Super Admin · Desarrollador';
+  if (user.isSuperAdmin) return ROLE_LABELS[ROLES.SUPER_ADMIN];
   const v2 = resolveV2RoleKey(user);
   if (v2 && ROLE_LABELS[v2]) return ROLE_LABELS[v2];
   return user.role || 'Equipo NEXARA';
@@ -289,6 +323,8 @@ export function getUserRoleLabel(user: UserAccessInput | null | undefined): stri
 
 export type { SectionViewMode };
 export {
+  getActivitiesCanonicalPath,
+  getAttendanceSectionConfig,
   getAttendanceViewMode,
   getCrmManagerSectionConfig,
   getCrmSalesSectionConfig,
@@ -297,6 +333,7 @@ export {
   getHrSectionConfig,
   canAccessCrmManagerPages,
   canAccessHrManagement,
+  canAccessMaintenanceContracts,
 };
 
 export { ORG_TO_V2, V2_TO_ORG };
