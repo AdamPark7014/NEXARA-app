@@ -96,7 +96,7 @@ export class EvidencesService {
   /** Roles v2 que tienen scope de equipo en evidencias (equivalente a CONSOLE_ADMIN legacy). */
   private static readonly V2_EVIDENCES_MANAGER_ROLES = new Set([
     'ceo', 'dir_admin', 'dir_operaciones', 'arquitecto',
-    'coord_operaciones', 'coord_admin',
+    'coord_operaciones', 'coord_admin', 'ing_soporte',
   ]);
 
   private isEvidencesManager(user: { permissions?: string[]; isSuperAdmin?: boolean; roleKey?: string }): boolean {

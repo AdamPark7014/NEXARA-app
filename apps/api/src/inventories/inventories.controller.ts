@@ -14,7 +14,14 @@ export class InventoriesController {
   constructor(private readonly inventoriesService: InventoriesService) {}
 
   @Get()
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.CONSOLE_ADMIN,
+      PERMISSIONS.ASSETS_VIEW,
+      PERMISSIONS.CONSOLE_ACCESS,
+      PERMISSIONS.SUPPORT_VIEW,
+    ],
+  })
   findAll(
     @Query('clientId') clientId?: string,
     @Query('branchId') branchId?: string,
@@ -69,7 +76,14 @@ export class InventoriesController {
   }
 
   @Get(':id')
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.CONSOLE_ADMIN,
+      PERMISSIONS.ASSETS_VIEW,
+      PERMISSIONS.CONSOLE_ACCESS,
+      PERMISSIONS.SUPPORT_VIEW,
+    ],
+  })
   detail(@Param('id', ParseIntPipe) id: number) {
     return this.inventoriesService.detail(id);
   }
