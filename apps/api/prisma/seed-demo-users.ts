@@ -196,6 +196,28 @@ async function ensureDepartment(name: string): Promise<number> {
   return created.id;
 }
 
+/** Evita P2002 cuando otro usuario ya tiene el mismo employeeNumber en producción. */
+async function resolveEmployeeNumber(
+  email: string,
+  desired?: string,
+  existing?: string | null,
+): Promise<string | null | undefined> {
+  if (!desired) return existing ?? null;
+
+  const conflict = await prisma.user.findFirst({
+    where: { employeeNumber: desired, NOT: { email } },
+    select: { email: true },
+  });
+  if (conflict) {
+    console.warn(
+      `   ⚠️  employeeNumber ${desired} ya asignado a ${conflict.email} — se mantiene ${existing ?? 'sin número'} para ${email}`,
+    );
+    return existing ?? null;
+  }
+
+  return desired;
+}
+
 async function resolveRole(v2RoleKey: string) {
   // 1) orgRoleKey = clave v2 (migración seed_nexara_team: coord_admin, ing_campo, …)
   const byV2Org = await prisma.role.findFirst({ where: { orgRoleKey: v2RoleKey } });
@@ -241,6 +263,12 @@ async function seedDemoUsers() {
       existing.passwordHash === PLACEHOLDER_PASSWORD_HASH ||
       !(await bcryptjs.compare(DEMO_PASSWORD, existing.passwordHash));
 
+    const employeeNumber = await resolveEmployeeNumber(
+      u.email,
+      u.employeeNumber,
+      existing?.employeeNumber,
+    );
+
     if (existing) {
       await prisma.user.update({
         where: { email: u.email },
@@ -250,7 +278,7 @@ async function seedDemoUsers() {
           roleId: role.id,
           roleKey: u.roleKey,
           departmentId,
-          employeeNumber: u.employeeNumber ?? existing.employeeNumber,
+          employeeNumber,
           puesto: u.puesto ?? existing.puesto,
           isActive: true,
         },
@@ -267,7 +295,7 @@ async function seedDemoUsers() {
           roleId: role.id,
           roleKey: u.roleKey,
           departmentId,
-          employeeNumber: u.employeeNumber,
+          employeeNumber: employeeNumber ?? undefined,
           puesto: u.puesto,
           isActive: true,
         },
