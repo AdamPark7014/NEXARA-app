@@ -1,22 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useUser } from "@/components/UserContext";
 import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
 import { Tag, Money } from "@/components/ui/DataTable";
-import { closeSalesProject, getSalesProjectOrder, type SalesProjectOrder } from "@/lib/sales-api";
+import {
+  closeSalesProject,
+  getSalesProjectOrder,
+  invoiceSalesProject,
+  type SalesProjectOrder,
+} from "@/lib/sales-api";
 import { DetailError, DetailSection, formatDateTime } from "@/components/detail/DetailFrame";
 import { useProjectDetail } from "@/components/crm/ProjectDetailShell";
+import { getErpFinanceSectionConfig } from "@/lib/section-views";
 
 export default function ProjectOrderPage() {
   const { user } = useUser();
+  const router = useRouter();
   const token = user?.token ?? "";
   const { id, summary, error, reload } = useProjectDetail();
+  const invoiceCfg = useMemo(() => getErpFinanceSectionConfig(user, "invoicing"), [user]);
   const [order, setOrder] = useState<SalesProjectOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [orderError, setOrderError] = useState<string | null>(null);
+  const [invoicing, setInvoicing] = useState(false);
 
   useEffect(() => {
     if (!token || !id) return;
@@ -39,10 +49,27 @@ export default function ProjectOrderPage() {
     }
   };
 
+  const generateInvoice = async () => {
+    if (!token || !confirm("¿Generar factura borrador desde esta orden de cierre?")) return;
+    setInvoicing(true);
+    try {
+      const inv = await invoiceSalesProject(token, id);
+      reload();
+      void getSalesProjectOrder(token, id).then(setOrder).catch(() => undefined);
+      router.push(`/erp/invoicing?highlight=${inv.id}`);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "No se pudo generar la factura");
+    } finally {
+      setInvoicing(false);
+    }
+  };
+
   if (error) return <DetailError message={error} onRetry={reload} />;
   if (!summary) return null;
 
   const orderSummary = summary.order;
+  const activeOrder = order ?? orderSummary;
+  const linkedInvoice = order?.invoice ?? orderSummary?.invoice;
 
   return (
     <DetailSection title="Orden de cierre">
@@ -59,11 +86,11 @@ export default function ProjectOrderPage() {
         <EmptyState icon="📄" title="Sin orden" description={orderError} />
       ) : (
         <>
-          {(order ?? orderSummary) && (
+          {activeOrder && (
             <div style={{ padding: 14, border: "1px solid var(--border)", borderRadius: 10, marginBottom: 16 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontWeight: 700 }}>{order?.orderId ?? orderSummary?.orderId}</span>
-                <Tag variant="accent">{order?.status ?? orderSummary?.status}</Tag>
+                <span style={{ fontWeight: 700 }}>{activeOrder.orderId}</span>
+                <Tag variant="accent">{activeOrder.status}</Tag>
               </div>
               {order?.createdAt && (
                 <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 6 }}>{formatDateTime(order.createdAt)}</p>
@@ -85,10 +112,17 @@ export default function ProjectOrderPage() {
               ))}
             </ul>
           )}
-          {(order?.invoice ?? orderSummary?.invoice) && (
+          {activeOrder && !linkedInvoice && invoiceCfg.canCreate && (
+            <div style={{ marginTop: 16 }}>
+              <Button variant="primary" onClick={() => void generateInvoice()} disabled={invoicing}>
+                {invoicing ? "Generando…" : "Generar factura borrador"}
+              </Button>
+            </div>
+          )}
+          {linkedInvoice && (
             <p style={{ marginTop: 16, fontSize: 13 }}>
-              <Link href="/erp/invoicing" style={{ color: "var(--primary)", fontWeight: 600 }}>
-                Ver factura {(order?.invoice ?? orderSummary?.invoice)?.invoiceNumber} en ERP →
+              <Link href={`/erp/invoicing?highlight=${linkedInvoice.id}`} style={{ color: "var(--primary)", fontWeight: 600 }}>
+                Ver factura {linkedInvoice.invoiceNumber} en ERP →
               </Link>
             </p>
           )}

@@ -215,7 +215,7 @@ export function shouldShowModuleInSidebar(
     case 'attendance':
       return v2 !== ROLES.CLIENTE;
     case 'lunch-breaks':
-      return HR_ONLY.has(v2) || HR_MANAGERS.has(v2);
+      return HR_ONLY.has(v2) || HR_MANAGERS.has(v2) || isFieldRole(v2);
     case 'viatics-admin':
       return HR_MANAGERS.has(v2) || EXECUTIVE.has(v2) || v2 === ROLES.COORD_ADMIN || v2 === ROLES.DIR_OPERACIONES;
     case 'expenses-admin':
@@ -271,20 +271,27 @@ export function shouldShowModuleInSidebar(
         || v2 === ROLES.COORD_ADMIN
       );
     case 'crm-products':
-      return DESIGN_TEAM.has(v2) || SALES_MANAGERS.has(v2) || SALES_REP.has(v2);
+      return DESIGN_TEAM.has(v2) || SALES_MANAGERS.has(v2) || SALES_REP.has(v2) || v2 === ROLES.COORD_ADMIN;
     case 'crm-pipeline':
     case 'crm-agenda':
     case 'crm-clients':
     case 'crm-leads':
       return SALES_MANAGERS.has(v2) || SALES_REP.has(v2) || v2 === ROLES.COORD_ADMIN;
     case 'crm-opportunities':
-      return EXECUTIVE.has(v2) || SALES_MANAGERS.has(v2);
+      return EXECUTIVE.has(v2) || SALES_MANAGERS.has(v2) || v2 === ROLES.COORD_ADMIN;
     case 'crm-dashboard':
-      return SALES_MANAGERS.has(v2) || SALES_REP.has(v2);
+      return SALES_MANAGERS.has(v2) || SALES_REP.has(v2) || v2 === ROLES.COORD_ADMIN;
     case 'crm-reports':
       return SALES_MANAGERS.has(v2) || v2 === ROLES.DIR_ADMIN;
     case 'crm-projects':
-      return SALES_MANAGERS.has(v2) || SALES_REP.has(v2) || v2 === ROLES.COORD_OPERACIONES || v2 === ROLES.ARQUITECTO;
+      return (
+        SALES_MANAGERS.has(v2)
+        || SALES_REP.has(v2)
+        || v2 === ROLES.COORD_OPERACIONES
+        || v2 === ROLES.ARQUITECTO
+        || v2 === ROLES.COORD_ADMIN
+        || v2 === ROLES.CONTABILIDAD
+      );
     case 'approvals':
       return (
         tier(v2) >= 45
@@ -572,7 +579,7 @@ export function getActivitiesSectionConfig(user: UserAccessInput | null | undefi
     viewMode: 'execute',
     defaultScope: 'self',
     canCreate: false,
-    canEdit: false,
+    canEdit: true,
     canDelete: false,
     canAssign: false,
     canApprove: false,
@@ -930,7 +937,7 @@ export function getCrmSalesSectionConfig(
     return {
       viewMode: 'manage',
       defaultScope: 'team',
-      canCreate: module === 'quotes' || module === 'clients',
+      canCreate: module === 'quotes' || module === 'clients' || module === 'leads',
       canEdit: true,
       canDelete: false,
       canAssign: false,
@@ -939,12 +946,34 @@ export function getCrmSalesSectionConfig(
         ? 'Seguimiento de clientes'
         : module === 'quotes'
           ? 'Cotizaciones'
-          : copy.manager.title,
+          : module === 'leads'
+            ? 'Leads · Equipo'
+            : module === 'projects'
+              ? 'Proyectos de venta'
+              : copy.manager.title,
       subtitle: module === 'clients'
         ? 'Clientes activos y seguimiento administrativo.'
         : module === 'quotes'
           ? 'Cotizaciones para revision y gestion administrativa.'
-          : copy.manager.subtitle,
+          : module === 'leads'
+            ? 'Prospectos del equipo — califica y da seguimiento administrativo.'
+            : module === 'projects'
+              ? 'Proyectos cerrados — genera factura borrador desde la orden de cierre.'
+              : copy.manager.subtitle,
+    };
+  }
+  // Contabilidad: proyectos CRM para facturación desde orden de cierre
+  if (module === 'projects' && v2 === ROLES.CONTABILIDAD) {
+    return {
+      viewMode: 'manage',
+      defaultScope: 'team',
+      canCreate: false,
+      canEdit: false,
+      canDelete: false,
+      canAssign: false,
+      canApprove: false,
+      title: 'Proyectos de venta',
+      subtitle: 'Proyectos cerrados — genera factura borrador desde la orden de cierre.',
     };
   }
   // Arquitecto: ve proyectos CRM para planeacion tecnica (solo lectura)
