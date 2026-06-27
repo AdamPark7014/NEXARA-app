@@ -95,6 +95,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     // API lectura general para reportes
     { path: '/api/users',   methods: ['GET'], scope: 'read' },
     { path: '/api/clients', methods: ['GET'], scope: 'read' },
+    { path: '/api/ventas/proyectos/**', methods: ['GET'], scope: 'read' },
   ],
 
   // ─────────────────────────────────────────────────────────────────
@@ -187,8 +188,10 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/crm/opportunities/**', scope: 'write' },
     { path: '/crm/quotes/**', scope: 'write' },
     { path: '/crm/pipeline', scope: 'read' },
+    { path: '/crm/projects/**', scope: 'read' },
     { path: '/api/ventas/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     { path: '/api/cotizaciones/**', methods: ['GET', 'POST', 'PATCH', 'PUT'], scope: 'write' },
+    { path: '/api/accounting/invoices/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
   ],
 
   // ─────────────────────────────────────────────────────────────────
@@ -271,6 +274,9 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/attendance/**', methods: ['GET', 'POST'], scope: 'write' },
     { path: '/api/lunch-breaks/**', methods: ['GET', 'POST', 'PUT'], scope: 'write' },
     { path: '/api/gps/heartbeat', methods: ['POST'], scope: 'write' },
+    { path: '/api/vehicles/**', methods: ['GET'], scope: 'read' },
+    { path: '/api/tool-requests/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+    { path: '/api/service-sheets/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
   ],
 
   // ─────────────────────────────────────────────────────────────────
@@ -345,6 +351,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/cotizaciones/**', methods: ['GET', 'POST', 'PATCH', 'PUT'], scope: 'write' },
     { path: '/api/clients/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     { path: '/api/catalog/**', methods: ['GET'], scope: 'read' },
+    { path: '/api/crm-activities/**', methods: ['GET', 'POST', 'PATCH', 'DELETE'], scope: 'write' },
   ],
 
   // ─────────────────────────────────────────────────────────────────
@@ -417,7 +424,9 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/erp/notifications-center', scope: 'read' },
     { path: '/erp/my-profile', scope: 'write' },
     { path: '/crm/quotes', methods: ['GET'], scope: 'read' },
+    { path: '/crm/projects/**', methods: ['GET'], scope: 'read' },
     { path: '/api/accounting/**', scope: 'write' },
+    { path: '/api/ventas/proyectos/**', methods: ['GET'], scope: 'read' },
     { path: '/api/expenses/**', scope: 'write' },
     { path: '/api/employee-payments/**', methods: ['GET', 'POST'], scope: 'write' },
   ],

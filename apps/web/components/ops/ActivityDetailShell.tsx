@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { TabBar, type TabItem } from "@/components/rbac/TabBar";
-import { ROLES } from "@/lib/rbac";
+import { ROLES } from "@/lib/rbac/roles";
 import { useUser } from "@/components/UserContext";
 import { getActivity, type ActivityDetail } from "@/lib/ops-activities-api";
 import { DetailLoading } from "@/components/detail/DetailFrame";
+import { getActivitiesCanonicalPath } from "@/lib/section-views";
 
 type Ctx = {
   id: number;
@@ -79,12 +80,13 @@ export default function ActivityDetailShell({ id, children }: { id: string; chil
   );
 
   const title = activity ? `${activity.anNumber} · ${activity.titulo}` : `Actividad #${id}`;
+  const backHref = useMemo(() => getActivitiesCanonicalPath(user), [user]);
 
   return (
     <ActivityDetailContext.Provider value={ctx}>
       <div style={{ padding: "24px 32px", maxWidth: 1200, margin: "0 auto" }}>
         <header style={{ marginBottom: 16 }}>
-          <Link href="/ops/activities" style={{ fontSize: 13, color: "var(--text-secondary, #64748b)", textDecoration: "none" }}>
+          <Link href={backHref} style={{ fontSize: 13, color: "var(--text-secondary, #64748b)", textDecoration: "none" }}>
             ← Actividades
           </Link>
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: "6px 0 0" }}>

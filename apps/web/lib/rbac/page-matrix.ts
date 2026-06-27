@@ -55,6 +55,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/erp/notifications-center',
     '/erp/my-profile',
     '/crm/quotes/**',
+    '/crm/projects/**',
     ...SELF_ATTENDANCE_PATHS,
   ],
 
@@ -120,6 +121,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/crm/clients/**',
     '/crm/opportunities/**',
     '/crm/quotes/**',
+    '/crm/projects/**',
     '/crm/pipeline',
     ...SELF_ATTENDANCE_PATHS,
   ],
@@ -234,6 +236,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/erp/notifications-center',
     '/erp/my-profile',
     '/crm/quotes',
+    '/crm/projects/**',
   ],
 
   // ─── CLIENTE EXTERNO — portal ─────────────────────────────────────────
