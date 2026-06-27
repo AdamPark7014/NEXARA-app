@@ -20,15 +20,16 @@ compose() {
 }
 
 load_env() {
-  set -a
-  # shellcheck disable=SC1090
-  source "$ENV_FILE"
-  set +a
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line//$'\r'/}"
+    [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+    export "$line"
+  done < "$ENV_FILE"
 }
 
+# Usa POSTGRES_* del contenedor db (evita depender de source .env con CRLF Windows).
 psql_db() {
-  load_env
-  compose exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" "$@"
+  compose exec -T db sh -c 'exec psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' -- "$@"
 }
 
 case "$cmd" in
