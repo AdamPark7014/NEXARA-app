@@ -63,6 +63,9 @@ case "$cmd" in
   cleanup-users)
     cat "$REPO_ROOT/apps/api/scripts/cleanup-ghost-users.sql" | psql_db
     ;;
+  delete-ghost-users)
+    cat "$REPO_ROOT/apps/api/scripts/delete-ghost-users.sql" | psql_db
+    ;;
   audit-users)
     cat "$REPO_ROOT/apps/api/scripts/audit-org-users.sql" | psql_db
     ;;
@@ -72,6 +75,6 @@ case "$cmd" in
     ;;
   help|*)
     echo "Usage: ./deploy/nexara.sh <command>"
-    echo "Commands: up | up:fast | rebuild | ps | logs | restart | down | migrate | seed | cleanup-users | audit-users | validate"
+    echo "Commands: up | up:fast | rebuild | ps | logs | restart | down | migrate | seed | cleanup-users | delete-ghost-users | audit-users | validate"
     ;;
 esac
