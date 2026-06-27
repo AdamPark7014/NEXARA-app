@@ -36,6 +36,32 @@ async function apiFetch(path: string, token: string, opts?: RequestInit) {
 
 const emptyForm = { concepto: "", monto: 0, categoria: "Servicios", estado: "BORRADOR", esRecurrente: false, fecha: new Date().toISOString().slice(0, 10) };
 
+function mapExpenseRow(raw: Record<string, unknown>): Expense {
+  try {
+    const meta = JSON.parse(String(raw.razonGasto ?? "{}")) as Record<string, unknown>;
+    if (meta.tipo === "ADMIN") {
+      return {
+        id: Number(raw.id),
+        concepto: String(meta.concepto ?? ""),
+        monto: Number(raw.montoSolicitado ?? 0),
+        categoria: String(meta.categoria ?? ""),
+        estado: String(meta.estado ?? ""),
+        esRecurrente: Boolean(meta.esRecurrente),
+        fecha: String(meta.fecha ?? ""),
+        creadoPor: raw.usuario as Expense["creadoPor"],
+      };
+    }
+  } catch { /* legacy row */ }
+  return {
+    id: Number(raw.id),
+    concepto: String(raw.razonGasto ?? "—"),
+    monto: Number(raw.montoSolicitado ?? 0),
+    estado: String(raw.estatusPago ?? ""),
+    fecha: raw.fechaSolicitud ? String(raw.fechaSolicitud).slice(0, 10) : undefined,
+    creadoPor: raw.usuario as Expense["creadoPor"],
+  };
+}
+
 export default function ExpensesPage() {
   const { user } = useUser();
   const cfg = useMemo(() => getErpExpensesSectionConfig(user), [user]);
@@ -52,8 +78,11 @@ export default function ExpensesPage() {
     setLoading(true);
     try {
       const data = await apiFetch("expenses", token);
-      setItems(Array.isArray(data) ? data : (data.data ?? []));
-    } catch { /* skip */ } finally { setLoading(false); }
+      const rows = Array.isArray(data) ? data : (data.data ?? []);
+      setItems(rows.map((r: Record<string, unknown>) => mapExpenseRow(r)));
+    } catch (e) {
+      console.error(e);
+    } finally { setLoading(false); }
   }, [token]);
 
   useEffect(() => { load(); }, [load]);
@@ -71,17 +100,20 @@ export default function ExpensesPage() {
   };
 
   const save = async () => {
-    if (!token) return;
+    if (!token || !user?.id || !form.concepto.trim() || !form.monto) return;
     try {
+      const payload = { ...form, usuarioId: user.id };
       if (editing) {
-        const updated = await apiFetch(`expenses/${editing.id}`, token, { method: "PATCH", body: JSON.stringify(form) });
-        setItems(prev => prev.map(e => e.id === editing.id ? { ...e, ...updated } : e));
+        const updated = await apiFetch(`expenses/${editing.id}`, token, { method: "PATCH", body: JSON.stringify(payload) });
+        setItems(prev => prev.map(e => e.id === editing.id ? mapExpenseRow(updated) : e));
       } else {
-        const created = await apiFetch("expenses", token, { method: "POST", body: JSON.stringify(form) });
-        setItems(prev => [created, ...prev]);
+        const created = await apiFetch("expenses", token, { method: "POST", body: JSON.stringify(payload) });
+        setItems(prev => [mapExpenseRow(created), ...prev]);
       }
       setShowForm(false);
-    } catch { /* skip */ }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "No se pudo guardar el gasto");
+    }
   };
 
   const remove = async (id: number) => {

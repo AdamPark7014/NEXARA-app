@@ -35,6 +35,16 @@ async function apiFetch(path: string, token: string, init: RequestInit = {}) {
   return t ? JSON.parse(t) : null;
 }
 
+function displayInvoiceType(type: string): "INCOME" | "EXPENSE" {
+  return type === "ACCOUNTS_RECEIVABLE" || type === "INCOME" ? "INCOME" : "EXPENSE";
+}
+
+function apiTypeParam(filter: "" | "INCOME" | "EXPENSE"): string {
+  if (filter === "INCOME") return "ACCOUNTS_RECEIVABLE";
+  if (filter === "EXPENSE") return "ACCOUNTS_PAYABLE";
+  return "";
+}
+
 export default function InvoicingPage() {
   const { user } = useUser();
   const cfg = useMemo(() => getErpFinanceSectionConfig(user, "invoicing"), [user]);
@@ -53,11 +63,16 @@ export default function InvoicingPage() {
     type: "INCOME" as "INCOME" | "EXPENSE",
     receptorName: "",
     receptorRfc: "",
+    receptorZipCode: "",
+    receptorRegime: "601",
+    cfdiUsage: "G03",
     issueDate: new Date().toISOString().slice(0, 10),
     dueDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
     description: "",
     quantity: 1,
     unitPrice: 0,
+    satProductKey: "80101500",
+    satUnitKey: "E48",
   });
 
   const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface)", color: "var(--foreground)", fontSize: 13, boxSizing: "border-box" };
@@ -66,7 +81,8 @@ export default function InvoicingPage() {
     if (!token) return;
     setLoading(true); setError(null);
     try {
-      const qs = filter ? `?type=${filter}` : "";
+      const apiType = apiTypeParam(filter);
+      const qs = apiType ? `?type=${apiType}` : "";
       const data = await apiFetch(`accounting/invoices${qs}`, token);
       setItems(Array.isArray(data) ? data : (data?.data ?? []));
     } catch (e) {
@@ -89,7 +105,12 @@ export default function InvoicingPage() {
     return rows;
   }, [items, highlightId, invoiceRef]);
 
-  const facturadoMes = items.filter((f) => f.type === "INCOME" && f.status !== "CANCELLED").reduce((s, f) => s + Number(f.totalAmount), 0);
+  useEffect(() => {
+    if (!showForm || !token) return;
+    apiFetch("accounting/invoices/issuer-profile", token).catch(() => null);
+  }, [showForm, token]);
+
+  const facturadoMes = items.filter((f) => displayInvoiceType(f.type) === "INCOME" && f.status !== "CANCELLED").reduce((s, f) => s + Number(f.totalAmount), 0);
   const porTimbrar = items.filter((f) => f.status === "DRAFT").length;
   const canceladas = items.filter((f) => f.status === "CANCELLED").length;
   const vencidas = items.filter((f) => f.status === "OVERDUE").length;
@@ -105,13 +126,13 @@ export default function InvoicingPage() {
   const cancel = async (inv: InvoiceRow) => {
     if (!token || !confirm(`¿Cancelar el CFDI ${inv.invoiceNumber}?`)) return;
     try {
-      await apiFetch(`accounting/invoices/${inv.id}/cancel`, token, { method: "PATCH", body: JSON.stringify({ reason: "02" }) });
+      await apiFetch(`accounting/invoices/${inv.id}/cancel`, token, { method: "PATCH", body: JSON.stringify({ cancelReason: "02" }) });
       void load();
     } catch (e) { alert(`Error al cancelar: ${e instanceof Error ? e.message : "desconocido"}`); }
   };
 
   const saveInvoice = async () => {
-    if (!token || !form.receptorName.trim() || !form.description.trim() || form.unitPrice <= 0) return;
+    if (!token || !form.receptorName.trim() || !form.description.trim() || form.unitPrice <= 0 || !form.receptorZipCode.trim()) return;
     setSaving(true);
     try {
       await apiFetch("accounting/invoices", token, {
@@ -122,7 +143,20 @@ export default function InvoicingPage() {
           dueDate: form.dueDate,
           receptorName: form.receptorName.trim(),
           receptorRfc: form.receptorRfc.trim() || undefined,
-          items: [{ description: form.description.trim(), quantity: form.quantity, unitPrice: form.unitPrice, taxRate: 16 }],
+          receptorZipCode: form.receptorZipCode.trim() || undefined,
+          receptorRegime: form.receptorRegime.trim() || undefined,
+          cfdiUsage: form.cfdiUsage,
+          satPaymentForm: "03",
+          satPaymentMethod: "PUE",
+          items: [{
+            description: form.description.trim(),
+            quantity: form.quantity,
+            unitPrice: form.unitPrice,
+            taxRate: 16,
+            satProductKey: form.satProductKey.trim() || "80101500",
+            satUnitKey: form.satUnitKey.trim() || "E48",
+            unitName: "Servicio",
+          }],
         }),
       });
       setShowForm(false);
@@ -145,7 +179,10 @@ export default function InvoicingPage() {
     { key: "invoiceNumber", label: "Folio", render: (f) => <Tag variant="accent">{f.invoiceNumber}</Tag>, width: 130 },
     { key: "cfdiUuid", label: "UUID", render: (f) => <code style={{ fontSize: 11 }}>{f.cfdiUuid ? `${f.cfdiUuid.slice(0, 8)}…` : "—"}</code>, width: 110 },
     { key: "receptorName", label: "Cliente / Proveedor", accessor: (f) => f.receptorName ?? f.emisorName ?? "—" },
-    { key: "type", label: "Tipo", render: (f) => <Tag variant={f.type === "INCOME" ? "positive" : "danger"}>{f.type === "INCOME" ? "Ingreso" : "Egreso"}</Tag>, width: 100 },
+    { key: "type", label: "Tipo", render: (f) => {
+      const t = displayInvoiceType(f.type);
+      return <Tag variant={t === "INCOME" ? "positive" : "danger"}>{t === "INCOME" ? "Ingreso" : "Egreso"}</Tag>;
+    }, width: 100 },
     { key: "totalAmount", label: "Monto", align: "right" as const, render: (f) => <Money value={Number(f.totalAmount)} />, width: 130 },
     { key: "issueDate", label: "Fecha", render: (f) => <span style={{ fontSize: 12 }}>{new Date(f.issueDate).toLocaleDateString("es-MX")}</span>, width: 100 },
     { key: "status", label: "Estado", render: (f) => <Tag variant={statusVariant(f.status)}>{f.status.replace(/_/g, " ")}</Tag>, width: 130 },
@@ -183,7 +220,7 @@ export default function InvoicingPage() {
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginBottom: 18 }}>
-        <KpiCard label="Facturado (ingresos)" value={<Money value={facturadoMes} />} hint={`${items.filter((f) => f.type === "INCOME").length} CFDI`} variant="positive" icon="🧾" />
+        <KpiCard label="Facturado (ingresos)" value={<Money value={facturadoMes} />} hint={`${items.filter((f) => displayInvoiceType(f.type) === "INCOME").length} CFDI`} variant="positive" icon="🧾" />
         <KpiCard label="Por timbrar" value={porTimbrar} hint="En borrador" variant={porTimbrar > 0 ? "warning" : "positive"} icon="⏳" />
         <KpiCard label="Canceladas" value={canceladas} variant={canceladas > 0 ? "danger" : "default"} icon="✗" />
         <KpiCard label="Vencidas" value={vencidas} variant={vencidas > 0 ? "danger" : "positive"} icon="🛡️" />
@@ -207,6 +244,30 @@ export default function InvoicingPage() {
             <label style={{ gridColumn: "1 / -1", display: "grid", gap: 4 }}>
               <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Nombre cliente / proveedor *</span>
               <input value={form.receptorName} onChange={(e) => setForm((f) => ({ ...f, receptorName: e.target.value }))} style={inp} />
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>CP fiscal receptor *</span>
+              <input value={form.receptorZipCode} onChange={(e) => setForm((f) => ({ ...f, receptorZipCode: e.target.value }))} placeholder="64000" style={inp} />
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Régimen receptor</span>
+              <input value={form.receptorRegime} onChange={(e) => setForm((f) => ({ ...f, receptorRegime: e.target.value }))} placeholder="601" style={inp} />
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Uso CFDI</span>
+              <select value={form.cfdiUsage} onChange={(e) => setForm((f) => ({ ...f, cfdiUsage: e.target.value }))} style={inp}>
+                <option value="G03">G03 — Gastos en general</option>
+                <option value="I04">I04 — Equipo de cómputo</option>
+                <option value="P01">P01 — Por definir</option>
+              </select>
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Clave SAT producto</span>
+              <input value={form.satProductKey} onChange={(e) => setForm((f) => ({ ...f, satProductKey: e.target.value }))} placeholder="80101500" style={inp} />
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Clave SAT unidad</span>
+              <input value={form.satUnitKey} onChange={(e) => setForm((f) => ({ ...f, satUnitKey: e.target.value }))} placeholder="E48" style={inp} />
             </label>
             <label style={{ display: "grid", gap: 4 }}>
               <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Emisión</span>

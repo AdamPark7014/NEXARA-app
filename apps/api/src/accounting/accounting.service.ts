@@ -481,6 +481,10 @@ export class AccountingService {
     }>;
   }, userId: number) {
     const invoiceNumber = await this.generateInvoiceNumber();
+    const issuer = await this.getInvoiceIssuerProfile();
+    const emisorRfc = dto.emisorRfc?.trim() || issuer.emisorRfc || null;
+    const emisorName = dto.emisorName?.trim() || issuer.emisorName || null;
+    const emisorRegime = dto.emisorRegime?.trim() || issuer.emisorRegime || null;
     const items = dto.items.map((item) => {
       const base = item.quantity * item.unitPrice - (item.discount || 0);
       const iva = base * ((item.ivaRate ?? item.taxRate ?? 16) / 100);
@@ -511,12 +515,12 @@ export class AccountingService {
         notes: dto.notes?.trim() || null,
         createdById: userId,
         // CFDI 4.0
-        cfdiUsage: this.normalizeCfdiUsage(dto.cfdiUsage) as any,
-        satPaymentForm: this.normalizeSatPaymentForm(dto.satPaymentForm) as any,
-        satPaymentMethod: this.normalizeSatPaymentMethod(dto.satPaymentMethod) as any,
-        emisorRfc: dto.emisorRfc?.trim() || null,
-        emisorName: dto.emisorName?.trim() || null,
-        emisorRegime: this.normalizeFiscalRegime(dto.emisorRegime) as any,
+        cfdiUsage: this.normalizeCfdiUsage(dto.cfdiUsage || 'G03') as any,
+        satPaymentForm: this.normalizeSatPaymentForm(dto.satPaymentForm || '03') as any,
+        satPaymentMethod: this.normalizeSatPaymentMethod(dto.satPaymentMethod || 'PUE') as any,
+        emisorRfc: emisorRfc,
+        emisorName: emisorName,
+        emisorRegime: this.normalizeFiscalRegime(emisorRegime ?? undefined) as any,
         receptorRfc: dto.receptorRfc?.trim() || null,
         receptorName: dto.receptorName?.trim() || null,
         receptorRegime: this.normalizeFiscalRegime(dto.receptorRegime) as any,
@@ -533,9 +537,9 @@ export class AccountingService {
             taxRate: new Prisma.Decimal(i.ivaRate ?? i.taxRate ?? 16),
             total: new Prisma.Decimal(i.total),
             productId: i.productId ?? null,
-            satProductKey: i.satProductKey?.trim() || null,
-            satUnitKey: i.satUnitKey?.trim() || null,
-            unitName: i.unitName?.trim() || null,
+            satProductKey: i.satProductKey?.trim() || '80101500',
+            satUnitKey: i.satUnitKey?.trim() || 'E48',
+            unitName: i.unitName?.trim() || 'Servicio',
             discount: i.discount ? new Prisma.Decimal(i.discount) : undefined,
             taxBase: new Prisma.Decimal(i.base),
             ivaRate: new Prisma.Decimal(i.ivaRate ?? i.taxRate ?? 16),

@@ -35,12 +35,14 @@ import {
 import {
   canOpenPage,
   PAGE_MATRIX,
+} from '@/lib/rbac/page-matrix';
+import {
   ROLES,
   ROLE_HOME_PANEL,
   ROLE_LABELS,
   type PanelKey,
   type RoleKey,
-} from '@/lib/rbac';
+} from '@/lib/rbac/roles';
 import {
   isTechnicalSuperAdmin,
   resolveIsPlatformOwner,

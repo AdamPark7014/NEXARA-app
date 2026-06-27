@@ -66,7 +66,7 @@ export default function ActivityDetailShell({ id, children }: { id: string; chil
         id: "approvals",
         label: "Aprobaciones",
         href: `${base}/approvals`,
-        roles: [ROLES.CEO, ROLES.DIR_OPERACIONES, ROLES.DIR_ADMIN, ROLES.COORD_ADMIN, ROLES.COORD_OPERACIONES],
+        roles: [ROLES.CEO, ROLES.DIR_OPERACIONES, ROLES.DIR_ADMIN, ROLES.COORD_ADMIN, ROLES.COORD_OPERACIONES, ROLES.ARQUITECTO],
       },
       { id: "historial", label: "Historial", href: `${base}/historial` },
     ],
