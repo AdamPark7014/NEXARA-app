@@ -59,7 +59,13 @@ export class ServiceClientsController {
   }
 
   @UseGuards(RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.CONSOLE_ADMIN,
+      PERMISSIONS.MAINTENANCE_MANAGE,
+      PERMISSIONS.ASSETS_MANAGE,
+    ],
+  })
   @Post()
   @UseInterceptors(FileInterceptor('logo', {
     storage: diskStorage({
@@ -151,7 +157,13 @@ export class ServiceClientsController {
   }
 
   @UseGuards(RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.CONSOLE_ADMIN,
+      PERMISSIONS.MAINTENANCE_MANAGE,
+      PERMISSIONS.ASSETS_MANAGE,
+    ],
+  })
   @Put(':id')
   @UseInterceptors(FileInterceptor('logo', {
     storage: diskStorage({

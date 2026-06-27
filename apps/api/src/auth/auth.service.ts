@@ -469,22 +469,23 @@ export class AuthService {
       set.add(PERMISSIONS.GPS_VIEW);
     }
 
-    // ── Ingeniero de soporte / NOC ───────────────────────────────────
+    // ── Ingeniero de soporte — ejecuta OT asignadas (no asigna ni administra) ──
     if (roleKey === 'ing_soporte') {
       set.add(PERMISSIONS.CONSOLE_ACCESS);
       set.add(PERMISSIONS.ACTIVITIES_VIEW);
-      set.add(PERMISSIONS.ACTIVITIES_MANAGE);
       set.add(PERMISSIONS.EVIDENCES_VIEW);
-      set.add(PERMISSIONS.EVIDENCES_REVIEW);
-      set.add(PERMISSIONS.NOC_VIEW);
-      set.add(PERMISSIONS.NOC_MANAGE);
-      set.add(PERMISSIONS.MAINTENANCE_VIEW);
-      set.add(PERMISSIONS.MAINTENANCE_MANAGE);
-      set.add(PERMISSIONS.ASSETS_VIEW);
-      set.add(PERMISSIONS.PANEL_NOC);
-      set.add(PERMISSIONS.PANEL_SUPPORT);
+      set.add(PERMISSIONS.EVIDENCES_CREATE);
+      set.add(PERMISSIONS.TOOLS_VIEW);
+      set.add(PERMISSIONS.TOOLS_REQUEST);
+      set.add(PERMISSIONS.VEHICLES_VIEW);
+      set.add(PERMISSIONS.VEHICLES_REQUEST);
       set.add(PERMISSIONS.SUPPORT_VIEW);
-      set.add(PERMISSIONS.SUPPORT_MANAGE);
+      set.add(PERMISSIONS.ATTENDANCE_VIEW);
+      set.add(PERMISSIONS.KB_VIEW);
+      set.add(PERMISSIONS.DOCUMENTS_VIEW);
+      // Viáticos propios — el soporte también viaja y necesita reportar gastos
+      set.add(PERMISSIONS.VIATICS_VIEW);
+      set.add(PERMISSIONS.VIATICS_CREATE);
     }
 
 

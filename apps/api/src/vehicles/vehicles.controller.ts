@@ -244,6 +244,60 @@ export class VehiclesController {
     return this.vehiclesService.removeAsset(+id);
   }
 
+  // ── Checkout: engineer takes "before" photos and marks vehicle as taken ──────
+  @Post('inventory/:id/checkout')
+  @UseGuards(RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.VEHICLES_REQUEST, PERMISSIONS.VEHICLES_INVENTORY] })
+  @UseInterceptors(FilesInterceptor('photos', 10, { dest: getUploadSubdir(__dirname, 'vehicles') }))
+  async checkoutVehicle(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @UploadedFiles() files: any[],
+  ) {
+    const asset = await this.vehiclesService.getAsset(+id);
+    if (!asset) throw new BadRequestException('Vehículo no encontrado');
+    if (asset.estatus === 'Asignado') {
+      throw new BadRequestException('El vehículo ya está asignado');
+    }
+    const photoUrls = (files ?? []).map(f => `/uploads/vehicles/${f.filename}`);
+    return this.vehiclesService.updateAsset(+id, {
+      estatus: 'Asignado',
+      assignedToId: user.id,
+      assignedAt: new Date(),
+      salidaFotos: photoUrls,
+      devolucionFotos: null,
+      tiempoUsoMinutos: null,
+    });
+  }
+
+  // ── Return: engineer takes "after" photos, system logs time used ─────────────
+  @Post('inventory/:id/return')
+  @UseGuards(RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.VEHICLES_REQUEST, PERMISSIONS.VEHICLES_INVENTORY] })
+  @UseInterceptors(FilesInterceptor('photos', 10, { dest: getUploadSubdir(__dirname, 'vehicles') }))
+  async returnVehicle(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @UploadedFiles() files: any[],
+  ) {
+    const asset = await this.vehiclesService.getAsset(+id);
+    if (!asset) throw new BadRequestException('Vehículo no encontrado');
+    if (!user.isSuperAdmin && !user.permissions?.includes(PERMISSIONS.VEHICLES_INVENTORY) && asset.assignedToId !== user.id) {
+      throw new ForbiddenException('Solo el asignatario puede devolver el vehículo');
+    }
+    const photoUrls = (files ?? []).map(f => `/uploads/vehicles/${f.filename}`);
+    const minutosUso = asset.assignedAt
+      ? Math.round((Date.now() - new Date(asset.assignedAt).getTime()) / 60000)
+      : null;
+    return this.vehiclesService.updateAsset(+id, {
+      estatus: 'Disponible',
+      assignedToId: null,
+      assignedAt: null,
+      devolucionFotos: photoUrls,
+      tiempoUsoMinutos: minutosUso,
+    });
+  }
+
   // Exportar vehículos (CSV o JSON)
   @Get('export/:format')
   @UseGuards(RbacGuard)

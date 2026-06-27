@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
+import { getActivitiesSectionConfig } from '@/lib/section-views';
 import ExcelDownloadModal from './ExcelDownloadModal';
 import { openExternalUrl } from '@/lib/open-external-url';
 
@@ -47,6 +48,13 @@ const ActivitiesTable: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const { user } = useUser();
+  const actCfg = getActivitiesSectionConfig(user);
+  const canAssignActivities =
+    hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && actCfg.canCreate && actCfg.canAssign;
+  const canEditActivities =
+    hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && actCfg.canEdit;
+  const canDeleteActivities =
+    hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && actCfg.canDelete;
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isSmallMobile, setIsSmallMobile] = useState(false);
@@ -268,7 +276,7 @@ const ActivitiesTable: React.FC = () => {
   });
 
   const fetchAssignableUsers = () => {
-    if (!user?.token || !hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE)) return;
+    if (!user?.token || !canAssignActivities) return;
     fetch(buildApiUrl('users/assignable'), {
       headers: { Authorization: `Bearer ${user.token}` },
     })
@@ -308,7 +316,7 @@ const ActivitiesTable: React.FC = () => {
   };
 
   const fetchNextAn = () => {
-    if (!user?.token || !hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE)) {
+    if (!user?.token || !canAssignActivities) {
       setNextAn('');
       setNextAnLoaded(true);
       return;
@@ -707,7 +715,7 @@ const ActivitiesTable: React.FC = () => {
             </div>
           </div>
         )}
-        {hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && (
+        {canAssignActivities && (
           <>
           {showOtroModal && (
             <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -899,7 +907,7 @@ const ActivitiesTable: React.FC = () => {
                   <th>Entrega</th>
                   <th>Estimado/Max</th>
                   <th>Indicaciones</th>
-                  {hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && <th>Acciones</th>}
+                  {canEditActivities && <th>Acciones</th>}
                 </tr>
               </thead>
               <tbody>
@@ -1023,11 +1031,11 @@ const ActivitiesTable: React.FC = () => {
                       <td>{formatDateTime(a.fechaEntregaEsperada)}</td>
                       <td>{a.tiempoEstimadoMin || 0}/{a.tiempoMaximoMin || 0}</td>
                       <td>{a.indicaciones || '-'}</td>
-                      {hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && (
+                      {canEditActivities && (
                         <td>
                           <div className="activities-row-actions">
                             <button className="button-secondary">Editar</button>
-                            <button className="button-primary">Borrar</button>
+                            {canDeleteActivities && <button className="button-primary">Borrar</button>}
                           </div>
                         </td>
                       )}
@@ -1165,10 +1173,12 @@ const ActivitiesTable: React.FC = () => {
                       <strong>Indicaciones:</strong> {a.indicaciones || '-'}
                     </div>
 
-                    {hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && (
+                    {canEditActivities && (
                       <div className="activities-mobile-actions">
                         <button className="button-secondary activities-mobile-action-btn">Editar</button>
-                        <button className="button-primary activities-mobile-action-btn">Borrar</button>
+                        {canDeleteActivities && (
+                          <button className="button-primary activities-mobile-action-btn">Borrar</button>
+                        )}
                       </div>
                     )}
                   </article>

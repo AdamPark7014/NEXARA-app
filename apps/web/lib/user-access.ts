@@ -130,7 +130,8 @@ export function buildUserSidebar(
   if (user.isSuperAdmin) return buildSidebar(panel, null, true);
 
   const v2 = resolveV2RoleKey(user);
-  if (v2) {
+  const orgKey = resolveOrgRoleKey(user.role, user.orgRoleKey);
+  if (v2 || orgKey) {
     const items: ModuleEntry[] = [];
     for (const module of Object.values(MODULES)) {
       if (module.panel !== panel) continue;
@@ -153,7 +154,6 @@ export function buildUserSidebar(
     }));
   }
 
-  const orgKey = resolveOrgRoleKey(user.role, user.orgRoleKey);
   return buildSidebar(panel, orgKey, false);
 }
 

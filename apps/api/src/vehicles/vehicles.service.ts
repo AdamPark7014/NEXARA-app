@@ -59,6 +59,10 @@ export class VehiclesService {
     return vehicleControl;
   }
 
+  getAsset(id: number) {
+    return this.prisma['vehicleAsset'].findUnique({ where: { id } });
+  }
+
   createAsset(data: any) {
     return this.prisma['vehicleAsset'].create({ data });
   }
