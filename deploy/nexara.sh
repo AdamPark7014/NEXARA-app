@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 COMPOSE_FILE="$SCRIPT_DIR/docker-compose.nexara.yml"
 ENV_FILE="$SCRIPT_DIR/.env.nexara"
 
@@ -16,6 +17,18 @@ shift || true
 
 compose() {
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
+}
+
+load_env() {
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+}
+
+psql_db() {
+  load_env
+  compose exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" "$@"
 }
 
 case "$cmd" in
@@ -46,8 +59,11 @@ case "$cmd" in
   seed)
     compose exec -T api sh -c "cd /app/apps/api && npx prisma db seed"
     ;;
+  cleanup-users)
+    cat "$REPO_ROOT/apps/api/scripts/cleanup-ghost-users.sql" | psql_db
+    ;;
   audit-users)
-    compose exec -T api sh -c "cd /app/apps/api && node scripts/audit-org-users.mjs"
+    cat "$REPO_ROOT/apps/api/scripts/audit-org-users.sql" | psql_db
     ;;
   validate)
     compose config >/dev/null
@@ -55,6 +71,6 @@ case "$cmd" in
     ;;
   help|*)
     echo "Usage: ./deploy/nexara.sh <command>"
-    echo "Commands: up | up:fast | rebuild | ps | logs | restart | down | migrate | seed | audit-users | validate"
+    echo "Commands: up | up:fast | rebuild | ps | logs | restart | down | migrate | seed | cleanup-users | audit-users | validate"
     ;;
 esac
