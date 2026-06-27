@@ -23,6 +23,9 @@ export type ActivityDetail = {
   activityEvidence?: {
     id: number;
     status?: string | null;
+    reviewStatus?: string | null;
+    rejectedStep?: string | null;
+    reviewNotes?: string | null;
     reviewedAt?: string | null;
     reviewedBy?: { id: number; nombre: string } | null;
   } | null;

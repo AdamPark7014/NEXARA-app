@@ -367,13 +367,58 @@ export class AuthService {
       set.add(PERMISSIONS.HR_VIEW);
       set.add(PERMISSIONS.HR_MANAGE);
       set.add(PERMISSIONS.CVS_MANAGE);
+      set.add(PERMISSIONS.DOCUMENTS_VIEW);
+    }
+
+    // ── Ventas / CRM ────────────────────────────────────────────────
+    if (roleKey === 'vendedor' || roleKey === 'coord_ventas') {
+      set.add(PERMISSIONS.SALES_VIEW);
+      set.add(PERMISSIONS.SALES_MANAGE);
+      set.add(PERMISSIONS.PANEL_VENTAS);
+      set.add(PERMISSIONS.COTIZACIONES_ACCESS);
+      set.add(PERMISSIONS.CLIENTS_VIEW);
+      set.add(PERMISSIONS.CLIENTS_MANAGE);
+      set.add(PERMISSIONS.CATALOG_VIEW);
+    }
+    if (roleKey === 'coord_ventas') {
+      set.add(PERMISSIONS.SALES_REPORTS_VIEW);
+      set.add(PERMISSIONS.SALES_TARGETS_VIEW);
+    }
+
+    // Contabilidad: lectura de cotizaciones vinculadas a facturación
+    if (roleKey === 'contabilidad') {
+      set.add(PERMISSIONS.COTIZACIONES_ACCESS);
+      set.add(PERMISSIONS.DOCUMENTS_VIEW);
     }
 
     // ── Contabilidad / Finanzas ─────────────────────────────────────
-    const V2_ACCOUNTING_ROLES = new Set(['ceo', 'dir_admin', 'coord_admin']);
+    const V2_ACCOUNTING_ROLES = new Set(['ceo', 'dir_admin', 'coord_admin', 'contabilidad']);
     if (V2_ACCOUNTING_ROLES.has(roleKey)) {
       set.add(PERMISSIONS.CONTABILIDAD_VIEW);
       set.add(PERMISSIONS.CONTABILIDAD_MANAGE);
+      set.add(PERMISSIONS.ACCOUNTING_VIEW);
+      set.add(PERMISSIONS.ACCOUNTING_MANAGE);
+      set.add(PERMISSIONS.INVOICING_VIEW);
+      set.add(PERMISSIONS.INVOICING_MANAGE);
+      set.add(PERMISSIONS.BANKING_VIEW);
+      set.add(PERMISSIONS.BANKING_MANAGE);
+    }
+
+    // ── Compras, almacen y documentos corporativos ─────────────────
+    // Roles administrativos que gestionan compras, inventario y control documental
+    const V2_ERP_ADMIN_ROLES = new Set(['ceo', 'dir_admin', 'coord_admin', 'dir_operaciones']);
+    if (V2_ERP_ADMIN_ROLES.has(roleKey)) {
+      set.add(PERMISSIONS.PROCUREMENT_VIEW);
+      set.add(PERMISSIONS.PROCUREMENT_REQUEST);
+      set.add(PERMISSIONS.PROCUREMENT_APPROVE);
+      set.add(PERMISSIONS.PROCUREMENT_MANAGE);
+      set.add(PERMISSIONS.WAREHOUSE_VIEW);
+      set.add(PERMISSIONS.WAREHOUSE_MANAGE);
+      set.add(PERMISSIONS.STOCK_VIEW);
+      set.add(PERMISSIONS.STOCK_MANAGE);
+      set.add(PERMISSIONS.DOCUMENTS_VIEW);
+      set.add(PERMISSIONS.DOCUMENTS_MANAGE);
+      set.add(PERMISSIONS.DOCUMENTS_APPROVE);
     }
 
     // ── Gobierno ERP (empresas del grupo) ───────────────────────────
@@ -442,7 +487,26 @@ export class AuthService {
       set.add(PERMISSIONS.SUPPORT_MANAGE);
     }
 
-    return Array.from(set);
+
+    // Acceso CRM per diagrama org chart
+    // Coordinador Administrativo (Administracion): Cotizaciones + Seguimiento clientes
+    if (roleKey === 'coord_admin') {
+      set.add(PERMISSIONS.SALES_VIEW);
+      set.add(PERMISSIONS.PANEL_VENTAS);
+      set.add(PERMISSIONS.COTIZACIONES_ACCESS);
+      set.add(PERMISSIONS.CLIENTS_VIEW);
+      set.add(PERMISSIONS.CLIENTS_MANAGE);
+      set.add(PERMISSIONS.CATALOG_VIEW);
+    }
+
+    // Arquitecto: diseno y planeacion de proyectos CRM - necesita ver proyectos comerciales
+    // Coordinador de Operaciones: ve proyectos CRM para coordinar ejecucion
+    if (roleKey === 'arquitecto' || roleKey === 'coord_operaciones') {
+      set.add(PERMISSIONS.SALES_VIEW);
+      set.add(PERMISSIONS.PANEL_VENTAS);
+    }
+
+        return Array.from(set);
   }
 
   private pickRoleFlags(role: any) {

@@ -186,6 +186,34 @@ export class ActivitiesController {
     return this.activitiesService.update(+id, updateActivityDto, actor);
   }
 
+  /** Ingeniero de campo: actualizar estatus de su propia OT (iniciar/finalizar). */
+  @Patch(':id/execute')
+  @UseGuards(RbacGuard)
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.ACTIVITIES_MANAGE,
+      PERMISSIONS.ACTIVITIES_VIEW,
+      PERMISSIONS.EVIDENCES_CREATE,
+    ],
+  })
+  async executeOwn(
+    @Param('id') id: string,
+    @Body() body: { estatus?: string; fechaInicio?: string; fechaFinalizacion?: string },
+    @CurrentUser() user: any,
+  ) {
+    const activity = await this.activitiesService.findOne(+id);
+    if (!activity) throw new ForbiddenException('Actividad no encontrada');
+    if (!user?.isSuperAdmin && activity.responsableId !== user.id) {
+      throw new ForbiddenException('Solo puedes actualizar actividades asignadas a ti');
+    }
+    const allowed: UpdateActivityDto = {};
+    if (body.estatus) allowed.estatus = body.estatus;
+    if (body.fechaInicio) allowed.fechaInicio = body.fechaInicio;
+    if (body.fechaFinalizacion) allowed.fechaFinalizacion = body.fechaFinalizacion;
+    const actor = user?.id ? { id: user.id, nombre: user.nombre } : undefined;
+    return this.activitiesService.update(+id, allowed, actor);
+  }
+
   @Delete(':id')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.ACTIVITIES_MANAGE] })

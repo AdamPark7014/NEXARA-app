@@ -122,7 +122,7 @@ export default function MyActivitiesPage() {
       const body: Record<string, unknown> = { estatus };
       if (estatus === "En Proceso") body.fechaInicio = new Date().toISOString();
       if (estatus === "Finalizado") body.fechaFinalizacion = new Date().toISOString();
-      await apiFetch(`activities/${a.id}`, token, { method: "PATCH", body: JSON.stringify(body) });
+      await apiFetch(`activities/${a.id}/execute`, token, { method: "PATCH", body: JSON.stringify(body) });
       void load();
     } catch (e) {
       alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);

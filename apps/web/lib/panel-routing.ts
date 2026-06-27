@@ -1,7 +1,6 @@
 import { PERMISSIONS, hasAnyPermission, hasPermission, type UserPermissions } from "@/lib/permissions";
 import { ORG_ROLE_KEYS, resolveOrgRoleKey } from "@/lib/org-roles";
 import { getAllowedPanels, PANEL_META, LEGACY_PANEL_MAP, type PanelId, type PanelMeta } from "@/lib/access-matrix";
-import { getUserAllowedPanels } from "@/lib/user-access";
 
 export type PanelKey =
   | "console"
@@ -256,7 +255,12 @@ export const clearActivePanel = () => {
 export const getAccessiblePanelsV2 = (
   user: (UserPermissions & { role?: string; orgRoleKey?: string | null; roleKey?: string | null }) | null | undefined,
 ): PanelMeta[] => {
-  return getUserAllowedPanels(user);
+  if (!user) return [];
+  if (user.isSuperAdmin) return Object.values(PANEL_META);
+  const orgKey = resolveOrgRoleKey(user.role, user.orgRoleKey);
+  if (!orgKey) return Object.values(PANEL_META);
+  const allowed = new Set(getAllowedPanels(orgKey, Boolean(user.isSuperAdmin)).map((p) => p.id));
+  return Object.values(PANEL_META).filter((p) => allowed.has(p.id));
 };
 
 /**

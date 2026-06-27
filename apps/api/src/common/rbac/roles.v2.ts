@@ -88,10 +88,10 @@ export const ROLE_HOME_PANEL: Record<RoleKey, PanelKey> = {
 export const ROLE_EXTRA_PANELS: Record<RoleKey, PanelKey[]> = {
   super_admin:        ['core', 'sales', 'ops', 'studio', 'portal'],
   ceo:                ['core', 'sales', 'ops', 'studio'], // ve todo (lectura)
-  arquitecto:         ['ops', 'core'],   // OPS supervisor + ERP parcial
+  arquitecto:         ['ops', 'core', 'sales'], // OPS supervisor + planea proyectos CRM
   dir_operaciones:    ['core', 'ops', 'sales'],
-  dir_admin:          ['core'],
-  coord_admin:        ['core'],
+  dir_admin:          ['core', 'sales'], // Admin + CRM: cotizaciones, clientes
+  coord_admin:        ['core', 'sales'], // Coord Admin: cotizaciones + seguimiento clientes
   administrativo:     ['core'],
   rh:                 ['core'],
   contabilidad:       ['core'],

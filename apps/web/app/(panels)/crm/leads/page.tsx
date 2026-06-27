@@ -11,6 +11,7 @@ import { useUser } from "@/components/UserContext";
 import { filterRowsByScope, getCrmSalesSectionConfig } from "@/lib/section-views";
 import {
   createSalesLead,
+  createSalesOpportunity,
   formatLeadStatus,
   listSalesLeads,
   updateSalesLead,
@@ -103,8 +104,30 @@ export default function LeadsPage() {
         setItems((prev) => [created, ...prev]);
       }
       setShowForm(false);
-    } catch {
-      /* skip */
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "No se pudo guardar el lead");
+    }
+  };
+
+  const convertToOpportunity = async (l: SalesLead) => {
+    if (!token || l.status === "CONVERTED") return;
+    const value = Number(window.prompt("Valor estimado de la oportunidad (MXN):", "50000") ?? "0");
+    if (!value) return;
+    try {
+      await createSalesOpportunity(token, {
+        title: l.company ? `${l.company} — ${l.name}` : l.name ?? "Nueva oportunidad",
+        description: l.notes ?? `Lead desde ${l.source ?? "captación"}`,
+        stage: "DISCOVERY",
+        value,
+        probability: Math.min(100, Number(l.score ?? 20)),
+        leadId: l.id,
+        clientName: l.company ?? l.name ?? undefined,
+      });
+      await updateSalesLead(token, l.id, { status: "CONVERTED" });
+      setItems((prev) => prev.map((row) => (row.id === l.id ? { ...row, status: "CONVERTED" } : row)));
+      window.alert("Oportunidad creada. Revisa el pipeline comercial.");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "No se pudo convertir el lead");
     }
   };
 
@@ -113,8 +136,8 @@ export default function LeadsPage() {
     try {
       const updated = await updateSalesLead(token, id, { status });
       setItems((prev) => prev.map((l) => (l.id === id ? { ...l, ...updated } : l)));
-    } catch {
-      /* skip */
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "No se pudo actualizar el estado");
     }
   };
 
@@ -180,13 +203,21 @@ export default function LeadsPage() {
     {
       key: "id",
       label: "",
-      render: (l) =>
-        cfg.canEdit ? (
-          <button onClick={() => openEdit(l)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>
-            ✎
-          </button>
-        ) : null,
-      width: 40,
+      render: (l) => (
+        <div style={{ display: "flex", gap: 4 }}>
+          {cfg.canCreate && l.status !== "CONVERTED" && l.status !== "LOST" && (
+            <button onClick={() => void convertToOpportunity(l)} title="Convertir a oportunidad" style={{ fontSize: 11, background: "var(--primary)", color: "#fff", border: "none", borderRadius: 4, padding: "3px 8px", cursor: "pointer" }}>
+              → Opp
+            </button>
+          )}
+          {cfg.canEdit && (
+            <button onClick={() => openEdit(l)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>
+              ✎
+            </button>
+          )}
+        </div>
+      ),
+      width: 90,
     },
   ];
 

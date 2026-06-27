@@ -20,6 +20,7 @@ interface Evidence {
   tipo?: string;
   descripcion?: string;
   estado?: string;
+  estatus?: string;
   creadoEn?: string;
   activity?: { anNumber?: string; clienteNombre?: string };
   uploadedBy?: { nombre?: string };
@@ -81,12 +82,25 @@ export default function ActivitiesPage() {
   }, [cfg.viewMode, router, user]);
   useEffect(() => { if (tab === "evidencias") loadEvidences(); }, [tab, loadEvidences]);
 
-  const patchEvState = async (id: number, estado: string) => {
+  const patchEvState = async (id: number, approve: boolean) => {
     if (!token) return;
     try {
-      await apiFetch(`evidences/${id}`, token, { method: "PATCH", body: JSON.stringify({ estado }) });
-      setEvids(prev => prev.map(e => e.id === id ? { ...e, estado } : e));
-    } catch { /* skip */ }
+      await apiFetch(`evidences/${id}`, token, {
+        method: "PATCH",
+        body: JSON.stringify({
+          aprobada: approve,
+          estatus: approve ? "Aprobada" : "Rechazada",
+        }),
+      });
+      setEvids(prev => prev.map(e => e.id === id ? { ...e, estado: approve ? "APROBADA" : "RECHAZADA", estatus: approve ? "Aprobada" : "Rechazada" } : e));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Error al actualizar evidencia");
+    }
+  };
+
+  const isPendingEvidence = (e: Evidence) => {
+    const s = (e.estado ?? e.estatus ?? "").toUpperCase();
+    return !s || s === "PENDIENTE" || s === "PENDIENTE_REVISION" || s === "PENDIENTE REVISION";
   };
 
   const removeEvidence = async (id: number) => {
@@ -108,19 +122,22 @@ export default function ActivitiesPage() {
     )},
     { key: "uploadedBy", label: "Ingeniero", accessor: (e) => e.uploadedBy?.nombre ?? "—", width: 130 },
     { key: "creadoEn", label: "Capturada", accessor: (e) => e.creadoEn ? new Date(e.creadoEn).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "—", width: 90 },
-    { key: "estado", label: "Estado", render: (e) => (
+    { key: "estado", label: "Estado", render: (e) => {
+      const label = e.estado ?? e.estatus ?? "Pendiente";
+      const norm = label.toUpperCase();
+      return (
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <Tag variant={e.estado === "APROBADA" ? "positive" : e.estado === "RECHAZADA" ? "danger" : "warning"}>
-          {(e.estado ?? "—").replace(/_/g, " ")}
+        <Tag variant={norm.includes("APROB") ? "positive" : norm.includes("RECHAZ") ? "danger" : "warning"}>
+          {label.replace(/_/g, " ")}
         </Tag>
-        {evCfg.canApprove && e.estado === "PENDIENTE_REVISION" && (
+        {evCfg.canApprove && isPendingEvidence(e) && (
           <>
-            <button onClick={() => patchEvState(e.id, "APROBADA")}  style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>✓</button>
-            <button onClick={() => patchEvState(e.id, "RECHAZADA")} style={{ fontSize: 11, background: "var(--danger)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>✕</button>
+            <button onClick={() => patchEvState(e.id, true)}  style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>✓</button>
+            <button onClick={() => patchEvState(e.id, false)} style={{ fontSize: 11, background: "var(--danger)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>✕</button>
           </>
         )}
       </div>
-    ), width: 220 },
+    ); }, width: 220 },
     ...(evCfg.canDelete ? [{
       key: "id" as const, label: "" as const,
       render: (e: Evidence) => (
@@ -133,7 +150,7 @@ export default function ActivitiesPage() {
     ? evids.filter(e => e.uploadedBy?.nombre === user?.nombre)
     : evids;
 
-  const pendingEvids = visibleEvids.filter(e => e.estado === "PENDIENTE_REVISION").length;
+  const pendingEvids = visibleEvids.filter(isPendingEvidence).length;
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
     padding: "8px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer",

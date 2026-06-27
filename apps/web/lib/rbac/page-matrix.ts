@@ -115,6 +115,12 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/erp/notifications-center',
     '/erp/my-profile',
     '/erp/news',
+    '/crm/dashboard',
+    '/crm/leads/**',
+    '/crm/clients/**',
+    '/crm/opportunities/**',
+    '/crm/quotes/**',
+    '/crm/pipeline',
     ...SELF_ATTENDANCE_PATHS,
   ],
 

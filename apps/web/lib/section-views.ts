@@ -5,7 +5,7 @@
  * cada sección según el rol (solo ejecutar, solo administrar, o ambos).
  */
 import type { ModuleEntry, ModuleId } from '@/lib/access-matrix';
-import { ROLES, ROLE_TIER, type RoleKey } from '@/lib/rbac';
+import { ROLES, ROLE_TIER, type RoleKey } from '@/lib/rbac/roles';
 import { resolveV2RoleKey, type UserAccessInput } from '@/lib/rbac/role-mapping';
 
 export type SectionViewMode = 'manage' | 'execute' | 'manage_execute';
@@ -268,6 +268,7 @@ export function shouldShowModuleInSidebar(
         || v2 === ROLES.ING_SOPORTE
         || v2 === ROLES.COORD_OPERACIONES
         || v2 === ROLES.CONTABILIDAD
+        || v2 === ROLES.COORD_ADMIN
       );
     case 'crm-products':
       return DESIGN_TEAM.has(v2) || SALES_MANAGERS.has(v2) || SALES_REP.has(v2);
@@ -275,7 +276,7 @@ export function shouldShowModuleInSidebar(
     case 'crm-agenda':
     case 'crm-clients':
     case 'crm-leads':
-      return SALES_MANAGERS.has(v2) || SALES_REP.has(v2);
+      return SALES_MANAGERS.has(v2) || SALES_REP.has(v2) || v2 === ROLES.COORD_ADMIN;
     case 'crm-opportunities':
       return EXECUTIVE.has(v2) || SALES_MANAGERS.has(v2);
     case 'crm-dashboard':
@@ -283,7 +284,7 @@ export function shouldShowModuleInSidebar(
     case 'crm-reports':
       return SALES_MANAGERS.has(v2) || v2 === ROLES.DIR_ADMIN;
     case 'crm-projects':
-      return SALES_MANAGERS.has(v2) || SALES_REP.has(v2) || v2 === ROLES.COORD_OPERACIONES;
+      return SALES_MANAGERS.has(v2) || SALES_REP.has(v2) || v2 === ROLES.COORD_OPERACIONES || v2 === ROLES.ARQUITECTO;
     case 'approvals':
       return (
         tier(v2) >= 45
@@ -924,6 +925,42 @@ export function getCrmSalesSectionConfig(
       subtitle: 'Seguimiento de proyectos comerciales en ejecución.',
     };
   }
+  // Coordinador Administrativo: ve clientes, cotizaciones y pipeline con scope de equipo
+  if (v2 === ROLES.COORD_ADMIN) {
+    return {
+      viewMode: 'manage',
+      defaultScope: 'team',
+      canCreate: module === 'quotes' || module === 'clients',
+      canEdit: true,
+      canDelete: false,
+      canAssign: false,
+      canApprove: false,
+      title: module === 'clients'
+        ? 'Seguimiento de clientes'
+        : module === 'quotes'
+          ? 'Cotizaciones'
+          : copy.manager.title,
+      subtitle: module === 'clients'
+        ? 'Clientes activos y seguimiento administrativo.'
+        : module === 'quotes'
+          ? 'Cotizaciones para revision y gestion administrativa.'
+          : copy.manager.subtitle,
+    };
+  }
+  // Arquitecto: ve proyectos CRM para planeacion tecnica (solo lectura)
+  if (module === 'projects' && v2 === ROLES.ARQUITECTO) {
+    return {
+      viewMode: 'manage',
+      defaultScope: 'team',
+      canCreate: false,
+      canEdit: false,
+      canDelete: false,
+      canAssign: false,
+      canApprove: false,
+      title: 'Proyectos de venta',
+      subtitle: 'Proyectos comerciales para planeacion y diseno tecnico.',
+    };
+  }
   return {
     viewMode: 'execute',
     defaultScope: 'self',
@@ -1531,11 +1568,11 @@ export function getErpFinanceSectionConfig(
     return {
       viewMode: 'manage',
       defaultScope: 'team',
-      canCreate: module === 'accounting' || module === 'employee-payments',
+      canCreate: module === 'accounting' || module === 'employee-payments' || module === 'invoicing' || module === 'banking',
       canEdit: true,
       canDelete: false,
       canAssign: false,
-      canApprove: module === 'accounting',
+      canApprove: module === 'accounting' || module === 'banking' || module === 'invoicing',
       title: copy.title,
       subtitle: copy.subtitle,
     };

@@ -623,6 +623,8 @@ export const createSalesOpportunity = async (
     value: number;
     probability: number;
     expectedCloseDate?: string;
+    leadId?: number;
+    clientName?: string;
   },
 ) => {
   return apiRequest<SalesOpportunity>(
