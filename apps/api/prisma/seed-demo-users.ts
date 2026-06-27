@@ -196,6 +196,20 @@ async function ensureDepartment(name: string): Promise<number> {
   return created.id;
 }
 
+/** Roles v2 que deben existir para el organigrama (la migración SQL no crea ing_soporte). */
+async function ensureV2Roles() {
+  const required: { orgRoleKey: string; nombre: string }[] = [
+    { orgRoleKey: 'ing_soporte', nombre: 'Ingeniero de Soporte' },
+  ];
+  for (const r of required) {
+    const hit = await prisma.role.findFirst({ where: { orgRoleKey: r.orgRoleKey } });
+    if (!hit) {
+      await prisma.role.create({ data: { nombre: r.nombre, orgRoleKey: r.orgRoleKey } });
+      console.log(`   ✨ Rol ${r.orgRoleKey} creado`);
+    }
+  }
+}
+
 /** Evita P2002 cuando otro usuario ya tiene el mismo employeeNumber en producción. */
 async function resolveEmployeeNumber(
   email: string,
@@ -206,9 +220,19 @@ async function resolveEmployeeNumber(
 
   const conflict = await prisma.user.findFirst({
     where: { employeeNumber: desired, NOT: { email } },
-    select: { email: true },
+    select: { email: true, isActive: true },
   });
   if (conflict) {
+    if (!conflict.isActive) {
+      await prisma.user.update({
+        where: { email: conflict.email },
+        data: { employeeNumber: null },
+      });
+      console.warn(
+        `   ↪ employeeNumber ${desired} liberado de ${conflict.email} (cuenta inactiva/legacy)`,
+      );
+      return desired;
+    }
     console.warn(
       `   ⚠️  employeeNumber ${desired} ya asignado a ${conflict.email} — se mantiene ${existing ?? 'sin número'} para ${email}`,
     );
@@ -244,6 +268,7 @@ async function resolveRole(v2RoleKey: string) {
 
 async function seedDemoUsers() {
   console.log('🌱 [demo-users] Upsert de usuarios demo…');
+  await ensureV2Roles();
 
   let created = 0;
   let updated = 0;

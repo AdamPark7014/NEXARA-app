@@ -16,8 +16,6 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "prisma db seed",
     "audit:org-users": "node ./scripts/audit-org-users.mjs",
-    "prisma:seed:onboarding": "ts-node ./prisma/seed-onboarding-demo.ts",
-    "prisma:seed:full": "npm run prisma:seed && npm run prisma:seed:onboarding",
     "generate:vapid": "web-push generate-vapid-keys"
   },
   "dependencies": {

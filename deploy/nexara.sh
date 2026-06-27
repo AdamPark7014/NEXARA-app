@@ -41,7 +41,13 @@ case "$cmd" in
     compose down
     ;;
   migrate)
-    compose run --rm -T api sh -c "cd apps/api && npx prisma migrate deploy"
+    compose run --rm -T api sh -c "cd /app/apps/api && npx prisma migrate deploy"
+    ;;
+  seed)
+    compose exec -T api sh -c "cd /app/apps/api && npx prisma db seed"
+    ;;
+  audit-users)
+    compose exec -T api sh -c "cd /app/apps/api && node scripts/audit-org-users.mjs"
     ;;
   validate)
     compose config >/dev/null
@@ -49,6 +55,6 @@ case "$cmd" in
     ;;
   help|*)
     echo "Usage: ./deploy/nexara.sh <command>"
-    echo "Commands: up | up:fast | rebuild | ps | logs | restart | down | migrate | validate"
+    echo "Commands: up | up:fast | rebuild | ps | logs | restart | down | migrate | seed | audit-users | validate"
     ;;
 esac
