@@ -103,15 +103,15 @@ export function resolveOpsPairNav(
 
   switch (pair) {
     case 'activities':
-      if (isFieldRole(v2)) return 'self';
-      if (isOpsManager(v2) || isSupportRole(v2)) return 'team';
+      if (isFieldRole(v2) || isSupportRole(v2)) return 'self';
+      if (isOpsManager(v2)) return 'team';
       return null;
     case 'evidences':
-      if (isFieldRole(v2)) return 'self';
-      if (isOpsManager(v2) || isSupportRole(v2)) return 'team';
+      if (isFieldRole(v2) || isSupportRole(v2)) return 'self';
+      if (isOpsManager(v2)) return 'team';
       return null;
     case 'viatics':
-      if (isFieldRole(v2)) return 'self';
+      if (isFieldRole(v2) || isSupportRole(v2)) return 'self'; // field & support engineers request own viatics
       if (isOpsManager(v2)) return 'team';
       return null;
     case 'vehicles':
@@ -169,27 +169,31 @@ export function shouldShowModuleInSidebar(
   user: UserAccessInput | null | undefined,
   module: ModuleEntry,
 ): boolean {
-  if (user?.isSuperAdmin) return module.visible !== false;
-
   const v2 = resolveV2RoleKey(user);
+  // isSuperAdmin resolves to ROLES.SUPER_ADMIN via resolveV2RoleKey;
+  // fall through to switch so ops-my-* modules stay hidden for admin/exec roles
   if (!v2) return module.visible !== false;
 
   switch (module.id as ModuleId) {
     case 'ops-activities':
       return resolveOpsPairNav(user, 'activities') === 'team';
     case 'ops-my-activities':
+      if (EXECUTIVE.has(v2)) return false;
       return resolveOpsPairNav(user, 'activities') === 'self';
     case 'ops-evidences':
     case 'ops-my-evidences':
       // Evidencias integradas en Actividades (pestaña) — no duplicar menú.
       return false;
     case 'ops-viatics':
+      if (EXECUTIVE.has(v2)) return resolveOpsPairNav(user, 'viatics') === 'team';
       return resolveOpsPairNav(user, 'viatics') === 'team';
     case 'ops-my-viatics':
+      if (EXECUTIVE.has(v2)) return false;
       return resolveOpsPairNav(user, 'viatics') === 'self';
     case 'ops-vehicles':
       return resolveOpsPairNav(user, 'vehicles') === 'team';
     case 'ops-my-vehicles':
+      if (EXECUTIVE.has(v2)) return false;
       return resolveOpsPairNav(user, 'vehicles') === 'self';
     case 'ops-gps':
       return isOpsManager(v2);
@@ -202,14 +206,15 @@ export function shouldShowModuleInSidebar(
     case 'ops-noc':
     case 'ops-support-inbox':
     case 'ops-support-sla':
-      return EXECUTIVE.has(v2) || OPS_MANAGERS.has(v2) || isSupportRole(v2);
+      return EXECUTIVE.has(v2) || OPS_MANAGERS.has(v2);
     case 'ops-maintenance-contracts':
       // Contratos accesibles desde /ops/maintenance (pestaña/enlace), no duplicar menú.
       return false;
     case 'ops-maintenance':
-    case 'ops-service-clients':
     case 'ops-assets':
-      return EXECUTIVE.has(v2) || OPS_MANAGERS.has(v2) || isSupportRole(v2);
+      return EXECUTIVE.has(v2) || OPS_MANAGERS.has(v2);
+    case 'ops-service-clients':
+      return EXECUTIVE.has(v2) || OPS_MANAGERS.has(v2);
     case 'ops-cvs':
       return EXECUTIVE.has(v2) || OPS_MANAGERS.has(v2) || v2 === ROLES.RH;
     case 'attendance':
@@ -303,9 +308,16 @@ export function shouldShowModuleInSidebar(
     case 'bi':
       return ERP_EXECUTIVE.has(v2) || v2 === ROLES.DIR_OPERACIONES;
     case 'kb':
-      return tier(v2) >= 50 && !DESIGN_TEAM.has(v2) && v2 !== ROLES.ING_CAMPO && v2 !== ROLES.VENDEDOR;
+      return (
+        (tier(v2) >= 50 && !DESIGN_TEAM.has(v2) && v2 !== ROLES.VENDEDOR)
+        || isSupportRole(v2)
+      );
     case 'documents':
-      return tier(v2) >= 45 && v2 !== ROLES.ING_CAMPO && v2 !== ROLES.VENDEDOR && !DESIGN_TEAM.has(v2);
+      return (
+        (tier(v2) >= 45 && v2 !== ROLES.VENDEDOR && !DESIGN_TEAM.has(v2))
+        || isSupportRole(v2)
+        || isFieldRole(v2)
+      );
     case 'exports':
       return FINANCE_ROLES.has(v2);
     case 'news':
@@ -564,15 +576,15 @@ export function getActivitiesSectionConfig(user: UserAccessInput | null | undefi
   }
   if (isSupportRole(v2)) {
     return {
-      viewMode: 'manage',
-      defaultScope: 'team',
+      viewMode: 'execute',
+      defaultScope: 'self',
       canCreate: false,
       canEdit: true,
       canDelete: false,
       canAssign: false,
-      canApprove: true,
-      title: 'Actividades · Soporte',
-      subtitle: 'OT vinculadas a tickets — seguimiento y cierre.',
+      canApprove: false,
+      title: 'Mis actividades',
+      subtitle: 'OT asignadas a ti — ejecuta, evidencia y cierra en sitio.',
     };
   }
   return {
@@ -1397,7 +1409,7 @@ export function getOpsTeamSectionConfig(
     };
   }
 
-  if (module === 'tools' && v2 && isFieldRole(v2)) {
+  if (module === 'tools' && v2 && (isFieldRole(v2) || isSupportRole(v2))) {
     return {
       viewMode: 'execute',
       defaultScope: 'self',

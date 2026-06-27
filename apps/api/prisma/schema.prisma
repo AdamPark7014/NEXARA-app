@@ -1028,15 +1028,22 @@ model VehicleControl {
 }
 
 model VehicleAsset {
-  id        Int              @id @default(autoincrement())
-  nombre    String           @db.VarChar(100)
-  placas    String?          @db.VarChar(20)
-  estatus   String           @default("Disponible") @db.VarChar(30)
-  activo    Boolean          @default(true)
-  notas     String?
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-  controles VehicleControl[]
+  id                  Int              @id @default(autoincrement())
+  nombre              String           @db.VarChar(100)
+  placas              String?          @db.VarChar(20)
+  estatus             String           @default("Disponible") @db.VarChar(30)
+  activo              Boolean          @default(true)
+  notas               String?
+  // Checkout / return tracking
+  assignedToId        Int?
+  assignedAt          DateTime?
+  salidaFotos         Json?            // before-checkout photos array
+  devolucionFotos     Json?            // after-return photos array
+  tiempoUsoMinutos    Int?             // computed on return
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  controles           VehicleControl[]
+  assignedTo          User?            @relation("VehicleAssetAssigned", fields: [assignedToId], references: [id])
 }
 
 model Expense {

@@ -157,14 +157,31 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/ops/**',
     '/erp/notifications-center',
     '/erp/my-profile',
+    '/erp/calendar',
+    '/erp/documents',
     ...SELF_ATTENDANCE_PATHS,
   ],
 
-  // ─── ING. SOPORTE — tickets, NOC, mantenimiento ───────────────────────
+  // ─── ING. SOPORTE — campo + cuenta ERP operativa ───────────────────────
   [ROLES.ING_SOPORTE]: [
-    '/ops/**',
+    '/ops/my-activities',
+    '/ops/my-activities/**',
+    '/ops/my-viatics',
+    '/ops/my-viatics/**',
+    '/ops/my-vehicles',
+    '/ops/my-vehicles/**',
+    '/ops/tools',
+    '/ops/tools/**',
+    '/ops/dashboard',
+    '/ops/support',
+    '/ops/support/**',
     '/erp/notifications-center',
     '/erp/my-profile',
+    '/erp/calendar',
+    '/erp/kb',
+    '/erp/kb/**',
+    '/erp/documents',
+    '/erp/documents/**',
     ...SELF_ATTENDANCE_PATHS,
   ],
 
@@ -262,10 +279,18 @@ function rx(p: string): RegExp {
   return r;
 }
 
+const EXECUTIVE_OPS_SELF_DENY = /^\/ops\/my-(activities|viatics|vehicles|evidences)(\/|$)/;
+
 /** Verifica si un rol puede ABRIR una página concreta (acepta paths legacy). */
 export function canOpenPage(role: RoleKey, pathname: string): boolean {
   if (role === ROLES.SUPER_ADMIN) return true;
   const clean = normalizePathToCanonical(pathname);
+  if (
+    (role === ROLES.CEO || role === ROLES.DIR_ADMIN || role === ROLES.DIR_OPERACIONES || role === ROLES.ARQUITECTO)
+    && EXECUTIVE_OPS_SELF_DENY.test(clean)
+  ) {
+    return false;
+  }
   const rules = PAGE_MATRIX[role] ?? [];
   return rules.some(p => rx(p).test(clean));
 }
