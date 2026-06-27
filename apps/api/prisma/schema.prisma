@@ -441,6 +441,7 @@ model User {
   evidencias                Evidence[]
   evidenciasAprobadas       Evidence[]                 @relation("EvidenceApprover")
   vehiculosRevisados        VehicleControl[]           @relation("VehicleDeliveryReviewer")
+  vehicleAssetsAssigned     VehicleAsset[]             @relation("VehicleAssetAssigned")
   expenses                  Expense[]
   locations                 LocationTracking[]
   department                Department                 @relation(fields: [departmentId], references: [id])
