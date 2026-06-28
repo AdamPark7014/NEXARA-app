@@ -42,6 +42,21 @@ export class ViaticosController {
     return this.viaticosService.findAll(user, query);
   }
 
+  @Post()
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.VIATICS_MANAGE] })
+  create(@CurrentUser() user: any, @Body() body: any) {
+    return this.viaticosService.create({
+      usuarioId: body.usuarioId ?? user.id,
+      actividadId: body.actividadId ?? null,
+      projectId: body.projectId ?? null,
+      montoSolicitado: body.montoSolicitado,
+      motivo: body.motivo ?? body.concepto,
+      ticketEvidenciaUrl: body.ticketEvidenciaUrl ?? body.comprobante ?? null,
+      estatus: body.estatus ?? 'Pendiente',
+    });
+  }
+
   // Exportar viáticos (CSV o JSON)
   @Get('export/:format')
   @UseGuards(RbacGuard)
@@ -85,6 +100,13 @@ export class ViaticosController {
         .status(HttpStatus.BAD_REQUEST)
         .json({ message: e instanceof Error ? e.message : 'Archivo inválido o error de importación' });
     }
+  }
+
+  @Get(':id')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.VIATICS_VIEW] })
+  findOne(@Param('id') id: string) {
+    return this.viaticosService.findOne(+id);
   }
 
   @Patch(':id')

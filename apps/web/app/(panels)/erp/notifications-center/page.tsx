@@ -74,7 +74,9 @@ export default function NotificationsCenterPage() {
     try {
       await apiFetch(`notifications/${id}/read`, token, { method: "PATCH" });
       setNotifs(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
-    } catch { /* ignore */ }
+    } catch (e: unknown) {
+      window.alert("No se pudo marcar como leída: " + (e instanceof Error ? e.message : "error"));
+    }
   };
 
   const markAllRead = async () => {
@@ -82,7 +84,9 @@ export default function NotificationsCenterPage() {
     try {
       await apiFetch("notifications/read-all", token, { method: "PATCH" });
       setNotifs(prev => prev.map(n => ({ ...n, isRead: true })));
-    } catch { /* ignore */ }
+    } catch (e: unknown) {
+      window.alert("No se pudieron marcar todas: " + (e instanceof Error ? e.message : "error"));
+    }
   };
 
   const remove = async (id: number) => {
@@ -90,7 +94,9 @@ export default function NotificationsCenterPage() {
     try {
       await apiFetch(`notifications/${id}`, token, { method: "DELETE" });
       setNotifs(prev => prev.filter(n => n.id !== id));
-    } catch { /* ignore */ }
+    } catch (e: unknown) {
+      window.alert("No se pudo eliminar: " + (e instanceof Error ? e.message : "error"));
+    }
   };
 
   const openNotif = (n: Notif) => {

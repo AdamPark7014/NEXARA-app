@@ -3,39 +3,74 @@ import PDFDocument from 'pdfkit';
 import { PrismaService } from '../prisma/prisma.service.js';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// ─── Brand constants ──────────────────────────────────────────────────────────
+const NEXARA_LOGO  = path.join(__dirname, '../assets/logo-nexara.png');
+const BRAND_DARK   = '#0a1f3d';
+const BRAND_LIGHT  = '#e8f0fb';
+const BRAND_WHITE  = '#ffffff';
+const TEXT_DARK    = '#1e293b';
+const TEXT_MID     = '#475569';
+const TEXT_LIGHT   = '#94a3b8';
+const DIVIDER      = '#e2e8f0';
+const ROW_ALT      = '#f8fafc';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface QuoteItem {
+  description: string;
+  brand?: string;
+  model?: string;
+  unit?: string;
+  quantity: number;
+  unitPrice: number;
+  discount: number;
+  tax: number;
+  ieps: number;
+  retention: number;
+  lineTotal: number;
+  warrantyMonths?: number;
+  deliveryTime?: string;
+  notes?: string;
+}
 
 interface QuotePdfData {
+  quoteNumber: string;
+  date: string;
+  validity?: string;
+  currency: string;
+  companyName: string;
+  companyAddress?: string;
+  companyEmail?: string;
+  companyPhone?: string;
+  companyRfc?: string;
+  companyWebsite?: string;
   clientName: string;
   clientCompany?: string;
-  clientTaxId?: string;
+  clientRfc?: string;
   clientAddress?: string;
   clientEmail?: string;
   clientPhone?: string;
-  projectName: string;
-  items: Array<{
-    description: string;
-    quantity: number;
-    unitPrice: number;
-    quantity_total: number;
-  }>;
-  subtotal: number;
-  discounts: number;
-  taxes: number;
-  total: number;
-  currency?: string;
-  notes?: string;
-  date?: string;
-  validity?: string;
-  quoteNumber: string;
+  projectName?: string;
+  scope?: string;
   paymentTerms?: string;
+  depositPercent?: number;
+  deliveryTime?: string;
   preparedBy?: string;
-}
-
-interface OrderPdfData extends QuotePdfData {
-  projectBudget: number;
-  projectCosts: number;
-  projectMargin: number;
-  orderNumber: string;
+  notes?: string;
+  items: QuoteItem[];
+  subtotal: number;
+  discountTotal: number;
+  taxTotal: number;
+  iepsTotal: number;
+  retentionTotal: number;
+  total: number;
+  primaryColor: string;
+  footerText?: string;
 }
 
 type TemplateSections = {
@@ -51,545 +86,405 @@ type TemplateSections = {
   showFooterBrand: boolean;
 };
 
+const fmtMXN = (n: number, cur = 'MXN') =>
+  `$${n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cur}`;
+
+// ─── Service ──────────────────────────────────────────────────────────────────
+
 @Injectable()
 export class PdfGeneratorService {
   constructor(private readonly prisma: PrismaService) {}
 
   private resolveTemplateSections(template: any): TemplateSections {
     const defaults: TemplateSections = {
-      showClientInfo: true,
-      showProjectScope: true,
-      showItemsTable: true,
-      showTotals: true,
-      showTerms: true,
-      showNotes: true,
-      showPreparedBy: true,
-      showValidity: true,
-      showPaymentTerms: true,
-      showFooterBrand: true,
+      showClientInfo: true, showProjectScope: true, showItemsTable: true,
+      showTotals: true, showTerms: true, showNotes: true,
+      showPreparedBy: true, showValidity: true, showPaymentTerms: true, showFooterBrand: true,
     };
-
     if (!template?.sections || typeof template.sections !== 'object') return defaults;
     const raw = template.sections as Record<string, unknown>;
-    return {
-      showClientInfo: raw.showClientInfo !== false,
-      showProjectScope: raw.showProjectScope !== false,
-      showItemsTable: raw.showItemsTable !== false,
-      showTotals: raw.showTotals !== false,
-      showTerms: raw.showTerms !== false,
-      showNotes: raw.showNotes !== false,
-      showPreparedBy: raw.showPreparedBy !== false,
-      showValidity: raw.showValidity !== false,
-      showPaymentTerms: raw.showPaymentTerms !== false,
-      showFooterBrand: raw.showFooterBrand !== false,
-    };
+    return Object.fromEntries(Object.entries(defaults).map(([k]) => [k, raw[k] !== false])) as TemplateSections;
   }
 
-  /**
-   * Genera un PDF de cotización dinámico embebiendo datos del cliente
-   */
-  async generateQuotePdf(
-    opportunityQuoteId: number,
-    clientId: number,
-    templateId?: number,
-  ): Promise<Buffer> {
-    // Fetch data
+  // ─── Public methods ────────────────────────────────────────────────────────
+
+  async generateQuotePdf(opportunityQuoteId: number, clientId: number, templateId?: number): Promise<Buffer> {
     const quote = await this.prisma.salesOpportunityQuote.findUnique({
       where: { id: opportunityQuoteId },
-      include: {
-        opportunity: {
-          include: { client: true },
-        },
-        cotizacion: { include: { items: true } },
-        createdBy: true,
-      },
+      include: { opportunity: { include: { client: true } }, cotizacion: { include: { items: true } }, createdBy: true },
     });
+    const client = await this.prisma.salesClient.findUnique({ where: { id: clientId } });
+    if (!quote || !client) throw new BadRequestException('Quote or client not found');
 
-    const client = await this.prisma.salesClient.findUnique({
-      where: { id: clientId },
-    });
+    const template = templateId
+      ? await this.prisma.orderTemplate.findUnique({ where: { id: templateId } })
+      : await this.prisma.orderTemplate.findFirst({ where: { isDefault: true } });
 
-    let template = null;
-    if (templateId) {
-      template = await this.prisma.orderTemplate.findUnique({
-        where: { id: templateId },
-      });
-    } else {
-      // Get default template
-      template = await this.prisma.orderTemplate.findFirst({
-        where: { isDefault: true },
-      });
-    }
-
-    if (!quote || !client) {
-      throw new BadRequestException('Quote or client not found');
-    }
-
-    // Build PDF data
-    const pdfData: QuotePdfData = {
+    const cot = quote.cotizacion as any;
+    const data: QuotePdfData = {
+      quoteNumber: cot?.quoteNumber || `COT-${quote.id}`,
+      date: new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' }),
+      validity: cot?.validUntil ? new Date(cot.validUntil).toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' }) : undefined,
+      currency: cot?.currency || 'MXN',
+      companyName: template?.companyName || 'NEXARA',
+      companyAddress: (template as any)?.companyAddress || undefined,
+      companyEmail: (template as any)?.companyEmail || undefined,
+      companyPhone: (template as any)?.companyPhone || undefined,
+      companyRfc: (template as any)?.companyRfc || undefined,
+      companyWebsite: (template as any)?.companyWebsite || undefined,
       clientName: client.name,
       clientCompany: client.legalName || undefined,
-      clientTaxId: client.taxId || undefined,
-      clientAddress: client.fiscalAddress || undefined,
-      clientEmail: client.billingEmail || undefined,
-      clientPhone: client.billingPhone || undefined,
-      projectName: quote.opportunity?.description || 'Proyecto',
-      items: (quote.cotizacion?.items || []).map((item: any) => ({
-        description: item.name,
-        quantity: item.qty,
-        unitPrice: item.unitPrice,
-        quantity_total: item.qty * item.unitPrice,
+      clientRfc: (client as any).taxId || undefined,
+      clientAddress: (client as any).fiscalAddress || undefined,
+      clientEmail: (client as any).billingEmail || undefined,
+      clientPhone: (client as any).billingPhone || undefined,
+      projectName: (quote.opportunity as any)?.description || cot?.projectName || undefined,
+      scope: cot?.scope || undefined,
+      paymentTerms: cot?.paymentTerms || undefined,
+      depositPercent: cot?.depositPercent || undefined,
+      deliveryTime: cot?.deliveryTime || undefined,
+      preparedBy: (quote.createdBy as any)?.nombre || template?.companyName || 'NEXARA',
+      notes: cot?.note || undefined,
+      items: ((cot?.items || []) as any[]).map((it) => ({
+        description: it.name, brand: it.brand || undefined, model: it.model || undefined,
+        unit: it.unit || undefined, quantity: it.qty, unitPrice: Number(it.unitPrice),
+        discount: it.discount || 0, tax: it.tax || 0, ieps: it.ieps || 0,
+        retention: it.retention || 0, lineTotal: Number(it.lineTotal),
+        warrantyMonths: it.warrantyMonths || undefined, deliveryTime: it.deliveryTime || undefined, notes: it.notes || undefined,
       })),
-      subtotal: Number(quote.cotizacion?.subtotal || 0),
-      discounts: Number(quote.cotizacion?.discountTotal || 0),
-      taxes: Number(quote.cotizacion?.taxTotal || 0) + Number(quote.cotizacion?.iepsTotal || 0),
-      total: Number(quote.cotizacion?.total || 0),
-      currency: 'MXN',
-      notes: quote.cotizacion?.note || '',
-      date: new Date().toLocaleDateString('es-MX'),
-      validity: quote.cotizacion?.validUntil?.toLocaleDateString('es-MX'),
-      quoteNumber: quote.cotizacion?.quoteNumber || `COT-${quote.id}`,
-      paymentTerms: quote.cotizacion?.paymentTerms || 'Contra entrega',
-      preparedBy: quote.createdBy?.nombre || 'NEXARA',
+      subtotal: Number(cot?.subtotal || 0), discountTotal: Number(cot?.discountTotal || 0),
+      taxTotal: Number(cot?.taxTotal || 0), iepsTotal: Number(cot?.iepsTotal || 0),
+      retentionTotal: Number(cot?.retentionTotal || 0), total: Number(cot?.total || 0),
+      primaryColor: template?.primaryColor || '#0f6ad6',
+      footerText: template?.footerText || undefined,
     };
-
-    return this._generatePdfDocument(pdfData, template, 'quote');
+    return this._buildPdf(data, this.resolveTemplateSections(template));
   }
 
-  /**
-   * Genera un PDF de orden embebiendo datos del proyecto y cliente
-   */
   async generateOrderPdf(projectId: number, templateId?: number): Promise<Buffer> {
     const project = await this.prisma.salesProject.findUnique({
       where: { id: projectId },
-      include: {
-        opportunity: {
-          include: {
-            client: true,
-            quotes: {
-              orderBy: { createdAt: 'desc' },
-              take: 1,
-              include: {
-                cotizacion: { include: { items: true } },
-                createdBy: true,
-              },
-            },
-          },
-        },
-      },
+      include: { opportunity: { include: { client: true, quotes: { orderBy: { createdAt: 'desc' }, take: 1, include: { cotizacion: { include: { items: true } }, createdBy: true } } } } },
     });
-
-    if (!project) {
-      throw new BadRequestException('Project not found');
-    }
-
-    const client = project.opportunity?.client;
-    const quote = project.opportunity?.quotes?.[0];
-
-    if (!client) {
-      throw new BadRequestException('Client not found');
-    }
-
-    let template = null;
-    if (templateId) {
-      template = await this.prisma.orderTemplate.findUnique({
-        where: { id: templateId },
-      });
-    } else {
-      template = await this.prisma.orderTemplate.findFirst({
-        where: { isDefault: true },
-      });
-    }
-
-    const pdfData: OrderPdfData = {
-      clientName: client.name,
-      clientCompany: client.legalName || undefined,
-      clientTaxId: client.taxId || undefined,
-      clientAddress: client.fiscalAddress || undefined,
-      clientEmail: client.billingEmail || undefined,
-      clientPhone: client.billingPhone || undefined,
-      projectName: project.name,
-      items: (quote?.cotizacion?.items || []).map((item: any) => ({
-        description: item.name,
-        quantity: item.qty,
-        unitPrice: item.unitPrice,
-        quantity_total: item.qty * item.unitPrice,
-      })),
-      subtotal: Number(quote?.cotizacion?.subtotal || 0),
-      discounts: Number(quote?.cotizacion?.discountTotal || 0),
-      taxes: Number(quote?.cotizacion?.taxTotal || 0) + Number(quote?.cotizacion?.iepsTotal || 0),
-      total: Number(quote?.cotizacion?.total || 0),
-      projectBudget: Number(project.budget),
-      projectCosts:
-        Number(project.costProducts) +
-        Number(project.costViaticos) +
-        Number(project.costOperativo),
-      projectMargin: Number(project.margin),
-      currency: 'MXN',
-      notes: quote?.cotizacion?.note || '',
-      date: new Date().toLocaleDateString('es-MX'),
-      orderNumber: `ORD-${project.id}-${Date.now()}`,
-      quoteNumber: quote?.cotizacion?.quoteNumber || `COT-${quote?.id}`,
-      paymentTerms: quote?.cotizacion?.paymentTerms || 'Contra entrega',
+    if (!project) throw new BadRequestException('Project not found');
+    const client = (project.opportunity as any)?.client;
+    if (!client) throw new BadRequestException('Client not found');
+    const template = templateId
+      ? await this.prisma.orderTemplate.findUnique({ where: { id: templateId } })
+      : await this.prisma.orderTemplate.findFirst({ where: { isDefault: true } });
+    const quote = (project.opportunity as any)?.quotes?.[0];
+    const cot = quote?.cotizacion as any;
+    const data: QuotePdfData = {
+      quoteNumber: `ORD-${project.id}`,
+      date: new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' }),
+      currency: cot?.currency || 'MXN',
+      companyName: template?.companyName || 'NEXARA',
+      companyAddress: (template as any)?.companyAddress || undefined,
+      companyEmail: (template as any)?.companyEmail || undefined,
+      companyPhone: (template as any)?.companyPhone || undefined,
+      companyRfc: (template as any)?.companyRfc || undefined,
+      clientName: client.name, clientCompany: client.legalName || undefined,
+      clientRfc: client.taxId || undefined, clientAddress: client.fiscalAddress || undefined,
+      projectName: (project as any).name, scope: cot?.scope || undefined,
+      paymentTerms: cot?.paymentTerms || undefined, depositPercent: cot?.depositPercent || undefined,
       preparedBy: quote?.createdBy?.nombre || 'NEXARA',
+      notes: cot?.note || undefined,
+      items: ((cot?.items || []) as any[]).map((it) => ({
+        description: it.name, brand: it.brand || undefined, model: it.model || undefined,
+        unit: it.unit || undefined, quantity: it.qty, unitPrice: Number(it.unitPrice),
+        discount: it.discount || 0, tax: it.tax || 0, ieps: it.ieps || 0,
+        retention: it.retention || 0, lineTotal: Number(it.lineTotal),
+      })),
+      subtotal: Number(cot?.subtotal || 0), discountTotal: Number(cot?.discountTotal || 0),
+      taxTotal: Number(cot?.taxTotal || 0), iepsTotal: Number(cot?.iepsTotal || 0),
+      retentionTotal: Number(cot?.retentionTotal || 0), total: Number(cot?.total || 0),
+      primaryColor: template?.primaryColor || '#0f6ad6',
+      footerText: template?.footerText || undefined,
     };
-
-    return this._generatePdfDocument(pdfData, template, 'order');
+    return this._buildPdf(data, this.resolveTemplateSections(template));
   }
 
-  /**
-   * Método privado para generar el documento PDF con estilos personalizados
-   */
-  private _generatePdfDocument(
-    data: QuotePdfData | OrderPdfData,
-    template: any,
-    docType: 'quote' | 'order',
-  ): Promise<Buffer> {
+  // ─── Core PDF builder ──────────────────────────────────────────────────────
+
+  private _buildPdf(data: QuotePdfData, sections: TemplateSections): Promise<Buffer> {
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ size: 'A4', margin: 40 });
+      const doc = new PDFDocument({ size: 'A4', margin: 0, bufferPages: true });
       const chunks: Buffer[] = [];
-
-      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('data', (c) => chunks.push(c));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
-      doc.on('error', (error) => reject(error));
+      doc.on('error', reject);
 
-      const primaryColor = template?.primaryColor || '#1F6BBA';
-      const secondaryColor = template?.secondaryColor || '#F5F7FB';
-      const textColor = template?.textColor || '#1E293B';
-      const darkColor = '#0B1F3A';
-      const sections = this.resolveTemplateSections(template);
+      const W  = doc.page.width;   // 595.28
+      const H  = doc.page.height;  // 841.89
+      const M  = 40;
+      const CW = W - M * 2;
+      const primary = data.primaryColor;
 
-      const margin = 40;
-      const pageWidth = doc.page.width;
-      const contentWidth = pageWidth - margin * 2;
+      // ─── Background ─────────────────────────────────────────────────────────
+      doc.rect(0, 0, W, H).fill(BRAND_WHITE);
 
-      // ===== HEADER =====
-      this._drawHeader(doc, data, template, primaryColor, darkColor, secondaryColor, margin, pageWidth, sections);
+      // Top accent bar
+      doc.rect(0, 0, W, 5).fill(primary);
 
-      doc.fillColor(textColor);
+      // ─── Header band ─────────────────────────────────────────────────────────
+      const hH = 88;
+      doc.rect(0, 5, W, hH).fill(BRAND_DARK);
+
+      // Logo
+      let logoW = 0;
+      try {
+        if (fs.existsSync(NEXARA_LOGO)) {
+          doc.image(NEXARA_LOGO, M, 14, { height: 56, fit: [160, 56] });
+          logoW = 170;
+        }
+      } catch { /* silent */ }
+
+      // Company info block (right of logo)
+      const cmpX = M + logoW + 8;
+      let cmpY = 18;
+      if (data.companyName) {
+        doc.fontSize(8.5).font('Helvetica-Bold').fillColor(BRAND_WHITE).text(data.companyName, cmpX, cmpY, { width: 180 });
+        cmpY += 13;
+      }
+      doc.fontSize(6.5).font('Helvetica').fillColor('rgba(255,255,255,0.6)');
+      if (data.companyRfc)     { doc.text(`RFC: ${data.companyRfc}`, cmpX, cmpY, { width: 180 }); cmpY += 10; }
+      if (data.companyPhone)   { doc.text(`Tel: ${data.companyPhone}`, cmpX, cmpY, { width: 180 }); cmpY += 10; }
+      if (data.companyEmail)   { doc.text(data.companyEmail, cmpX, cmpY, { width: 180 }); cmpY += 10; }
+      if (data.companyAddress) { doc.text(data.companyAddress, cmpX, cmpY, { width: 180 }); cmpY += 10; }
+      if (data.companyWebsite) { doc.text(data.companyWebsite, cmpX, cmpY, { width: 180 }); }
+
+      // Doc type box (right side)
+      const boxW = 180;
+      const boxX = W - M - boxW;
+      doc.rect(boxX - 10, 12, boxW + 12, 72).fill(primary);
+      const isOrder = data.quoteNumber.startsWith('ORD');
+      doc.fontSize(7.5).font('Helvetica-Bold').fillColor(BRAND_WHITE)
+         .text(isOrder ? 'ORDEN DE VENTA' : 'COTIZACIÓN', boxX, 21, { width: boxW, align: 'center' });
+      doc.fontSize(15).font('Helvetica-Bold').fillColor(BRAND_WHITE)
+         .text(data.quoteNumber, boxX, 33, { width: boxW, align: 'center' });
+      doc.fontSize(7).font('Helvetica').fillColor('rgba(255,255,255,0.8)')
+         .text(`Fecha: ${data.date}`, boxX, 54, { width: boxW, align: 'center' });
+      if (sections.showValidity && data.validity) {
+        doc.text(`Vigente hasta: ${data.validity}`, boxX, 65, { width: boxW, align: 'center' });
+      }
+
+      // ─── Client info ─────────────────────────────────────────────────────────
+      let y = 5 + hH + 14;
 
       if (sections.showClientInfo) {
-        doc.moveDown(1);
-        this._drawClientInfo(doc, data, primaryColor, margin, contentWidth);
+        const boxH = 68;
+        doc.rect(M, y, CW, boxH).fill(BRAND_LIGHT);
+        doc.rect(M, y, 3, boxH).fill(primary); // left stripe
+
+        const inX = M + 12;
+        let inY = y + 9;
+        doc.fontSize(6.5).font('Helvetica-Bold').fillColor(primary).text('DATOS DEL CLIENTE', inX, inY);
+        inY += 12;
+        doc.fontSize(8.5).font('Helvetica-Bold').fillColor(TEXT_DARK).text(data.clientName, inX, inY, { width: CW * 0.5 });
+        inY += 12;
+        doc.fontSize(7.5).font('Helvetica').fillColor(TEXT_MID);
+        if (data.clientCompany) { doc.text(data.clientCompany, inX, inY, { width: CW * 0.5 }); inY += 11; }
+        if (data.clientRfc)     { doc.text(`RFC: ${data.clientRfc}`, inX, inY, { width: CW * 0.5 }); inY += 11; }
+        if (data.clientAddress) { doc.text(data.clientAddress, inX, inY, { width: CW * 0.5 }); }
+
+        const rcX = M + CW * 0.56;
+        let rcY = y + 9;
+        doc.fontSize(6.5).font('Helvetica-Bold').fillColor(primary).text('CONTACTO', rcX, rcY);
+        rcY += 12;
+        doc.fontSize(7.5).font('Helvetica').fillColor(TEXT_MID);
+        if (data.clientEmail) { doc.text(data.clientEmail, rcX, rcY, { width: CW * 0.42 }); rcY += 11; }
+        if (data.clientPhone) { doc.text(data.clientPhone, rcX, rcY, { width: CW * 0.42 }); }
+
+        y += boxH + 12;
       }
 
-      if (sections.showItemsTable) {
-        doc.moveDown(1);
-        this._drawItemsTable(doc, data, primaryColor, margin, contentWidth);
+      // ─── Project / scope ─────────────────────────────────────────────────────
+      if (sections.showProjectScope && (data.projectName || data.scope)) {
+        doc.fontSize(7).font('Helvetica-Bold').fillColor(primary).text('PROYECTO / ALCANCE', M, y);
+        y += 11;
+        if (data.projectName) {
+          doc.fontSize(9).font('Helvetica-Bold').fillColor(TEXT_DARK).text(data.projectName, M, y, { width: CW });
+          y += 13;
+        }
+        if (data.scope) {
+          doc.fontSize(7.5).font('Helvetica').fillColor(TEXT_MID).text(data.scope, M, y, { width: CW });
+          y += doc.heightOfString(data.scope, { width: CW }) + 8;
+        }
+        doc.moveTo(M, y + 4).lineTo(M + CW, y + 4).lineWidth(0.5).strokeColor(DIVIDER).stroke();
+        y += 14;
       }
 
+      // ─── Items table ─────────────────────────────────────────────────────────
+      if (sections.showItemsTable && data.items.length > 0) {
+        doc.fontSize(7).font('Helvetica-Bold').fillColor(primary).text('PARTIDAS', M, y);
+        y += 10;
+
+        // Column config
+        const C = { desc: 195, brand: 60, qty: 38, unit: 44, price: 62, disc: 38, total: 58 };
+        const rowH = 22;
+        const hdrH = 20;
+
+        // Header
+        doc.rect(M, y, CW, hdrH).fill(BRAND_DARK);
+        const hCols = [
+          { label: 'DESCRIPCIÓN',   x: M + 5,                                    w: C.desc - 5 },
+          { label: 'MARCA / MOD.',  x: M + C.desc,                               w: C.brand },
+          { label: 'CANT.',         x: M + C.desc + C.brand,                     w: C.qty },
+          { label: 'UNIDAD',        x: M + C.desc + C.brand + C.qty,             w: C.unit },
+          { label: 'PRECIO UNIT.',  x: M + C.desc + C.brand + C.qty + C.unit,   w: C.price },
+          { label: 'DSCTO.',        x: M + C.desc + C.brand + C.qty + C.unit + C.price, w: C.disc },
+          { label: 'TOTAL',         x: M + C.desc + C.brand + C.qty + C.unit + C.price + C.disc, w: C.total - 5 },
+        ];
+        hCols.forEach(col =>
+          doc.fontSize(6.5).font('Helvetica-Bold').fillColor(BRAND_WHITE)
+             .text(col.label, col.x, y + 6, { width: col.w, align: 'center' })
+        );
+        y += hdrH;
+
+        data.items.forEach((item, idx) => {
+          const hasExtra = !!item.notes || !!item.warrantyMonths;
+          const lH = hasExtra ? 32 : rowH;
+          doc.rect(M, y, CW, lH).fill(idx % 2 === 0 ? BRAND_WHITE : ROW_ALT);
+          doc.rect(M, y, CW, lH).stroke(DIVIDER);
+
+          const cy = y + (lH > rowH ? 5 : 6);
+          doc.fontSize(7.5).font('Helvetica').fillColor(TEXT_DARK)
+             .text(item.description, M + 5, cy, { width: C.desc - 10, ellipsis: true });
+          if (hasExtra) {
+            doc.fontSize(6.5).fillColor(TEXT_LIGHT);
+            const extras: string[] = [];
+            if (item.warrantyMonths) extras.push(`Garantía: ${item.warrantyMonths} meses`);
+            if (item.notes) extras.push(item.notes);
+            doc.text(extras.join(' · '), M + 5, cy + 11, { width: C.desc - 10 });
+          }
+
+          const bLabel = [item.brand, item.model].filter(Boolean).join(' / ');
+          const x2 = M + C.desc;
+          doc.fontSize(7).font('Helvetica').fillColor(TEXT_MID)
+             .text(bLabel || '—',     x2,                         cy, { width: C.brand, align: 'center' })
+             .text(String(item.quantity), x2 + C.brand,           cy, { width: C.qty, align: 'center' })
+             .text(item.unit || 'pza',  x2 + C.brand + C.qty,     cy, { width: C.unit, align: 'center' });
+          doc.fontSize(7.5).fillColor(TEXT_DARK)
+             .text(`$${item.unitPrice.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
+               x2 + C.brand + C.qty + C.unit, cy, { width: C.price, align: 'right' });
+          doc.fontSize(7).fillColor(item.discount > 0 ? '#dc2626' : TEXT_LIGHT)
+             .text(item.discount > 0 ? `${item.discount}%` : '—',
+               x2 + C.brand + C.qty + C.unit + C.price, cy, { width: C.disc, align: 'center' });
+          doc.fontSize(7.5).font('Helvetica-Bold').fillColor(TEXT_DARK)
+             .text(`$${item.lineTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`,
+               x2 + C.brand + C.qty + C.unit + C.price + C.disc, cy, { width: C.total - 5, align: 'right' });
+
+          y += lH;
+        });
+
+        // Bottom rule
+        doc.moveTo(M, y).lineTo(M + CW, y).lineWidth(1).strokeColor(primary).stroke();
+        y += 12;
+      }
+
+      // ─── Totals ──────────────────────────────────────────────────────────────
       if (sections.showTotals) {
-        doc.moveDown(0.5);
-        this._drawTotalsSection(doc, data, primaryColor, darkColor, margin, contentWidth);
+        const tW = 210;
+        const tX = M + CW - tW;
+
+        const rows: Array<{ label: string; value: string; bold?: boolean; highlight?: boolean; neg?: boolean }> = [
+          { label: 'Subtotal',  value: fmtMXN(data.subtotal, data.currency) },
+        ];
+        if (data.discountTotal > 0)  rows.push({ label: 'Descuento', value: `− ${fmtMXN(data.discountTotal, data.currency)}`, neg: true });
+        if (data.taxTotal > 0)       rows.push({ label: 'IVA 16%',   value: fmtMXN(data.taxTotal, data.currency) });
+        if (data.iepsTotal > 0)      rows.push({ label: 'IEPS',      value: fmtMXN(data.iepsTotal, data.currency) });
+        if (data.retentionTotal > 0) rows.push({ label: 'Retención', value: `− ${fmtMXN(data.retentionTotal, data.currency)}`, neg: true });
+        rows.push({ label: 'TOTAL', value: fmtMXN(data.total, data.currency), bold: true, highlight: true });
+
+        const rH = 18;
+        rows.forEach(row => {
+          if (row.highlight) {
+            doc.rect(tX - 10, y, tW + 10, rH + 2).fill(primary);
+            doc.fontSize(9.5).font('Helvetica-Bold').fillColor(BRAND_WHITE)
+               .text(row.label, tX, y + 4, { width: 90 })
+               .text(row.value,  tX + 90, y + 4, { width: tW - 90, align: 'right' });
+          } else {
+            doc.fontSize(8).font(row.bold ? 'Helvetica-Bold' : 'Helvetica')
+               .fillColor(row.neg ? '#dc2626' : TEXT_MID)
+               .text(row.label, tX, y + 4, { width: 90 })
+               .fillColor(row.neg ? '#dc2626' : TEXT_DARK)
+               .text(row.value,  tX + 90, y + 4, { width: tW - 90, align: 'right' });
+          }
+          y += rH + (row.highlight ? 2 : 0);
+        });
+
+        if (data.depositPercent && data.depositPercent > 0) {
+          y += 5;
+          const dep = data.total * (data.depositPercent / 100);
+          doc.fontSize(7.5).font('Helvetica').fillColor(TEXT_LIGHT)
+             .text(`Anticipo requerido ${data.depositPercent}%: ${fmtMXN(dep, data.currency)}`,
+               tX - 10, y, { width: tW + 10, align: 'right' });
+          y += 14;
+        }
+        y += 10;
       }
 
-      if (docType === 'order' && 'projectBudget' in data && sections.showProjectScope) {
-        doc.moveDown(0.8);
-        this._drawBudgetSection(doc, data as OrderPdfData, primaryColor, margin, contentWidth);
-      }
-
+      // ─── Terms / notes ───────────────────────────────────────────────────────
       if (sections.showTerms || sections.showNotes || sections.showPaymentTerms) {
-        doc.moveDown(1);
-        this._drawTermsAndNotes(doc, data, primaryColor, margin, contentWidth, sections);
+        doc.moveTo(M, y).lineTo(M + CW, y).lineWidth(0.5).strokeColor(DIVIDER).stroke();
+        y += 12;
+        const colW = (CW - 16) / 2;
+        let lY = y;
+        let rY = y;
+
+        if (sections.showPaymentTerms && data.paymentTerms) {
+          doc.fontSize(7).font('Helvetica-Bold').fillColor(primary).text('CONDICIONES DE PAGO', M, lY);
+          lY += 11;
+          doc.fontSize(7.5).font('Helvetica').fillColor(TEXT_MID).text(data.paymentTerms, M, lY, { width: colW });
+          lY += doc.heightOfString(data.paymentTerms, { width: colW }) + 8;
+        }
+        if (data.deliveryTime) {
+          doc.fontSize(7).font('Helvetica-Bold').fillColor(primary).text('TIEMPO DE ENTREGA', M, lY);
+          lY += 11;
+          doc.fontSize(7.5).font('Helvetica').fillColor(TEXT_MID).text(data.deliveryTime, M, lY, { width: colW });
+          lY += doc.heightOfString(data.deliveryTime, { width: colW }) + 8;
+        }
+
+        if (sections.showNotes && data.notes) {
+          const rX = M + colW + 16;
+          doc.fontSize(7).font('Helvetica-Bold').fillColor(primary).text('NOTAS ADICIONALES', rX, rY);
+          rY += 11;
+          doc.fontSize(7.5).font('Helvetica').fillColor(TEXT_MID).text(data.notes, rX, rY, { width: colW });
+          rY += doc.heightOfString(data.notes, { width: colW }) + 8;
+        }
+
+        y = Math.max(lY, rY) + 10;
       }
 
-      // ===== FOOTER =====
-      doc.moveDown(1);
-      this._drawFooter(doc, data, template, primaryColor, darkColor, margin, pageWidth, sections);
+      // ─── Signature area ──────────────────────────────────────────────────────
+      if (sections.showPreparedBy) {
+        doc.moveTo(M, y).lineTo(M + CW, y).lineWidth(0.5).strokeColor(DIVIDER).stroke();
+        y += 14;
+        const sigW = (CW - 20) / 2;
+        doc.fontSize(7).font('Helvetica').fillColor(TEXT_LIGHT)
+           .text('FIRMA DE AUTORIZACIÓN CLIENTE', M, y)
+           .text('ELABORÓ', M + sigW + 20, y);
+        y += 34;
+        doc.moveTo(M, y).lineTo(M + sigW, y).lineWidth(0.5).strokeColor(DIVIDER).stroke();
+        doc.moveTo(M + sigW + 20, y).lineTo(M + CW, y).lineWidth(0.5).strokeColor(DIVIDER).stroke();
+        y += 8;
+        doc.fontSize(7.5).font('Helvetica').fillColor(TEXT_MID)
+           .text(data.clientName, M, y, { width: sigW, align: 'center' })
+           .text(data.preparedBy || data.companyName, M + sigW + 20, y, { width: sigW, align: 'center' });
+      }
 
+      // ─── Footer ──────────────────────────────────────────────────────────────
+      const fY = H - 36;
+      doc.rect(0, fY, W, 36).fill(BRAND_DARK);
+      doc.rect(0, fY, W, 3).fill(primary);
+
+      const ftxt = data.footerText || `${data.companyName} · Propuesta comercial confidencial · ${data.quoteNumber}`;
+      doc.fontSize(7).font('Helvetica').fillColor('rgba(255,255,255,0.55)')
+         .text(ftxt, M, fY + 12, { width: CW - 100, align: 'left' })
+         .text(`${data.date}`, W - M - 100, fY + 12, { width: 100, align: 'right' });
+
+      doc.rect(0, H - 5, W, 5).fill(primary);
       doc.end();
     });
   }
-
-  /**
-   * Dibuja el header del documento
-   */
-  private _drawHeader(
-    doc: any,
-    data: any,
-    template: any,
-    primaryColor: string,
-    darkColor: string,
-    lightColor: string,
-    margin: number,
-    pageWidth: number,
-    sections: TemplateSections,
-  ): void {
-    // Background color
-    doc.rect(0, 0, pageWidth, 100).fill(lightColor);
-    doc.rect(0, 0, pageWidth, 5).fill(primaryColor);
-
-    // Logo (if exists)
-    if (template?.headerLogo && fs.existsSync(template.headerLogo)) {
-      try {
-        doc.image(template.headerLogo, margin, 20, { width: 80, height: 60 });
-      } catch {
-        // Silent fail if logo not loadable
-      }
-    }
-
-    // Title
-    doc
-      .fillColor(darkColor)
-      .fontSize(24)
-      .font('Helvetica-Bold')
-      .text(template?.headerText || data.quoteNumber || 'COTIZACIÓN', margin + 100, 25, { width: 260 });
-
-    // Doc type badge
-    doc
-      .fontSize(10)
-      .font('Helvetica')
-      .fillColor('#666')
-      .text(data.quoteNumber || 'Propuesta Comercial', margin + 100, 55);
-
-    if (template?.companyName) {
-      doc.fontSize(9).font('Helvetica').fillColor('#4b5563').text(template.companyName, margin + 100, 70);
-    }
-
-    // Right column info
-    const rightX = margin + pageWidth - 200;
-    doc
-      .fontSize(9)
-      .fillColor('#333')
-      .text(`Fecha: ${data.date || ''}`, rightX, 25);
-    if (sections.showValidity && data.validity) {
-      doc.text(`Vigencia: ${data.validity}`, rightX, 40);
-    }
-    doc.text(`Moneda: ${data.currency || 'MXN'}`, rightX, 55);
-    if (template?.companyEmail) {
-      doc.text(`Email: ${template.companyEmail}`, rightX, 70);
-    }
-    if (template?.companyPhone) {
-      doc.text(`Tel: ${template.companyPhone}`, rightX, 85);
-    }
-  }
-
-  /**
-   * Dibuja información de cliente
-   */
-  private _drawClientInfo(
-    doc: any,
-    data: any,
-    primaryColor: string,
-    margin: number,
-    contentWidth: number,
-  ): void {
-    // Sección Cliente
-    doc.fontSize(11).font('Helvetica-Bold').fillColor(primaryColor).text('CLIENTE', margin);
-
-    const boxWidth = contentWidth / 2 - 10;
-
-    // Left column
-    doc.fontSize(9).font('Helvetica').fillColor('#333');
-    const leftX = margin;
-    let y = doc.y + 5;
-
-    doc.text(`Nombre: ${data.clientName || 'N/A'}`, leftX, y);
-    y += 15;
-    if (data.clientCompany) {
-      doc.text(`Empresa: ${data.clientCompany}`, leftX, y);
-      y += 15;
-    }
-    if (data.clientTaxId) {
-      doc.text(`RFC: ${data.clientTaxId}`, leftX, y);
-      y += 15;
-    }
-
-    // Right column
-    const rightX = margin + contentWidth / 2;
-    y = doc.y - 45;
-
-    if (data.clientEmail) {
-      doc.text(`Email: ${data.clientEmail}`, rightX, y);
-      y += 15;
-    }
-    if (data.clientPhone) {
-      doc.text(`Tel: ${data.clientPhone}`, rightX, y);
-      y += 15;
-    }
-    if (data.clientAddress) {
-      doc.text(`Domicilio: ${data.clientAddress}`, rightX, y, { width: boxWidth });
-    }
-  }
-
-  /**
-   * Dibuja tabla de items
-   */
-  private _drawItemsTable(doc: any, data: any, primaryColor: string, margin: number, contentWidth: number): void {
-    const tableMargin = margin;
-    const tableTop = doc.y + 10;
-    const colWidth = [250, 60, 80, 100];
-    const rowHeight = 25;
-
-    // Header
-    doc.rect(tableMargin, tableTop, contentWidth, rowHeight).fill(primaryColor);
-    doc.fontSize(10).font('Helvetica-Bold').fillColor('white');
-    doc.text('Descripción', tableMargin + 5, tableTop + 5, { width: colWidth[0] - 10 });
-    doc.text('Cantidad', tableMargin + colWidth[0], tableTop + 5, { width: colWidth[1] });
-    doc.text('P. Unitario', tableMargin + colWidth[0] + colWidth[1], tableTop + 5, { width: colWidth[2] });
-    doc.text('Total', tableMargin + colWidth[0] + colWidth[1] + colWidth[2], tableTop + 5, { width: colWidth[3] });
-
-    // Items
-    doc.fontSize(9).font('Helvetica').fillColor('#333');
-    let currentY = tableTop + rowHeight;
-
-    (data.items || []).forEach((item: any, index: number) => {
-      const itemTotal = (item.quantity * item.unitPrice).toFixed(2);
-      const bgColor = index % 2 === 0 ? '#f9f9f9' : 'white';
-
-      doc.rect(tableMargin, currentY, contentWidth, rowHeight).fill(bgColor);
-
-      doc.text(item.description || '', tableMargin + 5, currentY + 5, { width: colWidth[0] - 10 });
-      doc.text(String(item.quantity), tableMargin + colWidth[0], currentY + 5, { width: colWidth[1] });
-      doc.text(`$${Number(item.unitPrice).toFixed(2)}`, tableMargin + colWidth[0] + colWidth[1], currentY + 5, {
-        width: colWidth[2],
-      });
-      doc.text(`$${itemTotal}`, tableMargin + colWidth[0] + colWidth[1] + colWidth[2], currentY + 5, {
-        width: colWidth[3],
-      });
-
-      currentY += rowHeight;
-    });
-
-    doc.moveDown(data.items.length + 1);
-  }
-
-  /**
-   * Dibuja sección de totales
-   */
-  private _drawTotalsSection(
-    doc: any,
-    data: any,
-    primaryColor: string,
-    darkColor: string,
-    margin: number,
-    contentWidth: number,
-  ): void {
-    const rightX = margin + contentWidth - 200;
-    const colWidth = 80;
-
-    // Subtotal
-    doc.fontSize(10).font('Helvetica').fillColor('#333');
-    doc.text('Subtotal:', rightX, doc.y, { width: 80 });
-    doc.text(`$${Number(data.subtotal).toFixed(2)}`, rightX + colWidth, doc.y - 15);
-
-    // Discounts
-    if (data.discounts && data.discounts > 0) {
-      doc.text('Descuentos:', rightX, doc.y + 5, { width: 80 });
-      doc.text(`-$${Number(data.discounts).toFixed(2)}`, rightX + colWidth, doc.y - 15);
-    }
-
-    // Taxes
-    if (data.taxes && data.taxes > 0) {
-      doc.text('Impuestos:', rightX, doc.y + 5, { width: 80 });
-      doc.text(`$${Number(data.taxes).toFixed(2)}`, rightX + colWidth, doc.y - 15);
-    }
-
-    // Total (highlighted)
-    doc.moveDown(1);
-    doc.rect(rightX - 10, doc.y, 200, 30).fill(primaryColor);
-    doc.fontSize(14).font('Helvetica-Bold').fillColor('white');
-    doc.text('TOTAL:', rightX, doc.y + 5, { width: 80 });
-    doc.text(`$${Number(data.total).toFixed(2)}`, rightX + colWidth, doc.y - 15);
-
-    doc.moveDown(2);
-  }
-
-  /**
-   * Dibuja sección de presupuesto (solo para órdenes)
-   */
-  private _drawBudgetSection(
-    doc: any,
-    data: OrderPdfData,
-    primaryColor: string,
-    margin: number,
-    contentWidth: number,
-  ): void {
-    doc.fontSize(11).font('Helvetica-Bold').fillColor(primaryColor).text('INFORMACIÓN DE PROYECTO', margin);
-
-    const col1 = margin;
-    const col2 = margin + contentWidth / 3;
-    const col3 = margin + (contentWidth * 2) / 3;
-
-    doc.fontSize(9).font('Helvetica').fillColor('#333').moveDown(0.3);
-
-    doc.text(
-      `Presupuesto: $${Number(data.projectBudget).toFixed(2)}`,
-      col1,
-      doc.y,
-    );
-    doc.text(
-      `Costos: $${Number(data.projectCosts).toFixed(2)}`,
-      col2,
-      doc.y - 15,
-    );
-    doc.text(
-      `Margen: $${Number(data.projectMargin).toFixed(2)}`,
-      col3,
-      doc.y - 15,
-    );
-  }
-
-  /**
-   * Dibuja términos y notas
-   */
-  private _drawTermsAndNotes(
-    doc: any,
-    data: any,
-    primaryColor: string,
-    margin: number,
-    contentWidth: number,
-    sections: TemplateSections,
-  ): void {
-    if (sections.showPaymentTerms && data.paymentTerms) {
-      doc.fontSize(10).font('Helvetica-Bold').fillColor(primaryColor).text('TÉRMINOS DE PAGO', margin);
-      doc.fontSize(9).font('Helvetica').fillColor('#333').text(data.paymentTerms, margin, doc.y + 3, {
-        width: contentWidth,
-      });
-    }
-
-    if (sections.showNotes && data.notes) {
-      doc.moveDown(0.8);
-      doc.fontSize(10).font('Helvetica-Bold').fillColor(primaryColor).text('NOTAS', margin);
-      doc.fontSize(9).font('Helvetica').fillColor('#333').text(data.notes, margin, doc.y + 3, {
-        width: contentWidth,
-      });
-    }
-  }
-
-  /**
-   * Dibuja footer del documento
-   */
-  private _drawFooter(
-    doc: any,
-    data: any,
-    template: any,
-    primaryColor: string,
-    darkColor: string,
-    margin: number,
-    pageWidth: number,
-    sections: TemplateSections,
-  ): void {
-    const footerY = doc.page.height - 50;
-
-    doc.moveTo(margin, footerY).lineTo(pageWidth - margin, footerY).stroke(primaryColor);
-
-    const footerAlignment = (template?.footerAlignment || 'center') as 'left' | 'center' | 'right';
-    const company = template?.companyName || 'NEXARA SOFTWARE';
-    const footerText = template?.footerText || `${company} · Documento comercial confidencial`;
-
-    doc.fontSize(9).font('Helvetica').fillColor('#666');
-    if (sections.showPreparedBy) {
-      doc.text(`Preparado por: ${data.preparedBy || company}`, margin, footerY + 10);
-    }
-    doc.text(`Documento: ${data.quoteNumber} - ${data.date}`, margin, footerY + 20);
-    if (sections.showFooterBrand) {
-      doc.text(footerText, margin, footerY + 30, {
-        align: footerAlignment,
-        width: pageWidth - margin * 2,
-      });
-    }
-  }
 }
-
-

@@ -776,6 +776,95 @@ export class AccountingService {
     return invoice;
   }
 
+  async updateInvoiceDraft(
+    id: number,
+    dto: {
+      issueDate?: string;
+      dueDate?: string;
+      receptorRfc?: string;
+      receptorName?: string;
+      receptorRegime?: string;
+      receptorZipCode?: string;
+      cfdiUsage?: string;
+      notes?: string;
+      items?: Array<{
+        description: string;
+        quantity: number;
+        unitPrice: number;
+        taxRate?: number;
+        satProductKey?: string;
+        satUnitKey?: string;
+        unitName?: string;
+      }>;
+    },
+  ) {
+    const invoice = await this.prisma.invoice.findFirst({ where: { id, deletedAt: null } });
+    if (!invoice) throw new NotFoundException('Factura no encontrada');
+    if (invoice.status !== 'DRAFT' || invoice.cfdiUuid) {
+      throw new BadRequestException('Solo borradores sin timbrar pueden editarse');
+    }
+
+    if (dto.items?.length) {
+      const items = dto.items.map((item) => {
+        const base = item.quantity * item.unitPrice;
+        const iva = base * ((item.taxRate ?? 16) / 100);
+        const total = base + iva;
+        return { ...item, base, iva, total };
+      });
+      const subtotal = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+      const taxAmount = items.reduce((s, i) => s + i.iva, 0);
+      const totalAmount = subtotal + taxAmount;
+
+      await this.prisma.$transaction(async (tx) => {
+        await tx.invoiceItem.deleteMany({ where: { invoiceId: id } });
+        await tx.invoice.update({
+          where: { id },
+          data: {
+            issueDate: dto.issueDate ? new Date(dto.issueDate) : undefined,
+            dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+            receptorRfc: dto.receptorRfc?.trim() ?? undefined,
+            receptorName: dto.receptorName?.trim() ?? undefined,
+            receptorRegime: dto.receptorRegime ? (this.normalizeFiscalRegime(dto.receptorRegime) as any) : undefined,
+            receptorZipCode: dto.receptorZipCode?.trim() ?? undefined,
+            cfdiUsage: dto.cfdiUsage ? (this.normalizeCfdiUsage(dto.cfdiUsage) as any) : undefined,
+            notes: dto.notes !== undefined ? (dto.notes?.trim() || null) : undefined,
+            subtotal: new Prisma.Decimal(subtotal),
+            taxAmount: new Prisma.Decimal(taxAmount),
+            totalAmount: new Prisma.Decimal(totalAmount),
+            items: {
+              create: items.map((i) => ({
+                description: i.description.trim(),
+                quantity: new Prisma.Decimal(i.quantity),
+                unitPrice: new Prisma.Decimal(i.unitPrice),
+                taxRate: new Prisma.Decimal(i.taxRate ?? 16),
+                total: new Prisma.Decimal(i.total),
+                satProductKey: i.satProductKey?.trim() || null,
+                satUnitKey: i.satUnitKey?.trim() || null,
+                unitName: i.unitName?.trim() || 'Servicio',
+              })),
+            },
+          },
+        });
+      });
+    } else {
+      await this.prisma.invoice.update({
+        where: { id },
+        data: {
+          issueDate: dto.issueDate ? new Date(dto.issueDate) : undefined,
+          dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
+          receptorRfc: dto.receptorRfc?.trim() ?? undefined,
+          receptorName: dto.receptorName?.trim() ?? undefined,
+          receptorRegime: dto.receptorRegime ? (this.normalizeFiscalRegime(dto.receptorRegime) as any) : undefined,
+          receptorZipCode: dto.receptorZipCode?.trim() ?? undefined,
+          cfdiUsage: dto.cfdiUsage ? (this.normalizeCfdiUsage(dto.cfdiUsage) as any) : undefined,
+          notes: dto.notes !== undefined ? (dto.notes?.trim() || null) : undefined,
+        },
+      });
+    }
+
+    return this.getInvoice(id);
+  }
+
   async getInvoiceIssuerProfile() {
     const settings = await this.prisma.systemSetting.findMany({
       where: { category: { in: ['empresa', 'fiscal'] } },
@@ -975,6 +1064,32 @@ export class AccountingService {
     return this.prisma.bankAccount.findMany({
       where: { isActive: true },
       orderBy: { name: 'asc' },
+    });
+  }
+
+  async updateBankAccount(
+    id: number,
+    dto: Partial<{
+      name: string;
+      bankName: string;
+      accountNumber: string;
+      clabe: string;
+      currentBalance: number;
+      isActive: boolean;
+    }>,
+  ) {
+    const account = await this.prisma.bankAccount.findUnique({ where: { id } });
+    if (!account) throw new NotFoundException('Cuenta bancaria no encontrada');
+    return this.prisma.bankAccount.update({
+      where: { id },
+      data: {
+        name: dto.name?.trim() ?? undefined,
+        bankName: dto.bankName?.trim() ?? undefined,
+        accountNumber: dto.accountNumber?.trim() ?? undefined,
+        clabe: dto.clabe !== undefined ? (dto.clabe?.trim() || null) : undefined,
+        currentBalance: dto.currentBalance !== undefined ? new Prisma.Decimal(dto.currentBalance) : undefined,
+        isActive: dto.isActive ?? undefined,
+      },
     });
   }
 

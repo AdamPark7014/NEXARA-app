@@ -132,4 +132,25 @@ export class DocumentsService {
       data: { status: 'OBSOLETE' },
     });
   }
+
+  async updateDocument(
+    id: number,
+    dto: { title?: string; description?: string; categoryId?: number | null; fileUrl?: string },
+  ) {
+    const doc = await this.prisma.managedDocument.findUnique({ where: { id } });
+    if (!doc) throw new NotFoundException('Documento no encontrado');
+    if (doc.status === 'APPROVED' || doc.status === 'OBSOLETE') {
+      throw new NotFoundException('Solo se pueden editar documentos en borrador o pendientes de aprobación');
+    }
+    return this.prisma.managedDocument.update({
+      where: { id },
+      data: {
+        title: dto.title?.trim() ?? undefined,
+        description: dto.description !== undefined ? (dto.description?.trim() || null) : undefined,
+        categoryId: dto.categoryId !== undefined ? dto.categoryId : undefined,
+        fileUrl: dto.fileUrl !== undefined ? (dto.fileUrl?.trim() || null) : undefined,
+      },
+      include: { category: true, createdBy: { select: { id: true, nombre: true } } },
+    });
+  }
 }

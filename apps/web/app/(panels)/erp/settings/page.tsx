@@ -39,7 +39,9 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [editingSetting, setEditingSetting] = useState<SettingRow | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
+  const [formErr, setFormErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -64,25 +66,27 @@ export default function SettingsPage() {
     return Array.from(map.entries());
   }, [settings]);
 
+  const openNew = () => { setEditingSetting(null); setForm({ ...emptyForm }); setFormErr(null); setShowForm(true); };
+  const openEdit = (s: SettingRow) => {
+    setEditingSetting(s);
+    setForm({ key: s.key, value: s.value, category: s.category, label: s.label ?? "" });
+    setFormErr(null);
+    setShowForm(true);
+  };
+
   const save = async () => {
     if (!token || !form.key || !form.value) return;
     setSaving(true);
+    setFormErr(null);
     try {
       await apiFetch("settings", token, { method: "PUT", body: JSON.stringify(form) });
-      setShowForm(false); setForm({ ...emptyForm });
+      setShowForm(false);
+      setEditingSetting(null);
+      setForm({ ...emptyForm });
       void load();
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      setFormErr(e instanceof Error ? e.message : "No se pudo guardar");
     } finally { setSaving(false); }
-  };
-
-  const editValue = async (s: SettingRow) => {
-    const next = prompt(`Nuevo valor para "${s.label ?? s.key}":`, s.value);
-    if (next === null || next === s.value || !token) return;
-    try {
-      await apiFetch("settings", token, { method: "PUT", body: JSON.stringify({ key: s.key, value: next, category: s.category, label: s.label }) });
-      void load();
-    } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
   };
 
   const remove = async (s: SettingRow) => {
@@ -104,7 +108,7 @@ export default function SettingsPage() {
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nueva configuración</Button>}
+            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva configuración</Button>}
           </>
         }
       />
@@ -123,7 +127,7 @@ export default function SettingsPage() {
                   <div style={{ fontWeight: 600, fontSize: 13 }}>{s.label ?? s.key}</div>
                   <div style={{ fontSize: 12, color: "var(--text-tertiary)", wordBreak: "break-all" }}>{s.value}</div>
                 </div>
-                {cfg.canCreate && <Button size="sm" variant="ghost" onClick={() => void editValue(s)}>✎ Editar</Button>}
+                {cfg.canCreate && <Button size="sm" variant="ghost" onClick={() => openEdit(s)}>✎ Editar</Button>}
                 {cfg.canCreate && <Button size="sm" variant="danger" onClick={() => void remove(s)}>✕</Button>}
               </div>
             ))}
@@ -134,19 +138,22 @@ export default function SettingsPage() {
       {showForm && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setShowForm(false)}>
           <div style={{ background: "var(--surface)", borderRadius: 16, padding: 28, width: 460, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.24)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Nueva configuración</div>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>{editingSetting ? "Editar configuración" : "Nueva configuración"}</div>
             <div style={{ display: "grid", gap: 14 }}>
               <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Clave (key)</span>
-                <input value={form.key} onChange={(e) => setForm((f) => ({ ...f, key: e.target.value }))} placeholder="brand.primaryColor" style={inp} /></label>
+                <input value={form.key} onChange={(e) => setForm((f) => ({ ...f, key: e.target.value }))} placeholder="brand.primaryColor" style={inp} disabled={!!editingSetting} /></label>
               <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Valor</span>
-                <input value={form.value} onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))} style={inp} /></label>
+                <input value={form.value} onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))} style={inp} autoFocus={!!editingSetting} /></label>
               <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Categoría</span>
                 <input value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} placeholder="branding, integraciones, general…" style={inp} /></label>
               <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Etiqueta (nombre visible)</span>
                 <input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} style={inp} /></label>
+              {formErr && (
+                <div role="alert" style={{ padding: "8px 12px", background: "var(--state-danger-bg, #fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>{formErr}</div>
+              )}
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
-              <Button variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
+              <Button variant="secondary" onClick={() => { setShowForm(false); setEditingSetting(null); setFormErr(null); }}>Cancelar</Button>
               <Button variant="primary" onClick={() => void save()} disabled={saving || !form.key || !form.value}>{saving ? "Guardando…" : "Guardar"}</Button>
             </div>
           </div>

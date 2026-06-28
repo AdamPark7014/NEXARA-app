@@ -48,7 +48,9 @@ export default function DocumentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<ManagedDoc | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
+  const [formErr, setFormErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
 
@@ -78,23 +80,62 @@ export default function DocumentsPage() {
   const pendientes = docs.filter((d) => d.status === "PENDING_APPROVAL").length;
   const aprobados = docs.filter((d) => d.status === "APPROVED").length;
 
+  const openNew = () => {
+    setEditing(null);
+    setForm({ ...emptyForm });
+    setFormErr(null);
+    setShowForm(true);
+  };
+
+  const openEdit = async (d: ManagedDoc) => {
+    if (d.status === "APPROVED" || d.status === "ARCHIVED" || d.status === "OBSOLETE") {
+      window.alert("Solo se pueden editar documentos en borrador o pendientes de aprobación.");
+      return;
+    }
+    setEditing(d);
+    setFormErr(null);
+    setShowForm(true);
+    setForm({
+      title: d.title,
+      description: d.description ?? "",
+      categoryId: d.categoryId != null ? String(d.categoryId) : "",
+      fileUrl: d.fileUrl ?? "",
+    });
+    try {
+      const full = await apiFetch(`documents/${d.id}`, token) as ManagedDoc;
+      setForm({
+        title: full.title ?? d.title,
+        description: full.description ?? "",
+        categoryId: full.categoryId != null ? String(full.categoryId) : "",
+        fileUrl: full.fileUrl ?? "",
+      });
+    } catch (e) {
+      setFormErr(e instanceof Error ? e.message : "No se pudo cargar el documento");
+    }
+  };
+
   const submit = async () => {
     if (!token || !form.title) return;
     setSaving(true);
+    setFormErr(null);
     try {
-      await apiFetch("documents", token, {
-        method: "POST",
-        body: JSON.stringify({
-          title: form.title,
-          description: form.description || undefined,
-          categoryId: form.categoryId ? Number(form.categoryId) : undefined,
-          fileUrl: form.fileUrl || undefined,
-        }),
-      });
-      setShowForm(false); setForm({ ...emptyForm });
+      const body = {
+        title: form.title.trim(),
+        description: form.description.trim() || undefined,
+        categoryId: form.categoryId ? Number(form.categoryId) : undefined,
+        fileUrl: form.fileUrl.trim() || undefined,
+      };
+      if (editing) {
+        await apiFetch(`documents/${editing.id}`, token, { method: "PATCH", body: JSON.stringify(body) });
+      } else {
+        await apiFetch("documents", token, { method: "POST", body: JSON.stringify(body) });
+      }
+      setShowForm(false);
+      setEditing(null);
+      setForm({ ...emptyForm });
       void load();
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      setFormErr(e instanceof Error ? e.message : "No se pudo guardar");
     } finally { setSaving(false); }
   };
 
@@ -137,6 +178,9 @@ export default function DocumentsPage() {
       render: (d) => (
         <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
           {d.fileUrl && <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); window.open(buildApiUrl(d.fileUrl!), "_blank"); }}>Ver</Button>}
+          {cfg.canCreate && d.status !== "APPROVED" && d.status !== "ARCHIVED" && d.status !== "OBSOLETE" && (
+            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); void openEdit(d); }}>Editar</Button>
+          )}
           {cfg.canApprove && d.status === "PENDING_APPROVAL" && (
             <Button size="sm" variant="primary" onClick={(e) => { e.stopPropagation(); void approve(d); }}>Aprobar</Button>
           )}
@@ -158,7 +202,7 @@ export default function DocumentsPage() {
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nuevo documento</Button>}
+            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo documento</Button>}
           </>
         }
       />
@@ -180,25 +224,30 @@ export default function DocumentsPage() {
       </Section>
 
       {showForm && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setShowForm(false)}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => { setShowForm(false); setEditing(null); }}>
           <div style={{ background: "var(--surface)", borderRadius: 16, padding: 28, width: 460, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.24)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Nuevo documento</div>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>{editing ? "Editar documento" : "Nuevo documento"}</div>
             <div style={{ display: "grid", gap: 14 }}>
               <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Título</span>
                 <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} placeholder="Contrato de arrendamiento CEDIS Puebla" style={inp} /></label>
               <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Categoría</span>
                 <select value={form.categoryId} onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))} style={inp}>
                   <option value="">— Sin categoría —</option>
-                  {cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {cats.map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
                 </select></label>
               <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>URL del archivo</span>
                 <input value={form.fileUrl} onChange={(e) => setForm((f) => ({ ...f, fileUrl: e.target.value }))} placeholder="/uploads/documents/archivo.pdf" style={inp} /></label>
               <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Descripción</span>
                 <textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} rows={3} style={{ ...inp, resize: "vertical" }} /></label>
+              {formErr && (
+                <div role="alert" style={{ padding: "8px 12px", background: "var(--state-danger-bg, #fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>
+                  {formErr}
+                </div>
+              )}
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
-              <Button variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
-              <Button variant="primary" onClick={() => void submit()} disabled={saving || !form.title}>{saving ? "Guardando…" : "Crear"}</Button>
+              <Button variant="secondary" onClick={() => { setShowForm(false); setEditing(null); setFormErr(null); }}>Cancelar</Button>
+              <Button variant="primary" onClick={() => void submit()} disabled={saving || !form.title}>{saving ? "Guardando…" : editing ? "Guardar" : "Crear"}</Button>
             </div>
           </div>
         </div>

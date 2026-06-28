@@ -11,6 +11,7 @@ import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { getErpInventorySectionConfig } from "@/lib/section-views";
 import { listStockLevels, mapStockLevelToRow, updateStockLevelConfig, listWarehouses, listCatalogProducts, createStockMovement } from "@/lib/stock-api";
+import { formatApiError } from "@/lib/erp-api";
 
 type StockRow = ReturnType<typeof mapStockLevelToRow>;
 
@@ -24,13 +25,14 @@ export default function WarehousePage() {
 
   const [items, setItems] = useState<StockRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showMovementForm, setShowMovementForm] = useState(false);
   const [editing, setEditing] = useState<StockRow | null>(null);
   const [minimo, setMinimo] = useState(5);
   const [products, setProducts] = useState<{ id: number; name: string; sku: string }[]>([]);
   const [warehouses, setWarehouses] = useState<{ id: number; name: string }[]>([]);
-  const [movement, setMovement] = useState({ productId: "", warehouseId: "", quantity: 1, unitCost: "", reference: "" });
+  const [movement, setMovement] = useState({ type: "IN" as "IN" | "OUT", productId: "", warehouseId: "", quantity: 1, unitCost: "", reference: "" });
   const [savingMovement, setSavingMovement] = useState(false);
   const [showWarehouseForm, setShowWarehouseForm] = useState(false);
   const [warehouseForm, setWarehouseForm] = useState({ name: "", code: "", address: "", city: "" });
@@ -67,11 +69,13 @@ export default function WarehousePage() {
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
+    setLoadError(null);
     try {
       const levels = await listStockLevels(token);
       setItems(levels.map(mapStockLevelToRow));
-    } catch {
-      /* skip */
+    } catch (e) {
+      setLoadError(formatApiError(e, "No se pudo cargar el inventario"));
+      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -93,15 +97,17 @@ export default function WarehousePage() {
     setSavingMovement(true);
     try {
       await createStockMovement(token, {
-        type: "IN",
+        type: movement.type,
         productId: Number(movement.productId),
-        toWarehouseId: Number(movement.warehouseId),
+        ...(movement.type === "IN"
+          ? { toWarehouseId: Number(movement.warehouseId) }
+          : { fromWarehouseId: Number(movement.warehouseId) }),
         quantity: movement.quantity,
         unitCost: movement.unitCost ? Number(movement.unitCost) : undefined,
         reference: movement.reference.trim() || undefined,
       });
       setShowMovementForm(false);
-      setMovement({ productId: "", warehouseId: "", quantity: 1, unitCost: "", reference: "" });
+      setMovement({ type: "IN", productId: "", warehouseId: "", quantity: 1, unitCost: "", reference: "" });
       void load();
     } catch (e) {
       window.alert(e instanceof Error ? e.message : "Error al registrar entrada");
@@ -122,8 +128,8 @@ export default function WarehousePage() {
       await updateStockLevelConfig(token, editing.id, { minStock: minimo, reorderPoint: minimo });
       setItems((prev) => prev.map((i) => (i.id === editing.id ? { ...i, minimo } : i)));
       setShowForm(false);
-    } catch {
-      /* skip */
+    } catch (e) {
+      window.alert(formatApiError(e, "No se pudo actualizar el mínimo de stock"));
     }
   };
 
@@ -262,8 +268,15 @@ export default function WarehousePage() {
 
       {showMovementForm && (
         <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20 }}>
-          <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>Entrada de inventario</p>
+          <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>{movement.type === "IN" ? "Entrada de inventario" : "Salida de inventario"}</p>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Tipo de movimiento *</span>
+              <select value={movement.type} onChange={(e) => setMovement((m) => ({ ...m, type: e.target.value as "IN" | "OUT" }))} style={inp}>
+                <option value="IN">Entrada (IN)</option>
+                <option value="OUT">Salida (OUT)</option>
+              </select>
+            </label>
             <label style={{ display: "grid", gap: 4 }}>
               <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Producto *</span>
               <select value={movement.productId} onChange={(e) => setMovement((m) => ({ ...m, productId: e.target.value }))} style={inp}>
@@ -273,7 +286,7 @@ export default function WarehousePage() {
               </select>
             </label>
             <label style={{ display: "grid", gap: 4 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Almacén destino *</span>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>{movement.type === "IN" ? "Almacén destino *" : "Almacén origen *"}</span>
               <select value={movement.warehouseId} onChange={(e) => setMovement((m) => ({ ...m, warehouseId: e.target.value }))} style={inp}>
                 <option value="">Seleccionar…</option>
                 {warehouses.length === 0 && <option disabled>Sin almacenes — usa "Nuevo almacén" arriba</option>}
@@ -295,7 +308,7 @@ export default function WarehousePage() {
           </div>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
             <Button variant="ghost" onClick={() => setShowMovementForm(false)}>Cancelar</Button>
-            <Button variant="primary" onClick={() => void saveMovement()} disabled={savingMovement}>{savingMovement ? "Registrando…" : "Registrar entrada"}</Button>
+            <Button variant="primary" onClick={() => void saveMovement()} disabled={savingMovement}>{savingMovement ? "Registrando…" : movement.type === "IN" ? "Registrar entrada" : "Registrar salida"}</Button>
           </div>
         </div>
       )}
@@ -312,11 +325,16 @@ export default function WarehousePage() {
             Enlace desde movimiento de stock <strong>#{movementId}</strong>.
           </p>
         )}
+        {loadError && (
+          <div role="alert" style={{ padding: "10px 14px", marginBottom: 12, background: "var(--state-warning-bg)", border: "1px solid var(--state-warning-border)", borderRadius: 8, fontSize: 12 }}>
+            {loadError} <Button size="sm" variant="ghost" onClick={() => void load()}>Reintentar</Button>
+          </div>
+        )}
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
-        ) : (
+        ) : !loadError ? (
           <DataTable columns={columns} rows={visibleItems} rowKey={(s) => s.id} emptyTitle="Sin stock registrado" emptyDescription="Configura almacenes y niveles de inventario en el backend." />
-        )}
+        ) : null}
       </Section>
     </>
   );

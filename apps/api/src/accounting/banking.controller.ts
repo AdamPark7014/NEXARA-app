@@ -31,6 +31,13 @@ export class BankingController {
     return this.service.getBankAccountSummary(+id);
   }
 
+  @Patch('accounts/:id')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.BANKING_MANAGE] })
+  updateAccount(@Param('id') id: string, @Body() dto: any) {
+    return this.service.updateBankAccount(+id, dto);
+  }
+
   @Get('accounts/:id/transactions')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.BANKING_VIEW] })

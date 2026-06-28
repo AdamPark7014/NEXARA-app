@@ -15,6 +15,7 @@ type Tab = "comunicados" | "newsletter";
 interface Comunicado {
   id: number;
   titulo: string;
+  cuerpo?: string;
   audiencia: string;
   prioridad: string;
   estado: string;
@@ -117,10 +118,31 @@ export default function ComunicacionesInternasPage() {
   useEffect(() => { load(); }, [load]);
 
   const openNew = () => { setEditing(null); setForm({ ...EMPTY_FORM }); setShowForm(true); };
-  const openEdit = (c: Comunicado) => {
+
+  const openEdit = async (c: Comunicado) => {
     setEditing(c);
-    setForm({ titulo: c.titulo, cuerpo: "", audiencia: c.audiencia, prioridad: c.prioridad, estado: c.estado, scheduledAt: c.scheduledAt?.slice(0, 16) ?? "" });
     setShowForm(true);
+    setForm({
+      titulo: c.titulo,
+      cuerpo: "",
+      audiencia: c.audiencia,
+      prioridad: c.prioridad,
+      estado: c.estado,
+      scheduledAt: c.scheduledAt?.slice(0, 16) ?? "",
+    });
+    try {
+      const full = await apiFetch(`internal-comunicados/${c.id}`, token) as Comunicado & { cuerpo?: string };
+      setForm({
+        titulo: full.titulo ?? c.titulo,
+        cuerpo: full.cuerpo ?? "",
+        audiencia: full.audiencia ?? c.audiencia,
+        prioridad: full.prioridad ?? c.prioridad,
+        estado: full.estado ?? c.estado,
+        scheduledAt: full.scheduledAt?.slice(0, 16) ?? "",
+      });
+    } catch (e) {
+      window.alert("No se pudo cargar el contenido: " + (e instanceof Error ? e.message : "error"));
+    }
   };
 
   const save = async () => {
@@ -150,7 +172,9 @@ export default function ComunicacionesInternasPage() {
     try {
       const updated = await apiFetch(`internal-comunicados/${id}/enviar`, token, { method: "PATCH" });
       setItems(prev => prev.map(c => c.id === id ? { ...c, ...updated } : c));
-    } catch { /* ignore */ }
+    } catch (e: unknown) {
+      window.alert("Error al enviar: " + (e instanceof Error ? e.message : "error"));
+    }
   };
 
   const remove = async (id: number) => {
@@ -158,7 +182,9 @@ export default function ComunicacionesInternasPage() {
     try {
       await apiFetch(`internal-comunicados/${id}`, token, { method: "DELETE" });
       setItems(prev => prev.filter(c => c.id !== id));
-    } catch { /* ignore */ }
+    } catch (e: unknown) {
+      window.alert("Error al eliminar: " + (e instanceof Error ? e.message : "error"));
+    }
   };
 
   const field = (key: keyof typeof EMPTY_FORM) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -198,7 +224,7 @@ export default function ComunicacionesInternasPage() {
               color: "var(--primary)", border: "1px solid color-mix(in srgb, var(--primary) 30%, transparent)", fontWeight: 600,
             }}>Enviar</button>
           )}
-          {cfg.canEdit && <button onClick={() => openEdit(c)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--text-tertiary)", padding: "3px 6px" }}>✎</button>}
+          {cfg.canEdit && <button onClick={() => void openEdit(c)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--text-tertiary)", padding: "3px 6px" }}>✎</button>}
           {cfg.canDelete && <button onClick={() => remove(c.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--danger)", padding: "3px 6px" }}>✕</button>}
         </div>
       ),

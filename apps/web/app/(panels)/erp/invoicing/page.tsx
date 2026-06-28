@@ -58,6 +58,8 @@ export default function InvoicingPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"" | "INCOME" | "EXPENSE">("");
   const [showForm, setShowForm] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState<InvoiceRow | null>(null);
+  const [formErr, setFormErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     type: "INCOME" as "INCOME" | "EXPENSE",
@@ -131,38 +133,109 @@ export default function InvoicingPage() {
     } catch (e) { alert(`Error al cancelar: ${e instanceof Error ? e.message : "desconocido"}`); }
   };
 
+  const openNew = () => {
+    setEditingInvoice(null);
+    setFormErr(null);
+    setForm({
+      type: "INCOME",
+      receptorName: "",
+      receptorRfc: "",
+      receptorZipCode: "",
+      receptorRegime: "601",
+      cfdiUsage: "G03",
+      issueDate: new Date().toISOString().slice(0, 10),
+      dueDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+      description: "",
+      quantity: 1,
+      unitPrice: 0,
+      satProductKey: "80101500",
+      satUnitKey: "E48",
+    });
+    setShowForm(true);
+  };
+
+  const openEditDraft = async (inv: InvoiceRow) => {
+    if (inv.status !== "DRAFT") {
+      window.alert("Solo se pueden editar facturas en borrador.");
+      return;
+    }
+    setEditingInvoice(inv);
+    setFormErr(null);
+    setShowForm(true);
+    try {
+      const full = await apiFetch(`accounting/invoices/${inv.id}`, token) as {
+        type?: string;
+        issueDate?: string;
+        dueDate?: string;
+        receptorName?: string;
+        receptorRfc?: string;
+        receptorZipCode?: string;
+        receptorRegime?: string;
+        cfdiUsage?: string;
+        items?: Array<{ description?: string; quantity?: number | string; unitPrice?: number | string; satProductKey?: string; satUnitKey?: string }>;
+      };
+      const item = full.items?.[0];
+      setForm({
+        type: full.type === "ACCOUNTS_PAYABLE" ? "EXPENSE" : "INCOME",
+        receptorName: full.receptorName ?? "",
+        receptorRfc: full.receptorRfc ?? "",
+        receptorZipCode: full.receptorZipCode ?? "",
+        receptorRegime: full.receptorRegime ?? "601",
+        cfdiUsage: full.cfdiUsage ?? "G03",
+        issueDate: full.issueDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+        dueDate: full.dueDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+        description: item?.description ?? "",
+        quantity: Number(item?.quantity ?? 1),
+        unitPrice: Number(item?.unitPrice ?? 0),
+        satProductKey: item?.satProductKey ?? "80101500",
+        satUnitKey: item?.satUnitKey ?? "E48",
+      });
+    } catch (e) {
+      setFormErr(e instanceof Error ? e.message : "No se pudo cargar la factura");
+    }
+  };
+
   const saveInvoice = async () => {
     if (!token || !form.receptorName.trim() || !form.description.trim() || form.unitPrice <= 0 || !form.receptorZipCode.trim()) return;
     setSaving(true);
+    setFormErr(null);
+    const body = {
+      issueDate: form.issueDate,
+      dueDate: form.dueDate,
+      receptorName: form.receptorName.trim(),
+      receptorRfc: form.receptorRfc.trim() || undefined,
+      receptorZipCode: form.receptorZipCode.trim() || undefined,
+      receptorRegime: form.receptorRegime.trim() || undefined,
+      cfdiUsage: form.cfdiUsage,
+      items: [{
+        description: form.description.trim(),
+        quantity: form.quantity,
+        unitPrice: form.unitPrice,
+        taxRate: 16,
+        satProductKey: form.satProductKey.trim() || "80101500",
+        satUnitKey: form.satUnitKey.trim() || "E48",
+        unitName: "Servicio",
+      }],
+    };
     try {
-      await apiFetch("accounting/invoices", token, {
-        method: "POST",
-        body: JSON.stringify({
-          type: form.type === "INCOME" ? "ACCOUNTS_RECEIVABLE" : "ACCOUNTS_PAYABLE",
-          issueDate: form.issueDate,
-          dueDate: form.dueDate,
-          receptorName: form.receptorName.trim(),
-          receptorRfc: form.receptorRfc.trim() || undefined,
-          receptorZipCode: form.receptorZipCode.trim() || undefined,
-          receptorRegime: form.receptorRegime.trim() || undefined,
-          cfdiUsage: form.cfdiUsage,
-          satPaymentForm: "03",
-          satPaymentMethod: "PUE",
-          items: [{
-            description: form.description.trim(),
-            quantity: form.quantity,
-            unitPrice: form.unitPrice,
-            taxRate: 16,
-            satProductKey: form.satProductKey.trim() || "80101500",
-            satUnitKey: form.satUnitKey.trim() || "E48",
-            unitName: "Servicio",
-          }],
-        }),
-      });
+      if (editingInvoice) {
+        await apiFetch(`accounting/invoices/${editingInvoice.id}`, token, { method: "PATCH", body: JSON.stringify(body) });
+      } else {
+        await apiFetch("accounting/invoices", token, {
+          method: "POST",
+          body: JSON.stringify({
+            type: form.type === "INCOME" ? "ACCOUNTS_RECEIVABLE" : "ACCOUNTS_PAYABLE",
+            satPaymentForm: "03",
+            satPaymentMethod: "PUE",
+            ...body,
+          }),
+        });
+      }
       setShowForm(false);
+      setEditingInvoice(null);
       void load();
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "No se pudo crear"}`);
+      setFormErr(e instanceof Error ? e.message : "No se pudo guardar");
     } finally {
       setSaving(false);
     }
@@ -190,6 +263,9 @@ export default function InvoicingPage() {
       key: "acciones" as keyof InvoiceRow, label: "",
       render: (f: InvoiceRow) => (
         <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+          {f.status === "DRAFT" && cfg.canCreate && (
+            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); void openEditDraft(f); }}>Editar</Button>
+          )}
           {f.status === "DRAFT" && <Button size="sm" variant="primary" onClick={(e) => { e.stopPropagation(); void stamp(f); }}>Timbrar</Button>}
           {cfg.canDelete && f.status !== "CANCELLED" && <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); void cancel(f); }}>Cancelar</Button>}
         </div>
@@ -207,7 +283,7 @@ export default function InvoicingPage() {
         actions={
           <>
             {cfg.canCreate && (
-              <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nueva factura</Button>
+              <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva factura</Button>
             )}
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
             <select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}>
@@ -228,7 +304,7 @@ export default function InvoicingPage() {
 
       {showForm && (
         <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 18 }}>
-          <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>Nueva factura (borrador CFDI)</p>
+          <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>{editingInvoice ? `Editar borrador ${editingInvoice.invoiceNumber}` : "Nueva factura (borrador CFDI)"}</p>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <label style={{ display: "grid", gap: 4 }}>
               <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Tipo</span>
@@ -290,9 +366,14 @@ export default function InvoicingPage() {
               <input type="number" min={0} step="0.01" value={form.unitPrice || ""} onChange={(e) => setForm((f) => ({ ...f, unitPrice: +e.target.value }))} style={inp} />
             </label>
           </div>
+          {formErr && (
+            <div role="alert" style={{ marginTop: 12, padding: "8px 12px", background: "var(--state-danger-bg, #fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>
+              {formErr}
+            </div>
+          )}
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14 }}>
-            <Button variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
-            <Button variant="primary" onClick={() => void saveInvoice()} disabled={saving}>{saving ? "Guardando…" : "Crear borrador"}</Button>
+            <Button variant="ghost" onClick={() => { setShowForm(false); setEditingInvoice(null); setFormErr(null); }}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void saveInvoice()} disabled={saving}>{saving ? "Guardando…" : editingInvoice ? "Guardar cambios" : "Crear borrador"}</Button>
           </div>
         </div>
       )}

@@ -66,7 +66,11 @@ export class CatalogService {
     sku: string;
     name: string;
     category?: string;
+    subcategory?: string;
     price?: number;
+    currency?: string;
+    unit?: string;
+    imageUrl?: string;
     description?: string;
   }) {
     const existing = await this.prisma.product.findFirst({ where: { sku: dto.sku.trim().toUpperCase() } });
@@ -76,7 +80,11 @@ export class CatalogService {
         sku: dto.sku.trim().toUpperCase(),
         name: dto.name.trim(),
         category: dto.category?.trim() || null,
+        subcategory: dto.subcategory?.trim() || null,
         price: dto.price ?? null,
+        currency: dto.currency?.trim() || 'MXN',
+        unit: dto.unit?.trim() || null,
+        imageUrl: dto.imageUrl?.trim() || null,
         description: dto.description?.trim() || null,
         activo: true,
       },

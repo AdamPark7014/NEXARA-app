@@ -83,6 +83,7 @@ export default function FinesPage() {
   const [items, setItems] = useState<Fine[]>([]);
   const [staff, setStaff] = useState<HrStaff[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Fine | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
@@ -92,6 +93,7 @@ export default function FinesPage() {
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
+    setLoadError(null);
     try {
       const [finesData, staffData] = await Promise.all([
         apiFetch("fines", token),
@@ -99,8 +101,9 @@ export default function FinesPage() {
       ]);
       setItems(Array.isArray(finesData) ? finesData : (finesData?.data ?? []));
       setStaff(Array.isArray(staffData) ? staffData : (staffData?.data ?? []));
-    } catch {
-      /* skip */
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "No se pudieron cargar las sanciones");
+      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -177,8 +180,8 @@ export default function FinesPage() {
     try {
       await apiFetch(`fines/${id}`, token, { method: "DELETE" });
       setItems((prev) => prev.filter((f) => f.id !== id));
-    } catch {
-      /* skip */
+    } catch (e) {
+      window.alert("No se pudo eliminar: " + (e instanceof Error ? e.message : "error"));
     }
   };
 
@@ -335,11 +338,16 @@ export default function FinesPage() {
             Mostrando sanción <strong>#{highlightId}</strong> desde enlace directo.
           </p>
         )}
+        {loadError && (
+          <div role="alert" style={{ padding: "10px 14px", marginBottom: 12, background: "var(--state-warning-bg)", border: "1px solid var(--state-warning-border)", borderRadius: 8, fontSize: 12 }}>
+            {loadError} <Button size="sm" variant="ghost" onClick={() => void load()}>Reintentar</Button>
+          </div>
+        )}
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
-        ) : (
+        ) : !loadError ? (
           <DataTable columns={columns} rows={visibleItems} rowKey={(f) => f.id} emptyTitle="Sin sanciones registradas" emptyDescription="Registra una incidencia cuando sea necesario." />
-        )}
+        ) : null}
       </Section>
     </>
   );
