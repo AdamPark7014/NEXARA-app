@@ -27,6 +27,9 @@ interface ApiUser {
   email: string;
   isActive: boolean;
   orgRoleKey?: string | null;
+  roleId?: number;
+  departmentId?: number;
+  managerId?: number | null;
   role?: { id: number; nombre: string; orgRoleKey?: string };
   department?: { id: number; nombre: string };
   manager?: { id: number; nombre: string };
@@ -73,6 +76,29 @@ function Lbl({ text }: { text: string }) {
 
 const emptyForm = { nombre: "", email: "", password: "", roleId: "", departmentId: "", managerId: "" };
 
+function asList<T>(payload: unknown): T[] {
+  if (Array.isArray(payload)) return payload;
+  if (payload && typeof payload === "object" && Array.isArray((payload as { data?: T[] }).data)) {
+    return (payload as { data: T[] }).data;
+  }
+  return [];
+}
+
+function userRoleId(u: ApiUser): string {
+  const id = u.role?.id ?? u.roleId;
+  return id != null ? String(id) : "";
+}
+
+function userDepartmentId(u: ApiUser): string {
+  const id = u.department?.id ?? u.departmentId;
+  return id != null ? String(id) : "";
+}
+
+function userManagerId(u: ApiUser): string {
+  const id = u.manager?.id ?? u.managerId;
+  return id != null ? String(id) : "";
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    PAGE
 ═══════════════════════════════════════════════════════════════════════ */
@@ -95,20 +121,40 @@ export default function UsersPage() {
   const [pwForm,  setPwForm]  = useState({ newPassword: "", confirm: "" });
   const [saving,  setSaving]  = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [metaError, setMetaError] = useState<string | null>(null);
 
   /* ── carga ───────────────────────────────────────────────────────── */
   const load = useCallback(async () => {
     if (!token) return;
-    setLoading(true); setError(null);
+    setLoading(true); setError(null); setMetaError(null);
     try {
-      const [usersData, rolesData, deptsData] = await Promise.all([
+      const [usersResult, rolesResult, deptsResult] = await Promise.allSettled([
         apiFetch("users", token),
-        apiFetch("users/roles", token).catch(() => []),
-        apiFetch("departments", token).catch(() => []),
+        apiFetch("users/roles", token),
+        apiFetch("users/departments", token),
       ]);
-      setUsers(Array.isArray(usersData) ? usersData : (usersData?.data ?? []));
-      setRoles(Array.isArray(rolesData) ? rolesData : []);
-      setDepts(Array.isArray(deptsData) ? deptsData : []);
+
+      if (usersResult.status === "rejected") {
+        throw usersResult.reason;
+      }
+      setUsers(asList<ApiUser>(usersResult.value));
+
+      const metaProblems: string[] = [];
+      if (rolesResult.status === "fulfilled") {
+        setRoles(asList<ApiRole>(rolesResult.value));
+      } else {
+        setRoles([]);
+        metaProblems.push("roles");
+      }
+      if (deptsResult.status === "fulfilled") {
+        setDepts(asList<ApiDept>(deptsResult.value));
+      } else {
+        setDepts([]);
+        metaProblems.push("departamentos");
+      }
+      if (metaProblems.length > 0) {
+        setMetaError(`No se pudieron cargar ${metaProblems.join(" ni ")}. Recarga la página o vuelve a iniciar sesión.`);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error cargando usuarios");
     } finally { setLoading(false); }
@@ -120,7 +166,14 @@ export default function UsersPage() {
   const openCreate = () => { setTarget(null); setForm({ ...emptyForm }); setSaveErr(null); setModal("create"); };
   const openEdit = (u: ApiUser) => {
     setTarget(u);
-    setForm({ nombre: u.nombre, email: u.email, password: "", roleId: String(u.role?.id ?? ""), departmentId: String(u.department?.id ?? ""), managerId: String(u.manager?.id ?? "") });
+    setForm({
+      nombre: u.nombre,
+      email: u.email,
+      password: "",
+      roleId: userRoleId(u),
+      departmentId: userDepartmentId(u),
+      managerId: userManagerId(u),
+    });
     setSaveErr(null); setModal("edit");
   };
   const openPassword = (u: ApiUser) => { setTarget(u); setPwForm({ newPassword: "", confirm: "" }); setSaveErr(null); setModal("password"); };
@@ -273,6 +326,12 @@ export default function UsersPage() {
         <KpiCard label="Nuevos hoy" value={kpis.nuevos} icon="🆕" variant="accent" />
       </div>
 
+      {metaError && (
+        <div style={{ padding: "10px 14px", background: "var(--state-warning-bg)", border: "1px solid var(--state-warning-border)", borderRadius: 10, marginBottom: 16, fontSize: 13, color: "var(--state-warning-text)" }}>
+          ⚠️ {metaError}
+        </div>
+      )}
+
       {error && (
         <div style={{ padding: "10px 14px", background: "var(--state-warning-bg)", border: "1px solid var(--state-warning-border)", borderRadius: 10, marginBottom: 16, fontSize: 13, color: "var(--state-warning-text)" }}>
           ⚠️ {error}
@@ -315,16 +374,16 @@ export default function UsersPage() {
               )}
               <div>
                 <Lbl text="Rol *" />
-                <select value={form.roleId} onChange={e => setForm(f => ({ ...f, roleId: e.target.value }))} style={inp}>
+                <select value={form.roleId} onChange={e => setForm(f => ({ ...f, roleId: e.target.value }))} style={inp} disabled={roles.length === 0}>
                   <option value="">— Seleccionar —</option>
-                  {roles.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+                  {roles.map(r => <option key={r.id} value={String(r.id)}>{r.nombre}</option>)}
                 </select>
               </div>
               <div>
                 <Lbl text="Departamento *" />
-                <select value={form.departmentId} onChange={e => setForm(f => ({ ...f, departmentId: e.target.value }))} style={inp}>
+                <select value={form.departmentId} onChange={e => setForm(f => ({ ...f, departmentId: e.target.value }))} style={inp} disabled={depts.length === 0}>
                   <option value="">— Seleccionar —</option>
-                  {depts.map(d => <option key={d.id} value={d.id}>{d.nombre}</option>)}
+                  {depts.map(d => <option key={d.id} value={String(d.id)}>{d.nombre}</option>)}
                 </select>
               </div>
               <div style={{ gridColumn: "1 / -1" }}>
@@ -332,7 +391,7 @@ export default function UsersPage() {
                 <select value={form.managerId} onChange={e => setForm(f => ({ ...f, managerId: e.target.value }))} style={inp}>
                   <option value="">— Sin manager —</option>
                   {users.filter(u => u.id !== target?.id && u.isActive).map(u => (
-                    <option key={u.id} value={u.id}>{u.nombre} · {u.role?.nombre}</option>
+                    <option key={u.id} value={String(u.id)}>{u.nombre} · {u.role?.nombre}</option>
                   ))}
                 </select>
               </div>

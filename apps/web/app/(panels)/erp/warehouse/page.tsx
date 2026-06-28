@@ -32,6 +32,37 @@ export default function WarehousePage() {
   const [warehouses, setWarehouses] = useState<{ id: number; name: string }[]>([]);
   const [movement, setMovement] = useState({ productId: "", warehouseId: "", quantity: 1, unitCost: "", reference: "" });
   const [savingMovement, setSavingMovement] = useState(false);
+  const [showWarehouseForm, setShowWarehouseForm] = useState(false);
+  const [warehouseForm, setWarehouseForm] = useState({ name: "", code: "", address: "", city: "" });
+  const [savingWarehouse, setSavingWarehouse] = useState(false);
+
+  const loadWarehouses = useCallback(() => {
+    if (!token) return;
+    void listWarehouses(token).then(setWarehouses).catch(() => setWarehouses([]));
+  }, [token]);
+
+  const createWarehouse = async () => {
+    if (!token || !warehouseForm.name.trim()) return;
+    setSavingWarehouse(true);
+    try {
+      const { buildApiUrl } = await import("@/lib/api-base");
+      const res = await fetch(buildApiUrl("warehouse"), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: warehouseForm.name.trim(),
+          code: warehouseForm.code.trim() || warehouseForm.name.trim().toUpperCase().slice(0, 6).replace(/\s/g, "-"),
+          address: warehouseForm.address.trim() || undefined,
+          city: warehouseForm.city.trim() || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+      setShowWarehouseForm(false);
+      setWarehouseForm({ name: "", code: "", address: "", city: "" });
+      void loadWarehouses();
+    } catch (e) { alert(e instanceof Error ? e.message : "Error al crear almacén"); }
+    finally { setSavingWarehouse(false); }
+  };
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -50,11 +81,12 @@ export default function WarehousePage() {
     load();
   }, [load]);
 
+  useEffect(() => { loadWarehouses(); }, [loadWarehouses]);
+
   useEffect(() => {
-    if (!token || !showMovementForm) return;
+    if (!token) return;
     void listCatalogProducts(token).then(setProducts).catch(() => setProducts([]));
-    void listWarehouses(token).then(setWarehouses).catch(() => setWarehouses([]));
-  }, [token, showMovementForm]);
+  }, [token]);
 
   const saveMovement = async () => {
     if (!token || !movement.productId || !movement.warehouseId || movement.quantity <= 0) return;
@@ -169,7 +201,10 @@ export default function WarehousePage() {
         actions={
           <div style={{ display: "flex", gap: 8 }}>
             {cfg.canCreate && (
-              <Button variant="primary" iconLeft="+" onClick={() => setShowMovementForm(true)}>Entrada de stock</Button>
+              <>
+                <Button variant="secondary" iconLeft="+" onClick={() => setShowWarehouseForm(true)}>Nuevo almacén</Button>
+                <Button variant="primary" iconLeft="+" onClick={() => setShowMovementForm(true)}>Entrada de stock</Button>
+              </>
             )}
             <Button variant="ghost" onClick={load}>Actualizar</Button>
           </div>
@@ -181,6 +216,37 @@ export default function WarehousePage() {
         <KpiCard label="Bajo mínimo" value={bajoMinimo} />
         <KpiCard label="Valor inventario" value={`$${(valorTotal / 1000000).toFixed(2)}M`} />
       </div>
+
+      {/* ── Nuevo almacén ── */}
+      {showWarehouseForm && (
+        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20 }}>
+          <p style={{ margin: "0 0 14px", fontWeight: 700, fontSize: 13 }}>Nuevo almacén</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <label style={{ display: "grid", gap: 4, gridColumn: "1 / -1" }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Nombre *</span>
+              <input value={warehouseForm.name} onChange={e => setWarehouseForm(f => ({ ...f, name: e.target.value }))} placeholder="Almacén Central, Bodega Norte…" style={inp} />
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Código (opcional)</span>
+              <input value={warehouseForm.code} onChange={e => setWarehouseForm(f => ({ ...f, code: e.target.value }))} placeholder="ALM-01, BODEGA-N…" style={inp} />
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Ciudad</span>
+              <input value={warehouseForm.city} onChange={e => setWarehouseForm(f => ({ ...f, city: e.target.value }))} placeholder="CDMX, Monterrey…" style={inp} />
+            </label>
+            <label style={{ display: "grid", gap: 4, gridColumn: "1 / -1" }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Dirección</span>
+              <input value={warehouseForm.address} onChange={e => setWarehouseForm(f => ({ ...f, address: e.target.value }))} placeholder="Av. Insurgentes 123…" style={inp} />
+            </label>
+          </div>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14 }}>
+            <Button variant="ghost" onClick={() => setShowWarehouseForm(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={() => void createWarehouse()} disabled={savingWarehouse || !warehouseForm.name.trim()}>
+              {savingWarehouse ? "Creando…" : "Crear almacén"}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {showForm && editing && (
         <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20 }}>
@@ -202,6 +268,7 @@ export default function WarehousePage() {
               <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Producto *</span>
               <select value={movement.productId} onChange={(e) => setMovement((m) => ({ ...m, productId: e.target.value }))} style={inp}>
                 <option value="">Seleccionar…</option>
+                {products.length === 0 && <option disabled>Sin productos — agrégalos en CRM → Productos</option>}
                 {products.map((p) => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
               </select>
             </label>
@@ -209,6 +276,7 @@ export default function WarehousePage() {
               <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Almacén destino *</span>
               <select value={movement.warehouseId} onChange={(e) => setMovement((m) => ({ ...m, warehouseId: e.target.value }))} style={inp}>
                 <option value="">Seleccionar…</option>
+                {warehouses.length === 0 && <option disabled>Sin almacenes — usa "Nuevo almacén" arriba</option>}
                 {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
               </select>
             </label>

@@ -82,7 +82,7 @@ export class RolesController {
 
   @Get()
   @UseGuards(AuthGuard('jwt'), RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.ROLES_MANAGE] })
+  @RBAC({ anyPermissions: [PERMISSIONS.ROLES_MANAGE, PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.HR_MANAGE] })
   async findAll() {
     return this.prisma.role.findMany();
   }

@@ -108,6 +108,35 @@ export class UsersController {
     return this.usersService.findAllVisible(user, query);
   }
 
+  @Get('roles')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.USERS_MANAGE,
+      PERMISSIONS.ROLES_MANAGE,
+      PERMISSIONS.CONSOLE_ADMIN,
+      PERMISSIONS.HR_VIEW,
+      PERMISSIONS.HR_MANAGE,
+    ],
+  })
+  async listRoles() {
+    return this.usersService.listRolesForPicker();
+  }
+
+  @Get('departments')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.USERS_MANAGE,
+      PERMISSIONS.CONSOLE_ADMIN,
+      PERMISSIONS.HR_VIEW,
+      PERMISSIONS.HR_MANAGE,
+    ],
+  })
+  async listDepartments() {
+    return this.usersService.listDepartments();
+  }
+
   @Get('assignable')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: [PERMISSIONS.USERS_MANAGE, PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.ACTIVITIES_MANAGE] })

@@ -34,9 +34,18 @@ async function stockRequest<T>(path: string, token: string, init: RequestInit = 
   return text ? (JSON.parse(text) as T) : (null as T);
 }
 
+// Normalize: some endpoints return plain [] while others return { data: [], total: N }
+function unwrapArray<T>(res: T[] | { data: T[] } | null | undefined): T[] {
+  if (!res) return [];
+  if (Array.isArray(res)) return res;
+  if (Array.isArray((res as { data: T[] }).data)) return (res as { data: T[] }).data;
+  return [];
+}
+
 export async function listStockLevels(token: string, filters?: { belowReorder?: boolean }) {
   const qs = filters?.belowReorder ? "?belowReorder=true" : "";
-  return stockRequest<StockLevelRow[]>(`stock/levels${qs}`, token, {}, "No se pudo cargar el inventario");
+  const raw = await stockRequest<StockLevelRow[] | { data: StockLevelRow[] }>(`stock/levels${qs}`, token, {}, "No se pudo cargar el inventario");
+  return unwrapArray(raw);
 }
 
 export async function updateStockLevelConfig(
@@ -65,11 +74,13 @@ export function mapStockLevelToRow(level: StockLevelRow) {
 }
 
 export async function listWarehouses(token: string) {
-  return stockRequest<Array<{ id: number; name: string; code?: string }>>("warehouse", token, {}, "No se pudieron cargar almacenes");
+  const raw = await stockRequest<Array<{ id: number; name: string; code?: string }> | { data: Array<{ id: number; name: string; code?: string }> }>("warehouse", token, {}, "No se pudieron cargar almacenes");
+  return unwrapArray(raw);
 }
 
 export async function listCatalogProducts(token: string) {
-  return stockRequest<Array<{ id: number; name: string; sku: string }>>("catalog/products?take=200", token, {}, "No se pudieron cargar productos");
+  const raw = await stockRequest<Array<{ id: number; name: string; sku: string }> | { data: Array<{ id: number; name: string; sku: string }> }>("catalog/products?take=200", token, {}, "No se pudieron cargar productos");
+  return unwrapArray(raw);
 }
 
 export async function createStockMovement(
