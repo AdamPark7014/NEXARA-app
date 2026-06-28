@@ -152,8 +152,8 @@ export default function ProcurementPage() {
         const qs = poId ? `?purchaseOrderId=${poId}` : "";
         setReceipts(unwrapList<GoodsReceipt>(await apiFetch(`procurement/goods-receipts${qs}`, token)));
       }
-    } catch {
-      /* skip */
+    } catch (e) {
+      window.alert("Error al cargar: " + (e instanceof Error ? e.message : "error"));
     } finally {
       setLoading(false);
     }
@@ -238,8 +238,8 @@ export default function ProcurementPage() {
     try {
       await apiFetch(`procurement/purchase-orders/${id}/approve`, token, { method: "PATCH" });
       void load();
-    } catch {
-      /* skip */
+    } catch (e) {
+      window.alert("Error al aprobar OC: " + (e instanceof Error ? e.message : "error"));
     }
   };
 
@@ -248,8 +248,8 @@ export default function ProcurementPage() {
     try {
       await apiFetch(`procurement/requisitions/${id}/approve`, token, { method: "PATCH" });
       void load();
-    } catch {
-      /* skip */
+    } catch (e) {
+      window.alert("Error al aprobar requisición: " + (e instanceof Error ? e.message : "error"));
     }
   };
 

@@ -18,6 +18,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
+import { formatApiError } from "@/lib/erp-api";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 
 /* ─── tipos ─────────────────────────────────────────────────────────── */
@@ -227,7 +228,9 @@ export default function UsersPage() {
     try {
       await apiFetch(`users/${u.id}/hr`, token, { method: "PATCH", body: JSON.stringify({ isActive: !u.isActive }) });
       setUsers(prev => prev.map(x => x.id === u.id ? { ...x, isActive: !u.isActive } : x));
-    } catch { /* skip */ }
+    } catch (e) {
+      alert(formatApiError(e, "No se pudo cambiar el estado"));
+    }
   };
 
   const deleteUser = async (u: ApiUser) => {

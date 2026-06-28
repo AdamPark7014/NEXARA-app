@@ -41,6 +41,12 @@ export class DocumentsController {
     return this.svc.getDocument(id);
   }
 
+  @Patch(':id')
+  @RBAC({ permissions: [PERMISSIONS.DOCUMENTS_MANAGE] })
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: any) {
+    return this.svc.updateDocument(id, dto);
+  }
+
   @Post(':id/versions')
   @RBAC({ permissions: [PERMISSIONS.DOCUMENTS_MANAGE] })
   uploadVersion(@Param('id', ParseIntPipe) id: number, @Body() dto: any, @CurrentUser() user: any) {

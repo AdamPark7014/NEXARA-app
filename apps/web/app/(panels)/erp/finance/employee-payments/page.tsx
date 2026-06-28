@@ -45,6 +45,7 @@ export default function EmployeePaymentsPage() {
 
   const [items, setItems] = useState<Payment[]>([]);
   const [users, setUsers] = useState<ApiUserLite[]>([]);
+  const [usersErr, setUsersErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -57,7 +58,7 @@ export default function EmployeePaymentsPage() {
     try {
       const [data, usersData] = await Promise.all([
         apiFetch("employee-payments", token),
-        apiFetch("users", token).catch(() => []),
+        apiFetch("users", token).catch((e) => { setUsersErr(e instanceof Error ? e.message : "No se cargó el catálogo de empleados"); return []; }),
       ]);
       setItems(Array.isArray(data) ? data : (data?.data ?? []));
       setUsers(Array.isArray(usersData) ? usersData : (usersData?.data ?? []));
@@ -127,8 +128,9 @@ export default function EmployeePaymentsPage() {
               <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Empleado</span>
                 <select value={form.userId} onChange={(e) => setForm((f) => ({ ...f, userId: e.target.value }))} style={inp}>
                   <option value="">— Seleccionar —</option>
-                  {users.map((u) => <option key={u.id} value={u.id}>{u.nombre}</option>)}
+                  {users.map((u) => <option key={u.id} value={String(u.id)}>{u.nombre}</option>)}
                 </select></label>
+              {usersErr && <p style={{ fontSize: 12, color: "var(--danger)", margin: 0 }}>{usersErr}</p>}
               <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Periodo desde</span>
                 <input type="date" value={form.periodFrom} onChange={(e) => setForm((f) => ({ ...f, periodFrom: e.target.value }))} style={inp} /></label>
               <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Periodo hasta</span>

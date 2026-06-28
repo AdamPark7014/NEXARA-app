@@ -10,6 +10,7 @@ import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import { formatApiError } from "@/lib/erp-api";
 
 interface JournalEntry {
   id: number;
@@ -45,27 +46,44 @@ export default function AccountingPage() {
 
   const [items, setItems] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
 
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
+    setError(null);
     try {
       const data = await apiFetch("accounting/journal-entries", token);
       setItems(Array.isArray(data) ? data : (data.data ?? []));
-    } catch { /* skip */ } finally { setLoading(false); }
+    } catch (e) {
+      setError(formatApiError(e, "No se pudieron cargar las pólizas"));
+      setItems([]);
+    } finally { setLoading(false); }
   }, [token]);
 
   useEffect(() => { load(); }, [load]);
 
   const save = async () => {
-    if (!token) return;
+    if (!token || !form.description.trim()) {
+      setSaveErr("El concepto es obligatorio.");
+      return;
+    }
+    setSaving(true);
+    setSaveErr(null);
     try {
       const created = await apiFetch("accounting/journal-entries", token, { method: "POST", body: JSON.stringify(form) });
       setItems(prev => [created, ...prev]);
       setShowForm(false);
-    } catch { /* skip */ }
+      setForm({ ...emptyForm });
+    } catch (e) {
+      setSaveErr(formatApiError(e, "No se pudo crear la póliza"));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const postEntry = async (id: number) => {
@@ -73,7 +91,9 @@ export default function AccountingPage() {
     try {
       const updated = await apiFetch(`accounting/journal-entries/${id}/post`, token, { method: "PATCH" });
       setItems(prev => prev.map(e => e.id === id ? { ...e, ...updated } : e));
-    } catch { /* skip */ }
+    } catch (e) {
+      window.alert(formatApiError(e, "No se pudo contabilizar"));
+    }
   };
 
   const reverseEntry = async (id: number) => {
@@ -81,7 +101,9 @@ export default function AccountingPage() {
     try {
       const updated = await apiFetch(`accounting/journal-entries/${id}/reverse`, token, { method: "POST" });
       setItems(prev => prev.map(e => e.id === id ? { ...e, ...updated } : e));
-    } catch { /* skip */ }
+    } catch (e) {
+      window.alert(formatApiError(e, "No se pudo reversar"));
+    }
   };
 
   const ingresos = items.filter(e => e.type === "INGRESOS").reduce((s, e) => s + (e.totalCredit ?? 0), 0);
@@ -163,9 +185,16 @@ export default function AccountingPage() {
             <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Abono ($)</label>
             <input type="number" min={0} value={form.totalCredit} onChange={e => setForm(f => ({ ...f, totalCredit: +e.target.value }))} style={inp} />
           </div>
-          <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <Button variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
-            <Button variant="primary" onClick={save}>Crear póliza</Button>
+          <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end", flexDirection: "column", alignItems: "stretch" }}>
+            {saveErr && (
+              <div role="alert" style={{ padding: "8px 12px", background: "var(--state-danger-bg, #fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>
+                {saveErr}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <Button variant="ghost" onClick={() => { setShowForm(false); setSaveErr(null); }}>Cancelar</Button>
+              <Button variant="primary" onClick={() => void save()} disabled={saving}>{saving ? "Guardando…" : "Crear póliza"}</Button>
+            </div>
           </div>
         </div>
       )}
@@ -176,11 +205,16 @@ export default function AccountingPage() {
             Mostrando póliza <strong>#{highlightId}</strong> desde enlace directo.
           </p>
         )}
+        {error && (
+          <div role="alert" style={{ padding: "10px 14px", marginBottom: 12, background: "var(--state-warning-bg)", border: "1px solid var(--state-warning-border)", borderRadius: 8, fontSize: 12 }}>
+            {error} <Button size="sm" variant="ghost" onClick={() => void load()}>Reintentar</Button>
+          </div>
+        )}
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
-        ) : (
+        ) : !error ? (
           <DataTable columns={columns} rows={visibleItems} rowKey={e => e.id} emptyTitle="Sin pólizas" emptyDescription="Registra la primera póliza contable." />
-        )}
+        ) : null}
       </Section>
     </>
   );

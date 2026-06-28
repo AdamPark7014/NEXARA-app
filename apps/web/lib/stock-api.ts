@@ -85,7 +85,7 @@ export async function listCatalogProducts(token: string) {
 
 export async function createStockMovement(
   token: string,
-  payload: { type: string; productId: number; toWarehouseId: number; quantity: number; unitCost?: number; reference?: string; notes?: string },
+  payload: { type: string; productId: number; fromWarehouseId?: number; toWarehouseId?: number; quantity: number; unitCost?: number; reference?: string; notes?: string },
 ) {
   return stockRequest<unknown>("stock/movements", token, { method: "POST", body: JSON.stringify(payload) }, "No se pudo registrar el movimiento");
 }

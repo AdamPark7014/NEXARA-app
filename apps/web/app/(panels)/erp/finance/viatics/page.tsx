@@ -70,7 +70,12 @@ export default function ViaticosPage() {
     setError(null);
     try {
       const data = await apiFetch("viatics", token);
-      setItems(Array.isArray(data) ? data : (data?.data ?? []));
+      const rows = Array.isArray(data) ? data : (data?.data ?? []);
+      setItems(rows.map((v: Record<string, unknown>) => ({
+        ...v,
+        concepto: (v.motivo as string | undefined) ?? (v.concepto as string | undefined),
+        comprobante: (v.ticketEvidenciaUrl as string | undefined) ?? (v.comprobante as string | undefined),
+      })) as Viatico[]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar viáticos");
     } finally {
@@ -117,11 +122,25 @@ export default function ViaticosPage() {
   };
 
   const submitCreate = async () => {
-    if (!token) return;
+    if (!token || !user?.id || !form.concepto.trim() || !form.montoSolicitado) return;
     setSaving(true);
     try {
-      const created = await apiFetch("viatics", token, { method: "POST", body: JSON.stringify(form) });
-      if (created) setItems((prev) => [created, ...prev]);
+      const created = await apiFetch("viatics", token, {
+        method: "POST",
+        body: JSON.stringify({
+          usuarioId: user.id,
+          motivo: form.concepto.trim(),
+          montoSolicitado: form.montoSolicitado,
+          ticketEvidenciaUrl: form.comprobante.trim() || undefined,
+        }),
+      });
+      if (created) {
+        setItems((prev) => [{
+          ...created,
+          concepto: created.motivo ?? form.concepto,
+          comprobante: created.ticketEvidenciaUrl ?? form.comprobante,
+        }, ...prev]);
+      }
       setMode(null);
     } catch (e) {
       alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
@@ -134,13 +153,9 @@ export default function ViaticosPage() {
     try {
       const updated = await apiFetch(`viatics/${selected.id}`, token, {
         method: "PATCH",
-        body: JSON.stringify({
-          estatus: approveForm.estatus,
-          aprobadoAdmin: approveForm.estatus === "Aprobado",
-          comentariosAdmin: approveForm.comentariosAdmin,
-        }),
+        body: JSON.stringify({ estatus: approveForm.estatus }),
       });
-      setItems((prev) => prev.map((v) => (v.id === selected.id ? { ...v, ...(updated ?? {}) } : v)));
+      setItems((prev) => prev.map((v) => (v.id === selected.id ? { ...v, ...(updated ?? {}), concepto: updated?.motivo ?? v.concepto } : v)));
       setMode(null);
     } catch (e) {
       alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
@@ -148,7 +163,7 @@ export default function ViaticosPage() {
   };
 
   const softDelete = async (v: Viatico) => {
-    if (!token || !confirm(`¿Cancelar viático "${v.concepto}"?`)) return;
+    if (!token || !confirm(`¿Cancelar viático "${v.concepto ?? v.motivo}"?`)) return;
     try {
       await apiFetch(`viatics/${v.id}`, token, { method: "PATCH", body: JSON.stringify({ estatus: "Rechazado" }) });
       setItems((prev) => prev.map((i) => (i.id === v.id ? { ...i, estatus: "Rechazado" } : i)));

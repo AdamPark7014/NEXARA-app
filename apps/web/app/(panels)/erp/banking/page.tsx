@@ -10,6 +10,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import { formatApiError } from "@/lib/erp-api";
 
 interface BankAccount {
   id: number;
@@ -66,8 +67,10 @@ export default function BankingPage() {
   const [txs, setTxs] = useState<BankTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingTx, setLoadingTx] = useState(false);
+  const [txError, setTxError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
   const [saving, setSaving] = useState(false);
   const [showTxForm, setShowTxForm] = useState(false);
@@ -92,23 +95,40 @@ export default function BankingPage() {
   useEffect(() => {
     if (!token || !selected) return;
     setLoadingTx(true);
+    setTxError(null);
     apiFetch(`accounting/banking/accounts/${selected.id}/transactions`, token)
       .then((data) => setTxs(Array.isArray(data) ? data : []))
-      .catch(() => setTxs([]))
+      .catch((e) => {
+        setTxError(formatApiError(e, "No se pudieron cargar los movimientos"));
+        setTxs([]);
+      })
       .finally(() => setLoadingTx(false));
   }, [token, selected]);
 
   const totalBalance = accounts.reduce((s, a) => s + Number(a.currentBalance), 0);
 
-  const createAccount = async () => {
+  const openNewAccount = () => { setEditingAccount(null); setForm({ ...emptyForm }); setShowForm(true); };
+  const openEditAccount = (a: BankAccount) => {
+    setEditingAccount(a);
+    setForm({ name: a.name, bankName: a.bankName, accountNumber: a.accountNumber, clabe: a.clabe ?? "", currentBalance: Number(a.currentBalance) });
+    setShowForm(true);
+  };
+
+  const saveAccount = async () => {
     if (!token || !form.name || !form.bankName || !form.accountNumber) return;
     setSaving(true);
     try {
-      await apiFetch("accounting/banking/accounts", token, { method: "POST", body: JSON.stringify(form) });
-      setShowForm(false); setForm({ ...emptyForm });
+      if (editingAccount) {
+        await apiFetch(`accounting/banking/accounts/${editingAccount.id}`, token, { method: "PATCH", body: JSON.stringify(form) });
+      } else {
+        await apiFetch("accounting/banking/accounts", token, { method: "POST", body: JSON.stringify(form) });
+      }
+      setShowForm(false);
+      setEditingAccount(null);
+      setForm({ ...emptyForm });
       void load();
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      alert(formatApiError(e, "No se pudo guardar la cuenta"));
     } finally { setSaving(false); }
   };
 
@@ -178,7 +198,7 @@ export default function BankingPage() {
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nueva cuenta</Button>}
+            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={openNewAccount}>Nueva cuenta</Button>}
           </>
         }
       />
@@ -196,7 +216,9 @@ export default function BankingPage() {
           <Section title="Cuentas">
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
               {accounts.map((a) => (
-                <button key={a.id} onClick={() => setSelected(a)} style={{
+                <div key={a.id} style={{ position: "relative" }}>
+                <button onClick={() => setSelected(a)} style={{
+                  width: "100%",
                   textAlign: "left", padding: 16, borderRadius: 12, cursor: "pointer",
                   border: `1px solid ${selected?.id === a.id ? "var(--primary)" : "var(--border)"}`,
                   background: selected?.id === a.id ? "color-mix(in srgb, var(--primary) 6%, var(--surface))" : "var(--surface)",
@@ -205,6 +227,10 @@ export default function BankingPage() {
                   <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginBottom: 8 }}>{a.bankName} · {a.clabe ?? a.accountNumber}</div>
                   <div style={{ fontSize: 18, fontWeight: 800 }}><Money value={Number(a.currentBalance)} /></div>
                 </button>
+                {cfg.canCreate && (
+                  <button onClick={() => openEditAccount(a)} title="Editar cuenta" style={{ position: "absolute", top: 8, right: 8, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6, cursor: "pointer", fontSize: 12, padding: "2px 6px" }}>✎</button>
+                )}
+                </div>
               ))}
             </div>
           </Section>
@@ -218,7 +244,9 @@ export default function BankingPage() {
             >
               {loadingTx
                 ? <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
-                : <DataTable columns={txColumns} rows={txs} rowKey={(t) => t.id} emptyTitle="Sin movimientos" emptyDescription="No hay transacciones registradas para esta cuenta." />
+                : txError
+                  ? <EmptyState icon="⚠️" title="Error al cargar movimientos" description={txError} action={<Button size="sm" variant="secondary" onClick={() => setSelected({ ...selected! })}>Reintentar</Button>} />
+                  : <DataTable columns={txColumns} rows={txs} rowKey={(t) => t.id} emptyTitle="Sin movimientos" emptyDescription="No hay transacciones registradas para esta cuenta." />
               }
             </Section>
           )}
@@ -259,7 +287,7 @@ export default function BankingPage() {
       {showForm && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setShowForm(false)}>
           <div style={{ background: "var(--surface)", borderRadius: 16, padding: 28, width: 440, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.24)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Nueva cuenta bancaria</div>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>{editingAccount ? "Editar cuenta bancaria" : "Nueva cuenta bancaria"}</div>
             <div style={{ display: "grid", gap: 14 }}>
               <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Nombre / alias</span>
                 <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Cuenta operativa MXN" style={inp} /></label>
@@ -274,7 +302,7 @@ export default function BankingPage() {
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
               <Button variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
-              <Button variant="primary" onClick={() => void createAccount()} disabled={saving || !form.name || !form.bankName}>{saving ? "Guardando…" : "Crear cuenta"}</Button>
+              <Button variant="primary" onClick={() => void saveAccount()} disabled={saving || !form.name || !form.bankName}>{saving ? "Guardando…" : editingAccount ? "Guardar cambios" : "Crear cuenta"}</Button>
             </div>
           </div>
         </div>

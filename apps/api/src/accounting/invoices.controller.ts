@@ -82,6 +82,13 @@ export class InvoicesController {
     return this.service.getInvoice(+id);
   }
 
+  @Patch(':id')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })
+  updateDraft(@Param('id') id: string, @Body() dto: any) {
+    return this.service.updateInvoiceDraft(+id, dto);
+  }
+
   @Post(':id/payments')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.INVOICING_MANAGE] })

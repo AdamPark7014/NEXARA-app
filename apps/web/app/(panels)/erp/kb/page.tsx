@@ -47,7 +47,10 @@ export default function KbPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<KbArticle | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
+  const [formErr, setFormErr] = useState<string | null>(null);
+  const [loadingEdit, setLoadingEdit] = useState(false);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
 
@@ -74,27 +77,69 @@ export default function KbPage() {
     return articles.filter((a) => a.title.toLowerCase().includes(q) || (a.tags ?? "").toLowerCase().includes(q));
   }, [articles, search]);
 
+  const openNew = () => {
+    setEditing(null);
+    setForm({ ...emptyForm });
+    setFormErr(null);
+    setShowForm(true);
+  };
+
+  const openEdit = async (a: KbArticle) => {
+    setEditing(a);
+    setFormErr(null);
+    setShowForm(true);
+    setForm({
+      title: a.title,
+      content: "",
+      categoryId: a.categoryId != null ? String(a.categoryId) : "",
+      visibility: a.visibility,
+      tags: a.tags ?? "",
+    });
+    setLoadingEdit(true);
+    try {
+      const full = await apiFetch(`kb/articles/${a.id}`, token) as KbArticle & { content?: string };
+      setForm({
+        title: full.title ?? a.title,
+        content: full.content ?? "",
+        categoryId: full.categoryId != null ? String(full.categoryId) : (a.categoryId != null ? String(a.categoryId) : ""),
+        visibility: full.visibility ?? a.visibility,
+        tags: full.tags ?? a.tags ?? "",
+      });
+    } catch (e) {
+      setFormErr(e instanceof Error ? e.message : "No se pudo cargar el artículo");
+    } finally {
+      setLoadingEdit(false);
+    }
+  };
+
   const submit = async () => {
     if (!token || !form.title || !form.content) return;
     setSaving(true);
+    setFormErr(null);
     try {
       const excerpt = form.content.trim().slice(0, 160).replace(/\s+/g, " ");
-      await apiFetch("kb/articles", token, {
-        method: "POST",
-        body: JSON.stringify({
-          title: form.title.trim(),
-          excerpt: excerpt || undefined,
-          content: form.content.trim(),
-          categoryId: form.categoryId ? Number(form.categoryId) : undefined,
-          visibility: form.visibility,
-          tags: form.tags.trim() || undefined,
-          status: "PUBLISHED",
-        }),
-      });
-      setShowForm(false); setForm({ ...emptyForm });
+      const body = {
+        title: form.title.trim(),
+        excerpt: excerpt || undefined,
+        content: form.content.trim(),
+        categoryId: form.categoryId ? Number(form.categoryId) : undefined,
+        visibility: form.visibility,
+        tags: form.tags.trim() || undefined,
+      };
+      if (editing) {
+        await apiFetch(`kb/articles/${editing.id}`, token, { method: "PATCH", body: JSON.stringify(body) });
+      } else {
+        await apiFetch("kb/articles", token, {
+          method: "POST",
+          body: JSON.stringify({ ...body, status: "PUBLISHED" }),
+        });
+      }
+      setShowForm(false);
+      setEditing(null);
+      setForm({ ...emptyForm });
       void load();
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      setFormErr(e instanceof Error ? e.message : "No se pudo guardar");
     } finally { setSaving(false); }
   };
 
@@ -135,6 +180,7 @@ export default function KbPage() {
       key: "acciones" as keyof KbArticle, label: "",
       render: (a: KbArticle) => (
         <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+          <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); void openEdit(a); }}>Editar</Button>
           <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); void togglePublish(a); }}>
             {a.status === "PUBLISHED" ? "Despublicar" : "Publicar"}
           </Button>
@@ -154,7 +200,7 @@ export default function KbPage() {
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nuevo artículo</Button>}
+            {cfg.canCreate && <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo artículo</Button>}
           </>
         }
       />
@@ -197,7 +243,7 @@ export default function KbPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ padding: "18px 20px 12px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
-              <div id="kb-new-title" style={{ fontSize: 15, fontWeight: 700 }}>Nuevo artículo</div>
+              <div id="kb-new-title" style={{ fontSize: 15, fontWeight: 700 }}>{editing ? "Editar artículo" : "Nuevo artículo"}</div>
               <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 4 }}>
                 Procedimiento o guía para el equipo. Se publica de inmediato en la wiki interna.
               </div>
@@ -232,7 +278,7 @@ export default function KbPage() {
                     <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Categoría</span>
                     <select value={form.categoryId} onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))} style={inp}>
                       <option value="">Sin categoría</option>
-                      {cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      {cats.map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
                     </select>
                   </label>
                 )}
@@ -255,6 +301,12 @@ export default function KbPage() {
                   style={inp}
                 />
               </label>
+
+              {formErr && (
+                <div role="alert" style={{ padding: "8px 12px", background: "var(--state-danger-bg, #fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>
+                  {formErr}
+                </div>
+              )}
             </div>
 
             <div style={{
@@ -262,13 +314,13 @@ export default function KbPage() {
               justifyContent: "flex-end", borderTop: "1px solid var(--border)", flexShrink: 0,
               background: "var(--surface)",
             }}>
-              <Button variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
+              <Button variant="secondary" onClick={() => { setShowForm(false); setEditing(null); setFormErr(null); }}>Cancelar</Button>
               <Button
                 variant="primary"
                 onClick={() => void submit()}
-                disabled={saving || !form.title.trim() || !form.content.trim()}
+                disabled={saving || loadingEdit || !form.title.trim() || !form.content.trim()}
               >
-                {saving ? "Guardando…" : "Publicar artículo"}
+                {saving ? "Guardando…" : loadingEdit ? "Cargando…" : editing ? "Guardar cambios" : "Publicar artículo"}
               </Button>
             </div>
           </div>

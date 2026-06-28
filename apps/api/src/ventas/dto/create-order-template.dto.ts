@@ -7,6 +7,9 @@ export class CreateOrderTemplateDto {
   companyName?: string;
   companyEmail?: string;
   companyPhone?: string;
+  companyAddress?: string;
+  companyRfc?: string;
+  companyWebsite?: string;
   footerText?: string;
   footerAlignment?: string;
   primaryColor?: string;

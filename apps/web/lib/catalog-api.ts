@@ -63,7 +63,17 @@ export const getCatalogProduct = async (token: string, id: number) => {
 
 export const createCatalogProduct = async (
   token: string,
-  dto: { sku: string; name: string; category?: string; price?: number; description?: string },
+  dto: {
+    sku: string;
+    name: string;
+    category?: string;
+    subcategory?: string;
+    price?: number;
+    currency?: string;
+    unit?: string;
+    imageUrl?: string;
+    description?: string;
+  },
 ): Promise<CatalogProduct> => {
   const res = await fetch(buildApiUrl("catalog/products"), {
     method: "POST",

@@ -8,6 +8,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
+import { formatApiError } from "@/lib/erp-api";
 import { filterRowsByScope, getErpExpensesSectionConfig } from "@/lib/section-views";
 
 interface Expense {
@@ -69,6 +70,8 @@ export default function ExpensesPage() {
 
   const [items, setItems] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
@@ -76,12 +79,14 @@ export default function ExpensesPage() {
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
+    setError(null);
     try {
       const data = await apiFetch("expenses", token);
       const rows = Array.isArray(data) ? data : (data.data ?? []);
       setItems(rows.map((r: Record<string, unknown>) => mapExpenseRow(r)));
     } catch (e) {
-      console.error(e);
+      setError(formatApiError(e, "No se pudieron cargar los gastos"));
+      setItems([]);
     } finally { setLoading(false); }
   }, [token]);
 
@@ -92,15 +97,24 @@ export default function ExpensesPage() {
     [items, user, cfg.defaultScope],
   );
 
-  const openNew = () => { setEditing(null); setForm({ ...emptyForm }); setShowForm(true); };
-  const openEdit = (e: Expense) => {
+  const openNew = () => { setEditing(null); setForm({ ...emptyForm }); setSaveErr(null); setShowForm(true); };
+  const openEdit = async (e: Expense) => {
     setEditing(e);
-    setForm({ concepto: e.concepto ?? "", monto: e.monto ?? 0, categoria: e.categoria ?? "Servicios", estado: e.estado ?? "BORRADOR", esRecurrente: e.esRecurrente ?? false, fecha: e.fecha?.slice(0, 10) ?? "" });
+    setSaveErr(null);
     setShowForm(true);
+    setForm({ concepto: e.concepto ?? "", monto: e.monto ?? 0, categoria: e.categoria ?? "Servicios", estado: e.estado ?? "BORRADOR", esRecurrente: e.esRecurrente ?? false, fecha: e.fecha?.slice(0, 10) ?? "" });
+    try {
+      const full = await apiFetch(`expenses/${e.id}`, token) as Record<string, unknown>;
+      const mapped = mapExpenseRow(full);
+      setForm({ concepto: mapped.concepto ?? "", monto: mapped.monto ?? 0, categoria: mapped.categoria ?? "Servicios", estado: mapped.estado ?? "BORRADOR", esRecurrente: mapped.esRecurrente ?? false, fecha: mapped.fecha?.slice(0, 10) ?? "" });
+    } catch (err) {
+      setSaveErr(formatApiError(err, "No se pudo cargar el gasto"));
+    }
   };
 
   const save = async () => {
     if (!token || !user?.id || !form.concepto.trim() || !form.monto) return;
+    setSaveErr(null);
     try {
       const payload = { ...form, usuarioId: user.id };
       if (editing) {
@@ -112,7 +126,7 @@ export default function ExpensesPage() {
       }
       setShowForm(false);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "No se pudo guardar el gasto");
+      setSaveErr(formatApiError(e, "No se pudo guardar el gasto"));
     }
   };
 
@@ -121,7 +135,9 @@ export default function ExpensesPage() {
     try {
       await apiFetch(`expenses/${id}`, token, { method: "DELETE" });
       setItems(prev => prev.filter(e => e.id !== id));
-    } catch { /* skip */ }
+    } catch (e) {
+      window.alert("Error al eliminar: " + (e instanceof Error ? e.message : "error"));
+    }
   };
 
   const totalMes = visibleItems.filter(e => e.estado === "PAGADO" || e.estado === "APROBADO").reduce((s, e) => s + (e.monto ?? 0), 0);
@@ -146,7 +162,7 @@ export default function ExpensesPage() {
     { key: "estado", label: "Estado", render: e => <Tag variant={estadoVariant(e.estado)}>{(e.estado ?? "—").replace(/_/g, " ")}</Tag>, width: 160 },
     { key: "id", label: "", render: e => (
       <div style={{ display: "flex", gap: 4 }}>
-        {cfg.canEdit && <button onClick={() => openEdit(e)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>}
+        {cfg.canEdit && <button onClick={() => void openEdit(e)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✎</button>}
         {cfg.canDelete && <button onClick={() => remove(e.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>✕</button>}
       </div>
     ), width: 60 },
@@ -199,17 +215,23 @@ export default function ExpensesPage() {
           </div>
           <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <Button variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
-            <Button variant="primary" onClick={save}>{editing ? "Guardar" : "Crear gasto"}</Button>
+            {saveErr && <div role="alert" style={{ gridColumn: "1 / -1", padding: "8px 12px", background: "var(--state-danger-bg, #fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>{saveErr}</div>}
+            <Button variant="primary" onClick={() => void save()}>{editing ? "Guardar" : "Crear gasto"}</Button>
           </div>
         </div>
       )}
 
       <Section title={loading ? "Cargando…" : `${visibleItems.length} gastos`}>
+        {error && (
+          <div role="alert" style={{ padding: "10px 14px", marginBottom: 12, background: "var(--state-warning-bg)", border: "1px solid var(--state-warning-border)", borderRadius: 8, fontSize: 12 }}>
+            {error} <Button size="sm" variant="ghost" onClick={() => void load()}>Reintentar</Button>
+          </div>
+        )}
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
-        ) : (
+        ) : !error ? (
           <DataTable columns={columns} rows={visibleItems} rowKey={e => e.id} emptyTitle="Sin gastos" emptyDescription="Registra el primer gasto administrativo." />
-        )}
+        ) : null}
       </Section>
     </>
   );

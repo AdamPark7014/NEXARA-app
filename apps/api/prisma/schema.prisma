@@ -1633,6 +1633,9 @@ model OrderTemplate {
   companyName     String?             @db.VarChar(200)
   companyEmail    String?             @db.VarChar(150)
   companyPhone    String?             @db.VarChar(60)
+  companyAddress  String?             @db.VarChar(300)
+  companyRfc      String?             @db.VarChar(20)
+  companyWebsite  String?             @db.VarChar(200)
   footerText      String?             @db.Text
   footerAlignment String              @default("center") @db.VarChar(20)
   primaryColor    String              @default("#0f6ad6") @db.VarChar(20)

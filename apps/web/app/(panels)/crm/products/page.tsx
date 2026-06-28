@@ -13,12 +13,13 @@ import { createCatalogProduct, listCatalogProducts, listCatalogCategories, type 
 
 const MARGIN = 1.35;
 
-const inp: React.CSSProperties = {
-  width: "100%", padding: "7px 9px", border: "1px solid var(--border)",
-  borderRadius: 7, background: "var(--surface)", color: "var(--foreground)", fontSize: 12.5, boxSizing: "border-box",
-};
+const CURRENCIES = ["MXN", "USD", "EUR"];
+const UNITS = ["pza", "kit", "caja", "licencia", "servicio", "m", "m2", "hr", "rollo"];
 
-const emptyForm = { sku: "", name: "", category: "", price: "", description: "" };
+const EMPTY_FORM = {
+  sku: "", name: "", category: "", subcategory: "",
+  price: "", currency: "MXN", unit: "", imageUrl: "", description: "",
+};
 
 function stockTotal(p: CatalogProduct): number {
   return (p.stockLevels ?? []).reduce((s, l) => s + Number(l.quantity ?? 0), 0);
@@ -34,33 +35,27 @@ export default function ProductsPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
-  // ── Create form ────────────────────────────────────────────────────────
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ ...emptyForm });
+  const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     if (!token) return;
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     try {
       const res = await listCatalogProducts(token, { take: 200 });
       setItems(res.data ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar el catálogo");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, [token]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
     if (showForm && token && !categories.length) {
-      listCatalogCategories(token).then(setCategories).catch(() => {/* ok */});
+      listCatalogCategories(token).then(setCategories).catch(() => { /* ok */ });
     }
   }, [showForm, token, categories.length]);
 
@@ -72,61 +67,64 @@ export default function ProductsPage() {
         sku: form.sku.trim(),
         name: form.name.trim(),
         category: form.category.trim() || undefined,
+        subcategory: form.subcategory.trim() || undefined,
         price: form.price ? Number(form.price) : undefined,
+        currency: form.currency || "MXN",
+        unit: form.unit.trim() || undefined,
+        imageUrl: form.imageUrl.trim() || undefined,
         description: form.description.trim() || undefined,
       });
-      setItems(prev => [created, ...prev]);
+      setItems((prev) => [created, ...prev]);
       setShowForm(false);
-      setForm({ ...emptyForm });
+      setForm({ ...EMPTY_FORM });
     } catch (e) {
       window.alert("Error: " + (e instanceof Error ? e.message : "No se pudo crear"));
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return items;
-    return items.filter((p) => (p.name ?? "").toLowerCase().includes(q) || (p.sku ?? "").toLowerCase().includes(q));
+    return items.filter(
+      (p) => (p.name ?? "").toLowerCase().includes(q) || (p.sku ?? "").toLowerCase().includes(q),
+    );
   }, [items, search]);
 
+  const inp: React.CSSProperties = {
+    width: "100%", padding: "8px 10px", border: "1px solid var(--border)",
+    borderRadius: 8, background: "var(--surface-2)", color: "var(--foreground)",
+    fontSize: 13, boxSizing: "border-box",
+  };
+
+  const lbl = (text: string, required?: boolean) => (
+    <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "flex", gap: 3, marginBottom: 4 }}>
+      {text}{required && <span style={{ color: "#ef4444" }}>*</span>}
+    </span>
+  );
+
   const columns: Column<CatalogProduct>[] = [
-    { key: "sku", label: "SKU", render: (p) => <code style={{ fontSize: 11.5 }}>{p.sku ?? "—"}</code>, width: 120 },
+    { key: "sku", label: "SKU", render: (p) => <code style={{ fontSize: 11.5, background: "var(--surface-2)", padding: "2px 6px", borderRadius: 4 }}>{p.sku ?? "—"}</code>, width: 130 },
     {
-      key: "name",
-      label: "Producto",
+      key: "name", label: "Producto",
       render: (p) => (
         <div>
           <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name ?? "—"}</div>
-          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{p.brand?.name ?? p.category ?? "—"}</div>
+          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
+            {[p.brand?.name, p.subcategory].filter(Boolean).join(" · ") || p.category || "—"}
+          </div>
         </div>
       ),
     },
     { key: "category", label: "Categoría", render: (p) => <Tag variant="default">{p.category ?? "—"}</Tag>, width: 120 },
+    { key: "price", label: "Precio costo", align: "right", render: (p) => <Money value={Number(p.price ?? 0)} />, width: 120 },
+    { key: "suggested", label: "P. sugerido", align: "right", render: (p) => <Money value={Number(p.price ?? 0) * MARGIN} />, width: 120 },
     {
-      key: "price",
-      label: "Precio lista",
-      align: "right",
-      render: (p) => <Money value={Number(p.price ?? 0)} />,
-      width: 110,
-    },
-    {
-      key: "suggested",
-      label: "Precio sugerido",
-      align: "right",
-      render: (p) => <Money value={Number(p.price ?? 0) * MARGIN} />,
-      width: 130,
-    },
-    {
-      key: "stock",
-      label: "Stock",
-      align: "center",
+      key: "stock", label: "Stock", align: "center",
       render: (p) => {
-        const stock = stockTotal(p);
-        return <Tag variant={stock === 0 ? "danger" : stock < 5 ? "warning" : "positive"}>{stock}</Tag>;
+        const s = stockTotal(p);
+        return <Tag variant={s === 0 ? "danger" : s < 5 ? "warning" : "positive"}>{s}</Tag>;
       },
-      width: 90,
+      width: 80,
     },
   ];
 
@@ -139,7 +137,7 @@ export default function ProductsPage() {
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
-            {cfg.viewMode !== 'execute' && (
+            {cfg.viewMode !== "execute" && (
               <Link href="/erp/warehouse" style={{ textDecoration: "none" }}>
                 <Button variant="secondary" iconLeft="📦">Ver inventario</Button>
               </Link>
@@ -151,67 +149,149 @@ export default function ProductsPage() {
         }
       />
 
-      {/* ── Formulario: Nuevo producto ─────────────────────────────────── */}
+      {/* ── Modal: Nuevo producto ─────────────────────────────────────────── */}
       {showForm && (
-        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 18 }}>
-          <p style={{ margin: "0 0 14px", fontWeight: 700, fontSize: 13 }}>Nuevo producto en catálogo</p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <div>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>SKU *</label>
-              <input value={form.sku} onChange={e => setForm(f => ({ ...f, sku: e.target.value }))} placeholder="Ej. CAM-DOMO-4K" style={inp} />
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
+          onClick={() => setShowForm(false)}
+        >
+          <div
+            style={{ background: "var(--surface)", borderRadius: 16, padding: "28px 32px", width: 600, maxWidth: "calc(100vw - 32px)", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 24px 56px rgba(0,0,0,0.28)", border: "1px solid var(--border)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ marginBottom: 22 }}>
+              <div style={{ fontSize: 17, fontWeight: 700 }}>Nuevo producto en catálogo</div>
+              <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 4 }}>
+                Completa al menos SKU y nombre. Los demás campos son opcionales.
+              </div>
             </div>
-            <div>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Nombre *</label>
-              <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ej. Cámara domo IP 4K" style={inp} />
+
+            <div style={{ display: "grid", gap: 14 }}>
+
+              {/* ── Sección: Identificación ── */}
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                Identificación
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 12 }}>
+                <label style={{ display: "grid" }}>
+                  {lbl("SKU", true)}
+                  <input value={form.sku}
+                    onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value.toUpperCase() }))}
+                    placeholder="CAM-DOMO-4K" style={{ ...inp, fontFamily: "monospace", textTransform: "uppercase" }}
+                    autoFocus />
+                </label>
+                <label style={{ display: "grid" }}>
+                  {lbl("Nombre del producto", true)}
+                  <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="Cámara domo IP 4K exterior" style={inp} />
+                </label>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <label style={{ display: "grid" }}>
+                  {lbl("Categoría")}
+                  <input list="cat-list" value={form.category}
+                    onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                    placeholder="Ej. CCTV, Redes, Alarmas…" style={inp} />
+                  <datalist id="cat-list">
+                    {categories.map((c) => <option key={c} value={c} />)}
+                  </datalist>
+                </label>
+                <label style={{ display: "grid" }}>
+                  {lbl("Subcategoría")}
+                  <input value={form.subcategory} onChange={(e) => setForm((f) => ({ ...f, subcategory: e.target.value }))}
+                    placeholder="Ej. Domo, PTZ, Bullet…" style={inp} />
+                </label>
+              </div>
+
+              {/* ── Sección: Precio ── */}
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.08em", paddingTop: 4 }}>
+                Precio y unidad
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 130px", gap: 12 }}>
+                <label style={{ display: "grid" }}>
+                  {lbl("Precio de costo")}
+                  <input type="number" min="0" step="0.01" value={form.price}
+                    onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+                    placeholder="0.00" style={inp} />
+                </label>
+                <label style={{ display: "grid" }}>
+                  {lbl("Moneda")}
+                  <select value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))} style={inp}>
+                    {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </label>
+                <label style={{ display: "grid" }}>
+                  {lbl("Unidad")}
+                  <input list="unit-list" value={form.unit}
+                    onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
+                    placeholder="pza" style={inp} />
+                  <datalist id="unit-list">
+                    {UNITS.map((u) => <option key={u} value={u} />)}
+                  </datalist>
+                </label>
+              </div>
+
+              {/* ── Sección: Detalles ── */}
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.08em", paddingTop: 4 }}>
+                Detalles adicionales
+              </div>
+
+              <label style={{ display: "grid" }}>
+                {lbl("URL de imagen")}
+                <input type="url" value={form.imageUrl}
+                  onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value }))}
+                  placeholder="https://…/producto.jpg" style={inp} />
+              </label>
+
+              <label style={{ display: "grid" }}>
+                {lbl("Descripción")}
+                <textarea value={form.description}
+                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                  placeholder="Características técnicas, especificaciones, notas de uso…"
+                  rows={3} style={{ ...inp, resize: "vertical" }} />
+              </label>
+
+              {/* Price preview */}
+              {form.price && Number(form.price) > 0 && (
+                <div style={{ background: "var(--surface-2)", borderRadius: 8, padding: "10px 14px", display: "flex", gap: 24, fontSize: 12.5, color: "var(--text-secondary)" }}>
+                  <span>Costo: <strong style={{ color: "var(--foreground)" }}>${Number(form.price).toLocaleString("es-MX", { minimumFractionDigits: 2 })} {form.currency}</strong></span>
+                  <span>Precio sugerido (×{MARGIN}): <strong style={{ color: "#22c55e" }}>${(Number(form.price) * MARGIN).toLocaleString("es-MX", { minimumFractionDigits: 2 })} {form.currency}</strong></span>
+                </div>
+              )}
             </div>
-            <div>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Categoría</label>
-              <input
-                list="cat-list"
-                value={form.category}
-                onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
-                placeholder="Ej. CCTV"
-                style={inp}
-              />
-              <datalist id="cat-list">
-                {categories.map(c => <option key={c} value={c ?? ""} />)}
-              </datalist>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 26, justifyContent: "flex-end" }}>
+              <Button variant="secondary" onClick={() => { setShowForm(false); setForm({ ...EMPTY_FORM }); }}>Cancelar</Button>
+              <Button variant="primary" onClick={() => void saveProduct()} disabled={saving || !form.sku.trim() || !form.name.trim()}>
+                {saving ? "Creando…" : "Crear producto"}
+              </Button>
             </div>
-            <div>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Precio de costo (MXN)</label>
-              <input type="number" min="0" step="0.01" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0.00" style={inp} />
-            </div>
-            <div style={{ gridColumn: "1 / -1" }}>
-              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Descripción</label>
-              <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Descripción breve del producto" style={inp} />
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14 }}>
-            <Button variant="ghost" onClick={() => { setShowForm(false); setForm({ ...emptyForm }); }}>Cancelar</Button>
-            <Button
-              variant="primary"
-              onClick={() => void saveProduct()}
-              disabled={saving || !form.sku.trim() || !form.name.trim()}
-            >
-              {saving ? "Creando…" : "Crear producto"}
-            </Button>
           </div>
         </div>
       )}
 
+      {/* ── Search ─────────────────────────────────────────────────────────── */}
       <div style={{ marginBottom: 12 }}>
         <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          value={search} onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar por SKU o nombre…"
           style={{ width: "100%", maxWidth: 360, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}
         />
       </div>
 
-      <Section title={loading ? "Cargando…" : `${filtered.length} SKUs`}>
+      <Section title={loading ? "Cargando…" : `${filtered.length} SKU${filtered.length === 1 ? "" : "s"}`}>
         {loading && <EmptyState icon="⏳" title="Cargando catálogo…" description="Consultando productos." />}
-        {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
-        {!loading && !error && <DataTable columns={columns} rows={filtered} rowKey={(p) => p.id} emptyTitle="Catálogo vacío" emptyDescription="Los productos se administran en el módulo de catálogo." />}
+        {!loading && error && (
+          <EmptyState icon="⚠️" title="No se pudo cargar" description={error}
+            action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />
+        )}
+        {!loading && !error && (
+          <DataTable columns={columns} rows={filtered} rowKey={(p) => p.id}
+            emptyTitle="Catálogo vacío" emptyDescription='Agrega el primer producto con "Nuevo producto".' />
+        )}
       </Section>
     </>
   );

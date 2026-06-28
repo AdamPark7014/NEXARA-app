@@ -121,6 +121,14 @@ export default function ApprovalsPage() {
     }
   }, [highlightId, list, loading]);
 
+  const handleRequestInfo = (row: ApprovalRow) => {
+    const msg = window.prompt(`¿Qué información necesitas de ${row.solicita}?`, "");
+    if (msg == null || !msg.trim()) return;
+    window.alert(
+      `Solicitud de información registrada.\n\nContacta a ${row.solicita} (${row.solicitaRol}) con tu pregunta:\n\n"${msg.trim()}"\n\nLa solicitud permanece en tu bandeja hasta que la apruebes o rechaces.`,
+    );
+  };
+
   const handleDecide = async (row: ApprovalRow, decision: "APPROVED" | "REJECTED") => {
     if (!user?.token) {
       window.alert("Tu sesión expiró. Vuelve a iniciar sesión.");
@@ -161,7 +169,11 @@ export default function ApprovalsPage() {
             <Button variant="ghost" iconLeft="🔄" onClick={() => void fetchPending()} disabled={loading}>
               Actualizar
             </Button>
-            <Button variant="secondary" iconLeft="🛠️">
+            <Button
+              variant="secondary"
+              iconLeft="🛠️"
+              onClick={() => window.alert("La configuración visual de flujos de aprobación estará disponible próximamente. Los flujos actuales se definen por tipo de entidad y nivel jerárquico.")}
+            >
               Definir flujos
             </Button>
           </>
@@ -318,7 +330,7 @@ export default function ApprovalsPage() {
                     <Button variant="primary" iconLeft="✓" onClick={() => void handleDecide(a, "APPROVED")} disabled={decidingId === a.approvalId}>
                       {decidingId === a.approvalId ? "Aprobando…" : "Aprobar"}
                     </Button>
-                    <Button variant="secondary" iconLeft="💬">Pedir más info</Button>
+                    <Button variant="secondary" iconLeft="💬" onClick={() => handleRequestInfo(a)}>Pedir más info</Button>
                     <Button variant="ghost" iconLeft="✕" onClick={() => void handleDecide(a, "REJECTED")} disabled={decidingId === a.approvalId} style={{ color: "var(--danger)" }}>
                       Rechazar
                     </Button>
