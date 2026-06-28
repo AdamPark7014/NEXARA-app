@@ -421,6 +421,14 @@ export class AuthService {
       set.add(PERMISSIONS.DOCUMENTS_APPROVE);
     }
 
+    // ── Gobierno ERP (usuarios y roles) ─────────────────────────────
+    const V2_GOV_ROLES = new Set(['ceo', 'dir_admin', 'coord_admin']);
+    if (V2_GOV_ROLES.has(roleKey)) {
+      set.add(PERMISSIONS.USERS_MANAGE);
+      set.add(PERMISSIONS.USERS_REVIEW);
+      set.add(PERMISSIONS.ROLES_MANAGE);
+    }
+
     // ── Gobierno ERP (empresas del grupo) ───────────────────────────
     const V2_COMPANY_GOV_ROLES = new Set(['ceo', 'dir_admin', 'coord_admin', 'administrativo']);
     if (V2_COMPANY_GOV_ROLES.has(roleKey)) {

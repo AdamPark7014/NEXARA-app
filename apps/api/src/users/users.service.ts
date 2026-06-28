@@ -156,7 +156,11 @@ export class UsersService {
       NOT: { email: { in: this.superAdminEmails } },
     };
     // Incluye campos RRHH (puesto, tipoContrato, estadoRRHH, isActive, fechaIngreso)
-    const include = { role: true, department: true };
+    const include = {
+      role: true,
+      department: true,
+      manager: { select: { id: true, nombre: true } },
+    };
 
     let where: any;
     if (currentUser.isSuperAdmin) {
@@ -430,6 +434,20 @@ export class UsersService {
     return this.prisma['user'].findMany({
       where: { departmentId },
       include: { role: true, department: true },
+    });
+  }
+
+  listRolesForPicker() {
+    return this.prisma['role'].findMany({
+      select: { id: true, nombre: true, orgRoleKey: true, nivelAutoridad: true },
+      orderBy: [{ nivelAutoridad: 'desc' }, { nombre: 'asc' }],
+    });
+  }
+
+  listDepartments() {
+    return this.prisma['department'].findMany({
+      select: { id: true, nombre: true },
+      orderBy: { nombre: 'asc' },
     });
   }
 

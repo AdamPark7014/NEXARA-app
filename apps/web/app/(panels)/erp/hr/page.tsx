@@ -83,8 +83,8 @@ export default function HrPage() {
     try {
       const [data, rolesData, deptsData] = await Promise.all([
         apiFetch("users/hr-staff?limit=50", user.token),
-        apiFetch("users/roles", user.token).catch(() => []),
-        apiFetch("departments", user.token).catch(() => []),
+        apiFetch("users/roles", user.token),
+        apiFetch("users/departments", user.token),
       ]);
       const items: HrEmpleado[] = Array.isArray(data) ? data : (data?.data ?? []);
       setState({ kind: "ready", items });
@@ -479,14 +479,14 @@ export default function HrPage() {
                 <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Rol / nivel de acceso</span>
                 <select value={createForm.roleId} onChange={(e) => setCreateForm((f) => ({ ...f, roleId: e.target.value }))} style={inp}>
                   <option value="">— Seleccionar —</option>
-                  {roles.map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+                  {roles.map((r) => <option key={r.id} value={String(r.id)}>{r.nombre}</option>)}
                 </select>
               </label>
               <label style={{ display: "grid", gap: 4 }}>
                 <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Departamento</span>
                 <select value={createForm.departmentId} onChange={(e) => setCreateForm((f) => ({ ...f, departmentId: e.target.value }))} style={inp}>
                   <option value="">— Seleccionar —</option>
-                  {depts.map((d) => <option key={d.id} value={d.id}>{d.nombre}</option>)}
+                  {depts.map((d) => <option key={d.id} value={String(d.id)}>{d.nombre}</option>)}
                 </select>
               </label>
               <label style={{ display: "grid", gap: 4 }}>
