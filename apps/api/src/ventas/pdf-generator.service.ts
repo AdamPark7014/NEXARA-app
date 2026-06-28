@@ -3,13 +3,20 @@ import PDFDocument from 'pdfkit';
 import { PrismaService } from '../prisma/prisma.service.js';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+function resolveNexaraLogoPath(): string | null {
+  const candidates = [
+    path.join(process.cwd(), 'dist/assets/logo-nexara.png'),
+    path.join(process.cwd(), 'src/assets/logo-nexara.png'),
+    path.resolve(__dirname, '../assets/logo-nexara.png'),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
 
 // ─── Brand constants ──────────────────────────────────────────────────────────
-const NEXARA_LOGO  = path.join(__dirname, '../assets/logo-nexara.png');
 const BRAND_DARK   = '#0a1f3d';
 const BRAND_LIGHT  = '#e8f0fb';
 const BRAND_WHITE  = '#ffffff';
@@ -233,8 +240,9 @@ export class PdfGeneratorService {
       // Logo
       let logoW = 0;
       try {
-        if (fs.existsSync(NEXARA_LOGO)) {
-          doc.image(NEXARA_LOGO, M, 14, { height: 56, fit: [160, 56] });
+        const logoPath = resolveNexaraLogoPath();
+        if (logoPath) {
+          doc.image(logoPath, M, 14, { height: 56, fit: [160, 56] });
           logoW = 170;
         }
       } catch { /* silent */ }
