@@ -15,10 +15,12 @@ import { buildApiUrl } from "@/lib/api-base";
 interface Viatico {
   id: number;
   concepto?: string;
+  motivo?: string;
   montoSolicitado?: number;
   estatus?: string;
   fechaSolicitud?: string;
   comprobante?: string;
+  ticketEvidenciaUrl?: string;
   usuario?: { id: number; nombre: string; email?: string };
   actividad?: { id: number; titulo?: string; folio?: string } | null;
   aprobadoCoordinador?: boolean;
