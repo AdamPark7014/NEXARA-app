@@ -8,6 +8,38 @@ import { getActivitiesSectionConfig } from '@/lib/section-views';
 import ExcelDownloadModal from './ExcelDownloadModal';
 import { openExternalUrl } from '@/lib/open-external-url';
 
+const EMPTY_ACTIVITY_FORM = {
+  titulo: '',
+  descripcion: '',
+  indicaciones: '',
+  prioridad: 'Media',
+  responsableId: '',
+  tiempoEstimadoMin: '',
+  tiempoMaximoMin: '',
+  fechaInicio: '',
+  fechaMaxima: '',
+  fechaEntregaEsperada: '',
+  activityType: 'CLIENT' as 'CLIENT' | 'INTERNAL',
+  clientId: '',
+  projectId: '',
+  ticketType: 'PREVENTIVO',
+  ticketTypeCustom: '',
+  workType: 'ISSUE',
+  branchName: '',
+  branchNumber: '',
+  branchCity: '',
+  branchState: '',
+  branchAddress: '',
+};
+
+function toDatetimeLocalValue(iso?: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 const humanizeEvidenceKey = (value: string) =>
   value
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
@@ -97,7 +129,11 @@ const ActivitiesTable: React.FC = () => {
     fechaInicio?: string;
     fechaMaxima?: string;
     fechaEntregaEsperada?: string;
-    responsable?: { nombre: string };
+    responsable?: { id?: number; nombre: string };
+    responsableId?: number;
+    activityType?: 'CLIENT' | 'INTERNAL';
+    clientId?: number | null;
+    projectId?: number | null;
     activityEvidence?: {
       id: number;
       status: string;
@@ -227,6 +263,9 @@ const ActivitiesTable: React.FC = () => {
     };
   }, [excelUrl]);
 
+  const [listError, setListError] = useState<string | null>(null);
+  const [editingActivityId, setEditingActivityId] = useState<number | null>(null);
+
   const fetchActivities = () => {
     if (!user?.token) return;
     setLoading(true);
@@ -234,11 +273,17 @@ const ActivitiesTable: React.FC = () => {
       headers: { Authorization: `Bearer ${user.token}` },
     })
       .then((res) => {
-        if (!res.ok) throw new Error('No autorizado');
+        if (!res.ok) throw new Error('No se pudieron cargar las actividades');
         return res.json();
       })
-      .then((data) => setActivities(Array.isArray(data) ? data : []))
-      .catch(() => setActivities([]))
+      .then((data) => {
+        setActivities(Array.isArray(data) ? data : []);
+        setListError(null);
+      })
+      .catch((err) => {
+        setActivities([]);
+        setListError(err instanceof Error ? err.message : 'Error al cargar actividades');
+      })
       .finally(() => setLoading(false));
   };
 
@@ -251,29 +296,83 @@ const ActivitiesTable: React.FC = () => {
   const [nextAnLoaded, setNextAnLoaded] = useState(false);
   const [showOtroModal, setShowOtroModal] = useState(false);
   const [otroModalInput, setOtroModalInput] = useState('');
-  const [newActivity, setNewActivity] = useState({
-    titulo: '',
-    descripcion: '',
-    indicaciones: '',
-    prioridad: 'Media',
-    responsableId: '',
-    tiempoEstimadoMin: '',
-    tiempoMaximoMin: '',
-    fechaInicio: '',
-    fechaMaxima: '',
-    fechaEntregaEsperada: '',
-    activityType: 'CLIENT' as 'CLIENT' | 'INTERNAL',
-    clientId: '',
-    projectId: '',
-    ticketType: 'PREVENTIVO',
-    ticketTypeCustom: '',
-    workType: 'ISSUE',
-    branchName: '',
-    branchNumber: '',
-    branchCity: '',
-    branchState: '',
-    branchAddress: '',
-  });
+  const [newActivity, setNewActivity] = useState({ ...EMPTY_ACTIVITY_FORM });
+
+  const resetActivityForm = () => {
+    setNewActivity({ ...EMPTY_ACTIVITY_FORM });
+    setEditingActivityId(null);
+    setPendingRequestId(null);
+    setFormError(null);
+    setFormSuccess(null);
+  };
+
+  const populateFormFromRecord = (record: Activity & Record<string, unknown>) => {
+    const activityType = record.activityType === 'INTERNAL' ? 'INTERNAL' : 'CLIENT';
+    setNewActivity({
+      titulo: record.titulo ?? '',
+      descripcion: record.descripcion ?? '',
+      indicaciones: record.indicaciones ?? '',
+      prioridad: record.prioridad ?? 'Media',
+      responsableId: record.responsableId ? String(record.responsableId) : '',
+      tiempoEstimadoMin: record.tiempoEstimadoMin != null ? String(record.tiempoEstimadoMin) : '',
+      tiempoMaximoMin: record.tiempoMaximoMin != null ? String(record.tiempoMaximoMin) : '',
+      fechaInicio: toDatetimeLocalValue(record.fechaInicio),
+      fechaMaxima: toDatetimeLocalValue(record.fechaMaxima),
+      fechaEntregaEsperada: toDatetimeLocalValue(record.fechaEntregaEsperada),
+      activityType,
+      clientId: record.clientId ? String(record.clientId) : record.client?.id ? String(record.client.id) : '',
+      projectId: record.projectId ? String(record.projectId) : '',
+      ticketType: record.ticketType ?? 'PREVENTIVO',
+      ticketTypeCustom: record.ticketTypeCustom ?? '',
+      workType: record.workType ?? 'ISSUE',
+      branchName: record.branchName ?? '',
+      branchNumber: record.branchNumber ?? '',
+      branchCity: record.branchCity ?? '',
+      branchState: record.branchState ?? '',
+      branchAddress: record.branchAddress ?? '',
+    });
+  };
+
+  const openEditActivity = async (activity: Activity) => {
+    if (!user?.token) return;
+    setFormError(null);
+    setFormSuccess(null);
+    try {
+      const res = await fetch(buildApiUrl(`activities/${activity.id}`), {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      if (!res.ok) throw new Error('No se pudo cargar la actividad para editar');
+      const full = await res.json();
+      populateFormFromRecord(full);
+      setEditingActivityId(activity.id);
+      setFormSuccess(`Editando OT ${activity.anNumber || activity.id}`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Error al abrir edición');
+    }
+  };
+
+  const handleDeleteActivity = async (id: number) => {
+    if (!user?.token || !canDeleteActivities) return;
+    if (!window.confirm('¿Eliminar esta actividad? Esta acción no se puede deshacer.')) return;
+    setFormError(null);
+    try {
+      const res = await fetch(buildApiUrl(`activities/${id}`), {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Error al eliminar actividad');
+      }
+      if (editingActivityId === id) resetActivityForm();
+      setFormSuccess('Actividad eliminada');
+      fetchActivities();
+      fetchNextAn();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Error al eliminar actividad');
+    }
+  };
 
   const fetchAssignableUsers = () => {
     if (!user?.token || !canAssignActivities) return;
@@ -551,12 +650,11 @@ const ActivitiesTable: React.FC = () => {
       return;
     }
 
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       titulo: newActivity.titulo,
       descripcion: newActivity.descripcion || undefined,
       indicaciones: newActivity.indicaciones || undefined,
       prioridad: newActivity.prioridad,
-      estatus: 'Pendiente',
       activityType: newActivity.activityType,
       ticketType: newActivity.ticketType === 'INVENTARIO' ? 'PREVENTIVO' : newActivity.ticketType,
       ticketTypeCustom: newActivity.ticketType === 'OTRO' ? (newActivity.ticketTypeCustom || undefined) : undefined,
@@ -568,7 +666,6 @@ const ActivitiesTable: React.FC = () => {
       branchCity: newActivity.branchCity || undefined,
       branchState: newActivity.branchState || undefined,
       branchAddress: newActivity.branchAddress || undefined,
-      creadoPorId: user.id,
       responsableId: Number(newActivity.responsableId),
       tiempoEstimadoMin: newActivity.tiempoEstimadoMin ? Number(newActivity.tiempoEstimadoMin) : undefined,
       tiempoMaximoMin: newActivity.tiempoMaximoMin ? Number(newActivity.tiempoMaximoMin) : undefined,
@@ -577,8 +674,14 @@ const ActivitiesTable: React.FC = () => {
       fechaEntregaEsperada: newActivity.fechaEntregaEsperada ? new Date(newActivity.fechaEntregaEsperada).toISOString() : undefined,
     };
 
-    const res = await fetch(buildApiUrl('activities'), {
-      method: 'POST',
+    const isEditing = editingActivityId != null;
+    if (!isEditing) {
+      payload.estatus = 'Pendiente';
+      payload.creadoPorId = user.id;
+    }
+
+    const res = await fetch(buildApiUrl(isEditing ? `activities/${editingActivityId}` : 'activities'), {
+      method: isEditing ? 'PATCH' : 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${user.token}`,
@@ -588,11 +691,11 @@ const ActivitiesTable: React.FC = () => {
 
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setFormError(data.message || 'Error al asignar actividad');
+      setFormError(data.message || (isEditing ? 'Error al actualizar actividad' : 'Error al asignar actividad'));
       return;
     }
 
-    if (pendingRequestId && data?.id) {
+    if (!isEditing && pendingRequestId && data?.id) {
       await fetch(buildApiUrl(`client-ticket-requests/${pendingRequestId}/assign`), {
         method: 'PATCH',
         headers: {
@@ -605,30 +708,8 @@ const ActivitiesTable: React.FC = () => {
       fetchTicketRequests();
     }
 
-    setFormSuccess('Actividad asignada');
-    setNewActivity({
-      titulo: '',
-      descripcion: '',
-      indicaciones: '',
-      prioridad: 'Media',
-      responsableId: '',
-      tiempoEstimadoMin: '',
-      tiempoMaximoMin: '',
-      fechaInicio: '',
-      fechaMaxima: '',
-      fechaEntregaEsperada: '',
-      activityType: 'CLIENT',
-      clientId: '',
-      projectId: '',
-      ticketType: 'PREVENTIVO',
-      ticketTypeCustom: '',
-      workType: 'ISSUE',
-      branchName: '',
-      branchNumber: '',
-      branchCity: '',
-      branchState: '',
-      branchAddress: '',
-    });
+    setFormSuccess(isEditing ? 'Actividad actualizada' : 'Actividad asignada');
+    resetActivityForm();
     fetchActivities();
     fetchNextAn();
   };
@@ -825,7 +906,12 @@ const ActivitiesTable: React.FC = () => {
               <input className="input" placeholder="Indicaciones" value={newActivity.indicaciones} onChange={(e) => setNewActivity({ ...newActivity, indicaciones: e.target.value })} />
             </div>
             <div className="activities-form-footer">
-              <button className="button-primary" onClick={handleAssign}>Asignar</button>
+              {editingActivityId && (
+                <button type="button" className="button-secondary" onClick={resetActivityForm}>Cancelar edición</button>
+              )}
+              <button className="button-primary" onClick={handleAssign}>
+                {editingActivityId ? 'Guardar cambios' : 'Asignar'}
+              </button>
               {formError && <span className="activities-feedback-error">{formError}</span>}
               {formSuccess && <span className="activities-feedback-success">{formSuccess}</span>}
             </div>
@@ -834,6 +920,12 @@ const ActivitiesTable: React.FC = () => {
         )}
 
         <div className="activities-toolbar">
+          {listError && (
+            <div className="activities-feedback-error" style={{ marginBottom: 8 }}>
+              {listError}{' '}
+              <button type="button" className="activities-link-sm" onClick={fetchActivities}>Reintentar</button>
+            </div>
+          )}
           <div className="activities-toolbar-meta">
             <span className="activities-top-chip">Total visibles: {filtered.length}</span>
           </div>
@@ -1034,8 +1126,10 @@ const ActivitiesTable: React.FC = () => {
                       {canEditActivities && (
                         <td>
                           <div className="activities-row-actions">
-                            <button className="button-secondary">Editar</button>
-                            {canDeleteActivities && <button className="button-primary">Borrar</button>}
+                            <button type="button" className="button-secondary" onClick={() => void openEditActivity(a)}>Editar</button>
+                            {canDeleteActivities && (
+                              <button type="button" className="button-primary" onClick={() => void handleDeleteActivity(a.id)}>Borrar</button>
+                            )}
                           </div>
                         </td>
                       )}
@@ -1175,9 +1269,9 @@ const ActivitiesTable: React.FC = () => {
 
                     {canEditActivities && (
                       <div className="activities-mobile-actions">
-                        <button className="button-secondary activities-mobile-action-btn">Editar</button>
+                        <button type="button" className="button-secondary activities-mobile-action-btn" onClick={() => void openEditActivity(a)}>Editar</button>
                         {canDeleteActivities && (
-                          <button className="button-primary activities-mobile-action-btn">Borrar</button>
+                          <button type="button" className="button-primary activities-mobile-action-btn" onClick={() => void handleDeleteActivity(a.id)}>Borrar</button>
                         )}
                       </div>
                     )}

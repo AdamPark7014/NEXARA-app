@@ -12,6 +12,7 @@ import { useUser } from "@/components/UserContext";
 import { getActivitiesSectionConfig } from "@/lib/section-views";
 import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 import { buildApiUrl } from "@/lib/api-base";
+import { activityStatusVariant, isActivityCompleted, isActivityInProgress } from "@/lib/activity-status";
 
 interface ActivityRow {
   id: number;
@@ -111,9 +112,9 @@ export default function MyActivitiesPage() {
   }, [items, rangeTab]);
 
   const counts = {
-    completadas: filtered.filter((a) => a.estatus === "Finalizado").length,
-    enCurso: filtered.filter((a) => a.estatus === "En Proceso").length,
-    pendientes: filtered.filter((a) => a.estatus !== "Finalizado" && a.estatus !== "En Proceso").length,
+    completadas: filtered.filter((a) => isActivityCompleted(a.estatus)).length,
+    enCurso: filtered.filter((a) => isActivityInProgress(a.estatus)).length,
+    pendientes: filtered.filter((a) => !isActivityCompleted(a.estatus) && !isActivityInProgress(a.estatus)).length,
   };
 
   const updateStatus = async (a: ActivityRow, estatus: string) => {
@@ -129,7 +130,7 @@ export default function MyActivitiesPage() {
     }
   };
 
-  const estadoVariant = (e: string): "positive" | "warning" | "default" => e === "Finalizado" ? "positive" : e === "En Proceso" ? "warning" : "default";
+  const estadoVariant = activityStatusVariant;
 
   return (
     <>
@@ -200,8 +201,8 @@ export default function MyActivitiesPage() {
             <article key={a.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, padding: 18, display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 16, alignItems: "center" }}>
               <div style={{
                 width: 64, height: 64, borderRadius: 14,
-                background: a.estatus === "Finalizado" ? "color-mix(in srgb, var(--success) 14%, transparent)" : a.estatus === "En Proceso" ? "color-mix(in srgb, var(--warning) 14%, transparent)" : "var(--surface-2)",
-                color: a.estatus === "Finalizado" ? "var(--success)" : a.estatus === "En Proceso" ? "var(--warning)" : "var(--text-secondary)",
+                background: isActivityCompleted(a.estatus) ? "color-mix(in srgb, var(--success) 14%, transparent)" : isActivityInProgress(a.estatus) ? "color-mix(in srgb, var(--warning) 14%, transparent)" : "var(--surface-2)",
+                color: isActivityCompleted(a.estatus) ? "var(--success)" : isActivityInProgress(a.estatus) ? "var(--warning)" : "var(--text-secondary)",
                 display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "var(--nx-font-display)", fontWeight: 700,
               }}>
                 <div style={{ fontSize: 11, opacity: 0.8 }}>OT</div>
@@ -228,10 +229,10 @@ export default function MyActivitiesPage() {
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {a.estatus !== "En Proceso" && a.estatus !== "Finalizado" && (
+                {!isActivityInProgress(a.estatus) && !isActivityCompleted(a.estatus) && (
                   <Button variant="primary" iconLeft="▶" onClick={() => void updateStatus(a, "En Proceso")}>Iniciar</Button>
                 )}
-                {a.estatus === "En Proceso" && (
+                {isActivityInProgress(a.estatus) && (
                   <Button variant="primary" iconLeft="✓" onClick={() => void updateStatus(a, "Finalizado")}>Finalizar</Button>
                 )}
                 <Link href={`/ops/activities/${a.id}`} style={{ textDecoration: "none" }}>

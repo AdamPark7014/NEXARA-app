@@ -174,7 +174,7 @@ export default function VehiclesPage() {
     try {
       await apiFetch(`vehicles/inventory/${id}`, token, { method: "PATCH", body: JSON.stringify({ activo: false }) });
       setItems(prev => prev.filter(v => v.id !== id));
-    } catch { /* skip */ }
+    } catch (e) { alert(e instanceof Error ? e.message : "Error al eliminar vehículo"); }
   };
 
   const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface)", color: "var(--foreground)", fontSize: 13, boxSizing: "border-box" };
