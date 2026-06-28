@@ -131,13 +131,18 @@ function MyGpsView({ token }: { token: string }) {
   const [loadingTraj, setLoadingTraj] = useState(false);
   const [attendanceOpen, setAttendanceOpen] = useState(false);
   const [toggling, setToggling] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const loadState = useCallback(async () => {
     if (!token) return;
     try {
       const d = await apiFetch<MyGpsState>("gps/me", token);
       setState({ consent: Boolean(d?.consent), location: d?.location ?? null });
-    } catch { /* skip */ }
+      setLoadError(null);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "No se pudo cargar el estado GPS");
+    }
   }, [token]);
 
   const loadTrajectory = useCallback(async () => {
@@ -147,8 +152,9 @@ function MyGpsView({ token }: { token: string }) {
       const today = new Date().toLocaleDateString("sv-SE");
       const pts = await apiFetch<TrajectoryPoint[]>(`gps/trajectory?date=${today}`, token);
       setTrajectory(Array.isArray(pts) ? pts : []);
-    } catch { setTrajectory([]); }
-    finally { setLoadingTraj(false); }
+    } catch {
+      setTrajectory([]);
+    } finally { setLoadingTraj(false); }
   }, [token]);
 
   const loadAttendance = useCallback(async () => {
@@ -156,7 +162,9 @@ function MyGpsView({ token }: { token: string }) {
     try {
       const d = await apiFetch<{ isOpen?: boolean }>("attendance/current", token);
       setAttendanceOpen(Boolean(d?.isOpen));
-    } catch { /* skip */ }
+    } catch {
+      setAttendanceOpen(false);
+    }
   }, [token]);
 
   useEffect(() => {
@@ -184,19 +192,22 @@ function MyGpsView({ token }: { token: string }) {
   const toggleConsent = async () => {
     if (!token) return;
     setToggling(true);
+    setActionError(null);
     try {
       const next = !state.consent;
-      await fetch(buildApiUrl("gps/consent"), {
+      const res = await fetch(buildApiUrl("gps/consent"), {
         method: "PATCH",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ enabled: next }),
       });
+      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
       setState(prev => ({ ...prev, consent: next }));
       window.dispatchEvent(new CustomEvent("gps:consent", { detail: { enabled: next } }));
       void loadState();
       void loadTrajectory();
-    } catch { /* skip */ }
-    finally { setToggling(false); }
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "No se pudo actualizar el consentimiento GPS");
+    } finally { setToggling(false); }
   };
 
   const isSharing = state.consent && attendanceOpen;
@@ -210,6 +221,16 @@ function MyGpsView({ token }: { token: string }) {
 
   return (
     <>
+      {(loadError || actionError) && (
+        <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13 }}>
+          {actionError ?? loadError}
+          {loadError && (
+            <button type="button" onClick={() => void loadState()} style={{ marginLeft: 10, background: "none", border: "none", color: "inherit", cursor: "pointer", textDecoration: "underline" }}>
+              Reintentar
+            </button>
+          )}
+        </div>
+      )}
       <div style={{
         background: "var(--surface)",
         border: `1.5px solid ${isSharing ? "#3b82f6" : "var(--border)"}`,

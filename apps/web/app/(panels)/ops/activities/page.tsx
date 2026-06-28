@@ -60,16 +60,20 @@ export default function ActivitiesPage() {
   );
   const [evids, setEvids] = useState<Evidence[]>([]);
   const [evLoading, setEvLoading] = useState(false);
+  const [evError, setEvError] = useState<string | null>(null);
 
   const canToggleScope = cfg.viewMode === "manage_execute";
 
   const loadEvidences = useCallback(async () => {
     if (!token) return;
     setEvLoading(true);
+    setEvError(null);
     try {
       const data = await apiFetch("evidences?limit=80", token);
       setEvids(Array.isArray(data) ? data : (data.data ?? []));
-    } catch { /* skip */ } finally { setEvLoading(false); }
+    } catch (e) {
+      setEvError(e instanceof Error ? e.message : "Error al cargar evidencias");
+    } finally { setEvLoading(false); }
   }, [token]);
 
   useEffect(() => {
@@ -108,7 +112,9 @@ export default function ActivitiesPage() {
     try {
       await apiFetch(`evidences/${id}`, token, { method: "DELETE" });
       setEvids(prev => prev.filter(e => e.id !== id));
-    } catch { /* skip */ }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Error al eliminar evidencia");
+    }
   };
 
   const evColumns: Column<Evidence>[] = [
@@ -224,6 +230,11 @@ export default function ActivitiesPage() {
         <Section title={evLoading ? "Cargando…" : `${visibleEvids.length} evidencias${showOnlyMine && canToggleScope ? " (tuyas)" : ""}`}>
           {evLoading ? (
             <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
+          ) : evError ? (
+            <div style={{ padding: 24, textAlign: "center" }}>
+              <p style={{ color: "var(--danger)", marginBottom: 12 }}>{evError}</p>
+              <Button size="sm" variant="secondary" onClick={() => void loadEvidences()}>Reintentar</Button>
+            </div>
           ) : (
             <DataTable columns={evColumns} rows={visibleEvids} rowKey={(e) => e.id} emptyTitle="Sin evidencias" emptyDescription={showOnlyMine ? "No tienes evidencias registradas." : "Sin evidencias aún."} />
           )}

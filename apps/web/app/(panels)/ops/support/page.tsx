@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -115,18 +116,30 @@ export default function SupportInboxPage() {
     {
       key: "acciones" as keyof TicketRequest, label: "",
       render: (t) => (
-        cfg.canApprove ? (
-          <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
-            {t.status === "NEW" && (
-              <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); void patchStatus(t, "ASSIGNED"); }}>Asignar</Button>
-            )}
-            {(t.status === "NEW" || t.status === "ASSIGNED") && (
-              <Button size="sm" variant="primary" onClick={(e) => { e.stopPropagation(); void patchStatus(t, "CLOSED"); }}>Cerrar</Button>
-            )}
-          </div>
-        ) : null
+        <div style={{ display: "flex", gap: 4, justifyContent: "flex-end", flexWrap: "wrap" }}>
+          {t.activityId && (
+            <Link href={`/ops/activities/${t.activityId}`} style={{ textDecoration: "none" }}>
+              <Button size="sm" variant="ghost">Ver OT</Button>
+            </Link>
+          )}
+          {cfg.canApprove ? (
+            <>
+              {t.status === "NEW" && (
+                <>
+                  <Link href="/ops/activities" style={{ textDecoration: "none" }}>
+                    <Button size="sm" variant="primary">Crear OT</Button>
+                  </Link>
+                  <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); void patchStatus(t, "ASSIGNED"); }}>Marcar asignado</Button>
+                </>
+              )}
+              {(t.status === "NEW" || t.status === "ASSIGNED") && (
+                <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); void patchStatus(t, "CLOSED"); }}>Cerrar</Button>
+              )}
+            </>
+          ) : null}
+        </div>
       ),
-      width: 160,
+      width: 220,
     },
   ], [cfg.canApprove]);
 

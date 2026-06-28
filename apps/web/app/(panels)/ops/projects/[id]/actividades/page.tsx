@@ -32,12 +32,19 @@ export default function OpsProjectActivitiesPage() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ titulo: "", descripcion: "", responsableId: "", branchName: "" });
 
+  const [engineerError, setEngineerError] = useState<string | null>(null);
+
   const loadEngineers = useCallback(async () => {
     if (!token) return;
+    setEngineerError(null);
     try {
       const res = await fetch(buildApiUrl("users/assignable"), { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) setEngineers(await res.json());
-    } catch { /* skip */ }
+      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+      setEngineers(await res.json());
+    } catch (e) {
+      setEngineers([]);
+      setEngineerError(e instanceof Error ? e.message : "No se pudieron cargar ingenieros");
+    }
   }, [token]);
 
   useEffect(() => { if (showForm) void loadEngineers(); }, [showForm, loadEngineers]);
@@ -51,7 +58,7 @@ export default function OpsProjectActivitiesPage() {
     if (!token || !form.titulo.trim() || !form.responsableId) return;
     setSaving(true);
     try {
-      const res = await fetch(buildApiUrl(`ops/projects/${id}/activities`), {
+      const res = await fetch(buildApiUrl(`operational-projects/${id}/activities`), {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -94,6 +101,14 @@ export default function OpsProjectActivitiesPage() {
           }}
         >
           <div style={{ fontWeight: 700, fontSize: 14 }}>Nueva orden de trabajo</div>
+          {engineerError && (
+            <p style={{ margin: 0, color: "var(--danger)", fontSize: 13 }}>
+              {engineerError}{" "}
+              <button type="button" onClick={() => void loadEngineers()} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", textDecoration: "underline" }}>
+                Reintentar
+              </button>
+            </p>
+          )}
           <label style={{ fontSize: 13 }}>
             Titulo *
             <input

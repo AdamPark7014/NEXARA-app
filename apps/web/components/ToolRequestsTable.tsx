@@ -1,5 +1,7 @@
 "use client";
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
+import { formatApiError } from "@/lib/erp-api";
+import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { isPanelDrawerViewport } from "@/lib/panel-drawer-breakpoint";
 import React, { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
@@ -30,9 +32,12 @@ interface ToolRequest {
 
 const ToolRequestsTable: React.FC = () => {
   const { user } = useUser();
+  const canManage = hasPermission(user, PERMISSIONS.TOOLS_MANAGE);
   const [tools, setTools] = useState<ToolRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState("");
   const [isMobile, setIsMobile] = useState(false);
 
@@ -84,6 +89,73 @@ const ToolRequestsTable: React.FC = () => {
     };
   }, [user?.token]);
 
+  const runAction = async (id: number, path: string, init: RequestInit = {}) => {
+    if (!user?.token || !canManage) return;
+    setBusyId(id);
+    setActionError(null);
+    try {
+      const res = await fetch(buildApiUrl(path), {
+        ...init,
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+          "Content-Type": "application/json",
+          ...(init.headers as Record<string, string> | undefined),
+        },
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(text || `HTTP ${res.status}`);
+      }
+      await fetchTools();
+    } catch (err) {
+      setActionError(formatApiError(err, "No se pudo completar la acción"));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const approveRequest = (id: number) => void runAction(id, `tool-requests/${id}/approve`, { method: "POST" });
+
+  const rejectRequest = (id: number) => {
+    const adminNotes = window.prompt("Motivo del rechazo (obligatorio):");
+    if (!adminNotes?.trim()) return;
+    void runAction(id, `tool-requests/${id}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ adminNotes: adminNotes.trim() }),
+    });
+  };
+
+  const deliverRequest = (id: number) => void runAction(id, `tool-requests/${id}/deliver`, { method: "POST" });
+
+  const returnRequest = (id: number) => {
+    const damageDescription = window.prompt("Descripción de daño (opcional, dejar vacío si está en buen estado):") ?? "";
+    void runAction(id, `tool-requests/${id}/return`, {
+      method: "POST",
+      body: JSON.stringify({ damageDescription: damageDescription.trim() || undefined }),
+    });
+  };
+
+  const renderActions = (tool: ToolRequest) => {
+    if (!canManage) return null;
+    const busy = busyId === tool.id;
+    return (
+      <div className={styles.actions}>
+        {tool.status === "PENDING" && (
+          <>
+            <button type="button" className={styles.actionBtn} disabled={busy} onClick={() => approveRequest(tool.id)}>Aprobar</button>
+            <button type="button" className={`${styles.actionBtn} ${styles.actionDanger}`} disabled={busy} onClick={() => rejectRequest(tool.id)}>Rechazar</button>
+          </>
+        )}
+        {tool.status === "APPROVED" && (
+          <button type="button" className={styles.actionBtn} disabled={busy} onClick={() => deliverRequest(tool.id)}>Entregar</button>
+        )}
+        {tool.status === "IN_USE" && (
+          <button type="button" className={styles.actionBtn} disabled={busy} onClick={() => returnRequest(tool.id)}>Registrar devolución</button>
+        )}
+      </div>
+    );
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'PENDING':
@@ -133,6 +205,7 @@ const ToolRequestsTable: React.FC = () => {
         <h3 className={styles.title}>Solicitudes de Herramientas</h3>
         
         {error && <div className={styles.error}>{error}</div>}
+        {actionError && <div className={styles.error}>{actionError}</div>}
 
         <div className={styles.filterRow}>
           <select
@@ -185,6 +258,9 @@ const ToolRequestsTable: React.FC = () => {
                       <th className={styles.th}>
                         Aprobado Por
                       </th>
+                      {canManage && (
+                        <th className={styles.th}>Acciones</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -229,6 +305,9 @@ const ToolRequestsTable: React.FC = () => {
                         <td className={`${styles.td} ${styles.metaText}`}>
                           {tool.approvedBy?.nombre || '—'}
                         </td>
+                        {canManage && (
+                          <td className={styles.td}>{renderActions(tool)}</td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -293,6 +372,7 @@ const ToolRequestsTable: React.FC = () => {
                         </div>
                       )}
                     </div>
+                    {renderActions(tool)}
                   </div>
                 ))}
               </div>
