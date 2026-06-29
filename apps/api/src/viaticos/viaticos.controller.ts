@@ -12,6 +12,7 @@ import {
   UseGuards,
   UseInterceptors,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
@@ -45,12 +46,15 @@ export class ViaticosController {
 
   @Post()
   @UseGuards(RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.VIATICS_MANAGE] })
+  @RBAC({ anyPermissions: [PERMISSIONS.VIATICS_MANAGE, PERMISSIONS.VIATICS_CREATE] })
   @UseInterceptors(FileInterceptor('ticketEvidencia', { dest: getUploadSubdir(__dirname, 'viatics') }))
   create(@CurrentUser() user: any, @Body() body: any, @UploadedFile() file?: any) {
     const ticketEvidenciaUrl = file
       ? `/uploads/viatics/${file.filename}`
       : body.ticketEvidenciaUrl ?? body.comprobante ?? null;
+    if (!ticketEvidenciaUrl) {
+      throw new BadRequestException('Debes adjuntar el ticket o comprobante');
+    }
     return this.viaticosService.create({
       usuarioId: body.usuarioId ? Number(body.usuarioId) : user.id,
       actividadId: body.actividadId ? Number(body.actividadId) : null,
@@ -112,6 +116,25 @@ export class ViaticosController {
   @RBAC({ permissions: [PERMISSIONS.VIATICS_VIEW] })
   findOne(@Param('id') id: string) {
     return this.viaticosService.findOne(+id);
+  }
+
+  @Patch(':id/approve')
+  @UseGuards(RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.VIATICS_MANAGE, PERMISSIONS.CONSOLE_ADMIN] })
+  approve(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body: { action?: 'approve' | 'reject'; note?: string },
+  ) {
+    const action = body.action === 'reject' ? 'reject' : 'approve';
+    return this.viaticosService.approveOrReject(+id, user, action, body.note);
+  }
+
+  @Patch(':id/pagado')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.VIATICS_MANAGE] })
+  markPagado(@Param('id') id: string) {
+    return this.viaticosService.markPagado(+id);
   }
 
   @Patch(':id')

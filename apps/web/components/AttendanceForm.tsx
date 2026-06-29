@@ -1,5 +1,5 @@
 "use client";
-import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
+import { buildApiUrl, getSocketBaseUrl, parseResponseJson } from "@/lib/api-base";
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useUser } from './UserContext';
@@ -339,7 +339,11 @@ const AttendanceForm = () => {
       ]);
 
       if (dayRes.ok) {
-        const day = await dayRes.json();
+        const day = await parseResponseJson<{
+          totalMinutes?: number;
+          isOpen?: boolean;
+          lastEntryAt?: string | null;
+        }>(dayRes);
         if (!day) {
           setTotalMinutes(0);
           setStartTime(null);
@@ -355,7 +359,7 @@ const AttendanceForm = () => {
       }
 
       if (historyRes.ok) {
-        const list = await historyRes.json();
+        const list = await parseResponseJson<{ type: string; timestamp: string }[]>(historyRes);
         if (Array.isArray(list)) setHistory(list);
       }
     } catch {
@@ -408,7 +412,8 @@ const AttendanceForm = () => {
           headers: { Authorization: `Bearer ${user.token}` },
         });
         if (!res.ok) return;
-        const data = await res.json();
+        const data = await parseResponseJson<{ totalMinutes?: number; days?: typeof rangeDays }>(res);
+        if (!data) return;
         setRangeTotalMinutes(data.totalMinutes || 0);
         if (Array.isArray(data.days)) setRangeDays(data.days);
       } catch {

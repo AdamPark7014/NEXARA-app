@@ -150,6 +150,7 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
         avatarUrl: data.user.avatarUrl || "",
         permissions: data.user.permissions || [],
         isSuperAdmin: data.user.isSuperAdmin || false,
+        isPlatformOwner: data.user.isPlatformOwner || false,
         loginDevice: data.loginDevice || data.user.loginDevice,
       };
 

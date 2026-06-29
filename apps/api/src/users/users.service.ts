@@ -250,6 +250,29 @@ export class UsersService {
     throw new BadRequestException('Departamento inválido');
   }
 
+  private async resolveManagerId(
+    value: unknown,
+    tx: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<number | null> {
+    if (value === null) return null;
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed) {
+        const parsed = Number(trimmed);
+        if (Number.isFinite(parsed) && parsed > 0) return parsed;
+      }
+    } else if (value !== undefined) {
+      return null;
+    }
+
+    const ceo = await tx.user.findFirst({
+      where: { email: { equals: 'gerencia@nexara.com.mx', mode: 'insensitive' } },
+      select: { id: true },
+    });
+    return ceo?.id ?? null;
+  }
+
   async create(createUserDto: CreateUserDto) {
     await this.clearEmployeeNumberForProtectedUsers();
 
@@ -285,6 +308,7 @@ export class UsersService {
             departmentId,
             avatarUrl: createUserDto.avatarUrl,
             passwordHash: hash,
+            managerId: await this.resolveManagerId(createUserDto.managerId, tx),
           },
         });
 
@@ -603,6 +627,9 @@ export class UsersService {
     }
     if (data.departmentId !== undefined) {
       data.departmentId = await this.resolveDepartmentId(data.departmentId);
+    }
+    if (data.managerId !== undefined) {
+      data.managerId = await this.resolveManagerId(data.managerId);
     }
     if (isProtectedUser) {
       data.employeeNumber = null;

@@ -110,6 +110,20 @@ export class FinesController {
     return stats;
   }
 
+  @Patch(':id/approve')
+  @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.ACTIVITIES_MANAGE] })
+  async approve(
+    @Param('id') id: string,
+    @Body() body: { action?: 'approve' | 'reject'; note?: string },
+    @CurrentUser() user: any,
+  ) {
+    if (!this.isOpsManager(user)) {
+      throw new ForbiddenException('No autorizado');
+    }
+    const action = body.action === 'reject' ? 'reject' : 'approve';
+    return this.finesService.approveOrReject(parseInt(id, 10), user, action, body.note);
+  }
+
   @Patch(':id')
   @RBAC({ anyPermissions: [PERMISSIONS.CONSOLE_ADMIN, PERMISSIONS.ACTIVITIES_MANAGE] })
   async update(

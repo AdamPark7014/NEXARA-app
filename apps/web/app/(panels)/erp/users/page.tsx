@@ -40,9 +40,16 @@ interface ApiUser {
 }
 
 interface ApiRole { id: number; nombre: string; orgRoleKey?: string }
+interface OrgRoleTemplate {
+  orgRoleKey: string;
+  nombre: string;
+  label: string;
+  description?: string;
+  flags?: Record<string, boolean>;
+}
 interface ApiDept { id: number; nombre: string }
 
-type ModalMode = "create" | "edit" | "password" | null;
+type ModalMode = "create" | "edit" | "password" | "role" | null;
 
 /* ─── API helper ─────────────────────────────────────────────────────── */
 async function apiFetch(path: string, token: string, opts?: RequestInit) {
@@ -125,6 +132,8 @@ export default function UsersPage() {
   const [saving,  setSaving]  = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [metaError, setMetaError] = useState<string | null>(null);
+  const [roleTemplates, setRoleTemplates] = useState<OrgRoleTemplate[]>([]);
+  const [roleForm, setRoleForm] = useState({ nombre: "", templateKey: "" });
 
   /* ── carga ───────────────────────────────────────────────────────── */
   const load = useCallback(async () => {
@@ -166,7 +175,21 @@ export default function UsersPage() {
   useEffect(() => { load(); }, [load]);
 
   /* ── modales ─────────────────────────────────────────────────────── */
-  const openCreate = () => { setTarget(null); setForm({ ...emptyForm }); setSaveErr(null); setModal("create"); };
+  const resolveDefaultManagerId = useCallback(() => {
+    const ceo = users.find((u) =>
+      u.email?.toLowerCase() === "gerencia@nexara.com.mx" ||
+      u.orgRoleKey === "ceo" ||
+      u.role?.orgRoleKey === "ceo",
+    );
+    return ceo ? String(ceo.id) : "";
+  }, [users]);
+
+  const openCreate = () => {
+    setTarget(null);
+    setForm({ ...emptyForm, managerId: resolveDefaultManagerId() });
+    setSaveErr(null);
+    setModal("create");
+  };
   const openEdit = (u: ApiUser) => {
     setTarget(u);
     setForm({
@@ -180,6 +203,18 @@ export default function UsersPage() {
     setSaveErr(null); setModal("edit");
   };
   const openPassword = (u: ApiUser) => { setTarget(u); setPwForm({ newPassword: "", confirm: "" }); setSaveErr(null); setModal("password"); };
+  const openRoleCreate = async () => {
+    setSaveErr(null);
+    setRoleForm({ nombre: "", templateKey: "" });
+    setModal("role");
+    if (!token || roleTemplates.length) return;
+    try {
+      const data = await apiFetch("roles/org-templates", token);
+      setRoleTemplates(asList<OrgRoleTemplate>(data));
+    } catch {
+      setRoleTemplates([]);
+    }
+  };
   const closeModal = () => { setModal(null); setTarget(null); setSaveErr(null); };
 
   /* ── guardar ─────────────────────────────────────────────────────── */
@@ -222,6 +257,25 @@ export default function UsersPage() {
       closeModal();
     } catch (e) {
       setSaveErr(e instanceof Error ? e.message : "Error");
+    } finally { setSaving(false); }
+  };
+
+  const saveRole = async () => {
+    if (!roleForm.nombre.trim()) { setSaveErr("Nombre del rol requerido."); return; }
+    setSaving(true); setSaveErr(null);
+    try {
+      const template = roleTemplates.find((t) => t.orgRoleKey === roleForm.templateKey);
+      const body: Record<string, unknown> = {
+        nombre: roleForm.nombre.trim(),
+        ...(template?.flags ?? {}),
+        ...(template?.orgRoleKey ? { orgRoleKey: template.orgRoleKey } : {}),
+      };
+      const created = await apiFetch("roles", token, { method: "POST", body: JSON.stringify(body) });
+      setRoles((prev) => [...prev, created as ApiRole]);
+      closeModal();
+      void load();
+    } catch (e) {
+      setSaveErr(e instanceof Error ? e.message : "Error al crear rol");
     } finally { setSaving(false); }
   };
 
@@ -323,7 +377,12 @@ export default function UsersPage() {
         eyebrow="ERP · RRHH"
         title="Gestión de usuarios"
         subtitle="Administración de cuentas, roles, departamentos y contraseñas del equipo NEXARA."
-        actions={cfg.canAssign ? <Button variant="primary" iconLeft="+" onClick={openCreate}>Nuevo usuario</Button> : undefined}
+        actions={cfg.canAssign ? (
+          <div style={{ display: "flex", gap: 8 }}>
+            <Button variant="secondary" iconLeft="🏷" onClick={() => void openRoleCreate()}>Nuevo rol</Button>
+            <Button variant="primary" iconLeft="+" onClick={openCreate}>Nuevo usuario</Button>
+          </div>
+        ) : undefined}
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 24 }}>
@@ -401,12 +460,47 @@ export default function UsersPage() {
                     <option key={u.id} value={String(u.id)}>{u.nombre} · {u.role?.nombre}</option>
                   ))}
                 </select>
+                {modal === "create" && !form.managerId && (
+                  <p style={{ margin: "6px 0 0", fontSize: 11.5, color: "var(--text-tertiary)" }}>
+                    Si no eliges manager, se asignará al CEO por defecto.
+                  </p>
+                )}
               </div>
             </div>
             {saveErr && <div style={{ marginTop: 12, padding: "8px 12px", background: "var(--state-danger-bg)", borderRadius: 8, fontSize: 12.5, color: "var(--state-danger-text)" }}>{saveErr}</div>}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 22 }}>
               <Button variant="ghost" onClick={closeModal}>Cancelar</Button>
               <Button variant="primary" onClick={saveUser} disabled={saving}>{saving ? "Guardando…" : modal === "create" ? "Crear usuario" : "Guardar cambios"}</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modal === "role" && (
+        <div style={overlay} onClick={e => { if (e.target === e.currentTarget) closeModal(); }}>
+          <div style={box}>
+            <h2 style={{ margin: "0 0 20px", fontSize: 18, fontFamily: "var(--nx-font-display)", fontWeight: 700 }}>
+              🏷 Nuevo rol
+            </h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <Lbl text="Nombre del rol *" />
+                <input value={roleForm.nombre} onChange={e => setRoleForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Ej. Encargado de almacén" style={inp} />
+              </div>
+              <div>
+                <Lbl text="Plantilla base (opcional)" />
+                <select value={roleForm.templateKey} onChange={e => setRoleForm(f => ({ ...f, templateKey: e.target.value }))} style={inp}>
+                  <option value="">— Sin plantilla —</option>
+                  {roleTemplates.map((t) => (
+                    <option key={t.orgRoleKey} value={t.orgRoleKey}>{t.label || t.nombre}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {saveErr && <div style={{ marginTop: 12, padding: "8px 12px", background: "var(--state-danger-bg)", borderRadius: 8, fontSize: 12.5, color: "var(--state-danger-text)" }}>{saveErr}</div>}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 22 }}>
+              <Button variant="ghost" onClick={closeModal}>Cancelar</Button>
+              <Button variant="primary" onClick={() => void saveRole()} disabled={saving}>{saving ? "Guardando…" : "Crear rol"}</Button>
             </div>
           </div>
         </div>

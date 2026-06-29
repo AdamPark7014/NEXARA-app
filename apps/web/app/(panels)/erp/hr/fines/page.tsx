@@ -27,6 +27,7 @@ interface Fine {
   descripcion?: string;
   monto?: number;
   estatusPago?: string;
+  estatusAprobacion?: string;
   fechaCreacion?: string;
   usuario?: { id?: number; nombre?: string; email?: string };
 }
@@ -36,6 +37,7 @@ const MOTIVOS = [
   { key: "TARDANZA", tipo: "asistencia", razon: "TARDANZA", label: "Tardanza" },
   { key: "FALTA_INJUSTIFICADA", tipo: "asistencia", razon: "FALTA_INJUSTIFICADA", label: "Falta injustificada" },
   { key: "DANO_VEHICULO", tipo: "vehiculo", razon: "DANO_VEHICULO", label: "Daño a vehículo" },
+  { key: "USO_VEHICULO_INDEBIDO", tipo: "vehiculo", razon: "USO_VEHICULO_INDEBIDO", label: "Uso indebido de vehículo" },
   { key: "HERRAMIENTA_PERDIDA", tipo: "herramienta", razon: "HERRAMIENTA_PERDIDA", label: "Herramienta perdida" },
   { key: "COMPORTAMIENTO", tipo: "actividad", razon: "COMPORTAMIENTO", label: "Comportamiento" },
   { key: "OTRO", tipo: "actividad", razon: "OTRO", label: "Otro" },
@@ -200,6 +202,16 @@ export default function FinesPage() {
     boxSizing: "border-box",
   };
 
+  const approveFine = async (id: number, action: "approve" | "reject") => {
+    if (!token) return;
+    try {
+      await apiFetch(`fines/${id}/approve`, token, { method: "PATCH", body: JSON.stringify({ action }) });
+      void load();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Error al autorizar multa");
+    }
+  };
+
   const visibleItems = useMemo(() => {
     if (!highlightId) return items;
     const id = Number(highlightId);
@@ -231,6 +243,16 @@ export default function FinesPage() {
     { key: "descripcion", label: "Descripción", render: (f) => <span style={{ fontSize: 13 }}>{f.descripcion ?? f.razon ?? "—"}</span> },
     { key: "monto", label: "Monto", render: (f) => <Money value={Number(f.monto ?? 0)} />, width: 100 },
     {
+      key: "estatusAprobacion",
+      label: "Autorización",
+      render: (f) => (
+        <Tag variant={f.estatusAprobacion === "Aprobado" ? "positive" : f.estatusAprobacion === "Rechazado" ? "danger" : "warning"}>
+          {f.estatusAprobacion ?? "Pendiente"}
+        </Tag>
+      ),
+      width: 120,
+    },
+    {
       key: "estatusPago",
       label: "Estado",
       render: (f) => (
@@ -249,6 +271,16 @@ export default function FinesPage() {
             <button onClick={() => openEdit(f)} title="Editar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>
               ✎
             </button>
+          )}
+          {cfg.canApprove && f.estatusAprobacion === "Pendiente" && (
+            <>
+              <button onClick={() => void approveFine(f.id, "approve")} title="Autorizar" style={{ background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer", fontSize: 11 }}>
+                ✓
+              </button>
+              <button onClick={() => void approveFine(f.id, "reject")} title="Rechazar" style={{ background: "var(--danger)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer", fontSize: 11 }}>
+                ✕
+              </button>
+            </>
           )}
           {cfg.canApprove && (
             <button onClick={() => void remove(f.id)} title="Eliminar" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "var(--text-tertiary)", padding: "4px 6px" }}>

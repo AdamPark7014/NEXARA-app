@@ -111,6 +111,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/erp/finance/**',
     '/erp/procurement',
     '/erp/warehouse',
+    '/erp/warehouse/**',
     '/erp/users',
     '/erp/exports',
     '/erp/notifications-center',
@@ -121,8 +122,12 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/crm/clients/**',
     '/crm/opportunities/**',
     '/crm/quotes/**',
+    '/crm/products',
+    '/crm/products/**',
     '/crm/projects/**',
     '/crm/pipeline',
+    '/ops/tools',
+    '/ops/tools/**',
     ...SELF_ATTENDANCE_PATHS,
   ],
 
@@ -166,6 +171,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
   [ROLES.ING_SOPORTE]: [
     '/ops/my-activities',
     '/ops/my-activities/**',
+    '/ops/activities/**',
     '/ops/my-viatics',
     '/ops/my-viatics/**',
     '/ops/my-vehicles',

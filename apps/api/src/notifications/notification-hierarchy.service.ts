@@ -566,6 +566,53 @@ export class NotificationHierarchyService {
   }
 
   /**
+   * Aviso de vencimiento de uso de vehículo (ingeniero + aprobadores).
+   */
+  async notifyVehicleExpiring(
+    userId: number,
+    vehicleRequestId: number,
+    requesterName: string,
+    vehicleName: string,
+    fechaFin?: Date | null,
+  ) {
+    try {
+      const finLabel = fechaFin
+        ? fechaFin.toLocaleString('es-MX', { timeZone: 'America/Mexico_City', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+        : 'pronto';
+      const message = `${requesterName}: el uso de "${vehicleName}" vence ${finLabel}. Solicita renovación si lo necesitas.`;
+
+      await this.notificationsService.createNotification({
+        userId,
+        type: 'VEHICLE_USAGE_EXPIRING',
+        category: 'vehicles',
+        title: '⏰ Vehículo por vencer',
+        message,
+        relatedEntityId: vehicleRequestId,
+        entityType: 'VehicleControl',
+        relatedUrl: `/ops/my-vehicles?highlight=${vehicleRequestId}`,
+        priority: 'high',
+      });
+
+      const supervisors = await this.getSupervisors(userId);
+      for (const supervisor of supervisors) {
+        await this.notificationsService.createNotification({
+          userId: supervisor.id,
+          type: 'VEHICLE_USAGE_EXPIRING',
+          category: 'vehicles',
+          title: '⏰ Vehículo por vencer',
+          message,
+          relatedEntityId: vehicleRequestId,
+          entityType: 'VehicleControl',
+          relatedUrl: `/ops/vehicles?highlight=${vehicleRequestId}`,
+          priority: 'high',
+        });
+      }
+    } catch (error) {
+      this.logger.error(`Error notifying vehicle expiring:`, error);
+    }
+  }
+
+  /**
    * Notificar solicitud de vehículo
    */
   async notifyVehicleRequested(

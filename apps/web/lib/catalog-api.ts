@@ -64,7 +64,7 @@ export const getCatalogProduct = async (token: string, id: number) => {
 export const createCatalogProduct = async (
   token: string,
   dto: {
-    sku: string;
+    sku?: string;
     name: string;
     category?: string;
     subcategory?: string;

@@ -11,6 +11,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { filterRowsByScope, getErpViaticsAdminSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import { approveViatico, markViaticoPagado } from "@/lib/viatics-api";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface Viatico {
@@ -26,7 +27,8 @@ interface Viatico {
   actividad?: { id: number; titulo?: string; folio?: string } | null;
   aprobadoCoordinador?: boolean;
   aprobadoAdmin?: boolean;
-  comentariosAdmin?: string;
+  contabilidadRef?: string;
+  approvalStep?: number;
 }
 
 const ESTATUS = ["Pendiente", "Aprobado_Coordinador", "Aprobado", "Rechazado", "Pagado"];
@@ -66,6 +68,7 @@ export default function ViaticosPage() {
   const [form, setForm] = useState({ ...emptyForm });
   const [approveForm, setApproveForm] = useState({ estatus: "Aprobado", comentariosAdmin: "" });
   const [saving, setSaving] = useState(false);
+  const [tab, setTab] = useState<"todos" | "contabilidad">("contabilidad");
   const [filter, setFilter] = useState("");
 
   const load = useCallback(async () => {
@@ -95,7 +98,9 @@ export default function ViaticosPage() {
   );
 
   const filtered = useMemo(() => {
-    let rows = visibleItems;
+    let rows = tab === "contabilidad"
+      ? visibleItems.filter((v) => v.estatus === "Aprobado" || v.estatus === "Pagado")
+      : visibleItems;
     if (highlightId) {
       const id = Number(highlightId);
       if (!Number.isNaN(id)) rows = [...rows].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
@@ -107,12 +112,14 @@ export default function ViaticosPage() {
         (v.concepto ?? "").toLowerCase().includes(q) ||
         (v.usuario?.nombre ?? "").toLowerCase().includes(q) ||
         (v.actividad?.folio ?? "").toLowerCase().includes(q) ||
-        (v.estatus ?? "").toLowerCase().includes(q),
+        (v.estatus ?? "").toLowerCase().includes(q) ||
+        (v.contabilidadRef ?? "").toLowerCase().includes(q),
     );
-  }, [visibleItems, filter, highlightId]);
+  }, [visibleItems, filter, highlightId, tab]);
 
-  const pendientes = visibleItems.filter((v) => v.estatus === "Pendiente" || v.estatus === "Aprobado_Coordinador").length;
-  const aprobados = visibleItems.filter((v) => v.estatus === "Aprobado" || v.estatus === "Pagado").length;
+  const pendientes = visibleItems.filter((v) => v.estatus === "Pendiente").length;
+  const contabilidadItems = visibleItems.filter((v) => v.estatus === "Aprobado" || v.estatus === "Pagado");
+  const aprobados = contabilidadItems.length;
   const totalMonto = visibleItems.reduce((s, v) => s + (Number(v.montoSolicitado) || 0), 0);
   const pendienteMonto = visibleItems
     .filter((v) => v.estatus !== "Rechazado")
@@ -188,11 +195,14 @@ export default function ViaticosPage() {
     if (!token || !selected) return;
     setSaving(true);
     try {
-      const updated = await apiFetch(`viatics/${selected.id}`, token, {
-        method: "PATCH",
-        body: JSON.stringify({ estatus: approveForm.estatus }),
-      });
-      setItems((prev) => prev.map((v) => (v.id === selected.id ? { ...v, ...(updated ?? {}), concepto: updated?.motivo ?? v.concepto } : v)));
+      if (approveForm.estatus === "Pagado") {
+        await markViaticoPagado(token, selected.id);
+      } else if (approveForm.estatus === "Rechazado") {
+        await approveViatico(token, selected.id, "reject", approveForm.comentariosAdmin || undefined);
+      } else {
+        await approveViatico(token, selected.id, "approve", approveForm.comentariosAdmin || undefined);
+      }
+      void load();
       setMode(null);
     } catch (e) {
       alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
@@ -258,7 +268,12 @@ export default function ViaticosPage() {
     {
       key: "estatus", label: "Estado",
       render: (v) => <Tag variant={estatusVariant(v.estatus)}>{(v.estatus ?? "Pendiente").replace(/_/g, " ")}</Tag>,
-      width: 160,
+      width: 140,
+    },
+    {
+      key: "contabilidadRef" as keyof Viatico, label: "Ref. contabilidad",
+      render: (v) => <code style={{ fontSize: 11 }}>{v.contabilidadRef ?? "—"}</code>,
+      width: 140,
     },
     {
       key: "acciones" as keyof Viatico, label: "",
@@ -267,8 +282,11 @@ export default function ViaticosPage() {
           {v.estatus === "Pendiente" && (cfg.canCreate || v.usuario?.id === user?.id) && (
             <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); openEdit(v); }}>Editar</Button>
           )}
-          {cfg.canApprove && (v.estatus === "Pendiente" || v.estatus === "Aprobado_Coordinador") && (
-            <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openApprove(v); }}>Revisar</Button>
+          {cfg.canApprove && v.estatus === "Pendiente" && (
+            <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openApprove(v); }}>Autorizar</Button>
+          )}
+          {cfg.canApprove && v.estatus === "Aprobado" && (
+            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setSelected(v); setApproveForm({ estatus: "Pagado", comentariosAdmin: "" }); setMode("approve"); }}>Marcar pagado</Button>
           )}
           {cfg.canDelete && (
             <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); void softDelete(v); }}>✕</Button>
@@ -305,12 +323,14 @@ export default function ViaticosPage() {
         )}
       </div>
 
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+        <Button size="sm" variant={tab === "contabilidad" ? "primary" : "secondary"} onClick={() => setTab("contabilidad")}>Contabilidad (aprobados)</Button>
+        <Button size="sm" variant={tab === "todos" ? "primary" : "secondary"} onClick={() => setTab("todos")}>Todos</Button>
         <input
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder="Buscar por concepto, solicitante, folio…"
-          style={{ width: "100%", maxWidth: 400, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}
+          style={{ flex: 1, minWidth: 220, maxWidth: 400, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13 }}
         />
       </div>
 

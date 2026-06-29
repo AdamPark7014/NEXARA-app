@@ -1,5 +1,5 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength, IsOptional } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { IsEmail, IsNotEmpty, IsString, MinLength, IsOptional, IsInt } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 
 export class CreateUserDto {
   @IsNotEmpty()
@@ -29,4 +29,10 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   employeeNumber?: string;
+
+  /** Manager directo; si se omite, el backend asigna al CEO por defecto. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  managerId?: number | null;
 }

@@ -6,6 +6,9 @@ export interface ViaticoRow {
   montoSolicitado?: number;
   monto?: number;
   estatus?: string;
+  approvalStep?: number;
+  approvalTrail?: { role: string; userName?: string; action: string; at: string }[];
+  contabilidadRef?: string;
   estado?: string;
   fechaSolicitud?: string;
   fecha?: string;
@@ -43,5 +46,15 @@ export function viaticoEstatusVariant(e?: string | null): "positive" | "warning"
 }
 
 export function isViaticoPending(e?: string | null): boolean {
-  return e === "Pendiente" || e === "Aprobado_Coordinador";
+  return e === "Pendiente";
+}
+
+export function isViaticoInApproval(e?: string | null): boolean {
+  return e === "Pendiente";
+}
+
+export function formatApprovalProgress(step?: number, trail?: ViaticoRow["approvalTrail"]): string {
+  const done = trail?.filter((t) => t.action === "approve").length ?? 0;
+  if (step != null && step > 0) return `Paso ${step + 1} · ${done} aprobación(es)`;
+  return done > 0 ? `${done} pre-aprobación(es)` : "En revisión";
 }

@@ -76,6 +76,31 @@ export default function VehiclesPage() {
   const [photoSaving, setPhotoSaving] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [requests, setRequests] = useState<{ id: number; solicitante?: { nombre?: string }; nombreVehiculo?: string; estatusAprobacion?: string; fechaInicioSolicitada?: string; fechaFinSolicitada?: string }[]>([]);
+  const [usageStats, setUsageStats] = useState<{ users?: { nombre: string; kmTotal: number; kmPorLitroPromedio: number | null; trips: number }[] } | null>(null);
+
+  const loadRequests = useCallback(async () => {
+    if (!token || !cfg.canApprove) return;
+    try {
+      const data = await apiFetch("vehicles", token);
+      setRequests(Array.isArray(data) ? data : (data.data ?? []));
+    } catch { setRequests([]); }
+  }, [token, cfg.canApprove]);
+
+  const loadAnalytics = useCallback(async () => {
+    if (!token || !cfg.canApprove) return;
+    try {
+      setUsageStats(await apiFetch("vehicles/analytics/usage", token));
+    } catch { setUsageStats(null); }
+  }, [token, cfg.canApprove]);
+
+  const approveRequest = async (id: number, action: "approve" | "reject") => {
+    if (!token) return;
+    try {
+      await apiFetch(`vehicles/${id}/approve`, token, { method: "PATCH", body: JSON.stringify({ action }) });
+      void loadRequests();
+    } catch (e) { alert(e instanceof Error ? e.message : "Error al autorizar"); }
+  };
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -91,6 +116,7 @@ export default function VehiclesPage() {
   }, [token]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { void loadRequests(); void loadAnalytics(); }, [loadRequests, loadAnalytics]);
 
   const openNew = () => { setEditing(null); setForm({ ...emptyForm }); setShowForm(true); };
   const openEdit = (v: Vehicle) => {
@@ -219,6 +245,40 @@ export default function VehiclesPage() {
         subtitle={cfg.subtitle}
         actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Agregar vehículo</Button> : undefined}
       />
+
+      {cfg.canApprove && requests.filter((r) => r.estatusAprobacion === "Pendiente").length > 0 && (
+        <Section title="Solicitudes pendientes de autorización">
+          <div style={{ display: "grid", gap: 8 }}>
+            {requests.filter((r) => r.estatusAprobacion === "Pendiente").map((r) => (
+              <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: 12, border: "1px solid var(--border)", borderRadius: 10 }}>
+                <div>
+                  <div style={{ fontWeight: 600 }}>{r.solicitante?.nombre ?? "—"} · {r.nombreVehiculo ?? "Vehículo"}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>#{r.id}</div>
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <Button size="sm" variant="primary" onClick={() => void approveRequest(r.id, "approve")}>Autorizar</Button>
+                  <Button size="sm" variant="danger" onClick={() => void approveRequest(r.id, "reject")}>Rechazar</Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {cfg.canApprove && usageStats?.users && usageStats.users.length > 0 && (
+        <Section title="Control de kilometraje y eficiencia por usuario">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
+            {usageStats.users.map((u) => (
+              <div key={u.nombre} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 12 }}>
+                <div style={{ fontWeight: 700, fontSize: 13 }}>{u.nombre}</div>
+                <div style={{ fontSize: 12, marginTop: 6 }}>Km total: <strong>{u.kmTotal}</strong></div>
+                <div style={{ fontSize: 12 }}>Viajes: {u.trips}</div>
+                <div style={{ fontSize: 12 }}>Km/L prom.: {u.kmPorLitroPromedio ?? "—"}</div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
 
       {showForm && (
         <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>

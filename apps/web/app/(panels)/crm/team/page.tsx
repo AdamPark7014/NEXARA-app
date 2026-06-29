@@ -16,6 +16,7 @@ interface Performance {
   targetId: number;
   ownerId: number;
   ownerName: string;
+  hasQuota?: boolean;
   revenueTarget: number;
   revenueAchieved: number;
   attainmentPct: number;
@@ -64,7 +65,12 @@ export default function TeamPage() {
       },
       width: 40,
     },
-    { key: "ownerName" as keyof Performance, label: "Ejecutivo" },
+    { key: "ownerName" as keyof Performance, label: "Ejecutivo", render: (p) => (
+      <div>
+        <div style={{ fontWeight: 600 }}>{p.ownerName}</div>
+        {!p.hasQuota && <div style={{ fontSize: 10.5, color: "var(--text-tertiary)" }}>Sin cuota asignada</div>}
+      </div>
+    ) },
     { key: "opportunitiesCreated", label: "Oportunidades", width: 120 },
     { key: "newClientsAchieved", label: "Clientes nuevos", width: 120 },
     { key: "revenueAchieved", label: "Vendido (mes)", render: (p) => <Money value={p.revenueAchieved} />, width: 130 },
@@ -84,7 +90,7 @@ export default function TeamPage() {
       <Section title={loading ? "Cargando…" : `${rows.length} ejecutivos`}>
         {loading && <EmptyState icon="⏳" title="Cargando ranking…" description="Calculando desempeño del equipo." />}
         {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
-        {!loading && !error && <DataTable columns={columns} rows={rows} rowKey={(p) => p.targetId} emptyTitle="Sin cuotas este mes" emptyDescription="Asigna cuotas al equipo desde Cuotas y metas para ver el ranking." />}
+        {!loading && !error && <DataTable columns={columns} rows={rows} rowKey={(p) => p.ownerId} emptyTitle="Sin ejecutivos de ventas" emptyDescription="Asigna el rol vendedor o acceso al panel de ventas, y opcionalmente cuotas en Cuotas y metas." />}
       </Section>
     </>
   );

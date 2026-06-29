@@ -1,8 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { AutoApprovalService } from '../workflow/auto-approval.service.js';
+import {
+  appendTrail,
+  buildApprovalChain,
+  canActOnStep,
+  isTerminalApproved,
+  stepRoleAt,
+  type TrailEntry,
+} from '../common/rbac/hierarchical-approval.js';
+import { ROLES, type RoleKey } from '../common/rbac/roles.v2.js';
 
 @Injectable()
 export class ViaticosService {
@@ -12,7 +21,18 @@ export class ViaticosService {
     private readonly autoApproval: AutoApprovalService,
   ) {}
 
-  // Exportar a CSV
+  private resolveActorRole(actor: any): RoleKey | null {
+    if (actor?.isSuperAdmin) return ROLES.SUPER_ADMIN;
+    const key = actor?.roleKey ?? actor?.role?.orgRoleKey;
+    return key ?? null;
+  }
+
+  private amountOf(viatico: { montoSolicitado: unknown }) {
+    return typeof viatico.montoSolicitado === 'object' && viatico.montoSolicitado && 'toNumber' in (viatico.montoSolicitado as object)
+      ? (viatico.montoSolicitado as { toNumber: () => number }).toNumber()
+      : Number(viatico.montoSolicitado) || 0;
+  }
+
   toCSV(viatics: any[]): string {
     if (!viatics.length) return '';
     const fields = Object.keys(viatics[0]);
@@ -22,12 +42,8 @@ export class ViaticosService {
         fields
           .map((f) => {
             let val = row[f];
-            if (typeof val === 'object' && val !== null) {
-              val = JSON.stringify(val);
-            }
-            if (typeof val === 'string' && val.includes(',')) {
-              val = '"' + val.replace(/"/g, '""') + '"';
-            }
+            if (typeof val === 'object' && val !== null) val = JSON.stringify(val);
+            if (typeof val === 'string' && val.includes(',')) val = '"' + val.replace(/"/g, '""') + '"';
             return val ?? '';
           })
           .join(','),
@@ -36,23 +52,25 @@ export class ViaticosService {
     return csvRows.join('\n');
   }
 
-  // Importar muchos viáticos desde JSON
   importMany(_json: any[]): never {
     throw new Error('Modelo viatico no existe en Prisma.');
   }
 
   async create(dto: any) {
+    if (!dto.ticketEvidenciaUrl) {
+      throw new BadRequestException('Debes adjuntar el ticket o comprobante de gasto');
+    }
     const viatico = await this.prisma['viatico'].create({
-      data: dto,
+      data: {
+        ...dto,
+        approvalStep: 0,
+        approvalTrail: [],
+        estatus: dto.estatus ?? 'Pendiente',
+      },
       include: { User: { select: { nombre: true, id: true } }, Activity: { select: { anNumber: true, id: true } } },
     });
 
-    const amount =
-      typeof viatico.montoSolicitado === 'object' && 'toNumber' in viatico.montoSolicitado
-        ? viatico.montoSolicitado.toNumber()
-        : Number(viatico.montoSolicitado) || 0;
-
-    // Notify supervisors about viatico request
+    const amount = this.amountOf(viatico);
     if (viatico.usuarioId && viatico.User) {
       await this.notificationHierarchy.notifyViaticRequested(
         viatico.usuarioId,
@@ -60,7 +78,6 @@ export class ViaticosService {
         viatico.User.nombre || 'Usuario',
         amount,
       );
-
       this.autoApproval
         .evaluate({
           entityType: 'VIATIC',
@@ -70,7 +87,6 @@ export class ViaticosService {
         })
         .catch(() => undefined);
     }
-
     return viatico;
   }
 
@@ -82,9 +98,8 @@ export class ViaticosService {
       where = undefined;
     } else if (
       currentUser?.permissions?.includes('CONSOLE_ADMIN') ||
-      currentUser?.permissions?.includes('viaticos.manage')
+      currentUser?.permissions?.includes('viatics.manage')
     ) {
-      // Legacy admin or v2 OPS manager: team scope within same department
       where = {
         User: {
           AND: [
@@ -116,11 +131,7 @@ export class ViaticosService {
       where: { User: { departmentId } },
       include: { Activity: true, User: true },
     });
-    return data.map((row: any) => ({
-      ...row,
-      actividad: row.Activity,
-      usuario: row.User,
-    }));
+    return data.map((row: any) => ({ ...row, actividad: row.Activity, usuario: row.User }));
   }
 
   async findByUser(userId: number) {
@@ -128,24 +139,16 @@ export class ViaticosService {
       where: { usuarioId: userId },
       include: { Activity: true, User: true },
     });
-    return data.map((row: any) => ({
-      ...row,
-      actividad: row.Activity,
-      usuario: row.User,
-    }));
+    return data.map((row: any) => ({ ...row, actividad: row.Activity, usuario: row.User }));
   }
 
   async findByAllowedUsers(userIds: number[]) {
-    if (!userIds || userIds.length === 0) return [];
+    if (!userIds?.length) return [];
     const data = await this.prisma['viatico'].findMany({
       where: { usuarioId: { in: userIds } },
       include: { Activity: true, User: true },
     });
-    return data.map((row: any) => ({
-      ...row,
-      actividad: row.Activity,
-      usuario: row.User,
-    }));
+    return data.map((row: any) => ({ ...row, actividad: row.Activity, usuario: row.User }));
   }
 
   findOne(id: number) {
@@ -155,44 +158,102 @@ export class ViaticosService {
     });
   }
 
-  async update(id: number, dto: any) {
-    // Get current viatico to check for status changes
-    const currentViatico = await this.findOne(id);
+  async approveOrReject(id: number, actor: any, action: 'approve' | 'reject', note?: string) {
+    const viatico = await this.findOne(id);
+    if (!viatico) throw new BadRequestException('Viático no encontrado');
+    if (['Rechazado', 'Aprobado', 'Pagado'].includes(viatico.estatus)) {
+      throw new BadRequestException('Este viático ya fue cerrado');
+    }
 
+    const amount = this.amountOf(viatico);
+    const chain = buildApprovalChain('viaticos', amount);
+    const step = viatico.approvalStep ?? 0;
+    const actorRole = this.resolveActorRole(actor);
+    const canAct = actor?.isSuperAdmin || canActOnStep(actorRole, step, chain);
+
+    if (!canAct) {
+      throw new ForbiddenException('No tienes permisos para autorizar en este paso del flujo');
+    }
+
+    const trailEntry: TrailEntry = {
+      role: stepRoleAt(chain, step) ?? actorRole ?? 'unknown',
+      userId: actor.id,
+      userName: actor.nombre,
+      action,
+      at: new Date().toISOString(),
+      note: note?.trim() || undefined,
+    };
+    const trail = appendTrail(viatico.approvalTrail as TrailEntry[] | null, trailEntry);
+
+    if (action === 'reject') {
+      const updated = await this.prisma['viatico'].update({
+        where: { id },
+        data: { estatus: 'Rechazado', approvalTrail: trail },
+        include: { User: { select: { id: true, nombre: true } } },
+      });
+      if (updated.usuarioId) {
+        await this.notificationHierarchy.notifyViaticReview(updated.usuarioId, id, 'rejected', 0);
+      }
+      return updated;
+    }
+
+    const nextStep = step + 1;
+    if (isTerminalApproved(nextStep, chain)) {
+      const contabilidadRef = `VIAT-${id}-${new Date().toISOString().slice(0, 10)}`;
+      const updated = await this.prisma['viatico'].update({
+        where: { id },
+        data: {
+          approvalStep: nextStep,
+          approvalTrail: trail,
+          estatus: 'Aprobado',
+          contabilidadRef,
+        },
+        include: { User: { select: { id: true, nombre: true } }, Activity: { select: { anNumber: true } } },
+      });
+      if (updated.usuarioId) {
+        await this.notificationHierarchy.notifyViaticReview(updated.usuarioId, id, 'approved', amount);
+      }
+      return updated;
+    }
+
+    return this.prisma['viatico'].update({
+      where: { id },
+      data: { approvalStep: nextStep, approvalTrail: trail, estatus: 'Pendiente' },
+      include: { User: { select: { id: true, nombre: true } } },
+    });
+  }
+
+  async markPagado(id: number) {
+    const viatico = await this.findOne(id);
+    if (!viatico || viatico.estatus !== 'Aprobado') {
+      throw new BadRequestException('Solo viáticos aprobados por CEO pueden marcarse como pagados');
+    }
+    return this.prisma['viatico'].update({
+      where: { id },
+      data: { estatus: 'Pagado' },
+    });
+  }
+
+  async update(id: number, dto: any) {
+    const currentViatico = await this.findOne(id);
     const updatedViatico = await this.prisma['viatico'].update({
       where: { id },
       data: dto,
       include: { User: { select: { nombre: true, id: true } }, Activity: { select: { anNumber: true } } },
     });
 
-    // Notify about viatico review status changes
     if (currentViatico && dto.estatus && currentViatico.estatus !== dto.estatus) {
-      if (dto.estatus === 'APPROVED' && updatedViatico.usuarioId) {
-        await this.notificationHierarchy.notifyViaticReview(
-          updatedViatico.usuarioId,
-          id,
-          'approved',
-          typeof updatedViatico.montoSolicitado === 'object' && 'toNumber' in updatedViatico.montoSolicitado
-            ? updatedViatico.montoSolicitado.toNumber()
-            : Number(updatedViatico.montoSolicitado) || 0,
-        );
-      } else if (dto.estatus === 'REJECTED' && updatedViatico.usuarioId) {
-        await this.notificationHierarchy.notifyViaticReview(
-          updatedViatico.usuarioId,
-          id,
-          'rejected',
-          0,
-        );
+      const amount = this.amountOf(updatedViatico);
+      if (['Aprobado', 'APPROVED', 'Pagado'].includes(dto.estatus) && updatedViatico.usuarioId) {
+        await this.notificationHierarchy.notifyViaticReview(updatedViatico.usuarioId, id, 'approved', amount);
+      } else if (['Rechazado', 'REJECTED'].includes(dto.estatus) && updatedViatico.usuarioId) {
+        await this.notificationHierarchy.notifyViaticReview(updatedViatico.usuarioId, id, 'rejected', 0);
       }
     }
-
     return updatedViatico;
   }
 
   remove(id: number) {
-    return this.prisma['viatico'].delete({
-      where: { id },
-    });
+    return this.prisma['viatico'].delete({ where: { id } });
   }
 }
-

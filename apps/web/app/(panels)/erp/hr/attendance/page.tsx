@@ -7,7 +7,7 @@ import Section from "@/components/ui/Section";
 import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
-import { buildApiUrl } from "@/lib/api-base";
+import { buildApiUrl, parseResponseJson } from "@/lib/api-base";
 import { getAttendanceSectionConfig } from "@/lib/user-access";
 
 const AttendanceForm = dynamic(() => import("@/components/AttendanceForm"), { ssr: false });
@@ -26,10 +26,12 @@ interface TeamMember {
   email?: string;
   department?: string;
   roleName?: string;
-  attendances?: { type: string; timestamp: string }[];
+  attendances?: { type: string; timestamp: string; entryLatitude?: number; entryLongitude?: number; exitLatitude?: number; exitLongitude?: number }[];
   totalMinutes?: number;
   checkIn?: string;
   checkOut?: string;
+  entryMapUrl?: string | null;
+  exitMapUrl?: string | null;
   estado?: "PRESENTE" | "COMPLETO" | "AUSENTE";
 }
 
@@ -46,7 +48,7 @@ interface ApiAttendanceUser {
   roleName?: string;
   totalMinutes?: number;
   days?: { date: string; totalMinutes?: number; isOpen?: boolean }[];
-  attendances?: { type: string; timestamp: string }[];
+  attendances?: { type: string; timestamp: string; entryLatitude?: number; entryLongitude?: number; exitLatitude?: number; exitLongitude?: number }[];
 }
 
 interface WeekDay {
@@ -57,12 +59,12 @@ interface WeekDay {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function apiFetch<T = unknown>(path: string, token: string): Promise<T> {
+async function apiFetch<T = unknown>(path: string, token: string): Promise<T | null> {
   const res = await fetch(buildApiUrl(path), {
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
   });
   if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
-  return res.json();
+  return parseResponseJson<T>(res);
 }
 
 function fmtTime(iso?: string | null): string {
@@ -78,12 +80,25 @@ function fmtMinutes(m?: number): string {
 }
 
 function getLatestByType(
-  list: { type: string; timestamp: string }[] | undefined,
+  list: { type: string; timestamp: string; entryLatitude?: number; entryLongitude?: number; exitLatitude?: number; exitLongitude?: number }[] | undefined,
   type: "entrada" | "salida",
 ): string | undefined {
   const filtered = (list ?? []).filter((a) => a.type === type);
   if (filtered.length === 0) return undefined;
   return filtered.reduce((max, a) => (a.timestamp > max.timestamp ? a : max)).timestamp;
+}
+
+function getLatestMapUrl(
+  list: TeamMember["attendances"],
+  type: "entrada" | "salida",
+): string | null {
+  const filtered = (list ?? []).filter((a) => a.type === type);
+  if (filtered.length === 0) return null;
+  const latest = filtered.reduce((max, a) => (a.timestamp > max.timestamp ? a : max));
+  const lat = type === "entrada" ? latest.entryLatitude : latest.exitLatitude;
+  const lng = type === "entrada" ? latest.entryLongitude : latest.exitLongitude;
+  if (typeof lat !== "number" || typeof lng !== "number") return null;
+  return `https://www.google.com/maps?q=${lat},${lng}`;
 }
 
 function resolveEstado(
@@ -112,6 +127,8 @@ function mapApiUser(raw: ApiAttendanceUser, dateFilter: string): TeamMember {
     totalMinutes,
     checkIn,
     checkOut,
+    entryMapUrl: getLatestMapUrl(raw.attendances, "entrada"),
+    exitMapUrl: getLatestMapUrl(raw.attendances, "salida"),
     estado: resolveEstado(checkIn, checkOut, dayInfo?.isOpen),
   };
 }
@@ -334,6 +351,16 @@ function TeamCard({ member }: { member: TeamMember }) {
           <div style={{ marginLeft: "auto", color: "var(--text-tertiary)" }}>{fmtMinutes(member.totalMinutes)}</div>
         )}
       </div>
+      {(member.entryMapUrl || member.exitMapUrl) && (
+        <div style={{ display: "flex", gap: 10, marginTop: 8, fontSize: 11 }}>
+          {member.entryMapUrl ? (
+            <a href={member.entryMapUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)" }}>Mapa entrada</a>
+          ) : null}
+          {member.exitMapUrl ? (
+            <a href={member.exitMapUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)" }}>Mapa salida</a>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
@@ -386,6 +413,24 @@ function TeamAttendanceView({ token, dateFilter, visibilityHint }: { token: stri
     },
     { key: "checkIn",      label: "Entrada",  accessor: m => fmtTime(m.checkIn),        width: 90 },
     { key: "checkOut",     label: "Salida",   accessor: m => fmtTime(m.checkOut),       width: 90 },
+    {
+      key: "ubicacion", label: "Ubicación", width: 120,
+      render: m => (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11 }}>
+          {m.entryMapUrl ? (
+            <a href={m.entryMapUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)" }}>
+              ↓ Entrada
+            </a>
+          ) : null}
+          {m.exitMapUrl ? (
+            <a href={m.exitMapUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)" }}>
+              ↑ Salida
+            </a>
+          ) : null}
+          {!m.entryMapUrl && !m.exitMapUrl ? "—" : null}
+        </div>
+      ),
+    },
     { key: "totalMinutes", label: "Horas",    accessor: m => fmtMinutes(m.totalMinutes), width: 80 },
     {
       key: "estado", label: "Estado", width: 120,

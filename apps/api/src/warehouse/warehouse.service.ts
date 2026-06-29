@@ -128,7 +128,11 @@ export class WarehouseService {
     notes?: string;
     purchaseOrderId?: number;
   }, userId: number) {
-    if (dto.type === 'TRANSFER' && (!dto.fromWarehouseId || !dto.toWarehouseId)) {
+    const normalizedType = dto.type === 'IN' ? 'RECEIPT'
+      : dto.type === 'OUT' ? 'DISPATCH'
+      : dto.type;
+
+    if (normalizedType === 'TRANSFER' && (!dto.fromWarehouseId || !dto.toWarehouseId)) {
       throw new BadRequestException('Transferencias requieren almacén origen y destino');
     }
 
@@ -138,7 +142,7 @@ export class WarehouseService {
     const movement = await this.prisma.stockMovement.create({
       data: {
         movementNumber,
-        type: dto.type as any,
+        type: normalizedType as any,
         productId: dto.productId,
         fromWarehouseId: dto.fromWarehouseId ?? null,
         toWarehouseId: dto.toWarehouseId ?? null,
@@ -164,7 +168,7 @@ export class WarehouseService {
 
     const productLabel = movement.product?.name?.trim() || movement.product?.sku?.trim() || `Producto #${dto.productId}`;
     void this.notificationHierarchy
-      .notifyStockMovementPosted(userId, movement.id, movement.movementNumber, productLabel, dto.type)
+      .notifyStockMovementPosted(userId, movement.id, movement.movementNumber, productLabel, normalizedType)
       .catch(() => undefined);
 
     return movement;

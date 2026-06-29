@@ -79,6 +79,14 @@ export const buildApiUrl = (path: string) => {
   return `${base}/${path.replace(/^\/+/, "")}`;
 };
 
+/** Nest may respond 200 with an empty body when the handler returns null. */
+export async function parseResponseJson<T>(res: Response): Promise<T | null> {
+  if (res.status === 204) return null;
+  const text = await res.text();
+  if (!text.trim()) return null;
+  return JSON.parse(text) as T;
+}
+
 /** Trailing slashes removed; use for legacy `${API_URL}/path` or pass paths through {@link buildApiUrl}. */
 export const getApiBaseTrimmed = () => getApiBase().replace(/[\/.]+$/, "");
 

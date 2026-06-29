@@ -12,7 +12,7 @@
  */
 import { ROLES, type RoleKey } from './roles.v2';
 
-export type ApprovalFlow = 'viaticos' | 'evidencias' | 'cotizaciones' | 'compras';
+export type ApprovalFlow = 'viaticos' | 'evidencias' | 'cotizaciones' | 'compras' | 'vehicles' | 'multas';
 
 export type ApprovalStep = {
   /** Rol que aprueba este paso. */
@@ -58,6 +58,21 @@ export const APPROVAL_CHAINS: Record<ApprovalFlow, ApprovalStep[]> = {
     { role: ROLES.COORD_ADMIN,       label: 'Coordinación administrativa' },
     { role: ROLES.DIR_ADMIN,         thresholdMxn: 25_000,   label: 'Dir. Administrativo' },
     { role: ROLES.CEO,               thresholdMxn: 200_000,  label: 'CEO', isFinal: true },
+  ],
+
+  // ─── VEHÍCULOS (Operaciones → Arquitecto → Admin → CEO) ─────────
+  vehicles: [
+    { role: ROLES.COORD_OPERACIONES, label: 'Coordinación de Operaciones' },
+    { role: ROLES.ARQUITECTO,        label: 'Arquitecto / validación técnica' },
+    { role: ROLES.ADMINISTRATIVO,    label: 'Administración' },
+    { role: ROLES.CEO,               label: 'CEO — Autorización final', isFinal: true },
+  ],
+
+  // ─── MULTAS ──────────────────────────────────────────────────────
+  multas: [
+    { role: ROLES.COORD_OPERACIONES, label: 'Operaciones — pre-autorización' },
+    { role: ROLES.ADMINISTRATIVO,    label: 'Administración' },
+    { role: ROLES.CEO,               label: 'CEO — Autorización final', isFinal: true },
   ],
 };
 

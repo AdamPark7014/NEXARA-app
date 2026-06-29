@@ -9,6 +9,7 @@ import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getCrmCatalogSectionConfig } from "@/lib/section-views";
+import { buildApiUrl } from "@/lib/api-base";
 import { createCatalogProduct, listCatalogProducts, listCatalogCategories, type CatalogProduct } from "@/lib/catalog-api";
 
 const MARGIN = 1.35;
@@ -60,12 +61,23 @@ export default function ProductsPage() {
     }
   }, [showForm, token, categories.length]);
 
+  useEffect(() => {
+    if (!showForm || !token) return;
+    fetch(buildApiUrl("catalog/products/next-sku"), { headers: { Authorization: `Bearer ${token}` } })
+      .then(async (res) => {
+        if (!res.ok) return;
+        const sku = await res.json();
+        if (typeof sku === "string") setForm((f) => ({ ...f, sku: f.sku.trim() ? f.sku : sku }));
+      })
+      .catch(() => { /* ok */ });
+  }, [showForm, token]);
+
   const saveProduct = async () => {
-    if (!token || !form.sku.trim() || !form.name.trim()) return;
+    if (!token || !form.name.trim()) return;
     setSaving(true);
     try {
       const created = await createCatalogProduct(token, {
-        sku: form.sku.trim(),
+        ...(form.sku.trim() ? { sku: form.sku.trim() } : {}),
         name: form.name.trim(),
         category: form.category.trim() || undefined,
         subcategory: form.subcategory.trim() || undefined,
@@ -163,7 +175,7 @@ export default function ProductsPage() {
             <div style={{ marginBottom: 22 }}>
               <div style={{ fontSize: 17, fontWeight: 700 }}>Nuevo producto en catálogo</div>
               <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 4 }}>
-                Completa al menos SKU y nombre. Los demás campos son opcionales.
+                Completa al menos el nombre. El SKU se genera automáticamente si lo dejas vacío.
               </div>
             </div>
 
@@ -176,10 +188,10 @@ export default function ProductsPage() {
 
               <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 12 }}>
                 <label style={{ display: "grid" }}>
-                  {lbl("SKU", true)}
+                  {lbl("SKU")}
                   <input value={form.sku}
                     onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value.toUpperCase() }))}
-                    placeholder="CAM-DOMO-4K" style={{ ...inp, fontFamily: "monospace", textTransform: "uppercase" }}
+                    placeholder="Auto: SKU-0001" style={{ ...inp, fontFamily: "monospace", textTransform: "uppercase" }}
                     autoFocus />
                 </label>
                 <label style={{ display: "grid" }}>
@@ -267,7 +279,7 @@ export default function ProductsPage() {
             {saveErr && <p style={{ marginTop: 12, marginBottom: 0, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 12 }}>{saveErr}</p>}
             <div style={{ display: "flex", gap: 10, marginTop: 16, justifyContent: "flex-end" }}>
               <Button variant="secondary" onClick={() => { setShowForm(false); setForm({ ...EMPTY_FORM }); setSaveErr(null); }}>Cancelar</Button>
-              <Button variant="primary" onClick={() => void saveProduct()} disabled={saving || !form.sku.trim() || !form.name.trim()}>
+              <Button variant="primary" onClick={() => void saveProduct()} disabled={saving || !form.name.trim()}>
                 {saving ? "Creando…" : "Crear producto"}
               </Button>
             </div>
