@@ -1,35 +1,127 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
-import { provisionSalesServiceClient } from "@/lib/sales-api";
+import { provisionSalesServiceClient, updateSalesClient } from "@/lib/sales-api";
 import { DetailError, DetailField, DetailFieldGrid, DetailSection } from "@/components/detail/DetailFrame";
 import { useClientDetail } from "@/components/crm/ClientDetailShell";
+
+const INDUSTRIES = ["Corporativo", "Gobierno", "PyME", "Hogar", "Retail", "Industrial", "Educación", "Salud", "Otro"];
+const ESTADOS = ["Activo", "Inactivo", "Prospecto"];
+
+const inp: React.CSSProperties = {
+  width: "100%", padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 8,
+  background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13, boxSizing: "border-box",
+};
 
 export default function ClientDetailPage() {
   const { user } = useUser();
   const token = user?.token ?? "";
   const { client, error, reload } = useClientDetail();
 
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    name: "", legalName: "", taxId: "", billingEmail: "", billingPhone: "",
+    industry: "", status: "", fiscalAddress: "", website: "", notes: "",
+  });
+
   if (error) return <DetailError message={error} onRetry={reload} />;
   if (!client) return null;
+
+  const openEdit = () => {
+    setForm({
+      name: client.name ?? "",
+      legalName: client.legalName ?? "",
+      taxId: client.taxId ?? "",
+      billingEmail: client.billingEmail ?? "",
+      billingPhone: client.billingPhone ?? "",
+      industry: client.industry ?? "PyME",
+      status: client.status ?? "Prospecto",
+      fiscalAddress: client.fiscalAddress ?? "",
+      website: client.website ?? "",
+      notes: client.notes ?? "",
+    });
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    if (!token) return;
+    setSaving(true);
+    try {
+      await updateSalesClient(token, client.id, form);
+      reload();
+      setEditing(false);
+    } catch (e) {
+      alert("Error: " + (e instanceof Error ? e.message : "desconocido"));
+    } finally { setSaving(false); }
+  };
 
   const provision = async () => {
     if (!token) return;
     try {
       await provisionSalesServiceClient(token, client.id);
       reload();
-    } catch {
-      /* ignore */
-    }
+    } catch { /* ignore */ }
   };
+
+  if (editing) {
+    return (
+      <DetailSection title="Editar cliente">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {([
+            { label: "Nombre comercial *", key: "name", ph: "Marca o alias", span: true },
+            { label: "Razón social", key: "legalName", ph: "Empresa S.A. de C.V.", span: true },
+            { label: "RFC", key: "taxId", ph: "ABC123456XYZ0" },
+            { label: "Sitio web", key: "website", ph: "https://www.empresa.com" },
+            { label: "Email facturación", key: "billingEmail", ph: "facturación@empresa.com" },
+            { label: "Teléfono", key: "billingPhone", ph: "222 555 1234" },
+            { label: "Dirección fiscal", key: "fiscalAddress", ph: "Calle, Col., CP, Estado", span: true },
+          ] as const).map(({ label, key, ph, ...rest }) => (
+            <div key={key} style={{ gridColumn: "span" in rest && rest.span ? "1 / -1" : undefined }}>
+              <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>{label}</label>
+              <input value={(form as Record<string, string>)[key]} onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))} placeholder={ph} style={inp} />
+            </div>
+          ))}
+          <div>
+            <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Industria</label>
+            <select value={form.industry} onChange={(e) => setForm((f) => ({ ...f, industry: e.target.value }))} style={inp}>
+              {INDUSTRIES.map((i) => <option key={i}>{i}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Estado</label>
+            <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))} style={inp}>
+              {ESTADOS.map((s) => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Notas internas</label>
+            <textarea value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} rows={3} style={{ ...inp, resize: "vertical" }} />
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "flex-end" }}>
+          <Button variant="secondary" onClick={() => setEditing(false)}>Cancelar</Button>
+          <Button variant="primary" onClick={() => void saveEdit()} disabled={saving || !form.name.trim()}>
+            {saving ? "Guardando…" : "Guardar cambios"}
+          </Button>
+        </div>
+      </DetailSection>
+    );
+  }
 
   return (
     <DetailSection title="Datos generales">
-      <div style={{ marginBottom: 12 }}>
-        <Tag variant={client.status === "Activo" ? "positive" : "neutral"}>{client.status || "Prospecto"}</Tag>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <Tag variant={client.status === "Activo" ? "positive" : client.status === "Prospecto" ? "warning" : "neutral"}>
+          {client.status || "Prospecto"}
+        </Tag>
+        {client.industry && <Tag variant="neutral">{client.industry}</Tag>}
+        <div style={{ flex: 1 }} />
+        <Button size="sm" variant="secondary" onClick={openEdit}>✎ Editar</Button>
       </div>
       <DetailFieldGrid>
         <DetailField label="Nombre comercial" value={client.name} />
@@ -48,9 +140,7 @@ export default function ClientDetailPage() {
       )}
       <div style={{ marginTop: 20, display: "flex", gap: 10, flexWrap: "wrap" }}>
         {!client.serviceClientId && (
-          <Button variant="secondary" onClick={() => void provision()}>
-            Activar en operación
-          </Button>
+          <Button variant="secondary" onClick={() => void provision()}>Activar en operación</Button>
         )}
         {client.serviceClientId && (
           <Link href={`/ops/service-clients`} style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)", alignSelf: "center" }}>

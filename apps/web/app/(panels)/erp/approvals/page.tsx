@@ -73,6 +73,11 @@ export default function ApprovalsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [decidingId, setDecidingId] = useState<number | null>(null);
+  const [rejectModal, setRejectModal] = useState<ApprovalRow | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [infoModal, setInfoModal] = useState<ApprovalRow | null>(null);
+  const [infoMessage, setInfoMessage] = useState("");
+  const [decidingErr, setDecidingErr] = useState<string | null>(null);
 
   const fetchPending = async () => {
     if (!user?.token) {
@@ -122,31 +127,40 @@ export default function ApprovalsPage() {
   }, [highlightId, list, loading]);
 
   const handleRequestInfo = (row: ApprovalRow) => {
-    const msg = window.prompt(`¿Qué información necesitas de ${row.solicita}?`, "");
-    if (msg == null || !msg.trim()) return;
-    window.alert(
-      `Solicitud de información registrada.\n\nContacta a ${row.solicita} (${row.solicitaRol}) con tu pregunta:\n\n"${msg.trim()}"\n\nLa solicitud permanece en tu bandeja hasta que la apruebes o rechaces.`,
-    );
+    setInfoModal(row);
+    setInfoMessage("");
   };
 
   const handleDecide = async (row: ApprovalRow, decision: "APPROVED" | "REJECTED") => {
-    if (!user?.token) {
-      window.alert("Tu sesión expiró. Vuelve a iniciar sesión.");
+    if (!user?.token) return;
+    if (decision === "REJECTED") {
+      setRejectModal(row);
+      setRejectReason("");
+      setDecidingErr(null);
       return;
     }
-    let comments: string | undefined;
-    if (decision === "REJECTED") {
-      const reason = window.prompt("Motivo del rechazo (visible al solicitante):", "");
-      if (reason == null) return;
-      comments = reason.trim() || undefined;
-    }
     setDecidingId(row.approvalId);
+    setDecidingErr(null);
     try {
-      await decideApproval(user.token, row.approvalId, decision, comments);
+      await decideApproval(user.token, row.approvalId, decision, undefined);
       await fetchPending();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "No se pudo registrar la decisión";
-      window.alert(`Error: ${msg}`);
+      setDecidingErr(e instanceof Error ? e.message : "No se pudo registrar la decisión");
+    } finally {
+      setDecidingId(null);
+    }
+  };
+
+  const submitReject = async () => {
+    if (!user?.token || !rejectModal) return;
+    setDecidingId(rejectModal.approvalId);
+    setDecidingErr(null);
+    try {
+      await decideApproval(user.token, rejectModal.approvalId, "REJECTED", rejectReason.trim() || undefined);
+      setRejectModal(null);
+      await fetchPending();
+    } catch (e: unknown) {
+      setDecidingErr(e instanceof Error ? e.message : "No se pudo registrar el rechazo");
     } finally {
       setDecidingId(null);
     }
@@ -384,6 +398,76 @@ export default function ApprovalsPage() {
               </article>
             );
           })}
+        </div>
+      )}
+
+      {/* ── Rechazo modal ── */}
+      {rejectModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
+          onClick={() => setRejectModal(null)}>
+          <div style={{ background: "var(--surface)", borderRadius: 16, padding: "24px 28px", width: 440, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.28)", border: "1px solid var(--border)" }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Rechazar solicitud</div>
+            <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginBottom: 18 }}>
+              <strong>{rejectModal.titulo}</strong> · Solicitada por {rejectModal.solicita}
+            </div>
+            <label style={{ display: "grid", gap: 4, marginBottom: 16 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Motivo del rechazo (visible al solicitante)</span>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                rows={4}
+                placeholder="Explica la razón del rechazo para que el solicitante pueda tomar acción…"
+                autoFocus
+                style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13, resize: "vertical", fontFamily: "inherit", lineHeight: 1.45 }}
+              />
+            </label>
+            {decidingErr && (
+              <div style={{ padding: "8px 12px", background: "var(--state-danger-bg,#fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)", marginBottom: 12 }}>
+                {decidingErr}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <Button variant="secondary" onClick={() => setRejectModal(null)}>Cancelar</Button>
+              <Button variant="danger" onClick={() => void submitReject()} disabled={decidingId === rejectModal.approvalId}>
+                {decidingId === rejectModal.approvalId ? "Rechazando…" : "Confirmar rechazo"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Solicitar info modal ── */}
+      {infoModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
+          onClick={() => setInfoModal(null)}>
+          <div style={{ background: "var(--surface)", borderRadius: 16, padding: "24px 28px", width: 440, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.28)", border: "1px solid var(--border)" }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Pedir más información</div>
+            <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginBottom: 18 }}>
+              A: <strong>{infoModal.solicita}</strong> ({infoModal.solicitaRol})
+            </div>
+            <label style={{ display: "grid", gap: 4, marginBottom: 16 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Pregunta o información requerida</span>
+              <textarea
+                value={infoMessage}
+                onChange={(e) => setInfoMessage(e.target.value)}
+                rows={4}
+                placeholder={`¿Qué necesitas de ${infoModal.solicita}? Escribe tu pregunta aquí…`}
+                autoFocus
+                style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13, resize: "vertical", fontFamily: "inherit", lineHeight: 1.45 }}
+              />
+            </label>
+            <div style={{ padding: "10px 12px", background: "var(--surface-2)", borderRadius: 8, fontSize: 12, color: "var(--text-secondary)", marginBottom: 16 }}>
+              💡 La solicitud permanecerá en tu bandeja hasta que apruebes o rechaces. Contacta a {infoModal.solicita} por el canal habitual.
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <Button variant="secondary" onClick={() => setInfoModal(null)}>Cancelar</Button>
+              <Button variant="primary" onClick={() => { setInfoModal(null); }} disabled={!infoMessage.trim()}>
+                Registrar pregunta
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </>

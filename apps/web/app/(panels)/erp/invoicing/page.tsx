@@ -19,6 +19,7 @@ interface InvoiceRow {
   status: "DRAFT" | "SENT" | "PARTIALLY_PAID" | "PAID" | "OVERDUE" | "CANCELLED" | string;
   issueDate: string;
   totalAmount: number | string;
+  paidAmount?: number | string;
   cfdiUuid?: string | null;
   receptorName?: string | null;
   emisorName?: string | null;
@@ -61,6 +62,10 @@ export default function InvoicingPage() {
   const [editingInvoice, setEditingInvoice] = useState<InvoiceRow | null>(null);
   const [formErr, setFormErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [paymentTarget, setPaymentTarget] = useState<InvoiceRow | null>(null);
+  const [paymentForm, setPaymentForm] = useState({ amount: "", paymentDate: new Date().toISOString().slice(0, 10), method: "SPEI", reference: "", notes: "" });
+  const [paymentErr, setPaymentErr] = useState<string | null>(null);
+  const [paying, setPaying] = useState(false);
   const [form, setForm] = useState({
     type: "INCOME" as "INCOME" | "EXPENSE",
     receptorName: "",
@@ -131,6 +136,47 @@ export default function InvoicingPage() {
       await apiFetch(`accounting/invoices/${inv.id}/cancel`, token, { method: "PATCH", body: JSON.stringify({ cancelReason: "02" }) });
       void load();
     } catch (e) { alert(`Error al cancelar: ${e instanceof Error ? e.message : "desconocido"}`); }
+  };
+
+  const openPayment = (inv: InvoiceRow) => {
+    const total = Number(inv.totalAmount);
+    const paid = Number(inv.paidAmount ?? 0);
+    const pending = Math.max(0, total - paid);
+    setPaymentTarget(inv);
+    setPaymentForm({
+      amount: pending > 0 ? String(pending) : "",
+      paymentDate: new Date().toISOString().slice(0, 10),
+      method: "SPEI",
+      reference: "",
+      notes: "",
+    });
+    setPaymentErr(null);
+  };
+
+  const submitPayment = async () => {
+    if (!token || !paymentTarget) return;
+    const amount = Number(paymentForm.amount);
+    if (!amount || amount <= 0) { setPaymentErr("Indica un monto válido."); return; }
+    setPaying(true);
+    setPaymentErr(null);
+    try {
+      await apiFetch(`accounting/invoices/${paymentTarget.id}/payments`, token, {
+        method: "POST",
+        body: JSON.stringify({
+          amount,
+          paymentDate: paymentForm.paymentDate,
+          method: paymentForm.method,
+          reference: paymentForm.reference.trim() || undefined,
+          notes: paymentForm.notes.trim() || undefined,
+        }),
+      });
+      setPaymentTarget(null);
+      void load();
+    } catch (e) {
+      setPaymentErr(e instanceof Error ? e.message : "Error al registrar pago");
+    } finally {
+      setPaying(false);
+    }
   };
 
   const openNew = () => {
@@ -267,10 +313,13 @@ export default function InvoicingPage() {
             <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); void openEditDraft(f); }}>Editar</Button>
           )}
           {f.status === "DRAFT" && <Button size="sm" variant="primary" onClick={(e) => { e.stopPropagation(); void stamp(f); }}>Timbrar</Button>}
+          {cfg.canCreate && f.status !== "DRAFT" && f.status !== "CANCELLED" && f.status !== "PAID" && (
+            <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openPayment(f); }}>Pago</Button>
+          )}
           {cfg.canDelete && f.status !== "CANCELLED" && <Button size="sm" variant="danger" onClick={(e) => { e.stopPropagation(); void cancel(f); }}>Cancelar</Button>}
         </div>
       ),
-      width: 180,
+      width: 240,
     }] : []),
   ];
 
@@ -391,6 +440,57 @@ export default function InvoicingPage() {
         {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
         {!loading && !error && <DataTable columns={columns} rows={visibleItems} rowKey={(f) => f.id} emptyTitle="Sin facturas" emptyDescription="Las facturas se generan desde un proyecto de ventas cerrado." />}
       </Section>
+
+      {paymentTarget && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
+          onClick={() => setPaymentTarget(null)}>
+          <div style={{ background: "var(--surface)", borderRadius: 16, padding: "24px 28px", width: 440, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.28)", border: "1px solid var(--border)" }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Registrar pago</div>
+            <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginBottom: 18 }}>
+              {paymentTarget.invoiceNumber} · saldo pendiente{" "}
+              <Money value={Math.max(0, Number(paymentTarget.totalAmount) - Number(paymentTarget.paidAmount ?? 0))} />
+            </div>
+            <div style={{ display: "grid", gap: 12 }}>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Monto *</span>
+                <input type="number" min={0} step="0.01" value={paymentForm.amount} onChange={(e) => setPaymentForm((f) => ({ ...f, amount: e.target.value }))} style={inp} />
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Fecha de pago</span>
+                <input type="date" value={paymentForm.paymentDate} onChange={(e) => setPaymentForm((f) => ({ ...f, paymentDate: e.target.value }))} style={inp} />
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Método</span>
+                <select value={paymentForm.method} onChange={(e) => setPaymentForm((f) => ({ ...f, method: e.target.value }))} style={inp}>
+                  <option value="SPEI">SPEI</option>
+                  <option value="TRANSFER">Transferencia</option>
+                  <option value="CASH">Efectivo</option>
+                  <option value="CHECK">Cheque</option>
+                  <option value="CARD">Tarjeta</option>
+                </select>
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Referencia</span>
+                <input value={paymentForm.reference} onChange={(e) => setPaymentForm((f) => ({ ...f, reference: e.target.value }))} placeholder="Clave de rastreo, folio…" style={inp} />
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Notas</span>
+                <input value={paymentForm.notes} onChange={(e) => setPaymentForm((f) => ({ ...f, notes: e.target.value }))} style={inp} />
+              </label>
+            </div>
+            {paymentErr && (
+              <div role="alert" style={{ marginTop: 12, padding: "8px 12px", background: "var(--state-danger-bg,#fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>
+                {paymentErr}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
+              <Button variant="secondary" onClick={() => setPaymentTarget(null)}>Cancelar</Button>
+              <Button variant="primary" onClick={() => void submitPayment()} disabled={paying}>{paying ? "Registrando…" : "Registrar pago"}</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

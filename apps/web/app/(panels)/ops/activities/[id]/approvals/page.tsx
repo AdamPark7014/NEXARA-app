@@ -17,6 +17,8 @@ export default function ActivityApprovalsPage() {
   const token = user?.token ?? "";
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [rejectErr, setRejectErr] = useState<string | null>(null);
+  const [actionErr, setActionErr] = useState<string | null>(null);
 
   if (error) return <DetailError message={error} onRetry={reload} />;
   if (!activity) return null;
@@ -27,7 +29,7 @@ export default function ActivityApprovalsPage() {
 
   const approve = async () => {
     if (!token || !user?.id) return;
-    setSaving(true);
+    setSaving(true); setActionErr(null);
     try {
       const res = await fetch(buildApiUrl(`activity-evidence/${id}/approve`), {
         method: "POST",
@@ -37,7 +39,7 @@ export default function ActivityApprovalsPage() {
       if (!res.ok) throw new Error(await res.text());
       reload();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "No se pudo aprobar");
+      setActionErr(e instanceof Error ? e.message : "No se pudo aprobar");
     } finally {
       setSaving(false);
     }
@@ -45,9 +47,9 @@ export default function ActivityApprovalsPage() {
 
   const reject = async () => {
     if (!token || !user?.id) return;
-    const reason = notes.trim() || window.prompt("Motivo del rechazo:")?.trim();
-    if (!reason) return;
-    setSaving(true);
+    const reason = notes.trim();
+    if (!reason) { setRejectErr("Escribe un motivo de rechazo antes de continuar."); return; }
+    setRejectErr(null); setSaving(true); setActionErr(null);
     try {
       const res = await fetch(buildApiUrl(`activity-evidence/${id}/reject`), {
         method: "POST",
@@ -57,7 +59,7 @@ export default function ActivityApprovalsPage() {
       if (!res.ok) throw new Error(await res.text());
       reload();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "No se pudo rechazar");
+      setActionErr(e instanceof Error ? e.message : "No se pudo rechazar");
     } finally {
       setSaving(false);
     }
@@ -95,11 +97,25 @@ export default function ActivityApprovalsPage() {
 
       {cfg.canApprove && isPending && (
         <div style={{ marginTop: 20, padding: 16, border: "1px solid var(--border)", borderRadius: 10 }}>
-          <label style={{ display: "grid", gap: 6, marginBottom: 12 }}>
+          <label style={{ display: "grid", gap: 6, marginBottom: 4 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>Notas de revisión</span>
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13, resize: "vertical" }} placeholder="Observaciones para el ingeniero (opcional al aprobar, requerido al rechazar)…" />
+            <textarea
+              value={notes}
+              onChange={(e) => { setNotes(e.target.value); if (e.target.value.trim()) setRejectErr(null); }}
+              rows={3}
+              style={{ width: "100%", padding: 8, borderRadius: 8, border: `1px solid ${rejectErr ? "var(--danger)" : "var(--border)"}`, background: "var(--surface)", color: "var(--foreground)", fontSize: 13, resize: "vertical" }}
+              placeholder="Observaciones para el ingeniero (opcional al aprobar, requerido al rechazar)…"
+            />
           </label>
-          <div style={{ display: "flex", gap: 8 }}>
+          {rejectErr && (
+            <div style={{ fontSize: 12, color: "var(--danger)", marginBottom: 8 }}>⚠ {rejectErr}</div>
+          )}
+          {actionErr && (
+            <div style={{ padding: "8px 12px", background: "var(--state-danger-bg,#fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)", marginBottom: 8 }}>
+              {actionErr}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
             <Button variant="primary" onClick={() => void approve()} disabled={saving}>Aprobar paquete</Button>
             <Button variant="danger" onClick={() => void reject()} disabled={saving}>Rechazar</Button>
           </div>

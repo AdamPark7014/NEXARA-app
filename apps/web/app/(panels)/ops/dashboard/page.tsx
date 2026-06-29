@@ -10,7 +10,8 @@ import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
-import { filterRowsByScope, getOpsDashboardSectionConfig, getActivitiesCanonicalPath } from "@/lib/section-views";
+import { activityStatusVariant, isActivityCompleted, isActivityInProgress } from "@/lib/activity-status";
+import { filterRowsByScope, getActivitiesCanonicalPath, getOpsDashboardSectionConfig } from "@/lib/section-views";
 
 interface ActivityRow {
   id: number;
@@ -47,16 +48,22 @@ export default function OpsDashboardPage() {
   const [alerts, setAlerts] = useState<NocAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [alertsErr, setAlertsErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError(null);
+    setAlertsErr(null);
     try {
       const [actData, alertData] = await Promise.all([
         apiFetch("activities", token),
         cfg.viewMode === "execute"
           ? Promise.resolve([])
-          : apiFetch("noc/alerts", token).catch(() => []),
+          : apiFetch("noc/alerts", token).catch((e) => {
+              setAlertsErr(e instanceof Error ? e.message : "No se pudieron cargar alertas NOC");
+              return [];
+            }),
       ]);
       setActivities(Array.isArray(actData) ? actData : (actData?.data ?? []));
       setAlerts(Array.isArray(alertData) ? alertData : []);
@@ -74,12 +81,12 @@ export default function OpsDashboardPage() {
 
   const today = new Date().toDateString();
   const ots = scopedActivities.filter((a) => a.fechaEntregaEsperada && new Date(a.fechaEntregaEsperada).toDateString() === today);
-  const enCurso = scopedActivities.filter((a) => a.estatus === "En Proceso").length;
-  const completadasHoy = scopedActivities.filter((a) => a.estatus === "Finalizado" && a.fechaEntregaEsperada && new Date(a.fechaEntregaEsperada).toDateString() === today).length;
+  const enCurso = scopedActivities.filter((a) => isActivityInProgress(a.estatus)).length;
+  const completadasHoy = scopedActivities.filter((a) => isActivityCompleted(a.estatus) && a.fechaEntregaEsperada && new Date(a.fechaEntregaEsperada).toDateString() === today).length;
   const showTeam = cfg.defaultScope === "team";
   const showNoc = cfg.viewMode !== "execute";
 
-  const estadoVariant = (e: string): "positive" | "warning" | "default" => e === "Finalizado" ? "positive" : e === "En Proceso" ? "warning" : "default";
+  const estadoVariant = activityStatusVariant;
   const sevColor: Record<string, string> = { critical: "var(--danger)", warning: "var(--warning)", info: "var(--text-tertiary)" };
 
   return (
@@ -116,7 +123,8 @@ export default function OpsDashboardPage() {
             <Section title="OT del día">
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {ots.map((a) => (
-                  <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                  <Link key={a.id} href={`/ops/activities/${a.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10 }}>
                     <Tag variant="accent">{a.anNumber}</Tag>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: 13 }}>{a.client?.name ?? a.branchName ?? "—"}</div>
@@ -124,13 +132,15 @@ export default function OpsDashboardPage() {
                     </div>
                     <Tag variant={estadoVariant(a.estatus)}>{a.estatus}</Tag>
                   </div>
+                  </Link>
                 ))}
                 {ots.length === 0 && <EmptyState icon="🎉" title="Sin OT para hoy" description="No hay actividades con entrega esperada hoy." />}
               </div>
             </Section>
 
             {showNoc && (
-            <Section title="Alertas de monitoreo">
+            <Section title="Alertas de monitoreo" actions={<Link href="/ops/noc" style={{ fontSize: 12, color: "var(--primary)" }}>Ver NOC →</Link>}>
+              {alertsErr && <p style={{ fontSize: 12, color: "var(--danger)", marginBottom: 8 }}>{alertsErr}</p>}
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {alerts.slice(0, 8).map((al) => (
                   <div key={al.id} style={{ padding: "10px 12px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, borderLeftWidth: 3, borderLeftColor: sevColor[al.severity] }}>
