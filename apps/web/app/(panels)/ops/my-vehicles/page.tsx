@@ -25,8 +25,8 @@ interface VehicleRequest {
   fechaFinSolicitada?: string | null;
   odometroInicio?: number | null;
   odometroFin?: number | null;
-  fotosSalida?: unknown;
-  fotosDevolucion?: unknown;
+  fotosSalida?: Record<string, unknown> | null;
+  fotosDevolucion?: Record<string, unknown> | null;
   renovacionEstatus?: string | null;
 }
 
@@ -172,7 +172,7 @@ export default function MyVehiclesPage() {
                     {!v.fotosSalida && (
                       <Button size="sm" variant="primary" onClick={() => openCheckout(v, "salida")}>📸 Registrar salida (4+4 + odómetro)</Button>
                     )}
-                    {v.fotosSalida && !v.fotosDevolucion && (
+                    {Boolean(v.fotosSalida) && !v.fotosDevolucion && (
                       <Button size="sm" variant="secondary" onClick={() => openCheckout(v, "devolucion")}>📸 Registrar entrega</Button>
                     )}
                     {v.entregaEstatus === "En uso" && (
