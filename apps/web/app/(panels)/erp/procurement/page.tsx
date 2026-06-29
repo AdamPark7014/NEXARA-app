@@ -134,6 +134,12 @@ export default function ProcurementPage() {
   const [receiptNotes, setReceiptNotes] = useState("");
   const [savingReceipt, setSavingReceipt] = useState(false);
 
+  // ── Rechazar requisición ───────────────────────────────────────────────
+  const [rejectReqModal, setRejectReqModal] = useState<Requisition | null>(null);
+  const [rejectReqReason, setRejectReqReason] = useState("");
+  const [rejectingReq, setRejectingReq] = useState(false);
+  const [rejectReqErr, setRejectReqErr] = useState<string | null>(null);
+
   const setTab = (next: ProcTab) => {
     const p = new URLSearchParams();
     p.set("tab", next);
@@ -253,6 +259,34 @@ export default function ProcurementPage() {
     }
   };
 
+  const openRejectReq = (req: Requisition) => {
+    setRejectReqModal(req);
+    setRejectReqReason("");
+    setRejectReqErr(null);
+  };
+
+  const submitRejectReq = async () => {
+    if (!token || !rejectReqModal) return;
+    if (!rejectReqReason.trim()) { setRejectReqErr("Escribe un motivo de rechazo."); return; }
+    setRejectingReq(true); setRejectReqErr(null);
+    try {
+      await apiFetch(`procurement/requisitions/${rejectReqModal.id}/reject`, token, {
+        method: "PATCH",
+        body: JSON.stringify({ reason: rejectReqReason.trim() }),
+      });
+      setRejectReqModal(null);
+      void load();
+    } catch (e) {
+      setRejectReqErr(e instanceof Error ? e.message : "Error al rechazar");
+    } finally { setRejectingReq(false); }
+  };
+
+  // kept for backward compat with column definitions that may call rejectReq(id)
+  const rejectReq = (id: number) => {
+    const req = requisitions.find((r) => r.id === id);
+    if (req) openRejectReq(req);
+  };
+
   const saveReceipt = async () => {
     if (!token || !receiptPoId) return;
     setSavingReceipt(true);
@@ -343,9 +377,14 @@ export default function ProcurementPage() {
             {REQ_STATUS[r.status] ?? r.status}
           </Tag>
           {r.status === "PENDING" && cfg.canApprove && (
-            <button onClick={() => void approveReq(r.id)} style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>
-              ✓
-            </button>
+            <>
+              <button onClick={() => void approveReq(r.id)} style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>
+                ✓
+              </button>
+              <button onClick={() => void rejectReq(r.id)} style={{ fontSize: 11, background: "var(--danger)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>
+                ✕
+              </button>
+            </>
           )}
         </div>
       ),
@@ -543,6 +582,42 @@ export default function ProcurementPage() {
           <DataTable columns={receiptColumns} rows={visibleReceipts} rowKey={(r) => r.id} emptyTitle="Sin recepciones" emptyDescription="Registra la entrada de mercancía contra una OC." />
         )}
       </Section>
+
+      {/* ── Rechazar requisición modal ── */}
+      {rejectReqModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
+          onClick={() => setRejectReqModal(null)}>
+          <div style={{ background: "var(--surface)", borderRadius: 16, padding: "24px 28px", width: 440, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.28)", border: "1px solid var(--border)" }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Rechazar requisición</div>
+            <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginBottom: 18 }}>
+              <strong>{rejectReqModal.reqNumber}</strong> · {rejectReqModal.title}
+            </div>
+            <label style={{ display: "grid", gap: 4, marginBottom: 14 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Motivo del rechazo *</span>
+              <textarea
+                value={rejectReqReason}
+                onChange={(e) => { setRejectReqReason(e.target.value); if (e.target.value.trim()) setRejectReqErr(null); }}
+                rows={4}
+                placeholder="Explica la razón del rechazo para que el solicitante pueda tomar acción…"
+                autoFocus
+                style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: `1px solid ${rejectReqErr ? "var(--danger)" : "var(--border)"}`, background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13, resize: "vertical", fontFamily: "inherit", lineHeight: 1.45 }}
+              />
+            </label>
+            {rejectReqErr && (
+              <div style={{ padding: "8px 12px", background: "var(--state-danger-bg,#fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)", marginBottom: 12 }}>
+                {rejectReqErr}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <Button variant="secondary" onClick={() => setRejectReqModal(null)}>Cancelar</Button>
+              <Button variant="danger" onClick={() => void submitRejectReq()} disabled={rejectingReq}>
+                {rejectingReq ? "Rechazando…" : "Confirmar rechazo"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

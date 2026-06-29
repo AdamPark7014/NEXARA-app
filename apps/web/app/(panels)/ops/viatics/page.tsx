@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -13,67 +13,95 @@ import { useUser } from "@/components/UserContext";
 import { getViaticsSectionConfig } from "@/lib/section-views";
 import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 import { buildApiUrl } from "@/lib/api-base";
-
-interface Viatic {
-  id: number;
-  concepto?: string;
-  monto?: number;
-  estado?: string;
-  fecha?: string;
-  tipo?: string;
-  user?: { nombre?: string };
-  activity?: { id?: number; anNumber?: string };
-  actividadId?: number;
-}
-
-const ESTADOS = ["PENDIENTE_COORD", "PENDIENTE_ADMIN", "APROBADO", "RECHAZADO"];
+import { formatApiError } from "@/lib/erp-api";
+import {
+  isViaticoPending,
+  normalizeViaticoRow,
+  viaticoEstatusVariant,
+  type ViaticoRow,
+} from "@/lib/viatics-display";
 
 async function apiFetch(path: string, token: string, opts?: RequestInit) {
   const res = await fetch(buildApiUrl(path), {
     ...opts,
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(opts?.headers ?? {}) },
   });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+  if (res.status === 204) return null;
+  const t = await res.text();
+  return t ? JSON.parse(t) : null;
 }
 
 export default function OpsViaticsPage() {
   const { user } = useUser();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const highlightId = searchParams.get("highlight");
   const cfg = useMemo(() => getViaticsSectionConfig(user), [user]);
   useOpsCanonicalRoute(user, "viatics");
   const token = user?.token ?? "";
 
-  const [items, setItems] = useState<Viatic[]>([]);
+  const [items, setItems] = useState<ViaticoRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<ViaticoRow | null>(null);
+  const [approveEstatus, setApproveEstatus] = useState("Aprobado");
+  const [saving, setSaving] = useState(false);
+  const [actionErr, setActionErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError(null);
     try {
       const data = await apiFetch("viatics", token);
-      setItems(Array.isArray(data) ? data : (data.data ?? []));
+      const rows = Array.isArray(data) ? data : (data?.data ?? []);
+      setItems(rows.map((r: Record<string, unknown>) => normalizeViaticoRow(r)));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar viaticos");
-    } finally { setLoading(false); }
+      setError(formatApiError(e, "Error al cargar viáticos"));
+    } finally {
+      setLoading(false);
+    }
   }, [token]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
-  const patchEstado = async (id: number, estado: string) => {
+  const patchEstatus = async (id: number, estatus: string) => {
     if (!token) return;
+    setSaving(true);
+    setActionErr(null);
     try {
-      await apiFetch(`viatics/${id}`, token, { method: "PATCH", body: JSON.stringify({ estado }) });
-      setItems(prev => prev.map(v => v.id === id ? { ...v, estado } : v));
-    } catch (e) { alert(e instanceof Error ? e.message : "Error al actualizar viatico"); }
+      const updated = await apiFetch(`viatics/${id}`, token, {
+        method: "PATCH",
+        body: JSON.stringify({ estatus }),
+      });
+      setItems((prev) =>
+        prev.map((v) =>
+          v.id === id
+            ? normalizeViaticoRow({ ...(v as unknown as Record<string, unknown>), ...(updated ?? {}), estatus })
+            : v,
+        ),
+      );
+      setSelected(null);
+    } catch (e) {
+      setActionErr(formatApiError(e, "Error al actualizar viático"));
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const pendientes = items.filter(v => v.estado?.startsWith("PENDIENTE")).length;
-  const totalAprobado = items.filter(v => v.estado === "APROBADO").reduce((s, v) => s + (v.monto ?? 0), 0);
-  const totalPendiente = items.filter(v => v.estado?.startsWith("PENDIENTE")).reduce((s, v) => s + (v.monto ?? 0), 0);
+  const openApprove = (v: ViaticoRow) => {
+    setSelected(v);
+    setApproveEstatus(v.estatus === "Pendiente" ? "Aprobado_Coordinador" : "Aprobado");
+    setActionErr(null);
+  };
+
+  const pendientes = items.filter((v) => isViaticoPending(v.estatus)).length;
+  const totalAprobado = items
+    .filter((v) => v.estatus === "Aprobado" || v.estatus === "Pagado")
+    .reduce((s, v) => s + (v.montoSolicitado ?? 0), 0);
+  const totalPendiente = items
+    .filter((v) => isViaticoPending(v.estatus))
+    .reduce((s, v) => s + (v.montoSolicitado ?? 0), 0);
 
   const visibleItems = useMemo(() => {
     if (!highlightId) return items;
@@ -82,41 +110,68 @@ export default function OpsViaticsPage() {
     return [...items].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
   }, [items, highlightId]);
 
-  void ESTADOS; // used for future estado filter
-
-  const columns: Column<Viatic>[] = [
-    { key: "id", label: "ID", render: v => <Tag variant="accent">V-{v.id}</Tag>, width: 80 },
-    { key: "user", label: "Ingeniero", accessor: v => v.user?.nombre ?? "—", width: 140 },
-    { key: "activity", label: "OT", render: v => {
-      const activityId = v.activity?.id ?? v.actividadId;
-      const label = v.activity?.anNumber ?? (activityId ? `ACT-${activityId}` : "—");
-      return activityId ? (
-        <Link href={`/ops/activities/${activityId}`} style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)", textDecoration: "none" }}>{label}</Link>
-      ) : label;
-    }, width: 100 },
-    { key: "concepto", label: "Concepto", render: v => <span style={{ fontSize: 13 }}>{v.concepto ?? "—"}</span> },
-    { key: "monto", label: "Monto", render: v => <Money value={v.monto ?? 0} />, width: 110 },
-    { key: "fecha", label: "Fecha", accessor: v => v.fecha ? new Date(v.fecha).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "—", width: 90 },
-    { key: "estado", label: "Estado", render: v => (
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <Tag variant={v.estado === "APROBADO" ? "neutral" : v.estado === "RECHAZADO" ? "danger" : "warning"}>
-          {(v.estado ?? "—").replace(/_/g, " ")}
-        </Tag>
-        {v.estado === "PENDIENTE_COORD" && cfg.canApprove && (
-          <>
-            <button onClick={() => patchEstado(v.id, "PENDIENTE_ADMIN")} style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>✓ Coord</button>
-            <button onClick={() => patchEstado(v.id, "RECHAZADO")} style={{ fontSize: 11, background: "var(--danger)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>✕</button>
-          </>
-        )}
-        {v.estado === "PENDIENTE_ADMIN" && cfg.canApprove && (
-          <>
-            <button onClick={() => patchEstado(v.id, "APROBADO")} style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>✓ Admin</button>
-            <button onClick={() => patchEstado(v.id, "RECHAZADO")} style={{ fontSize: 11, background: "var(--danger)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>✕</button>
-          </>
-        )}
-      </div>
-    ), width: 240 },
+  const columns: Column<ViaticoRow>[] = [
+    { key: "id", label: "ID", render: (v) => <Tag variant="accent">V-{v.id}</Tag>, width: 80 },
+    { key: "usuario", label: "Ingeniero", accessor: (v) => v.usuario?.nombre ?? "—", width: 140 },
+    {
+      key: "actividad",
+      label: "OT",
+      render: (v) => {
+        const activityId = v.actividad?.id ?? v.actividadId;
+        const label = v.actividad?.anNumber ?? v.actividad?.folio ?? (activityId ? `ACT-${activityId}` : "—");
+        return activityId ? (
+          <Link href={`/ops/activities/${activityId}`} style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)", textDecoration: "none" }}>
+            {label}
+          </Link>
+        ) : label;
+      },
+      width: 100,
+    },
+    { key: "concepto", label: "Concepto", render: (v) => <span style={{ fontSize: 13 }}>{v.concepto ?? "—"}</span> },
+    { key: "montoSolicitado", label: "Monto", render: (v) => <Money value={v.montoSolicitado ?? 0} />, width: 110 },
+    {
+      key: "fechaSolicitud",
+      label: "Fecha",
+      accessor: (v) =>
+        v.fechaSolicitud ? new Date(v.fechaSolicitud).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "—",
+      width: 90,
+    },
+    {
+      key: "estatus",
+      label: "Estado",
+      render: (v) => (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+          <Tag variant={viaticoEstatusVariant(v.estatus)}>{(v.estatus ?? "—").replace(/_/g, " ")}</Tag>
+          {cfg.canApprove && v.estatus === "Pendiente" && (
+            <>
+              <button type="button" onClick={() => openApprove(v)} style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>
+                ✓ Coord
+              </button>
+              <button type="button" onClick={() => void patchEstatus(v.id, "Rechazado")} style={{ fontSize: 11, background: "var(--danger)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>
+                ✕
+              </button>
+            </>
+          )}
+          {cfg.canApprove && v.estatus === "Aprobado_Coordinador" && (
+            <>
+              <button type="button" onClick={() => openApprove(v)} style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>
+                ✓ Admin
+              </button>
+              <button type="button" onClick={() => void patchEstatus(v.id, "Rechazado")} style={{ fontSize: 11, background: "var(--danger)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>
+                ✕
+              </button>
+            </>
+          )}
+        </div>
+      ),
+      width: 260,
+    },
   ];
+
+  const inp: React.CSSProperties = {
+    width: "100%", padding: "8px 12px", border: "1px solid var(--border)",
+    borderRadius: 8, background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13,
+  };
 
   return (
     <>
@@ -124,7 +179,7 @@ export default function OpsViaticsPage() {
         eyebrow="OPS · Finanzas campo"
         title={cfg.title}
         subtitle={cfg.subtitle}
-        actions={<Button variant="ghost" onClick={load}>Actualizar</Button>}
+        actions={<Button variant="ghost" onClick={() => void load()}>Actualizar</Button>}
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
@@ -133,20 +188,49 @@ export default function OpsViaticsPage() {
         <KpiCard label="Aprobado ($)" value={`$${(totalAprobado / 1000).toFixed(0)}k`} />
       </div>
 
-      <Section title={loading ? "Cargando…" : `${visibleItems.length} viaticos`}>
+      {actionErr && (
+        <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13 }}>
+          {actionErr}
+        </div>
+      )}
+
+      <Section title={loading ? "Cargando…" : `${visibleItems.length} viáticos`}>
         {highlightId && (
           <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
-            Mostrando viatico <strong>#{highlightId}</strong> desde enlace directo.
+            Mostrando viático <strong>#{highlightId}</strong> desde enlace directo.
           </p>
         )}
-        {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando viaticos de campo." />}
+        {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando viáticos de campo." />}
         {!loading && error && (
           <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />
         )}
         {!loading && !error && (
-          <DataTable columns={columns} rows={visibleItems} rowKey={v => v.id} emptyTitle="Sin viaticos" emptyDescription="No hay gastos de campo registrados." />
+          <DataTable columns={columns} rows={visibleItems} rowKey={(v) => v.id} emptyTitle="Sin viáticos" emptyDescription="No hay gastos de campo registrados." />
         )}
       </Section>
+
+      {selected && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setSelected(null)}>
+          <div style={{ background: "var(--surface)", borderRadius: 16, padding: 24, width: 400, maxWidth: "calc(100vw - 32px)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontWeight: 700, marginBottom: 12 }}>Aprobar viático V-{selected.id}</div>
+            <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "0 0 12px" }}>{selected.concepto} · <Money value={selected.montoSolicitado ?? 0} /></p>
+            <label style={{ display: "grid", gap: 4, marginBottom: 16 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Nuevo estatus</span>
+              <select value={approveEstatus} onChange={(e) => setApproveEstatus(e.target.value)} style={inp}>
+                {selected.estatus === "Pendiente" && <option value="Aprobado_Coordinador">Aprobado por coordinador</option>}
+                <option value="Aprobado">Aprobado final</option>
+                <option value="Pagado">Marcar como pagado</option>
+              </select>
+            </label>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <Button variant="secondary" onClick={() => setSelected(null)}>Cancelar</Button>
+              <Button variant="primary" disabled={saving} onClick={() => void patchEstatus(selected.id, approveEstatus)}>
+                {saving ? "Guardando…" : "Confirmar"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

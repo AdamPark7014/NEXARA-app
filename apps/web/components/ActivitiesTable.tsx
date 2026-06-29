@@ -1,6 +1,7 @@
 "use client";
 import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
 import { hasPermission, PERMISSIONS } from '@/lib/permissions';
@@ -80,6 +81,8 @@ const ActivitiesTable: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const { user } = useUser();
+  const searchParams = useSearchParams();
+  const ticketIdParam = searchParams.get('ticketId');
   const actCfg = getActivitiesSectionConfig(user);
   const canAssignActivities =
     hasPermission(user, PERMISSIONS.ACTIVITIES_MANAGE) && actCfg.canCreate && actCfg.canAssign;
@@ -499,6 +502,7 @@ const ActivitiesTable: React.FC = () => {
   useEffect(() => {
     if (!user?.token) return;
     fetchActivities();
+    fetchAssignableUsers();
     fetchNextAn();
     fetchClients();
     fetchOperationalProjects();
@@ -506,12 +510,24 @@ const ActivitiesTable: React.FC = () => {
   }, [user?.token]);
 
   useEffect(() => {
-    fetchAssignableUsers();
-    fetchNextAn();
-    fetchClients();
-    fetchOperationalProjects();
-    fetchTicketRequests();
-  }, [user?.token]);
+    if (!user?.token || !ticketIdParam || !canAssignActivities) return;
+    const ticketId = Number(ticketIdParam);
+    if (Number.isNaN(ticketId)) return;
+    fetch(buildApiUrl(`client-ticket-requests/${ticketId}`), {
+      headers: { Authorization: `Bearer ${user.token}` },
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error('No se pudo cargar el ticket de soporte');
+        return res.json();
+      })
+      .then((request) => {
+        prefillFromRequest(request);
+        setPendingRequestId(ticketId);
+      })
+      .catch((err) => {
+        setFormError(err instanceof Error ? err.message : 'Error al precargar ticket');
+      });
+  }, [user?.token, ticketIdParam, canAssignActivities]);
 
   useEffect(() => {
     if (!user?.token) return;
@@ -629,15 +645,20 @@ const ActivitiesTable: React.FC = () => {
 
   const handleCloseRequest = async (id: number) => {
     if (!user?.token) return;
-    await fetch(buildApiUrl(`client-ticket-requests/${id}/status`), {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${user.token}`,
-      },
-      body: JSON.stringify({ status: 'CLOSED' }),
-    }).catch(() => null);
-    fetchTicketRequests();
+    try {
+      const res = await fetch(buildApiUrl(`client-ticket-requests/${id}/status`), {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${user.token}`,
+        },
+        body: JSON.stringify({ status: 'CLOSED' }),
+      });
+      if (!res.ok) throw new Error('No se pudo cerrar el ticket');
+      fetchTicketRequests();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Error al cerrar ticket');
+    }
   };
 
   const handleAssign = async () => {
@@ -696,16 +717,20 @@ const ActivitiesTable: React.FC = () => {
     }
 
     if (!isEditing && pendingRequestId && data?.id) {
-      await fetch(buildApiUrl(`client-ticket-requests/${pendingRequestId}/assign`), {
+      const assignRes = await fetch(buildApiUrl(`client-ticket-requests/${pendingRequestId}/assign`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${user.token}`,
         },
         body: JSON.stringify({ activityId: data.id }),
-      }).catch(() => null);
-      setPendingRequestId(null);
-      fetchTicketRequests();
+      });
+      if (!assignRes.ok) {
+        setFormError('OT creada pero no se pudo vincular al ticket de soporte');
+      } else {
+        setPendingRequestId(null);
+        fetchTicketRequests();
+      }
     }
 
     setFormSuccess(isEditing ? 'Actividad actualizada' : 'Actividad asignada');

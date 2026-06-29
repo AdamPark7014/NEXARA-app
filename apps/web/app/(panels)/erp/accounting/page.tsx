@@ -35,7 +35,17 @@ async function apiFetch(path: string, token: string, opts?: RequestInit) {
   return res.json();
 }
 
-const emptyForm = { description: "", type: "DIARIO", date: new Date().toISOString().slice(0, 10), totalDebit: 0, totalCredit: 0 };
+interface AccountOption { id: number; code?: string; name?: string; }
+
+const emptyForm = {
+  description: "",
+  type: "DIARIO",
+  date: new Date().toISOString().slice(0, 10),
+  reference: "",
+  debitAccountId: "",
+  creditAccountId: "",
+  amount: 0,
+};
 
 export default function AccountingPage() {
   const { user } = useUser();
@@ -51,6 +61,24 @@ export default function AccountingPage() {
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
+  const [accounts, setAccounts] = useState<AccountOption[]>([]);
+  const [accountsErr, setAccountsErr] = useState<string | null>(null);
+
+  const loadAccounts = useCallback(async () => {
+    if (!token) return;
+    setAccountsErr(null);
+    try {
+      const data = await apiFetch("accounting/accounts?isActive=true", token);
+      setAccounts(Array.isArray(data) ? data : (data?.data ?? []));
+    } catch (e) {
+      setAccounts([]);
+      setAccountsErr(formatApiError(e, "No se pudo cargar el catálogo de cuentas"));
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (showForm) void loadAccounts();
+  }, [showForm, loadAccounts]);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -72,10 +100,46 @@ export default function AccountingPage() {
       setSaveErr("El concepto es obligatorio.");
       return;
     }
+    if (!form.debitAccountId || !form.creditAccountId) {
+      setSaveErr("Selecciona cuenta de cargo y abono.");
+      return;
+    }
+    if (form.debitAccountId === form.creditAccountId) {
+      setSaveErr("Las cuentas de cargo y abono deben ser distintas.");
+      return;
+    }
+    if (!form.amount || form.amount <= 0) {
+      setSaveErr("El importe debe ser mayor a cero.");
+      return;
+    }
     setSaving(true);
     setSaveErr(null);
     try {
-      const created = await apiFetch("accounting/journal-entries", token, { method: "POST", body: JSON.stringify(form) });
+      const amount = Number(form.amount);
+      const created = await apiFetch("accounting/journal-entries", token, {
+        method: "POST",
+        body: JSON.stringify({
+          date: form.date,
+          description: form.description.trim(),
+          reference: form.reference.trim() || undefined,
+          lines: [
+            {
+              debitAccountId: Number(form.debitAccountId),
+              creditAccountId: Number(form.creditAccountId),
+              description: form.description.trim(),
+              debit: amount,
+              credit: 0,
+            },
+            {
+              debitAccountId: Number(form.creditAccountId),
+              creditAccountId: Number(form.debitAccountId),
+              description: form.description.trim(),
+              debit: 0,
+              credit: amount,
+            },
+          ],
+        }),
+      });
       setItems(prev => [created, ...prev]);
       setShowForm(false);
       setForm({ ...emptyForm });
@@ -178,13 +242,35 @@ export default function AccountingPage() {
             <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} style={inp} />
           </div>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Cargo ($)</label>
-            <input type="number" min={0} value={form.totalDebit} onChange={e => setForm(f => ({ ...f, totalDebit: +e.target.value }))} style={inp} />
+            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Referencia (opcional)</label>
+            <input value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} placeholder="REF-001" style={inp} />
           </div>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Abono ($)</label>
-            <input type="number" min={0} value={form.totalCredit} onChange={e => setForm(f => ({ ...f, totalCredit: +e.target.value }))} style={inp} />
+            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Cuenta cargo (Debe)</label>
+            <select value={form.debitAccountId} onChange={e => setForm(f => ({ ...f, debitAccountId: e.target.value }))} style={inp}>
+              <option value="">— Seleccionar —</option>
+              {accounts.map(a => <option key={a.id} value={a.id}>{a.code ? `${a.code} · ` : ""}{a.name ?? `Cuenta ${a.id}`}</option>)}
+            </select>
           </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Cuenta abono (Haber)</label>
+            <select value={form.creditAccountId} onChange={e => setForm(f => ({ ...f, creditAccountId: e.target.value }))} style={inp}>
+              <option value="">— Seleccionar —</option>
+              {accounts.map(a => <option key={a.id} value={a.id}>{a.code ? `${a.code} · ` : ""}{a.name ?? `Cuenta ${a.id}`}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 4 }}>Importe ($)</label>
+            <input type="number" min={0} step="0.01" value={form.amount || ""} onChange={e => setForm(f => ({ ...f, amount: +e.target.value }))} style={inp} />
+          </div>
+          {accountsErr && (
+            <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--danger)" }}>
+              {accountsErr}{" "}
+              <button type="button" onClick={() => void loadAccounts()} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", textDecoration: "underline" }}>
+                Reintentar
+              </button>
+            </div>
+          )}
           <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end", flexDirection: "column", alignItems: "stretch" }}>
             {saveErr && (
               <div role="alert" style={{ padding: "8px 12px", background: "var(--state-danger-bg, #fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>

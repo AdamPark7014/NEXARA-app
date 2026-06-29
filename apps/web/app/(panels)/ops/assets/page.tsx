@@ -72,6 +72,26 @@ export default function AssetsPage() {
   const [notes, setNotes] = useState("");
   const [equipRows, setEquipRows] = useState<EquipmentRow[]>([{ equipmentName: "", serialNumber: "", model: "" }]);
   const [saving, setSaving] = useState(false);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+
+  const downloadReport = async (id: number) => {
+    if (!token) return;
+    try {
+      const res = await fetch(buildApiUrl(`inventories/${id}/report`), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `inventario-${id}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Error al descargar reporte");
+    }
+  };
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -90,7 +110,10 @@ export default function AssetsPage() {
     if (!token || !showForm || clients.length) return;
     apiFetch<ServiceClient[]>("service-clients?limit=200", token)
       .then((d) => setClients(Array.isArray(d) ? d : ((d as { data?: ServiceClient[] })?.data ?? [])))
-      .catch(() => setClients([]));
+      .catch((e) => {
+        setClients([]);
+        setCatalogError(e instanceof Error ? e.message : "No se pudieron cargar clientes");
+      });
   }, [token, showForm, clients.length]);
 
   useEffect(() => {
@@ -160,6 +183,16 @@ export default function AssetsPage() {
     }, width: 120 },
     { key: "status", label: "Estado", render: (s) => <Tag variant={statusVariant(s.status)}>{s.status}</Tag>, width: 110 },
     { key: "updatedAt", label: "Actualizado", render: (s) => <span style={{ fontSize: 12 }}>{s.updatedAt ? new Date(s.updatedAt).toLocaleDateString("es-MX") : "—"}</span>, width: 110 },
+    ...(cfg.canEdit ? [{
+      key: "id" as keyof Snapshot,
+      label: "",
+      width: 120,
+      render: (s: Snapshot) => (
+        <button type="button" onClick={() => void downloadReport(s.id)} style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px solid var(--primary)", background: "transparent", color: "var(--primary)", cursor: "pointer" }}>
+          PDF
+        </button>
+      ),
+    }] : []),
   ];
 
   return (
@@ -181,6 +214,7 @@ export default function AssetsPage() {
       {showForm && (
         <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 18 }}>
           <p style={{ margin: "0 0 14px", fontWeight: 700, fontSize: 13 }}>Registrar inventario en sitio</p>
+          {catalogError && <p style={{ margin: "0 0 10px", fontSize: 12, color: "var(--danger)" }}>{catalogError}</p>}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <div>
               <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Cliente *</label>
