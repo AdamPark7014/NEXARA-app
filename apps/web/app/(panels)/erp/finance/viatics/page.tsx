@@ -11,6 +11,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { filterRowsByScope, getErpViaticsAdminSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface Viatico {
   id: number;
@@ -57,6 +58,7 @@ export default function ViaticosPage() {
   const highlightId = searchParams.get("highlight");
 
   const [items, setItems] = useState<Viatico[]>([]);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<FormMode>(null);
@@ -198,13 +200,15 @@ export default function ViaticosPage() {
   };
 
   const softDelete = async (v: Viatico) => {
-    if (!token || !confirm(`¿Cancelar viático "${v.concepto ?? v.motivo}"?`)) return;
+    if (!token) return;
+    setConfirmState({ message: `¿Cancelar viático "${v.concepto ?? v.motivo}"?`, confirmLabel: "Cancelar viático", fn: async () => {
     try {
       await apiFetch(`viatics/${v.id}`, token, { method: "PATCH", body: JSON.stringify({ estatus: "Rechazado" }) });
       setItems((prev) => prev.map((i) => (i.id === v.id ? { ...i, estatus: "Rechazado" } : i)));
     } catch (e) {
       alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
     }
+  } });
   };
 
   const estatusVariant = (e?: string): "positive" | "warning" | "danger" | "accent" | "default" => {
@@ -445,6 +449,7 @@ export default function ViaticosPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }

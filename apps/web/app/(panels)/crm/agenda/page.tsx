@@ -10,6 +10,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { getCrmSalesSectionConfig } from "@/lib/section-views";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface CrmActivity {
   id: number;
@@ -65,10 +66,14 @@ export default function AgendaPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [actionErr, setActionErr] = useState<string | null>(null);
 
   // Lead/opp options
   const [leads, setLeads] = useState<LeadLite[]>([]);
   const [opps, setOpps] = useState<OppLite[]>([]);
+  const [formOptionsErr, setFormOptionsErr] = useState<string | null>(null);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -86,8 +91,17 @@ export default function AgendaPage() {
   // Load leads+opps when form opens
   useEffect(() => {
     if (!showForm || !token) return;
-    if (!leads.length) apiFetch("ventas/leads", token).then((d) => setLeads(Array.isArray(d) ? d : (d?.data ?? []))).catch(() => { });
-    if (!opps.length) apiFetch("ventas/oportunidades", token).then((d) => setOpps(Array.isArray(d) ? d : (d?.data ?? []))).catch(() => { });
+    setFormOptionsErr(null);
+    if (!leads.length) {
+      apiFetch("ventas/leads", token)
+        .then((d) => setLeads(Array.isArray(d) ? d : (d?.data ?? [])))
+        .catch(() => setFormOptionsErr("No se pudieron cargar los leads"));
+    }
+    if (!opps.length) {
+      apiFetch("ventas/oportunidades", token)
+        .then((d) => setOpps(Array.isArray(d) ? d : (d?.data ?? [])))
+        .catch(() => setFormOptionsErr("No se pudieron cargar las oportunidades"));
+    }
   }, [showForm, token, leads.length, opps.length]);
 
   const complete = async (a: CrmActivity) => {
@@ -95,20 +109,28 @@ export default function AgendaPage() {
     try {
       await apiFetch(`crm-activities/${a.id}/complete`, token, { method: "PATCH", body: JSON.stringify({ outcome: "Completado" }) });
       void load();
-    } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+    } catch (e) { setActionErr(e instanceof Error ? e.message : "Error al completar"); }
   };
 
-  const remove = async (a: CrmActivity) => {
-    if (!token || !confirm(`¿Eliminar "${a.subject}"?`)) return;
-    try {
-      await apiFetch(`crm-activities/${a.id}`, token, { method: "DELETE" });
-      void load();
-    } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+  const remove = (a: CrmActivity) => {
+    if (!token) return;
+    setConfirmState({
+      message: `¿Eliminar "${a.subject}"?`,
+      fn: async () => {
+        try {
+          await apiFetch(`crm-activities/${a.id}`, token, { method: "DELETE" });
+          void load();
+        } catch (e) {
+          setActionErr(e instanceof Error ? e.message : "Error al eliminar");
+        }
+      },
+    });
   };
 
   const openNew = () => {
     setEditingId(null);
     setForm({ ...EMPTY_FORM });
+    setSaveErr(null);
     setShowForm(true);
   };
 
@@ -146,7 +168,7 @@ export default function AgendaPage() {
       setForm({ ...EMPTY_FORM });
       void load();
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      setSaveErr(e instanceof Error ? e.message : "Error al guardar actividad");
     } finally { setSaving(false); }
   };
 
@@ -191,6 +213,13 @@ export default function AgendaPage() {
           </>
         }
       />
+
+      {actionErr && (
+        <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13 }}>
+          {actionErr}{' '}
+          <button type="button" style={{ background: "none", border: "none", color: "inherit", textDecoration: "underline", cursor: "pointer" }} onClick={() => setActionErr(null)}>Cerrar</button>
+        </div>
+      )}
 
       {loading && <EmptyState icon="⏳" title="Cargando agenda…" description="Consultando tus actividades." />}
       {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
@@ -270,6 +299,16 @@ export default function AgendaPage() {
                 </label>
               </div>
 
+              {formOptionsErr && (
+                <div style={{ padding: "8px 12px", background: "var(--state-danger-bg, #fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>
+                  {formOptionsErr}
+                </div>
+              )}
+              {saveErr && (
+                <div style={{ padding: "8px 12px", background: "var(--state-danger-bg, #fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>
+                  {saveErr}
+                </div>
+              )}
               <label style={{ display: "grid", gap: 4 }}>
                 {lbl("Descripción / notas")}
                 <textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} rows={3} style={{ ...inp, resize: "vertical" }} placeholder="Detalles, acuerdos, resultados esperados…" />
@@ -284,6 +323,8 @@ export default function AgendaPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }
+

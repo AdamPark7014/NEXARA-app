@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import EmptyState from "@/components/ui/EmptyState";
 import Button from "@/components/ui/Button";
+import InlineAlert from "@/components/ui/InlineAlert";
 import { Tag } from "@/components/ui/DataTable";
 import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
 import { useClientDetail } from "@/components/crm/ClientDetailShell";
@@ -21,10 +22,25 @@ interface TicketRequest {
   branch?: { id: number; name: string } | null;
 }
 
-async function apiFetch(path: string, token: string) {
-  const res = await fetch(buildApiUrl(path), { headers: { Authorization: `Bearer ${token}` } });
+interface Branch {
+  id: number;
+  name: string;
+}
+
+const inp: React.CSSProperties = {
+  width: "100%", padding: "7px 9px", border: "1px solid var(--border)",
+  borderRadius: 7, background: "var(--surface)", color: "var(--foreground)", fontSize: 12.5, boxSizing: "border-box",
+};
+
+async function apiFetch(path: string, token: string, init: RequestInit = {}) {
+  const res = await fetch(buildApiUrl(path), {
+    ...init,
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(init.headers as Record<string, string> ?? {}) },
+  });
   if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
-  return res.json();
+  if (res.status === 204) return null;
+  const t = await res.text();
+  return t ? JSON.parse(t) : null;
 }
 
 export default function ClientTicketsPage() {
@@ -34,22 +50,64 @@ export default function ClientTicketsPage() {
   const scId = client?.serviceClient?.id;
 
   const [tickets, setTickets] = useState<TicketRequest[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ description: "", branchId: "", urgency: "MEDIUM", requestType: "ISSUE" });
+  const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token || !scId) return;
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError(null);
     try {
-      // Use snapshot which returns ticketRequests scoped to the service client
       const data = await apiFetch(`service-clients/${scId}/snapshot`, token);
       setTickets(Array.isArray(data?.ticketRequests) ? data.ticketRequests : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar tickets");
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
+  }, [token, scId]);
+
+  const loadBranches = useCallback(async () => {
+    if (!token || !scId) return;
+    try {
+      const data = await apiFetch(`service-clients/${scId}/branches`, token);
+      setBranches(Array.isArray(data) ? data : []);
+    } catch {
+      setBranches([]);
+    }
   }, [token, scId]);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => { if (showForm) void loadBranches(); }, [showForm, loadBranches]);
+
+  const submitTicket = async () => {
+    if (!token || !scId || !form.description.trim()) return;
+    setSaving(true);
+    setSaveErr(null);
+    try {
+      await apiFetch(`service-clients/${scId}/ticket-requests`, token, {
+        method: "POST",
+        body: JSON.stringify({
+          description: form.description.trim(),
+          branchId: form.branchId ? Number(form.branchId) : undefined,
+          urgency: form.urgency,
+          requestType: form.requestType,
+        }),
+      });
+      setShowForm(false);
+      setForm({ description: "", branchId: "", urgency: "MEDIUM", requestType: "ISSUE" });
+      void load();
+    } catch (e) {
+      setSaveErr(e instanceof Error ? e.message : "No se pudo crear el ticket");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (clientError) return <DetailError message={clientError} onRetry={reloadClient} />;
   if (!client) return null;
@@ -76,57 +134,92 @@ export default function ClientTicketsPage() {
 
   return (
     <DetailSection title="Tickets de soporte">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
         <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
           {tickets.filter((t) => t.status === "NEW").length} nuevo(s) · {tickets.length} total
         </span>
         <div style={{ display: "flex", gap: 8 }}>
           <Button variant="ghost" size="sm" onClick={() => void load()}>Actualizar</Button>
+          <Button variant="primary" size="sm" iconLeft="+" onClick={() => { setSaveErr(null); setShowForm(true); }}>Nuevo ticket</Button>
           <Link href="/ops/support" style={{ textDecoration: "none" }}>
-            <Button variant="secondary" size="sm">Bandeja de soporte →</Button>
+            <Button variant="secondary" size="sm">Bandeja OPS →</Button>
           </Link>
         </div>
       </div>
 
-      {loading && <EmptyState icon="⏳" title="Cargando tickets…" description="" />}
-      {!loading && error && (
-        <EmptyState icon="⚠️" title="Error al cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />
-      )}
+      {saveErr && !showForm && <InlineAlert message={saveErr} onDismiss={() => setSaveErr(null)} />}
 
-      {!loading && !error && tickets.length === 0 && (
-        <EmptyState icon="🎫" title="Sin tickets" description="Este cliente no ha levantado solicitudes de soporte." />
-      )}
-
+      {loading && <EmptyState icon="⏳" title="Cargando tickets…" description="Consultando tickets de soporte." />}
+      {!loading && error && <EmptyState icon="⚠️" title="Sin tickets" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
+      {!loading && !error && tickets.length === 0 && <EmptyState icon="🎫" title="Sin tickets" description="No hay solicitudes registradas para este cliente." />}
       {!loading && !error && tickets.length > 0 && (
-        <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 8 }}>
           {tickets.map((t) => (
-            <li key={t.id} style={{ padding: "12px 14px", border: "1px solid var(--border)", borderRadius: 10 }}>
+            <li key={t.id} style={{ padding: "10px 14px", border: "1px solid var(--border)", borderRadius: 10, background: "var(--surface)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
-                    <Tag variant="accent" size="sm">T-{t.id}</Tag>
-                    {t.branch?.name ?? "Sin sucursal"}
-                  </div>
-                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 3 }}>
-                    {t.description?.slice(0, 80)}{t.description?.length > 80 ? "…" : ""}
-                  </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontWeight: 600, fontSize: 13 }}>{t.description}</p>
+                  {t.branch && <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>Sucursal: {t.branch.name}</span>}
                 </div>
                 <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                   {t.urgency && <Tag variant={urgencyVariant(t.urgency)}>{t.urgency}</Tag>}
                   <Tag variant={statusVariant(t.status)}>{t.status}</Tag>
                 </div>
               </div>
-              <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 6, display: "flex", gap: 12 }}>
-                <span>Abierto: {new Date(t.createdAt).toLocaleDateString("es-MX")}</span>
-                {t.dueAt && (
-                  <span style={{ color: new Date(t.dueAt) < new Date() && t.status !== "CLOSED" ? "var(--danger)" : undefined }}>
-                    Vence: {new Date(t.dueAt).toLocaleDateString("es-MX")}
-                  </span>
-                )}
-              </div>
+              {t.createdAt && (
+                <p style={{ margin: "4px 0 0", fontSize: 11, color: "var(--text-tertiary)" }}>
+                  {new Date(t.createdAt).toLocaleDateString("es-MX")}
+                </p>
+              )}
             </li>
           ))}
         </ul>
+      )}
+
+      {showForm && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setShowForm(false)}>
+          <div style={{ background: "var(--surface)", borderRadius: 14, padding: "22px 24px", width: 420, maxWidth: "calc(100vw - 32px)", boxShadow: "0 20px 50px rgba(0,0,0,0.22)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16 }}>Nuevo ticket de soporte</div>
+            <div style={{ display: "grid", gap: 12 }}>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Descripción del problema *</span>
+                <textarea rows={3} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Describe el problema o solicitud…" style={{ ...inp, resize: "vertical" }} />
+              </label>
+              {branches.length > 0 && (
+                <label style={{ display: "grid", gap: 4 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Sucursal</span>
+                  <select value={form.branchId} onChange={(e) => setForm((f) => ({ ...f, branchId: e.target.value }))} style={inp}>
+                    <option value="">Sede principal</option>
+                    {branches.map((b) => <option key={b.id} value={String(b.id)}>{b.name}</option>)}
+                  </select>
+                </label>
+              )}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <label style={{ display: "grid", gap: 4 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Urgencia</span>
+                  <select value={form.urgency} onChange={(e) => setForm((f) => ({ ...f, urgency: e.target.value }))} style={inp}>
+                    <option value="LOW">Baja</option>
+                    <option value="MEDIUM">Media</option>
+                    <option value="HIGH">Alta</option>
+                  </select>
+                </label>
+                <label style={{ display: "grid", gap: 4 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Tipo</span>
+                  <select value={form.requestType} onChange={(e) => setForm((f) => ({ ...f, requestType: e.target.value }))} style={inp}>
+                    <option value="ISSUE">Incidencia</option>
+                    <option value="MAINTENANCE">Mantenimiento</option>
+                    <option value="IMPROVEMENT">Mejora</option>
+                  </select>
+                </label>
+              </div>
+              {saveErr && <p style={{ margin: 0, fontSize: 12, color: "var(--danger)" }}>{saveErr}</p>}
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 18, justifyContent: "flex-end" }}>
+              <Button variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
+              <Button variant="primary" onClick={() => void submitTicket()} disabled={saving || !form.description.trim()}>{saving ? "Enviando…" : "Crear ticket"}</Button>
+            </div>
+          </div>
+        </div>
       )}
     </DetailSection>
   );

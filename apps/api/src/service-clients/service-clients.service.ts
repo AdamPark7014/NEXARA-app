@@ -791,4 +791,64 @@ export class ServiceClientsService {
       orderBy: { createdAt: 'desc' },
     });
   }
+
+  async createTicketRequest(
+    clientId: number,
+    dto: { description: string; branchId?: number; urgency?: string; requestType?: string },
+  ) {
+    const description = dto.description?.trim();
+    if (!description) throw new BadRequestException('Descripción requerida');
+
+    const client = await this.db.serviceClient.findUnique({ where: { id: clientId } });
+    if (!client) throw new NotFoundException('Cliente de servicio no encontrado');
+
+    let branch: {
+      id: number;
+      name: string;
+      branchNumber?: string | null;
+      address?: string | null;
+      city?: string | null;
+      state?: string | null;
+      country?: string | null;
+      placeId?: string | null;
+      latitud?: number | null;
+      longitud?: number | null;
+    } | null = null;
+
+    if (dto.branchId) {
+      branch = await this.db.serviceClientBranch.findFirst({
+        where: { id: dto.branchId, clientId, isActive: true },
+      });
+      if (!branch) throw new BadRequestException('Sucursal no encontrada');
+    }
+
+    const urgencyRaw = String(dto.urgency || 'MEDIUM').toUpperCase();
+    const urgency = urgencyRaw === 'HIGH' || urgencyRaw === 'ALTA'
+      ? 'HIGH'
+      : urgencyRaw === 'LOW' || urgencyRaw === 'BAJA'
+        ? 'LOW'
+        : 'MEDIUM';
+
+    const requestTypeRaw = String(dto.requestType || 'ISSUE').toUpperCase();
+    const requestType = requestTypeRaw === 'PREVENTIVE_INVENTORY' ? 'PREVENTIVE_INVENTORY' : 'ISSUE';
+
+    return this.db.clientTicketRequest.create({
+      data: {
+        clientId,
+        branchId: branch?.id ?? null,
+        branchName: branch?.name ?? null,
+        branchNumber: branch?.branchNumber ?? null,
+        address: branch?.address ?? null,
+        city: branch?.city ?? null,
+        state: branch?.state ?? null,
+        country: branch?.country ?? null,
+        description,
+        requestType,
+        urgency,
+        placeId: branch?.placeId ?? null,
+        latitud: branch?.latitud ?? null,
+        longitud: branch?.longitud ?? null,
+      },
+    });
+  }
 }

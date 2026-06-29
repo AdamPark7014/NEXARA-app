@@ -9,6 +9,7 @@ import Button from "@/components/ui/Button";
 import { useUser } from "@/components/UserContext";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 type Tab = "comunicados" | "newsletter";
 
@@ -79,6 +80,7 @@ export default function ComunicacionesInternasPage() {
   const token = user?.token ?? "";
 
   const [tab, setTab]         = useState<Tab>("comunicados");
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [items, setItems]     = useState<Comunicado[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
@@ -168,23 +170,25 @@ export default function ComunicacionesInternasPage() {
   };
 
   const enviar = async (id: number) => {
-    if (!confirm("¿Enviar este comunicado ahora?")) return;
+    setConfirmState({ message: "¿Enviar este comunicado ahora?", confirmLabel: "Enviar", fn: async () => {
     try {
       const updated = await apiFetch(`internal-comunicados/${id}/enviar`, token, { method: "PATCH" });
       setItems(prev => prev.map(c => c.id === id ? { ...c, ...updated } : c));
     } catch (e: unknown) {
       window.alert("Error al enviar: " + (e instanceof Error ? e.message : "error"));
     }
+  } });
   };
 
   const remove = async (id: number) => {
-    if (!confirm("¿Eliminar este comunicado?")) return;
+    setConfirmState({ message: "¿Eliminar este comunicado?", fn: async () => {
     try {
       await apiFetch(`internal-comunicados/${id}`, token, { method: "DELETE" });
       setItems(prev => prev.filter(c => c.id !== id));
     } catch (e: unknown) {
       window.alert("Error al eliminar: " + (e instanceof Error ? e.message : "error"));
     }
+  } });
   };
 
   const field = (key: keyof typeof EMPTY_FORM) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -341,6 +345,7 @@ export default function ComunicacionesInternasPage() {
           )}
         </Section>
       )}
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }

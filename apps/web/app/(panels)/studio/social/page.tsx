@@ -9,6 +9,7 @@ import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface SocialPost {
   id: number;
@@ -58,6 +59,8 @@ export default function StudioSocialPage() {
   const [editing, setEditing]   = useState<SocialPost | null>(null);
   const [form, setForm]         = useState({ ...EMPTY_FORM });
   const [saving, setSaving]     = useState(false);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -90,7 +93,7 @@ export default function StudioSocialPage() {
   };
 
   const save = async () => {
-    if (!form.titulo || !form.cuando) return alert("Título y fecha son requeridos.");
+    if (!form.titulo || !form.cuando) { setSaveErr("Título y fecha son requeridos."); return; }
     setSaving(true);
     try {
       const body = { ...form, cuando: new Date(form.cuando).toISOString() };
@@ -103,7 +106,7 @@ export default function StudioSocialPage() {
       }
       setShowForm(false);
     } catch (e: unknown) {
-      alert("Error: " + (e instanceof Error ? e.message : "Error"));
+      setSaveErr(e instanceof Error ? e.message : "Error al guardar post");
     } finally {
       setSaving(false);
     }
@@ -117,11 +120,12 @@ export default function StudioSocialPage() {
   };
 
   const remove = async (id: number) => {
-    if (!confirm("¿Eliminar este post?")) return;
+    setConfirmState({ message: "¿Eliminar este post?", fn: async () => {
     try {
       await apiFetch(`social-posts/${id}`, token, { method: "DELETE" });
       setItems(prev => prev.filter(p => p.id !== id));
     } catch { /* ignore */ }
+  } });
   };
 
   const field = (key: keyof typeof EMPTY_FORM) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -233,6 +237,7 @@ export default function StudioSocialPage() {
           </div>
         )}
       </Section>
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }

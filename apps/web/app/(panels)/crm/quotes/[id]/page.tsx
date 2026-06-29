@@ -113,6 +113,7 @@ export default function QuoteDetailPage() {
   const [quote, setQuote] = useState<CotizacionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionErr, setActionErr] = useState<string | null>(null);
 
   // Send modal state
   const [showSend, setShowSend] = useState(false);
@@ -149,7 +150,7 @@ export default function QuoteDetailPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      alert(`Error al descargar PDF: ${e instanceof Error ? e.message : "desconocido"}`);
+      setActionErr(`Error al descargar PDF: ${e instanceof Error ? e.message : "desconocido"}`);
     }
   };
 
@@ -164,7 +165,7 @@ export default function QuoteDetailPage() {
       setShowSend(false);
       void load();
     } catch (e) {
-      alert(`Error al enviar: ${e instanceof Error ? e.message : "desconocido"}`);
+      setActionErr(e instanceof Error ? e.message : "Error al enviar cotización");
     } finally { setSending(false); }
   };
 

@@ -11,6 +11,7 @@ import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { getActivitiesSectionConfig, getEvidencesSectionConfig, getActivitiesCanonicalPath } from "@/lib/section-views";
 import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 /** Formulario completo de OT (asignar ingeniero, cliente, AN, etc.) */
 const ActivitiesTable = dynamic(() => import("@/components/ActivitiesTable"), { ssr: false });
@@ -55,6 +56,7 @@ export default function ActivitiesPage() {
   const [showOnlyMine, setShowOnlyMine] = useState(
     cfg.viewMode === "manage_execute" ? false : cfg.defaultScope === "self",
   );
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [tab, setTab] = useState<TabId>(
     searchParams.get("tab") === "evidencias" ? "evidencias" : "actividades",
   );
@@ -108,13 +110,15 @@ export default function ActivitiesPage() {
   };
 
   const removeEvidence = async (id: number) => {
-    if (!token || !confirm("¿Eliminar esta evidencia?")) return;
+    if (!token) return;
+    setConfirmState({ message: "¿Eliminar esta evidencia?", fn: async () => {
     try {
       await apiFetch(`evidences/${id}`, token, { method: "DELETE" });
       setEvids(prev => prev.filter(e => e.id !== id));
     } catch (e) {
       alert(e instanceof Error ? e.message : "Error al eliminar evidencia");
     }
+  } });
   };
 
   const evColumns: Column<Evidence>[] = [
@@ -240,6 +244,7 @@ export default function ActivitiesPage() {
           )}
         </Section>
       )}
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }

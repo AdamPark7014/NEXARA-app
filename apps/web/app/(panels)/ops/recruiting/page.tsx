@@ -84,6 +84,8 @@ export default function RecruitingPage() {
   const [category, setCategory] = useState("Ingeniero de Campo");
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [actionErr, setActionErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -108,7 +110,7 @@ export default function RecruitingPage() {
         body: JSON.stringify({ stage }),
       });
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      setActionErr(e instanceof Error ? e.message : "Error al mover candidato");
       setItems(prev => prev.map(i => i.id === c.id ? { ...i, stage: c.stage } : i)); // rollback
     }
   };
@@ -126,7 +128,7 @@ export default function RecruitingPage() {
       setShowForm(false); setName(""); setEmail(""); setFile(null);
       void load();
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      setSaveErr(e instanceof Error ? e.message : "Error al guardar candidato");
     } finally { setSaving(false); }
   };
 
@@ -347,7 +349,8 @@ export default function RecruitingPage() {
               </label>
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
-              <Button variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
+              {saveErr && <p style={{ color: "var(--danger)", fontSize: 12, margin: "0 0 8px" }}>{saveErr}</p>}
+              <Button variant="secondary" onClick={() => { setShowForm(false); setSaveErr(null); }}>Cancelar</Button>
               <Button variant="primary" onClick={() => void submit()} disabled={saving || !name || !file}>
                 {saving ? "Subiendo…" : "Agregar candidato"}
               </Button>

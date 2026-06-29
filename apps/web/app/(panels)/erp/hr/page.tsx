@@ -11,6 +11,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { getHrSectionConfig } from "@/lib/section-views";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 type HrEmpleado = {
   id: number;
@@ -69,6 +70,8 @@ export default function HrPage() {
   const [editing, setEditing] = useState<HrEmpleado | null>(null);
   const [editForm, setEditForm] = useState<Partial<HrEmpleado>>({});
   const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [actionErr, setActionErr] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
 
   const [roles, setRoles] = useState<ApiRole[]>([]);
@@ -76,6 +79,7 @@ export default function HrPage() {
   const [creating, setCreating] = useState(false);
   const [createForm, setCreateForm] = useState({ ...emptyCreateForm });
   const [createErr, setCreateErr] = useState<string | null>(null);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const fetchStaff = useCallback(async () => {
     if (!user?.token) return;
@@ -145,7 +149,7 @@ export default function HrPage() {
       });
       setEditing(null);
     } catch (e) {
-      alert(`Error al guardar: ${e instanceof Error ? e.message : "desconocido"}`);
+      setSaveErr(e instanceof Error ? e.message : "Error al guardar empleado");
     } finally {
       setSaving(false);
     }
@@ -167,7 +171,7 @@ export default function HrPage() {
         };
       });
     } catch (err) {
-      alert(`Error: ${err instanceof Error ? err.message : "desconocido"}`);
+      setActionErr(err instanceof Error ? err.message : "Error en la operación");
     }
   };
 
@@ -207,13 +211,14 @@ export default function HrPage() {
 
   const deleteEmpleado = async (e: HrEmpleado) => {
     if (!user?.token) return;
-    if (!confirm(`⚠️ Eliminar permanentemente a "${e.nombre}" (${e.email})?\n\nEsta acción no se puede deshacer.`)) return;
+    setConfirmState({ message: `⚠️ Eliminar permanentemente a "${e.nombre}" (${e.email}). Esta acción no se puede deshacer.`, fn: async () => {
     try {
       await apiFetch(`users/${e.id}`, user.token, { method: "DELETE" });
       setState((s) => (s.kind === "ready" ? { kind: "ready", items: s.items.filter((i) => i.id !== e.id) } : s));
     } catch (err) {
-      alert(`Error al eliminar: ${err instanceof Error ? err.message : "desconocido"}`);
+      setActionErr(err instanceof Error ? err.message : "Error al eliminar empleado");
     }
+  } });
   };
 
   const columns: Column<HrEmpleado>[] = [
@@ -347,6 +352,12 @@ export default function HrPage() {
         </div>
       )}
 
+      {actionErr && (
+        <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>{actionErr}</span>
+          <button type="button" onClick={() => setActionErr(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontWeight: 700, fontSize: 16, lineHeight: 1, padding: "0 4px" }}>×</button>
+        </div>
+      )}
       <Section title="Plantilla activa">
         {state.kind === "loading" && <EmptyState icon="⏳" title="Cargando plantilla…" description="Consultando usuarios desde la API." />}
         {state.kind === "error" && (
@@ -506,6 +517,7 @@ export default function HrPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }

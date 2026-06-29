@@ -55,17 +55,25 @@ export default function QuotesPage() {
   const [items, setItems] = useState<SalesQuote[]>([]);
   const [clients, setClients] = useState<SalesClient[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
   const [lines, setLines] = useState<LineItem[]>([emptyItem()]);
 
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
+    setLoadError(null);
     try {
       setItems(await listSalesQuotes(token));
-    } catch { /* skip */ } finally { setLoading(false); }
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "No se pudieron cargar las cotizaciones");
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
   }, [token]);
 
   useEffect(() => { void load(); }, [load]);
@@ -101,6 +109,7 @@ export default function QuotesPage() {
   const openForm = () => {
     setForm({ ...emptyForm });
     setLines([emptyItem()]);
+    setSaveErr(null);
     setShowForm(true);
   };
 
@@ -131,7 +140,7 @@ export default function QuotesPage() {
       setShowForm(false);
       void load();
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : "No se pudo crear la cotización");
+      setSaveErr(e instanceof Error ? e.message : "No se pudo crear la cotización");
     } finally { setSaving(false); }
   };
 
@@ -306,7 +315,8 @@ export default function QuotesPage() {
               <textarea value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} rows={2} style={{ ...inp, resize: "vertical" }} placeholder="Condiciones de pago, tiempo de entrega, garantía…" />
             </div>
 
-            <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
+            {saveErr && <p style={{ marginBottom: 8, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 12 }}>{saveErr}</p>}
+            <div style={{ display: "flex", gap: 10, marginTop: 16, justifyContent: "flex-end" }}>
               <Button variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
               <Button variant="primary" onClick={() => void save()} disabled={saving || !form.clientCompany.trim() || lines.filter((l) => l.name.trim() && l.unitPrice > 0).length === 0}>
                 {saving ? "Creando…" : "Crear cotización"}
@@ -318,7 +328,10 @@ export default function QuotesPage() {
 
       <Section title={loading ? "Cargando…" : `${items.length} cotización${items.length === 1 ? "" : "es"}`}>
         {loading && <EmptyState icon="⏳" title="Cargando cotizaciones…" description="Consultando documentos." />}
-        {!loading && (
+        {!loading && loadError && (
+          <EmptyState icon="⚠️" title="No se pudo cargar" description={loadError} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />
+        )}
+        {!loading && !loadError && (
           <DataTable columns={columns} rows={highlighted} rowKey={(q) => q.id}
             emptyTitle="Sin cotizaciones" emptyDescription="Genera la primera cotización con el botón de arriba." />
         )}

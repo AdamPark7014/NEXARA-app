@@ -8,6 +8,7 @@ import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface ContactMsg {
   id: number;
@@ -63,7 +64,9 @@ export default function StudioContactsPage() {
 
   const [items, setItems]     = useState<ContactMsg[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionErr, setActionErr] = useState<string | null>(null);
   const [error, setError]     = useState<string | null>(null);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -92,11 +95,13 @@ export default function StudioContactsPage() {
   };
 
   const remove = async (id: number) => {
-    if (!token || !confirm("¿Eliminar este mensaje?")) return;
+    if (!token) return;
+    setConfirmState({ message: "¿Eliminar este mensaje?", fn: async () => {
     try {
       await apiFetch(`contact-messages/${id}`, token, { method: "DELETE" });
       setItems(prev => prev.filter(c => c.id !== id));
     } catch { /* ignore */ }
+  } });
   };
 
   const columns: Column<ContactMsg>[] = [
@@ -166,7 +171,7 @@ export default function StudioContactsPage() {
         actions={
           <Button variant="primary" iconLeft="→" onClick={() => {
             const news = items.filter(c => c.status === "NEW");
-            if (news.length === 0) return alert("No hay mensajes sin atender.");
+            if (news.length === 0) { setActionErr("No hay mensajes sin atender."); return; }
             news.forEach(c => setStatus(c.id, "ASSIGNED"));
           }}>
             Asignar lote a CRM ({items.filter(c => c.status === "NEW").length})
@@ -180,6 +185,12 @@ export default function StudioContactsPage() {
         </div>
       )}
 
+      {actionErr && (
+        <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>{actionErr}</span>
+          <button type="button" onClick={() => setActionErr(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontWeight: 700, fontSize: 16, lineHeight: 1, padding: "0 4px" }}>×</button>
+        </div>
+      )}
       <Section title={loading ? "Cargando…" : `${items.length} mensajes`}>
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
@@ -193,6 +204,7 @@ export default function StudioContactsPage() {
           />
         )}
       </Section>
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }

@@ -211,3 +211,35 @@ export const buildApprovalChain = (instance: WorkflowInstanceRow, currentApprova
 };
 
 export const formatRequestedAt = (iso?: string | null): string => formatDateShort(iso) || "—";
+
+/** Ruta del panel para abrir la entidad asociada a una aprobación. */
+export function entityApprovalHref(entityType: string, entityId: number): string | null {
+  const t = (entityType || "").toUpperCase();
+  switch (t) {
+    case "PURCHASE_ORDER":
+      return `/erp/procurement?tab=orders&id=${entityId}`;
+    case "PURCHASE_REQUISITION":
+    case "REQUISITION":
+      return `/erp/procurement?tab=requisitions&id=${entityId}`;
+    case "EXPENSE":
+      return `/erp/finance/expenses?highlight=${entityId}`;
+    case "VIATIC":
+    case "VIATICS":
+      return `/erp/finance/viatics?highlight=${entityId}`;
+    case "QUOTE":
+    case "COTIZACION":
+      return `/crm/quotes/${entityId}`;
+    case "PROJECT":
+    case "SALES_PROJECT":
+      return `/crm/projects/${entityId}`;
+    case "OPPORTUNITY":
+      return `/crm/opportunities/${entityId}`;
+    case "HIRING":
+      return `/ops/recruiting`;
+    case "CONTRACT":
+    case "MAINTENANCE_CONTRACT":
+      return `/ops/maintenance/contracts`;
+    default:
+      return null;
+  }
+}

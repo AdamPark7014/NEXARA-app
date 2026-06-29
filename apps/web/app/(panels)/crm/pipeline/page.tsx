@@ -32,6 +32,7 @@ export default function PipelinePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dragId, setDragId] = useState<number | null>(null);
+  const [moveErr, setMoveErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -72,7 +73,7 @@ export default function PipelinePage() {
     try {
       await updateSalesOpportunityStage(token, id, stage);
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      setMoveErr(e instanceof Error ? e.message : "Error al mover oportunidad");
       void load();
     }
   };
@@ -99,6 +100,12 @@ export default function PipelinePage() {
         }
       />
 
+      {moveErr && (
+        <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>{moveErr}</span>
+          <button type="button" onClick={() => setMoveErr(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontWeight: 700, fontSize: 16, lineHeight: 1, padding: "0 4px" }}>×</button>
+        </div>
+      )}
       {loading && <EmptyState icon="⏳" title="Cargando pipeline…" description="Consultando oportunidades." />}
       {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
 

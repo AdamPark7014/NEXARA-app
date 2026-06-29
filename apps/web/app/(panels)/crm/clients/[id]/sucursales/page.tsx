@@ -51,6 +51,7 @@ export default function ClientBranchesPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
   const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token || !scId) return;
@@ -83,7 +84,7 @@ export default function ClientBranchesPage() {
       setShowForm(false);
       setForm({ ...emptyForm });
     } catch (e) {
-      window.alert("Error: " + (e instanceof Error ? e.message : "No se pudo crear"));
+      setSaveErr(e instanceof Error ? e.message : "No se pudo crear el sucursal");
     } finally { setSaving(false); }
   };
 

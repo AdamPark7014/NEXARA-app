@@ -80,6 +80,7 @@ interface NodeProps {
 function Node({ node, depth = 0, allUsers, token, onRefresh, canEditOrg }: NodeProps) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
   const [selectedManager, setSelectedManager] = useState<string>(
     node.managerId ? String(node.managerId) : ""
   );
@@ -95,7 +96,7 @@ function Node({ node, depth = 0, allUsers, token, onRefresh, canEditOrg }: NodeP
       setEditing(false);
       onRefresh();
     } catch (e) {
-      alert("Error al guardar: " + (e instanceof Error ? e.message : "Error desconocido"));
+      setSaveErr(e instanceof Error ? e.message : "Error al guardar");
     } finally {
       setSaving(false);
     }

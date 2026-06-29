@@ -11,6 +11,7 @@ import { useUser } from "@/components/UserContext";
 import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface JournalEntry {
   id: number;
@@ -55,6 +56,7 @@ export default function AccountingPage() {
   const highlightId = searchParams.get("highlight");
 
   const [items, setItems] = useState<JournalEntry[]>([]);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saveErr, setSaveErr] = useState<string | null>(null);
@@ -161,13 +163,15 @@ export default function AccountingPage() {
   };
 
   const reverseEntry = async (id: number) => {
-    if (!token || !confirm("¿Reversar esta póliza? Se generará una contrapóliza.")) return;
+    if (!token) return;
+    setConfirmState({ message: "¿Reversar esta póliza? Se generará una contrapóliza.", confirmLabel: "Reversar", fn: async () => {
     try {
       const updated = await apiFetch(`accounting/journal-entries/${id}/reverse`, token, { method: "POST" });
       setItems(prev => prev.map(e => e.id === id ? { ...e, ...updated } : e));
     } catch (e) {
       window.alert(formatApiError(e, "No se pudo reversar"));
     }
+  } });
   };
 
   const ingresos = items.filter(e => e.type === "INGRESOS").reduce((s, e) => s + (e.totalCredit ?? 0), 0);
@@ -302,6 +306,7 @@ export default function AccountingPage() {
           <DataTable columns={columns} rows={visibleItems} rowKey={e => e.id} emptyTitle="Sin pólizas" emptyDescription="Registra la primera póliza contable." />
         ) : null}
       </Section>
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }

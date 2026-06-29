@@ -98,6 +98,7 @@ export default function AiSandboxPage() {
   const [prompt, setPrompt] = useState("");
   const [showSystem, setShowSystem] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [queryErr, setQueryErr] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [runs, setRuns] = useState<Run[]>([]);
   const [flags, setFlags] = useState<FeatureFlag[]>([]);
@@ -155,7 +156,7 @@ export default function AiSandboxPage() {
       await apiFetch(`lab/flags/${key}`, token, { method: "PATCH", body: JSON.stringify({ enabled }) });
       setFlags((prev) => prev.map((f) => f.key === key ? { ...f, enabled } : f));
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      setQueryErr(e instanceof Error ? e.message : "Error al consultar IA");
     }
   };
 

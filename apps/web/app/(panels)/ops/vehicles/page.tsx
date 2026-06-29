@@ -10,6 +10,7 @@ import { useUser } from "@/components/UserContext";
 import { getVehiclesSectionConfig } from "@/lib/section-views";
 import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 import { buildApiUrl } from "@/lib/api-base";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface Vehicle {
   id: number;
@@ -63,6 +64,7 @@ export default function VehiclesPage() {
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<Vehicle[]>([]);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Vehicle | null>(null);
@@ -170,11 +172,13 @@ export default function VehiclesPage() {
   };
 
   const remove = async (id: number) => {
-    if (!token || !confirm("¿Eliminar este vehículo?")) return;
+    if (!token) return;
+    setConfirmState({ message: "¿Eliminar este vehículo?", fn: async () => {
     try {
       await apiFetch(`vehicles/inventory/${id}`, token, { method: "PATCH", body: JSON.stringify({ activo: false }) });
       setItems(prev => prev.filter(v => v.id !== id));
     } catch (e) { alert(e instanceof Error ? e.message : "Error al eliminar vehículo"); }
+  } });
   };
 
   const inp: React.CSSProperties = { width: "100%", padding: "8px 10px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface)", color: "var(--foreground)", fontSize: 13, boxSizing: "border-box" };
@@ -319,6 +323,7 @@ export default function VehiclesPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }

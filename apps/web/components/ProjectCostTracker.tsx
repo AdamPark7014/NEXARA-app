@@ -487,5 +487,3 @@ export default function ProjectCostTracker({
     </div>
   );
 }
-
-

@@ -23,6 +23,7 @@ import { PERMISSIONS } from '../common/permissions.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { ExcelExportService } from '../common/excel-export.service.js';
 import { ExcelImportService } from '../common/excel-import.service.js';
+import { getUploadSubdir } from '../common/upload-paths.js';
 
 @Controller('viatics')
 @UseGuards(UrlAccessGuard) // RBAC v2 — gate por URL/rol antes que RbacGuard legacy
@@ -45,14 +46,18 @@ export class ViaticosController {
   @Post()
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VIATICS_MANAGE] })
-  create(@CurrentUser() user: any, @Body() body: any) {
+  @UseInterceptors(FileInterceptor('ticketEvidencia', { dest: getUploadSubdir(__dirname, 'viatics') }))
+  create(@CurrentUser() user: any, @Body() body: any, @UploadedFile() file?: any) {
+    const ticketEvidenciaUrl = file
+      ? `/uploads/viatics/${file.filename}`
+      : body.ticketEvidenciaUrl ?? body.comprobante ?? null;
     return this.viaticosService.create({
-      usuarioId: body.usuarioId ?? user.id,
-      actividadId: body.actividadId ?? null,
-      projectId: body.projectId ?? null,
-      montoSolicitado: body.montoSolicitado,
+      usuarioId: body.usuarioId ? Number(body.usuarioId) : user.id,
+      actividadId: body.actividadId ? Number(body.actividadId) : null,
+      projectId: body.projectId ? Number(body.projectId) : null,
+      montoSolicitado: Number(body.montoSolicitado),
       motivo: body.motivo ?? body.concepto,
-      ticketEvidenciaUrl: body.ticketEvidenciaUrl ?? body.comprobante ?? null,
+      ticketEvidenciaUrl,
       estatus: body.estatus ?? 'Pendiente',
     });
   }
@@ -112,8 +117,17 @@ export class ViaticosController {
   @Patch(':id')
   @UseGuards(RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.VIATICS_MANAGE] })
-  update(@Param('id') id: string, @Body() body: any) {
-    return this.viaticosService.update(+id, body);
+  @UseInterceptors(FileInterceptor('ticketEvidencia', { dest: getUploadSubdir(__dirname, 'viatics') }))
+  update(@Param('id') id: string, @Body() body: any, @UploadedFile() file?: any) {
+    const data: Record<string, unknown> = { ...body };
+    if (file) data.ticketEvidenciaUrl = `/uploads/viatics/${file.filename}`;
+    if (body.motivo !== undefined || body.concepto !== undefined) {
+      data.motivo = body.motivo ?? body.concepto;
+    }
+    if (body.montoSolicitado !== undefined) {
+      data.montoSolicitado = Number(body.montoSolicitado);
+    }
+    return this.viaticosService.update(+id, data);
   }
 }
 

@@ -63,7 +63,7 @@ const ViaticTable = () => {
       setExcelUrl(url);
       setExcelBlob(blob);
     } catch {
-      alert('Error al exportar');
+      setError('Error al exportar viáticos');
     } finally {
       setExcelPreparing(false);
     }

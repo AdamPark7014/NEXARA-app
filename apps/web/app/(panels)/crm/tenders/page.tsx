@@ -12,6 +12,7 @@ import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { useCrmManagerGuard } from "@/lib/useCrmManagerGuard";
 import { getCrmManagerSubmoduleConfig } from "@/lib/section-views";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface Tender {
   id: number;
@@ -67,6 +68,10 @@ export default function TendersPage() {
   const [editing, setEditing] = useState<Tender | null>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [actionErr, setActionErr] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -123,7 +128,7 @@ export default function TendersPage() {
       setShowForm(false); setEditing(null); setForm({ ...EMPTY_FORM });
       void load();
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      setSaveErr(e instanceof Error ? e.message : "No se pudo guardar la licitación");
     } finally { setSaving(false); }
   };
 
@@ -132,15 +137,17 @@ export default function TendersPage() {
     try {
       await apiFetch(`tenders/${t.id}/status`, token, { method: "PATCH", body: JSON.stringify({ status }) });
       setItems((prev) => prev.map((i) => (i.id === t.id ? { ...i, status } : i)));
-    } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+    } catch (e) { setActionErr(e instanceof Error ? e.message : "Error al actualizar estado"); }
   };
 
   const promote = async (t: Tender) => {
-    if (!token || !confirm(`¿Promover "${t.title}" a Oportunidad?`)) return;
+    if (!token) return;
+    setConfirmState({ message: `¿Promover "${t.title}" a Oportunidad?`, confirmLabel: "Promover", fn: async () => {
     try {
       await apiFetch(`tenders/${t.id}/promote-opportunity`, token, { method: "POST" });
-      alert("Oportunidad creada en el pipeline.");
-    } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+      setSuccessMsg("Oportunidad creada en el pipeline de CRM.");
+    } catch (e) { setActionErr(e instanceof Error ? e.message : "Error al crear oportunidad"); }
+  } });
   };
 
   const statusVariant = (s: string): "positive" | "warning" | "danger" | "accent" | "neutral" => {
@@ -234,6 +241,18 @@ export default function TendersPage() {
         <KpiCard label="Pipeline (propuestas)" value={`$${(pipelineValue / 1_000_000).toFixed(1)}M`} icon="💰" />
       </div>
 
+      {successMsg && (
+        <div role="status" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--positive)", color: "var(--positive,#16a34a)", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>✓ {successMsg}</span>
+          <button type="button" onClick={() => setSuccessMsg(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontWeight: 700, fontSize: 16, lineHeight: 1, padding: "0 4px" }}>×</button>
+        </div>
+      )}
+      {actionErr && (
+        <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>{actionErr}</span>
+          <button type="button" onClick={() => setActionErr(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontWeight: 700, fontSize: 16, lineHeight: 1, padding: "0 4px" }}>×</button>
+        </div>
+      )}
       <Section title={loading ? "Cargando…" : `${visibleItems.length} licitaciones`}>
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando licitaciones." />}
         {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
@@ -319,8 +338,9 @@ export default function TendersPage() {
                   placeholder="Partidas clave, requisitos especiales, puntos de evaluación…" />
               </div>
             </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
-              <Button variant="secondary" onClick={() => { setShowForm(false); setEditing(null); }}>Cancelar</Button>
+            {saveErr && <p style={{ marginBottom: 8, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 12 }}>{saveErr}</p>}
+            <div style={{ display: "flex", gap: 10, marginTop: 16, justifyContent: "flex-end" }}>
+              <Button variant="secondary" onClick={() => { setShowForm(false); setEditing(null); setSaveErr(null); }}>Cancelar</Button>
               <Button variant="primary" onClick={() => void submit()} disabled={saving || !form.title || !form.conveningEntity}>
                 {saving ? "Guardando…" : editing ? "Guardar cambios" : "Crear licitación"}
               </Button>
@@ -328,6 +348,7 @@ export default function TendersPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }

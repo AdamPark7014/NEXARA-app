@@ -16,6 +16,7 @@ import {
 import { DetailError, DetailSection, formatDateTime } from "@/components/detail/DetailFrame";
 import { useProjectDetail } from "@/components/crm/ProjectDetailShell";
 import { getErpFinanceSectionConfig } from "@/lib/section-views";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 export default function ProjectOrderPage() {
   const { user } = useUser();
@@ -27,6 +28,8 @@ export default function ProjectOrderPage() {
   const [loading, setLoading] = useState(true);
   const [orderError, setOrderError] = useState<string | null>(null);
   const [invoicing, setInvoicing] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   useEffect(() => {
     if (!token || !id) return;
@@ -38,30 +41,32 @@ export default function ProjectOrderPage() {
       .finally(() => setLoading(false));
   }, [token, id, summary]);
 
-  const closeProject = async () => {
-    if (!token || !confirm("¿Generar orden de cierre para este proyecto?")) return;
-    try {
-      const created = await closeSalesProject(token, id);
-      setOrder(created);
-      reload();
-    } catch {
-      /* ignore */
-    }
+  const closeProject = () => {
+    if (!token) return;
+    setConfirmState({ message: "¿Generar orden de cierre para este proyecto?", confirmLabel: "Generar orden", fn: async () => {
+      try {
+        const created = await closeSalesProject(token, id);
+        setOrder(created);
+        reload();
+      } catch { /* ignore */ }
+    } });
   };
 
-  const generateInvoice = async () => {
-    if (!token || !confirm("¿Generar factura borrador desde esta orden de cierre?")) return;
-    setInvoicing(true);
-    try {
-      const inv = await invoiceSalesProject(token, id);
-      reload();
-      void getSalesProjectOrder(token, id).then(setOrder).catch(() => undefined);
-      router.push(`/erp/invoicing?highlight=${inv.id}`);
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "No se pudo generar la factura");
-    } finally {
-      setInvoicing(false);
-    }
+  const generateInvoice = () => {
+    if (!token) return;
+    setConfirmState({ message: "¿Generar factura borrador desde esta orden de cierre?", confirmLabel: "Generar factura", fn: async () => {
+      setInvoicing(true);
+      try {
+        const inv = await invoiceSalesProject(token, id);
+        reload();
+        void getSalesProjectOrder(token, id).then(setOrder).catch(() => undefined);
+        router.push(`/erp/invoicing?highlight=${inv.id}`);
+      } catch (e) {
+        setSaveErr(e instanceof Error ? e.message : "No se pudo generar la factura");
+      } finally {
+        setInvoicing(false);
+      }
+    } });
   };
 
   if (error) return <DetailError message={error} onRetry={reload} />;
@@ -114,7 +119,8 @@ export default function ProjectOrderPage() {
           )}
           {activeOrder && !linkedInvoice && invoiceCfg.canCreate && (
             <div style={{ marginTop: 16 }}>
-              <Button variant="primary" onClick={() => void generateInvoice()} disabled={invoicing}>
+              {saveErr && <p role="alert" style={{ color: "var(--danger)", fontSize: 12, marginBottom: 8 }}>{saveErr}</p>}
+              <Button variant="primary" onClick={generateInvoice} disabled={invoicing}>
                 {invoicing ? "Generando…" : "Generar factura borrador"}
               </Button>
             </div>
@@ -128,6 +134,7 @@ export default function ProjectOrderPage() {
           )}
         </>
       )}
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} danger={false} />
     </DetailSection>
   );
 }

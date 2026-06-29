@@ -160,6 +160,28 @@ export class ServiceClientsController {
   @RBAC({
     anyPermissions: [
       PERMISSIONS.CONSOLE_ADMIN,
+      PERMISSIONS.SUPPORT_VIEW,
+      PERMISSIONS.ACTIVITIES_MANAGE,
+    ],
+  })
+  @Post(':id/ticket-requests')
+  createTicketRequest(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { description?: string; branchId?: number; urgency?: string; requestType?: string },
+  ) {
+    if (!body?.description?.trim()) throw new BadRequestException('Descripción requerida');
+    return this.serviceClientsService.createTicketRequest(id, {
+      description: body.description,
+      branchId: body.branchId ? Number(body.branchId) : undefined,
+      urgency: body.urgency,
+      requestType: body.requestType,
+    });
+  }
+
+  @UseGuards(RbacGuard)
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.CONSOLE_ADMIN,
       PERMISSIONS.MAINTENANCE_MANAGE,
       PERMISSIONS.ASSETS_MANAGE,
     ],

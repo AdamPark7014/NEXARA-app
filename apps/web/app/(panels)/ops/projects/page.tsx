@@ -34,6 +34,7 @@ export default function OpsProjectsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
   const [form, setForm] = useState({ title: "", description: "", scopeSummary: "", clientId: "", startDate: new Date().toISOString().slice(0, 10) });
 
   const load = useCallback(async () => {
@@ -74,7 +75,7 @@ export default function OpsProjectsPage() {
       setForm({ title: "", description: "", scopeSummary: "", clientId: "", startDate: new Date().toISOString().slice(0, 10) });
       void load();
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : "No se pudo crear el proyecto");
+      setSaveErr(e instanceof Error ? e.message : "No se pudo crear el proyecto");
     } finally {
       setSaving(false);
     }

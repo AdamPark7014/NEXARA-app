@@ -10,6 +10,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface DocCategory { id: number; name: string }
 interface ManagedDoc {
@@ -44,6 +45,7 @@ export default function DocumentsPage() {
   const token = user?.token ?? "";
 
   const [docs, setDocs] = useState<ManagedDoc[]>([]);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [cats, setCats] = useState<DocCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -148,11 +150,13 @@ export default function DocumentsPage() {
   };
 
   const archive = async (d: ManagedDoc) => {
-    if (!token || !confirm(`¿Archivar "${d.title}"?`)) return;
+    if (!token) return;
+    setConfirmState({ message: `¿Archivar "${d.title}"?`, confirmLabel: "Archivar", fn: async () => {
     try {
       await apiFetch(`documents/${d.id}/archive`, token, { method: "PATCH" });
       void load();
     } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+  } });
   };
 
   const statusVariant = (s: string): "positive" | "warning" | "default" =>
@@ -252,6 +256,7 @@ export default function DocumentsPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }
