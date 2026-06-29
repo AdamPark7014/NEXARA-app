@@ -380,7 +380,7 @@ function TeamAttendanceView({ token, dateFilter, visibilityHint }: { token: stri
       const raw = await apiFetch<HierarchyRangeResponse | ApiAttendanceUser[]>(
         `attendance/hierarchy/range?from=${dateFilter}&to=${dateFilter}`, token
       );
-      const arr: ApiAttendanceUser[] = Array.isArray(raw) ? raw : (raw.users ?? []);
+      const arr: ApiAttendanceUser[] = !raw ? [] : Array.isArray(raw) ? raw : (raw.users ?? []);
       const ORDER = { PRESENTE: 0, COMPLETO: 1, AUSENTE: 2 } as const;
       const mapped = arr.map((u) => mapApiUser(u, dateFilter));
       mapped.sort((a, b) => (ORDER[a.estado ?? "AUSENTE"] ?? 2) - (ORDER[b.estado ?? "AUSENTE"] ?? 2));
