@@ -49,6 +49,7 @@ import {
 import { getUserHomeUrlAbsolute } from "@/lib/panel-home";
 import type { User } from "@/components/UserContext";
 import { buildCrossPanelUrl } from "@/lib/cross-panel-handoff";
+import { buildFreshLoginUrl } from "@/lib/tab-session";
 import styles from "./AppShell.module.scss";
 import CommandPalette from "./CommandPalette";
 
@@ -461,6 +462,16 @@ export default function AppShell({ panel, children }: AppShellProps) {
                 </span>
                 {darkMode ? "Modo claro" : "Modo oscuro"}
               </button>
+              <Link
+                href={buildFreshLoginUrl()}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setUserMenuOpen(false)}
+                style={menuItemStyle()}
+              >
+                <span style={{ width: 18, display: "inline-flex", justifyContent: "center" }}>👥</span>
+                Otra cuenta (nueva pestaña)
+              </Link>
               <hr style={{ border: 0, borderTop: "1px solid var(--nx-panel-hairline-soft)", margin: "4px 6px" }} />
               <button type="button" onClick={handleLogout} style={{ ...menuItemStyle(), color: "var(--danger)" }}>
                 <span style={{ width: 18, display: "inline-flex", justifyContent: "center" }}>🚪</span>

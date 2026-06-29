@@ -4,18 +4,35 @@ import { useEffect, useState } from 'react';
 import { getUserHomeUrlAbsolute } from '@/lib/panel-home';
 import { getSharedCookie, SHARED_COOKIE_KEYS } from '@/lib/shared-cookies';
 
+const USER_STORAGE_KEY = 'nexara_user';
+
+function readSessionUser(): Record<string, unknown> | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(USER_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Página de redirect de dashboard genérica.
- * Redirige al usuario a su panel HOME según su rol desde cookies compartidas (cross-subdomain).
- * 
- * Maneja redirecciones cross-subdomain (ej: core → studio).
+ * Redirige al panel HOME del usuario activo en esta pestaña.
  */
 export default function DashboardRedirect() {
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
     try {
-      // 1. Intentar leer de cookies compartidas (cross-subdomain)
+      const sessionUser = readSessionUser();
+      if (sessionUser?.token) {
+        const homeUrl = getUserHomeUrlAbsolute(sessionUser);
+        setIsChecking(false);
+        window.location.href = homeUrl;
+        return;
+      }
+
       const tokenFromCookie = getSharedCookie(SHARED_COOKIE_KEYS.ACCESS_TOKEN);
       const userFromCookie = getSharedCookie(SHARED_COOKIE_KEYS.USER);
 
@@ -27,23 +44,7 @@ export default function DashboardRedirect() {
         return;
       }
 
-      // 2. Fallback: intentar leer de localStorage (mismo subdominio)
-      const token = localStorage.getItem('nexara_access_token');
-      const userStr = localStorage.getItem('nexara_user');
-
-      if (!token || !userStr) {
-        // No autenticado → ir al login
-        window.location.href = '/login';
-        return;
-      }
-
-      // Parsear usuario
-      const user = JSON.parse(userStr);
-
-      // Usar función centralizada para obtener el URL home con subdominio
-      const homeUrl = getUserHomeUrlAbsolute(user);
-      setIsChecking(false);
-      window.location.href = homeUrl;
+      window.location.href = '/login';
     } catch (error) {
       console.error('Error en dashboard redirect:', error);
       window.location.href = '/login';

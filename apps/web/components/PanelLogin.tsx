@@ -9,6 +9,7 @@ import { useUser } from "./UserContext";
 import { hasPermission, PERMISSIONS } from "../lib/permissions";
 import { getDeviceIdentityHeaders } from "@/lib/device-identity";
 import { getUserHomeUrl, getUserHomeUrlAbsolute } from "@/lib/panel-home";
+import { isCapacitorNative } from "@/lib/capacitor-env";
 import { setSharedCookie, SHARED_COOKIE_KEYS } from "@/lib/shared-cookies";
 
 type PanelLoginProps = {
@@ -173,11 +174,11 @@ export default function PanelLogin({ redirectTo, requiredPermission, mode = "con
 
       setUser(userData);
 
-      // Guardar token y user en cookies compartidas entre subdomios
-      // Esto permite que el usuario permanezca autenticado al cambiar de subdominio
-      if (typeof document !== "undefined") {
+      // App nativa: cookies compartidas cross-subdominio. En navegador cada
+      // pestaña guarda su JWT solo en sessionStorage (UserContext).
+      if (typeof document !== "undefined" && isCapacitorNative()) {
         setSharedCookie(SHARED_COOKIE_KEYS.ACCESS_TOKEN, data.access_token, {
-          maxAge: 86400, // 24 horas
+          maxAge: 86400,
           sameSite: 'Lax',
         });
         setSharedCookie(SHARED_COOKIE_KEYS.USER, JSON.stringify(userData), {

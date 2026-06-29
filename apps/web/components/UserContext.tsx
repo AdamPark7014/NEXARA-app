@@ -1,5 +1,6 @@
 "use client";
 import { consumeHandoffParam } from '@/lib/cross-panel-handoff';
+import { consumeFreshLoginIntent, isBrowserLoginPath } from '@/lib/tab-session';
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { clearActivePanel } from '@/lib/panel-routing';
 import { isCapacitorNative } from '@/lib/capacitor-env';
@@ -133,27 +134,7 @@ const safeGetStoredUser = (): User | null => {
 		}
 	};
 
-	// 1. Intentar leer de cookies compartidas PRIMERO (para cross-subdomain)
-	// Si el usuario cambió de subdominio, localStorage/sessionStorage estarán vacíos
-	// pero la cookie compartida aún tendrá el token
-	try {
-		const cookieUserStr = getSharedCookie(SHARED_COOKIE_KEYS.USER);
-		const cookieUser = parseStored(cookieUserStr);
-		if (cookieUser) {
-			// Guardar también en sessionStorage para acceso rápido local
-			try {
-				const { offlineDegraded: _omit, ...persistable } = cookieUser;
-				window.sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(persistable));
-			} catch {
-				/* ignore */
-			}
-			return cookieUser;
-		}
-	} catch {
-		// Ignore cookie read errors
-	}
-
-	// 2. Fallback: leer de sessionStorage (sesión local dentro del mismo subdominio)
+	// 1. Sesión de ESTA pestaña (prioridad — permite CEO + ing en paralelo)
 	try {
 		const sessionCandidate = parseStored(window.sessionStorage.getItem(USER_STORAGE_KEY));
 		if (sessionCandidate) return sessionCandidate;
@@ -161,7 +142,29 @@ const safeGetStoredUser = (): User | null => {
 		// Ignore storage access errors (Safari private mode, etc.)
 	}
 
-	// 3. Fallback: leer de localStorage (legacy)
+	// 2. Cookies compartidas: solo si esta pestaña no tiene sesión propia
+	//    (salto cross-subdominio). En /login no hidratar desde cookie para
+	//    permitir iniciar sesión con otra cuenta en una pestaña nueva.
+	const skipCookieHydration = isBrowserLoginPath();
+	if (!skipCookieHydration) {
+		try {
+			const cookieUserStr = getSharedCookie(SHARED_COOKIE_KEYS.USER);
+			const cookieUser = parseStored(cookieUserStr);
+			if (cookieUser) {
+				try {
+					const { offlineDegraded: _omit, ...persistable } = cookieUser;
+					window.sessionStorage.setItem(USER_STORAGE_KEY, JSON.stringify(persistable));
+				} catch {
+					/* ignore */
+				}
+				return cookieUser;
+			}
+		} catch {
+			// Ignore cookie read errors
+		}
+	}
+
+	// 3. Fallback: localStorage legacy (app nativa / migración)
 	const native = isCapacitorNative();
 
 	try {
@@ -236,8 +239,8 @@ const safePersistUser = (user: User | null) => {
 		}
 	}
 
-	// También escribir/limpiar cookies compartidas para persistencia cross-subdomain
-	if (typeof document !== 'undefined') {
+	// Cookies compartidas: solo app nativa (en navegador cada pestaña es independiente)
+	if (isCapacitorNative() && typeof document !== 'undefined') {
 		if (user) {
 			const { offlineDegraded: _omit, ...persistable } = user;
 			setSharedCookie(SHARED_COOKIE_KEYS.USER, JSON.stringify(persistable), {
@@ -249,7 +252,6 @@ const safePersistUser = (user: User | null) => {
 				sameSite: 'Lax',
 			});
 		} else {
-			// Logout: limpiar cookies compartidas
 			deleteSharedCookie(SHARED_COOKIE_KEYS.USER);
 			deleteSharedCookie(SHARED_COOKIE_KEYS.ACCESS_TOKEN);
 		}
@@ -302,6 +304,9 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 				// Keep local session user if profile sync fails transiently.
 			}
 		};
+
+		// ?fresh=1 en /login: vaciar sesión de esta pestaña antes de hidratar
+		consumeFreshLoginIntent();
 
 		// Cross-subdomain SSO: consume ?_nxt= handoff token first
 		const handoffJson = consumeHandoffParam();
@@ -365,6 +370,11 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 	const logout = () => {
 		clearActivePanel();
 		setUser(null);
+		// Cerrar sesión global (cookies legacy / otras pestañas sin sesión propia)
+		if (typeof document !== 'undefined' && !isCapacitorNative()) {
+			deleteSharedCookie(SHARED_COOKIE_KEYS.USER);
+			deleteSharedCookie(SHARED_COOKIE_KEYS.ACCESS_TOKEN);
+		}
 	};
 
 	return (
