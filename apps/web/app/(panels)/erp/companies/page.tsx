@@ -47,6 +47,8 @@ export default function CompaniesPage() {
   const [editing, setEditing] = useState<CompanyProfile | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
   const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [actionErr, setActionErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -61,7 +63,7 @@ export default function CompaniesPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const openNew = () => { setEditing(null); setForm({ ...emptyForm }); setShowForm(true); };
+  const openNew = () => { setEditing(null); setForm({ ...emptyForm }); setSaveErr(null); setShowForm(true); };
   const openEdit = (c: CompanyProfile) => {
     setEditing(c);
     setForm({ legalName: c.legalName, tradeName: c.tradeName ?? "", rfc: c.rfc, fiscalRegime: c.fiscalRegime ?? "", contactEmail: c.contactEmail ?? "", websiteUrl: c.websiteUrl ?? "" });
@@ -80,7 +82,7 @@ export default function CompaniesPage() {
       setShowForm(false);
       void load();
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      setSaveErr(e instanceof Error ? e.message : "No se pudo guardar");
     } finally { setSaving(false); }
   };
 
@@ -89,16 +91,16 @@ export default function CompaniesPage() {
     try {
       await apiFetch(`company/${c.id}/primary`, token, { method: "PATCH" });
       void load();
-    } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+    } catch (e) { setActionErr(e instanceof Error ? e.message : "Error en la operación"); }
   };
 
   const toggleActive = async (c: CompanyProfile) => {
     if (!token) return;
-    if (c.isPrimary) { alert("No puedes desactivar la empresa primaria."); return; }
+    if (c.isPrimary) { setActionErr("No puedes desactivar la empresa primaria."); return; }
     try {
       await apiFetch(`company/${c.id}/active`, token, { method: "PATCH", body: JSON.stringify({ isActive: !c.isActive }) });
       void load();
-    } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+    } catch (e) { setActionErr(e instanceof Error ? e.message : "Error en la operación"); }
   };
 
   const inp: React.CSSProperties = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13 };
@@ -143,6 +145,12 @@ export default function CompaniesPage() {
           </>
         }
       />
+      {actionErr && (
+        <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>{actionErr}</span>
+          <button type="button" onClick={() => setActionErr(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontWeight: 700, fontSize: 16, lineHeight: 1, padding: "0 4px" }}>×</button>
+        </div>
+      )}
       <Section title={loading ? "Cargando…" : `${items.length} empresas`}>
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando empresas registradas." />}
         {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
@@ -168,7 +176,8 @@ export default function CompaniesPage() {
                 <input value={form.websiteUrl} onChange={(e) => setForm((f) => ({ ...f, websiteUrl: e.target.value }))} placeholder="https://nexara.com.mx" style={inp} /></label>
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
-              <Button variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
+              {saveErr && <p style={{ color: "var(--danger)", fontSize: 12, margin: "0 0 8px" }}>{saveErr}</p>}
+              <Button variant="secondary" onClick={() => { setShowForm(false); setSaveErr(null); }}>Cancelar</Button>
               <Button variant="primary" onClick={() => void save()} disabled={saving || !form.legalName || !form.rfc}>{saving ? "Guardando…" : "Guardar"}</Button>
             </div>
           </div>

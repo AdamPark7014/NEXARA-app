@@ -9,6 +9,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface NewsPost {
   id: number;
@@ -41,6 +42,9 @@ export default function StudioNewsPage() {
   const [summary, setSummary] = useState("");
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [actionErr, setActionErr] = useState<string | null>(null);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -68,16 +72,18 @@ export default function StudioNewsPage() {
       setShowForm(false); setTitle(""); setSummary(""); setContent("");
       void load();
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      setSaveErr(e instanceof Error ? e.message : "Error al guardar noticia");
     } finally { setSaving(false); }
   };
 
   const remove = async (n: NewsPost) => {
-    if (!token || !confirm(`¿Eliminar "${n.title}"?`)) return;
+    if (!token) return;
+    setConfirmState({ message: `¿Eliminar "${n.title}"?`, fn: async () => {
     try {
       await apiFetch(`news/${n.id}`, token, { method: "DELETE" });
       setItems((prev) => prev.filter((i) => i.id !== n.id));
-    } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+    } catch (e) { setActionErr(e instanceof Error ? e.message : "Error al eliminar"); }
+  } });
   };
 
   const togglePublish = async (n: NewsPost) => {
@@ -90,7 +96,7 @@ export default function StudioNewsPage() {
         body: JSON.stringify({ status: nextStatus, ...(nextStatus === "PUBLISHED" ? { publishedAt: new Date().toISOString() } : {}) }),
       });
       setItems((prev) => prev.map((i) => (i.id === n.id ? { ...i, status: nextStatus, publishedAt: nextStatus === "PUBLISHED" ? new Date().toISOString() : i.publishedAt } : i)));
-    } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+    } catch (e) { setActionErr(e instanceof Error ? e.message : "Error al eliminar"); }
   };
 
   const inp: React.CSSProperties = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13 };
@@ -135,6 +141,12 @@ export default function StudioNewsPage() {
         }
       />
 
+      {actionErr && (
+        <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>{actionErr}</span>
+          <button type="button" onClick={() => setActionErr(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontWeight: 700, fontSize: 16, lineHeight: 1, padding: "0 4px" }}>×</button>
+        </div>
+      )}
       <Section title={loading ? "Cargando…" : `${items.length} publicaciones`}>
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando el blog público." />}
         {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
@@ -154,12 +166,14 @@ export default function StudioNewsPage() {
                 <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Mínimo 20 caracteres" rows={8} style={{ ...inp, resize: "vertical" }} /></label>
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
-              <Button variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
+              {saveErr && <p style={{ color: "var(--danger)", fontSize: 12, margin: "0 0 8px" }}>{saveErr}</p>}
+              <Button variant="secondary" onClick={() => { setShowForm(false); setSaveErr(null); }}>Cancelar</Button>
               <Button variant="primary" onClick={() => void submit()} disabled={saving || title.length < 4 || content.length < 20}>{saving ? "Guardando…" : "Crear borrador"}</Button>
             </div>
           </div>
         </div>
       )}
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }

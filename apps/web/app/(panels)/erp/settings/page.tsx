@@ -9,6 +9,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface SettingRow {
   key: string;
@@ -36,6 +37,7 @@ export default function SettingsPage() {
   const token = user?.token ?? "";
 
   const [settings, setSettings] = useState<SettingRow[]>([]);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -90,11 +92,13 @@ export default function SettingsPage() {
   };
 
   const remove = async (s: SettingRow) => {
-    if (!token || !confirm(`¿Eliminar la configuración "${s.key}"?`)) return;
+    if (!token) return;
+    setConfirmState({ message: `¿Eliminar la configuración "${s.key}"?`, fn: async () => {
     try {
       await apiFetch(`settings/${s.key}`, token, { method: "DELETE" });
       setSettings((prev) => prev.filter((x) => x.key !== s.key));
     } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+  } });
   };
 
   const inp: React.CSSProperties = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13 };
@@ -159,6 +163,7 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }

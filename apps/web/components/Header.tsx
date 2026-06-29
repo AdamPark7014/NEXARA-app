@@ -47,7 +47,7 @@ function BackupRestorePanel() {
     const res = await fetch('/api/export/all', {
       headers: { Authorization: `Bearer ${user.token}` },
     });
-    if (!res.ok) return alert('Error al exportar backup');
+    if (!res.ok) return setMsg('Error al exportar backup');
     const blob = await res.blob();
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');

@@ -11,16 +11,12 @@ import { openExternalUrl } from '@/lib/open-external-url';
 
 const EMPTY_ACTIVITY_FORM = {
   titulo: '',
-  descripcion: '',
   indicaciones: '',
   prioridad: 'Media',
   responsableId: '',
   tiempoEstimadoMin: '',
   tiempoMaximoMin: '',
-  fechaInicio: '',
-  fechaMaxima: '',
-  fechaEntregaEsperada: '',
-  activityType: 'CLIENT' as 'CLIENT' | 'INTERNAL',
+  fecha: '',
   clientId: '',
   projectId: '',
   ticketType: 'PREVENTIVO',
@@ -33,12 +29,12 @@ const EMPTY_ACTIVITY_FORM = {
   branchAddress: '',
 };
 
-function toDatetimeLocalValue(iso?: string | null): string {
+function toDateInputValue(iso?: string | null): string {
   if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 const humanizeEvidenceKey = (value: string) =>
@@ -291,7 +287,6 @@ const ActivitiesTable: React.FC = () => {
   };
 
   const [assignableUsers, setAssignableUsers] = useState<{ id: number; nombre: string; email?: string; role?: { nombre: string } }[]>([]);
-  const [clients, setClients] = useState<{ id: number; name: string; logoUrl?: string | null }[]>([]);
   const [operationalProjects, setOperationalProjects] = useState<{ id: number; title: string; status: string; client: { id: number; name: string } }[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
@@ -310,21 +305,17 @@ const ActivitiesTable: React.FC = () => {
   };
 
   const populateFormFromRecord = (record: Activity & Record<string, unknown>) => {
-    const activityType = record.activityType === 'INTERNAL' ? 'INTERNAL' : 'CLIENT';
+    const projectId = record.projectId ? String(record.projectId) : '';
     setNewActivity({
       titulo: record.titulo ?? '',
-      descripcion: record.descripcion ?? '',
       indicaciones: record.indicaciones ?? '',
       prioridad: record.prioridad ?? 'Media',
       responsableId: record.responsableId ? String(record.responsableId) : '',
       tiempoEstimadoMin: record.tiempoEstimadoMin != null ? String(record.tiempoEstimadoMin) : '',
       tiempoMaximoMin: record.tiempoMaximoMin != null ? String(record.tiempoMaximoMin) : '',
-      fechaInicio: toDatetimeLocalValue(record.fechaInicio),
-      fechaMaxima: toDatetimeLocalValue(record.fechaMaxima),
-      fechaEntregaEsperada: toDatetimeLocalValue(record.fechaEntregaEsperada),
-      activityType,
+      fecha: toDateInputValue(record.fechaInicio ?? record.fechaEntregaEsperada ?? record.fechaMaxima),
       clientId: record.clientId ? String(record.clientId) : record.client?.id ? String(record.client.id) : '',
-      projectId: record.projectId ? String(record.projectId) : '',
+      projectId,
       ticketType: record.ticketType ?? 'PREVENTIVO',
       ticketTypeCustom: record.ticketTypeCustom ?? '',
       workType: record.workType ?? 'ISSUE',
@@ -385,16 +376,6 @@ const ActivitiesTable: React.FC = () => {
       .then((res) => res.ok ? res.json() : [])
       .then((data) => setAssignableUsers(Array.isArray(data) ? data : []))
       .catch(() => setAssignableUsers([]));
-  };
-
-  const fetchClients = () => {
-    if (!user?.token) return;
-    fetch(buildApiUrl('service-clients'), {
-      headers: { Authorization: `Bearer ${user.token}` },
-    })
-      .then((res) => res.ok ? res.json() : [])
-      .then((data) => setClients(Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : [])))
-      .catch(() => setClients([]));
   };
 
   const fetchOperationalProjects = () => {
@@ -504,7 +485,6 @@ const ActivitiesTable: React.FC = () => {
     fetchActivities();
     fetchAssignableUsers();
     fetchNextAn();
-    fetchClients();
     fetchOperationalProjects();
     fetchTicketRequests();
   }, [user?.token]);
@@ -620,18 +600,22 @@ const ActivitiesTable: React.FC = () => {
 
   const prefillFromRequest = (request: ClientTicketRequest) => {
     const isPreventiveInventory = request.requestType === 'PREVENTIVE_INVENTORY';
+    const clientId = request.client?.id ? String(request.client.id) : '';
+    const matchingProjects = operationalProjects.filter(
+      (p) => p.status === 'ACTIVE' && (!clientId || String(p.client.id) === clientId),
+    );
     setPendingRequestId(request.id);
     setNewActivity((prev) => ({
       ...prev,
-      activityType: 'CLIENT',
       titulo: request.branchName
         ? `${isPreventiveInventory ? 'Mantenimiento e inventario' : 'Ticket'} ${request.branchName}`
         : isPreventiveInventory
           ? 'Mantenimiento e inventario cliente'
           : 'Ticket cliente',
-      descripcion: request.description || prev.descripcion,
+      indicaciones: request.description || prev.indicaciones,
       prioridad: request.urgency === 'HIGH' ? 'Alta' : request.urgency === 'LOW' ? 'Baja' : 'Media',
-      clientId: request.client?.id ? String(request.client.id) : prev.clientId,
+      clientId,
+      projectId: matchingProjects.length === 1 ? String(matchingProjects[0].id) : '',
       branchName: request.branchName || prev.branchName,
       branchNumber: request.branchNumber || prev.branchNumber,
       branchCity: request.city || prev.branchCity,
@@ -670,18 +654,23 @@ const ActivitiesTable: React.FC = () => {
       setFormError('Titulo y responsable son obligatorios');
       return;
     }
+    if (!newActivity.projectId) {
+      setFormError('Selecciona un proyecto');
+      return;
+    }
+
+    const project = operationalProjects.find((p) => String(p.id) === newActivity.projectId);
 
     const payload: Record<string, unknown> = {
       titulo: newActivity.titulo,
-      descripcion: newActivity.descripcion || undefined,
       indicaciones: newActivity.indicaciones || undefined,
       prioridad: newActivity.prioridad,
-      activityType: newActivity.activityType,
+      activityType: 'INTERNAL',
       ticketType: newActivity.ticketType === 'INVENTARIO' ? 'PREVENTIVO' : newActivity.ticketType,
       ticketTypeCustom: newActivity.ticketType === 'OTRO' ? (newActivity.ticketTypeCustom || undefined) : undefined,
-      workType: newActivity.activityType === 'INTERNAL' ? 'ISSUE' : (newActivity.ticketType === 'INVENTARIO' ? 'PREVENTIVE_INVENTORY' : 'ISSUE'),
-      clientId: newActivity.activityType === 'CLIENT' && newActivity.clientId ? Number(newActivity.clientId) : undefined,
-      projectId: newActivity.activityType === 'INTERNAL' && newActivity.projectId ? Number(newActivity.projectId) : undefined,
+      workType: newActivity.ticketType === 'INVENTARIO' ? 'PREVENTIVE_INVENTORY' : newActivity.workType || 'ISSUE',
+      clientId: project?.client.id,
+      projectId: Number(newActivity.projectId),
       branchName: newActivity.branchName || undefined,
       branchNumber: newActivity.branchNumber || undefined,
       branchCity: newActivity.branchCity || undefined,
@@ -690,9 +679,7 @@ const ActivitiesTable: React.FC = () => {
       responsableId: Number(newActivity.responsableId),
       tiempoEstimadoMin: newActivity.tiempoEstimadoMin ? Number(newActivity.tiempoEstimadoMin) : undefined,
       tiempoMaximoMin: newActivity.tiempoMaximoMin ? Number(newActivity.tiempoMaximoMin) : undefined,
-      fechaInicio: newActivity.fechaInicio ? new Date(newActivity.fechaInicio).toISOString() : undefined,
-      fechaMaxima: newActivity.fechaMaxima ? new Date(newActivity.fechaMaxima).toISOString() : undefined,
-      fechaEntregaEsperada: newActivity.fechaEntregaEsperada ? new Date(newActivity.fechaEntregaEsperada).toISOString() : undefined,
+      fechaInicio: newActivity.fecha ? new Date(`${newActivity.fecha}T08:00:00`).toISOString() : undefined,
     };
 
     const isEditing = editingActivityId != null;
@@ -848,51 +835,53 @@ const ActivitiesTable: React.FC = () => {
             <div className="activities-form-head">
               <div>
                 <h3 className="activities-subtitle">Asignar actividad</h3>
-                <div className="activities-helper">Completa los campos clave para crear la actividad.</div>
+                <div className="activities-helper">Proyecto, responsable, fecha y tiempos estimados.</div>
               </div>
               <div className="activities-top-chip">AN sugerido: {nextAn || (nextAnLoaded ? 'No disponible' : 'Calculando...')}</div>
             </div>
             <div className={`activities-form-grid ${isMobile ? 'is-mobile' : ''}`}>
               <input className="input" placeholder="AN (auto)" value={nextAn || (nextAnLoaded ? 'No disponible' : 'Calculando...')} disabled />
-              <input className="input" placeholder="Titulo" value={newActivity.titulo} onChange={(e) => setNewActivity({ ...newActivity, titulo: e.target.value })} />
-              <select className="input" value={newActivity.activityType} onChange={(e) => setNewActivity({ ...newActivity, activityType: e.target.value as 'CLIENT' | 'INTERNAL', ticketType: 'PREVENTIVO', workType: 'ISSUE' })}>
-                <option value="CLIENT">Actividad para Cliente</option>
-                <option value="INTERNAL">Actividad Proyecto</option>
+              <input className="input" placeholder="Título de la actividad" value={newActivity.titulo} onChange={(e) => setNewActivity({ ...newActivity, titulo: e.target.value })} />
+              <select
+                className="input"
+                value={newActivity.projectId}
+                onChange={(e) => {
+                  const projectId = e.target.value;
+                  const project = operationalProjects.find((p) => String(p.id) === projectId);
+                  setNewActivity({
+                    ...newActivity,
+                    projectId,
+                    clientId: project ? String(project.client.id) : '',
+                  });
+                }}
+              >
+                <option value="">Seleccionar proyecto…</option>
+                {operationalProjects
+                  .filter((p) => {
+                    if (p.status !== 'ACTIVE') return false;
+                    if (newActivity.clientId && !newActivity.projectId) {
+                      return String(p.client.id) === newActivity.clientId;
+                    }
+                    return true;
+                  })
+                  .map((project) => (
+                    <option key={project.id} value={project.id}>{project.title}</option>
+                  ))}
               </select>
-              {newActivity.activityType === 'CLIENT' ? (
-                <>
-                  <select className="input" value={newActivity.ticketType} onChange={(e) => { const t = e.target.value; if (t === 'OTRO') { setNewActivity({ ...newActivity, ticketType: 'OTRO', workType: 'ISSUE' }); setOtroModalInput(newActivity.ticketTypeCustom || ''); setShowOtroModal(true); } else { setNewActivity({ ...newActivity, ticketType: t, ticketTypeCustom: '', workType: t === 'INVENTARIO' ? 'PREVENTIVE_INVENTORY' : 'ISSUE' }); } }}>
-                    <option value="PREVENTIVO">Tipo: Preventivo</option>
-                    <option value="CORRECTIVO">Tipo: Correctivo</option>
-                    <option value="EMERGENCIA">Tipo: Emergencia</option>
-                    <option value="INSTALACION">Tipo: Instalacion</option>
-                    <option value="INVENTARIO">Tipo: Inventario</option>
-                    <option value="OTRO">Tipo: Otro</option>
-                  </select>
-                  <select className="input" value={newActivity.clientId} onChange={(e) => setNewActivity({ ...newActivity, clientId: e.target.value })}>
-                    <option value="">Seleccionar cliente...</option>
-                    {clients.map((client) => (
-                      <option key={client.id} value={client.id}>{client.name}</option>
-                    ))}
-                  </select>
-                </>
-              ) : (
-                <>
-                  <select className="input" value={newActivity.projectId} onChange={(e) => setNewActivity({ ...newActivity, projectId: e.target.value })}>
-                    <option value="">Seleccionar proyecto...</option>
-                    {operationalProjects.filter(p => p.status === 'ACTIVE').map((project) => (
-                      <option key={project.id} value={project.id}>{project.title} ({project.client.name})</option>
-                    ))}
-                  </select>
-                  <select className="input" value={newActivity.ticketType} onChange={(e) => { const t = e.target.value; if (t === 'OTRO') { setNewActivity({ ...newActivity, ticketType: 'OTRO', workType: 'ISSUE' }); setOtroModalInput(newActivity.ticketTypeCustom || ''); setShowOtroModal(true); } else { setNewActivity({ ...newActivity, ticketType: t, ticketTypeCustom: '', workType: 'ISSUE' }); } }}>
-                    <option value="PREVENTIVO">Tipo: Preventivo</option>
-                    <option value="CORRECTIVO">Tipo: Correctivo</option>
-                    <option value="EMERGENCIA">Tipo: Emergencia</option>
-                    <option value="INSTALACION">Tipo: Instalacion</option>
-                    <option value="OTRO">Tipo: Otro</option>
-                  </select>
-                </>
-              )}
+              <input
+                className="input"
+                placeholder="Cliente (automático)"
+                value={operationalProjects.find((p) => String(p.id) === newActivity.projectId)?.client.name ?? ''}
+                disabled
+              />
+              <select className="input" value={newActivity.ticketType} onChange={(e) => { const t = e.target.value; if (t === 'OTRO') { setNewActivity({ ...newActivity, ticketType: 'OTRO', workType: 'ISSUE' }); setOtroModalInput(newActivity.ticketTypeCustom || ''); setShowOtroModal(true); } else { setNewActivity({ ...newActivity, ticketType: t, ticketTypeCustom: '', workType: t === 'INVENTARIO' ? 'PREVENTIVE_INVENTORY' : 'ISSUE' }); } }}>
+                <option value="PREVENTIVO">Tipo: Preventivo</option>
+                <option value="CORRECTIVO">Tipo: Correctivo</option>
+                <option value="EMERGENCIA">Tipo: Emergencia</option>
+                <option value="INSTALACION">Tipo: Instalación</option>
+                <option value="INVENTARIO">Tipo: Inventario</option>
+                <option value="OTRO">Tipo: Otro</option>
+              </select>
               <select className="input" value={newActivity.responsableId} onChange={(e) => setNewActivity({ ...newActivity, responsableId: e.target.value })}>
                 <option value="">Responsable</option>
                 {assignableUsers.map((u) => (
@@ -904,7 +893,13 @@ const ActivitiesTable: React.FC = () => {
               <select className="input" value={newActivity.prioridad} onChange={(e) => setNewActivity({ ...newActivity, prioridad: e.target.value })}>
                 {prioridadList.map((p) => <option key={p} value={p}>{p}</option>)}
               </select>
-              {newActivity.activityType === 'CLIENT' && (
+              <div>
+                <label className="activities-input-label">Fecha</label>
+                <input className="input" type="date" value={newActivity.fecha} onChange={(e) => setNewActivity({ ...newActivity, fecha: e.target.value })} />
+              </div>
+              <input className="input" type="number" min={0} placeholder="Tiempo esperado (min)" value={newActivity.tiempoEstimadoMin} onChange={(e) => setNewActivity({ ...newActivity, tiempoEstimadoMin: e.target.value })} />
+              <input className="input" type="number" min={0} placeholder="Tiempo máximo (min)" value={newActivity.tiempoMaximoMin} onChange={(e) => setNewActivity({ ...newActivity, tiempoMaximoMin: e.target.value })} />
+              {pendingRequestId && (
                 <>
                   <input className="input" placeholder="Sucursal" value={newActivity.branchName} onChange={(e) => setNewActivity({ ...newActivity, branchName: e.target.value })} />
                   <input className="input" placeholder="Número sucursal" value={newActivity.branchNumber} onChange={(e) => setNewActivity({ ...newActivity, branchNumber: e.target.value })} />
@@ -913,22 +908,7 @@ const ActivitiesTable: React.FC = () => {
                   <input className="input" placeholder="Dirección sucursal" value={newActivity.branchAddress} onChange={(e) => setNewActivity({ ...newActivity, branchAddress: e.target.value })} />
                 </>
               )}
-              <input className="input" type="number" placeholder="Tiempo estimado (min)" value={newActivity.tiempoEstimadoMin} onChange={(e) => setNewActivity({ ...newActivity, tiempoEstimadoMin: e.target.value })} />
-              <input className="input" type="number" placeholder="Tiempo maximo (min)" value={newActivity.tiempoMaximoMin} onChange={(e) => setNewActivity({ ...newActivity, tiempoMaximoMin: e.target.value })} />
-              <div>
-                <label className="activities-input-label">Fecha inicio</label>
-                <input className="input" type="datetime-local" value={newActivity.fechaInicio} onChange={(e) => setNewActivity({ ...newActivity, fechaInicio: e.target.value })} />
-              </div>
-              <div>
-                <label className="activities-input-label">Fecha maxima</label>
-                <input className="input" type="datetime-local" value={newActivity.fechaMaxima} onChange={(e) => setNewActivity({ ...newActivity, fechaMaxima: e.target.value })} />
-              </div>
-              <div>
-                <label className="activities-input-label">Entrega esperada</label>
-                <input className="input" type="datetime-local" value={newActivity.fechaEntregaEsperada} onChange={(e) => setNewActivity({ ...newActivity, fechaEntregaEsperada: e.target.value })} />
-              </div>
-              <input className="input" placeholder="Descripción" value={newActivity.descripcion} onChange={(e) => setNewActivity({ ...newActivity, descripcion: e.target.value })} />
-              <input className="input" placeholder="Indicaciones" value={newActivity.indicaciones} onChange={(e) => setNewActivity({ ...newActivity, indicaciones: e.target.value })} />
+              <input className="input activities-form-full" placeholder="Indicaciones para el responsable" value={newActivity.indicaciones} onChange={(e) => setNewActivity({ ...newActivity, indicaciones: e.target.value })} />
             </div>
             <div className="activities-form-footer">
               {editingActivityId && (
@@ -1645,6 +1625,10 @@ const ActivitiesTable: React.FC = () => {
           .activities-form-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
             align-content: start;
+          }
+
+          .activities-form-full {
+            grid-column: 1 / -1;
           }
 
           .activities-form-grid.is-mobile,

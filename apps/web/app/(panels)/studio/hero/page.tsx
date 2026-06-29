@@ -23,6 +23,7 @@ import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
 import { getStudioSectionConfig } from "@/lib/section-views";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import {
   createHeroSlide,
   deleteHeroSlide,
@@ -42,6 +43,7 @@ export default function StudioHeroPage() {
   const token = user?.token ?? "";
 
   const [slides, setSlides] = useState<HeroSlide[]>([]);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [pending, setPending] = useState<number | null>(null);
@@ -150,7 +152,7 @@ export default function StudioHeroPage() {
 
   // ── Eliminar ─────────────────────────────────────────────────────
   const onDelete = async (slide: HeroSlide) => {
-    if (!confirm(`¿Eliminar este slide del carrusel?\n\n${slide.altText || slide.imageUrl}`)) return;
+    setConfirmState({ message: `¿Eliminar este slide del carrusel? ${slide.altText || slide.imageUrl}`, fn: async () => {
     setPending(slide.id);
     try {
       await deleteHeroSlide(token, slide.id);
@@ -161,6 +163,7 @@ export default function StudioHeroPage() {
     } finally {
       setPending(null);
     }
+  } });
   };
 
   // ── Reordenar ↑ / ↓ ──────────────────────────────────────────────
@@ -408,6 +411,7 @@ export default function StudioHeroPage() {
           </div>
         )}
       </Section>
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }

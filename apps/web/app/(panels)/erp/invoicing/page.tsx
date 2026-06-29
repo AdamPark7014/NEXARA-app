@@ -11,6 +11,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface InvoiceRow {
   id: number;
@@ -55,6 +56,7 @@ export default function InvoicingPage() {
   const invoiceRef = searchParams.get("invoiceRef");
 
   const [items, setItems] = useState<InvoiceRow[]>([]);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"" | "INCOME" | "EXPENSE">("");
@@ -131,11 +133,13 @@ export default function InvoicingPage() {
   };
 
   const cancel = async (inv: InvoiceRow) => {
-    if (!token || !confirm(`¿Cancelar el CFDI ${inv.invoiceNumber}?`)) return;
+    if (!token) return;
+    setConfirmState({ message: `¿Cancelar el CFDI ${inv.invoiceNumber}?`, confirmLabel: "Cancelar CFDI", fn: async () => {
     try {
       await apiFetch(`accounting/invoices/${inv.id}/cancel`, token, { method: "PATCH", body: JSON.stringify({ cancelReason: "02" }) });
       void load();
     } catch (e) { alert(`Error al cancelar: ${e instanceof Error ? e.message : "desconocido"}`); }
+  } });
   };
 
   const openPayment = (inv: InvoiceRow) => {
@@ -491,6 +495,7 @@ export default function InvoicingPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }

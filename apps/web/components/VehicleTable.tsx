@@ -82,7 +82,7 @@ const VehicleTable = () => {
       setExcelUrl(url);
       setExcelBlob(blob);
     } catch {
-      alert('Error al exportar');
+      setError('Error al exportar vehículos');
     } finally {
       setExcelPreparing(false);
     }

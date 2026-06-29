@@ -9,6 +9,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface KbCategory { id: number; name: string; slug: string }
 interface KbArticle {
@@ -43,6 +44,7 @@ export default function KbPage() {
   const token = user?.token ?? "";
 
   const [articles, setArticles] = useState<KbArticle[]>([]);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [cats, setCats] = useState<KbCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -144,11 +146,13 @@ export default function KbPage() {
   };
 
   const remove = async (a: KbArticle) => {
-    if (!token || !confirm(`¿Eliminar el artículo "${a.title}"?`)) return;
+    if (!token) return;
+    setConfirmState({ message: `¿Eliminar el artículo "${a.title}"?`, fn: async () => {
     try {
       await apiFetch(`kb/articles/${a.id}`, token, { method: "DELETE" });
       setArticles((prev) => prev.filter((x) => x.id !== a.id));
     } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+  } });
   };
 
   const togglePublish = async (a: KbArticle) => {
@@ -326,6 +330,7 @@ export default function KbPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }

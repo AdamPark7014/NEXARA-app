@@ -38,6 +38,7 @@ export default function ProductsPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
 
   const load = useCallback(async () => {
@@ -78,7 +79,7 @@ export default function ProductsPage() {
       setShowForm(false);
       setForm({ ...EMPTY_FORM });
     } catch (e) {
-      window.alert("Error: " + (e instanceof Error ? e.message : "No se pudo crear"));
+      setSaveErr(e instanceof Error ? e.message : "No se pudo crear el producto");
     } finally { setSaving(false); }
   };
 
@@ -143,7 +144,7 @@ export default function ProductsPage() {
               </Link>
             )}
             {cfg.canCreate && (
-              <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nuevo producto</Button>
+        <Button variant="primary" iconLeft="+" onClick={() => { setShowForm(true); setSaveErr(null); setForm({ ...EMPTY_FORM }); }}>Nuevo producto</Button>
             )}
           </>
         }
@@ -263,8 +264,9 @@ export default function ProductsPage() {
               )}
             </div>
 
-            <div style={{ display: "flex", gap: 10, marginTop: 26, justifyContent: "flex-end" }}>
-              <Button variant="secondary" onClick={() => { setShowForm(false); setForm({ ...EMPTY_FORM }); }}>Cancelar</Button>
+            {saveErr && <p style={{ marginTop: 12, marginBottom: 0, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 12 }}>{saveErr}</p>}
+            <div style={{ display: "flex", gap: 10, marginTop: 16, justifyContent: "flex-end" }}>
+              <Button variant="secondary" onClick={() => { setShowForm(false); setForm({ ...EMPTY_FORM }); setSaveErr(null); }}>Cancelar</Button>
               <Button variant="primary" onClick={() => void saveProduct()} disabled={saving || !form.sku.trim() || !form.name.trim()}>
                 {saving ? "Creando…" : "Crear producto"}
               </Button>

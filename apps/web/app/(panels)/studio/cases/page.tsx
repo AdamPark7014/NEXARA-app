@@ -8,6 +8,7 @@ import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface CaseStudy {
   id: number;
@@ -46,6 +47,8 @@ export default function StudioCasesPage() {
   const [editing, setEditing]   = useState<CaseStudy | null>(null);
   const [form, setForm]         = useState({ ...EMPTY_FORM });
   const [saving, setSaving]     = useState(false);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -70,7 +73,7 @@ export default function StudioCasesPage() {
   };
 
   const save = async () => {
-    if (!form.titulo || !form.cliente) return alert("Título y cliente son requeridos.");
+    if (!form.titulo || !form.cliente) { setSaveErr("Título y cliente son requeridos."); return; }
     setSaving(true);
     try {
       if (editing) {
@@ -82,7 +85,7 @@ export default function StudioCasesPage() {
       }
       setShowForm(false);
     } catch (e: unknown) {
-      alert("Error: " + (e instanceof Error ? e.message : "Error"));
+      setSaveErr(e instanceof Error ? e.message : "Error al guardar caso");
     } finally {
       setSaving(false);
     }
@@ -96,11 +99,12 @@ export default function StudioCasesPage() {
   };
 
   const remove = async (id: number) => {
-    if (!confirm("¿Eliminar este caso de éxito?")) return;
+    setConfirmState({ message: "¿Eliminar este caso de éxito?", fn: async () => {
     try {
       await apiFetch(`case-studies/${id}`, token, { method: "DELETE" });
       setItems(prev => prev.filter(c => c.id !== id));
     } catch { /* ignore */ }
+  } });
   };
 
   const field = (key: keyof typeof EMPTY_FORM) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -226,6 +230,7 @@ export default function StudioCasesPage() {
           </div>
         )}
       </Section>
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }

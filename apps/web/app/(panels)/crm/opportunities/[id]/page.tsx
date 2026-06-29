@@ -25,6 +25,7 @@ export default function OpportunityDetailPage() {
   const { opportunity, error, reload } = useOpportunityDetail();
 
   const [editing, setEditing] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     title: "", description: "", stage: "DISCOVERY",
@@ -44,6 +45,7 @@ export default function OpportunityDetailPage() {
       expectedCloseDate: opportunity.expectedCloseDate?.slice(0, 10) ?? "",
     });
     setEditing(true);
+    setSaveErr(null);
   };
 
   const saveEdit = async () => {
@@ -57,7 +59,7 @@ export default function OpportunityDetailPage() {
       reload();
       setEditing(false);
     } catch (e) {
-      alert("Error: " + (e instanceof Error ? e.message : "desconocido"));
+      setSaveErr(e instanceof Error ? e.message : "No se pudo guardar");
     } finally { setSaving(false); }
   };
 
@@ -106,7 +108,8 @@ export default function OpportunityDetailPage() {
             style={{ width: "100%", accentColor: "var(--primary)" }} />
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "flex-end" }}>
-          <Button variant="secondary" onClick={() => setEditing(false)}>Cancelar</Button>
+          {saveErr && <p style={{ color: "var(--danger)", fontSize: 12, margin: "4px 0" }}>{saveErr}</p>}
+          <Button variant="secondary" onClick={() => { setEditing(false); setSaveErr(null); }}>Cancelar</Button>
           <Button variant="primary" onClick={() => void saveEdit()} disabled={saving || !form.title.trim()}>
             {saving ? "Guardando…" : "Guardar cambios"}
           </Button>

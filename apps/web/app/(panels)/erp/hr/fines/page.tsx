@@ -10,6 +10,7 @@ import { useUser } from "@/components/UserContext";
 import { useHrManagementGuard } from "@/lib/useHrManagementGuard";
 import { getHrSubmoduleConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface HrStaff {
   id: number;
@@ -81,6 +82,7 @@ export default function FinesPage() {
   const highlightId = searchParams.get("highlight");
 
   const [items, setItems] = useState<Fine[]>([]);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [staff, setStaff] = useState<HrStaff[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -176,13 +178,15 @@ export default function FinesPage() {
   };
 
   const remove = async (id: number) => {
-    if (!token || !confirm("¿Cancelar/eliminar esta sanción?")) return;
+    if (!token) return;
+    setConfirmState({ message: "¿Cancelar/eliminar esta sanción?", confirmLabel: "Cancelar sanción", fn: async () => {
     try {
       await apiFetch(`fines/${id}`, token, { method: "DELETE" });
       setItems((prev) => prev.filter((f) => f.id !== id));
     } catch (e) {
       window.alert("No se pudo eliminar: " + (e instanceof Error ? e.message : "error"));
     }
+  } });
   };
 
   const inp: React.CSSProperties = {
@@ -349,6 +353,7 @@ export default function FinesPage() {
           <DataTable columns={columns} rows={visibleItems} rowKey={(f) => f.id} emptyTitle="Sin sanciones registradas" emptyDescription="Registra una incidencia cuando sea necesario." />
         ) : null}
       </Section>
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }

@@ -39,6 +39,8 @@ export default function CrmProjectsPage() {
   const [items, setItems] = useState<SalesProjectDetail[]>([]);
   const [opportunities, setOpportunities] = useState<SalesOpportunity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionErr, setActionErr] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<SalesProjectDetail | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
@@ -46,12 +48,15 @@ export default function CrmProjectsPage() {
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
+    setLoadError(null);
     try {
       const [projects, opps] = await Promise.all([listSalesProjects(token), listSalesOpportunities(token)]);
       setItems(projects);
       setOpportunities(opps);
-    } catch {
-      /* skip */
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "No se pudieron cargar los proyectos");
+      setItems([]);
+      setOpportunities([]);
     } finally {
       setLoading(false);
     }
@@ -105,8 +110,8 @@ export default function CrmProjectsPage() {
         setItems((prev) => [created, ...prev]);
       }
       setShowForm(false);
-    } catch {
-      /* skip */
+    } catch (e) {
+      setActionErr(e instanceof Error ? e.message : "No se pudo guardar el proyecto");
     }
   };
 
@@ -187,6 +192,13 @@ export default function CrmProjectsPage() {
         <KpiCard label="Proyectos activos" value={activos} />
         <KpiCard label="Valor total presupuesto" value={`$${(totalContrato / 1000000).toFixed(1)}M`} />
       </div>
+
+      {actionErr && (
+        <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13 }}>
+          {actionErr}{' '}
+          <button type="button" style={{ background: "none", border: "none", color: "inherit", textDecoration: "underline", cursor: "pointer" }} onClick={() => setActionErr(null)}>Cerrar</button>
+        </div>
+      )}
 
       {showForm && (
         <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>

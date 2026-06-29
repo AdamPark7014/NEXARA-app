@@ -8,6 +8,7 @@ import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface ServiceClient {
   id: number;
@@ -58,6 +59,9 @@ export default function ServiceClientsPage() {
   const [editing, setEditing] = useState<ServiceClient | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
   const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [actionErr, setActionErr] = useState<string | null>(null);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -127,14 +131,15 @@ export default function ServiceClientsPage() {
       }
       setShowForm(false);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Error al guardar cliente");
+      setSaveErr(e instanceof Error ? e.message : "Error al guardar cliente");
     } finally {
       setSaving(false);
     }
   };
 
   const remove = async (id: number) => {
-    if (!token || !confirm("¿Dar de baja este cliente?")) return;
+    if (!token) return;
+    setConfirmState({ message: "¿Dar de baja este cliente?", confirmLabel: "Dar de baja", fn: async () => {
     try {
       await apiFetch(`service-clients/${id}`, token, {
         method: "PUT",
@@ -142,8 +147,9 @@ export default function ServiceClientsPage() {
       });
       setItems(prev => prev.filter(c => c.id !== id));
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Error al dar de baja");
+      setActionErr(e instanceof Error ? e.message : "Error al dar de baja");
     }
+  } });
   };
 
   const inp: React.CSSProperties = {
@@ -223,6 +229,12 @@ export default function ServiceClientsPage() {
         </div>
       )}
 
+      {actionErr && (
+        <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>{actionErr}</span>
+          <button type="button" onClick={() => setActionErr(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontWeight: 700, fontSize: 16, lineHeight: 1, padding: "0 4px" }}>×</button>
+        </div>
+      )}
       <Section title={`${items.length} cliente${items.length !== 1 ? "s" : ""}`}>
         {loadError && (
           <p style={{ color: "var(--danger, #ef4444)", fontSize: 13, marginBottom: 12 }}>{loadError}</p>
@@ -235,6 +247,7 @@ export default function ServiceClientsPage() {
           emptyDescription={loadError ?? "Agrega el primer cliente con contrato de servicio continuo."}
         />
       </Section>
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }

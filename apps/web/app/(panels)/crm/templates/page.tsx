@@ -10,6 +10,7 @@ import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { useCrmManagerGuard } from "@/lib/useCrmManagerGuard";
 import { getCrmManagerSubmoduleConfig } from "@/lib/section-views";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface OrderTemplate {
   id: number;
@@ -62,6 +63,9 @@ export default function TemplatesPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [actionErr, setActionErr] = useState<string | null>(null);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -86,7 +90,7 @@ export default function TemplatesPage() {
       setShowForm(false); setForm({ ...EMPTY_FORM });
       void load();
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      setSaveErr(e instanceof Error ? e.message : "No se pudo guardar la plantilla");
     } finally { setSaving(false); }
   };
 
@@ -95,15 +99,17 @@ export default function TemplatesPage() {
     try {
       await apiFetch(`ventas/order-templates/${t.id}/set-default`, token, { method: "POST" });
       void load();
-    } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+    } catch (e) { setActionErr(e instanceof Error ? e.message : "Error al predeterminar"); }
   };
 
   const remove = async (t: OrderTemplate) => {
-    if (!token || !confirm(`¿Eliminar la plantilla "${t.name}"?`)) return;
+    if (!token) return;
+    setConfirmState({ message: `¿Eliminar la plantilla "${t.name}"?`, fn: async () => {
     try {
       await apiFetch(`ventas/order-templates/${t.id}`, token, { method: "DELETE" });
       setItems((prev) => prev.filter((i) => i.id !== t.id));
-    } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+    } catch (e) { setActionErr(e instanceof Error ? e.message : "Error al eliminar"); }
+  } });
   };
 
   const inp: React.CSSProperties = {
@@ -191,12 +197,18 @@ export default function TemplatesPage() {
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
             {cfg.canCreate && (
-              <Button variant="primary" iconLeft="+" onClick={() => setShowForm(true)}>Nueva plantilla</Button>
+              <Button variant="primary" iconLeft="+" onClick={() => { setShowForm(true); setSaveErr(null); }}>Nueva plantilla</Button>
             )}
           </>
         }
       />
 
+      {actionErr && (
+        <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>{actionErr}</span>
+          <button type="button" onClick={() => setActionErr(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontWeight: 700, fontSize: 16, lineHeight: 1, padding: "0 4px" }}>×</button>
+        </div>
+      )}
       <Section title={loading ? "Cargando…" : `${items.length} plantilla${items.length === 1 ? "" : "s"}`}>
         {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando plantillas de cotización." />}
         {!loading && error && (
@@ -333,6 +345,7 @@ export default function TemplatesPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }

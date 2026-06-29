@@ -10,6 +10,7 @@ import { assignProjectEngineer, removeProjectEngineer } from "@/lib/ops-operatio
 import { getActivitiesSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { DetailError } from "@/components/detail/DetailFrame";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface AssignableUser { id: number; nombre: string; }
 
@@ -32,6 +33,7 @@ export default function OpsProjectEngineersPage() {
   const [usersErr, setUsersErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionErr, setActionErr] = useState<string | null>(null);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const loadUsers = useCallback(async () => {
     if (!token) return;
@@ -70,7 +72,8 @@ export default function OpsProjectEngineersPage() {
   };
 
   const remove = async (engineerId: number) => {
-    if (!token || !confirm("¿Quitar este ingeniero del proyecto?")) return;
+    if (!token) return;
+    setConfirmState({ message: "¿Quitar este ingeniero del proyecto?", confirmLabel: "Quitar", fn: async () => {
     setBusy(true);
     setActionErr(null);
     try {
@@ -81,6 +84,7 @@ export default function OpsProjectEngineersPage() {
     } finally {
       setBusy(false);
     }
+  } });
   };
 
   if (error) return <DetailError message={error} onRetry={reload} />;
@@ -123,6 +127,7 @@ export default function OpsProjectEngineersPage() {
             </select>
           </label>
           <Button variant="primary" disabled={busy || !pickId} onClick={() => void assign()}>Asignar</Button>
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
         </div>
       )}
       {usersErr && (

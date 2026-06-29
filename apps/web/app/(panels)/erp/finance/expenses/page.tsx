@@ -10,6 +10,7 @@ import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
 import { filterRowsByScope, getErpExpensesSectionConfig } from "@/lib/section-views";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface Expense {
   id: number;
@@ -69,6 +70,7 @@ export default function ExpensesPage() {
   const token = user?.token ?? "";
 
   const [items, setItems] = useState<Expense[]>([]);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saveErr, setSaveErr] = useState<string | null>(null);
@@ -131,13 +133,15 @@ export default function ExpensesPage() {
   };
 
   const remove = async (id: number) => {
-    if (!token || !confirm("¿Eliminar este gasto?")) return;
+    if (!token) return;
+    setConfirmState({ message: "¿Eliminar este gasto?", fn: async () => {
     try {
       await apiFetch(`expenses/${id}`, token, { method: "DELETE" });
       setItems(prev => prev.filter(e => e.id !== id));
     } catch (e) {
       window.alert("Error al eliminar: " + (e instanceof Error ? e.message : "error"));
     }
+  } });
   };
 
   const totalMes = visibleItems.filter(e => e.estado === "PAGADO" || e.estado === "APROBADO").reduce((s, e) => s + (e.monto ?? 0), 0);
@@ -233,6 +237,7 @@ export default function ExpensesPage() {
           <DataTable columns={columns} rows={visibleItems} rowKey={e => e.id} emptyTitle="Sin gastos" emptyDescription="Registra el primer gasto administrativo." />
         ) : null}
       </Section>
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }

@@ -11,6 +11,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { canAccessMaintenanceContracts, getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface WorkOrder {
   id: number;
@@ -51,6 +52,9 @@ export default function MaintenancePage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<WorkOrder | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [actionErr, setActionErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -83,15 +87,17 @@ export default function MaintenancePage() {
         setItems(prev => [created, ...prev]);
       }
       setShowForm(false);
-    } catch (e) { alert(e instanceof Error ? e.message : "Error al guardar orden"); }
+    } catch (e) { setSaveErr(e instanceof Error ? e.message : "Error al guardar OT"); }
   };
 
   const remove = async (id: number) => {
-    if (!token || !confirm("Cancelar esta OT de mantenimiento?")) return;
+    if (!token) return;
+    setConfirmState({ message: "¿Cancelar esta OT de mantenimiento?", confirmLabel: "Cancelar OT", fn: async () => {
     try {
       await apiFetch(`maintenance/work-orders/${id}`, token, { method: "PATCH", body: JSON.stringify({ status: "CANCELADA" }) });
       setItems(prev => prev.filter(w => w.id !== id));
-    } catch (e) { alert(e instanceof Error ? e.message : "Error al cancelar orden"); }
+    } catch (e) { setActionErr(e instanceof Error ? e.message : "Error al cancelar OT"); }
+  } });
   };
 
   const patchStatus = async (id: number, action: "start" | "complete") => {
@@ -99,7 +105,7 @@ export default function MaintenancePage() {
     try {
       const updated = await apiFetch(`maintenance/work-orders/${id}/${action}`, token, { method: "PATCH" });
       setItems(prev => prev.map(w => w.id === id ? { ...w, ...updated } : w));
-    } catch (e) { alert(e instanceof Error ? e.message : "Error al actualizar estado"); }
+    } catch (e) { setActionErr(e instanceof Error ? e.message : "Error al actualizar estado"); }
   };
 
   const statusVariant = (s?: string): "accent" | "warning" | "neutral" | "danger" =>
@@ -155,6 +161,12 @@ export default function MaintenancePage() {
         }
       />
 
+      {actionErr && (
+        <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>{actionErr}</span>
+          <button type="button" onClick={() => setActionErr(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontWeight: 700, fontSize: 16, lineHeight: 1, padding: "0 4px" }}>×</button>
+        </div>
+      )}
       {showForm && (
         <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div style={{ gridColumn: "1 / -1" }}>
@@ -204,6 +216,7 @@ export default function MaintenancePage() {
           <DataTable columns={columns} rows={items} rowKey={w => w.id} emptyTitle="Sin ordenes de mantenimiento" emptyDescription="Crea la primera orden de trabajo." />
         )}
       </Section>
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }

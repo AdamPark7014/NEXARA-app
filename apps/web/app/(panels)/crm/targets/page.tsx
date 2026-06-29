@@ -11,6 +11,7 @@ import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { useCrmManagerGuard } from "@/lib/useCrmManagerGuard";
 import { getCrmManagerSubmoduleConfig } from "@/lib/section-views";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface Performance {
   targetId: number;
@@ -59,6 +60,8 @@ export default function TargetsPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
   const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -84,19 +87,21 @@ export default function TargetsPage() {
     setSaving(true);
     try {
       await apiFetch("sales-targets", token, { method: "POST", body: JSON.stringify({ ...form, ownerId: Number(form.ownerId) }) });
-      setShowForm(false); setForm({ ...emptyForm });
+      setShowForm(false); setForm({ ...emptyForm }); setSaveErr(null);
       void load();
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      setSaveErr(e instanceof Error ? e.message : "No se pudo guardar la cuota");
     } finally { setSaving(false); }
   };
 
   const remove = async (p: Performance) => {
-    if (!token || !confirm(`¿Eliminar la cuota de ${p.ownerName}?`)) return;
+    if (!token) return;
+    setConfirmState({ message: `¿Eliminar la cuota de ${p.ownerName}?`, fn: async () => {
     try {
       await apiFetch(`sales-targets/${p.targetId}`, token, { method: "DELETE" });
       void load();
-    } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+    } catch (e) { setSaveErr(e instanceof Error ? e.message : "Error al eliminar"); }
+  } });
   };
 
   const inp: React.CSSProperties = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13 };
@@ -167,12 +172,14 @@ export default function TargetsPage() {
                 <input type="number" min={0} value={form.bonusCommissionPct} onChange={(e) => setForm((f) => ({ ...f, bonusCommissionPct: Number(e.target.value) }))} style={inp} /></label>
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
-              <Button variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
+              {saveErr && <p style={{ color: "var(--danger)", fontSize: 12, margin: "0 0 8px" }}>{saveErr}</p>}
+              <Button variant="secondary" onClick={() => { setShowForm(false); setSaveErr(null); }}>Cancelar</Button>
               <Button variant="primary" onClick={() => void submit()} disabled={saving || !form.ownerId || !form.revenueTarget}>{saving ? "Guardando…" : "Crear"}</Button>
             </div>
           </div>
         </div>
       )}
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }

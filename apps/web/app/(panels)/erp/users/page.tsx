@@ -20,6 +20,7 @@ import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 /* ─── tipos ─────────────────────────────────────────────────────────── */
 interface ApiUser {
@@ -111,6 +112,7 @@ export default function UsersPage() {
   const cfg = useMemo(() => getErpGovernanceSectionConfig(currentUser, "users"), [currentUser]);
 
   const [users,   setUsers]   = useState<ApiUser[]>([]);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [roles,   setRoles]   = useState<ApiRole[]>([]);
   const [depts,   setDepts]   = useState<ApiDept[]>([]);
   const [loading, setLoading] = useState(true);
@@ -224,23 +226,25 @@ export default function UsersPage() {
   };
 
   const toggleActive = async (u: ApiUser) => {
-    if (!confirm(`¿${u.isActive ? "Desactivar" : "Activar"} a ${u.nombre}?`)) return;
+    setConfirmState({ message: `¿${u.isActive ? "Desactivar" : "Activar"} a ${u.nombre}?`, confirmLabel: u.isActive ? "Desactivar" : "Activar", fn: async () => {
     try {
       await apiFetch(`users/${u.id}/hr`, token, { method: "PATCH", body: JSON.stringify({ isActive: !u.isActive }) });
       setUsers(prev => prev.map(x => x.id === u.id ? { ...x, isActive: !u.isActive } : x));
     } catch (e) {
       alert(formatApiError(e, "No se pudo cambiar el estado"));
     }
+  } });
   };
 
   const deleteUser = async (u: ApiUser) => {
-    if (!confirm(`⚠️ Eliminar permanentemente a "${u.nombre}" (${u.email})?\n\nEsta acción no se puede deshacer.`)) return;
+    setConfirmState({ message: `⚠️ Eliminar permanentemente a "${u.nombre}" (${u.email}). Esta acción no se puede deshacer.`, fn: async () => {
     try {
       await apiFetch(`users/${u.id}`, token, { method: "DELETE" });
       setUsers(prev => prev.filter(x => x.id !== u.id));
     } catch (e) {
       alert(`Error al eliminar: ${e instanceof Error ? e.message : "desconocido"}`);
     }
+  } });
   };
 
   /* ── KPIs ────────────────────────────────────────────────────────── */
@@ -432,6 +436,7 @@ export default function UsersPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     </>
   );
 }
