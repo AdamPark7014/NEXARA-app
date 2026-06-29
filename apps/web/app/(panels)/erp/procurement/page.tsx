@@ -43,6 +43,25 @@ interface GoodsReceipt {
   receivedBy?: { nombre?: string };
 }
 
+interface PoLine {
+  id: number;
+  description: string;
+  quantity: number | string;
+  unitPrice?: number | string;
+  receivedQty?: number | string;
+}
+
+interface ReqLine {
+  id: number;
+  description: string;
+  quantity: number | string;
+  estimatedCost?: number | string;
+}
+
+type PoDetail = PurchaseOrder & { items?: PoLine[]; notes?: string | null };
+type ReqDetail = Requisition & { items?: ReqLine[]; rejectionReason?: string | null; notes?: string | null };
+type ReceiptLine = { purchaseOrderItemId: number; description: string; ordered: number; alreadyReceived: number; qty: string };
+
 async function apiFetch<T = unknown>(path: string, token: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(buildApiUrl(path), {
     ...opts,
@@ -139,6 +158,15 @@ export default function ProcurementPage() {
   const [rejectReqReason, setRejectReqReason] = useState("");
   const [rejectingReq, setRejectingReq] = useState(false);
   const [rejectReqErr, setRejectReqErr] = useState<string | null>(null);
+
+  const [detailKind, setDetailKind] = useState<"order" | "req" | null>(null);
+  const [poDetail, setPoDetail] = useState<PoDetail | null>(null);
+  const [reqDetail, setReqDetail] = useState<ReqDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailErr, setDetailErr] = useState<string | null>(null);
+  const [receiptLines, setReceiptLines] = useState<ReceiptLine[]>([]);
+  const [loadingReceiptPo, setLoadingReceiptPo] = useState(false);
+  const [receiptErr, setReceiptErr] = useState<string | null>(null);
 
   const setTab = (next: ProcTab) => {
     const p = new URLSearchParams();
@@ -287,36 +315,108 @@ export default function ProcurementPage() {
     if (req) openRejectReq(req);
   };
 
+  const loadOrderDetail = async (id: number) => {
+    if (!token) return;
+    setDetailKind("order");
+    setReqDetail(null);
+    setDetailLoading(true);
+    setDetailErr(null);
+    try {
+      setPoDetail(await apiFetch<PoDetail>(`procurement/purchase-orders/${id}`, token));
+    } catch (e) {
+      setPoDetail(null);
+      setDetailErr(e instanceof Error ? e.message : "No se pudo cargar la OC");
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const loadReqDetail = async (id: number) => {
+    if (!token) return;
+    setDetailKind("req");
+    setPoDetail(null);
+    setDetailLoading(true);
+    setDetailErr(null);
+    try {
+      setReqDetail(await apiFetch<ReqDetail>(`procurement/requisitions/${id}`, token));
+    } catch (e) {
+      setReqDetail(null);
+      setDetailErr(e instanceof Error ? e.message : "No se pudo cargar la requisición");
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const loadReceiptPo = async (poIdValue?: string) => {
+    const id = poIdValue ?? receiptPoId;
+    if (!token || !id.trim()) return;
+    setLoadingReceiptPo(true);
+    setReceiptErr(null);
+    try {
+      const po = await apiFetch<{ items?: PoLine[] }>(`procurement/purchase-orders/${id}`, token);
+      const lines = (po.items ?? []).map((i) => {
+        const ordered = Number(i.quantity);
+        const alreadyReceived = Number(i.receivedQty ?? 0);
+        const pending = Math.max(0, ordered - alreadyReceived);
+        return {
+          purchaseOrderItemId: i.id,
+          description: i.description,
+          ordered,
+          alreadyReceived,
+          qty: pending > 0 ? String(pending) : "0",
+        };
+      });
+      setReceiptLines(lines);
+      if (!lines.length) setReceiptErr("La OC no tiene partidas.");
+    } catch (e) {
+      setReceiptLines([]);
+      setReceiptErr(e instanceof Error ? e.message : "No se pudo cargar partidas");
+    } finally {
+      setLoadingReceiptPo(false);
+    }
+  };
+
+  const openReceiptForPo = (id: number) => {
+    setReceiptPoId(String(id));
+    setReceiptNotes("");
+    setReceiptLines([]);
+    setReceiptErr(null);
+    setShowReceiptForm(true);
+    void loadReceiptPo(String(id));
+  };
+
   const saveReceipt = async () => {
     if (!token || !receiptPoId) return;
+    const items = receiptLines
+      .map((l) => ({ purchaseOrderItemId: l.purchaseOrderItemId, quantityReceived: Number(l.qty) }))
+      .filter((i) => i.quantityReceived > 0);
+    if (!items.length) {
+      setReceiptErr("Indica al menos una cantidad a recibir.");
+      return;
+    }
     setSavingReceipt(true);
+    setReceiptErr(null);
+    const poNum = Number(receiptPoId);
     try {
-      const po = await apiFetch<{ items?: { id: number; quantity: number | string }[] }>(
-        `procurement/purchase-orders/${receiptPoId}`, token,
-      );
-      const poItems = po.items ?? [];
-      if (!poItems.length) {
-        window.alert("La OC no tiene partidas para recibir.");
-        return;
-      }
       await apiFetch("procurement/goods-receipts", token, {
         method: "POST",
         body: JSON.stringify({
-          purchaseOrderId: Number(receiptPoId),
+          purchaseOrderId: poNum,
           receiptDate: new Date().toISOString().slice(0, 10),
           notes: receiptNotes.trim() || undefined,
-          items: poItems.map((i) => ({
-            purchaseOrderItemId: i.id,
-            quantityReceived: Number(i.quantity),
-          })),
+          items,
         }),
       });
       setShowReceiptForm(false);
       setReceiptPoId("");
       setReceiptNotes("");
+      setReceiptLines([]);
+      if (detailKind === "order" && poDetail?.id === poNum) {
+        void loadOrderDetail(poDetail.id);
+      }
       void load();
     } catch (e) {
-      window.alert("Error: " + (e instanceof Error ? e.message : "No se pudo registrar"));
+      setReceiptErr(e instanceof Error ? e.message : "No se pudo registrar");
     } finally {
       setSavingReceipt(false);
     }
@@ -543,7 +643,7 @@ export default function ProcurementPage() {
       {showReceiptForm && (
         <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 16 }}>
           <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>Registrar recepción de mercancía</p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10, alignItems: "end" }}>
             <div>
               <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Orden de compra (ID) *</label>
               <input value={receiptPoId} onChange={(e) => setReceiptPoId(e.target.value)} placeholder="Ej. 12" style={inp} />
@@ -552,12 +652,138 @@ export default function ProcurementPage() {
               <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Notas</label>
               <input value={receiptNotes} onChange={(e) => setReceiptNotes(e.target.value)} placeholder="Observaciones" style={inp} />
             </div>
+            <Button variant="secondary" onClick={() => void loadReceiptPo()} disabled={loadingReceiptPo || !receiptPoId.trim()}>
+              {loadingReceiptPo ? "Cargando…" : "Cargar partidas"}
+            </Button>
           </div>
-          <p style={{ fontSize: 11.5, color: "var(--text-tertiary)", margin: "8px 0 0" }}>Se reciben todas las partidas de la OC al 100%.</p>
+          {receiptLines.length > 0 && (
+            <div style={{ marginTop: 12, overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--text-secondary)" }}>
+                    <th style={{ textAlign: "left", padding: "6px 8px" }}>Artículo</th>
+                    <th style={{ textAlign: "right", padding: "6px 8px" }}>Pedido</th>
+                    <th style={{ textAlign: "right", padding: "6px 8px" }}>Recibido</th>
+                    <th style={{ textAlign: "right", padding: "6px 8px" }}>Recibir ahora</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {receiptLines.map((line) => (
+                    <tr key={line.purchaseOrderItemId} style={{ borderBottom: "1px solid var(--border)" }}>
+                      <td style={{ padding: "8px" }}>{line.description}</td>
+                      <td style={{ padding: "8px", textAlign: "right" }}>{line.ordered}</td>
+                      <td style={{ padding: "8px", textAlign: "right" }}>{line.alreadyReceived}</td>
+                      <td style={{ padding: "8px", textAlign: "right" }}>
+                        <input
+                          type="number"
+                          min={0}
+                          max={Math.max(0, line.ordered - line.alreadyReceived)}
+                          value={line.qty}
+                          onChange={(e) => setReceiptLines((prev) => prev.map((l) => l.purchaseOrderItemId === line.purchaseOrderItemId ? { ...l, qty: e.target.value } : l))}
+                          style={{ ...inp, width: 90, textAlign: "right" }}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p style={{ fontSize: 11.5, color: "var(--text-tertiary)", margin: "8px 0 0" }}>Puedes registrar recepción parcial por partida.</p>
+            </div>
+          )}
+          {receiptErr && (
+            <div role="alert" style={{ marginTop: 10, padding: "8px 12px", background: "var(--state-danger-bg,#fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>
+              {receiptErr}
+            </div>
+          )}
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
-            <Button variant="ghost" onClick={() => setShowReceiptForm(false)}>Cancelar</Button>
+            <Button variant="ghost" onClick={() => { setShowReceiptForm(false); setReceiptErr(null); setReceiptLines([]); }}>Cancelar</Button>
             <Button variant="primary" onClick={() => void saveReceipt()} disabled={savingReceipt}>{savingReceipt ? "Registrando…" : "Registrar entrada"}</Button>
           </div>
+        </div>
+      )}
+
+      {(detailKind === "order" || detailKind === "req") && (
+        <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <p style={{ margin: 0, fontWeight: 700, fontSize: 13 }}>
+              {detailKind === "order" ? `Detalle OC ${poDetail?.poNumber ?? ""}` : `Detalle requisición ${reqDetail?.reqNumber ?? ""}`}
+            </p>
+            <Button variant="ghost" onClick={() => { setDetailKind(null); setPoDetail(null); setReqDetail(null); setDetailErr(null); }}>Cerrar</Button>
+          </div>
+          {detailLoading && <p style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Cargando detalle…</p>}
+          {detailErr && (
+            <div role="alert" style={{ padding: "8px 12px", background: "var(--state-danger-bg,#fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>
+              {detailErr}
+            </div>
+          )}
+          {!detailLoading && detailKind === "order" && poDetail && (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 12, fontSize: 12.5 }}>
+                <div><strong>Proveedor:</strong> {poDetail.supplier?.name ?? "—"}</div>
+                <div><strong>Estado:</strong> {PO_STATUS[poDetail.status] ?? poDetail.status}</div>
+                <div><strong>Monto:</strong> <Money value={Number(poDetail.totalAmount)} /></div>
+                <div><strong>Creada por:</strong> {poDetail.createdBy?.nombre ?? "—"}</div>
+              </div>
+              {(poDetail.items ?? []).length > 0 && (
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, marginBottom: 12 }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--text-secondary)" }}>
+                      <th style={{ textAlign: "left", padding: "6px 8px" }}>Artículo</th>
+                      <th style={{ textAlign: "right", padding: "6px 8px" }}>Cant.</th>
+                      <th style={{ textAlign: "right", padding: "6px 8px" }}>Recibido</th>
+                      <th style={{ textAlign: "right", padding: "6px 8px" }}>Precio</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(poDetail.items ?? []).map((i) => (
+                      <tr key={i.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                        <td style={{ padding: "8px" }}>{i.description}</td>
+                        <td style={{ padding: "8px", textAlign: "right" }}>{Number(i.quantity)}</td>
+                        <td style={{ padding: "8px", textAlign: "right" }}>{Number(i.receivedQty ?? 0)}</td>
+                        <td style={{ padding: "8px", textAlign: "right" }}><Money value={Number(i.unitPrice ?? 0)} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {cfg.canCreate && poDetail.status !== "RECEIVED" && poDetail.status !== "CANCELLED" && (
+                <Button variant="primary" onClick={() => openReceiptForPo(poDetail.id)}>Registrar recepción</Button>
+              )}
+            </>
+          )}
+          {!detailLoading && detailKind === "req" && reqDetail && (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 12, fontSize: 12.5 }}>
+                <div><strong>Título:</strong> {reqDetail.title}</div>
+                <div><strong>Estado:</strong> {REQ_STATUS[reqDetail.status] ?? reqDetail.status}</div>
+                <div><strong>Prioridad:</strong> {reqDetail.priority ?? "NORMAL"}</div>
+                <div><strong>Solicitó:</strong> {reqDetail.requestedBy?.nombre ?? "—"}</div>
+              </div>
+              {reqDetail.rejectionReason && (
+                <p style={{ fontSize: 12, color: "var(--danger)", marginBottom: 10 }}>Motivo rechazo: {reqDetail.rejectionReason}</p>
+              )}
+              {(reqDetail.items ?? []).length > 0 && (
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--text-secondary)" }}>
+                      <th style={{ textAlign: "left", padding: "6px 8px" }}>Artículo</th>
+                      <th style={{ textAlign: "right", padding: "6px 8px" }}>Cant.</th>
+                      <th style={{ textAlign: "right", padding: "6px 8px" }}>Costo est.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(reqDetail.items ?? []).map((i) => (
+                      <tr key={i.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                        <td style={{ padding: "8px" }}>{i.description}</td>
+                        <td style={{ padding: "8px", textAlign: "right" }}>{Number(i.quantity)}</td>
+                        <td style={{ padding: "8px", textAlign: "right" }}><Money value={Number(i.estimatedCost ?? 0)} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </>
+          )}
         </div>
       )}
 
@@ -575,9 +801,9 @@ export default function ProcurementPage() {
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
         ) : tab === "orders" ? (
-          <DataTable columns={orderColumns} rows={visibleOrders} rowKey={(o) => o.id} emptyTitle="Sin órdenes" emptyDescription="Las OC se generan desde requisiciones aprobadas." />
+          <DataTable columns={orderColumns} rows={visibleOrders} rowKey={(o) => o.id} onRowClick={(o) => void loadOrderDetail(o.id)} emptyTitle="Sin órdenes" emptyDescription="Las OC se generan desde requisiciones aprobadas." />
         ) : tab === "requisitions" ? (
-          <DataTable columns={reqColumns} rows={visibleReqs} rowKey={(r) => r.id} emptyTitle="Sin requisiciones" emptyDescription="No hay solicitudes de compra pendientes." />
+          <DataTable columns={reqColumns} rows={visibleReqs} rowKey={(r) => r.id} onRowClick={(r) => void loadReqDetail(r.id)} emptyTitle="Sin requisiciones" emptyDescription="No hay solicitudes de compra pendientes." />
         ) : (
           <DataTable columns={receiptColumns} rows={visibleReceipts} rowKey={(r) => r.id} emptyTitle="Sin recepciones" emptyDescription="Registra la entrada de mercancía contra una OC." />
         )}

@@ -140,6 +140,7 @@ function getWeekDates(): string[] {
 
 function EmployeeStatusHero({ token, gpsConsent }: { token: string; gpsConsent: boolean }) {
   const [day, setDay] = useState<AttendanceDay | null>(null);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -148,7 +149,10 @@ function EmployeeStatusHero({ token, gpsConsent }: { token: string; gpsConsent: 
     try {
       const d = await apiFetch<AttendanceDay>("attendance/current", token);
       setDay(d ?? null);
-    } catch { /* skip */ }
+      setLoadErr(null);
+    } catch (e) {
+      setLoadErr(e instanceof Error ? e.message : "No se pudo cargar tu jornada");
+    }
   }, [token]);
 
   useEffect(() => { void loadDay(); }, [loadDay]);
@@ -179,6 +183,12 @@ function EmployeeStatusHero({ token, gpsConsent }: { token: string; gpsConsent: 
   };
 
   return (
+    <>
+      {loadErr && (
+        <div role="alert" style={{ padding: "10px 14px", marginBottom: 12, background: "var(--state-danger-bg,#fef2f2)", border: "1px solid var(--danger)", borderRadius: 10, fontSize: 12.5, color: "var(--danger)" }}>
+          {loadErr}
+        </div>
+      )}
     <div style={{
       background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16,
       padding: "20px 24px", marginBottom: 20, display: "flex", alignItems: "center",
@@ -225,6 +235,7 @@ function EmployeeStatusHero({ token, gpsConsent }: { token: string; gpsConsent: 
         </div>
       </div>
     </div>
+    </>
   );
 }
 
@@ -233,13 +244,15 @@ function EmployeeStatusHero({ token, gpsConsent }: { token: string; gpsConsent: 
 function WeeklyBar({ token }: { token: string }) {
   const [days, setDays] = useState<WeekDay[]>([]);
   const [totalMin, setTotalMin] = useState(0);
+  const [weekErr, setWeekErr] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
     const week = getWeekDates();
     apiFetch<{ totalMinutes?: number; days?: WeekDay[] }>(
       `attendance/range?from=${week[0]}&to=${week[6]}`, token
-    ).then(d => { setTotalMin(d?.totalMinutes ?? 0); setDays(d?.days ?? []); }).catch(() => {});
+    ).then(d => { setTotalMin(d?.totalMinutes ?? 0); setDays(d?.days ?? []); setWeekErr(null); })
+      .catch((e) => setWeekErr(e instanceof Error ? e.message : "No se pudo cargar la semana"));
   }, [token]);
 
   const weekDates = getWeekDates();
@@ -248,6 +261,11 @@ function WeeklyBar({ token }: { token: string }) {
 
   return (
     <Section title={`Esta semana · ${fmtMinutes(totalMin)} registradas`}>
+      {weekErr && (
+        <div role="alert" style={{ padding: "8px 12px", marginBottom: 10, background: "var(--state-danger-bg,#fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>
+          {weekErr}
+        </div>
+      )}
       <div style={{ display: "flex", gap: 10, alignItems: "flex-end", minHeight: 100, paddingBottom: 28, position: "relative" }}>
         {weekDates.map((dateStr, i) => {
           const found = days.find(d => d.date === dateStr);
@@ -325,6 +343,7 @@ function TeamCard({ member }: { member: TeamMember }) {
 function TeamAttendanceView({ token, dateFilter, visibilityHint }: { token: string; dateFilter: string; visibilityHint?: string }) {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [teamErr, setTeamErr] = useState<string | null>(null);
   const [view, setView] = useState<"grid" | "table">("grid");
 
   const load = useCallback(async () => {
@@ -339,7 +358,11 @@ function TeamAttendanceView({ token, dateFilter, visibilityHint }: { token: stri
       const mapped = arr.map((u) => mapApiUser(u, dateFilter));
       mapped.sort((a, b) => (ORDER[a.estado ?? "AUSENTE"] ?? 2) - (ORDER[b.estado ?? "AUSENTE"] ?? 2));
       setMembers(mapped);
-    } catch { setMembers([]); }
+      setTeamErr(null);
+    } catch (e) {
+      setMembers([]);
+      setTeamErr(e instanceof Error ? e.message : "No se pudo cargar el equipo");
+    }
     finally { setLoading(false); }
   }, [token, dateFilter]);
 
@@ -383,6 +406,11 @@ function TeamAttendanceView({ token, dateFilter, visibilityHint }: { token: stri
 
   return (
     <Section title="Equipo del día" subtitle={visibilityHint}>
+      {teamErr && (
+        <div role="alert" style={{ padding: "8px 12px", marginBottom: 12, background: "var(--state-danger-bg,#fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>
+          {teamErr}
+        </div>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, marginBottom: 14 }}>
         <KpiCard label="Total equipo" value={members.length} />
         <KpiCard label="En jornada"   value={presentes} />

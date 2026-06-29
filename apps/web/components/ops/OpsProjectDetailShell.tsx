@@ -56,6 +56,7 @@ export default function OpsProjectDetailShell({ id, children }: { id: string; ch
     () => [
       { id: "resumen", label: "Resumen", href: base },
       { id: "actividades", label: "Actividades", href: `${base}/actividades` },
+      { id: "ingenieros", label: "Ingenieros", href: `${base}/ingenieros` },
     ],
     [base],
   );

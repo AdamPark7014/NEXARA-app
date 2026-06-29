@@ -52,6 +52,11 @@ const ToolInventoryPanel: React.FC = () => {
   const [replacementPanoramicPhotoPreview, setReplacementPanoramicPhotoPreview] = useState<string | null>(null);
   const [replacementSerialPhotoPreview, setReplacementSerialPhotoPreview] = useState<string | null>(null);
   const [replacing, setReplacing] = useState(false);
+  const [editTarget, setEditTarget] = useState<InventoryItem | null>(null);
+  const [editModel, setEditModel] = useState("");
+  const [editSerial, setEditSerial] = useState("");
+  const [editStatus, setEditStatus] = useState<InventoryItem["status"]>("AVAILABLE");
+  const [editSaving, setEditSaving] = useState(false);
 
 
   useEffect(() => {
@@ -213,6 +218,41 @@ const ToolInventoryPanel: React.FC = () => {
       await fetchItems();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
+    }
+  };
+
+  const startEdit = (item: InventoryItem) => {
+    setEditTarget(item);
+    setEditModel(item.model);
+    setEditSerial(item.serialNumber);
+    setEditStatus(item.status);
+    setError(null);
+  };
+
+  const submitEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.token || !editTarget) return;
+    setEditSaving(true);
+    try {
+      const res = await fetch(buildApiUrl(`tool-requests/inventory/${editTarget.id}`), {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: editModel.trim() || editTarget.model,
+          serialNumber: editSerial.trim() || editTarget.serialNumber,
+          status: editStatus,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+      setEditTarget(null);
+      await fetchItems();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al editar");
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -395,6 +435,24 @@ const ToolInventoryPanel: React.FC = () => {
         </div>
       </form>
 
+      {editTarget && (
+        <form onSubmit={submitEdit} className={`card ${styles.formCard}`}>
+          <h3 className={styles.title}>✎ Editar: {editTarget.toolName}</h3>
+          <input className="input" value={editModel} onChange={(e) => setEditModel(e.target.value)} placeholder="Modelo" />
+          <input className="input" value={editSerial} onChange={(e) => setEditSerial(e.target.value)} placeholder="Serie" />
+          <select className="input" value={editStatus} onChange={(e) => setEditStatus(e.target.value as InventoryItem["status"])}>
+            <option value="AVAILABLE">Disponible</option>
+            <option value="ASSIGNED">Asignada</option>
+            <option value="IN_REPAIR">En reparación</option>
+            <option value="RETIRED">Retirada</option>
+          </select>
+          <div className={styles.formActions}>
+            <button type="button" className="button-secondary" onClick={() => setEditTarget(null)}>Cancelar</button>
+            <button type="submit" className="button-primary" disabled={editSaving}>{editSaving ? "Guardando…" : "Guardar"}</button>
+          </div>
+        </form>
+      )}
+
       {replacementTarget && (
         <form className={`card ${styles.formCard}`} onSubmit={submitReplacement}>
           <h3 className={styles.title}>
@@ -563,9 +621,10 @@ const ToolInventoryPanel: React.FC = () => {
                     <td className={styles.td}>{item.status}</td>
                     <td className={styles.td}>{item.replacements?.length || 0}</td>
                     <td className={styles.tdCenter}>
-                      <button className="button-secondary" onClick={() => startReplacement(item)}>
-                        Reemplazar
-                      </button>
+                      <div style={{ display: "flex", gap: 4, justifyContent: "center" }}>
+                        <button type="button" className="button-secondary" onClick={() => startEdit(item)}>Editar</button>
+                        <button type="button" className="button-secondary" onClick={() => startReplacement(item)}>Reemplazar</button>
+                      </div>
                     </td>
                   </tr>
                 ))}

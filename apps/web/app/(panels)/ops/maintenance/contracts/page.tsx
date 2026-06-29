@@ -65,6 +65,13 @@ export default function MaintenanceContractsPage() {
   const [form, setForm] = useState({ ...emptyForm });
   const [saving, setSaving] = useState(false);
   const [clients, setClients] = useState<ServiceClient[]>([]);
+  const [clientsErr, setClientsErr] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Contract | null>(null);
+  const [visits, setVisits] = useState<Array<{ id: number; scheduledDate: string; description?: string; status: string; activityId?: number | null }>>([]);
+  const [visitsLoading, setVisitsLoading] = useState(false);
+  const [visitsErr, setVisitsErr] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ title: "", monthlyFee: "", slaResponseHours: "", slaResolutionHours: "" });
+  const [editSaving, setEditSaving] = useState(false);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -81,9 +88,98 @@ export default function MaintenanceContractsPage() {
 
   useEffect(() => {
     if (showForm && token && !clients.length) {
-      apiFetch("service-clients?limit=200", token).then((d) => setClients(Array.isArray(d) ? d : (d?.data ?? []))).catch(() => {});
+      apiFetch("service-clients?limit=200", token)
+        .then((d) => setClients(Array.isArray(d) ? d : (d?.data ?? [])))
+        .catch((e) => setClientsErr(e instanceof Error ? e.message : "No se pudieron cargar clientes"));
     }
   }, [showForm, token, clients.length]);
+
+  const loadVisits = useCallback(async (contractId: number) => {
+    if (!token) return;
+    setVisitsLoading(true);
+    setVisitsErr(null);
+    try {
+      const data = await apiFetch(`maintenance-contracts/visits?contractId=${contractId}`, token);
+      setVisits(Array.isArray(data) ? data : (data?.data ?? []));
+    } catch (e) {
+      setVisits([]);
+      setVisitsErr(e instanceof Error ? e.message : "No se pudieron cargar visitas");
+    } finally {
+      setVisitsLoading(false);
+    }
+  }, [token]);
+
+  const openContract = (c: Contract) => {
+    setSelected(c);
+    setEditForm({
+      title: c.title,
+      monthlyFee: String(c.monthlyFee ?? ""),
+      slaResponseHours: String(c.slaResponseHours ?? ""),
+      slaResolutionHours: String(c.slaResolutionHours ?? ""),
+    });
+    void loadVisits(c.id);
+  };
+
+  const saveContractEdit = async () => {
+    if (!token || !selected) return;
+    setEditSaving(true);
+    try {
+      const updated = await apiFetch(`maintenance-contracts/${selected.id}`, token, {
+        method: "PATCH",
+        body: JSON.stringify({
+          title: editForm.title.trim(),
+          monthlyFee: editForm.monthlyFee ? Number(editForm.monthlyFee) : undefined,
+          slaResponseHours: editForm.slaResponseHours ? Number(editForm.slaResponseHours) : undefined,
+          slaResolutionHours: editForm.slaResolutionHours ? Number(editForm.slaResolutionHours) : undefined,
+        }),
+      });
+      setItems((prev) => prev.map((i) => (i.id === selected.id ? { ...i, ...updated } : i)));
+      setSelected((prev) => (prev ? { ...prev, ...updated } : prev));
+    } catch (e) {
+      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const downloadPdf = async (contractId: number) => {
+    if (!token) return;
+    try {
+      const res = await fetch(buildApiUrl(`maintenance-contracts/${contractId}/pdf`), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `contrato-${contractId}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Error al descargar PDF");
+    }
+  };
+
+  const generateOt = async (visitId: number) => {
+    if (!token) return;
+    try {
+      await apiFetch(`maintenance-contracts/visits/${visitId}/generate-ot`, token, { method: "POST", body: "{}" });
+      if (selected) void loadVisits(selected.id);
+    } catch (e) {
+      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+    }
+  };
+
+  const completeVisit = async (visitId: number) => {
+    if (!token) return;
+    try {
+      await apiFetch(`maintenance-contracts/visits/${visitId}/complete`, token, { method: "POST", body: "{}" });
+      if (selected) void loadVisits(selected.id);
+    } catch (e) {
+      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+    }
+  };
 
   const save = async () => {
     if (!token || !form.clientId || !form.title.trim() || !form.startDate) return;
@@ -153,6 +249,21 @@ export default function MaintenanceContractsPage() {
       width: 130,
     },
     { key: "_count" as keyof Contract, label: "Visitas", accessor: (c) => c._count?.visits ?? 0, width: 80 },
+    {
+      key: "id" as keyof Contract,
+      label: "",
+      width: 140,
+      render: (c) => (
+        <div style={{ display: "flex", gap: 4 }}>
+          <button type="button" onClick={() => openContract(c)} style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px solid var(--primary)", background: "transparent", color: "var(--primary)", cursor: "pointer" }}>
+            Detalle
+          </button>
+          <button type="button" onClick={() => void downloadPdf(c.id)} style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "transparent", cursor: "pointer" }}>
+            PDF
+          </button>
+        </div>
+      ),
+    },
   ];
 
   return (
@@ -188,6 +299,7 @@ export default function MaintenanceContractsPage() {
                 <option value="">— Seleccionar —</option>
                 {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
+              {clientsErr && <p style={{ fontSize: 11, color: "var(--danger)", margin: "4px 0 0" }}>{clientsErr}</p>}
             </div>
             <div>
               <label style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", display: "block", marginBottom: 3 }}>Frecuencia *</label>
@@ -232,6 +344,66 @@ export default function MaintenanceContractsPage() {
         {!loading && error && <EmptyState icon="⚠️" title="No se pudo cargar" description={error} action={<Button size="sm" variant="secondary" onClick={() => void load()}>Reintentar</Button>} />}
         {!loading && !error && <DataTable columns={columns} rows={items} rowKey={(c) => c.id} emptyTitle="Sin contratos" emptyDescription={cfg.canCreate ? "Crea el primer contrato con el botón de arriba." : "Sin contratos de mantenimiento registrados."} />}
       </Section>
+
+      {selected && (
+        <Section title={`Contrato ${selected.contractNumber}`} actions={<Button variant="ghost" size="sm" onClick={() => setSelected(null)}>Cerrar</Button>}>
+          {cfg.canEdit && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+              <label style={{ gridColumn: "1 / -1", display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Título</span>
+                <input value={editForm.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} style={inp} />
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Cuota mensual</span>
+                <input type="number" value={editForm.monthlyFee} onChange={(e) => setEditForm((f) => ({ ...f, monthlyFee: e.target.value }))} style={inp} />
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>SLA respuesta (h)</span>
+                <input type="number" value={editForm.slaResponseHours} onChange={(e) => setEditForm((f) => ({ ...f, slaResponseHours: e.target.value }))} style={inp} />
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>SLA resolución (h)</span>
+                <input type="number" value={editForm.slaResolutionHours} onChange={(e) => setEditForm((f) => ({ ...f, slaResolutionHours: e.target.value }))} style={inp} />
+              </label>
+              <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "flex-end" }}>
+                <Button variant="primary" size="sm" disabled={editSaving} onClick={() => void saveContractEdit()}>
+                  {editSaving ? "Guardando…" : "Guardar cambios"}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Visitas programadas</p>
+          {visitsLoading && <p style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Cargando visitas…</p>}
+          {visitsErr && <p style={{ fontSize: 12, color: "var(--danger)" }}>{visitsErr}</p>}
+          {!visitsLoading && visits.length === 0 && <p style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Sin visitas registradas.</p>}
+          {!visitsLoading && visits.length > 0 && (
+            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+              {visits.map((v) => (
+                <li key={v.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 8 }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{new Date(v.scheduledDate).toLocaleDateString("es-MX")}</div>
+                    <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{v.description ?? v.status}{v.activityId ? ` · OT #${v.activityId}` : ""}</div>
+                  </div>
+                  {cfg.canEdit && (
+                    <div style={{ display: "flex", gap: 4 }}>
+                      {!v.activityId && (
+                        <Button size="sm" variant="secondary" onClick={() => void generateOt(v.id)}>Generar OT</Button>
+                      )}
+                      {v.status !== "COMPLETED" && (
+                        <Button size="sm" variant="ghost" onClick={() => void completeVisit(v.id)}>Completar</Button>
+                      )}
+                      {v.activityId && (
+                        <Link href={`/ops/activities/${v.activityId}`} style={{ fontSize: 12, color: "var(--primary)", alignSelf: "center" }}>Ver OT</Link>
+                      )}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
+      )}
     </>
   );
 }

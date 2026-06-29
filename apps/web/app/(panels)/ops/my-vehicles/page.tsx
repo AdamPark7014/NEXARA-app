@@ -31,6 +31,8 @@ async function apiFetch(path: string, token: string, init: RequestInit = {}) {
   return res.json();
 }
 
+const INCIDENT_TYPES = ["Accidente de tráfico", "Daño en carrocería", "Avería mecánica", "Robo de pertenencias", "Llanta ponchada", "Falla eléctrica", "Cristal roto", "Otro"];
+
 export default function MyVehiclesPage() {
   const { user } = useUser();
   useOpsCanonicalRoute(user, "vehicles");
@@ -40,6 +42,10 @@ export default function MyVehiclesPage() {
   const [items, setItems] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [incidentVehicle, setIncidentVehicle] = useState<Vehicle | null>(null);
+  const [incidentForm, setIncidentForm] = useState({ tipo: "", descripcion: "" });
+  const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -54,14 +60,32 @@ export default function MyVehiclesPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const reportIncident = async (v: Vehicle) => {
-    const desc = prompt("Describe el incidente o daño:");
-    if (!desc || !token) return;
+  const openIncident = (v: Vehicle) => {
+    setIncidentVehicle(v);
+    setIncidentForm({ tipo: "", descripcion: "" });
+    setSaveErr(null);
+  };
+
+  const submitIncident = async () => {
+    if (!incidentVehicle || !token || !incidentForm.descripcion) return;
+    setSaving(true); setSaveErr(null);
     try {
-      await apiFetch(`vehicles/${v.id}`, token, { method: "PATCH", body: JSON.stringify({ estado: "Fuera_de_servicio", incidenteNotas: desc }) });
-      alert("Incidente reportado a Administración.");
+      const nota = [incidentForm.tipo, incidentForm.descripcion].filter(Boolean).join(": ");
+      await apiFetch(`vehicles/${incidentVehicle.id}`, token, {
+        method: "PATCH",
+        body: JSON.stringify({ estado: "Fuera_de_servicio", incidenteNotas: nota }),
+      });
+      setIncidentVehicle(null);
       void load();
-    } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+    } catch (e) {
+      setSaveErr(e instanceof Error ? e.message : "Error al reportar incidente");
+    } finally { setSaving(false); }
+  };
+
+  const inp: React.CSSProperties = {
+    width: "100%", padding: "8px 12px", borderRadius: 8,
+    border: "1px solid var(--border)", background: "var(--surface-2)",
+    color: "var(--foreground)", fontSize: 13,
   };
 
   return (
@@ -92,11 +116,62 @@ export default function MyVehiclesPage() {
                 <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
                   Póliza: {v.poliza ?? "—"} · Verificación: {v.verificacionVence ? new Date(v.verificacionVence).toLocaleDateString("es-MX") : "—"}
                 </div>
-                <Button size="sm" variant="danger" onClick={() => void reportIncident(v)}>⚠️ Reportar incidente</Button>
+                <Button size="sm" variant="danger" onClick={() => openIncident(v)}>⚠️ Reportar incidente</Button>
               </article>
             ))}
           </div>
         </Section>
+      )}
+
+      {incidentVehicle && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
+          onClick={() => setIncidentVehicle(null)}
+        >
+          <div
+            style={{ background: "var(--surface)", borderRadius: 16, padding: "24px 28px", width: 440, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.28)", border: "1px solid var(--border)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>⚠️ Reportar incidente</div>
+            <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 18 }}>
+              Unidad: <strong>{incidentVehicle.marca} {incidentVehicle.modelo}</strong> · Placas {incidentVehicle.placas ?? "—"}
+            </div>
+            <div style={{ display: "grid", gap: 14 }}>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Tipo de incidente</span>
+                <select value={incidentForm.tipo} onChange={(e) => setIncidentForm((f) => ({ ...f, tipo: e.target.value }))} style={inp}>
+                  <option value="">— Seleccionar —</option>
+                  {INCIDENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Descripción *</span>
+                <textarea
+                  value={incidentForm.descripcion}
+                  onChange={(e) => setIncidentForm((f) => ({ ...f, descripcion: e.target.value }))}
+                  rows={4}
+                  placeholder="Describe qué ocurrió, dónde, hora aproximada, daños visibles…"
+                  style={{ ...inp, resize: "vertical", fontFamily: "inherit", lineHeight: 1.45 }}
+                  autoFocus
+                />
+              </label>
+              {saveErr && (
+                <div style={{ padding: "8px 12px", background: "var(--state-danger-bg,#fef2f2)", border: "1px solid var(--danger)", borderRadius: 8, fontSize: 12, color: "var(--danger)" }}>
+                  {saveErr}
+                </div>
+              )}
+              <div style={{ padding: "10px 12px", background: "var(--state-warning-bg,#fffbeb)", border: "1px solid var(--warning,#f59e0b)", borderRadius: 8, fontSize: 12, color: "var(--text-secondary)" }}>
+                Al reportar, la unidad quedará marcada como <strong>Fuera de servicio</strong> y se notificará a Administración.
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 22, justifyContent: "flex-end" }}>
+              <Button variant="secondary" onClick={() => setIncidentVehicle(null)}>Cancelar</Button>
+              <Button variant="danger" onClick={() => void submitIncident()} disabled={saving || !incidentForm.descripcion}>
+                {saving ? "Enviando…" : "Reportar incidente"}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

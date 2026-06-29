@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -100,7 +101,14 @@ export default function SupportSlaPage() {
           </div>
 
           <Section title={`${stats.breaches.length} incumplimientos recientes`} subtitle="Ordenados por horas de retraso, los más críticos primero.">
-            <DataTable columns={columns} rows={stats.breaches} rowKey={(b) => `${b.id}-${b.type}`} emptyTitle="Sin incumplimientos" emptyDescription="Ningún ticket rompió su SLA en los últimos 30 días. 🎉" />
+            <DataTable
+              columns={columns}
+              rows={stats.breaches}
+              rowKey={(b) => `${b.id}-${b.type}`}
+              onRowClick={(b) => router.push(`/ops/activities/${b.id}`)}
+              emptyTitle="Sin incumplimientos"
+              emptyDescription="Ningún ticket rompió su SLA en los últimos 30 días. 🎉"
+            />
           </Section>
         </>
       )}

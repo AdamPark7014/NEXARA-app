@@ -63,6 +63,42 @@ export function updateOperationalProjectStatus(token: string, id: number, status
   );
 }
 
+export type UpdateOperationalProjectPayload = {
+  title?: string;
+  description?: string;
+  scopeSummary?: string;
+  endDate?: string | null;
+  siteCount?: number;
+  projectType?: string;
+};
+
+export function updateOperationalProject(token: string, id: number, dto: UpdateOperationalProjectPayload) {
+  return opsProjectRequest<OperationalProject>(
+    `operational-projects/${id}`,
+    token,
+    { method: "PATCH", body: JSON.stringify(dto) },
+    "No se pudo actualizar el proyecto",
+  );
+}
+
+export function assignProjectEngineer(token: string, projectId: number, engineerId: number) {
+  return opsProjectRequest<OperationalProject>(
+    `operational-projects/${projectId}/engineers`,
+    token,
+    { method: "POST", body: JSON.stringify({ engineerId }) },
+    "No se pudo asignar ingeniero",
+  );
+}
+
+export function removeProjectEngineer(token: string, projectId: number, engineerId: number) {
+  return opsProjectRequest<void>(
+    `operational-projects/${projectId}/engineers/${engineerId}`,
+    token,
+    { method: "DELETE" },
+    "No se pudo quitar ingeniero",
+  );
+}
+
 export type CreateOperationalProjectPayload = {
   title: string;
   clientId: number;

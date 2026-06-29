@@ -123,7 +123,7 @@ export default function ActivityViaticsPage() {
             {viatics.map((v) => (
               <li key={v.id} style={{ padding: 14, borderRadius: 10, border: "1px solid var(--border)", display: "grid", gap: 6 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontWeight: 600, fontSize: 14 }}>{v.motivo ?? v.concepto ?? `Viático #${v.id}`}</span>
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>{v.motivo ?? `Viático #${v.id}`}</span>
                   <Tag variant={
                     (v.estatus ?? "").includes("Aprobado") || (v.estatus ?? "").includes("APROBADO") || v.estatus === "Pagado"
                       ? "positive"

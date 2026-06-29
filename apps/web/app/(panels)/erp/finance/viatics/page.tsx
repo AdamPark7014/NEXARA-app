@@ -46,7 +46,7 @@ async function apiFetch(path: string, token: string, opts?: RequestInit) {
 
 const emptyForm = { concepto: "", montoSolicitado: 0, comprobante: "" };
 
-type FormMode = "create" | "approve" | null;
+type FormMode = "create" | "approve" | "edit" | null;
 
 export default function ViaticosPage() {
   const { user } = useUser();
@@ -121,6 +121,39 @@ export default function ViaticosPage() {
     setSelected(v);
     setApproveForm({ estatus: "Aprobado", comentariosAdmin: "" });
     setMode("approve");
+  };
+  const openEdit = (v: Viatico) => {
+    setSelected(v);
+    setForm({
+      concepto: v.concepto ?? v.motivo ?? "",
+      montoSolicitado: Number(v.montoSolicitado) || 0,
+      comprobante: v.comprobante ?? v.ticketEvidenciaUrl ?? "",
+    });
+    setMode("edit");
+  };
+
+  const submitEdit = async () => {
+    if (!token || !selected) return;
+    setSaving(true);
+    try {
+      const updated = await apiFetch(`viatics/${selected.id}`, token, {
+        method: "PATCH",
+        body: JSON.stringify({
+          motivo: form.concepto.trim(),
+          montoSolicitado: form.montoSolicitado,
+          ticketEvidenciaUrl: form.comprobante.trim() || undefined,
+        }),
+      });
+      setItems((prev) => prev.map((v) => (v.id === selected.id ? {
+        ...v,
+        ...(updated ?? {}),
+        concepto: updated?.motivo ?? form.concepto,
+        comprobante: updated?.ticketEvidenciaUrl ?? form.comprobante,
+      } : v)));
+      setMode(null);
+    } catch (e) {
+      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+    } finally { setSaving(false); }
   };
 
   const submitCreate = async () => {
@@ -227,6 +260,9 @@ export default function ViaticosPage() {
       key: "acciones" as keyof Viatico, label: "",
       render: (v) => (
         <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
+          {v.estatus === "Pendiente" && (cfg.canCreate || v.usuario?.id === user?.id) && (
+            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); openEdit(v); }}>Editar</Button>
+          )}
           {cfg.canApprove && (v.estatus === "Pendiente" || v.estatus === "Aprobado_Coordinador") && (
             <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); openApprove(v); }}>Revisar</Button>
           )}
@@ -235,7 +271,7 @@ export default function ViaticosPage() {
           )}
         </div>
       ),
-      width: 140,
+      width: 180,
     },
   ];
 
@@ -328,6 +364,37 @@ export default function ViaticosPage() {
               <Button variant="secondary" onClick={() => setMode(null)}>Cancelar</Button>
               <Button variant="primary" onClick={() => void submitCreate()} disabled={saving || !form.concepto}>
                 {saving ? "Enviando…" : "Enviar solicitud"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal editar pendiente */}
+      {mode === "edit" && selected && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
+          onClick={() => setMode(null)}>
+          <div style={{ background: "var(--surface)", borderRadius: 16, padding: 28, width: 460, maxWidth: "calc(100vw - 32px)", boxShadow: "0 24px 56px rgba(0,0,0,0.24)", border: "1px solid var(--border)" }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>Editar viático #{selected.id}</div>
+            <div style={{ display: "grid", gap: 14 }}>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Concepto / descripción</span>
+                <input value={form.concepto} onChange={(e) => setForm((f) => ({ ...f, concepto: e.target.value }))} style={inp} />
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Monto solicitado ($)</span>
+                <input type="number" min={0} value={form.montoSolicitado} onChange={(e) => setForm((f) => ({ ...f, montoSolicitado: +e.target.value }))} style={inp} />
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>URL comprobante</span>
+                <input value={form.comprobante} onChange={(e) => setForm((f) => ({ ...f, comprobante: e.target.value }))} style={inp} />
+              </label>
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
+              <Button variant="secondary" onClick={() => setMode(null)}>Cancelar</Button>
+              <Button variant="primary" onClick={() => void submitEdit()} disabled={saving || !form.concepto.trim()}>
+                {saving ? "Guardando…" : "Guardar cambios"}
               </Button>
             </div>
           </div>
