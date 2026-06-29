@@ -36,6 +36,7 @@ interface EvidenceRow {
   estatus: string;
   comentarios?: string | null;
   subidoEn: string;
+  userId?: number | null;
   actividad?: { id: number; anNumber?: string; titulo?: string } | null;
 }
 
@@ -92,15 +93,17 @@ export default function MyActivitiesPage() {
   }, [token]);
 
   const loadEvidences = useCallback(async () => {
-    if (!token) return;
+    if (!token || !user?.id) return;
     setEvLoading(true);
     try {
       const data = await apiFetch("evidences?limit=60", token);
-      setEvidences(Array.isArray(data) ? data : (data?.data ?? []));
+      const rows = Array.isArray(data) ? data : (data?.data ?? []);
+      const mine = rows.filter((e: EvidenceRow) => e.userId === user.id);
+      setEvidences(mine);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar tus evidencias");
     } finally { setEvLoading(false); }
-  }, [token]);
+  }, [token, user?.id]);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { if (viewTab === "evidencias") void loadEvidences(); }, [viewTab, loadEvidences]);

@@ -10,6 +10,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import { formatApiError } from "@/lib/erp-api";
 
 interface Payment {
   id: number;
@@ -50,7 +51,9 @@ export default function EmployeePaymentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...emptyForm });
+  const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -74,15 +77,27 @@ export default function EmployeePaymentsPage() {
   const submit = async () => {
     if (!token || !form.userId || !form.periodFrom || !form.periodTo || !form.amount) return;
     setSaving(true);
+    setSaveErr(null);
     try {
-      await apiFetch("employee-payments", token, {
+      const fd = new FormData();
+      fd.append("userId", form.userId);
+      fd.append("periodFrom", form.periodFrom);
+      fd.append("periodTo", form.periodTo);
+      fd.append("amount", String(form.amount));
+      if (form.note.trim()) fd.append("note", form.note.trim());
+      evidenceFiles.forEach((file) => fd.append("files", file));
+      const res = await fetch(buildApiUrl("employee-payments"), {
         method: "POST",
-        body: JSON.stringify({ userId: Number(form.userId), periodFrom: form.periodFrom, periodTo: form.periodTo, amount: form.amount, note: form.note || undefined }),
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
       });
-      setShowForm(false); setForm({ ...emptyForm });
+      if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+      setShowForm(false);
+      setForm({ ...emptyForm });
+      setEvidenceFiles([]);
       void load();
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      setSaveErr(formatApiError(e, "No se pudo registrar el pago"));
     } finally { setSaving(false); }
   };
 
@@ -139,9 +154,12 @@ export default function EmployeePaymentsPage() {
                 <input type="number" min={0} value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: Number(e.target.value) }))} style={inp} /></label>
               <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Concepto / nota</span>
                 <input value={form.note} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))} placeholder="Nómina quincenal, bono proyecto UDLA…" style={inp} /></label>
+              <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Comprobantes (PDF/imagen)</span>
+                <input type="file" accept=".pdf,image/*" multiple onChange={(e) => setEvidenceFiles(Array.from(e.target.files ?? []))} style={inp} /></label>
+              {saveErr && <p role="alert" style={{ fontSize: 12, color: "var(--danger)", margin: 0 }}>{saveErr}</p>}
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
-              <Button variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
+              <Button variant="secondary" onClick={() => { setShowForm(false); setSaveErr(null); setEvidenceFiles([]); }}>Cancelar</Button>
               <Button variant="primary" onClick={() => void submit()} disabled={saving || !form.userId || !form.amount}>{saving ? "Guardando…" : "Registrar"}</Button>
             </div>
           </div>
