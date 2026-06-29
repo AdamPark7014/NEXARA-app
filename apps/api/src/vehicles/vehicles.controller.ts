@@ -18,7 +18,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { Response } from 'express';
-import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor, FileFieldsInterceptor } from '@nestjs/platform-express';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
 import { CurrentUser } from '../common/current-user.decorator.js';
 import { VehiclesService } from './vehicles.service.js';
@@ -88,6 +88,71 @@ export class VehiclesController {
       fechaInicioSolicitada: fechaInicioSolicitada || null,
       fechaFinSolicitada: fechaFinSolicitada || null,
     });
+  }
+
+  @Patch(':id/approve')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.VEHICLES_REVIEW] })
+  approve(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body: { action?: 'approve' | 'reject'; note?: string; fechaInicioAprobada?: string; fechaFinAprobada?: string },
+  ) {
+    const action = body.action === 'reject' ? 'reject' : 'approve';
+    return this.vehiclesService.approveOrReject(+id, user, action, body);
+  }
+
+  @Post(':id/start-use')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.VEHICLES_REQUEST] })
+  @UseInterceptors(FileFieldsInterceptor([
+    { name: 'interna-0', maxCount: 1 }, { name: 'interna-1', maxCount: 1 },
+    { name: 'interna-2', maxCount: 1 }, { name: 'interna-3', maxCount: 1 },
+    { name: 'externa-0', maxCount: 1 }, { name: 'externa-1', maxCount: 1 },
+    { name: 'externa-2', maxCount: 1 }, { name: 'externa-3', maxCount: 1 },
+    { name: 'odometro', maxCount: 1 },
+  ], { dest: getUploadSubdir(__dirname, 'vehicles') }))
+  async startUse(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() body: any,
+    @UploadedFiles() uploaded: Record<string, any[]>,
+  ) {
+    const fileMap: Record<string, string> = {};
+    for (const [key, arr] of Object.entries(uploaded ?? {})) {
+      if (arr?.[0]?.filename) fileMap[key] = `/uploads/vehicles/${arr[0].filename}`;
+    }
+    return this.vehiclesService.startUse(+id, user.id, fileMap, Number(body.odometroKm), Number(body.combustiblePct));
+  }
+
+  @Post(':id/end-use')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.VEHICLES_REQUEST] })
+  @UseInterceptors(FileFieldsInterceptor([
+    { name: 'interna-0', maxCount: 1 }, { name: 'interna-1', maxCount: 1 },
+    { name: 'interna-2', maxCount: 1 }, { name: 'interna-3', maxCount: 1 },
+    { name: 'externa-0', maxCount: 1 }, { name: 'externa-1', maxCount: 1 },
+    { name: 'externa-2', maxCount: 1 }, { name: 'externa-3', maxCount: 1 },
+    { name: 'odometro', maxCount: 1 },
+  ], { dest: getUploadSubdir(__dirname, 'vehicles') }))
+  async endUse(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() body: any,
+    @UploadedFiles() uploaded: Record<string, any[]>,
+  ) {
+    const fileMap: Record<string, string> = {};
+    for (const [key, arr] of Object.entries(uploaded ?? {})) {
+      if (arr?.[0]?.filename) fileMap[key] = `/uploads/vehicles/${arr[0].filename}`;
+    }
+    return this.vehiclesService.endUse(+id, user.id, fileMap, Number(body.odometroKm), Number(body.combustiblePct));
+  }
+
+  @Post('notify-expiring')
+  @UseGuards(RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.VEHICLES_REVIEW] })
+  notifyExpiring() {
+    return this.vehiclesService.notifyExpiringAssignments();
   }
 
   @Patch(':id')
@@ -212,6 +277,13 @@ export class VehiclesController {
   @RBAC({ anyPermissions: [PERMISSIONS.VEHICLES_VIEW, PERMISSIONS.VEHICLES_REQUEST, PERMISSIONS.VEHICLES_INVENTORY] })
   listInventory(@Query() query: PaginationQueryDto) {
     return this.vehiclesService.listAssets(query);
+  }
+
+  @Get('analytics/usage')
+  @UseGuards(RbacGuard)
+  @RBAC({ anyPermissions: [PERMISSIONS.VEHICLES_REVIEW, PERMISSIONS.CONSOLE_ADMIN] })
+  usageAnalytics() {
+    return this.vehiclesService.getUsageAnalytics();
   }
 
   @Post('inventory')

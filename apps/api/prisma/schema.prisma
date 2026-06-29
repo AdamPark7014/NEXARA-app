@@ -1022,6 +1022,14 @@ model VehicleControl {
   penalizacionNotas          String?
   fechaInicio                DateTime?
   fechaFin                   DateTime?
+  approvalStep               Int           @default(0)
+  approvalTrail              Json?
+  odometroInicio             Int?
+  odometroFin                Int?
+  combustibleInicioPct       Int?
+  combustibleFinPct          Int?
+  fotosSalida                Json?
+  fotosDevolucion            Json?
   actividad                  Activity      @relation(fields: [actividadId], references: [id])
   solicitante                User          @relation("SolicitanteVehiculo", fields: [solicitanteId], references: [id])
   vehiculo                   VehicleAsset? @relation(fields: [vehicleId], references: [id])
@@ -1083,6 +1091,9 @@ model Viatico {
   motivo             String?       @db.VarChar(255)
   ticketEvidenciaUrl String?
   estatus            String        @default("Pendiente") @db.VarChar(30)
+  approvalStep       Int           @default(0)
+  approvalTrail      Json?
+  contabilidadRef    String?       @db.VarChar(120)
   fechaSolicitud     DateTime      @default(now())
   deletedAt          DateTime?
   Activity           Activity?     @relation(fields: [actividadId], references: [id])
@@ -1794,6 +1805,9 @@ model Fine {
   monto         Decimal   @db.Decimal(10, 2)
   referenciaId  Int? // id de la actividad, vehiculo, etc.
   estatusPago   String    @default("Pendiente") @db.VarChar(30)
+  estatusAprobacion String @default("Pendiente") @db.VarChar(30)
+  approvalStep  Int       @default(0)
+  approvalTrail Json?
   fechaCreacion DateTime  @default(now())
   fechaPago     DateTime?
   notas         String?

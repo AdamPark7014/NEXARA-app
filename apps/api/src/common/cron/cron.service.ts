@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { EmailService } from '../email/email.service.js';
 import { NotificationHierarchyService } from '../../notifications/notification-hierarchy.service.js';
 import { MaintenanceContractsService } from '../../maintenance-contracts/maintenance-contracts.service.js';
+import { VehiclesService } from '../../vehicles/vehicles.service.js';
 
 @Injectable()
 export class CronService {
@@ -14,6 +15,7 @@ export class CronService {
     private readonly email: EmailService,
     private readonly notificationHierarchy: NotificationHierarchyService,
     private readonly maintenanceContracts: MaintenanceContractsService,
+    private readonly vehiclesService: VehiclesService,
   ) {}
 
   // ── Contratos de mantenimiento — generar OT cada hora ───────────
@@ -180,6 +182,20 @@ export class CronService {
       }
     }
     this.logger.log(`Alertas de margen emitidas: ${alertsSent}`);
+  }
+
+  // ── Vehículos por vencer — 8AM y 4PM ───────────────────────────
+  @Cron('0 8,16 * * *', { name: 'vehicle-usage-expiring' })
+  async handleVehicleUsageExpiring() {
+    this.logger.log('Verificando asignaciones de vehículo por vencer...');
+    try {
+      const result = await this.vehiclesService.notifyExpiringAssignments(24);
+      if (result.notified > 0) {
+        this.logger.log(`Avisos de vencimiento de vehículo: ${result.notified}`);
+      }
+    } catch (error) {
+      this.logger.error('Cron vehículos por vencer falló', error as Error);
+    }
   }
 
   // ── KPI Snapshot — cada hora ────────────────────────────────────

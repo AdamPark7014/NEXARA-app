@@ -3,6 +3,7 @@
  * Usado por sidebar, guards, badges y hooks de capacidad.
  */
 import { ORG_ROLE_KEYS, resolveOrgRoleKey, type OrgRoleKey } from '@/lib/org-roles';
+import { resolveIsPlatformOwner } from '@/lib/platform-accounts';
 import { ROLES, type RoleKey } from './roles';
 
 export const V2_ROLE_KEYS = new Set<string>(Object.values(ROLES));
@@ -11,13 +12,16 @@ export type UserAccessInput = {
   role?: string | null;
   roleKey?: string | null;
   orgRoleKey?: string | null;
+  email?: string | null;
   isSuperAdmin?: boolean;
+  isPlatformOwner?: boolean;
 };
 
 /** Resuelve el roleKey RBAC v2 efectivo del usuario. */
 export function resolveV2RoleKey(user: UserAccessInput | null | undefined): RoleKey | null {
   if (!user) return null;
   if (user.isSuperAdmin) return ROLES.SUPER_ADMIN;
+  if (resolveIsPlatformOwner(user)) return ROLES.CEO;
 
   const direct = user.roleKey;
   if (direct && V2_ROLE_KEYS.has(direct)) return direct as RoleKey;

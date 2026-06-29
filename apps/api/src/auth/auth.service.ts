@@ -66,6 +66,7 @@ export class AuthService {
 
   /** roleKey del usuario o inferido desde Role.orgRoleKey (v2). */
   resolveEffectiveRoleKey(user: UserWithRole): RoleKey | null {
+    if (this.isPlatformOwner(user.email)) return ROLES.CEO;
     const validKeys = new Set<string>(Object.values(ROLES));
     if (user.roleKey && validKeys.has(user.roleKey)) {
       return user.roleKey as RoleKey;
@@ -489,6 +490,7 @@ export class AuthService {
       set.add(PERMISSIONS.VEHICLES_REQUEST);
       set.add(PERMISSIONS.SUPPORT_VIEW);
       set.add(PERMISSIONS.ATTENDANCE_VIEW);
+      set.add(PERMISSIONS.GPS_VIEW);
       set.add(PERMISSIONS.KB_VIEW);
       set.add(PERMISSIONS.DOCUMENTS_VIEW);
       // Viáticos propios — el soporte también viaja y necesita reportar gastos

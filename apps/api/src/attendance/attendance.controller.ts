@@ -21,7 +21,8 @@ export class AttendanceController {
   @RBAC({ anyPermissions: [PERMISSIONS.ATTENDANCE_VIEW, PERMISSIONS.CONSOLE_ACCESS, PERMISSIONS.CONSOLE_ADMIN] })
   @Get('current')
   async current(@Req() req: any) {
-    return this.attendanceService.getCurrentDay(req.user?.id);
+    const day = await this.attendanceService.getCurrentDay(req.user?.id);
+    return day ?? null;
   }
 
   @UseGuards(AuthGuard('jwt'), RbacGuard)

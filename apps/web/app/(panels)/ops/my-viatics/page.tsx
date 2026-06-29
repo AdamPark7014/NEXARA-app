@@ -14,6 +14,7 @@ import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 import { buildApiUrl } from "@/lib/api-base";
 import { isViaticoPending, normalizeViaticoRow, viaticoEstatusVariant, type ViaticoRow } from "@/lib/viatics-display";
 import { patchViatico, postViatico } from "@/lib/viatics-api";
+import FileDropzone from "@/components/ui/FileDropzone";
 
 async function apiFetch(path: string, token: string) {
   const res = await fetch(buildApiUrl(path), { headers: { Authorization: `Bearer ${token}` } });
@@ -82,6 +83,10 @@ export default function MyViaticsPage() {
 
   const submit = async () => {
     if (!token || !form.concepto.trim() || !form.montoSolicitado) return;
+    if (!editTarget && !evidenceFile && !form.comprobanteUrl.trim()) {
+      setActionErr("Debes adjuntar el ticket o comprobante");
+      return;
+    }
     setSaving(true);
     setActionErr(null);
     try {
@@ -167,18 +172,21 @@ export default function MyViaticsPage() {
                 <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Monto solicitado ($)</span>
                 <input type="number" min={0} value={form.montoSolicitado} onChange={(e) => setForm((f) => ({ ...f, montoSolicitado: Number(e.target.value) }))} style={inp} />
               </label>
+              <FileDropzone
+                file={evidenceFile}
+                onFile={setEvidenceFile}
+                label="Ticket / comprobante"
+                required
+                hint="Obligatorio · PDF o imagen"
+              />
               <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Comprobante (imagen o PDF)</span>
-                <input type="file" accept="image/*,application/pdf" onChange={(e) => setEvidenceFile(e.target.files?.[0] ?? null)} style={{ fontSize: 12 }} />
-              </label>
-              <label style={{ display: "grid", gap: 4 }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>URL comprobante (opcional)</span>
+                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>URL comprobante (alternativa)</span>
                 <input value={form.comprobanteUrl} onChange={(e) => setForm((f) => ({ ...f, comprobanteUrl: e.target.value }))} placeholder="https://…" style={inp} />
               </label>
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
               <Button variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
-              <Button variant="primary" onClick={() => void submit()} disabled={saving || !form.concepto.trim() || !form.montoSolicitado}>
+              <Button variant="primary" onClick={() => void submit()} disabled={saving || !form.concepto.trim() || !form.montoSolicitado || (!editTarget && !evidenceFile && !form.comprobanteUrl.trim())}>
                 {saving ? "Guardando…" : editTarget ? "Guardar cambios" : "Enviar"}
               </Button>
             </div>

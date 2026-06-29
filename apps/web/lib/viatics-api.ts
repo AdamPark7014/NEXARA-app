@@ -66,3 +66,30 @@ export async function patchViatico(
   const t = await res.text();
   return t ? JSON.parse(t) : null;
 }
+
+export async function approveViatico(
+  token: string,
+  id: number,
+  action: "approve" | "reject",
+  note?: string,
+) {
+  const res = await fetch(buildApiUrl(`viatics/${id}/approve`), {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ action, note }),
+  });
+  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+  const t = await res.text();
+  return t ? JSON.parse(t) : null;
+}
+
+export async function markViaticoPagado(token: string, id: number) {
+  const res = await fetch(buildApiUrl(`viatics/${id}`), {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ estatus: "Pagado" }),
+  });
+  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+  const t = await res.text();
+  return t ? JSON.parse(t) : null;
+}

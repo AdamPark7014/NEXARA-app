@@ -21,8 +21,15 @@ export class CatalogController {
   @Post('products')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CATALOG_MANAGE] })
-  createProduct(@Body() dto: { sku: string; name: string; category?: string; price?: number; description?: string }) {
+  createProduct(@Body() dto: { sku?: string; name: string; category?: string; price?: number; description?: string }) {
     return this.catalogService.createProduct(dto);
+  }
+
+  @Get('products/next-sku')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ anyPermissions: CATALOG_ACCESS })
+  nextSku() {
+    return this.catalogService.generateNextSku();
   }
 
   @Get('products')

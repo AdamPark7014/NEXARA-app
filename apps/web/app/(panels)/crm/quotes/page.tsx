@@ -219,7 +219,7 @@ export default function QuotesPage() {
           onClick={() => setShowForm(false)}
         >
           <div
-            style={{ background: "var(--surface)", borderRadius: 16, padding: "28px 32px", width: 700, maxWidth: "100%", boxShadow: "0 24px 56px rgba(0,0,0,0.28)", border: "1px solid var(--border)" }}
+            style={{ background: "var(--surface)", borderRadius: 16, padding: "28px 32px", width: 700, maxWidth: "100%", maxHeight: "min(90vh, 920px)", overflowY: "auto", boxShadow: "0 24px 56px rgba(0,0,0,0.28)", border: "1px solid var(--border)" }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ marginBottom: 22 }}>

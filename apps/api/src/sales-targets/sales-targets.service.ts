@@ -75,34 +75,57 @@ export class SalesTargetsService {
     const startOfMonth = new Date(y, m - 1, 1);
     const endOfMonth = new Date(y, m, 0, 23, 59, 59);
 
-    const targets = await (this.prisma as any).salesTarget.findMany({
-      where: { period: 'MONTHLY', year: y, month: m },
-      include: { owner: { select: { id: true, nombre: true } } },
-    });
+    const salesOrgKeys = ['sales_rep', 'sales_manager', 'vendedor', 'coord_ventas', 'director_commercial'];
+    const [targets, salesUsers] = await Promise.all([
+      (this.prisma as any).salesTarget.findMany({
+        where: { period: 'MONTHLY', year: y, month: m },
+        include: { owner: { select: { id: true, nombre: true } } },
+      }),
+      this.prisma.user.findMany({
+        where: {
+          isActive: true,
+          role: {
+            OR: [
+              { accesoPanelVentas: true },
+              { orgRoleKey: { in: salesOrgKeys } },
+            ],
+          },
+        },
+        select: { id: true, nombre: true, email: true },
+        orderBy: { nombre: 'asc' },
+      }),
+    ]);
+
+    const targetByOwner = new Map<number, any>(targets.map((t: any) => [t.ownerId, t]));
+    const ownerIds = new Set<number>([
+      ...salesUsers.map((u) => u.id),
+      ...targets.map((t: any) => t.ownerId),
+    ]);
 
     const results = await Promise.all(
-      targets.map(async (t: any) => {
-        // Revenue: sum WON SalesOpportunity.value en el periodo
+      [...ownerIds].map(async (ownerId) => {
+        const t = targetByOwner.get(ownerId);
+        const salesUser = salesUsers.find((u) => u.id === ownerId);
         const [revenueRow, opportunitiesCount, newClients] = await Promise.all([
           this.prisma.salesOpportunity.aggregate({
-            where: { ownerId: t.ownerId, stage: 'WON' as any, closedAt: { gte: startOfMonth, lte: endOfMonth } },
+            where: { ownerId, stage: 'WON' as any, closedAt: { gte: startOfMonth, lte: endOfMonth } },
             _sum: { value: true },
           }),
           this.prisma.salesOpportunity.count({
-            where: { ownerId: t.ownerId, createdAt: { gte: startOfMonth, lte: endOfMonth } },
+            where: { ownerId, createdAt: { gte: startOfMonth, lte: endOfMonth } },
           }),
           this.prisma.salesLead.count({
-            where: { ownerId: t.ownerId, createdAt: { gte: startOfMonth, lte: endOfMonth }, status: 'WON' as any },
+            where: { ownerId, createdAt: { gte: startOfMonth, lte: endOfMonth }, status: 'WON' as any },
           }),
         ]);
 
         const revenueAchieved = Number(revenueRow._sum?.value || 0);
-        const revenueTarget = Number(t.revenueTarget);
+        const revenueTarget = t ? Number(t.revenueTarget) : 0;
         const attainmentPct = revenueTarget > 0 ? (revenueAchieved / revenueTarget) * 100 : 0;
-        const thresholdPct = Number(t.bonusThresholdPct);
+        const thresholdPct = t ? Number(t.bonusThresholdPct) : 100;
 
         let commission = 0;
-        if (revenueAchieved > 0) {
+        if (t && revenueAchieved > 0) {
           const baseCommission = revenueAchieved * (Number(t.baseCommissionPct) / 100);
           const bonusCommission = attainmentPct >= thresholdPct
             ? revenueAchieved * (Number(t.bonusCommissionPct) / 100)
@@ -111,25 +134,26 @@ export class SalesTargetsService {
         }
 
         return {
-          targetId: t.id,
-          ownerId: t.ownerId,
-          ownerName: t.owner?.nombre || `User ${t.ownerId}`,
-          period: t.period,
-          year: t.year,
-          month: t.month,
-          quarter: t.quarter,
+          targetId: t?.id ?? ownerId,
+          ownerId,
+          ownerName: salesUser?.nombre || t?.owner?.nombre || `Usuario #${ownerId}`,
+          hasQuota: Boolean(t),
+          period: t?.period ?? 'MONTHLY',
+          year: y,
+          month: m,
+          quarter: t?.quarter ?? null,
           revenueTarget,
           revenueAchieved,
           attainmentPct: +attainmentPct.toFixed(1),
-          opportunitiesTarget: t.opportunitiesTarget,
+          opportunitiesTarget: t?.opportunitiesTarget ?? 0,
           opportunitiesCreated: opportunitiesCount,
-          newClientsTarget: t.newClientsTarget,
+          newClientsTarget: t?.newClientsTarget ?? 0,
           newClientsAchieved: newClients,
-          baseCommissionPct: Number(t.baseCommissionPct),
-          bonusCommissionPct: Number(t.bonusCommissionPct),
+          baseCommissionPct: t ? Number(t.baseCommissionPct) : 0,
+          bonusCommissionPct: t ? Number(t.bonusCommissionPct) : 0,
           bonusThresholdPct: thresholdPct,
           commission: +commission.toFixed(2),
-          reachedBonus: attainmentPct >= thresholdPct,
+          reachedBonus: Boolean(t) && attainmentPct >= thresholdPct,
         };
       }),
     );

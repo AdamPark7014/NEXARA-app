@@ -65,6 +65,36 @@ function isThisWeek(iso: string): boolean {
   return d <= now + 7 * 86400000 && d >= now - 7 * 86400000;
 }
 
+async function captureGeolocation(): Promise<{ latitud: number; longitud: number } | null> {
+  if (typeof navigator === "undefined" || !navigator.geolocation) return null;
+  return new Promise((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ latitud: pos.coords.latitude, longitud: pos.coords.longitude }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 5000 },
+    );
+  });
+}
+
+async function sendActivityGps(
+  token: string,
+  activityId: number,
+  coords: { latitud: number; longitud: number },
+  active: boolean,
+) {
+  await fetch(buildApiUrl("gps"), {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      actividadId: activityId,
+      latitud: coords.latitud,
+      longitud: coords.longitud,
+      estaActivo: active,
+      ultimaActualizacion: new Date().toISOString(),
+    }),
+  });
+}
+
 export default function MyActivitiesPage() {
   const { user } = useUser();
   const router = useRouter();
@@ -127,6 +157,12 @@ export default function MyActivitiesPage() {
       if (estatus === "En Proceso") body.fechaInicio = new Date().toISOString();
       if (estatus === "Finalizado") body.fechaFinalizacion = new Date().toISOString();
       await apiFetch(`activities/${a.id}/execute`, token, { method: "PATCH", body: JSON.stringify(body) });
+
+      const coords = await captureGeolocation();
+      if (coords) {
+        await sendActivityGps(token, a.id, coords, estatus === "En Proceso");
+      }
+
       void load();
     } catch (e) {
       alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);

@@ -47,9 +47,10 @@ export class AttendanceService {
   async getCurrentDay(userId: number) {
     if (!userId) throw new BadRequestException('Usuario no autenticado');
     const today = this.getDateOnly(new Date());
-    return this.prisma.attendanceDay.findUnique({
+    const day = await this.prisma.attendanceDay.findUnique({
       where: { userId_date: { userId, date: today } },
     });
+    return day ?? null;
   }
 
   async getHistory(userId: number, date?: string) {

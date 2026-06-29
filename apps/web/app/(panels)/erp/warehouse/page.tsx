@@ -32,7 +32,7 @@ export default function WarehousePage() {
   const [minimo, setMinimo] = useState(5);
   const [products, setProducts] = useState<{ id: number; name: string; sku: string }[]>([]);
   const [warehouses, setWarehouses] = useState<{ id: number; name: string }[]>([]);
-  const [movement, setMovement] = useState({ type: "IN" as "IN" | "OUT", productId: "", warehouseId: "", quantity: 1, unitCost: "", reference: "" });
+  const [movement, setMovement] = useState({ type: "RECEIPT" as "RECEIPT" | "DISPATCH", productId: "", warehouseId: "", quantity: 1, unitCost: "", reference: "" });
   const [savingMovement, setSavingMovement] = useState(false);
   const [showWarehouseForm, setShowWarehouseForm] = useState(false);
   const [warehouseForm, setWarehouseForm] = useState({ name: "", code: "", address: "", city: "" });
@@ -99,7 +99,7 @@ export default function WarehousePage() {
       await createStockMovement(token, {
         type: movement.type,
         productId: Number(movement.productId),
-        ...(movement.type === "IN"
+        ...(movement.type === "RECEIPT"
           ? { toWarehouseId: Number(movement.warehouseId) }
           : { fromWarehouseId: Number(movement.warehouseId) }),
         quantity: movement.quantity,
@@ -107,7 +107,7 @@ export default function WarehousePage() {
         reference: movement.reference.trim() || undefined,
       });
       setShowMovementForm(false);
-      setMovement({ type: "IN", productId: "", warehouseId: "", quantity: 1, unitCost: "", reference: "" });
+      setMovement({ type: "RECEIPT", productId: "", warehouseId: "", quantity: 1, unitCost: "", reference: "" });
       void load();
     } catch (e) {
       window.alert(e instanceof Error ? e.message : "Error al registrar entrada");
@@ -217,6 +217,22 @@ export default function WarehousePage() {
         }
       />
 
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
+        <span style={{ padding: "8px 14px", borderRadius: 999, background: "var(--primary)", color: "#fff", fontSize: 12, fontWeight: 700 }}>
+          Stock productos
+        </span>
+        <Link href="/crm/products" style={{ textDecoration: "none" }}>
+          <span style={{ padding: "8px 14px", borderRadius: 999, background: "var(--surface-2)", border: "1px solid var(--border)", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "inline-block" }}>
+            Catálogo productos
+          </span>
+        </Link>
+        <Link href="/ops/tools?tab=inventory" style={{ textDecoration: "none" }}>
+          <span style={{ padding: "8px 14px", borderRadius: 999, background: "var(--surface-2)", border: "1px solid var(--border)", fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", display: "inline-block" }}>
+            Stock herramientas
+          </span>
+        </Link>
+      </div>
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
         <KpiCard label="Sin stock" value={sinStock} />
         <KpiCard label="Bajo mínimo" value={bajoMinimo} />
@@ -268,13 +284,13 @@ export default function WarehousePage() {
 
       {showMovementForm && (
         <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 20, marginBottom: 20 }}>
-          <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>{movement.type === "IN" ? "Entrada de inventario" : "Salida de inventario"}</p>
+          <p style={{ margin: "0 0 12px", fontWeight: 700, fontSize: 13 }}>{movement.type === "RECEIPT" ? "Entrada de inventario" : "Salida de inventario"}</p>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <label style={{ display: "grid", gap: 4 }}>
               <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Tipo de movimiento *</span>
-              <select value={movement.type} onChange={(e) => setMovement((m) => ({ ...m, type: e.target.value as "IN" | "OUT" }))} style={inp}>
-                <option value="IN">Entrada (IN)</option>
-                <option value="OUT">Salida (OUT)</option>
+              <select value={movement.type} onChange={(e) => setMovement((m) => ({ ...m, type: e.target.value as "RECEIPT" | "DISPATCH" }))} style={inp}>
+                <option value="RECEIPT">Entrada (recepción)</option>
+                <option value="DISPATCH">Salida (despacho)</option>
               </select>
             </label>
             <label style={{ display: "grid", gap: 4 }}>
@@ -286,7 +302,7 @@ export default function WarehousePage() {
               </select>
             </label>
             <label style={{ display: "grid", gap: 4 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>{movement.type === "IN" ? "Almacén destino *" : "Almacén origen *"}</span>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>{movement.type === "RECEIPT" ? "Almacén destino *" : "Almacén origen *"}</span>
               <select value={movement.warehouseId} onChange={(e) => setMovement((m) => ({ ...m, warehouseId: e.target.value }))} style={inp}>
                 <option value="">Seleccionar…</option>
                 {warehouses.length === 0 && <option disabled>Sin almacenes — usa "Nuevo almacén" arriba</option>}
@@ -308,7 +324,7 @@ export default function WarehousePage() {
           </div>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
             <Button variant="ghost" onClick={() => setShowMovementForm(false)}>Cancelar</Button>
-            <Button variant="primary" onClick={() => void saveMovement()} disabled={savingMovement}>{savingMovement ? "Registrando…" : movement.type === "IN" ? "Registrar entrada" : "Registrar salida"}</Button>
+            <Button variant="primary" onClick={() => void saveMovement()} disabled={savingMovement}>{savingMovement ? "Registrando…" : movement.type === "RECEIPT" ? "Registrar entrada" : "Registrar salida"}</Button>
           </div>
         </div>
       )}

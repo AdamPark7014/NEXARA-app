@@ -14,7 +14,9 @@ import { getViaticsSectionConfig } from "@/lib/section-views";
 import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
+import { approveViatico } from "@/lib/viatics-api";
 import {
+  formatApprovalProgress,
   isViaticoPending,
   normalizeViaticoRow,
   viaticoEstatusVariant,
@@ -44,7 +46,7 @@ export default function OpsViaticsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<ViaticoRow | null>(null);
-  const [approveEstatus, setApproveEstatus] = useState("Aprobado");
+  const [approveNote, setApproveNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [actionErr, setActionErr] = useState<string | null>(null);
 
@@ -65,23 +67,19 @@ export default function OpsViaticsPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const patchEstatus = async (id: number, estatus: string) => {
+  const actOnViatic = async (id: number, action: "approve" | "reject") => {
     if (!token) return;
     setSaving(true);
     setActionErr(null);
     try {
-      const updated = await apiFetch(`viatics/${id}`, token, {
-        method: "PATCH",
-        body: JSON.stringify({ estatus }),
-      });
+      const updated = await approveViatico(token, id, action, approveNote || undefined);
       setItems((prev) =>
         prev.map((v) =>
-          v.id === id
-            ? normalizeViaticoRow({ ...(v as unknown as Record<string, unknown>), ...(updated ?? {}), estatus })
-            : v,
+          v.id === id ? normalizeViaticoRow({ ...(v as unknown as Record<string, unknown>), ...(updated ?? {}) }) : v,
         ),
       );
       setSelected(null);
+      setApproveNote("");
     } catch (e) {
       setActionErr(formatApiError(e, "Error al actualizar viático"));
     } finally {
@@ -91,7 +89,7 @@ export default function OpsViaticsPage() {
 
   const openApprove = (v: ViaticoRow) => {
     setSelected(v);
-    setApproveEstatus(v.estatus === "Pendiente" ? "Aprobado_Coordinador" : "Aprobado");
+    setApproveNote("");
     setActionErr(null);
   };
 
@@ -142,22 +140,17 @@ export default function OpsViaticsPage() {
       render: (v) => (
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
           <Tag variant={viaticoEstatusVariant(v.estatus)}>{(v.estatus ?? "—").replace(/_/g, " ")}</Tag>
-          {cfg.canApprove && v.estatus === "Pendiente" && (
-            <>
-              <button type="button" onClick={() => openApprove(v)} style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>
-                ✓ Coord
-              </button>
-              <button type="button" onClick={() => void patchEstatus(v.id, "Rechazado")} style={{ fontSize: 11, background: "var(--danger)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>
-                ✕
-              </button>
-            </>
+          {isViaticoPending(v.estatus) && (
+            <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
+              {formatApprovalProgress(v.approvalStep, v.approvalTrail)}
+            </span>
           )}
-          {cfg.canApprove && v.estatus === "Aprobado_Coordinador" && (
+          {cfg.canApprove && isViaticoPending(v.estatus) && (
             <>
               <button type="button" onClick={() => openApprove(v)} style={{ fontSize: 11, background: "#1F5F4E", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>
-                ✓ Admin
+                ✓ Autorizar
               </button>
-              <button type="button" onClick={() => void patchEstatus(v.id, "Rechazado")} style={{ fontSize: 11, background: "var(--danger)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>
+              <button type="button" onClick={() => void actOnViatic(v.id, "reject")} style={{ fontSize: 11, background: "var(--danger)", color: "#fff", border: "none", borderRadius: 4, padding: "2px 7px", cursor: "pointer" }}>
                 ✕
               </button>
             </>
@@ -212,20 +205,19 @@ export default function OpsViaticsPage() {
       {selected && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => setSelected(null)}>
           <div style={{ background: "var(--surface)", borderRadius: 16, padding: 24, width: 400, maxWidth: "calc(100vw - 32px)", border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontWeight: 700, marginBottom: 12 }}>Aprobar viático V-{selected.id}</div>
-            <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "0 0 12px" }}>{selected.concepto} · <Money value={selected.montoSolicitado ?? 0} /></p>
+            <div style={{ fontWeight: 700, marginBottom: 12 }}>Autorizar viático V-{selected.id}</div>
+            <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "0 0 8px" }}>{selected.concepto} · <Money value={selected.montoSolicitado ?? 0} /></p>
+            <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: "0 0 16px" }}>
+              {formatApprovalProgress(selected.approvalStep, selected.approvalTrail)} — el CEO da la autorización final.
+            </p>
             <label style={{ display: "grid", gap: 4, marginBottom: 16 }}>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Nuevo estatus</span>
-              <select value={approveEstatus} onChange={(e) => setApproveEstatus(e.target.value)} style={inp}>
-                {selected.estatus === "Pendiente" && <option value="Aprobado_Coordinador">Aprobado por coordinador</option>}
-                <option value="Aprobado">Aprobado final</option>
-                <option value="Pagado">Marcar como pagado</option>
-              </select>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Notas (opcional)</span>
+              <textarea value={approveNote} onChange={(e) => setApproveNote(e.target.value)} rows={3} style={{ ...inp, resize: "vertical" }} placeholder="Comentarios para el siguiente nivel o el solicitante" />
             </label>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
               <Button variant="secondary" onClick={() => setSelected(null)}>Cancelar</Button>
-              <Button variant="primary" disabled={saving} onClick={() => void patchEstatus(selected.id, approveEstatus)}>
-                {saving ? "Guardando…" : "Confirmar"}
+              <Button variant="primary" disabled={saving} onClick={() => void actOnViatic(selected.id, "approve")}>
+                {saving ? "Guardando…" : "Pre-autorizar / Aprobar"}
               </Button>
             </div>
           </div>

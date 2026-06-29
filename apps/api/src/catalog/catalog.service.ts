@@ -62,8 +62,22 @@ export class CatalogService {
     });
   }
 
+  async generateNextSku() {
+    const [latest] = await this.prisma.$queryRaw<Array<{ sku: string }>>`
+      SELECT sku FROM "Product"
+      WHERE sku ~ '^SKU-\\d+$'
+      ORDER BY CAST(substring(sku FROM '(\\d+)$') AS INTEGER) DESC
+      LIMIT 1
+    `;
+    if (!latest?.sku) return 'SKU-0001';
+    const match = latest.sku.match(/^(SKU-)(\d+)$/i);
+    if (!match) return 'SKU-0001';
+    const next = Number(match[2]) + 1;
+    return `SKU-${String(next).padStart(4, '0')}`;
+  }
+
   async createProduct(dto: {
-    sku: string;
+    sku?: string;
     name: string;
     category?: string;
     subcategory?: string;
@@ -73,11 +87,14 @@ export class CatalogService {
     imageUrl?: string;
     description?: string;
   }) {
-    const existing = await this.prisma.product.findFirst({ where: { sku: dto.sku.trim().toUpperCase() } });
-    if (existing) throw new ConflictException(`Ya existe un producto con SKU ${dto.sku}`);
+    const sku = dto.sku?.trim()
+      ? dto.sku.trim().toUpperCase()
+      : await this.generateNextSku();
+    const existing = await this.prisma.product.findFirst({ where: { sku } });
+    if (existing) throw new ConflictException(`Ya existe un producto con SKU ${sku}`);
     return this.prisma.product.create({
       data: {
-        sku: dto.sku.trim().toUpperCase(),
+        sku,
         name: dto.name.trim(),
         category: dto.category?.trim() || null,
         subcategory: dto.subcategory?.trim() || null,
