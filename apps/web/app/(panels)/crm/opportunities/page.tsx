@@ -244,10 +244,11 @@ export default function OpportunitiesPage() {
         actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nueva oportunidad</Button> : undefined}
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
-        <KpiCard label="Pipeline total" value={`$${(pipelineTotal / 1000000).toFixed(1)}M`} />
-        <KpiCard label="Ponderado" value={`$${(weighted / 1000000).toFixed(1)}M`} />
-        <KpiCard label="En cierre" value={enCierre} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 20 }}>
+        <KpiCard label="Pipeline total" value={<Money value={pipelineTotal} compact />} variant="accent" icon="📊" hint={`${active.length} oportunidades activas`} />
+        <KpiCard label="Valor ponderado" value={<Money value={weighted} compact />} icon="🎯" hint="Ajustado por probabilidad" />
+        <KpiCard label="En cierre" value={enCierre} variant={enCierre > 0 ? "positive" : "default"} icon="🔥" hint="Etapa caliente" />
+        <KpiCard label="Ganadas" value={visibleItems.filter((o) => o.stage === "WON").length} variant="positive" icon="🏆" />
       </div>
 
       {showForm && (

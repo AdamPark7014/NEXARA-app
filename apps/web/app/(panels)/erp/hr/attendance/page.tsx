@@ -457,10 +457,10 @@ function TeamAttendanceView({ token, dateFilter, visibilityHint }: { token: stri
         </div>
       )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, marginBottom: 14 }}>
-        <KpiCard label="Total equipo" value={members.length} />
-        <KpiCard label="En jornada"   value={presentes} />
-        <KpiCard label="Completaron"  value={completos} />
-        <KpiCard label="Ausentes"     value={ausentes} />
+        <KpiCard label="Total equipo" value={members.length} icon="👥" />
+        <KpiCard label="En jornada"   value={presentes} variant={presentes > 0 ? "accent" : "default"} icon="🟢" hint="Jornada abierta" />
+        <KpiCard label="Completaron"  value={completos} variant={completos > 0 ? "positive" : "default"} icon="✅" hint="Jornada cerrada" />
+        <KpiCard label="Ausentes"     value={ausentes} variant={ausentes > 0 ? "danger" : "positive"} icon="⚠️" hint={ausentes > 0 ? "Sin registro hoy" : "Todos presentes"} />
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
