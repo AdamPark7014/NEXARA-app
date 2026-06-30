@@ -6,6 +6,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
+import KpiCard from "@/components/ui/KpiCard";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getOpsTeamSectionConfig } from "@/lib/section-views";
@@ -167,9 +168,9 @@ export default function SupportInboxPage() {
         }
       />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 18 }}>
-        <Tag variant="warning" dot>{nuevos} nuevos</Tag>
-        <Tag variant="accent" dot>{asignados} asignados</Tag>
-        {vencidos > 0 && <Tag variant="danger" dot>{vencidos} vencidos</Tag>}
+        <KpiCard label="Nuevos" value={nuevos} variant={nuevos > 0 ? "warning" : "positive"} icon="📥" hint="Sin atender" />
+        <KpiCard label="Asignados" value={asignados} variant="accent" icon="🔧" hint="En proceso" />
+        <KpiCard label="Vencidos" value={vencidos} variant={vencidos > 0 ? "danger" : "positive"} icon="⚠️" hint={vencidos > 0 ? "Requieren atención inmediata" : "Sin tickets vencidos"} />
       </div>
       <Section title={loading ? "Cargando…" : `${items.length} tickets`}>
         {loading && <EmptyState icon="⏳" title="Cargando tickets…" description="Consultando solicitudes desde la API." />}
