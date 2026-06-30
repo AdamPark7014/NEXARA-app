@@ -108,12 +108,12 @@ export default function ReportsPage() {
       {!loading && !error && metrics && (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
-            <KpiCard label="Ingreso cerrado" value={`$${(metrics.totalRevenue / 1000000).toFixed(1)}M`} variant="positive" icon="💰" />
-            <KpiCard label="Pipeline abierto" value={`$${(metrics.pipelineValue / 1000000).toFixed(1)}M`} icon="📊" />
-            <KpiCard label="Conversión" value={`${metrics.conversionRate}%`} icon="🎯" />
-            <KpiCard label="Margen promedio" value={`$${(metrics.averageMargin / 1000).toFixed(0)}k`} icon="📈" />
-            <KpiCard label="Clientes nuevos" value={metrics.activeClients} icon="🤝" />
-            <KpiCard label="Proyectos cerrados" value={metrics.closedProjects} icon="✅" />
+            <KpiCard label="Ingreso cerrado" value={<Money value={metrics.totalRevenue} compact />} hint={period === "month" ? "Este mes" : period === "week" ? "Esta semana" : "Este año"} variant="positive" icon="💰" />
+            <KpiCard label="Pipeline abierto" value={<Money value={metrics.pipelineValue} compact />} hint={`${metrics.opportunityCount} oportunidades activas`} icon="📊" variant="accent" />
+            <KpiCard label="Conversión" value={`${metrics.conversionRate}%`} variant={metrics.conversionRate >= 30 ? "positive" : metrics.conversionRate >= 15 ? "warning" : "danger"} icon="🎯" />
+            <KpiCard label="Margen promedio" value={<Money value={metrics.averageMargin} compact />} icon="📈" />
+            <KpiCard label="Clientes activos" value={metrics.activeClients} icon="🤝" variant={metrics.activeClients > 0 ? "accent" : "default"} />
+            <KpiCard label="Proyectos cerrados" value={metrics.closedProjects} variant={metrics.closedProjects > 0 ? "positive" : "default"} icon="✅" />
           </div>
 
           <Section title="Desempeño por ejecutivo">

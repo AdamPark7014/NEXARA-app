@@ -234,10 +234,11 @@ export default function WarehousePage() {
         </Link>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
-        <KpiCard label="Sin stock" value={sinStock} />
-        <KpiCard label="Bajo mínimo" value={bajoMinimo} />
-        <KpiCard label="Valor inventario" value={`$${(valorTotal / 1000000).toFixed(2)}M`} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 20 }}>
+        <KpiCard label="Sin stock" value={sinStock} variant={sinStock > 0 ? "danger" : "positive"} hint={sinStock > 0 ? "Requieren reposición urgente" : "Todo disponible"} icon="📦" />
+        <KpiCard label="Bajo mínimo" value={bajoMinimo} variant={bajoMinimo > 0 ? "warning" : "positive"} hint={bajoMinimo > 0 ? "Por debajo del punto de reorden" : "Niveles OK"} icon="⚠️" />
+        <KpiCard label="Valor inventario" value={<Money value={valorTotal} compact />} hint={`${items.length} SKUs en catálogo`} variant="accent" icon="💰" />
+        <KpiCard label="Almacenes" value={warehouses.length} hint="Ubicaciones configuradas" icon="🏭" />
       </div>
 
       {/* ── Nuevo almacén ── */}

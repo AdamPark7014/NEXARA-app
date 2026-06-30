@@ -224,10 +224,11 @@ export default function AccountingPage() {
         actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={() => { setForm({ ...emptyForm }); setShowForm(true); }}>Nueva póliza</Button> : undefined}
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
-        <KpiCard label="Ingresos registrados" value={`$${(ingresos / 1000000).toFixed(2)}M`} />
-        <KpiCard label="Egresos registrados" value={`$${(egresos / 1000000).toFixed(2)}M`} />
-        <KpiCard label="Borradores" value={borradores} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 20 }}>
+        <KpiCard label="Ingresos registrados" value={<Money value={ingresos} compact />} hint={`${items.filter(e => e.type === "INGRESOS").length} pólizas de ingreso`} variant="positive" icon="📈" />
+        <KpiCard label="Egresos registrados" value={<Money value={egresos} compact />} hint={`${items.filter(e => e.type === "EGRESOS").length} pólizas de egreso`} variant={egresos > ingresos ? "danger" : "default"} icon="📉" />
+        <KpiCard label="Borradores" value={borradores} hint="Pendientes de contabilizar" variant={borradores > 0 ? "warning" : "positive"} icon="📝" />
+        <KpiCard label="Total pólizas" value={items.length} hint="En el periodo cargado" icon="📒" />
       </div>
 
       {showForm && (

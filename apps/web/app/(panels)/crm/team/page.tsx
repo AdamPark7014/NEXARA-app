@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
+import KpiCard from "@/components/ui/KpiCard";
 import Button from "@/components/ui/Button";
 import { Tag, Money, type Column } from "@/components/ui/DataTable";
 import DataTable from "@/components/ui/DataTable";
@@ -56,6 +57,14 @@ export default function TeamPage() {
 
   if (!cfg.canAccess) return null;
 
+  const teamTotals = useMemo(() => ({
+    revenue: rows.reduce((s, r) => s + r.revenueAchieved, 0),
+    opportunities: rows.reduce((s, r) => s + r.opportunitiesCreated, 0),
+    onQuota: rows.filter((r) => r.attainmentPct >= 100).length,
+    withBonus: rows.filter((r) => r.reachedBonus).length,
+    avgAttainment: rows.length > 0 ? Math.round(rows.reduce((s, r) => s + r.attainmentPct, 0) / rows.length) : 0,
+  }), [rows]);
+
   const columns: Column<Performance>[] = [
     {
       key: "ownerName", label: "#",
@@ -86,6 +95,16 @@ export default function TeamPage() {
         subtitle={viewCfg.subtitle}
         actions={<Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>}
       />
+
+      {!loading && !error && rows.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 24 }}>
+          <KpiCard label="Vendido total (equipo)" value={<Money value={teamTotals.revenue} compact />} hint="Ingresos cerrados este mes" variant="positive" icon="💰" />
+          <KpiCard label="Oportunidades creadas" value={teamTotals.opportunities} hint="Suma del equipo" icon="🎯" />
+          <KpiCard label="% cuota promedio" value={`${teamTotals.avgAttainment}%`} variant={teamTotals.avgAttainment >= 100 ? "positive" : teamTotals.avgAttainment >= 60 ? "warning" : "danger"} icon="📊" />
+          <KpiCard label="Alcanzaron cuota" value={`${teamTotals.onQuota}/${rows.length}`} hint="Ejecutivos sobre el 100%" variant={teamTotals.onQuota > 0 ? "positive" : "warning"} icon="🏆" />
+          <KpiCard label="Con bono desbloqueado" value={teamTotals.withBonus} variant={teamTotals.withBonus > 0 ? "accent" : "default"} icon="🎁" />
+        </div>
+      )}
 
       <Section title={loading ? "Cargando…" : `${rows.length} ejecutivos`}>
         {loading && <EmptyState icon="⏳" title="Cargando ranking…" description="Calculando desempeño del equipo." />}

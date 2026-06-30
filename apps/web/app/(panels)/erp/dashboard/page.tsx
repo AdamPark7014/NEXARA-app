@@ -11,6 +11,8 @@ import { Tag, Money } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { fetchExecutiveDashboard, type ExecutiveDashboard } from "@/lib/executive-api";
 import { listMyPendingApprovals, type PendingApproval } from "@/lib/workflow-api";
+import { resolveV2RoleKey } from "@/lib/user-access";
+import { ROLES } from "@/lib/rbac";
 
 type Approval = {
   id: string;
@@ -48,14 +50,56 @@ const PANEL_COLOR: Record<Approval["panel"], string> = {
   CRM: "#10b981",
 };
 
-const SHORTCUTS = [
-  { href: "/crm/dashboard", icon: "📈", title: "Pipeline comercial", desc: "Saltar al CRM", accent: "#10b981" },
-  { href: "/ops/dashboard", icon: "🚀", title: "Operación de campo", desc: "Saltar a OPS", accent: "#f97316" },
-  { href: "/studio/dashboard", icon: "🎨", title: "Sitio público & marca", desc: "Saltar a STUDIO", accent: "#a855f7" },
-  { href: "/erp/users", icon: "🧑‍💼", title: "Gestionar usuarios", desc: "Roles, accesos por URL y matriz", accent: "#0ea5e9" },
-  { href: "/erp/architecture", icon: "🗺️", title: "Arquitectura del ERP", desc: "Mapa de módulos y flujo end-to-end", accent: "#0ea5e9" },
-  { href: "/erp/audit", icon: "🔍", title: "Auditoría", desc: "Timeline inmutable de cambios sensibles", accent: "#0ea5e9" },
-];
+// Atajos filtrados por rol — solo mostramos lo que el usuario puede abrir
+const ALL_SHORTCUTS: Record<string, { href: string; icon: string; title: string; desc: string; accent: string }[]> = {
+  executive: [
+    { href: "/crm/dashboard", icon: "📈", title: "Pipeline comercial", desc: "Saltar al CRM", accent: "#10b981" },
+    { href: "/ops/dashboard", icon: "🚀", title: "Operación de campo", desc: "Saltar a OPS", accent: "#f97316" },
+    { href: "/studio/dashboard", icon: "🎨", title: "Sitio público & marca", desc: "Saltar a STUDIO", accent: "#a855f7" },
+    { href: "/erp/users", icon: "🧑‍💼", title: "Gestionar usuarios", desc: "Roles, accesos por URL y matriz", accent: "#0ea5e9" },
+    { href: "/erp/architecture", icon: "🗺️", title: "Arquitectura del ERP", desc: "Mapa de módulos y flujo end-to-end", accent: "#0ea5e9" },
+    { href: "/erp/audit", icon: "🔍", title: "Auditoría", desc: "Timeline inmutable de cambios sensibles", accent: "#0ea5e9" },
+  ],
+  dir_admin: [
+    { href: "/erp/approvals", icon: "🛡️", title: "Aprobaciones", desc: "Firma y autorización de solicitudes", accent: "#ef4444" },
+    { href: "/erp/invoicing", icon: "🧾", title: "Facturación", desc: "CFDIs emitidos y por cobrar", accent: "#10b981" },
+    { href: "/erp/finance/viatics", icon: "✈️", title: "Viáticos", desc: "Solicitudes y reembolsos del equipo", accent: "#f59e0b" },
+    { href: "/erp/hr", icon: "👥", title: "Recursos humanos", desc: "Plantilla, asistencia y fines", accent: "#0ea5e9" },
+    { href: "/ops/activities", icon: "📋", title: "Reportes de campo", desc: "Evidencias y avances para facturación", accent: "#f97316" },
+    { href: "/erp/procurement", icon: "🛒", title: "Compras", desc: "Requisiciones y órdenes de compra", accent: "#8b5cf6" },
+  ],
+  coord_admin: [
+    { href: "/erp/approvals", icon: "🛡️", title: "Aprobaciones", desc: "Firma y autorización de solicitudes", accent: "#ef4444" },
+    { href: "/erp/procurement", icon: "🛒", title: "Compras", desc: "Requisiciones y órdenes de compra", accent: "#8b5cf6" },
+    { href: "/erp/warehouse", icon: "📦", title: "Almacén", desc: "Stock e inventario de productos", accent: "#f97316" },
+    { href: "/crm/dashboard", icon: "📈", title: "Pipeline CRM", desc: "Estado comercial del equipo", accent: "#10b981" },
+    { href: "/ops/activities", icon: "📋", title: "Reportes OPS", desc: "Actividades del equipo de campo", accent: "#f97316" },
+    { href: "/erp/invoicing", icon: "🧾", title: "Facturación", desc: "CFDIs emitidos y por cobrar", accent: "#10b981" },
+  ],
+  rh: [
+    { href: "/erp/hr", icon: "👥", title: "Gestión de personal", desc: "Plantilla y datos del equipo", accent: "#0ea5e9" },
+    { href: "/erp/hr/attendance", icon: "📍", title: "Asistencia", desc: "Check-in y ubicaciones del equipo", accent: "#10b981" },
+    { href: "/erp/hr/fines", icon: "⚠️", title: "Incidencias", desc: "Multas y faltas de asistencia", accent: "#ef4444" },
+    { href: "/erp/hr/kpis", icon: "📊", title: "KPIs del equipo", desc: "Desempeño individual por área", accent: "#8b5cf6" },
+    { href: "/erp/finance/employee-payments", icon: "💵", title: "Nómina", desc: "Pagos y percepciones del personal", accent: "#f59e0b" },
+    { href: "/erp/calendar", icon: "📅", title: "Calendario", desc: "Eventos corporativos y agenda", accent: "#6366f1" },
+  ],
+  contabilidad: [
+    { href: "/erp/accounting", icon: "📒", title: "Pólizas contables", desc: "Libro diario y ajustes", accent: "#0ea5e9" },
+    { href: "/erp/invoicing", icon: "🧾", title: "Facturación CFDI", desc: "Ingresos y egresos timbrados", accent: "#10b981" },
+    { href: "/erp/banking", icon: "🏦", title: "Cuentas bancarias", desc: "Conciliación y movimientos", accent: "#8b5cf6" },
+    { href: "/erp/finance/viatics", icon: "✈️", title: "Viáticos", desc: "Solicitudes y reembolsos", accent: "#f59e0b" },
+    { href: "/erp/exports", icon: "📥", title: "Exportar datos", desc: "Reportes y cierres para SAT", accent: "#ef4444" },
+    { href: "/crm/quotes", icon: "📋", title: "Cotizaciones CRM", desc: "Propuestas comerciales para revisión", accent: "#10b981" },
+  ],
+  administrativo: [
+    { href: "/erp/approvals", icon: "🛡️", title: "Aprobaciones", desc: "Firma y autorización de solicitudes", accent: "#ef4444" },
+    { href: "/erp/documents", icon: "📂", title: "Documentos", desc: "Archivos corporativos", accent: "#0ea5e9" },
+    { href: "/erp/finance/viatics", icon: "✈️", title: "Mis viáticos", desc: "Solicitudes y reembolsos", accent: "#f59e0b" },
+    { href: "/erp/finance/expenses", icon: "💳", title: "Mis gastos", desc: "Gastos corporativos", accent: "#8b5cf6" },
+    { href: "/erp/calendar", icon: "📅", title: "Calendario", desc: "Agenda corporativa", accent: "#6366f1" },
+  ],
+};
 
 /** Deriva métricas de salud por dominio a partir del snapshot ejecutivo real. */
 function buildHealthDomains(exec: ExecutiveDashboard) {
@@ -128,6 +172,17 @@ function buildHealthDomains(exec: ExecutiveDashboard) {
 export default function ErpDashboardPage() {
   const { user, token } = useUser();
   const nombre = user?.nombre?.split(" ")[0] ?? "Equipo";
+  const v2Role = resolveV2RoleKey(user);
+  const shortcuts = useMemo(() => {
+    if (!v2Role) return ALL_SHORTCUTS.executive;
+    if (v2Role === ROLES.CEO || v2Role === ROLES.SUPER_ADMIN || v2Role === ROLES.DIR_OPERACIONES) return ALL_SHORTCUTS.executive;
+    if (v2Role === ROLES.DIR_ADMIN) return ALL_SHORTCUTS.dir_admin;
+    if (v2Role === ROLES.COORD_ADMIN) return ALL_SHORTCUTS.coord_admin;
+    if (v2Role === ROLES.RH) return ALL_SHORTCUTS.rh;
+    if (v2Role === ROLES.CONTABILIDAD) return ALL_SHORTCUTS.contabilidad;
+    if (v2Role === ROLES.ADMINISTRATIVO) return ALL_SHORTCUTS.administrativo;
+    return ALL_SHORTCUTS.executive;
+  }, [v2Role]);
   const ahora = new Date();
   const horas = ahora.getHours();
   const saludo = horas < 12 ? "Buenos días" : horas < 19 ? "Buenas tardes" : "Buenas noches";
@@ -317,7 +372,7 @@ export default function ErpDashboardPage() {
 
         <Section eyebrow="Atajos" title="Lo que más usas" subtitle="Saltos rápidos entre paneles">
           <div style={{ display: "grid", gap: 8 }}>
-            {SHORTCUTS.map((s) => (
+            {shortcuts.map((s) => (
               <Link
                 key={s.href}
                 href={s.href}

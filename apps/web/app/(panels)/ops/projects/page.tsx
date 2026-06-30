@@ -93,6 +93,7 @@ export default function OpsProjectsPage() {
     enPausa: items.filter((p) => p.status === "ON_HOLD").length,
     completados: items.filter((p) => p.status === "COMPLETED").length,
     totalOTs: items.reduce((s, p) => s + (p.activities?.length ?? 0), 0),
+    clientes: new Set(items.map((p) => p.client?.name).filter(Boolean)).size,
   }), [items]);
 
   const statusVariant = (s?: string): "accent" | "warning" | "neutral" | "danger" =>
@@ -181,10 +182,10 @@ export default function OpsProjectsPage() {
 
       {!loading && !error && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
-          <KpiCard label="Proyectos activos" value={kpis.activos} variant={kpis.activos > 0 ? "accent" : "default"} icon="🟢" />
-          <KpiCard label="En pausa" value={kpis.enPausa} variant={kpis.enPausa > 0 ? "warning" : "default"} icon="⏸️" />
-          <KpiCard label="Completados" value={kpis.completados} icon="✅" />
-          <KpiCard label="OTs totales" value={kpis.totalOTs} icon="📋" />
+          <KpiCard label="Proyectos activos" value={kpis.activos} variant={kpis.activos > 0 ? "accent" : "default"} icon="🟢" hint={`${kpis.clientes} clientes distintos`} />
+          <KpiCard label="En pausa" value={kpis.enPausa} variant={kpis.enPausa > 0 ? "warning" : "default"} icon="⏸️" hint={kpis.enPausa > 0 ? "Requieren seguimiento" : "Sin proyectos pausados"} />
+          <KpiCard label="Completados" value={kpis.completados} variant={kpis.completados > 0 ? "positive" : "default"} icon="✅" />
+          <KpiCard label="OTs registradas" value={kpis.totalOTs} icon="📋" hint="Actividades en todos los proyectos" />
         </div>
       )}
 
