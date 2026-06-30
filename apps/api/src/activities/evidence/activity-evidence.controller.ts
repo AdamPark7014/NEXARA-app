@@ -192,13 +192,24 @@ export class ActivityEvidenceController {
   @Post(':activityId/reject')
   async rejectEvidence(
     @Param('activityId') activityId: string,
-    @Body() body: { reviewerId: number; rejectedStep: string; notes: string },
+    @Body()
+    body: {
+      reviewerId: number;
+      notes: string;
+      rejectedStep?: string;
+      rejectedSteps?: string[];
+      resetFullFlow?: boolean;
+    },
   ) {
     return this.service.rejectEvidence(
       parseInt(activityId, 10),
       body.reviewerId,
-      body.rejectedStep,
       body.notes,
+      {
+        rejectedStep: body.rejectedStep,
+        rejectedSteps: body.rejectedSteps,
+        resetFullFlow: body.resetFullFlow,
+      },
     );
   }
 

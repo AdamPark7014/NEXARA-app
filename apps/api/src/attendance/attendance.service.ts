@@ -46,16 +46,59 @@ export class AttendanceService {
 
   async getCurrentDay(userId: number) {
     if (!userId) throw new BadRequestException('Usuario no autenticado');
-    const today = this.getDateOnly(new Date());
-    const day = await this.prisma.attendanceDay.findUnique({
-      where: { userId_date: { userId, date: today } },
+    const openDay = await this.prisma.attendanceDay.findFirst({
+      where: { userId, isOpen: true },
+      orderBy: { date: 'desc' },
     });
-    return day ?? null;
+    return openDay ?? null;
+  }
+
+  /** Reabre jornada si hay entrada sin salida pero attendanceDay quedó inconsistente. */
+  private async reconcileOpenDay(userId: number, referenceDate: Date) {
+    const dayStart = this.getDateOnly(referenceDate);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const [entry, exit] = await Promise.all([
+      this.prisma.attendance.findFirst({
+        where: {
+          userId,
+          type: 'entrada',
+          timestamp: { gte: dayStart, lte: dayEnd },
+        },
+        orderBy: { timestamp: 'desc' },
+      }),
+      this.prisma.attendance.findFirst({
+        where: {
+          userId,
+          type: 'salida',
+          timestamp: { gte: dayStart, lte: dayEnd },
+        },
+        orderBy: { timestamp: 'desc' },
+      }),
+    ]);
+
+    if (!entry || exit) return null;
+
+    return this.prisma.attendanceDay.upsert({
+      where: { userId_date: { userId, date: dayStart } },
+      create: {
+        userId,
+        date: dayStart,
+        totalMinutes: 0,
+        lastEntryAt: entry.timestamp,
+        isOpen: true,
+      },
+      update: {
+        lastEntryAt: entry.timestamp,
+        isOpen: true,
+      },
+    });
   }
 
   async getHistory(userId: number, date?: string) {
     if (!userId) throw new BadRequestException('Usuario no autenticado');
-    const base = date ? new Date(date) : new Date();
+    const base = date ? this.parseDateInput(date) : new Date();
     if (Number.isNaN(base.getTime())) {
       throw new BadRequestException('Fecha invalida');
     }
@@ -77,7 +120,7 @@ export class AttendanceService {
 
   async getDaySummary(userId: number, date?: string) {
     if (!userId) throw new BadRequestException('Usuario no autenticado');
-    const base = date ? new Date(date) : new Date();
+    const base = date ? this.parseDateInput(date) : new Date();
     if (Number.isNaN(base.getTime())) {
       throw new BadRequestException('Fecha invalida');
     }
@@ -238,6 +281,15 @@ export class AttendanceService {
     });
 
     if (isEntry) {
+      const openDay = await this.prisma.attendanceDay.findFirst({
+        where: { userId, isOpen: true },
+      });
+      if (openDay) {
+        throw new BadRequestException(
+          'Tienes una jornada abierta sin salida. Registra salida antes de una nueva entrada.',
+        );
+      }
+
       const day = await this.prisma.attendanceDay.upsert({
         where: { userId_date: { userId, date: today } },
         create: {
@@ -311,9 +363,20 @@ export class AttendanceService {
       };
     }
 
-    const day = await this.prisma.attendanceDay.findUnique({
-      where: { userId_date: { userId, date: today } },
+    let day = await this.prisma.attendanceDay.findFirst({
+      where: { userId, isOpen: true },
+      orderBy: { date: 'desc' },
     });
+
+    if (!day?.isOpen || !day.lastEntryAt) {
+      day = await this.reconcileOpenDay(userId, today);
+    }
+    if (!day?.isOpen || !day.lastEntryAt) {
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      day = await this.reconcileOpenDay(userId, yesterday);
+    }
+
     if (!day?.isOpen || !day.lastEntryAt) {
       throw new BadRequestException('No hay una entrada abierta para cerrar');
     }

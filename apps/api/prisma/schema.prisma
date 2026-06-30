@@ -982,6 +982,7 @@ model ActivityEvidence {
   // Sistema de Revisión y Aprobación
   reviewStatus          String    @default("PENDING") @db.VarChar(20) // PENDING, APPROVED, REJECTED
   rejectedStep          String?   @db.VarChar(50) // Cual paso fue rechazado: ENTRY_PHOTO, EVIDENCE_PHOTOS, etc.
+  rejectedSteps         Json? // Pasos rechazados (corrección parcial o reinicio completo)
   reviewNotes           String?   @db.Text // Observaciones del revisor
   reviewedAt            DateTime? // Fecha de revisión
   reviewedById          Int? // Usuario que revisó

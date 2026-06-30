@@ -35,6 +35,7 @@ const AttendanceForm = () => {
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [elapsed, setElapsed] = useState<number>(0);
   const [totalMinutes, setTotalMinutes] = useState<number>(0);
+  const [openSession, setOpenSession] = useState<{ lastEntryAt: string } | null>(null);
   const [history, setHistory] = useState<{ type: string; timestamp: string; photoUrl?: string; deviceInfo?: string | null }[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(() => toLocalDateInput(new Date()));
   const [rangeFrom, setRangeFrom] = useState<string>(() => getWeekRange().from);
@@ -329,14 +330,29 @@ const AttendanceForm = () => {
     }
 
     try {
-      const [dayRes, historyRes] = await Promise.all([
+      const [dayRes, historyRes, currentRes] = await Promise.all([
         fetch(buildApiUrl(`attendance/day?date=${selectedDate}`), {
           headers: { Authorization: `Bearer ${user.token}` },
         }),
         fetch(buildApiUrl(`attendance/history?date=${selectedDate}`), {
           headers: { Authorization: `Bearer ${user.token}` },
         }),
+        fetch(buildApiUrl('attendance/current'), {
+          headers: { Authorization: `Bearer ${user.token}` },
+        }),
       ]);
+
+      let activeOpen: { lastEntryAt: string } | null = null;
+      if (currentRes.ok) {
+        const current = await parseResponseJson<{
+          isOpen?: boolean;
+          lastEntryAt?: string | null;
+        }>(currentRes);
+        if (current?.isOpen && current.lastEntryAt) {
+          activeOpen = { lastEntryAt: current.lastEntryAt };
+        }
+      }
+      setOpenSession(activeOpen);
 
       if (dayRes.ok) {
         const day = await parseResponseJson<{
@@ -346,16 +362,21 @@ const AttendanceForm = () => {
         }>(dayRes);
         if (!day) {
           setTotalMinutes(0);
-          setStartTime(null);
-          localStorage.removeItem(STORAGE_KEY);
         } else {
           setTotalMinutes(day.totalMinutes || 0);
-          if (isToday(selectedDate) && day.isOpen && day.lastEntryAt) {
-            setStartTime(new Date(day.lastEntryAt));
-          } else {
-            setStartTime(null);
-          }
         }
+      }
+
+      if (activeOpen && isToday(selectedDate)) {
+        const entryTime = new Date(activeOpen.lastEntryAt);
+        setStartTime(entryTime);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          startTimeStr: entryTime.toISOString(),
+          date: toLocalDateKey(new Date()),
+        }));
+      } else if (!activeOpen) {
+        setStartTime(null);
+        localStorage.removeItem(STORAGE_KEY);
       }
 
       if (historyRes.ok) {
@@ -538,29 +559,28 @@ const AttendanceForm = () => {
         console.log('🧹 Timer limpiado de localStorage (salida registrada)');
       }
 
-      // Refrescar historial
-      const historyRes = await fetch(buildApiUrl(`attendance/history?date=${selectedDate}`), {
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-      if (historyRes.ok) {
-        const list = await historyRes.json();
-        if (Array.isArray(list)) setHistory(list);
-      }
+      await refreshSelectedDateAttendance();
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
       } else {
         setError('Error desconocido');
       }
-      // Si el intento de salida falló (sin entrada abierta), limpiar timer fantasma
       if (tipo === 'salida') {
         setStartTime(null);
+        setOpenSession(null);
         localStorage.removeItem(STORAGE_KEY);
+        void refreshSelectedDateAttendance();
       }
     } finally {
       setLoading(false);
     }
   };
+
+  const hasEntryToday = history.some((h) => h.type === 'entrada');
+  const hasExitToday = history.some((h) => h.type === 'salida');
+  const canRegisterEntry = isToday(selectedDate) && !hasEntryToday && !openSession;
+  const canRegisterExit = isToday(selectedDate) && Boolean(openSession) && !hasExitToday;
 
   return (
     <div className={styles.root}>
@@ -627,19 +647,18 @@ const AttendanceForm = () => {
         <div className={`${styles.actionsRow} ${isMobile ? styles.actionsRowMobile : ''}`}>
           {/* Botón entrada - deshabilitado si ya hay entrada o si no es hoy */}
           <button 
-            className={`button-secondary ${styles.flexGrow} ${(loading || !!startTime || !isToday(selectedDate) || history.some(h => h.type === 'entrada')) ? styles.btnDisabledVisual : ''}`} 
+            className={`button-secondary ${styles.flexGrow} ${(loading || !canRegisterEntry) ? styles.btnDisabledVisual : ''}`} 
             onClick={() => openCamera('entrada')} 
-            disabled={loading || !!startTime || !isToday(selectedDate) || history.some(h => h.type === 'entrada')}
-            title={history.some(h => h.type === 'entrada') ? 'Ya has registrado entrada hoy' : ''}
+            disabled={loading || !canRegisterEntry}
+            title={hasEntryToday ? 'Ya has registrado entrada hoy' : (openSession ? 'Cierra la jornada abierta primero' : '')}
           >
             Registrar Entrada del Día
           </button>
-          {/* Botón salida - deshabilitado si no hay entrada o si ya hay salida */}
           <button 
-            className={`button-primary ${styles.flexGrow} ${(loading || !startTime || !isToday(selectedDate) || history.some(h => h.type === 'salida')) ? styles.btnDisabledVisual : ''}`} 
+            className={`button-primary ${styles.flexGrow} ${(loading || !canRegisterExit) ? styles.btnDisabledVisual : ''}`} 
             onClick={() => openCamera('salida')} 
-            disabled={loading || !startTime || !isToday(selectedDate) || history.some(h => h.type === 'salida')}
-            title={!startTime ? 'Debes registrar entrada primero' : (history.some(h => h.type === 'salida') ? 'Ya has registrado salida hoy' : '')}
+            disabled={loading || !canRegisterExit}
+            title={!openSession ? 'Debes tener una entrada abierta' : (hasExitToday ? 'Ya has registrado salida hoy' : '')}
           >
             Registrar Salida del Día
           </button>
@@ -649,9 +668,9 @@ const AttendanceForm = () => {
             <strong>Tiempo transcurrido:</strong> {formatElapsed(elapsed)}
           </div>
         )}
-        {isToday(selectedDate) && history.some(h => h.type === 'entrada') && !history.some(h => h.type === 'salida') && (
+        {isToday(selectedDate) && openSession && !hasExitToday && (
           <div className={styles.infoAlert}>
-            ✓ <strong>Entrada registrada.</strong> Estás dentro. Solo puedes registrar salida.
+            ✓ <strong>Jornada abierta.</strong> Estás dentro. Registra salida para cerrar.
           </div>
         )}
         {isToday(selectedDate) && history.some(h => h.type === 'entrada') && history.some(h => h.type === 'salida') && (
@@ -729,4 +748,3 @@ const AttendanceForm = () => {
 };
 
 export default AttendanceForm;
-

@@ -127,17 +127,23 @@ export function buildUserSidebar(
   user: UserAccessInput | null | undefined,
 ): SidebarGroup[] {
   if (!user) return [];
-  if (user.isSuperAdmin) return buildSidebar(panel, null, true);
 
   const v2 = resolveV2RoleKey(user);
   const orgKey = resolveOrgRoleKey(user.role, user.orgRoleKey);
   if (v2 || orgKey) {
     const items: ModuleEntry[] = [];
+    const seenPaths = new Set<string>();
+
     for (const module of Object.values(MODULES)) {
       if (module.panel !== panel) continue;
       if (!canUserAccessModule(user, module)) continue;
       if (!shouldShowModuleInSidebar(user, module)) continue;
-      items.push(adaptModulePresentation(user, module));
+
+      const adapted = adaptModulePresentation(user, module);
+      if (seenPaths.has(adapted.path)) continue;
+      seenPaths.add(adapted.path);
+
+      items.push(adapted);
     }
 
     const byGroup = new Map<string, ModuleEntry[]>();
@@ -160,11 +166,16 @@ export function buildUserSidebar(
 /** Módulos accesibles (paleta de comandos, búsqueda global). */
 export function getUserAllowedModules(user: UserAccessInput | null | undefined): ModuleEntry[] {
   if (!user) return [];
-  if (user.isSuperAdmin) return Object.values(MODULES).filter((m) => m.visible !== false);
 
+  const seenPaths = new Set<string>();
   return Object.values(MODULES)
     .filter((m) => canUserAccessModule(user, m) && shouldShowModuleInSidebar(user, m))
-    .map((m) => adaptModulePresentation(user, m));
+    .map((m) => adaptModulePresentation(user, m))
+    .filter((m) => {
+      if (seenPaths.has(m.path)) return false;
+      seenPaths.add(m.path);
+      return true;
+    });
 }
 
 /** ¿Tiene al menos una ruta usable dentro de este panel? */

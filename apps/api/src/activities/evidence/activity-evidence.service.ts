@@ -10,6 +10,14 @@ import path from 'path';
 
 type ActivityEvidenceStatus = 'ENTRY_PHOTO' | 'EVIDENCE_PHOTOS' | 'SERVICE_SHEET_PDF' | 'SERVICE_SHEET_DATA' | 'EXIT_PHOTO' | 'COMPLETED';
 
+const EVIDENCE_STEP_ORDER: ActivityEvidenceStatus[] = [
+  'ENTRY_PHOTO',
+  'EVIDENCE_PHOTOS',
+  'SERVICE_SHEET_PDF',
+  'SERVICE_SHEET_DATA',
+  'EXIT_PHOTO',
+];
+
 @Injectable()
 export class ActivityEvidenceService {
   constructor(
@@ -41,6 +49,68 @@ export class ActivityEvidenceService {
     if (reviewStatus === 'APPROVED') return 'Aprobada';
     if (reviewStatus === 'REJECTED') return 'Rechazada';
     return 'Pendiente';
+  }
+
+  private parseRejectedSteps(evidence: { rejectedSteps?: unknown; rejectedStep?: string | null }): string[] {
+    if (Array.isArray(evidence.rejectedSteps) && evidence.rejectedSteps.length > 0) {
+      return evidence.rejectedSteps.filter((step): step is string => typeof step === 'string');
+    }
+    if (evidence.rejectedStep) return [evidence.rejectedStep];
+    return [];
+  }
+
+  private firstRejectedStep(steps: string[]): ActivityEvidenceStatus {
+    const found = EVIDENCE_STEP_ORDER.find((step) => steps.includes(step));
+    return (found || steps[0]) as ActivityEvidenceStatus;
+  }
+
+  private nextAfterCorrection(
+    completedStep: string,
+    remainingSteps: string[],
+  ): Pick<
+    {
+      status: ActivityEvidenceStatus | 'COMPLETED';
+      reviewStatus: string;
+      rejectedSteps: string[] | null;
+      rejectedStep: string | null;
+    },
+    'status' | 'reviewStatus' | 'rejectedSteps' | 'rejectedStep'
+  > {
+    if (remainingSteps.length === 0) {
+      return {
+        status: 'COMPLETED',
+        reviewStatus: 'PENDING',
+        rejectedSteps: null,
+        rejectedStep: null,
+      };
+    }
+    const next = this.firstRejectedStep(remainingSteps);
+    return {
+      status: next,
+      reviewStatus: 'REJECTED',
+      rejectedSteps: remainingSteps,
+      rejectedStep: next,
+    };
+  }
+
+  private clearEvidenceData() {
+    return {
+      entryPhotoUrl: null,
+      entryLatitude: null,
+      entryLongitude: null,
+      entryPhotoUploadedAt: null,
+      evidencePhotos: [],
+      evidencePhotosUploadedAt: null,
+      serviceSheetPdfUrl: null,
+      serviceSheetUploadedAt: null,
+      serviceSheetData: null,
+      serviceSheetCompletedAt: null,
+      exitPhotoUrl: null,
+      exitLatitude: null,
+      exitLongitude: null,
+      exitPhotoUploadedAt: null,
+      completedAt: null,
+    };
   }
 
   private mapReviewComment(reviewStatus: string | null | undefined, reviewNotes?: string | null) {
@@ -221,6 +291,10 @@ export class ActivityEvidenceService {
       throw new ForbiddenException('La evidencia ya fue aprobada y no puede modificarse');
     }
 
+    if (evidence?.status === 'COMPLETED' && evidence?.reviewStatus !== 'REJECTED') {
+      throw new ForbiddenException('La evidencia está en revisión y no puede modificarse');
+    }
+
     if (!evidence) {
       evidence = await this.prisma.activityEvidence.create({
         data: {
@@ -352,6 +426,10 @@ export class ActivityEvidenceService {
 
     if (evidence.status !== 'EXIT_PHOTO') {
       throw new BadRequestException('No estás en el paso correcto para guardar la foto de salida');
+    }
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      throw new BadRequestException('La ubicación GPS es obligatoria para la foto de salida');
     }
 
     const updated = await this.prisma.activityEvidence.update({
@@ -1073,52 +1151,94 @@ export class ActivityEvidenceService {
   }
 
   /**
-   * Rechazar evidencias (Admin) - seleccionar paso a corregir
+   * Rechazar evidencias (Admin) - seleccionar paso(s) a corregir o reiniciar flujo
    */
   async rejectEvidence(
     activityId: number,
     reviewerId: number,
-    rejectedStep: string,
     notes: string,
+    options: {
+      rejectedStep?: string;
+      rejectedSteps?: string[];
+      resetFullFlow?: boolean;
+    },
   ) {
-    const evidence = await this.getOrCreateActivityEvidence(activityId);
+    const evidence = await this.prisma.activityEvidence.findUnique({
+      where: { activityId },
+    });
 
-    if (evidence.status !== 'COMPLETED') {
+    if (!evidence || evidence.status !== 'COMPLETED') {
       throw new BadRequestException('Las evidencias deben estar completadas antes de rechazar');
     }
 
-    const validSteps = [
-      'ENTRY_PHOTO',
-      'EVIDENCE_PHOTOS',
-      'SERVICE_SHEET_PDF',
-      'SERVICE_SHEET_DATA',
-      'EXIT_PHOTO',
-    ];
+    const validSteps = [...EVIDENCE_STEP_ORDER];
 
-    if (!validSteps.includes(rejectedStep)) {
-      throw new BadRequestException('Paso inválido para rechazo');
+    if (options.resetFullFlow) {
+      const allSteps = [...EVIDENCE_STEP_ORDER];
+      const updated = await this.prisma.activityEvidence.update({
+        where: { activityId },
+        data: {
+          ...this.clearEvidenceData(),
+          reviewStatus: 'REJECTED',
+          rejectedStep: 'ENTRY_PHOTO',
+          rejectedSteps: allSteps,
+          reviewNotes: notes,
+          reviewedById: reviewerId,
+          reviewedAt: new Date(),
+          status: 'ENTRY_PHOTO',
+        },
+      });
+
+      await this.prisma.activity.update({
+        where: { id: activityId },
+        data: { estatus: 'En Proceso' },
+      });
+
+      await this.notifyReject(activityId, reviewerId, notes);
+      return updated;
     }
+
+    const steps = options.rejectedSteps?.length
+      ? options.rejectedSteps
+      : options.rejectedStep
+        ? [options.rejectedStep]
+        : [];
+
+    if (steps.length === 0) {
+      throw new BadRequestException('Debes seleccionar al menos un paso a rechazar');
+    }
+
+    for (const step of steps) {
+      if (!validSteps.includes(step as ActivityEvidenceStatus)) {
+        throw new BadRequestException('Paso inválido para rechazo');
+      }
+    }
+
+    const firstStep = this.firstRejectedStep(steps);
 
     const updated = await this.prisma.activityEvidence.update({
       where: { activityId },
       data: {
         reviewStatus: 'REJECTED',
-        rejectedStep,
+        rejectedStep: firstStep,
+        rejectedSteps: steps,
         reviewNotes: notes,
         reviewedById: reviewerId,
         reviewedAt: new Date(),
-        status: rejectedStep, // Regresar al paso rechazado
+        status: firstStep,
       },
     });
 
-    // Actualizar estatus de actividad
     await this.prisma.activity.update({
       where: { id: activityId },
-      data: {
-        estatus: 'Rechazada',
-      },
+      data: { estatus: 'Rechazada' },
     });
 
+    await this.notifyReject(activityId, reviewerId, notes);
+    return updated;
+  }
+
+  private async notifyReject(activityId: number, reviewerId: number, notes: string) {
     try {
       const activity = await this.prisma.activity.findUnique({
         where: { id: activityId },
@@ -1141,8 +1261,6 @@ export class ActivityEvidenceService {
     } catch {
       /* seguir */
     }
-
-    return updated;
   }
 
   /**
@@ -1155,32 +1273,36 @@ export class ActivityEvidenceService {
       throw new BadRequestException('Solo puedes reenviar si fue rechazada');
     }
 
-    if (evidence.rejectedStep !== step) {
+    const rejectedList = this.parseRejectedSteps(evidence);
+    if (!rejectedList.includes(step)) {
       throw new BadRequestException(
-        `Debes corregir el paso: ${evidence.rejectedStep}`,
+        `Debes corregir uno de los pasos rechazados: ${rejectedList.join(', ')}`,
       );
     }
 
-    // Actualizar según el paso
+    const remainingAfter = rejectedList.filter((s) => s !== step);
+    const transition = this.nextAfterCorrection(step, remainingAfter);
+
     let updateData: any = {
       correctionSubmittedAt: new Date(),
+      ...transition,
     };
 
     switch (step) {
       case 'ENTRY_PHOTO':
+        if (!Number.isFinite(data.latitude) || !Number.isFinite(data.longitude)) {
+          throw new BadRequestException('La ubicación GPS es obligatoria para la foto de entrada');
+        }
         updateData = {
           ...updateData,
           entryPhotoUrl: data.photoUrl,
           entryLatitude: data.latitude,
           entryLongitude: data.longitude,
           entryPhotoUploadedAt: new Date(),
-          status: 'EVIDENCE_PHOTOS',
-          reviewStatus: 'PENDING',
-          rejectedStep: null,
         };
         break;
 
-      case 'EVIDENCE_PHOTOS':
+      case 'EVIDENCE_PHOTOS': {
         const activity = await this.prisma.activity.findUnique({
           where: { id: activityId },
           select: { workType: true },
@@ -1198,20 +1320,15 @@ export class ActivityEvidenceService {
           ...updateData,
           evidencePhotos: data.photoUrls,
           evidencePhotosUploadedAt: new Date(),
-          status: 'SERVICE_SHEET_PDF',
-          reviewStatus: 'PENDING',
-          rejectedStep: null,
         };
         break;
+      }
 
       case 'SERVICE_SHEET_PDF':
         updateData = {
           ...updateData,
           serviceSheetPdfUrl: data.pdfUrl,
           serviceSheetUploadedAt: new Date(),
-          status: 'SERVICE_SHEET_DATA',
-          reviewStatus: 'PENDING',
-          rejectedStep: null,
         };
         break;
 
@@ -1220,24 +1337,23 @@ export class ActivityEvidenceService {
           ...updateData,
           serviceSheetData: data.formData,
           serviceSheetCompletedAt: new Date(),
-          status: 'EXIT_PHOTO',
-          reviewStatus: 'PENDING',
-          rejectedStep: null,
         };
         break;
 
       case 'EXIT_PHOTO':
+        if (!Number.isFinite(data.latitude) || !Number.isFinite(data.longitude)) {
+          throw new BadRequestException('La ubicación GPS es obligatoria para la foto de salida');
+        }
         updateData = {
           ...updateData,
           exitPhotoUrl: data.photoUrl,
           exitLatitude: data.latitude,
           exitLongitude: data.longitude,
           exitPhotoUploadedAt: new Date(),
-          status: 'COMPLETED',
-          reviewStatus: 'PENDING',
-          rejectedStep: null,
-          completedAt: new Date(),
         };
+        if (transition.status === 'COMPLETED') {
+          updateData.completedAt = new Date();
+        }
         break;
 
       default:
@@ -1249,15 +1365,18 @@ export class ActivityEvidenceService {
       data: updateData,
     });
 
-    // Al reenviar correcciones, vuelve a quedar pendiente de validación administrativa
+    const activityStatus =
+      transition.status === 'COMPLETED' ? 'Pendiente' : transition.reviewStatus === 'REJECTED' ? 'Rechazada' : 'Pendiente';
+
     await this.prisma.activity.update({
       where: { id: activityId },
       data: {
-        estatus: 'Pendiente',
+        estatus: activityStatus,
+        ...(transition.status === 'COMPLETED' ? { fechaFinalizacion: new Date() } : {}),
       },
     });
 
-    if (step === 'EXIT_PHOTO' && updateData.status === 'COMPLETED') {
+    if (transition.status === 'COMPLETED') {
       void this.notifyEvidenceReadyForReview(activityId);
     }
 

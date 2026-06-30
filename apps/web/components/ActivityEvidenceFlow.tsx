@@ -1,5 +1,10 @@
 "use client";
 import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
+import {
+  evidenceStepLabel,
+  isEvidenceLocked,
+  rejectedStepsList,
+} from "@/lib/evidence-lock";
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useUser } from './UserContext';
 import styles from './ActivityEvidenceFlow.module.css';
@@ -13,6 +18,12 @@ interface ActivityOption {
   responsableId?: number;
   responsable?: { id?: number };
   workType?: 'ISSUE' | 'PREVENTIVE_INVENTORY';
+  activityEvidence?: {
+    status?: string;
+    reviewStatus?: string;
+    rejectedStep?: string | null;
+    rejectedSteps?: string[] | null;
+  } | null;
 }
 
 const normalizeActivitiesPayload = (data: unknown): ActivityOption[] => {
@@ -28,6 +39,7 @@ interface EvidenceFlowData {
   step: 'ENTRY_PHOTO' | 'EVIDENCE_PHOTOS' | 'SERVICE_SHEET_PDF' | 'SERVICE_SHEET_DATA' | 'EXIT_PHOTO' | 'COMPLETED';
   reviewStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
   rejectedStep?: string;
+  rejectedSteps?: string[];
   reviewNotes?: string;
   entryPhotoUrl?: string;
   entryLatitude?: number;
@@ -97,6 +109,39 @@ const ActivityEvidenceFlow = () => {
   const inventoryFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const isCorrection = flowData?.reviewStatus === 'REJECTED';
+  const isFlowLocked = Boolean(flowData && isEvidenceLocked(flowData));
+  const rejectedList = flowData ? rejectedStepsList(flowData) : [];
+
+  const syncFlowFromSaved = (saved: Record<string, unknown>, local?: Partial<EvidenceFlowData>) => {
+    if (!flowData) return;
+    setFlowData({
+      ...flowData,
+      ...local,
+      step: (saved.status as EvidenceFlowData['step']) ?? flowData.step,
+      reviewStatus: (saved.reviewStatus as EvidenceFlowData['reviewStatus']) ?? flowData.reviewStatus,
+      rejectedStep: (saved.rejectedStep as string | null) ?? undefined,
+      rejectedSteps: Array.isArray(saved.rejectedSteps) ? (saved.rejectedSteps as string[]) : undefined,
+      entryPhotoUrl: (saved.entryPhotoUrl as string | undefined) ?? flowData.entryPhotoUrl,
+      entryLatitude: saved.entryLatitude != null ? Number(saved.entryLatitude) : flowData.entryLatitude,
+      entryLongitude: saved.entryLongitude != null ? Number(saved.entryLongitude) : flowData.entryLongitude,
+      evidencePhotos: Array.isArray(saved.evidencePhotos) ? (saved.evidencePhotos as string[]) : flowData.evidencePhotos,
+      serviceSheetPdfUrl: (saved.serviceSheetPdfUrl as string | undefined) ?? flowData.serviceSheetPdfUrl,
+      serviceSheetData: saved.serviceSheetData ?? flowData.serviceSheetData,
+      exitPhotoUrl: (saved.exitPhotoUrl as string | undefined) ?? flowData.exitPhotoUrl,
+      exitLatitude: saved.exitLatitude != null ? Number(saved.exitLatitude) : flowData.exitLatitude,
+      exitLongitude: saved.exitLongitude != null ? Number(saved.exitLongitude) : flowData.exitLongitude,
+    });
+  };
+
+  const correctionSuccessMessage = (saved: Record<string, unknown>, fallback: string) => {
+    if (saved.status === 'COMPLETED') {
+      return '🎉 ¡Corrección enviada! Tu evidencia será revisada nuevamente.';
+    }
+    if (typeof saved.status === 'string') {
+      return `✅ Paso corregido. Siguiente: ${evidenceStepLabel(saved.status)}`;
+    }
+    return fallback;
+  };
   const selectedActivity = actividades.find((activity) => activity.id === Number(selectedActivityId || flowData?.activityId));
   const isInventoryFlow = selectedActivity?.workType === 'PREVENTIVE_INVENTORY';
 
@@ -144,7 +189,10 @@ const ActivityEvidenceFlow = () => {
 
         const available = rows.filter((activity: ActivityOption) => {
           const status = (activity?.estatus || '').trim().toLowerCase();
-          return status !== 'aprobada';
+          if (status === 'aprobada') return false;
+          const ev = activity.activityEvidence;
+          if (ev?.status === 'COMPLETED' && ev?.reviewStatus !== 'REJECTED') return false;
+          return true;
         });
         setActividades(available);
         setError(null);
@@ -159,9 +207,8 @@ const ActivityEvidenceFlow = () => {
 
   useEffect(() => {
     if (!requestedActivityId || loading || flowData?.activityId === requestedActivityId) return;
-    if (!actividades.some((activity) => activity.id === requestedActivityId)) return;
     handleActivitySelect(requestedActivityId);
-  }, [requestedActivityId, actividades, flowData?.activityId]);
+  }, [requestedActivityId, loading, flowData?.activityId]);
 
   // Cuando selecciona una actividad
   const handleActivitySelect = async (activityId: number) => {
@@ -186,6 +233,7 @@ const ActivityEvidenceFlow = () => {
           step: data.status,
           reviewStatus: data.reviewStatus,
           rejectedStep: data.rejectedStep,
+          rejectedSteps: Array.isArray(data.rejectedSteps) ? data.rejectedSteps : undefined,
           reviewNotes: data.reviewNotes,
           entryPhotoUrl: data.entryPhotoUrl,
           entryLatitude: data.entryLatitude,
@@ -433,17 +481,13 @@ const ActivityEvidenceFlow = () => {
 
       if (res.ok) {
         const updated = await res.json();
-        setFlowData({
-          ...flowData,
-          step: 'EVIDENCE_PHOTOS',
+        syncFlowFromSaved(updated, {
           entryPhotoUrl: photoUrl,
           entryLatitude: latitude,
           entryLongitude: longitude,
-          reviewStatus: isCorrection ? 'PENDING' : flowData.reviewStatus,
-          rejectedStep: undefined,
         });
-        setSuccessMsg(isCorrection 
-          ? '✅ Corrección enviada. Siguiente: Tomar evidencias (4-8 fotos)' 
+        setSuccessMsg(isCorrection
+          ? correctionSuccessMessage(updated, '✅ Corrección enviada.')
           : '✅ Foto de entrada guardada. Siguiente: Tomar evidencias (4-8 fotos)');
         setCameraActive(false);
       } else {
@@ -555,14 +599,10 @@ const ActivityEvidenceFlow = () => {
       });
 
       if (res.ok) {
-        setFlowData({ 
-          ...flowData, 
-          step: 'SERVICE_SHEET_PDF',
-          reviewStatus: isCorrection ? 'PENDING' : flowData.reviewStatus,
-          rejectedStep: undefined,
-        });
-        setSuccessMsg(isCorrection 
-          ? '✅ Corrección enviada. Siguiente: Carga hoja de servicio PDF' 
+        const updated = await res.json();
+        syncFlowFromSaved(updated);
+        setSuccessMsg(isCorrection
+          ? correctionSuccessMessage(updated, '✅ Corrección enviada.')
           : '✅ Evidencias guardadas. Siguiente: Carga hoja de servicio PDF');
       } else {
         const errorData = await res.json();
@@ -615,15 +655,10 @@ const ActivityEvidenceFlow = () => {
         });
 
         if (res.ok) {
-          setFlowData({ 
-            ...flowData, 
-            step: 'SERVICE_SHEET_DATA', 
-            serviceSheetPdfUrl: pdfUrl,
-            reviewStatus: isCorrection ? 'PENDING' : flowData.reviewStatus,
-            rejectedStep: undefined,
-          });
-          setSuccessMsg(isCorrection 
-            ? '✅ Corrección enviada. Siguiente: Completa la plantilla interna' 
+          const updated = await res.json();
+          syncFlowFromSaved(updated, { serviceSheetPdfUrl: pdfUrl });
+          setSuccessMsg(isCorrection
+            ? correctionSuccessMessage(updated, '✅ Corrección enviada.')
             : '✅ PDF guardado. Siguiente: Completa la plantilla interna');
         } else {
           const errorData = await res.json();
@@ -663,15 +698,10 @@ const ActivityEvidenceFlow = () => {
       });
 
       if (res.ok) {
-        setFlowData({ 
-          ...flowData, 
-          step: 'EXIT_PHOTO', 
-          serviceSheetData: data,
-          reviewStatus: isCorrection ? 'PENDING' : flowData.reviewStatus,
-          rejectedStep: undefined,
-        });
-        setSuccessMsg(isCorrection 
-          ? '✅ Corrección enviada. Siguiente: Toma foto de salida' 
+        const updated = await res.json();
+        syncFlowFromSaved(updated, { serviceSheetData: data });
+        setSuccessMsg(isCorrection
+          ? correctionSuccessMessage(updated, '✅ Corrección enviada.')
           : '✅ Plantilla completada. Siguiente: Toma foto de salida');
       } else {
         const errorData = await res.json();
@@ -747,18 +777,19 @@ const ActivityEvidenceFlow = () => {
       });
 
       if (res.ok) {
-        setFlowData({
-          ...flowData,
-          step: 'COMPLETED',
-          exitPhotoUrl: photoUrl,
-          exitLatitude: latitude,
-          exitLongitude: longitude,
-          reviewStatus: isCorrection ? 'PENDING' : flowData.reviewStatus,
-          rejectedStep: undefined,
+        const saved = await res.json();
+        syncFlowFromSaved(saved, {
+          exitPhotoUrl: saved.exitPhotoUrl || photoUrl,
+          exitLatitude: saved.exitLatitude ?? latitude,
+          exitLongitude: saved.exitLongitude ?? longitude,
         });
-        setSuccessMsg(isCorrection 
-          ? '🎉 ¡Corrección enviada exitosamente! Tu evidencia será revisada nuevamente.' 
-          : '🎉 ¡Asignación completada exitosamente!');
+        if (saved.status === 'COMPLETED') {
+          setSuccessMsg(isCorrection
+            ? '🎉 ¡Corrección enviada exitosamente! Tu evidencia será revisada nuevamente.'
+            : '🎉 ¡Asignación completada! Queda en revisión administrativa.');
+        } else if (isCorrection) {
+          setSuccessMsg(correctionSuccessMessage(saved, '✅ Paso corregido.'));
+        }
         setCameraActive(false);
       } else {
         const errorData = await res.json();
@@ -814,21 +845,19 @@ const ActivityEvidenceFlow = () => {
       )}
 
       {/* Banner de Rechazo */}
-      {flowData.reviewStatus === 'REJECTED' && (flowData.rejectedStep || flowData.reviewNotes) && (
+      {flowData.reviewStatus === 'REJECTED' && (rejectedList.length > 0 || flowData.reviewNotes) && (
         <div className={styles.rejectedBanner}>
           <h3 className={styles.rejectedTitle}>
             <span className={styles.rejectedEmoji}>⚠️</span>
             Tu evidencia fue rechazada
           </h3>
-          {flowData.rejectedStep && (
+          {rejectedList.length > 0 && (
             <div className={styles.rejectedStepRow}>
-              <strong className={styles.rejectedStrong}>Paso rechazado:</strong>{' '}
+              <strong className={styles.rejectedStrong}>
+                {rejectedList.length > 1 ? 'Pasos a corregir:' : 'Paso rechazado:'}
+              </strong>{' '}
               <span className={styles.rejectedStepText}>
-                {flowData.rejectedStep === 'ENTRY_PHOTO' && '📸 Paso 1: Foto de Entrada'}
-                {flowData.rejectedStep === 'EVIDENCE_PHOTOS' && '📷 Paso 2: Fotos de Evidencia'}
-                {flowData.rejectedStep === 'SERVICE_SHEET_PDF' && '📄 Paso 3: PDF Hoja de Servicio'}
-                {flowData.rejectedStep === 'SERVICE_SHEET_DATA' && '📝 Paso 4: Plantilla Interna'}
-                {flowData.rejectedStep === 'EXIT_PHOTO' && '🚪 Paso 5: Foto de Salida'}
+                {rejectedList.map((step) => evidenceStepLabel(step)).join(' · ')}
               </span>
             </div>
           )}
@@ -839,7 +868,7 @@ const ActivityEvidenceFlow = () => {
             </p>
           </div>
           <div className={styles.rejectedHint}>
-            💡 <strong>Instrucciones:</strong> Completa nuevamente el paso rechazado para enviar la corrección.
+            💡 <strong>Instrucciones:</strong> Corrige el paso actual. {rejectedList.length > 1 ? 'Luego podrás corregir los demás pasos indicados.' : 'Al terminar, se enviará nuevamente a revisión.'}
           </div>
         </div>
       )}
@@ -863,7 +892,7 @@ const ActivityEvidenceFlow = () => {
       </div>
 
       {/* PASO 1: Foto de Entrada */}
-      {flowData.step === 'ENTRY_PHOTO' && (
+      {flowData.step === 'ENTRY_PHOTO' && !isFlowLocked && (
         <div className={`${styles.stepCard} ${styles.stepEntry}`}>
           <h3 className={styles.stepTitle}>📸 Paso 1: Foto de Entrada</h3>
           <p className={styles.stepDescription}>
@@ -889,7 +918,7 @@ const ActivityEvidenceFlow = () => {
       )}
 
       {/* PASO 2: Fotos de Evidencia */}
-      {flowData.step === 'EVIDENCE_PHOTOS' && (
+      {flowData.step === 'EVIDENCE_PHOTOS' && !isFlowLocked && (
         <div className={`${styles.stepCard} ${styles.stepEvidence}`}>
           <h3 className={styles.stepTitle}>
             {isInventoryFlow
@@ -1083,7 +1112,7 @@ const ActivityEvidenceFlow = () => {
       )}
 
       {/* PASO 3: PDF */}
-      {flowData.step === 'SERVICE_SHEET_PDF' && (
+      {flowData.step === 'SERVICE_SHEET_PDF' && !isFlowLocked && (
         <div className={`${styles.stepCard} ${styles.stepPdf}`}>
           <h3 className={styles.stepTitle}>📄 Paso 3: Hoja de Servicio (PDF)</h3>
           <p className={styles.stepDescription}>
@@ -1185,7 +1214,7 @@ const ActivityEvidenceFlow = () => {
       )}
 
       {/* PASO 4: Plantilla Interna */}
-      {flowData.step === 'SERVICE_SHEET_DATA' && (
+      {flowData.step === 'SERVICE_SHEET_DATA' && !isFlowLocked && (
         <div className={`${styles.stepCard} ${styles.stepData}`}>
           <h3 className={styles.stepTitle}>📝 Paso 4: Plantilla Interna</h3>
           <p className={styles.stepDescription}>
@@ -1196,12 +1225,17 @@ const ActivityEvidenceFlow = () => {
       )}
 
       {/* PASO 5: Foto de Salida */}
-      {flowData.step === 'EXIT_PHOTO' && (
+      {flowData.step === 'EXIT_PHOTO' && !isFlowLocked && (
         <div className={`${styles.stepCard} ${styles.stepExit}`}>
           <h3 className={styles.stepTitle}>🚪 Paso 5: Foto de Salida</h3>
           <p className={styles.stepDescription}>
-            Toma la foto de salida. Debe ser capturada en el momento actual.
+            Toma la foto de salida en el sitio. Se capturará automáticamente tu ubicación GPS — es obligatoria para cerrar la actividad.
           </p>
+          {flowData.exitLatitude != null && flowData.exitLongitude != null && (
+            <p className={styles.stepDescription}>
+              📍 Última ubicación registrada: {Number(flowData.exitLatitude).toFixed(5)}, {Number(flowData.exitLongitude).toFixed(5)}
+            </p>
+          )}
           <div className={styles.actionGrid}>
             <button
               className={`${styles.actionButton} ${styles.actionPrimary} ${styles.actionExit}`}
@@ -1224,20 +1258,26 @@ const ActivityEvidenceFlow = () => {
       {/* COMPLETADO */}
       {flowData.step === 'COMPLETED' && (
         <div className={styles.completedCard}>
-          <h2 className={styles.completedTitle}>🎉 ¡Asignación Completada Exitosamente!</h2>
+          <h2 className={styles.completedTitle}>
+            {isFlowLocked ? '⏳ Evidencias enviadas a revisión' : '🎉 ¡Asignación Completada Exitosamente!'}
+          </h2>
           <p className={styles.completedText}>
-            Todos los pasos han sido completados correctamente. Los 5 pasos se encuentran guardados en el sistema.
+            {isFlowLocked
+              ? 'Los 5 pasos están guardados. Un administrador debe aprobar o rechazar antes de que puedas modificar algo.'
+              : 'Todos los pasos han sido completados correctamente. Los 5 pasos se encuentran guardados en el sistema.'}
           </p>
-          <button
-            className={styles.completedButton}
-            onClick={() => {
-              setFlowData(null);
-              setSelectedActivityId('');
-              setSuccessMsg(null);
-            }}
-          >
-            ↻ Seleccionar Otra Actividad
-          </button>
+          {!isFlowLocked && (
+            <button
+              className={styles.completedButton}
+              onClick={() => {
+                setFlowData(null);
+                setSelectedActivityId('');
+                setSuccessMsg(null);
+              }}
+            >
+              ↻ Seleccionar Otra Actividad
+            </button>
+          )}
         </div>
       )}
     </div>
