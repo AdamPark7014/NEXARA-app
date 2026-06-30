@@ -118,7 +118,9 @@ async function getWithApiCache(abs: string, nativeExec: () => Promise<Response>)
   } catch {
     const hit = await readApiGetCache(abs, tag);
     if (hit) return responseFromApiCache(hit, true);
-    throw new Error("Sin conexión y sin copia local de esta consulta.");
+    throw new Error(
+      "No se pudo contactar la API. Comprueba que nexara-api esté activo o recarga con Ctrl+F5.",
+    );
   }
 }
 

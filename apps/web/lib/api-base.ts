@@ -21,6 +21,10 @@ const normalizeSocketOrigin = (baseUrl: string) => {
   }
 };
 
+function isNexaraPanelHost(host: string): boolean {
+  return host.endsWith(".nexara.com.mx") && host !== "api.nexara.com.mx";
+}
+
 export const getApiBase = () => {
   // Server-side: use internal Docker network URL if set (avoids hairpin NAT through Traefik)
   if (typeof window === "undefined") {
@@ -35,6 +39,13 @@ export const getApiBase = () => {
   if (typeof window !== "undefined" && window.location?.origin) {
     const originHost = window.location.hostname.toLowerCase();
     const currentOrigin = window.location.origin;
+    const pageProtocol = window.location.protocol;
+
+    // Traefik enruta /api al backend en el mismo host del panel (ops, core, etc.).
+    if (isNexaraPanelHost(originHost)) {
+      return `${currentOrigin}/api`;
+    }
+
     const isLocalOrigin =
       originHost === "localhost" ||
       originHost === "127.0.0.1" ||
@@ -55,9 +66,15 @@ export const getApiBase = () => {
         try {
           const envUrl = new URL(normalizedEnvBase);
           const isSameOriginApi = envUrl.origin === currentOrigin;
+          const isMixedContent = pageProtocol === "https:" && envUrl.protocol === "http:";
 
-          if (isSameOriginApi) return normalizedEnvBase;
-          if (allowCrossOriginApi) return normalizedEnvBase;
+          if (isMixedContent) {
+            // Evita bloqueo del navegador (HTTPS → HTTP) que parece "sin conexión".
+          } else if (isSameOriginApi) {
+            return normalizedEnvBase;
+          } else if (allowCrossOriginApi) {
+            return normalizedEnvBase;
+          }
         } catch {
           // Keep fallback to same-origin /api when parsing fails.
         }
@@ -143,6 +160,13 @@ export const getApiAssetOrigin = () => {
 };
 
 export const getSocketBaseUrl = () => {
+  if (typeof window !== "undefined" && window.location?.origin) {
+    const host = window.location.hostname.toLowerCase();
+    if (isNexaraPanelHost(host)) {
+      return window.location.origin;
+    }
+  }
+
   const envSocket = process.env.NEXT_PUBLIC_SOCKET_URL;
   if (envSocket && envSocket.trim()) {
     return normalizeSocketOrigin(envSocket.trim().replace(/\/+$/, ''));

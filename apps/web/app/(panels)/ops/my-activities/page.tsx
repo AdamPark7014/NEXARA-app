@@ -139,10 +139,9 @@ export default function MyActivitiesPage() {
     if (!token || !user?.id) return;
     setEvLoading(true);
     try {
-      const data = await apiFetch("evidences?limit=60", token);
+      const data = await apiFetch("activity-evidence/history", token);
       const rows = Array.isArray(data) ? data : (data?.data ?? []);
-      const mine = rows.filter((e: EvidenceRow) => e.userId === user.id);
-      setEvidences(mine);
+      setEvidences(rows);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar tus evidencias");
     } finally { setEvLoading(false); }
