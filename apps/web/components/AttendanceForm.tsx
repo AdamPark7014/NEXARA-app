@@ -169,7 +169,6 @@ const AttendanceForm = () => {
       setTimeout(() => {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          console.log('✅ Stream de cámara asignado al video element');
         }
       }, 100);
     } catch (err) {
@@ -223,13 +222,6 @@ const AttendanceForm = () => {
 
       // Usar calidad baja (0.4 = 40% de calidad) para reducir tamaño
       const photoBase64 = canvasRef.current.toDataURL('image/jpeg', 0.4);
-      console.log('📸 Foto capturada y comprimida:', {
-        type: cameraType,
-        originalSize: videoWidth + 'x' + videoHeight,
-        compressedSize: destWidth + 'x' + destHeight,
-        base64Length: photoBase64.length,
-        dataSize: (photoBase64.length / 1024).toFixed(2) + ' KB',
-      });
       closeCamera();
 
       // Registrar con foto
@@ -470,7 +462,6 @@ const AttendanceForm = () => {
           });
           latitude = position.coords.latitude;
           longitude = position.coords.longitude;
-          console.log('📍 GPS obtenido:', { latitude, longitude });
         } catch (gpsErr) {
           // Si no puede obtener GPS, continúa sin él
           console.warn('⚠️ No se pudo obtener ubicación GPS:', gpsErr);
@@ -485,12 +476,6 @@ const AttendanceForm = () => {
         longitude,
       };
 
-      console.log('📤 Enviando registro de asistencia:', {
-        type: tipo,
-        hasPhoto: !!photoBase64,
-        photoSize: photoBase64?.length || 0,
-        hasGPS: !!(latitude && longitude),
-      });
 
       const res = await fetch(buildApiUrl('attendance'), {
         method: 'POST',
@@ -499,7 +484,6 @@ const AttendanceForm = () => {
       });
       const data = await res.json().catch(() => ({}));
       
-      console.log('📥 Respuesta del servidor:', data);
       
       if (!res.ok) {
         throw new Error(data.message || 'Error al registrar asistencia');
@@ -538,11 +522,9 @@ const AttendanceForm = () => {
             startTimeStr: newStartTime.toISOString(),
             date: selectedDate,
           }));
-          console.log('💾 Timer guardado en localStorage:', newStartTime.toISOString());
         } else {
           setStartTime(null);
           localStorage.removeItem(STORAGE_KEY);
-          console.log('🧹 Timer limpiado de localStorage');
         }
       } else if (tipo === 'entrada' && isToday(selectedDate)) {
         const newStartTime = new Date();
@@ -552,25 +534,20 @@ const AttendanceForm = () => {
           startTimeStr: newStartTime.toISOString(),
           date: selectedDate,
         }));
-        console.log('💾 Timer guardado en localStorage:', newStartTime.toISOString());
       } else if (tipo === 'salida') {
         setStartTime(null);
         localStorage.removeItem(STORAGE_KEY);
-        console.log('🧹 Timer limpiado de localStorage (salida registrada)');
       }
 
       await refreshSelectedDateAttendance();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('attendance:updated'));
+      }
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
       } else {
         setError('Error desconocido');
-      }
-      if (tipo === 'salida') {
-        setStartTime(null);
-        setOpenSession(null);
-        localStorage.removeItem(STORAGE_KEY);
-        void refreshSelectedDateAttendance();
       }
     } finally {
       setLoading(false);
@@ -580,7 +557,10 @@ const AttendanceForm = () => {
   const hasEntryToday = history.some((h) => h.type === 'entrada');
   const hasExitToday = history.some((h) => h.type === 'salida');
   const canRegisterEntry = isToday(selectedDate) && !hasEntryToday && !openSession;
-  const canRegisterExit = isToday(selectedDate) && Boolean(openSession) && !hasExitToday;
+  const canRegisterExit = isToday(selectedDate) && Boolean(openSession);
+  const openSessionFromPriorDay = Boolean(
+    openSession?.lastEntryAt && !isToday(toLocalDateKey(new Date(openSession.lastEntryAt))),
+  );
 
   return (
     <div className={styles.root}>
@@ -658,7 +638,7 @@ const AttendanceForm = () => {
             className={`button-primary ${styles.flexGrow} ${(loading || !canRegisterExit) ? styles.btnDisabledVisual : ''}`} 
             onClick={() => openCamera('salida')} 
             disabled={loading || !canRegisterExit}
-            title={!openSession ? 'Debes tener una entrada abierta' : (hasExitToday ? 'Ya has registrado salida hoy' : '')}
+            title={!openSession ? 'Debes tener una entrada abierta' : ''}
           >
             Registrar Salida del Día
           </button>
@@ -668,9 +648,17 @@ const AttendanceForm = () => {
             <strong>Tiempo transcurrido:</strong> {formatElapsed(elapsed)}
           </div>
         )}
-        {isToday(selectedDate) && openSession && !hasExitToday && (
+        {isToday(selectedDate) && openSession && (
           <div className={styles.infoAlert}>
-            ✓ <strong>Jornada abierta.</strong> Estás dentro. Registra salida para cerrar.
+            {openSessionFromPriorDay ? (
+              <>
+                ⚠️ <strong>Jornada abierta desde el día anterior.</strong> Registra salida para cerrarla.
+              </>
+            ) : (
+              <>
+                ✓ <strong>Jornada abierta.</strong> Estás dentro. Registra salida para cerrar.
+              </>
+            )}
           </div>
         )}
         {isToday(selectedDate) && history.some(h => h.type === 'entrada') && history.some(h => h.type === 'salida') && (
