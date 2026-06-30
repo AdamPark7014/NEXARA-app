@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { saveBase64Photo } from '../../common/file-upload.util';
 import { ActivitiesService } from '../activities.service.js';
@@ -103,7 +104,7 @@ export class ActivityEvidenceService {
       evidencePhotosUploadedAt: null,
       serviceSheetPdfUrl: null,
       serviceSheetUploadedAt: null,
-      serviceSheetData: null,
+      serviceSheetData: Prisma.DbNull,
       serviceSheetCompletedAt: null,
       exitPhotoUrl: null,
       exitLatitude: null,
