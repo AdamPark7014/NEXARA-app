@@ -100,11 +100,11 @@ export default function StudioDashboardPage() {
         }
         actions={
           <>
-            <Link href="/studio/cases" style={{ textDecoration: "none" }}>
-              <Button variant="secondary" iconLeft="🏆">Nuevo caso</Button>
+            <Link href="/studio/leads" style={{ textDecoration: "none" }}>
+              <Button variant="secondary" iconLeft="✨">Nuevo lead</Button>
             </Link>
-            <Link href="/studio/social" style={{ textDecoration: "none" }}>
-              <Button variant="primary" iconLeft="✏️" iconRight="→">Crear post</Button>
+            <Link href="/studio/pages" style={{ textDecoration: "none" }}>
+              <Button variant="primary" iconLeft="🌐" iconRight="→">Gestionar sitio</Button>
             </Link>
           </>
         }
@@ -139,6 +139,24 @@ export default function StudioDashboardPage() {
           icon="📝"
           variant="default"
         />
+      </div>
+
+      {/* ── Módulos Studio ────────────────────────────────────────── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginBottom: 24 }}>
+        {[
+          { href: "/studio/pages", icon: "🌐", label: "Páginas web", desc: "Gestión del sitio público" },
+          { href: "/studio/leads", icon: "✨", label: "Leads digitales", desc: "Contactos del sitio web" },
+          { href: "/studio/contacts", icon: "📇", label: "Contactos", desc: "Directorio de contactos" },
+          { href: "/studio/newsletter", icon: "📬", label: "Newsletter", desc: "Campañas de email" },
+        ].map((m) => (
+          <Link key={m.href} href={m.href} style={{ textDecoration: "none", color: "var(--text-primary)", padding: "14px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, display: "flex", alignItems: "center", gap: 10, boxShadow: "var(--nx-panel-elev-1)" }}>
+            <span style={{ fontSize: 20, width: 36, height: 36, borderRadius: 9, background: "color-mix(in srgb, var(--primary) 12%, var(--surface))", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{m.icon}</span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{m.label}</div>
+              <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>{m.desc}</div>
+            </div>
+          </Link>
+        ))}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 }}>
@@ -202,8 +220,8 @@ export default function StudioDashboardPage() {
             </div>
           )}
           <div style={{ marginTop: 12, textAlign: "right" }}>
-            <Link href="/studio/social" style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600 }}>
-              Ver todos los posts →
+            <Link href="/studio/newsletter" style={{ fontSize: 12, color: "var(--primary)", fontWeight: 600 }}>
+              Ver newsletter →
             </Link>
           </div>
         </Section>
