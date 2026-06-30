@@ -20,8 +20,10 @@ export type UserAccessInput = {
 /** Resuelve el roleKey RBAC v2 efectivo del usuario. */
 export function resolveV2RoleKey(user: UserAccessInput | null | undefined): RoleKey | null {
   if (!user) return null;
-  if (user.isSuperAdmin) return ROLES.SUPER_ADMIN;
+  // isPlatformOwner toma precedencia: el dueño de la plataforma siempre es CEO
+  // aunque tenga isSuperAdmin = true en la BD (caso gerencia@nexara.com.mx).
   if (resolveIsPlatformOwner(user)) return ROLES.CEO;
+  if (user.isSuperAdmin) return ROLES.SUPER_ADMIN;
 
   const direct = user.roleKey;
   if (direct && V2_ROLE_KEYS.has(direct)) return direct as RoleKey;
