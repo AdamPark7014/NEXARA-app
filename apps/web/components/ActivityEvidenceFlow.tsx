@@ -1,6 +1,6 @@
 "use client";
 import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useUser } from './UserContext';
 import styles from './ActivityEvidenceFlow.module.css';
 import { io, Socket } from 'socket.io-client';
@@ -1255,100 +1255,140 @@ const ProgressStep = ({ step, active, completed, label }: { step: number; active
 );
 
 // Formulario de plantilla interna
-// Pad de firma digital (mouse + touch)
+// Pad de firma digital (mouse + touch + stylus)
 const SignaturePad = ({ onSignature, disabled, initialValue }: { onSignature: (dataUrl: string | null) => void; disabled: boolean; initialValue?: string | null }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawing = useRef(false);
   const lastPos = useRef({ x: 0, y: 0 });
+  const savedDataUrl = useRef<string | null>(initialValue ?? null);
   const onSigRef = useRef(onSignature);
   const disabledRef = useRef(disabled);
   useEffect(() => { onSigRef.current = onSignature; });
   useEffect(() => { disabledRef.current = disabled; });
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
-
-    const getPos = (e: MouseEvent | TouchEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      if ('touches' in e && e.touches.length > 0) {
-        return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
-      }
-      return { x: (e as MouseEvent).clientX - rect.left, y: (e as MouseEvent).clientY - rect.top };
-    };
-
-    const onStart = (e: MouseEvent | TouchEvent) => {
-      if (disabledRef.current) return;
-      e.preventDefault();
-      isDrawing.current = true;
-      lastPos.current = getPos(e);
-    };
-
-    const onMove = (e: MouseEvent | TouchEvent) => {
-      if (!isDrawing.current) return;
-      e.preventDefault();
-      const ctx = canvas.getContext('2d')!;
-      const pos = getPos(e);
-      ctx.beginPath();
-      ctx.moveTo(lastPos.current.x, lastPos.current.y);
-      ctx.lineTo(pos.x, pos.y);
-      ctx.strokeStyle = '#1a2e4a';
-      ctx.lineWidth = 2.5;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.stroke();
-      lastPos.current = pos;
-      onSigRef.current(canvas.toDataURL('image/png'));
-    };
-
-    const onEnd = () => { isDrawing.current = false; };
-
-    canvas.addEventListener('mousedown', onStart);
-    canvas.addEventListener('mousemove', onMove);
-    canvas.addEventListener('mouseup', onEnd);
-    canvas.addEventListener('mouseleave', onEnd);
-    canvas.addEventListener('touchstart', onStart, { passive: false });
-    canvas.addEventListener('touchmove', onMove, { passive: false });
-    canvas.addEventListener('touchend', onEnd);
-
-    return () => {
-      canvas.removeEventListener('mousedown', onStart);
-      canvas.removeEventListener('mousemove', onMove);
-      canvas.removeEventListener('mouseup', onEnd);
-      canvas.removeEventListener('mouseleave', onEnd);
-      canvas.removeEventListener('touchstart', onStart);
-      canvas.removeEventListener('touchmove', onMove);
-      canvas.removeEventListener('touchend', onEnd);
-    };
+  const syncCanvasSize = useCallback((canvas: HTMLCanvasElement) => {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.floor(rect.width * dpr));
+    canvas.height = Math.max(1, Math.floor(rect.height * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.strokeStyle = '#1a2e4a';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    return { ctx, rect };
   }, []);
 
+  const paintImage = useCallback((dataUrl: string) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const setup = syncCanvasSize(canvas);
+    if (!setup) return;
+    const { ctx } = setup;
+    const image = new Image();
+    image.onload = () => {
+      if (isDrawing.current) return;
+      const rect = canvas.getBoundingClientRect();
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      const ratio = Math.min(rect.width / image.width, rect.height / image.height);
+      const width = image.width * ratio;
+      const height = image.height * ratio;
+      const offsetX = (rect.width - width) / 2;
+      const offsetY = (rect.height - height) / 2;
+      ctx.drawImage(image, offsetX, offsetY, width, height);
+    };
+    image.src = dataUrl;
+  }, [syncCanvasSize]);
+
+  // Solo hidratar firma externa al montar o cuando cambia desde fuera (no durante el trazo)
+  useEffect(() => {
+    if (isDrawing.current) return;
+    if (!initialValue) return;
+    if (initialValue === savedDataUrl.current) return;
+    savedDataUrl.current = initialValue;
+    paintImage(initialValue);
+  }, [initialValue, paintImage]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const context = canvas.getContext('2d');
-    if (!context) return;
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    if (!initialValue) return;
 
-    const image = new Image();
-    image.onload = () => {
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      const ratio = Math.min(canvas.width / image.width, canvas.height / image.height);
-      const width = image.width * ratio;
-      const height = image.height * ratio;
-      const offsetX = (canvas.width - width) / 2;
-      const offsetY = (canvas.height - height) / 2;
-      context.drawImage(image, offsetX, offsetY, width, height);
+    syncCanvasSize(canvas);
+    if (savedDataUrl.current) paintImage(savedDataUrl.current);
+
+    const getPos = (clientX: number, clientY: number) => {
+      const rect = canvas.getBoundingClientRect();
+      return { x: clientX - rect.left, y: clientY - rect.top };
     };
-    image.src = initialValue;
-  }, [initialValue]);
+
+    const emitSignature = () => {
+      const dataUrl = canvas.toDataURL('image/png');
+      savedDataUrl.current = dataUrl;
+      onSigRef.current(dataUrl);
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (disabledRef.current) return;
+      e.preventDefault();
+      canvas.setPointerCapture(e.pointerId);
+      isDrawing.current = true;
+      const pos = getPos(e.clientX, e.clientY);
+      lastPos.current = pos;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (!isDrawing.current) return;
+      e.preventDefault();
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      const pos = getPos(e.clientX, e.clientY);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+      lastPos.current = pos;
+    };
+
+    const endStroke = (e: PointerEvent) => {
+      if (!isDrawing.current) return;
+      isDrawing.current = false;
+      if (canvas.hasPointerCapture(e.pointerId)) {
+        canvas.releasePointerCapture(e.pointerId);
+      }
+      emitSignature();
+    };
+
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerup', endStroke);
+    canvas.addEventListener('pointercancel', endStroke);
+
+    const onResize = () => {
+      if (isDrawing.current) return;
+      syncCanvasSize(canvas);
+      if (savedDataUrl.current) paintImage(savedDataUrl.current);
+    };
+    window.addEventListener('resize', onResize);
+
+    return () => {
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      canvas.removeEventListener('pointerup', endStroke);
+      canvas.removeEventListener('pointercancel', endStroke);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [paintImage, syncCanvasSize]);
 
   const clear = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    canvas.getContext('2d')!.clearRect(0, 0, canvas.width, canvas.height);
+    const rect = canvas.getBoundingClientRect();
+    canvas.getContext('2d')!.clearRect(0, 0, rect.width, rect.height);
+    savedDataUrl.current = null;
     onSigRef.current(null);
   };
 
@@ -1508,7 +1548,7 @@ const ServiceSheetForm = ({ onSubmit, loading, initialData }: { onSubmit: (data:
         <SignaturePad
           onSignature={(sig) => setData((prev) => ({ ...prev, managerSignature: sig }))}
           disabled={loading}
-          initialValue={data.managerSignature}
+          initialValue={initialData?.managerSignature}
         />
       </div>
 
