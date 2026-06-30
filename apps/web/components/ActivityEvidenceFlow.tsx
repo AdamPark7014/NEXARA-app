@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "@/components/Toast";
 import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
 import {
   evidenceStepLabel,
@@ -9,6 +10,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useUser } from './UserContext';
 import styles from './ActivityEvidenceFlow.module.css';
 import { io, Socket } from 'socket.io-client';
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 interface ActivityOption {
   id: number;
@@ -93,6 +95,7 @@ type ServiceSheetFormData = {
 const ActivityEvidenceFlow = () => {
   const { user } = useUser();
   const [actividades, setActividades] = useState<ActivityOption[]>([]);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [selectedActivityId, setSelectedActivityId] = useState<number | ''>('');
   const [flowData, setFlowData] = useState<EvidenceFlowData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -715,7 +718,7 @@ const ActivityEvidenceFlow = () => {
   };
 
   // Paso 5: Foto de salida
-  const handleExitPhoto = async () => {
+  const handleExitPhoto = async (forceInventoryConfirmed = false) => {
     if (!flowData) return;
     setLoading(true);
     setError(null);
@@ -723,14 +726,13 @@ const ActivityEvidenceFlow = () => {
     try {
       if (isInventoryFlow) {
         const delta = inventoryItems.length - inventoryPreviousCount;
-        if (delta !== 0) {
-          const proceed = window.confirm(
-            `Se detectaron ${Math.abs(delta)} equipos ${delta > 0 ? 'de más' : 'de menos'} vs inventario previo. ¿Deseas guardar de todos modos?`,
-          );
-          if (!proceed) {
-            setLoading(false);
-            return;
-          }
+        if (delta !== 0 && !forceInventoryConfirmed) {
+          setLoading(false);
+          setConfirmState({
+            message: `Se detectaron ${Math.abs(delta)} equipos ${delta > 0 ? 'de más' : 'de menos'} vs inventario previo. ¿Deseas guardar de todos modos?`,
+            fn: async () => { await handleExitPhoto(true); },
+          });
+          return;
         }
 
         const syncRes = await fetch(buildApiUrl(`inventories/activity/${flowData.activityId}/sync`), {
@@ -832,6 +834,7 @@ const ActivityEvidenceFlow = () => {
   // Mostrar paso actual
   return (
     <div className={`card ${styles.flowCard}`}>
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
       {error && (
         <div className={styles.alertError}>
           ❌ {error}
@@ -1239,7 +1242,7 @@ const ActivityEvidenceFlow = () => {
           <div className={styles.actionGrid}>
             <button
               className={`${styles.actionButton} ${styles.actionPrimary} ${styles.actionExit}`}
-              onClick={handleExitPhoto}
+              onClick={() => void handleExitPhoto()}
               disabled={loading}
             >
               {loading ? '⏳ Capturando...' : '📷 Salida'}
@@ -1486,7 +1489,7 @@ const ServiceSheetForm = ({ onSubmit, loading, initialData }: { onSubmit: (data:
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!data.managerSignature) {
-      alert('La firma del gerente es obligatoria');
+      toast.error('La firma del gerente es obligatoria');
       return;
     }
     onSubmit(data);

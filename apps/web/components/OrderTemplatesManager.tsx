@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useUser } from '@/components/UserContext';
 import styles from './OrderTemplatesManager.module.css';
 import { io, Socket } from 'socket.io-client';
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 type TemplateSections = {
   showClientInfo: boolean;
@@ -136,6 +137,7 @@ export default function OrderTemplatesManager() {
   const { user } = useUser();
 
   const [templates, setTemplates] = useState<OrderTemplate[]>([]);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -285,21 +287,22 @@ export default function OrderTemplatesManager() {
     }
   };
 
-  const removeTemplate = async (id: number) => {
+  const removeTemplate = (id: number) => {
     if (!user?.token) return;
-    if (!window.confirm('¿Eliminar esta plantilla?')) return;
-    try {
-      const res = await fetch(buildApiUrl(`ventas/order-templates/${id}`), {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload?.message || 'No se pudo eliminar la plantilla');
-      setInfo('Plantilla eliminada.');
-      await fetchTemplates();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error eliminando plantilla');
-    }
+    setConfirmState({ message: '¿Eliminar esta plantilla?', fn: async () => {
+      try {
+        const res = await fetch(buildApiUrl(`ventas/order-templates/${id}`), {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${user.token}` },
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(payload?.message || 'No se pudo eliminar la plantilla');
+        setInfo('Plantilla eliminada.');
+        await fetchTemplates();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error eliminando plantilla');
+      }
+    } });
   };
 
   const setAsDefault = async (id: number) => {
@@ -342,6 +345,8 @@ export default function OrderTemplatesManager() {
   if (loading) return <div className={styles.loading}>Cargando plantillas de cotización...</div>;
 
   return (
+    <>
+    <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     <div className={styles.container}>
       <div className={styles.header}>
         <div className={styles.titleBlock}>
@@ -514,5 +519,6 @@ export default function OrderTemplatesManager() {
         </div>
       )}
     </div>
+    </>
   );
 }

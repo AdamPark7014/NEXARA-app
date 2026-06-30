@@ -9,6 +9,7 @@ import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { filterRowsByScope, getCrmSalesSectionConfig } from "@/lib/section-views";
+import { toast } from "@/components/Toast";
 import {
   createSalesLead,
   createSalesOpportunity,
@@ -41,6 +42,7 @@ export default function LeadsPage() {
 
   const [items, setItems] = useState<SalesLead[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<SalesLead | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
@@ -53,10 +55,11 @@ export default function LeadsPage() {
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
+    setLoadError(null);
     try {
       setItems(await listSalesLeads(token));
-    } catch {
-      /* skip */
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "No se pudieron cargar los datos");
     } finally {
       setLoading(false);
     }
@@ -110,7 +113,7 @@ export default function LeadsPage() {
       }
       setShowForm(false);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "No se pudo guardar el lead");
+      toast.error(e instanceof Error ? e.message : "No se pudo guardar el lead");
     }
   };
 
@@ -151,7 +154,7 @@ export default function LeadsPage() {
       const updated = await updateSalesLead(token, id, { status });
       setItems((prev) => prev.map((l) => (l.id === id ? { ...l, ...updated } : l)));
     } catch (e) {
-      alert(e instanceof Error ? e.message : "No se pudo actualizar el estado");
+      toast.error(e instanceof Error ? e.message : "No se pudo actualizar el estado");
     }
   };
 
@@ -307,7 +310,7 @@ export default function LeadsPage() {
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
         ) : (
-          <DataTable columns={columns} rows={visibleItems} rowKey={(l) => l.id} emptyTitle="Sin leads" emptyDescription="Agrega el primer lead." />
+          <DataTable columns={columns} rows={visibleItems} rowKey={(l) => l.id} emptyTitle={loadError ? `⚠ ${loadError}` : "Sin leads"} emptyDescription="Agrega el primer lead." />
         )}
       </Section>
 

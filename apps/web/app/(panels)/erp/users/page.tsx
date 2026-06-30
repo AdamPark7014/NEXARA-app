@@ -21,6 +21,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { toast } from "@/components/Toast";
 
 /* ─── tipos ─────────────────────────────────────────────────────────── */
 interface ApiUser {
@@ -285,7 +286,7 @@ export default function UsersPage() {
       await apiFetch(`users/${u.id}/hr`, token, { method: "PATCH", body: JSON.stringify({ isActive: !u.isActive }) });
       setUsers(prev => prev.map(x => x.id === u.id ? { ...x, isActive: !u.isActive } : x));
     } catch (e) {
-      alert(formatApiError(e, "No se pudo cambiar el estado"));
+      toast.error(formatApiError(e, "No se pudo cambiar el estado"));
     }
   } });
   };
@@ -296,7 +297,7 @@ export default function UsersPage() {
       await apiFetch(`users/${u.id}`, token, { method: "DELETE" });
       setUsers(prev => prev.filter(x => x.id !== u.id));
     } catch (e) {
-      alert(`Error al eliminar: ${e instanceof Error ? e.message : "desconocido"}`);
+      toast.error(`Error al eliminar: ${e instanceof Error ? e.message : "desconocido"}`);
     }
   } });
   };
@@ -312,12 +313,25 @@ export default function UsersPage() {
     };
   }, [users]);
 
+  const [userSearch, setUserSearch] = useState("");
+
   const visibleUsers = useMemo(() => {
-    if (!highlightId) return users;
-    const id = Number(highlightId);
-    if (Number.isNaN(id)) return users;
-    return [...users].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
-  }, [users, highlightId]);
+    let list = users;
+    if (highlightId) {
+      const id = Number(highlightId);
+      if (!Number.isNaN(id)) list = [...list].sort((a, b) => (a.id === id ? -1 : b.id === id ? 1 : 0));
+    }
+    const q = userSearch.trim().toLowerCase();
+    if (q) {
+      list = list.filter((u) =>
+        u.nombre.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        (u.role?.nombre ?? "").toLowerCase().includes(q) ||
+        (u.department?.nombre ?? "").toLowerCase().includes(q),
+      );
+    }
+    return list;
+  }, [users, highlightId, userSearch]);
 
   /* ── columnas ────────────────────────────────────────────────────── */
   const columns: Column<ApiUser>[] = [
@@ -405,6 +419,12 @@ export default function UsersPage() {
       )}
 
       <Section title={loading ? "Cargando…" : `${visibleUsers.length} usuarios`}>
+        <input
+          value={userSearch}
+          onChange={(e) => setUserSearch(e.target.value)}
+          placeholder="Buscar por nombre, email, rol o área…"
+          style={{ width: "100%", maxWidth: 400, padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--foreground)", fontSize: 13, marginBottom: 16, boxSizing: "border-box" }}
+        />
         {highlightId && (
           <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 12 }}>
             Mostrando usuario <strong>#{highlightId}</strong> desde enlace directo.

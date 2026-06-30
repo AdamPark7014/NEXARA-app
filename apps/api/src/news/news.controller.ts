@@ -12,8 +12,12 @@ import {
   Query,
   Res,
   UploadedFiles,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { RBAC, RbacGuard } from '../common/rbac.guard.js';
+import { PERMISSIONS } from '../common/permissions.js';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import * as path from 'path';
@@ -43,6 +47,8 @@ export class NewsController {
   constructor(private readonly newsService: NewsService) {}
 
   @Post()
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'coverImage', maxCount: 1 },
@@ -100,6 +106,8 @@ export class NewsController {
   }
 
   @Put(':id')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() payload: UpdateNewsPostDto,
@@ -108,6 +116,8 @@ export class NewsController {
   }
 
   @Delete(':id')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.newsService.remove(id);
   }

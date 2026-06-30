@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "@/components/Toast";
 import React, { useEffect, useMemo, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { useUser } from "./UserContext";
@@ -501,7 +502,7 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
       setExcelUrl(url);
       setExcelBlob(blob);
     } catch {
-      alert("Error al exportar");
+      toast.error("Error al exportar");
     } finally {
       setExcelPreparing(false);
     }
@@ -547,7 +548,7 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
   const handlePreviewTicketPdf = async (evi: Evidence) => {
     const activityId = evi.actividad?.id;
     if (!activityId) {
-      alert("No se encontró la actividad asociada para generar el PDF.");
+      toast.error("No se encontró la actividad asociada para generar el PDF.");
       return;
     }
     setPdfLoadingId(evi.id);
@@ -563,7 +564,7 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
       setPreviewPdfName(buildReportFileName(evi));
       setShowPdfViewer(true);
     } catch {
-      alert("No se pudo abrir la vista previa del PDF.");
+      toast.error("No se pudo abrir la vista previa del PDF.");
     } finally {
       setPdfLoadingId((current) => (current === evi.id ? null : current));
     }
@@ -643,7 +644,7 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
   const handlePreviewBulkPdfReport = async () => {
     if (bulkReportLoading) return;
     if (!bulkCandidates.length) {
-      alert("No hay tickets con actividad válida para descargar.");
+      toast.error("No hay tickets con actividad válida para descargar.");
       return;
     }
 
@@ -678,7 +679,7 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
       setShowBulkPdfModal(false);
       setShowPdfViewer(true);
     } catch {
-      alert("No se pudo generar el PDF consolidado.");
+      toast.error("No se pudo generar el PDF consolidado.");
     } finally {
       setBulkReportLoading(false);
     }
@@ -713,12 +714,12 @@ const EvidenceTable: React.FC<{ mode?: "admin" | "user"; title?: string | null }
     if (!user?.token) return;
     const isPendingReview = (evi.estatus || "").toLowerCase() === "pendiente";
     if (!isPendingReview) {
-      alert("Esta evidencia ya fue revisada y no puede volver a cambiarse.");
+      toast.error("Esta evidencia ya fue revisada y no puede volver a cambiarse.");
       return;
     }
     const activityId = evi.actividad?.id;
     if (!activityId || !user?.id) {
-      alert("No se encontró la actividad para revisar esta evidencia.");
+      toast.error("No se encontró la actividad para revisar esta evidencia.");
       return;
     }
 

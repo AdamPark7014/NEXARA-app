@@ -10,6 +10,7 @@ import { useUser } from "@/components/UserContext";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { toast } from "@/components/Toast";
 
 interface SettingRow {
   key: string;
@@ -97,7 +98,7 @@ export default function SettingsPage() {
     try {
       await apiFetch(`settings/${s.key}`, token, { method: "DELETE" });
       setSettings((prev) => prev.filter((x) => x.key !== s.key));
-    } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+    } catch (e) { toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
   } });
   };
 

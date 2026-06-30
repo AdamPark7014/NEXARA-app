@@ -10,7 +10,6 @@ export const registeredServiceWorker = async () => {
       scope: '/',
     });
 
-    console.log('✓ Service Worker registrado:', registration);
     return true;
   } catch (error) {
     console.error('✗ Error registrando Service Worker:', error);
@@ -25,14 +24,12 @@ export const requestNotificationPermission = async () => {
   }
 
   if (Notification.permission === 'granted') {
-    console.log('✓ Permisos de notificación ya concedidos');
     return true;
   }
 
   if (Notification.permission !== 'denied') {
     try {
       const permission = await Notification.requestPermission();
-      console.log('Permiso de notificación:', permission);
       return permission === 'granted';
     } catch (error) {
       console.error('Error solicitando permiso de notificación:', error);

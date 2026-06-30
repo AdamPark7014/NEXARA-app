@@ -1,6 +1,17 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
+import { promises as fs } from 'fs';
+import * as path from 'path';
+
+interface MulterFile {
+  fieldname: string;
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+}
 
 export interface CreateCaseStudyDto {
   titulo: string;
@@ -31,8 +42,9 @@ function toSlug(titulo: string): string {
 export class CaseStudiesService {
   constructor(private prisma: PrismaService) {}
 
-  async create(data: CreateCaseStudyDto, autorId: number) {
+  async create(data: CreateCaseStudyDto, autorId: number, coverImage?: MulterFile) {
     const slug = data.slug || toSlug(data.titulo) + '-' + Date.now();
+    const imageUrl = coverImage ? await this.saveCoverImage(coverImage) : data.imageUrl;
     return this.prisma.caseStudy.create({
       data: {
         titulo:      data.titulo,
@@ -42,7 +54,7 @@ export class CaseStudiesService {
         impacto:     data.impacto,
         descripcion: data.descripcion,
         cover:       data.cover,
-        imageUrl:    data.imageUrl,
+        imageUrl,
         publicado:   data.publicado ?? false,
         autorId,
       },
@@ -80,11 +92,17 @@ export class CaseStudiesService {
     return cs;
   }
 
-  async update(id: number, data: UpdateCaseStudyDto) {
+  async update(id: number, data: UpdateCaseStudyDto, coverImage?: MulterFile) {
     await this.findOne(id);
+    const imageUrl = coverImage ? await this.saveCoverImage(coverImage) : data.imageUrl;
+    const { imageUrl: _omit, ...rest } = data;
     return this.prisma.caseStudy.update({
       where: { id },
-      data: { ...data, updatedAt: new Date() },
+      data: {
+        ...rest,
+        ...(imageUrl !== undefined ? { imageUrl } : {}),
+        updatedAt: new Date(),
+      },
       include: { autor: { select: { id: true, nombre: true } } },
     });
   }
@@ -100,5 +118,18 @@ export class CaseStudiesService {
   async remove(id: number) {
     await this.findOne(id);
     return this.prisma.caseStudy.delete({ where: { id } });
+  }
+
+  private async saveCoverImage(file: MulterFile): Promise<string> {
+    try {
+      const uploadDir = path.resolve(process.cwd(), './uploads/case-studies');
+      await fs.mkdir(uploadDir, { recursive: true });
+      const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const filename = `${Date.now()}-${safeName}`;
+      await fs.writeFile(path.join(uploadDir, filename), file.buffer);
+      return `/case-studies/image/${filename}`;
+    } catch {
+      throw new InternalServerErrorException('Error al guardar la imagen del caso');
+    }
   }
 }

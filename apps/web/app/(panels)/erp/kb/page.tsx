@@ -10,6 +10,7 @@ import { useUser } from "@/components/UserContext";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { toast } from "@/components/Toast";
 
 interface KbCategory { id: number; name: string; slug: string }
 interface KbArticle {
@@ -151,7 +152,7 @@ export default function KbPage() {
     try {
       await apiFetch(`kb/articles/${a.id}`, token, { method: "DELETE" });
       setArticles((prev) => prev.filter((x) => x.id !== a.id));
-    } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+    } catch (e) { toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
   } });
   };
 
@@ -161,7 +162,7 @@ export default function KbPage() {
     try {
       await apiFetch(`kb/articles/${a.id}`, token, { method: "PATCH", body: JSON.stringify({ status: nextStatus }) });
       setArticles((prev) => prev.map((x) => (x.id === a.id ? { ...x, status: nextStatus } : x)));
-    } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+    } catch (e) { toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
   };
 
   const inp: React.CSSProperties = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13 };

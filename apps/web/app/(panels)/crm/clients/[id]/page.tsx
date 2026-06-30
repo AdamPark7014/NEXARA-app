@@ -8,6 +8,7 @@ import { useUser } from "@/components/UserContext";
 import { provisionSalesServiceClient, updateSalesClient } from "@/lib/sales-api";
 import { DetailError, DetailField, DetailFieldGrid, DetailSection } from "@/components/detail/DetailFrame";
 import { useClientDetail } from "@/components/crm/ClientDetailShell";
+import { toast } from "@/components/Toast";
 
 const INDUSTRIES = ["Corporativo", "Gobierno", "PyME", "Hogar", "Retail", "Industrial", "Educación", "Salud", "Otro"];
 const ESTADOS = ["Activo", "Inactivo", "Prospecto"];
@@ -56,7 +57,7 @@ export default function ClientDetailPage() {
       reload();
       setEditing(false);
     } catch (e) {
-      alert("Error: " + (e instanceof Error ? e.message : "desconocido"));
+      toast.error(e instanceof Error ? e.message : "No se pudo guardar el cliente");
     } finally { setSaving(false); }
   };
 
@@ -65,7 +66,9 @@ export default function ClientDetailPage() {
     try {
       await provisionSalesServiceClient(token, client.id);
       reload();
-    } catch { /* ignore */ }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo provisionar el cliente");
+    }
   };
 
   if (editing) {

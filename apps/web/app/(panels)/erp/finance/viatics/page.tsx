@@ -13,6 +13,7 @@ import { filterRowsByScope, getErpViaticsAdminSectionConfig } from "@/lib/sectio
 import { buildApiUrl } from "@/lib/api-base";
 import { approveViatico, markViaticoPagado } from "@/lib/viatics-api";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { toast } from "@/components/Toast";
 
 interface Viatico {
   id: number;
@@ -161,7 +162,7 @@ export default function ViaticosPage() {
       } : v)));
       setMode(null);
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
     } finally { setSaving(false); }
   };
 
@@ -187,7 +188,7 @@ export default function ViaticosPage() {
       }
       setMode(null);
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
     } finally { setSaving(false); }
   };
 
@@ -205,7 +206,7 @@ export default function ViaticosPage() {
       void load();
       setMode(null);
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
     } finally { setSaving(false); }
   };
 
@@ -216,7 +217,7 @@ export default function ViaticosPage() {
       await apiFetch(`viatics/${v.id}`, token, { method: "PATCH", body: JSON.stringify({ estatus: "Rechazado" }) });
       setItems((prev) => prev.map((i) => (i.id === v.id ? { ...i, estatus: "Rechazado" } : i)));
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
     }
   } });
   };

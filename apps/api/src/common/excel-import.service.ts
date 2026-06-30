@@ -340,7 +340,7 @@ export class ExcelImportService {
         validData.push(parsed);
       } catch (err) {
         if (err instanceof z.ZodError) {
-          errors.push({ row: i + headerRowIndex + 1, error: err.errors });
+          errors.push({ row: i + headerRowIndex + 1, error: err.issues });
         } else {
           errors.push({ row: i + headerRowIndex + 1, error: err });
         }

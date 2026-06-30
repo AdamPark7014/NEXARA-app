@@ -158,9 +158,11 @@ export default function ExecutivePage() {
             }}>
               Actualizar
             </Button>
-            <Button variant="primary" iconLeft="📅" iconRight="→">
-              Vista del mes
-            </Button>
+            <Link href="/erp/calendar" style={{ textDecoration: "none" }}>
+              <Button variant="primary" iconLeft="📅" iconRight="→">
+                Vista del mes
+              </Button>
+            </Link>
           </>
         }
       />

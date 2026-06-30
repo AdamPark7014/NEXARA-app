@@ -11,6 +11,7 @@ import { useUser } from "@/components/UserContext";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { toast } from "@/components/Toast";
 
 interface DocCategory { id: number; name: string }
 interface ManagedDoc {
@@ -91,7 +92,7 @@ export default function DocumentsPage() {
 
   const openEdit = async (d: ManagedDoc) => {
     if (d.status === "APPROVED" || d.status === "ARCHIVED" || d.status === "OBSOLETE") {
-      window.alert("Solo se pueden editar documentos en borrador o pendientes de aprobación.");
+      toast.warning("Solo se pueden editar documentos en borrador o pendientes de aprobación.");
       return;
     }
     setEditing(d);
@@ -146,7 +147,7 @@ export default function DocumentsPage() {
     try {
       await apiFetch(`documents/${d.id}/approve`, token, { method: "PATCH" });
       void load();
-    } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+    } catch (e) { toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
   };
 
   const archive = async (d: ManagedDoc) => {
@@ -155,7 +156,7 @@ export default function DocumentsPage() {
     try {
       await apiFetch(`documents/${d.id}/archive`, token, { method: "PATCH" });
       void load();
-    } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+    } catch (e) { toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
   } });
   };
 

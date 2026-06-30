@@ -11,6 +11,7 @@ import { useUser } from "@/components/UserContext";
 import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
+import { toast } from "@/components/Toast";
 
 interface BankAccount {
   id: number;
@@ -128,7 +129,7 @@ export default function BankingPage() {
       setForm({ ...emptyForm });
       void load();
     } catch (e) {
-      alert(formatApiError(e, "No se pudo guardar la cuenta"));
+      toast.error(formatApiError(e, "No se pudo guardar la cuenta"));
     } finally { setSaving(false); }
   };
 
@@ -155,7 +156,7 @@ export default function BankingPage() {
       setTxs(Array.isArray(data) ? data : []);
       void load();
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
     } finally { setSavingTx(false); }
   };
 
@@ -164,7 +165,7 @@ export default function BankingPage() {
     try {
       await apiFetch(`accounting/banking/transactions/${tx.id}/reconcile`, token, { method: "PATCH", body: JSON.stringify({ status: "MATCHED" }) });
       setTxs((prev) => prev.map((t) => (t.id === tx.id ? { ...t, reconciled: true, reconciliationStatus: "MATCHED" } : t)));
-    } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+    } catch (e) { toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
   };
 
   const inp: React.CSSProperties = { width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface-2)", color: "var(--foreground)", fontSize: 13 };

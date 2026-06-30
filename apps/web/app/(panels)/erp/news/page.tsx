@@ -10,6 +10,7 @@ import { useUser } from "@/components/UserContext";
 import { getErpGovernanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { toast } from "@/components/Toast";
 
 type Tab = "comunicados" | "newsletter";
 
@@ -90,16 +91,20 @@ export default function ComunicacionesInternasPage() {
   const [saving, setSaving]     = useState(false);
   const [subs, setSubs]         = useState<NewsletterSubscriber[]>([]);
   const [subsLoading, setSubsLoading] = useState(false);
+  const [subsErr, setSubsErr] = useState<string | null>(null);
   const [subSearch, setSubSearch]     = useState("");
 
   const loadSubs = useCallback(async (q?: string) => {
     if (!token) return;
     setSubsLoading(true);
+    setSubsErr(null);
     try {
       const qs = q ? `?search=${encodeURIComponent(q)}` : "";
       const data = await apiFetch(`newsletter${qs}`, token);
       setSubs(Array.isArray(data) ? data : (data?.data ?? []));
-    } catch { /* skip */ } finally { setSubsLoading(false); }
+    } catch (e) {
+      setSubsErr(e instanceof Error ? e.message : "No se pudo cargar la lista");
+    } finally { setSubsLoading(false); }
   }, [token]);
 
   useEffect(() => { if (tab === "newsletter") void loadSubs(); }, [tab, loadSubs]);
@@ -143,12 +148,12 @@ export default function ComunicacionesInternasPage() {
         scheduledAt: full.scheduledAt?.slice(0, 16) ?? "",
       });
     } catch (e) {
-      window.alert("No se pudo cargar el contenido: " + (e instanceof Error ? e.message : "error"));
+      toast.error("No se pudo cargar el contenido: " + (e instanceof Error ? e.message : "error"));
     }
   };
 
   const save = async () => {
-    if (!form.titulo || !form.audiencia) return alert("Título y audiencia son requeridos.");
+    if (!form.titulo || !form.audiencia) return toast.warning("Título y audiencia son requeridos.");
     setSaving(true);
     try {
       const body: Record<string, unknown> = { ...form };
@@ -163,7 +168,7 @@ export default function ComunicacionesInternasPage() {
       }
       setShowForm(false);
     } catch (e: unknown) {
-      alert("Error: " + (e instanceof Error ? e.message : "Error"));
+      toast.error("Error: " + (e instanceof Error ? e.message : "Error"));
     } finally {
       setSaving(false);
     }
@@ -175,7 +180,7 @@ export default function ComunicacionesInternasPage() {
       const updated = await apiFetch(`internal-comunicados/${id}/enviar`, token, { method: "PATCH" });
       setItems(prev => prev.map(c => c.id === id ? { ...c, ...updated } : c));
     } catch (e: unknown) {
-      window.alert("Error al enviar: " + (e instanceof Error ? e.message : "error"));
+      toast.error("Error al enviar: " + (e instanceof Error ? e.message : "error"));
     }
   } });
   };
@@ -186,7 +191,7 @@ export default function ComunicacionesInternasPage() {
       await apiFetch(`internal-comunicados/${id}`, token, { method: "DELETE" });
       setItems(prev => prev.filter(c => c.id !== id));
     } catch (e: unknown) {
-      window.alert("Error al eliminar: " + (e instanceof Error ? e.message : "error"));
+      toast.error("Error al eliminar: " + (e instanceof Error ? e.message : "error"));
     }
   } });
   };
@@ -327,6 +332,7 @@ export default function ComunicacionesInternasPage() {
             />
             <KpiCard label="Suscriptores" value={subs.length} />
           </div>
+          {subsErr && <p role="alert" style={{ color: "var(--danger)", fontSize: 12, marginBottom: 8 }}>{subsErr}</p>}
           {subsLoading ? (
             <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
           ) : (

@@ -10,6 +10,9 @@ import { useUser } from "@/components/UserContext";
 import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import StudioImageHint from "@/components/studio/StudioImageHint";
+import { getSocialImageSpec, studioImageHintLine } from "@/lib/studio-image-specs";
+import { toast } from "@/components/Toast";
 
 interface SocialPost {
   id: number;
@@ -45,7 +48,7 @@ function fmtDate(iso: string) {
     d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
 }
 
-const EMPTY_FORM = { red: "Instagram", titulo: "", contenido: "", cuando: "", estado: "Borrador" };
+const EMPTY_FORM = { red: "Instagram", titulo: "", contenido: "", mediaUrl: "", cuando: "", estado: "Borrador" };
 
 export default function StudioSocialPage() {
   const { user } = useUser();
@@ -88,9 +91,11 @@ export default function StudioSocialPage() {
 
   const openEdit = (p: SocialPost) => {
     setEditing(p);
-    setForm({ red: p.red, titulo: p.titulo, contenido: p.contenido ?? "", cuando: p.cuando.slice(0, 16), estado: p.estado });
+    setForm({ red: p.red, titulo: p.titulo, contenido: p.contenido ?? "", mediaUrl: p.mediaUrl ?? "", cuando: p.cuando.slice(0, 16), estado: p.estado });
     setShowForm(true);
   };
+
+  const socialImageSpec = useMemo(() => getSocialImageSpec(form.red), [form.red]);
 
   const save = async () => {
     if (!form.titulo || !form.cuando) { setSaveErr("Título y fecha son requeridos."); return; }
@@ -116,7 +121,9 @@ export default function StudioSocialPage() {
     try {
       const updated = await apiFetch(`social-posts/${id}/estado`, token, { method: "PATCH", body: JSON.stringify({ estado }) });
       setItems(prev => prev.map(p => p.id === id ? { ...p, estado: updated.estado } : p));
-    } catch { /* ignore */ }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo actualizar el estado");
+    }
   };
 
   const remove = async (id: number) => {
@@ -124,7 +131,9 @@ export default function StudioSocialPage() {
     try {
       await apiFetch(`social-posts/${id}`, token, { method: "DELETE" });
       setItems(prev => prev.filter(p => p.id !== id));
-    } catch { /* ignore */ }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo eliminar");
+    }
   } });
   };
 
@@ -146,7 +155,7 @@ export default function StudioSocialPage() {
       <PageHeader
         eyebrow="STUDIO · Contenido"
         title={cfg.title}
-        subtitle={cfg.subtitle}
+        subtitle={`${cfg.subtitle} ${studioImageHintLine(getSocialImageSpec("Instagram"))}`}
         actions={
           cfg.canCreate ? <Button variant="primary" iconLeft="✏️" onClick={openNew}>Crear post</Button> : undefined
         }
@@ -195,8 +204,25 @@ export default function StudioSocialPage() {
               <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)" }}>Contenido / caption (opcional)</label>
               <textarea style={{ ...inputStyle, minHeight: 80, resize: "vertical" }} value={form.contenido} onChange={field("contenido")} placeholder="Escribe el texto del post…" />
             </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, gridColumn: "1 / -1" }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)" }}>URL de imagen o video (opcional)</label>
+              <input
+                style={inputStyle}
+                type="url"
+                value={form.mediaUrl}
+                onChange={field("mediaUrl")}
+                placeholder="https://…"
+              />
+              <StudioImageHint spec={socialImageSpec} />
+              {form.red === "Instagram" && (
+                <p style={{ margin: "6px 0 0", fontSize: 11, color: "var(--text-tertiary)", lineHeight: 1.45 }}>
+                  Para historias o Reels usa 1080×1920 px (9:16) en lugar del cuadrado del feed.
+                </p>
+              )}
+            </div>
           </div>
-          <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+          <div style={{ display: "flex", gap: 8, marginTop: 14, alignItems: "center" }}>
+            {saveErr && <p style={{ color: "var(--danger)", fontSize: 12, margin: 0, flex: 1 }}>{saveErr}</p>}
             <Button variant="primary" onClick={save}>{saving ? "Guardando…" : (editing ? "Guardar" : "Crear post")}</Button>
             <Button variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
           </div>

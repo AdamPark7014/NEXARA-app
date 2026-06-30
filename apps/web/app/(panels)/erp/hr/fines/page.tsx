@@ -11,6 +11,7 @@ import { useHrManagementGuard } from "@/lib/useHrManagementGuard";
 import { getHrSubmoduleConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { toast } from "@/components/Toast";
 
 interface HrStaff {
   id: number;
@@ -186,7 +187,7 @@ export default function FinesPage() {
       await apiFetch(`fines/${id}`, token, { method: "DELETE" });
       setItems((prev) => prev.filter((f) => f.id !== id));
     } catch (e) {
-      window.alert("No se pudo eliminar: " + (e instanceof Error ? e.message : "error"));
+      toast.error("No se pudo eliminar: " + (e instanceof Error ? e.message : "error"));
     }
   } });
   };
@@ -208,7 +209,7 @@ export default function FinesPage() {
       await apiFetch(`fines/${id}/approve`, token, { method: "PATCH", body: JSON.stringify({ action }) });
       void load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Error al autorizar multa");
+      toast.error(e instanceof Error ? e.message : "Error al autorizar multa");
     }
   };
 

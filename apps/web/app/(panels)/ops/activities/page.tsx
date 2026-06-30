@@ -12,6 +12,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import { getActivitiesSectionConfig, getEvidencesSectionConfig, getActivitiesCanonicalPath } from "@/lib/section-views";
 import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { toast } from "@/components/Toast";
 
 /** Formulario completo de OT (asignar ingeniero, cliente, AN, etc.) */
 const ActivitiesTable = dynamic(() => import("@/components/ActivitiesTable"), { ssr: false });
@@ -100,7 +101,7 @@ export default function ActivitiesPage() {
       });
       setEvids(prev => prev.map(e => e.id === id ? { ...e, estado: approve ? "APROBADA" : "RECHAZADA", estatus: approve ? "Aprobada" : "Rechazada" } : e));
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Error al actualizar evidencia");
+      toast.error(e instanceof Error ? e.message : "Error al actualizar evidencia");
     }
   };
 
@@ -116,7 +117,7 @@ export default function ActivitiesPage() {
       await apiFetch(`evidences/${id}`, token, { method: "DELETE" });
       setEvids(prev => prev.filter(e => e.id !== id));
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Error al eliminar evidencia");
+      toast.error(e instanceof Error ? e.message : "Error al eliminar evidencia");
     }
   } });
   };
