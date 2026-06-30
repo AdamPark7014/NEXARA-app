@@ -39,7 +39,7 @@ export class ViaticosController {
   // Endpoint para obtener todos los viáticos
   @Get()
   @UseGuards(RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.VIATICS_VIEW] })
+  @RBAC({ anyPermissions: [PERMISSIONS.VIATICS_VIEW, PERMISSIONS.VIATICS_MANAGE] })
   async findAll(@CurrentUser() user: any, @Query() query: PaginationQueryDto) {
     return this.viaticosService.findAll(user, query);
   }
@@ -113,7 +113,7 @@ export class ViaticosController {
 
   @Get(':id')
   @UseGuards(RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.VIATICS_VIEW] })
+  @RBAC({ anyPermissions: [PERMISSIONS.VIATICS_VIEW, PERMISSIONS.VIATICS_MANAGE] })
   findOne(@Param('id') id: string) {
     return this.viaticosService.findOne(+id);
   }

@@ -453,6 +453,7 @@ export class AuthService {
       set.add(PERMISSIONS.TOOLS_MANAGE);
       set.add(PERMISSIONS.TOOLS_INVENTORY);
       set.add(PERMISSIONS.VIATICS_MANAGE);
+      set.add(PERMISSIONS.VIATICS_VIEW);
       set.add(PERMISSIONS.ATTENDANCE_MANAGE);
       set.add(PERMISSIONS.ATTENDANCE_VIEW);
       set.add(PERMISSIONS.GPS_MANAGE);

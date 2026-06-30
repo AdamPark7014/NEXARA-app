@@ -13,6 +13,18 @@ import { getActivitiesSectionConfig } from "@/lib/section-views";
 import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 import { buildApiUrl } from "@/lib/api-base";
 import { activityStatusVariant, isActivityCompleted, isActivityInProgress } from "@/lib/activity-status";
+import { toast } from "@/components/Toast";
+import {
+  canStartActivity,
+  fieldActionLabel,
+  isEvidenceApproved,
+  isEvidenceLocked,
+  type ActivityEvidenceSummary,
+} from "@/lib/evidence-lock";
+
+interface ActivityEvidenceInfo extends ActivityEvidenceSummary {
+  reviewedBy?: { nombre?: string } | null;
+}
 
 interface ActivityRow {
   id: number;
@@ -27,6 +39,7 @@ interface ActivityRow {
   fechaEntregaEsperada?: string | null;
   fechaFinalizacion?: string | null;
   client?: { name: string } | null;
+  activityEvidence?: ActivityEvidenceInfo | null;
 }
 
 interface EvidenceRow {
@@ -145,9 +158,9 @@ export default function MyActivitiesPage() {
   }, [items, rangeTab]);
 
   const counts = {
-    completadas: filtered.filter((a) => isActivityCompleted(a.estatus)).length,
-    enCurso: filtered.filter((a) => isActivityInProgress(a.estatus)).length,
-    pendientes: filtered.filter((a) => !isActivityCompleted(a.estatus) && !isActivityInProgress(a.estatus)).length,
+    completadas: filtered.filter((a) => isActivityCompleted(a.estatus) || isEvidenceApproved(a.activityEvidence)).length,
+    enCurso: filtered.filter((a) => isActivityInProgress(a.estatus) && !isEvidenceLocked(a.activityEvidence)).length,
+    pendientes: filtered.filter((a) => !isActivityCompleted(a.estatus) && !isActivityInProgress(a.estatus) && !isEvidenceLocked(a.activityEvidence)).length,
   };
 
   const updateStatus = async (a: ActivityRow, estatus: string) => {
@@ -155,7 +168,6 @@ export default function MyActivitiesPage() {
     try {
       const body: Record<string, unknown> = { estatus };
       if (estatus === "En Proceso") body.fechaInicio = new Date().toISOString();
-      if (estatus === "Finalizado") body.fechaFinalizacion = new Date().toISOString();
       await apiFetch(`activities/${a.id}/execute`, token, { method: "PATCH", body: JSON.stringify(body) });
 
       const coords = await captureGeolocation();
@@ -165,7 +177,7 @@ export default function MyActivitiesPage() {
 
       void load();
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
     }
   };
 
@@ -268,17 +280,29 @@ export default function MyActivitiesPage() {
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {!isActivityInProgress(a.estatus) && !isActivityCompleted(a.estatus) && (
+                {canStartActivity(a.estatus, a.activityEvidence) && (
                   <Button variant="primary" iconLeft="▶" onClick={() => void updateStatus(a, "En Proceso")}>Iniciar</Button>
                 )}
-                {isActivityInProgress(a.estatus) && (
-                  <Button variant="primary" iconLeft="✓" onClick={() => void updateStatus(a, "Finalizado")}>Finalizar</Button>
+                {isEvidenceLocked(a.activityEvidence) && (
+                  <Tag variant="warning">En revisión</Tag>
                 )}
+                {a.activityEvidence?.reviewStatus === "REJECTED" && (
+                  <Tag variant="danger">Corrección requerida</Tag>
+                )}
+                {isEvidenceApproved(a.activityEvidence) && (
+                  <Tag variant="positive">Aprobada</Tag>
+                )}
+                {(() => {
+                  const action = fieldActionLabel(a.estatus, a.activityEvidence);
+                  if (!action || action.label === "En revisión") return null;
+                  return (
+                    <Link href={`/ops/activities/${a.id}/${action.href}`} style={{ textDecoration: "none" }}>
+                      <Button variant={action.variant} iconLeft="📸" size="sm">{action.label}</Button>
+                    </Link>
+                  );
+                })()}
                 <Link href={`/ops/activities/${a.id}`} style={{ textDecoration: "none" }}>
                   <Button variant="ghost" size="sm">Ver detalle</Button>
-                </Link>
-                <Link href={`/ops/activities/${a.id}/evidences`} style={{ textDecoration: "none" }}>
-                  <Button variant="secondary" iconLeft="📸" size="sm">Subir evidencia</Button>
                 </Link>
               </div>
             </article>

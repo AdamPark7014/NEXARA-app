@@ -1,5 +1,6 @@
 "use client";
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
+import { EVIDENCE_STEP_ORDER, evidenceStepLabel } from "@/lib/evidence-lock";
 import React, { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useUser } from './UserContext';
@@ -20,18 +21,16 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
 }) => {
   const { user } = useUser();
   const [action, setAction] = useState<'approve' | 'reject' | null>(null);
-  const [rejectedStep, setRejectedStep] = useState<string>('');
+  const [rejectedSteps, setRejectedSteps] = useState<string[]>([]);
+  const [resetFullFlow, setResetFullFlow] = useState(false);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const steps = [
-    { value: 'ENTRY_PHOTO', label: '📸 Paso 1: Foto de Entrada' },
-    { value: 'EVIDENCE_PHOTOS', label: '📷 Paso 2: Fotos de Evidencia' },
-    { value: 'SERVICE_SHEET_PDF', label: '📄 Paso 3: PDF Hoja de Servicio' },
-    { value: 'SERVICE_SHEET_DATA', label: '📝 Paso 4: Plantilla Interna' },
-    { value: 'EXIT_PHOTO', label: '🚪 Paso 5: Foto de Salida' },
-  ];
+  const steps = EVIDENCE_STEP_ORDER.map((value) => ({
+    value,
+    label: evidenceStepLabel(value),
+  }));
 
   useEffect(() => {
     if (!user) return;
@@ -65,11 +64,18 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
     };
   }, [activityId, onSuccess, user]);
 
+  const toggleStep = (step: string) => {
+    setResetFullFlow(false);
+    setRejectedSteps((prev) =>
+      prev.includes(step) ? prev.filter((s) => s !== step) : [...prev, step],
+    );
+  };
+
   const handleSubmit = async () => {
     if (!user || !action) return;
 
-    if (action === 'reject' && !rejectedStep) {
-      setError('Debes seleccionar el paso a rechazar');
+    if (action === 'reject' && !resetFullFlow && rejectedSteps.length === 0) {
+      setError('Debes seleccionar al menos un paso a rechazar');
       return;
     }
 
@@ -83,9 +89,15 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
 
     try {
       const endpoint = action === 'approve' ? 'approve' : 'reject';
-      const body = action === 'approve' 
+      const body = action === 'approve'
         ? { reviewerId: user.id, notes: notes.trim() || undefined }
-        : { reviewerId: user.id, rejectedStep, notes: notes.trim() };
+        : {
+            reviewerId: user.id,
+            notes: notes.trim(),
+            ...(resetFullFlow
+              ? { resetFullFlow: true }
+              : { rejectedSteps }),
+          };
 
       const res = await fetch(buildApiUrl(`activity-evidence/${activityId}/${endpoint}`), {
         method: 'POST',
@@ -99,12 +111,6 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.message || 'Error al procesar la revisión');
-      }
-
-      // Crear notificación para el usuario
-      if (action === 'reject') {
-        // TODO: Implementar notificación push
-        console.log(`Notificar al usuario sobre rechazo en paso: ${rejectedStep}`);
       }
 
       onSuccess();
@@ -125,7 +131,6 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
         className={styles.modal}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className={styles.header}>
           <h2 className={styles.title}>
             Revisar Evidencias - {activityNumber}
@@ -138,7 +143,6 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
           </button>
         </div>
 
-        {/* Body */}
         <div className={styles.body}>
           {error && (
             <div className={styles.errorAlert}>
@@ -173,7 +177,7 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
               <div className={`${styles.actionPanel} ${styles.approvePanel}`}>
                 <h3 className={`${styles.panelTitle} ${styles.approveTitle}`}>✅ Aprobar Evidencias</h3>
                 <p className={styles.panelDescription}>
-                  Las evidencias se marcarán como aprobadas y la actividad cambiará a estado "Aprobada".
+                  Las evidencias se marcarán como aprobadas y la actividad cambiará a estado &quot;Aprobada&quot;.
                 </p>
               </div>
 
@@ -214,28 +218,43 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
               <div className={`${styles.actionPanel} ${styles.rejectPanel}`}>
                 <h3 className={`${styles.panelTitle} ${styles.rejectTitle}`}>❌ Rechazar Evidencias</h3>
                 <p className={styles.panelDescription}>
-                  Selecciona el paso que debe corregirse. El usuario recibirá una notificación.
+                  Selecciona uno o varios pasos a corregir, o indica que el técnico debe rehacer todo el flujo desde cero.
                 </p>
               </div>
 
-              <label className={styles.fieldGroup}>
-                <span className={styles.fieldLabel}>
-                  Selecciona el paso a rechazar *
+              <label className={styles.fieldGroup} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={resetFullFlow}
+                  onChange={(e) => {
+                    setResetFullFlow(e.target.checked);
+                    if (e.target.checked) setRejectedSteps([]);
+                  }}
+                />
+                <span className={styles.fieldLabel} style={{ margin: 0 }}>
+                  Rehacer todo desde cero (borrar evidencias y volver al paso 1)
                 </span>
-                <select
-                  className="input"
-                  value={rejectedStep}
-                  onChange={(e) => setRejectedStep(e.target.value)}
-                  required
-                >
-                  <option value="">-- Selecciona un paso --</option>
-                  {steps.map((step) => (
-                    <option key={step.value} value={step.value}>
-                      {step.label}
-                    </option>
-                  ))}
-                </select>
               </label>
+
+              {!resetFullFlow && (
+                <div className={styles.fieldGroup}>
+                  <span className={styles.fieldLabel}>
+                    Pasos a corregir *
+                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+                    {steps.map((step) => (
+                      <label key={step.value} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                        <input
+                          type="checkbox"
+                          checked={rejectedSteps.includes(step.value)}
+                          onChange={() => toggleStep(step.value)}
+                        />
+                        {step.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <label className={styles.fieldGroup}>
                 <span className={styles.fieldLabel}>
@@ -244,7 +263,7 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
                 <textarea
                   className="input"
                   rows={5}
-                  placeholder="Explica qué debe corregir el usuario en este paso..."
+                  placeholder="Explica qué debe corregir el usuario..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   required
@@ -255,7 +274,7 @@ const EvidenceReviewModal: React.FC<EvidenceReviewModalProps> = ({
                 <button
                   className={`button-primary ${styles.flexAction} ${styles.rejectButton}`}
                   onClick={handleSubmit}
-                  disabled={loading || !rejectedStep || !notes.trim()}
+                  disabled={loading || !notes.trim() || (!resetFullFlow && rejectedSteps.length === 0)}
                 >
                   {loading ? '⏳ Rechazando...' : 'Confirmar Rechazo'}
                 </button>
