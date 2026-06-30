@@ -10,7 +10,15 @@ import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
-import { activityStatusVariant, isActivityCompleted, isActivityInProgress } from "@/lib/activity-status";
+import {
+  activityDisplayLabel,
+  activityDisplayVariant,
+  isActivityAwaitingReview,
+  isActivityCompletedToday,
+  isActivityInProgress,
+  isActivityRelevantToday,
+} from "@/lib/activity-status";
+import type { ActivityEvidenceSummary } from "@/lib/evidence-lock";
 import { filterRowsByScope, getActivitiesCanonicalPath, getOpsDashboardSectionConfig } from "@/lib/section-views";
 
 interface ActivityRow {
@@ -20,6 +28,9 @@ interface ActivityRow {
   estatus: string;
   branchName?: string | null;
   fechaEntregaEsperada?: string | null;
+  fechaInicio?: string | null;
+  fechaFinalizacion?: string | null;
+  activityEvidence?: (ActivityEvidenceSummary & { completedAt?: string | null }) | null;
   client?: { name: string } | null;
   responsable?: { nombre: string } | null;
 }
@@ -79,14 +90,14 @@ export default function OpsDashboardPage() {
     [activities, user, cfg.defaultScope],
   );
 
-  const today = new Date().toDateString();
-  const ots = scopedActivities.filter((a) => a.fechaEntregaEsperada && new Date(a.fechaEntregaEsperada).toDateString() === today);
+  const ots = scopedActivities.filter((a) => isActivityRelevantToday(a));
   const enCurso = scopedActivities.filter((a) => isActivityInProgress(a.estatus)).length;
-  const completadasHoy = scopedActivities.filter((a) => isActivityCompleted(a.estatus) && a.fechaEntregaEsperada && new Date(a.fechaEntregaEsperada).toDateString() === today).length;
+  const completadasHoy = scopedActivities.filter((a) => isActivityCompletedToday(a)).length;
+  const enRevision = scopedActivities.filter(
+    (a) => isActivityAwaitingReview(a.activityEvidence) && isActivityCompletedToday(a),
+  ).length;
   const showTeam = cfg.defaultScope === "team";
   const showNoc = cfg.viewMode !== "execute";
-
-  const estadoVariant = activityStatusVariant;
   const sevColor: Record<string, string> = { critical: "var(--danger)", warning: "var(--warning)", info: "var(--text-tertiary)" };
 
   return (
@@ -116,6 +127,9 @@ export default function OpsDashboardPage() {
             <KpiCard label="OT de hoy" value={ots.length} icon="📋" />
             <KpiCard label="En curso" value={enCurso} variant="warning" icon="⏳" />
             <KpiCard label="Completadas hoy" value={completadasHoy} variant="positive" icon="✓" />
+            {showTeam && enRevision > 0 && (
+              <KpiCard label="En revisión" value={enRevision} variant="warning" icon="👁" />
+            )}
             <KpiCard label="Alertas activas" value={showNoc ? alerts.length : "—"} variant={showNoc && alerts.length > 0 ? "danger" : "positive"} icon="🚨" />
           </div>
 
@@ -130,11 +144,19 @@ export default function OpsDashboardPage() {
                       <div style={{ fontWeight: 600, fontSize: 13 }}>{a.client?.name ?? a.branchName ?? "—"}</div>
                       <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{a.titulo}{showTeam && a.responsable ? ` · ${a.responsable.nombre}` : ""}</div>
                     </div>
-                    <Tag variant={estadoVariant(a.estatus)}>{a.estatus}</Tag>
+                    <Tag variant={activityDisplayVariant(a.estatus, a.activityEvidence)}>
+                      {activityDisplayLabel(a.estatus, a.activityEvidence)}
+                    </Tag>
                   </div>
                   </Link>
                 ))}
-                {ots.length === 0 && <EmptyState icon="🎉" title="Sin OT para hoy" description="No hay actividades con entrega esperada hoy." />}
+                {ots.length === 0 && (
+                  <EmptyState
+                    icon="🎉"
+                    title="Sin OT para hoy"
+                    description="No hay actividades con entrega, en curso o completadas hoy."
+                  />
+                )}
               </div>
             </Section>
 
