@@ -139,10 +139,10 @@ export default function TargetsPage() {
       {!loading && !error && perf && (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
-            <KpiCard label="Meta total" value={`$${(perf.totals.revenueTarget / 1000000).toFixed(1)}M`} icon="🎯" />
-            <KpiCard label="Logrado total" value={`$${(perf.totals.revenueAchieved / 1000000).toFixed(1)}M`} variant="positive" icon="📈" />
-            <KpiCard label="Cumplimiento promedio" value={`${perf.totals.avgAttainmentPct}%`} icon="📊" />
-            <KpiCard label="Comisiones del mes" value={`$${(perf.totals.totalCommissions / 1000).toFixed(1)}k`} icon="💰" />
+            <KpiCard label="Meta total" value={<Money value={perf.totals.revenueTarget} compact />} icon="🎯" hint="Objetivo del mes" />
+            <KpiCard label="Logrado total" value={<Money value={perf.totals.revenueAchieved} compact />} variant={perf.totals.revenueAchieved >= perf.totals.revenueTarget ? "positive" : "accent"} icon="📈" />
+            <KpiCard label="Cumplimiento promedio" value={`${perf.totals.avgAttainmentPct}%`} variant={perf.totals.avgAttainmentPct >= 100 ? "positive" : perf.totals.avgAttainmentPct >= 60 ? "warning" : "danger"} icon="📊" />
+            <KpiCard label="Comisiones del mes" value={<Money value={perf.totals.totalCommissions} compact />} icon="💰" variant="accent" hint="Comisiones generadas" />
           </div>
           <Section title={`Cuotas · ${perf.year}-${String(perf.performance[0]?.month ?? now.getMonth() + 1).padStart(2, "0")}`}>
             <DataTable columns={columns} rows={perf.performance} rowKey={(p) => p.targetId} emptyTitle="Sin cuotas asignadas" emptyDescription="Crea la primera cuota del mes para tu equipo." />
