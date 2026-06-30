@@ -42,7 +42,20 @@ interface TrajectoryPoint {
 
 async function apiFetch<T = unknown>(path: string, token: string): Promise<T> {
   const res = await fetch(buildApiUrl(path), { headers: { Authorization: `Bearer ${token}` } });
-  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    if (res.status === 429) {
+      const retryAfter = Number(res.headers.get("Retry-After") || "60");
+      throw new Error(`Demasiadas solicitudes. Espera ${retryAfter}s e intenta de nuevo.`);
+    }
+    try {
+      const parsed = JSON.parse(body) as { message?: string };
+      if (parsed?.message) throw new Error(parsed.message);
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith("Demasiadas")) throw e;
+    }
+    throw new Error(body || `HTTP ${res.status}`);
+  }
   return res.json();
 }
 
@@ -369,24 +382,31 @@ function TeamGpsView({ token }: { token: string }) {
   const [items, setItems] = useState<LocationRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pollMs, setPollMs] = useState(30_000);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!token) return;
-    setLoading(true); setError(null);
+    if (!opts?.silent) setLoading(true);
+    setError(null);
     try {
       const data = await apiFetch<LocationRecord[]>("gps/team", token);
       setItems(Array.isArray(data) ? data : []);
+      setPollMs(30_000);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar ubicaciones");
-    } finally { setLoading(false); }
+      const msg = e instanceof Error ? e.message : "Error al cargar ubicaciones";
+      setError(msg);
+      if (msg.includes("Demasiadas solicitudes")) setPollMs(90_000);
+    } finally {
+      if (!opts?.silent) setLoading(false);
+    }
   }, [token]);
 
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
-    const id = setInterval(() => void load(), 30_000);
+    const id = setInterval(() => void load({ silent: true }), pollMs);
     return () => clearInterval(id);
-  }, [load]);
+  }, [load, pollMs]);
 
   const active   = items.filter(i => i.estaActivo).length;
   const inactive = items.filter(i => !i.estaActivo).length;
@@ -401,7 +421,7 @@ function TeamGpsView({ token }: { token: string }) {
 
       <Section
         title={loading ? "Cargando..." : `${active} unidades activas ahora`}
-        subtitle="Actualiza automaticamente cada 30 seg. Solo usuarios con jornada abierta y GPS activo."
+        subtitle={`Actualiza automaticamente cada ${Math.round(pollMs / 1000)} seg. Solo usuarios con jornada abierta y GPS activo.`}
         actions={
           <button onClick={() => void load()}
             style={{ fontSize: 11.5, color: "var(--primary, #3b82f6)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
