@@ -22,6 +22,7 @@ import {
   isMutatingMethod,
   isOriginAllowed,
   isPathSuspicious,
+  isRateLimitExemptPath,
   isSafeFetchSite,
   resolveCorsOrigin,
 } from './common/security/security.utils';
@@ -278,9 +279,12 @@ async function bootstrap() {
     }),
   );
 
+  const globalRateLimitMax = readPositiveIntEnv('GLOBAL_RATE_LIMIT_MAX', 1200);
+  const globalRateLimitWindowMs = readPositiveIntEnv('GLOBAL_RATE_LIMIT_WINDOW_MS', 60_000);
+
   const globalLimiter = createInMemoryRateLimiter({
-    maxHits: readPositiveIntEnv('GLOBAL_RATE_LIMIT_MAX', 300),
-    windowMs: readPositiveIntEnv('GLOBAL_RATE_LIMIT_WINDOW_MS', 60_000),
+    maxHits: globalRateLimitMax,
+    windowMs: globalRateLimitWindowMs,
     keyGenerator: (ip) => `global:${ip}`,
   });
 
@@ -294,10 +298,15 @@ async function bootstrap() {
     const ip = getClientIpFromRequestMeta(request.headers['x-forwarded-for'], request.ip);
 
     const pathname = request.path || request.url || '/';
+    if (isRateLimitExemptPath(pathname)) {
+      next();
+      return;
+    }
+
     const isAuthPath = /^\/api\/(auth|client-auth|branch-auth)\b/i.test(pathname);
     const limiterResult = isAuthPath ? authLimiter(ip, pathname) : globalLimiter(ip, pathname);
 
-    response.setHeader('X-RateLimit-Limit', `${isAuthPath ? readPositiveIntEnv('AUTH_RATE_LIMIT_MAX', 25) : readPositiveIntEnv('GLOBAL_RATE_LIMIT_MAX', 300)}`);
+    response.setHeader('X-RateLimit-Limit', `${isAuthPath ? readPositiveIntEnv('AUTH_RATE_LIMIT_MAX', 25) : globalRateLimitMax}`);
     response.setHeader('X-RateLimit-Remaining', `${limiterResult.remaining}`);
     response.setHeader('X-RateLimit-Reset', `${Math.ceil(Date.now() / 1000) + Math.ceil(limiterResult.retryAfterMs / 1000)}`);
 
