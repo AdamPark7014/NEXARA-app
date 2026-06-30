@@ -160,7 +160,8 @@ export default function LeadsPage() {
 
   const nuevos = visibleItems.filter((l) => l.status === "NEW").length;
   const calificados = visibleItems.filter((l) => l.status === "QUALIFIED").length;
-  const pipeline = visibleItems.filter((l) => l.status !== "LOST").reduce((s, l) => s + Number(l.score ?? 0), 0);
+  const activeLeads = visibleItems.filter((l) => l.status !== "LOST");
+  const avgScore = activeLeads.length > 0 ? Math.round(activeLeads.reduce((s, l) => s + Number(l.score ?? 0), 0) / activeLeads.length) : 0;
 
   const inp: React.CSSProperties = {
     width: "100%",
@@ -248,9 +249,9 @@ export default function LeadsPage() {
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
-        <KpiCard label="Nuevos" value={nuevos} />
-        <KpiCard label="Calificados" value={calificados} />
-        <KpiCard label="Score acumulado" value={pipeline} />
+        <KpiCard label="Nuevos" value={nuevos} variant={nuevos > 0 ? "accent" : "default"} icon="✨" />
+        <KpiCard label="Calificados" value={calificados} variant={calificados > 0 ? "positive" : "default"} icon="⭐" />
+        <KpiCard label="Score promedio" value={`${avgScore}/100`} hint={`${activeLeads.length} leads activos`} variant={avgScore >= 70 ? "positive" : avgScore >= 40 ? "warning" : "default"} icon="📊" />
       </div>
 
       {showForm && (

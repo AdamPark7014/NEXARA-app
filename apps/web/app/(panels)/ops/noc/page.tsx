@@ -6,6 +6,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
+import KpiCard from "@/components/ui/KpiCard";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
@@ -83,18 +84,12 @@ export default function NocPage() {
 
       {!loading && !error && summary && (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 18 }}>
-            {[
-              { label: "Dispositivos monitoreados", value: summary.total, color: "var(--primary)" },
-              { label: "Operativos", value: summary.byStatus.ONLINE ?? 0, color: "var(--success)" },
-              { label: "Degradados", value: summary.byStatus.DEGRADED ?? 0, color: "var(--warning)" },
-              { label: "Caídos / alerta", value: summary.criticalCount, color: "var(--danger)" },
-            ].map((k) => (
-              <div key={k.label} style={{ padding: 16, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-tertiary)" }}>{k.label}</div>
-                <div style={{ marginTop: 6, fontFamily: "var(--nx-font-display)", fontSize: 26, fontWeight: 700, color: k.color }}>{k.value}</div>
-              </div>
-            ))}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12, marginBottom: 18 }}>
+            <KpiCard label="Monitoreados" value={summary.total} icon="📡" hint="Total dispositivos" />
+            <KpiCard label="Operativos" value={summary.byStatus.ONLINE ?? 0} variant={(summary.byStatus.ONLINE ?? 0) === summary.total ? "positive" : "default"} icon="🟢" hint="Estado ONLINE" />
+            <KpiCard label="Degradados" value={summary.byStatus.DEGRADED ?? 0} variant={(summary.byStatus.DEGRADED ?? 0) > 0 ? "warning" : "positive"} icon="🟡" hint="Rendimiento reducido" />
+            <KpiCard label="Caídos / alerta" value={summary.criticalCount} variant={summary.criticalCount > 0 ? "danger" : "positive"} icon="🔴" hint="Requieren intervención" />
+            <KpiCard label="Uptime promedio" value={`${summary.avgUptime?.toFixed(1) ?? "—"}%`} variant={(summary.avgUptime ?? 100) >= 99 ? "positive" : (summary.avgUptime ?? 100) >= 95 ? "warning" : "danger"} icon="📈" hint="30 días de ventana" />
           </div>
 
           <Section title={`Dispositivos (${devices.length})`}>

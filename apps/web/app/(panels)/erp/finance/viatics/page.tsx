@@ -320,7 +320,7 @@ export default function ViaticosPage() {
         <KpiCard label="Aprobados" value={aprobados} variant="positive" icon="✅" />
         <KpiCard label="Total registros" value={items.length} variant="default" icon="📋" />
         {canViewAll && (
-          <KpiCard label="Monto pendiente" value={`$${(pendienteMonto / 1000).toFixed(1)}k`} variant={pendienteMonto > 10000 ? "warning" : "default"} icon="💰" />
+          <KpiCard label="Monto pendiente" value={<Money value={pendienteMonto} compact />} variant={pendienteMonto > 10000 ? "warning" : "default"} icon="💰" />
         )}
       </div>
 

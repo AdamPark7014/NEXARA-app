@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import { Money, Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
@@ -87,7 +88,7 @@ export default function PipelinePage() {
       <PageHeader
         eyebrow="CRM · Pipeline"
         title={cfg.title}
-        subtitle={`${scopedItems.length} oportunidades · $${(totalPipeline / 1000000).toFixed(1)}M en juego. ${cfg.canEdit ? "Arrastra una tarjeta para cambiar de etapa." : "Vista de solo lectura."}`}
+        subtitle={cfg.canEdit ? "Arrastra una tarjeta para cambiar de etapa." : "Vista de solo lectura."}
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
@@ -99,6 +100,15 @@ export default function PipelinePage() {
           </>
         }
       />
+
+      {!loading && !error && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 18 }}>
+          <KpiCard label="Oportunidades activas" value={scopedItems.filter((o) => !isClosedOpportunityStage(o.stage)).length} icon="📊" variant="accent" />
+          <KpiCard label="Valor en pipeline" value={<Money value={totalPipeline} compact />} icon="💰" variant="positive" hint={`${scopedItems.length} total incluyendo cerradas`} />
+          <KpiCard label="Ganadas" value={scopedItems.filter((o) => o.stage === "WON").length} icon="🏆" variant="positive" />
+          <KpiCard label="Perdidas" value={scopedItems.filter((o) => o.stage === "LOST").length} icon="❌" variant={scopedItems.filter((o) => o.stage === "LOST").length > 0 ? "danger" : "default"} />
+        </div>
+      )}
 
       {moveErr && (
         <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
