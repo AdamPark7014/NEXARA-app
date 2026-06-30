@@ -69,12 +69,21 @@ case "$cmd" in
   audit-users)
     cat "$REPO_ROOT/apps/api/scripts/audit-org-users.sql" | psql_db
     ;;
+  close-attendance)
+    email="${1:-}"
+    if [[ -z "$email" ]]; then
+      echo "Usage: ./deploy/nexara.sh close-attendance <email>"
+      echo "Example: ./deploy/nexara.sh close-attendance soporte@nexara.com.mx"
+      exit 1
+    fi
+    cat "$REPO_ROOT/apps/api/scripts/close-open-attendance.sql" | psql_db -v user_email="'${email}'"
+    ;;
   validate)
     compose config >/dev/null
     echo "docker-compose.nexara.yml OK"
     ;;
   help|*)
     echo "Usage: ./deploy/nexara.sh <command>"
-    echo "Commands: up | up:fast | rebuild | ps | logs | restart | down | migrate | seed | cleanup-users | delete-ghost-users | audit-users | validate"
+    echo "Commands: up | up:fast | rebuild | ps | logs | restart | down | migrate | seed | cleanup-users | delete-ghost-users | audit-users | close-attendance | validate"
     ;;
 esac
