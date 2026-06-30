@@ -93,16 +93,16 @@ export class ExecutiveService {
         where: { estatus: 'Finalizado', fechaFinalizacion: { gte: startOfMonth, lte: endOfMonth } },
       }).catch(() => 0),
       this.prisma.invoice.aggregate({
-        where: { issueDate: { gte: startOfMonth, lte: endOfMonth }, status: { not: 'CANCELLED' as any }, type: 'INCOME' as any },
+        where: { issueDate: { gte: startOfMonth, lte: endOfMonth }, status: { not: 'CANCELLED' }, type: 'ACCOUNTS_RECEIVABLE' },
         _sum: { totalAmount: true },
         _count: { _all: true },
       }).catch(() => ({ _sum: { totalAmount: 0 }, _count: { _all: 0 } } as any)),
       this.prisma.invoice.aggregate({
-        where: { type: 'INCOME' as any, status: { in: ['SENT' as any, 'PARTIALLY_PAID' as any, 'OVERDUE' as any] } },
+        where: { type: 'ACCOUNTS_RECEIVABLE', status: { in: ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] } },
         _sum: { totalAmount: true },
       }).catch(() => ({ _sum: { totalAmount: 0 } } as any)),
       this.prisma.invoice.aggregate({
-        where: { type: 'EXPENSE' as any, status: { in: ['SENT' as any, 'PARTIALLY_PAID' as any, 'OVERDUE' as any] } },
+        where: { type: 'ACCOUNTS_PAYABLE', status: { in: ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] } },
         _sum: { totalAmount: true },
       }).catch(() => ({ _sum: { totalAmount: 0 } } as any)),
       this.prisma.invoice.count({
@@ -124,8 +124,8 @@ export class ExecutiveService {
         where: { scheduledDate: { gte: now, lte: new Date(now.getTime() + 30 * 86400000) }, status: { in: ['SCHEDULED', 'GENERATED'] } },
       }).catch(() => 0),
       this.prisma.user.count().catch(() => 0),
-      (this.prisma as any).requisition?.count({ where: { status: 'PENDING_APPROVAL' } }).catch(() => 0) ?? 0,
-      (this.prisma as any).purchaseOrder?.count({ where: { status: { in: ['DRAFT', 'PENDING_APPROVAL'] } } }).catch(() => 0) ?? 0,
+      this.prisma.purchaseRequisition.count({ where: { status: 'SUBMITTED' } }).catch(() => 0),
+      this.prisma.purchaseOrder.count({ where: { status: { in: ['DRAFT', 'SENT'] } } }).catch(() => 0),
       (this.prisma as any).stockItem?.findMany({
         where: { currentQuantity: { lte: { _ref: 'minQuantity' } as any } },
         take: 5,
