@@ -125,6 +125,35 @@ export function resolveOpsPairNav(
   }
 }
 
+/** Dónde debe vivir Viáticos en el menú (un solo lugar por rol, sin duplicar ERP/OPS). */
+export type ViaticsSidebarHome = 'erp-finance' | 'ops-team' | 'ops-self' | null;
+
+export function resolveViaticsSidebarHome(
+  user: UserAccessInput | null | undefined,
+): ViaticsSidebarHome {
+  const v2 = resolveV2RoleKey(user);
+  if (!v2) return null;
+  if (user?.isSuperAdmin) return 'erp-finance';
+
+  const opsNav = resolveOpsPairNav(user, 'viatics');
+  if (opsNav === 'self') return 'ops-self';
+
+  if (
+    EXECUTIVE.has(v2) ||
+    v2 === ROLES.DIR_ADMIN ||
+    v2 === ROLES.COORD_ADMIN ||
+    v2 === ROLES.CONTABILIDAD ||
+    v2 === ROLES.RH ||
+    v2 === ROLES.ADMINISTRATIVO
+  ) {
+    return 'erp-finance';
+  }
+
+  if (opsNav === 'team') return 'ops-team';
+
+  return null;
+}
+
 function opsPairFromModuleId(id: ModuleId): OpsNavPair | null {
   for (const pair of Object.keys(OPS_TEAM_MODULE) as OpsNavPair[]) {
     if (id === OPS_TEAM_MODULE[pair] || id === OPS_SELF_MODULE[pair]) return pair;
@@ -185,11 +214,10 @@ export function shouldShowModuleInSidebar(
       // Evidencias integradas en Actividades (pestaña) — no duplicar menú.
       return false;
     case 'ops-viatics':
-      if (EXECUTIVE.has(v2)) return resolveOpsPairNav(user, 'viatics') === 'team';
-      return resolveOpsPairNav(user, 'viatics') === 'team';
+      return resolveViaticsSidebarHome(user) === 'ops-team';
     case 'ops-my-viatics':
       if (EXECUTIVE.has(v2)) return false;
-      return resolveOpsPairNav(user, 'viatics') === 'self';
+      return resolveViaticsSidebarHome(user) === 'ops-self';
     case 'ops-vehicles':
       return resolveOpsPairNav(user, 'vehicles') === 'team';
     case 'ops-my-vehicles':
@@ -222,11 +250,12 @@ export function shouldShowModuleInSidebar(
     case 'lunch-breaks':
       return HR_ONLY.has(v2) || HR_MANAGERS.has(v2) || isFieldRole(v2);
     case 'viatics-admin':
-      return HR_MANAGERS.has(v2) || EXECUTIVE.has(v2) || v2 === ROLES.COORD_ADMIN || v2 === ROLES.DIR_OPERACIONES;
+      return resolveViaticsSidebarHome(user) === 'erp-finance';
     case 'expenses-admin':
       return FINANCE_ROLES.has(v2) || v2 === ROLES.ADMINISTRATIVO;
     // ERP — tablero ejecutivo y resumen corporativo solo dirección
     case 'dashboard': {
+      if (EXECUTIVE.has(v2)) return false;
       if (DESIGN_TEAM.has(v2)) return false;
       const minimalErp = new Set<RoleKey>([
         ROLES.COORD_OPERACIONES,
@@ -292,8 +321,6 @@ export function shouldShowModuleInSidebar(
       return (
         SALES_MANAGERS.has(v2)
         || SALES_REP.has(v2)
-        || v2 === ROLES.COORD_OPERACIONES
-        || v2 === ROLES.ARQUITECTO
         || v2 === ROLES.COORD_ADMIN
         || v2 === ROLES.CONTABILIDAD
       );
@@ -378,8 +405,8 @@ export function adaptModulePresentation(
         : 'Tus OT del día — iniciar, evidenciar y cerrar',
     },
     'ops-viatics': {
-      label: 'Viáticos · Aprobación',
-      description: 'Revisar y autorizar viáticos del equipo',
+      label: 'Viáticos',
+      description: 'Revisar y autorizar solicitudes del equipo de campo.',
     },
     'ops-my-viatics': {
       label: 'Mis viáticos',
@@ -404,8 +431,8 @@ export function adaptModulePresentation(
       ? { label: 'Mantenimiento', description: 'Órdenes de trabajo y contratos de servicio (SLA).' }
       : { label: 'Mantenimiento', description: 'Visitas preventivas, correctivas y OT de activos.' },
     'viatics-admin': {
-      label: 'Viáticos · Finanzas',
-      description: 'Aprobación administrativa y contable de viáticos de campo.',
+      label: 'Viáticos',
+      description: 'Solicitudes, aprobación y pago de viáticos de campo.',
     },
     warehouse: {
       label: 'Almacén',
@@ -716,6 +743,8 @@ export function getEvidencesCanonicalPath(user: UserAccessInput | null | undefin
 }
 
 export function getViaticsCanonicalPath(user: UserAccessInput | null | undefined): string {
+  const home = resolveViaticsSidebarHome(user);
+  if (home === 'erp-finance') return '/erp/finance/viatics';
   return `/ops${opsCanonicalRelativePath(user, 'viatics')}`;
 }
 
