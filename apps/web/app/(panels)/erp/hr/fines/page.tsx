@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { useHrManagementGuard } from "@/lib/useHrManagementGuard";
@@ -366,6 +367,15 @@ export default function FinesPage() {
               {saving ? "Guardando…" : editing ? "Guardar" : "Registrar sanción"}
             </Button>
           </div>
+        </div>
+      )}
+
+      {!loading && items.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 18 }}>
+          <KpiCard label="Total sanciones" value={items.length} icon="📋" />
+          <KpiCard label="Pendientes aprobación" value={items.filter(f => f.estatusAprobacion === "Pendiente").length} variant={items.filter(f => f.estatusAprobacion === "Pendiente").length > 0 ? "warning" : "positive"} icon="⏳" />
+          <KpiCard label="Pagadas" value={items.filter(f => f.estatusPago === "Pagado").length} variant="positive" icon="✅" />
+          <KpiCard label="Monto total" value={<Money value={items.reduce((s, f) => s + Number(f.monto ?? 0), 0)} compact />} icon="💰" hint="Sanciones registradas" />
         </div>
       )}
 
