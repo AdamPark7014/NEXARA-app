@@ -234,6 +234,41 @@ export class AttendanceService {
     };
   }
 
+  private getDayBounds(date: Date) {
+    const start = this.getDateOnly(date);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    return { start, end };
+  }
+
+  private async findAttendanceOnDate(userId: number, type: string, date: Date) {
+    const { start, end } = this.getDayBounds(date);
+    return this.prisma.attendance.findFirst({
+      where: {
+        userId,
+        type,
+        timestamp: { gte: start, lt: end },
+      },
+      orderBy: { timestamp: 'desc' },
+    });
+  }
+
+  private async resolveOpenDay(userId: number, referenceDate: Date) {
+    let day = await this.prisma.attendanceDay.findFirst({
+      where: { userId, isOpen: true },
+      orderBy: { date: 'desc' },
+    });
+    if (!day?.isOpen || !day.lastEntryAt) {
+      day = await this.reconcileOpenDay(userId, referenceDate);
+    }
+    if (!day?.isOpen || !day.lastEntryAt) {
+      const yesterday = new Date(referenceDate);
+      yesterday.setDate(yesterday.getDate() - 1);
+      day = await this.reconcileOpenDay(userId, yesterday);
+    }
+    return day;
+  }
+
   async register(dto: CreateAttendanceDto, userId: number, req?: any) {
     if (!userId) throw new BadRequestException('Usuario no autenticado');
     const now = dto.timestamp ? new Date(dto.timestamp) : new Date();
@@ -241,46 +276,14 @@ export class AttendanceService {
     const userAgent = req?.headers?.['user-agent'] || req?.headers?.['User-Agent'];
     const deviceInfo = detectDeviceFromUserAgent(userAgent, req?.headers);
 
-    // Determinar si es entrada o salida para guardar coordenadas correctas
     const isEntry = dto.type === 'entrada';
-    
-    // Validar que no exista ya una entrada/salida del mismo tipo hoy
-    const existingAttendance = await this.prisma.attendance.findFirst({
-      where: {
-        userId,
-        type: dto.type,
-        timestamp: {
-          gte: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
-          lt: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1),
-        },
-      },
-    });
-
-    if (existingAttendance) {
-      throw new BadRequestException(`Ya existe una ${dto.type} registrada para hoy`);
-    }
-    
-    const attendance = await this.prisma.attendance.create({
-      data: {
-        userId,
-        type: dto.type,
-        timestamp: now,
-        deviceInfo,
-        photoUrl: dto.photoBase64 || null,
-        // Guardar coordenadas en los campos apropiados según si es entrada o salida
-        ...(isEntry && {
-          entryLatitude: dto.latitude || null,
-          entryLongitude: dto.longitude || null,
-        }),
-        ...(!isEntry && {
-          exitLatitude: dto.latitude || null,
-          exitLongitude: dto.longitude || null,
-        }),
-      },
-      include: { user: true },
-    });
 
     if (isEntry) {
+      const existingEntry = await this.findAttendanceOnDate(userId, 'entrada', today);
+      if (existingEntry) {
+        throw new BadRequestException('Ya existe una entrada registrada para hoy');
+      }
+
       const openDay = await this.prisma.attendanceDay.findFirst({
         where: { userId, isOpen: true },
       });
@@ -289,6 +292,19 @@ export class AttendanceService {
           'Tienes una jornada abierta sin salida. Registra salida antes de una nueva entrada.',
         );
       }
+
+      const attendance = await this.prisma.attendance.create({
+        data: {
+          userId,
+          type: dto.type,
+          timestamp: now,
+          deviceInfo,
+          photoUrl: dto.photoBase64 || null,
+          entryLatitude: dto.latitude || null,
+          entryLongitude: dto.longitude || null,
+        },
+        include: { user: true },
+      });
 
       const day = await this.prisma.attendanceDay.upsert({
         where: { userId_date: { userId, date: today } },
@@ -305,7 +321,6 @@ export class AttendanceService {
         },
       });
 
-      // Abrir consentimiento de ubicación al iniciar jornada y dejar un primer punto GPS
       await this.prisma.user.update({
         where: { id: userId },
         data: { locationConsent: true },
@@ -347,15 +362,14 @@ export class AttendanceService {
             : String(selfNotificationError),
         );
       }
-      
-      // Enviar notificación a supervisores
+
       await this.notificationHierarchy.notifyAttendanceChange(
         userId,
         'ATTENDANCE_CHECKIN',
         attendance.user.nombre || 'Usuario',
         deviceInfo,
       );
-      
+
       return {
         message: 'Entrada registrada exitosamente',
         data: attendance,
@@ -363,27 +377,43 @@ export class AttendanceService {
       };
     }
 
-    let day = await this.prisma.attendanceDay.findFirst({
-      where: { userId, isOpen: true },
-      orderBy: { date: 'desc' },
-    });
+    // Salida: resolver jornada abierta ANTES de crear el registro (evita salidas huérfanas).
+    const openDay = await this.resolveOpenDay(userId, today);
 
-    if (!day?.isOpen || !day.lastEntryAt) {
-      day = await this.reconcileOpenDay(userId, today);
-    }
-    if (!day?.isOpen || !day.lastEntryAt) {
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      day = await this.reconcileOpenDay(userId, yesterday);
-    }
-
-    if (!day?.isOpen || !day.lastEntryAt) {
+    if (!openDay?.isOpen || !openDay.lastEntryAt) {
+      const existingExit = await this.findAttendanceOnDate(userId, 'salida', today);
+      if (existingExit) {
+        throw new BadRequestException('Ya existe una salida registrada para hoy');
+      }
       throw new BadRequestException('No hay una entrada abierta para cerrar');
     }
-    const diffMs = now.getTime() - day.lastEntryAt.getTime();
+
+    // Limpiar salida huérfana de un intento fallido anterior (jornada sigue abierta).
+    const orphanExit = await this.findAttendanceOnDate(userId, 'salida', today);
+    if (orphanExit) {
+      await this.prisma.attendance.delete({ where: { id: orphanExit.id } });
+      this.logger.warn(
+        `Salida huérfana eliminada (id=${orphanExit.id}) para userId=${userId} al cerrar jornada abierta`,
+      );
+    }
+
+    const attendance = await this.prisma.attendance.create({
+      data: {
+        userId,
+        type: dto.type,
+        timestamp: now,
+        deviceInfo,
+        photoUrl: dto.photoBase64 || null,
+        exitLatitude: dto.latitude || null,
+        exitLongitude: dto.longitude || null,
+      },
+      include: { user: true },
+    });
+
+    const diffMs = now.getTime() - openDay.lastEntryAt.getTime();
     const durationMinutes = diffMs > 0 ? Math.ceil(diffMs / 60000) : 0;
     const updatedDay = await this.prisma.attendanceDay.update({
-      where: { id: day.id },
+      where: { id: openDay.id },
       data: {
         totalMinutes: { increment: durationMinutes },
         lastEntryAt: null,
@@ -391,7 +421,6 @@ export class AttendanceService {
       },
     });
 
-    // Cerrar consentimiento de ubicación al finalizar jornada y desactivar tracking activo
     await this.prisma.user.update({
       where: { id: userId },
       data: { locationConsent: false },
@@ -425,15 +454,14 @@ export class AttendanceService {
           : String(selfNotificationError),
       );
     }
-    
-    // Enviar notificación a supervisores
+
     await this.notificationHierarchy.notifyAttendanceChange(
       userId,
       'ATTENDANCE_CHECKOUT',
       attendance.user.nombre || 'Usuario',
       deviceInfo,
     );
-    
+
     return {
       message: 'Salida registrada exitosamente',
       data: attendance,
