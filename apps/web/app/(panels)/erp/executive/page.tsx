@@ -112,12 +112,28 @@ export default function ExecutivePage() {
     );
   }
 
-  const shortcuts = [
-    { href: "/erp/approvals", label: "Aprobaciones", icon: "🛡️", accent: "#ef4444" },
-    { href: "/erp/users", label: "Roles y accesos", icon: "🧑‍💼", accent: "#0ea5e9" },
-    { href: "/erp/architecture", label: "Arquitectura", icon: "🗺️", accent: "#0ea5e9" },
-    { href: "/erp/audit", label: "Audit log", icon: "🔍", accent: "#0ea5e9" },
-  ];
+  const v2Role = resolveV2RoleKey(user);
+  const shortcuts =
+    v2Role === ROLES.DIR_OPERACIONES
+      ? [
+          { href: "/erp/approvals", label: "Aprobaciones", icon: "🛡️", accent: "#ef4444" },
+          { href: "/ops/dashboard", label: "Centro OPS", icon: "🔧", accent: "#f59e0b" },
+          { href: "/ops/projects", label: "Proyectos", icon: "🏗️", accent: "#0ea5e9" },
+          { href: "/erp/procurement", label: "Compras", icon: "🛒", accent: "#10b981" },
+        ]
+      : v2Role === ROLES.DIR_ADMIN
+      ? [
+          { href: "/erp/approvals", label: "Aprobaciones", icon: "🛡️", accent: "#ef4444" },
+          { href: "/erp/invoicing", label: "Facturación", icon: "🧾", accent: "#10b981" },
+          { href: "/erp/hr", label: "Recursos humanos", icon: "👥", accent: "#0ea5e9" },
+          { href: "/erp/finance/viatics", label: "Viáticos", icon: "✈️", accent: "#f59e0b" },
+        ]
+      : [
+          { href: "/erp/approvals", label: "Aprobaciones", icon: "🛡️", accent: "#ef4444" },
+          { href: "/erp/users", label: "Roles y accesos", icon: "🧑‍💼", accent: "#0ea5e9" },
+          { href: "/erp/architecture", label: "Arquitectura", icon: "🗺️", accent: "#0ea5e9" },
+          { href: "/erp/audit", label: "Audit log", icon: "🔍", accent: "#0ea5e9" },
+        ];
 
   const kpis = data?.headlineKpis;
   const ops = data?.operations;
@@ -299,6 +315,19 @@ export default function ExecutivePage() {
                 </span>
               </div>
             ))}
+          </div>
+        </Section>
+      )}
+
+      {/* ── Equipo y clientes ─────────────────────────────────────── */}
+      {!loading && !error && data && (
+        <Section eyebrow="Empresa" title="Equipo y cartera" subtitle="Tamaño del equipo activo y clientes en plataforma">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+            <KpiCard label="Total colaboradores" value={data.teamSize} icon="👥" variant="accent" />
+            <KpiCard label="Clientes activos" value={data.clientsCount} icon="🤝" />
+            {fin && (
+              <KpiCard label="Facturado (mes)" value={<Money value={fin.invoicedMtd} compact />} hint={`${fin.invoicesCountMtd} facturas emitidas`} icon="🧾" variant="positive" />
+            )}
           </div>
         </Section>
       )}

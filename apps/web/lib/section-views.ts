@@ -1376,6 +1376,15 @@ export function getOpsDashboardSectionConfig(user: UserAccessInput | null | unde
       subtitle: 'OT del equipo, alertas NOC y estado del día.',
     };
   }
+  // Admin roles (DIR_ADMIN/COORD_ADMIN) acceden OPS solo para lectura de
+  // reportes de campo — no deben poder crear, asignar ni aprobar OTs.
+  if (!activities.canCreate && !activities.canAssign && !activities.canApprove) {
+    return {
+      ...activities,
+      title: 'Reportes de campo',
+      subtitle: 'Actividades del equipo de campo — evidencias y avances para facturación.',
+    };
+  }
   return {
     viewMode: 'manage',
     defaultScope: 'team',

@@ -88,6 +88,23 @@ export default function CrmDashboardPage() {
   );
   const enCierre = visibleOpps.filter((o) => isHotOpportunityStage(o.stage)).length;
 
+  // Desempeño por vendedor — solo visible en vista de equipo
+  const byRep = useMemo(() => {
+    if (cfg.defaultScope !== 'team') return [];
+    const map = new Map<number, { nombre: string; pipeline: number; count: number; hot: number }>();
+    for (const o of visibleOpps) {
+      if (isClosedOpportunityStage(o.stage)) continue;
+      const id = o.ownerId ?? 0;
+      const nombre = o.owner?.nombre ?? 'Sin asignar';
+      const cur = map.get(id) ?? { nombre, pipeline: 0, count: 0, hot: 0 };
+      cur.pipeline += Number(o.value ?? 0);
+      cur.count += 1;
+      if (isHotOpportunityStage(o.stage)) cur.hot += 1;
+      map.set(id, cur);
+    }
+    return Array.from(map.values()).sort((a, b) => b.pipeline - a.pipeline);
+  }, [visibleOpps, cfg.defaultScope]);
+
   return (
     <>
       <PageHeader
@@ -120,6 +137,24 @@ export default function CrmDashboardPage() {
             <KpiCard label="En negociación/cierre" value={enCierre} hint="Oportunidades calientes" icon="🔥" />
             <KpiCard label="Tasa de conversión" value={`${metrics?.conversionRate ?? 0}%`} hint="Este mes" icon="⚡" />
           </div>
+
+          {byRep.length > 0 && (
+            <Section eyebrow="Equipo" title="Desempeño por vendedor" subtitle="Pipeline activo por rep — excluye oportunidades cerradas">
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {byRep.map((rep, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-tertiary)", width: 20, textAlign: "center" }}>#{i + 1}</span>
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{rep.nombre}</span>
+                    <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>{rep.count} opp.</span>
+                    {rep.hot > 0 && <Tag variant="warning">{rep.hot} 🔥</Tag>}
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--primary)" }}>
+                      <Money value={rep.pipeline} compact />
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
 
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
             <Section title={cfg.defaultScope === 'team' ? 'Top oportunidades del equipo' : 'Mis oportunidades activas'}>
