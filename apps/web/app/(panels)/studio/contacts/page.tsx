@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { getStudioSectionConfig } from "@/lib/section-views";
@@ -196,6 +197,15 @@ export default function StudioContactsPage() {
           <button type="button" onClick={() => setActionErr(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontWeight: 700, fontSize: 16, lineHeight: 1, padding: "0 4px" }}>×</button>
         </div>
       )}
+      {!loading && items.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 18 }}>
+          <KpiCard label="Total mensajes" value={items.length} icon="📥" />
+          <KpiCard label="Sin atender" value={items.filter(c => c.status === "NEW").length} variant={items.filter(c => c.status === "NEW").length > 0 ? "warning" : "positive"} icon="⚡" hint="Pendientes de respuesta" />
+          <KpiCard label="En proceso" value={items.filter(c => c.status === "ASSIGNED" || c.status === "IN_PROGRESS").length} variant="accent" icon="🔄" />
+          <KpiCard label="Resueltos" value={items.filter(c => c.status === "RESOLVED" || c.status === "CLOSED").length} variant="positive" icon="✅" />
+        </div>
+      )}
+
       <Section title={loading ? "Cargando…" : `${items.length} mensajes`}>
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { getVehiclesSectionConfig } from "@/lib/section-views";
@@ -319,6 +320,15 @@ export default function VehiclesPage() {
               {saving ? "Guardando…" : editing ? "Guardar" : "Agregar"}
             </Button>
           </div>
+        </div>
+      )}
+
+      {!loading && items.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 18 }}>
+          <KpiCard label="Flotilla total" value={items.length} icon="🚗" hint="Unidades registradas" />
+          <KpiCard label="Disponibles" value={items.filter(v => v.estatus === "Disponible").length} variant="positive" icon="✅" />
+          <KpiCard label="Asignados" value={items.filter(v => v.estatus === "Asignado").length} variant="accent" icon="🔑" hint="En uso activo" />
+          <KpiCard label="En mantenimiento" value={items.filter(v => v.estatus === "En_mantenimiento" || v.estatus === "Fuera_de_servicio").length} variant={items.filter(v => v.estatus === "En_mantenimiento" || v.estatus === "Fuera_de_servicio").length > 0 ? "danger" : "positive"} icon="🔧" />
         </div>
       )}
 
