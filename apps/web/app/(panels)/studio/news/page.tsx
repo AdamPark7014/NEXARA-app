@@ -10,6 +10,16 @@ import { useUser } from "@/components/UserContext";
 import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import StudioFileInput from "@/components/studio/StudioFileInput";
+import StudioImageHint from "@/components/studio/StudioImageHint";
+import {
+  STUDIO_IMAGE_SPECS,
+  studioImageHintLine,
+} from "@/lib/studio-image-specs";
+import { toast } from "@/components/Toast";
+
+const BLOG_COVER_SPEC = STUDIO_IMAGE_SPECS.blogCoverFeatured;
+const BLOG_CARD_SPEC = STUDIO_IMAGE_SPECS.blogCoverCard;
 
 interface NewsPost {
   id: number;
@@ -41,6 +51,7 @@ export default function StudioNewsPage() {
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [content, setContent] = useState("");
+  const [coverFile, setCoverFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [actionErr, setActionErr] = useState<string | null>(null);
@@ -68,8 +79,9 @@ export default function StudioNewsPage() {
       if (summary) fd.append("summary", summary);
       fd.append("content", content);
       fd.append("status", "DRAFT");
+      if (coverFile) fd.append("coverImage", coverFile);
       await apiFetch("news", token, { method: "POST", body: fd });
-      setShowForm(false); setTitle(""); setSummary(""); setContent("");
+      setShowForm(false); setTitle(""); setSummary(""); setContent(""); setCoverFile(null);
       void load();
     } catch (e) {
       setSaveErr(e instanceof Error ? e.message : "Error al guardar noticia");
@@ -132,7 +144,7 @@ export default function StudioNewsPage() {
       <PageHeader
         eyebrow="STUDIO · Contenido"
         title="Noticias y blog"
-        subtitle="Publicaciones del blog público (SEO) que aparecen en /noticias del sitio."
+        subtitle={`Publicaciones del blog público (SEO) que aparecen en /noticias del sitio. ${studioImageHintLine(BLOG_COVER_SPEC)}`}
         actions={
           <>
             <Button variant="ghost" iconLeft="🔄" onClick={() => void load()}>Actualizar</Button>
@@ -164,10 +176,23 @@ export default function StudioNewsPage() {
                 <input value={summary} onChange={(e) => setSummary(e.target.value)} style={inp} /></label>
               <label style={{ display: "grid", gap: 4 }}><span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)" }}>Contenido</span>
                 <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Mínimo 20 caracteres" rows={8} style={{ ...inp, resize: "vertical" }} /></label>
+              <div>
+                <StudioFileInput
+                  spec={BLOG_COVER_SPEC}
+                  label="Imagen de portada (opcional)"
+                  showDetailHint
+                  compactHint={false}
+                  fileName={coverFile?.name ?? null}
+                  onChange={setCoverFile}
+                  onError={(msg) => toast.error(msg)}
+                  inputStyle={inp}
+                />
+                <StudioImageHint spec={BLOG_CARD_SPEC} compact style={{ marginTop: 8 }} />
+              </div>
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
-              {saveErr && <p style={{ color: "var(--danger)", fontSize: 12, margin: "0 0 8px" }}>{saveErr}</p>}
-              <Button variant="secondary" onClick={() => { setShowForm(false); setSaveErr(null); }}>Cancelar</Button>
+              {saveErr && <p style={{ color: "var(--danger)", fontSize: 12, margin: "0 8px 0 0", alignSelf: "center" }}>{saveErr}</p>}
+              <Button variant="secondary" onClick={() => { setShowForm(false); setSaveErr(null); setCoverFile(null); }}>Cancelar</Button>
               <Button variant="primary" onClick={() => void submit()} disabled={saving || title.length < 4 || content.length < 20}>{saving ? "Guardando…" : "Crear borrador"}</Button>
             </div>
           </div>

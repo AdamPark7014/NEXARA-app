@@ -14,8 +14,7 @@
  * Backend: `apps/api/src/hero-slides/`.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
@@ -24,6 +23,11 @@ import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
 import { getStudioSectionConfig } from "@/lib/section-views";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import StudioFileInput from "@/components/studio/StudioFileInput";
+import {
+  STUDIO_IMAGE_SPECS,
+  studioImageHintLine,
+} from "@/lib/studio-image-specs";
 import {
   createHeroSlide,
   deleteHeroSlide,
@@ -34,8 +38,7 @@ import {
   type HeroSlide,
 } from "@/lib/hero-slides-api";
 
-const MAX_SIZE_BYTES = 5 * 1024 * 1024;
-const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const HERO_SPEC = STUDIO_IMAGE_SPECS.heroCarousel;
 
 export default function StudioHeroPage() {
   const { user, isContextReady } = useUser();
@@ -52,7 +55,6 @@ export default function StudioHeroPage() {
     href: "",
     file: null as File | null,
   });
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(async () => {
     if (!token) return;
@@ -76,29 +78,6 @@ export default function StudioHeroPage() {
     [slides],
   );
 
-  // ── Validación de archivo en cliente ─────────────────────────────
-  const validateFile = (file: File): string | null => {
-    if (!ACCEPTED_TYPES.includes(file.type)) {
-      return "Formato no permitido. Usa JPG, PNG, WEBP o GIF.";
-    }
-    if (file.size > MAX_SIZE_BYTES) {
-      return "El archivo supera 5 MB.";
-    }
-    return null;
-  };
-
-  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const error = validateFile(file);
-    if (error) {
-      toast.error(error);
-      e.target.value = "";
-      return;
-    }
-    setDraft((d) => ({ ...d, file }));
-  };
-
   // ── Crear ─────────────────────────────────────────────────────────
   const onCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,7 +94,6 @@ export default function StudioHeroPage() {
       });
       toast.success("Slide añadido al carrusel.");
       setDraft({ altText: "", href: "", file: null });
-      if (fileInputRef.current) fileInputRef.current.value = "";
       await refresh();
     } catch (err) {
       toast.error(`No se pudo guardar: ${(err as Error).message}`);
@@ -203,7 +181,7 @@ export default function StudioHeroPage() {
       <Section
         eyebrow="Nuevo slide"
         title="Subir imagen al carrusel"
-        subtitle="Formatos JPG, PNG, WEBP o GIF. Hasta 5 MB. Se recomienda 1920×1080 px."
+        subtitle={studioImageHintLine(HERO_SPEC)}
         tone="accent"
       >
         <form
@@ -215,21 +193,16 @@ export default function StudioHeroPage() {
             alignItems: "end",
           }}
         >
-          <label style={fieldStyle}>
-            <span style={labelStyle}>Imagen</span>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={ACCEPTED_TYPES.join(",")}
-              onChange={onFileChange}
-              style={inputStyle}
-            />
-            {draft.file && (
-              <span style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 4 }}>
-                {draft.file.name} · {(draft.file.size / 1024).toFixed(0)} KB
-              </span>
-            )}
-          </label>
+          <StudioFileInput
+            spec={HERO_SPEC}
+            label="Imagen"
+            showDetailHint
+            compactHint={false}
+            fileName={draft.file ? `${draft.file.name} · ${(draft.file.size / 1024).toFixed(0)} KB` : null}
+            onChange={(file) => setDraft((d) => ({ ...d, file }))}
+            onError={(msg) => toast.error(msg)}
+            inputStyle={inputStyle}
+          />
 
           <label style={fieldStyle}>
             <span style={labelStyle}>Texto alternativo (accesibilidad)</span>

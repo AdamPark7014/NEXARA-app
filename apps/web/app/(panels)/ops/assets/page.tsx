@@ -13,6 +13,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { getActivitiesCanonicalPath, resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES } from "@/lib/rbac";
+import { toast } from "@/components/Toast";
 
 interface Snapshot {
   id: number;
@@ -89,7 +90,7 @@ export default function AssetsPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : "Error al descargar reporte");
+      toast.error(e instanceof Error ? e.message : "Error al descargar reporte");
     }
   };
 
@@ -133,7 +134,7 @@ export default function AssetsPage() {
         model: r.model.trim() || undefined,
       }));
     if (!items.length) {
-      window.alert("Agrega al menos un equipo.");
+      toast.warning("Agrega al menos un equipo.");
       return;
     }
     setSaving(true);
@@ -155,7 +156,7 @@ export default function AssetsPage() {
       setEquipRows([{ equipmentName: "", serialNumber: "", model: "" }]);
       void load();
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : "No se pudo registrar el inventario");
+      toast.error(e instanceof Error ? e.message : "No se pudo registrar el inventario");
     } finally { setSaving(false); }
   };
 

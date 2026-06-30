@@ -10,6 +10,7 @@ import { DetailError } from "@/components/detail/DetailFrame";
 import { useOpsProjectDetail } from "@/components/ops/OpsProjectDetailShell";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
+import { toast } from "@/components/Toast";
 
 interface AssignableUser { id: number; nombre: string; roleKey?: string | null; }
 
@@ -73,7 +74,7 @@ export default function OpsProjectActivitiesPage() {
       setForm({ titulo: "", descripcion: "", responsableId: "", branchName: "" });
       reload();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Error al crear actividad");
+      toast.error(e instanceof Error ? e.message : "Error al crear actividad");
     } finally { setSaving(false); }
   };
 

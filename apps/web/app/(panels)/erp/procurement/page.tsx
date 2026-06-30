@@ -10,6 +10,7 @@ import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { getErpInventorySectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import { toast } from "@/components/Toast";
 
 type ProcTab = "orders" | "requisitions" | "receipts";
 
@@ -187,7 +188,7 @@ export default function ProcurementPage() {
         setReceipts(unwrapList<GoodsReceipt>(await apiFetch(`procurement/goods-receipts${qs}`, token)));
       }
     } catch (e) {
-      window.alert("Error al cargar: " + (e instanceof Error ? e.message : "error"));
+      toast.error("Error al cargar: " + (e instanceof Error ? e.message : "error"));
     } finally {
       setLoading(false);
     }
@@ -231,7 +232,7 @@ export default function ProcurementPage() {
       setReqItems([{ ...emptyReqItem }]);
       void load();
     } catch (e) {
-      window.alert("Error: " + (e instanceof Error ? e.message : "No se pudo crear"));
+      toast.error("Error: " + (e instanceof Error ? e.message : "No se pudo crear"));
     } finally {
       setSavingReq(false);
     }
@@ -261,7 +262,7 @@ export default function ProcurementPage() {
       setPoItems([{ ...emptyPoItem }]);
       void load();
     } catch (e) {
-      window.alert("Error: " + (e instanceof Error ? e.message : "No se pudo crear"));
+      toast.error("Error: " + (e instanceof Error ? e.message : "No se pudo crear"));
     } finally {
       setSavingPo(false);
     }
@@ -273,7 +274,7 @@ export default function ProcurementPage() {
       await apiFetch(`procurement/purchase-orders/${id}/approve`, token, { method: "PATCH" });
       void load();
     } catch (e) {
-      window.alert("Error al aprobar OC: " + (e instanceof Error ? e.message : "error"));
+      toast.error("Error al aprobar OC: " + (e instanceof Error ? e.message : "error"));
     }
   };
 
@@ -283,7 +284,7 @@ export default function ProcurementPage() {
       await apiFetch(`procurement/requisitions/${id}/approve`, token, { method: "PATCH" });
       void load();
     } catch (e) {
-      window.alert("Error al aprobar requisición: " + (e instanceof Error ? e.message : "error"));
+      toast.error("Error al aprobar requisición: " + (e instanceof Error ? e.message : "error"));
     }
   };
 

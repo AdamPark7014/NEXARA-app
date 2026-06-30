@@ -20,6 +20,7 @@ import {
   updateSalesProject,
 } from "@/lib/sales-api";
 import { getCrmSalesSectionConfig } from "@/lib/section-views";
+import { toast } from "@/components/Toast";
 
 const PROJECT_STATUSES = ["PLANNING", "IN_PROGRESS", "ON_HOLD", "CLOSED", "CANCELLED"];
 const PROJECT_TYPES = ["Instalación", "Mantenimiento", "Consultoría", "Soporte", "Integración", "Otro"];
@@ -101,7 +102,7 @@ export default function CrmProjectDetailPage() {
 
   const provision = async () => {
     if (!token) return;
-    try { await provisionSalesProjectOperacion(token, id); reload(); } catch { /* ignore */ }
+    try { await provisionSalesProjectOperacion(token, id); reload(); } catch (e) { toast.error(e instanceof Error ? e.message : "No se pudo provisionar el proyecto"); }
   };
 
   if (error) return <DetailError message={error} onRetry={reload} />;

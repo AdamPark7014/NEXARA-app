@@ -6,6 +6,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
+import { toast } from "@/components/Toast";
 import { getApprovalsSectionConfig } from "@/lib/section-views";
 import {
   listMyPendingApprovals,
@@ -186,7 +187,7 @@ export default function ApprovalsPage() {
             <Button
               variant="secondary"
               iconLeft="🛠️"
-              onClick={() => window.alert("La configuración visual de flujos de aprobación estará disponible próximamente. Los flujos actuales se definen por tipo de entidad y nivel jerárquico.")}
+              onClick={() => toast.info("La configuración visual de flujos de aprobación estará disponible próximamente. Los flujos actuales se definen por tipo de entidad y nivel jerárquico.")}
             >
               Definir flujos
             </Button>

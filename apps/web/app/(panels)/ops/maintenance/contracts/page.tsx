@@ -11,6 +11,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import { toast } from "@/components/Toast";
 
 interface Contract {
   id: number;
@@ -136,7 +137,7 @@ export default function MaintenanceContractsPage() {
       setItems((prev) => prev.map((i) => (i.id === selected.id ? { ...i, ...updated } : i)));
       setSelected((prev) => (prev ? { ...prev, ...updated } : prev));
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
     } finally {
       setEditSaving(false);
     }
@@ -157,7 +158,7 @@ export default function MaintenanceContractsPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Error al descargar PDF");
+      toast.error(e instanceof Error ? e.message : "Error al descargar PDF");
     }
   };
 
@@ -167,7 +168,7 @@ export default function MaintenanceContractsPage() {
       await apiFetch(`maintenance-contracts/visits/${visitId}/generate-ot`, token, { method: "POST", body: "{}" });
       if (selected) void loadVisits(selected.id);
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
     }
   };
 
@@ -177,7 +178,7 @@ export default function MaintenanceContractsPage() {
       await apiFetch(`maintenance-contracts/visits/${visitId}/complete`, token, { method: "POST", body: "{}" });
       if (selected) void loadVisits(selected.id);
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
     }
   };
 
@@ -201,7 +202,7 @@ export default function MaintenanceContractsPage() {
       setShowForm(false);
       setForm({ ...emptyForm });
     } catch (e) {
-      window.alert("Error: " + (e instanceof Error ? e.message : "No se pudo crear"));
+      toast.error("Error: " + (e instanceof Error ? e.message : "No se pudo crear"));
     } finally { setSaving(false); }
   };
 
@@ -221,7 +222,7 @@ export default function MaintenanceContractsPage() {
     try {
       await apiFetch(`maintenance-contracts/${c.id}/status`, token, { method: "PATCH", body: JSON.stringify({ status }) });
       setItems((prev) => prev.map((i) => (i.id === c.id ? { ...i, status: status as Contract["status"] } : i)));
-    } catch (e) { alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
+    } catch (e) { toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`); }
   };
 
   const columns: Column<Contract>[] = [

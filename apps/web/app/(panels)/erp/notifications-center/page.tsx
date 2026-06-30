@@ -9,6 +9,7 @@ import Button from "@/components/ui/Button";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl } from "@/lib/api-base";
 import { normalizeLegacyPath } from "@/lib/legacy-path-remap";
+import { toast } from "@/components/Toast";
 
 interface Notif {
   id: number;
@@ -75,7 +76,7 @@ export default function NotificationsCenterPage() {
       await apiFetch(`notifications/${id}/read`, token, { method: "PATCH" });
       setNotifs(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
     } catch (e: unknown) {
-      window.alert("No se pudo marcar como leída: " + (e instanceof Error ? e.message : "error"));
+      toast.error("No se pudo marcar como leída: " + (e instanceof Error ? e.message : "error"));
     }
   };
 
@@ -85,7 +86,7 @@ export default function NotificationsCenterPage() {
       await apiFetch("notifications/read-all", token, { method: "PATCH" });
       setNotifs(prev => prev.map(n => ({ ...n, isRead: true })));
     } catch (e: unknown) {
-      window.alert("No se pudieron marcar todas: " + (e instanceof Error ? e.message : "error"));
+      toast.error("No se pudieron marcar todas: " + (e instanceof Error ? e.message : "error"));
     }
   };
 
@@ -95,7 +96,7 @@ export default function NotificationsCenterPage() {
       await apiFetch(`notifications/${id}`, token, { method: "DELETE" });
       setNotifs(prev => prev.filter(n => n.id !== id));
     } catch (e: unknown) {
-      window.alert("No se pudo eliminar: " + (e instanceof Error ? e.message : "error"));
+      toast.error("No se pudo eliminar: " + (e instanceof Error ? e.message : "error"));
     }
   };
 

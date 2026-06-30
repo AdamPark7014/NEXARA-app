@@ -12,6 +12,7 @@ import { useUser } from "@/components/UserContext";
 import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { toast } from "@/components/Toast";
 
 interface InvoiceRow {
   id: number;
@@ -129,7 +130,7 @@ export default function InvoicingPage() {
     try {
       await apiFetch(`accounting/invoices/${inv.id}/stamp`, token, { method: "POST" });
       void load();
-    } catch (e) { alert(`Error al timbrar: ${e instanceof Error ? e.message : "desconocido"}`); }
+    } catch (e) { toast.error(`Error al timbrar: ${e instanceof Error ? e.message : "desconocido"}`); }
   };
 
   const cancel = async (inv: InvoiceRow) => {
@@ -138,7 +139,7 @@ export default function InvoicingPage() {
     try {
       await apiFetch(`accounting/invoices/${inv.id}/cancel`, token, { method: "PATCH", body: JSON.stringify({ cancelReason: "02" }) });
       void load();
-    } catch (e) { alert(`Error al cancelar: ${e instanceof Error ? e.message : "desconocido"}`); }
+    } catch (e) { toast.error(`Error al cancelar: ${e instanceof Error ? e.message : "desconocido"}`); }
   } });
   };
 
@@ -206,7 +207,7 @@ export default function InvoicingPage() {
 
   const openEditDraft = async (inv: InvoiceRow) => {
     if (inv.status !== "DRAFT") {
-      window.alert("Solo se pueden editar facturas en borrador.");
+      toast.warning("Solo se pueden editar facturas en borrador.");
       return;
     }
     setEditingInvoice(inv);

@@ -89,14 +89,18 @@ export default function ContactoPage() {
       pageUrl: typeof window !== "undefined" ? window.location.pathname : "/contacto",
     };
 
-    const response = await fetch(buildApiUrl("contact-messages"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
+    try {
+      const response = await fetch(buildApiUrl("contact-messages"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) { setLoading(false); return; }
+    } catch {
+      setLoading(false);
+      return;
+    }
     setLoading(false);
-    if (!response.ok) return;
     setSubmitted(true);
     timeoutRef.current = setTimeout(() => {
       setSubmitted(false);

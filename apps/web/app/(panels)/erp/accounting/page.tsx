@@ -12,6 +12,7 @@ import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { toast } from "@/components/Toast";
 
 interface JournalEntry {
   id: number;
@@ -158,7 +159,7 @@ export default function AccountingPage() {
       const updated = await apiFetch(`accounting/journal-entries/${id}/post`, token, { method: "PATCH" });
       setItems(prev => prev.map(e => e.id === id ? { ...e, ...updated } : e));
     } catch (e) {
-      window.alert(formatApiError(e, "No se pudo contabilizar"));
+      toast.error(formatApiError(e, "No se pudo contabilizar"));
     }
   };
 
@@ -169,7 +170,7 @@ export default function AccountingPage() {
       const updated = await apiFetch(`accounting/journal-entries/${id}/reverse`, token, { method: "POST" });
       setItems(prev => prev.map(e => e.id === id ? { ...e, ...updated } : e));
     } catch (e) {
-      window.alert(formatApiError(e, "No se pudo reversar"));
+      toast.error(formatApiError(e, "No se pudo reversar"));
     }
   } });
   };

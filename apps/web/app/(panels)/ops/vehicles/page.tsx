@@ -11,6 +11,7 @@ import { getVehiclesSectionConfig } from "@/lib/section-views";
 import { useOpsCanonicalRoute } from "@/lib/use-ops-canonical-route";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { toast } from "@/components/Toast";
 
 interface Vehicle {
   id: number;
@@ -99,7 +100,7 @@ export default function VehiclesPage() {
     try {
       await apiFetch(`vehicles/${id}/approve`, token, { method: "PATCH", body: JSON.stringify({ action }) });
       void loadRequests();
-    } catch (e) { alert(e instanceof Error ? e.message : "Error al autorizar"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Error al autorizar"); }
   };
 
   const load = useCallback(async () => {
@@ -135,7 +136,7 @@ export default function VehiclesPage() {
   const save = async () => {
     const nombre = buildVehicleName(form);
     if (!token || !nombre) {
-      alert("Marca y modelo son obligatorios");
+      toast.warning("Marca y modelo son obligatorios");
       return;
     }
     const notas = [
@@ -159,7 +160,7 @@ export default function VehiclesPage() {
       }
       setShowForm(false);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Error al guardar vehículo");
+      toast.error(e instanceof Error ? e.message : "Error al guardar vehículo");
     } finally {
       setSaving(false);
     }
@@ -167,7 +168,7 @@ export default function VehiclesPage() {
 
   const doCheckout = async () => {
     if (!checkoutId || !token) return;
-    if (checkoutPhotos.length === 0) { alert("Sube al menos 1 foto del estado actual del vehículo"); return; }
+    if (checkoutPhotos.length === 0) { toast.warning("Sube al menos 1 foto del estado actual del vehículo"); return; }
     setPhotoSaving(true);
     try {
       const fd = new FormData();
@@ -177,13 +178,13 @@ export default function VehiclesPage() {
       });
       if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
       setCheckoutId(null); setCheckoutPhotos([]); load();
-    } catch (e) { alert(e instanceof Error ? e.message : "Error al registrar salida"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Error al registrar salida"); }
     finally { setPhotoSaving(false); }
   };
 
   const doReturn = async () => {
     if (!returnId || !token) return;
-    if (returnPhotos.length === 0) { alert("Sube al menos 1 foto del estado en que se entrega el vehículo"); return; }
+    if (returnPhotos.length === 0) { toast.warning("Sube al menos 1 foto del estado en que se entrega el vehículo"); return; }
     setPhotoSaving(true);
     try {
       const fd = new FormData();
@@ -193,7 +194,7 @@ export default function VehiclesPage() {
       });
       if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
       setReturnId(null); setReturnPhotos([]); load();
-    } catch (e) { alert(e instanceof Error ? e.message : "Error al registrar devolución"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Error al registrar devolución"); }
     finally { setPhotoSaving(false); }
   };
 
@@ -203,7 +204,7 @@ export default function VehiclesPage() {
     try {
       await apiFetch(`vehicles/inventory/${id}`, token, { method: "PATCH", body: JSON.stringify({ activo: false }) });
       setItems(prev => prev.filter(v => v.id !== id));
-    } catch (e) { alert(e instanceof Error ? e.message : "Error al eliminar vehículo"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Error al eliminar vehículo"); }
   } });
   };
 

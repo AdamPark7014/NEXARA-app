@@ -14,6 +14,7 @@ export default function OpportunityNotesPage() {
   const { opportunity, error, reload } = useOpportunityDetail();
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   if (error) return <DetailError message={error} onRetry={reload} />;
   if (!opportunity) return null;
@@ -23,12 +24,13 @@ export default function OpportunityNotesPage() {
   const submit = async () => {
     if (!token || !message.trim()) return;
     setSaving(true);
+    setSaveError(null);
     try {
       await addSalesOpportunityNote(token, opportunity.id, message.trim());
       setMessage("");
       reload();
-    } catch {
-      /* ignore */
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "No se pudo agregar la nota");
     } finally {
       setSaving(false);
     }
@@ -36,6 +38,7 @@ export default function OpportunityNotesPage() {
 
   return (
     <DetailSection title="Notas de seguimiento">
+      {saveError && <p role="alert" style={{ color: "var(--danger)", fontSize: 12, marginBottom: 8 }}>{saveError}</p>}
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         <textarea
           value={message}

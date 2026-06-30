@@ -10,7 +10,11 @@ import {
   Put,
   Query,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { RBAC, RbacGuard } from '../common/rbac.guard.js';
+import { PERMISSIONS } from '../common/permissions.js';
 import { ContactMessagesService } from './contact-messages.service.js';
 import { PaginationQueryDto } from '../common/dto/pagination.dto.js';
 import { CreateContactMessageDto } from './dto/create-contact-message.dto.js';
@@ -39,16 +43,22 @@ export class ContactMessagesController {
   }
 
   @Get()
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
   findAll(@Query('status') status?: string, @Query('category') category?: string, @Query() query?: PaginationQueryDto) {
     return this.contactMessagesService.findAll(status, category, query);
   }
 
   @Get(':id')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ACCESS] })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.contactMessagesService.findOne(id);
   }
 
   @Put(':id')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateContactMessageDto: UpdateContactMessageDto,
@@ -57,6 +67,8 @@ export class ContactMessagesController {
   }
 
   @Delete(':id')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CONSOLE_ADMIN] })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.contactMessagesService.remove(id);
   }

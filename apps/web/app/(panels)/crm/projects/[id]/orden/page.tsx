@@ -48,7 +48,9 @@ export default function ProjectOrderPage() {
         const created = await closeSalesProject(token, id);
         setOrder(created);
         reload();
-      } catch { /* ignore */ }
+      } catch (e) {
+        setSaveErr(e instanceof Error ? e.message : "No se pudo generar la orden de cierre");
+      }
     } });
   };
 

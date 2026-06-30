@@ -40,9 +40,11 @@ export default function StudioDashboardPage() {
   const [contacts, setContacts]   = useState<number | null>(null);
   const [cases, setCases]         = useState<{ total: number; publicados: number } | null>(null);
   const [posts, setPosts]         = useState<{ id: number; red: string; titulo: string; cuando: string; estado: string }[]>([]);
+  const [loadErr, setLoadErr]       = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
+    setLoadErr(null);
     try {
       const [contactData, caseData, postData] = await Promise.allSettled([
         apiFetch("contact-messages?limit=1", token),
@@ -64,7 +66,9 @@ export default function StudioDashboardPage() {
         const arr = Array.isArray(postData.value) ? postData.value : (postData.value?.data ?? []);
         setPosts(arr.filter((p: { estado: string }) => p.estado === "Programado" || p.estado === "Borrador").slice(0, 4));
       }
-    } catch { /* ignore */ }
+    } catch (e) {
+      setLoadErr(e instanceof Error ? e.message : "Error al cargar el panel");
+    }
   }, [token]);
 
   useEffect(() => { load(); }, [load]);
@@ -81,6 +85,7 @@ export default function StudioDashboardPage() {
 
   return (
     <>
+      {loadErr && <p role="alert" style={{ color: "var(--danger)", fontSize: 12, marginBottom: 12 }}>⚠ {loadErr}</p>}
       <PageHeader
         eyebrow="STUDIO · Marca y marketing"
         title={cfg.title}

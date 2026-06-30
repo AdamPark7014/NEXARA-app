@@ -10,6 +10,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import { toast } from "@/components/Toast";
 
 interface TicketRequest {
   id: number;
@@ -77,7 +78,7 @@ export default function SupportInboxPage() {
       const updated = await apiFetch(`client-ticket-requests/${t.id}/status`, token, { method: "PATCH", body: JSON.stringify({ status }) });
       setItems((prev) => prev.map((i) => (i.id === t.id ? { ...i, ...(updated ?? { status }) } : i)));
     } catch (e) {
-      alert(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
+      toast.error(`Error: ${e instanceof Error ? e.message : "desconocido"}`);
     }
   };
 

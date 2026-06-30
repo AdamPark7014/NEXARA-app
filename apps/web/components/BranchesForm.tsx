@@ -4,6 +4,7 @@ import ClientLocationPicker, { ClientLocationValue } from './ClientLocationPicke
 import styles from './BranchesForm.module.css';
 import { io, Socket } from 'socket.io-client';
 import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from '@/lib/api-base';
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 export type Branch = {
   id: number;
@@ -56,6 +57,7 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
   companyLogoUrl,
 }) => {
   const [editingBranchId, setEditingBranchId] = useState<number | null>(null);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [branchDraft, setBranchDraft] = useState<BranchDraftType>({
     name: '',
     branchNumber: '',
@@ -268,28 +270,23 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
     }
   };
 
-  const handleBranchDelete = async (id: number) => {
-    if (!confirm('¿Estás seguro de que deseas eliminar esta sucursal?')) return;
-
-    setSaving(true);
-    setError(null);
-
-    try {
-      const res = await fetch(buildApiUrl(`client-portal/branches/${id}`), {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!res.ok) {
-        throw new Error('No se pudo eliminar la sucursal');
+  const handleBranchDelete = (id: number) => {
+    setConfirmState({ message: '¿Estás seguro de que deseas eliminar esta sucursal?', fn: async () => {
+      setSaving(true);
+      setError(null);
+      try {
+        const res = await fetch(buildApiUrl(`client-portal/branches/${id}`), {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('No se pudo eliminar la sucursal');
+        onBranchSaved();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Error al eliminar la sucursal');
+      } finally {
+        setSaving(false);
       }
-
-      onBranchSaved();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al eliminar la sucursal');
-    } finally {
-      setSaving(false);
-    }
+    } });
   };
 
   const handleLocationChange = (value: ClientLocationValue | null) => {
@@ -456,6 +453,8 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
   };
 
   return (
+    <>
+    <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     <div className={styles.root}>
       {/* Formulario de creación/edición */}
       <div className={styles.formCard}>
@@ -795,8 +794,8 @@ const BranchesForm: React.FC<BranchesFormProps> = ({
         </div>
       )}
     </div>
+    </>
   );
 };
 
 export default BranchesForm;
-

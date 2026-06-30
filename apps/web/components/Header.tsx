@@ -44,19 +44,23 @@ function BackupRestorePanel() {
 
   // Exportar backup general
   const handleExport = async () => {
-    const res = await fetch('/api/export/all', {
-      headers: { Authorization: `Bearer ${user.token}` },
-    });
-    if (!res.ok) return setMsg('Error al exportar backup');
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'nexara-backup.json';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
+    try {
+      const res = await fetch('/api/export/all', {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      if (!res.ok) return setMsg('Error al exportar backup');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'nexara-backup.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setMsg('Error al exportar backup');
+    }
   };
 
   // Importar backup general
@@ -64,19 +68,23 @@ function BackupRestorePanel() {
     setMsg(null);
     const file = e.target.files?.[0];
     if (!file || !user) return;
-    const formData = new FormData();
-    formData.append('file', file);
-    const res = await fetch('/api/import/all', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${user.token}` },
-      body: formData,
-    });
-    if (!res.ok) {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/import/all', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${user.token}` },
+        body: formData,
+      });
+      if (!res.ok) {
+        setMsg('Error al importar backup');
+        return;
+      }
+      const data = await res.json();
+      setMsg(data.message || 'Importación exitosa');
+    } catch {
       setMsg('Error al importar backup');
-      return;
     }
-    const data = await res.json();
-    setMsg(data.message || 'Importación exitosa');
   };
 
   return (

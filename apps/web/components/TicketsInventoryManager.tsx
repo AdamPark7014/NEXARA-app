@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { io, Socket } from 'socket.io-client';
 import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 type BranchOption = { id: number; name: string; branchNumber?: string | null };
 
@@ -80,6 +81,7 @@ const emptyItem = (): InventoryItemDraft => ({
 
 export default function TicketsInventoryManager({ token, mode, fixedBranch, branches = [] }: Props) {
   const [loading, setLoading] = useState(false);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -623,7 +625,7 @@ export default function TicketsInventoryManager({ token, mode, fixedBranch, bran
     return invalidIndex;
   };
 
-  const saveInventory = async (completed: boolean) => {
+  const saveInventory = async (completed: boolean, forceInventoryConfirmed = false) => {
     setSaving(true);
     setError(null);
     setSuccess(null);
@@ -643,17 +645,15 @@ export default function TicketsInventoryManager({ token, mode, fixedBranch, bran
     }
 
     const deltaCount = items.length - previousCount;
-    let confirmDifference = false;
-    if (completed && deltaCount !== 0) {
-      const proceed = window.confirm(
-        `Detectamos ${Math.abs(deltaCount)} equipos ${deltaCount > 0 ? "de más" : "de menos"} vs inventario previo. ¿Deseas guardar?`,
-      );
-      if (!proceed) {
-        setSaving(false);
-        return;
-      }
-      confirmDifference = true;
+    if (completed && deltaCount !== 0 && !forceInventoryConfirmed) {
+      setSaving(false);
+      setConfirmState({
+        message: `Detectamos ${Math.abs(deltaCount)} equipos ${deltaCount > 0 ? "de más" : "de menos"} vs inventario previo. ¿Deseas guardar?`,
+        fn: async () => { await saveInventory(completed, true); },
+      });
+      return;
     }
+    const confirmDifference = completed && deltaCount !== 0;
 
     const payload: any = {
       snapshotId: selectedInventoryId || undefined,
@@ -745,6 +745,8 @@ export default function TicketsInventoryManager({ token, mode, fixedBranch, bran
   };
 
   return (
+    <>
+    <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     <div className="card inventory-manager">
       <div className="panel-toolbar">
         <div className="panel-toolbar-title">
@@ -1521,5 +1523,6 @@ export default function TicketsInventoryManager({ token, mode, fixedBranch, bran
         }
       `}</style>
     </div>
+    </>
   );
 }

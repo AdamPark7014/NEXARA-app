@@ -177,9 +177,11 @@ export default function ErpDashboardPage() {
         }
         actions={
           <>
-            <Button variant="secondary" iconLeft="📥">
-              Exportar
-            </Button>
+            <Link href="/erp/exports" style={{ textDecoration: "none" }}>
+              <Button variant="secondary" iconLeft="📥">
+                Exportar
+              </Button>
+            </Link>
             <Link href="/erp/executive" style={{ textDecoration: "none" }}>
               <Button variant="primary" iconLeft="📊" iconRight="→">
                 Vista ejecutiva

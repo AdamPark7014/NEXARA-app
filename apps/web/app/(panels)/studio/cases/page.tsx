@@ -9,6 +9,11 @@ import { useUser } from "@/components/UserContext";
 import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import StudioFileInput from "@/components/studio/StudioFileInput";
+import { STUDIO_IMAGE_SPECS, studioImageHintLine } from "@/lib/studio-image-specs";
+import { toast } from "@/components/Toast";
+
+const CASE_COVER_SPEC = STUDIO_IMAGE_SPECS.caseCover;
 
 interface CaseStudy {
   id: number;
@@ -18,6 +23,7 @@ interface CaseStudy {
   impacto: string;
   descripcion?: string;
   cover?: string;
+  imageUrl?: string | null;
   publicado: boolean;
   slug: string;
   createdAt: string;
@@ -33,6 +39,22 @@ async function apiFetch(path: string, token: string, opts?: RequestInit) {
   return res.json();
 }
 
+async function apiFormData(path: string, token: string, formData: FormData, method = "POST") {
+  const res = await fetch(buildApiUrl(path), {
+    method,
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+function resolveCaseStudyImageUrl(imageUrl?: string | null): string {
+  if (!imageUrl) return "";
+  if (/^https?:\/\//i.test(imageUrl)) return imageUrl;
+  return buildApiUrl(imageUrl.replace(/^\//, ""));
+}
+
 const EMPTY_FORM = { titulo: "", cliente: "", vertical: "Servicios", impacto: "", descripcion: "", cover: "🏆" };
 
 export default function StudioCasesPage() {
@@ -46,6 +68,7 @@ export default function StudioCasesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing]   = useState<CaseStudy | null>(null);
   const [form, setForm]         = useState({ ...EMPTY_FORM });
+  const [coverFile, setCoverFile] = useState<File | null>(null);
   const [saving, setSaving]     = useState(false);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [saveErr, setSaveErr] = useState<string | null>(null);
@@ -65,18 +88,31 @@ export default function StudioCasesPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const openNew = () => { setEditing(null); setForm({ ...EMPTY_FORM }); setShowForm(true); };
+  const openNew = () => { setEditing(null); setForm({ ...EMPTY_FORM }); setCoverFile(null); setShowForm(true); };
   const openEdit = (c: CaseStudy) => {
     setEditing(c);
     setForm({ titulo: c.titulo, cliente: c.cliente, vertical: c.vertical, impacto: c.impacto, descripcion: c.descripcion ?? "", cover: c.cover ?? "🏆" });
+    setCoverFile(null);
     setShowForm(true);
   };
 
   const save = async () => {
     if (!form.titulo || !form.cliente) { setSaveErr("Título y cliente son requeridos."); return; }
     setSaving(true);
+    setSaveErr(null);
     try {
-      if (editing) {
+      if (coverFile) {
+        const fd = new FormData();
+        Object.entries(form).forEach(([key, value]) => fd.append(key, value));
+        fd.append("coverImage", coverFile);
+        if (editing) {
+          const updated = await apiFormData(`case-studies/${editing.id}`, token, fd, "PATCH");
+          setItems(prev => prev.map(c => c.id === editing.id ? updated : c));
+        } else {
+          const created = await apiFormData("case-studies", token, fd);
+          setItems(prev => [created, ...prev]);
+        }
+      } else if (editing) {
         const updated = await apiFetch(`case-studies/${editing.id}`, token, { method: "PATCH", body: JSON.stringify(form) });
         setItems(prev => prev.map(c => c.id === editing.id ? updated : c));
       } else {
@@ -84,6 +120,7 @@ export default function StudioCasesPage() {
         setItems(prev => [created, ...prev]);
       }
       setShowForm(false);
+      setCoverFile(null);
     } catch (e: unknown) {
       setSaveErr(e instanceof Error ? e.message : "Error al guardar caso");
     } finally {
@@ -95,7 +132,9 @@ export default function StudioCasesPage() {
     try {
       const updated = await apiFetch(`case-studies/${c.id}/toggle-publicado`, token, { method: "PATCH" });
       setItems(prev => prev.map(x => x.id === c.id ? { ...x, publicado: updated.publicado } : x));
-    } catch { /* ignore */ }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo actualizar el estado");
+    }
   };
 
   const remove = async (id: number) => {
@@ -103,7 +142,9 @@ export default function StudioCasesPage() {
     try {
       await apiFetch(`case-studies/${id}`, token, { method: "DELETE" });
       setItems(prev => prev.filter(c => c.id !== id));
-    } catch { /* ignore */ }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo eliminar");
+    }
   } });
   };
 
@@ -121,7 +162,7 @@ export default function StudioCasesPage() {
       <PageHeader
         eyebrow="STUDIO · Contenido"
         title={cfg.title}
-        subtitle={cfg.subtitle}
+        subtitle={`${cfg.subtitle} ${studioImageHintLine(CASE_COVER_SPEC)}`}
         actions={
           cfg.canCreate ? <Button variant="primary" iconLeft="🏆" onClick={openNew}>Nuevo caso</Button> : undefined
         }
@@ -165,8 +206,27 @@ export default function StudioCasesPage() {
               <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)" }}>Descripción (opcional)</label>
               <textarea style={{ ...inputStyle, minHeight: 80, resize: "vertical" }} value={form.descripcion} onChange={field("descripcion")} placeholder="Describe el proyecto, la solución implementada y los resultados…" />
             </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, gridColumn: "1 / -1" }}>
+              <StudioFileInput
+                spec={CASE_COVER_SPEC}
+                label="Foto de portada (opcional)"
+                showDetailHint
+                compactHint={false}
+                fileName={
+                  coverFile
+                    ? coverFile.name
+                    : editing?.imageUrl
+                      ? "Imagen actual en servidor"
+                      : null
+                }
+                onChange={setCoverFile}
+                onError={(msg) => toast.error(msg)}
+                inputStyle={inputStyle}
+              />
+            </div>
           </div>
-          <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+          <div style={{ display: "flex", gap: 8, marginTop: 14, alignItems: "center" }}>
+            {saveErr && <p style={{ color: "var(--danger)", fontSize: 12, margin: 0, flex: 1 }}>{saveErr}</p>}
             <Button variant="primary" onClick={save}>{saving ? "Guardando…" : (editing ? "Guardar cambios" : "Crear caso")}</Button>
             <Button variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
           </div>
@@ -183,14 +243,24 @@ export default function StudioCasesPage() {
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14 }}>
-            {items.map(c => (
+            {items.map(c => {
+              const coverSrc = resolveCaseStudyImageUrl(c.imageUrl);
+              return (
               <article key={c.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
                 <div style={{
                   height: 120,
-                  background: "linear-gradient(135deg, color-mix(in srgb, var(--primary) 25%, transparent), color-mix(in srgb, var(--accent) 15%, transparent))",
+                  background: coverSrc
+                    ? "#0a1419"
+                    : "linear-gradient(135deg, color-mix(in srgb, var(--primary) 25%, transparent), color-mix(in srgb, var(--accent) 15%, transparent))",
                   display: "flex", alignItems: "center", justifyContent: "center", fontSize: 52, position: "relative",
+                  overflow: "hidden",
                 }}>
-                  {c.cover ?? "🏆"}
+                  {coverSrc ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={coverSrc} alt={c.titulo} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  ) : (
+                    c.cover ?? "🏆"
+                  )}
                   <div style={{ position: "absolute", top: 8, right: 8 }}>
                     <Tag variant={c.publicado ? "positive" : "warning"}>{c.publicado ? "Publicado" : "Borrador"}</Tag>
                   </div>
@@ -226,7 +296,7 @@ export default function StudioCasesPage() {
                   </div>
                 </div>
               </article>
-            ))}
+            );})}
           </div>
         )}
       </Section>

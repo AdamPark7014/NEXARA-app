@@ -12,6 +12,7 @@ import { useUser } from "@/components/UserContext";
 import { getErpInventorySectionConfig } from "@/lib/section-views";
 import { listStockLevels, mapStockLevelToRow, updateStockLevelConfig, listWarehouses, listCatalogProducts, createStockMovement } from "@/lib/stock-api";
 import { formatApiError } from "@/lib/erp-api";
+import { toast } from "@/components/Toast";
 
 type StockRow = ReturnType<typeof mapStockLevelToRow>;
 
@@ -62,7 +63,7 @@ export default function WarehousePage() {
       setShowWarehouseForm(false);
       setWarehouseForm({ name: "", code: "", address: "", city: "" });
       void loadWarehouses();
-    } catch (e) { alert(e instanceof Error ? e.message : "Error al crear almacén"); }
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Error al crear almacén"); }
     finally { setSavingWarehouse(false); }
   };
 
@@ -110,7 +111,7 @@ export default function WarehousePage() {
       setMovement({ type: "RECEIPT", productId: "", warehouseId: "", quantity: 1, unitCost: "", reference: "" });
       void load();
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : "Error al registrar entrada");
+      toast.error(e instanceof Error ? e.message : "Error al registrar entrada");
     } finally {
       setSavingMovement(false);
     }
@@ -129,7 +130,7 @@ export default function WarehousePage() {
       setItems((prev) => prev.map((i) => (i.id === editing.id ? { ...i, minimo } : i)));
       setShowForm(false);
     } catch (e) {
-      window.alert(formatApiError(e, "No se pudo actualizar el mínimo de stock"));
+      toast.error(formatApiError(e, "No se pudo actualizar el mínimo de stock"));
     }
   };
 

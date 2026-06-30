@@ -52,13 +52,14 @@ export default function FloatingContactForm() {
       pageUrl: typeof window !== "undefined" ? window.location.pathname : undefined,
     };
 
-    const response = await fetch(buildApiUrl("contact-messages"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
+    try {
+      const response = await fetch(buildApiUrl("contact-messages"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) { setLoading(false); return; }
+    } catch {
       setLoading(false);
       return;
     }

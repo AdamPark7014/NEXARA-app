@@ -7,6 +7,7 @@ import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
+import { toast } from "@/components/Toast";
 import { getCrmSalesSectionConfig } from "@/lib/section-views";
 import {
   createSalesClient,
@@ -38,6 +39,7 @@ export default function ClientsPage() {
 
   const [items, setItems] = useState<SalesClient[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<SalesClient | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
@@ -45,11 +47,12 @@ export default function ClientsPage() {
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
+    setLoadError(null);
     try {
       const data = await listSalesClients(token);
       setItems(data);
-    } catch {
-      /* skip */
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "No se pudieron cargar los datos");
     } finally {
       setLoading(false);
     }
@@ -93,8 +96,8 @@ export default function ClientsPage() {
         setItems((prev) => [created, ...prev]);
       }
       setShowForm(false);
-    } catch {
-      /* skip */
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo guardar el cliente");
     }
   };
 
@@ -260,7 +263,7 @@ export default function ClientsPage() {
             columns={columns}
             rows={items}
             rowKey={(c) => c.id}
-            emptyTitle="Sin clientes"
+            emptyTitle={loadError ? `⚠ ${loadError}` : "Sin clientes"}
             emptyDescription="Agrega el primer cliente a la cartera comercial."
           />
         )}

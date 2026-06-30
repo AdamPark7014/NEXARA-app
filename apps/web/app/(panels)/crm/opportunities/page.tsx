@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
+import { toast } from "@/components/Toast";
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
@@ -42,9 +44,11 @@ export default function OpportunitiesPage() {
 
   const [items, setItems] = useState<SalesOpportunity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<SalesOpportunity | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   useEffect(() => {
     if (searchParams.get("new") === "1" && cfg.canCreate) {
@@ -57,10 +61,11 @@ export default function OpportunitiesPage() {
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
+    setLoadError(null);
     try {
       setItems(await listSalesOpportunities(token));
-    } catch {
-      /* skip */
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "No se pudieron cargar los datos");
     } finally {
       setLoading(false);
     }
@@ -109,19 +114,21 @@ export default function OpportunitiesPage() {
         setItems((prev) => [created, ...prev]);
       }
       setShowForm(false);
-    } catch {
-      /* skip */
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo guardar la oportunidad");
     }
   };
 
-  const remove = async (id: number) => {
-    if (!token || !confirm("¿Eliminar esta oportunidad?")) return;
-    try {
-      await deleteSalesOpportunity(token, id);
-      setItems((prev) => prev.filter((o) => o.id !== id));
-    } catch {
-      /* skip */
-    }
+  const remove = (id: number) => {
+    if (!token) return;
+    setConfirmState({ message: "¿Eliminar esta oportunidad?", fn: async () => {
+      try {
+        await deleteSalesOpportunity(token, id);
+        setItems((prev) => prev.filter((o) => o.id !== id));
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "No se pudo eliminar la oportunidad");
+      }
+    } });
   };
 
   const patchStage = async (id: number, stage: string) => {
@@ -129,8 +136,8 @@ export default function OpportunitiesPage() {
     try {
       const updated = await updateSalesOpportunityStage(token, id, stage);
       setItems((prev) => prev.map((o) => (o.id === id ? { ...o, ...updated } : o)));
-    } catch {
-      /* skip */
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo actualizar la etapa");
     }
   };
 
@@ -229,6 +236,7 @@ export default function OpportunitiesPage() {
 
   return (
     <>
+      <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
       <PageHeader
         eyebrow="CRM · Pipeline"
         title={cfg.title}
@@ -285,7 +293,7 @@ export default function OpportunitiesPage() {
         {loading ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)" }}>Cargando…</div>
         ) : (
-          <DataTable columns={columns} rows={visibleItems} rowKey={(o) => o.id} emptyTitle="Sin oportunidades" emptyDescription="Agrega la primera oportunidad al pipeline." />
+          <DataTable columns={columns} rows={visibleItems} rowKey={(o) => o.id} emptyTitle={loadError ? `⚠ ${loadError}` : "Sin oportunidades"} emptyDescription="Agrega la primera oportunidad al pipeline." />
         )}
       </Section>
     </>

@@ -10,6 +10,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import { createSalesQuote, linkSalesQuoteToOpportunity } from "@/lib/sales-api";
 import { DetailError, DetailSection, formatDateTime } from "@/components/detail/DetailFrame";
 import { useOpportunityDetail } from "@/components/crm/OpportunityDetailShell";
+import { toast } from "@/components/Toast";
 
 interface LineItem { name: string; qty: number; unitPrice: number; discount: number; tax: number }
 const emptyItem = (): LineItem => ({ name: "", qty: 1, unitPrice: 0, discount: 0, tax: 16 });
@@ -72,7 +73,7 @@ export default function OpportunityQuotesPage() {
       setLines([emptyItem()]);
       reload();
     } catch (e) {
-      alert("Error: " + (e instanceof Error ? e.message : "desconocido"));
+      toast.error("Error: " + (e instanceof Error ? e.message : "desconocido"));
     } finally { setSaving(false); }
   };
 

@@ -11,6 +11,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import { formatApiError } from "@/lib/erp-api";
 import { filterRowsByScope, getErpExpensesSectionConfig } from "@/lib/section-views";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { toast } from "@/components/Toast";
 
 interface Expense {
   id: number;
@@ -139,7 +140,7 @@ export default function ExpensesPage() {
       await apiFetch(`expenses/${id}`, token, { method: "DELETE" });
       setItems(prev => prev.filter(e => e.id !== id));
     } catch (e) {
-      window.alert("Error al eliminar: " + (e instanceof Error ? e.message : "error"));
+      toast.error("Error al eliminar: " + (e instanceof Error ? e.message : "error"));
     }
   } });
   };

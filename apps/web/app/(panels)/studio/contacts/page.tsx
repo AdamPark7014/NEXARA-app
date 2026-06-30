@@ -9,6 +9,7 @@ import { useUser } from "@/components/UserContext";
 import { getStudioSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
+import { toast } from "@/components/Toast";
 
 interface ContactMsg {
   id: number;
@@ -91,7 +92,9 @@ export default function StudioContactsPage() {
         body: JSON.stringify({ status }),
       });
       setItems(prev => prev.map(c => c.id === id ? { ...c, status } : c));
-    } catch { /* ignore */ }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo actualizar el estado");
+    }
   };
 
   const remove = async (id: number) => {
@@ -100,7 +103,9 @@ export default function StudioContactsPage() {
     try {
       await apiFetch(`contact-messages/${id}`, token, { method: "DELETE" });
       setItems(prev => prev.filter(c => c.id !== id));
-    } catch { /* ignore */ }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo eliminar");
+    }
   } });
   };
 

@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "@/components/Toast";
 import { buildApiUrl, getApiAssetOrigin, getSocketBaseUrl } from "@/lib/api-base";
 import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -8,6 +9,7 @@ import { hasPermission, PERMISSIONS } from '@/lib/permissions';
 import { getActivitiesSectionConfig } from '@/lib/section-views';
 import ExcelDownloadModal from './ExcelDownloadModal';
 import { openExternalUrl } from '@/lib/open-external-url';
+import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
 const EMPTY_ACTIVITY_FORM = {
   titulo: '',
@@ -237,7 +239,7 @@ const ActivitiesTable: React.FC = () => {
       setExcelUrl(url);
       setExcelBlob(blob);
     } catch {
-      alert('Error al exportar');
+      toast.error('Error al exportar');
     } finally {
       setExcelPreparing(false);
     }
@@ -346,26 +348,29 @@ const ActivitiesTable: React.FC = () => {
     }
   };
 
-  const handleDeleteActivity = async (id: number) => {
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+
+  const handleDeleteActivity = (id: number) => {
     if (!user?.token || !canDeleteActivities) return;
-    if (!window.confirm('¿Eliminar esta actividad? Esta acción no se puede deshacer.')) return;
-    setFormError(null);
-    try {
-      const res = await fetch(buildApiUrl(`activities/${id}`), {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || 'Error al eliminar actividad');
+    setConfirmState({ message: '¿Eliminar esta actividad? Esta acción no se puede deshacer.', fn: async () => {
+      setFormError(null);
+      try {
+        const res = await fetch(buildApiUrl(`activities/${id}`), {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${user.token}` },
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.message || 'Error al eliminar actividad');
+        }
+        if (editingActivityId === id) resetActivityForm();
+        setFormSuccess('Actividad eliminada');
+        fetchActivities();
+        fetchNextAn();
+      } catch (err) {
+        setFormError(err instanceof Error ? err.message : 'Error al eliminar actividad');
       }
-      if (editingActivityId === id) resetActivityForm();
-      setFormSuccess('Actividad eliminada');
-      fetchActivities();
-      fetchNextAn();
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Error al eliminar actividad');
-    }
+    } });
   };
 
   const fetchAssignableUsers = () => {
@@ -736,6 +741,8 @@ const ActivitiesTable: React.FC = () => {
   }
 
   return (
+    <>
+    <ConfirmDialog state={confirmState} onClose={() => setConfirmState(null)} />
     <div className="activities-shell">
       <div className="activities-main">
         {hasPermission(user, PERMISSIONS.CONSOLE_ADMIN) && (
@@ -1133,7 +1140,7 @@ const ActivitiesTable: React.FC = () => {
                           <div className="activities-row-actions">
                             <button type="button" className="button-secondary" onClick={() => void openEditActivity(a)}>Editar</button>
                             {canDeleteActivities && (
-                              <button type="button" className="button-primary" onClick={() => void handleDeleteActivity(a.id)}>Borrar</button>
+                              <button type="button" className="button-primary" onClick={() => handleDeleteActivity(a.id)}>Borrar</button>
                             )}
                           </div>
                         </td>
@@ -1276,7 +1283,7 @@ const ActivitiesTable: React.FC = () => {
                       <div className="activities-mobile-actions">
                         <button type="button" className="button-secondary activities-mobile-action-btn" onClick={() => void openEditActivity(a)}>Editar</button>
                         {canDeleteActivities && (
-                          <button type="button" className="button-primary activities-mobile-action-btn" onClick={() => void handleDeleteActivity(a.id)}>Borrar</button>
+                          <button type="button" className="button-primary activities-mobile-action-btn" onClick={() => handleDeleteActivity(a.id)}>Borrar</button>
                         )}
                       </div>
                     )}
@@ -2265,8 +2272,8 @@ const ActivitiesTable: React.FC = () => {
         `}</style>
       </div>
     </div>
+    </>
   );
 };
 
 export default ActivitiesTable;
-    

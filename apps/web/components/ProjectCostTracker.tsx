@@ -1,5 +1,6 @@
 'use client';
 
+import { toast } from "@/components/Toast";
 import React, { useState, useEffect, useCallback } from 'react';
 import { useUser } from './UserContext';
 import styles from './ProjectCostTracker.module.css';
@@ -208,7 +209,7 @@ export default function ProjectCostTracker({
       }
 
       const data = await response.json();
-      alert(data.message);
+      toast.error(data.message ?? "Error del servidor");
     } catch (err) {
       setError('Error validating budget: ' + (err instanceof Error ? err.message : 'Unknown'));
     }
