@@ -350,7 +350,7 @@ export default function InvoicingPage() {
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginBottom: 18 }}>
-        <KpiCard label="Facturado (ingresos)" value={<Money value={facturadoMes} />} hint={`${items.filter((f) => displayInvoiceType(f.type) === "INCOME").length} CFDI`} variant="positive" icon="🧾" />
+        <KpiCard label="Facturado (ingresos)" value={<Money value={facturadoMes} compact />} hint={`${items.filter((f) => displayInvoiceType(f.type) === "INCOME").length} CFDI`} variant="positive" icon="🧾" />
         <KpiCard label="Por timbrar" value={porTimbrar} hint="En borrador" variant={porTimbrar > 0 ? "warning" : "positive"} icon="⏳" />
         <KpiCard label="Canceladas" value={canceladas} variant={canceladas > 0 ? "danger" : "default"} icon="✗" />
         <KpiCard label="Vencidas" value={vencidas} variant={vencidas > 0 ? "danger" : "positive"} icon="🛡️" />

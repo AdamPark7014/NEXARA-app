@@ -182,10 +182,10 @@ export default function ExpensesPage() {
         actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo gasto</Button> : undefined}
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
-        <KpiCard label="Total aprobado / pagado" value={`$${(totalMes / 1000).toFixed(0)}k`} />
-        <KpiCard label="Pendientes de aprobar" value={pendientes} />
-        <KpiCard label="Recurrentes activos" value={recurrentes} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 20 }}>
+        <KpiCard label="Total aprobado / pagado" value={<Money value={totalMes} compact />} variant="positive" icon="✅" hint="Gastos autorizados" />
+        <KpiCard label="Pendientes de aprobar" value={pendientes} variant={pendientes > 0 ? "warning" : "positive"} icon="⏳" hint="Esperando autorización" />
+        <KpiCard label="Recurrentes activos" value={recurrentes} variant={recurrentes > 0 ? "accent" : "default"} icon="🔄" hint="Gastos mensuales fijos" />
       </div>
 
       {showForm && (
