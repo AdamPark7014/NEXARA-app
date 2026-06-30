@@ -105,6 +105,8 @@ export function resolveOpsPairNav(
     case 'activities':
       if (isFieldRole(v2) || isSupportRole(v2)) return 'self';
       if (isOpsManager(v2)) return 'team';
+      // Admin necesita vista de equipo (read) para facturación y seguimiento a clientes
+      if (v2 === ROLES.DIR_ADMIN || v2 === ROLES.COORD_ADMIN) return 'team';
       return null;
     case 'evidences':
       if (isFieldRole(v2) || isSupportRole(v2)) return 'self';
@@ -228,7 +230,7 @@ export function shouldShowModuleInSidebar(
     case 'ops-tools':
       return isFieldRole(v2) || isOpsManager(v2) || isSupportRole(v2);
     case 'ops-projects':
-      return isOpsManager(v2);
+      return isOpsManager(v2) || v2 === ROLES.DIR_ADMIN || v2 === ROLES.COORD_ADMIN;
     case 'ops-dashboard':
       return isOpsManager(v2) || isFieldRole(v2) || isSupportRole(v2);
     case 'ops-noc':
@@ -389,14 +391,18 @@ export function adaptModulePresentation(
     'ops-activities': {
       label: isSupportRole(v2)
         ? 'Actividades'
-        : EXECUTIVE.has(v2)
-          ? 'Actividades · Asignación'
-          : 'Actividades · Equipo',
+        : (v2 === ROLES.DIR_ADMIN || v2 === ROLES.COORD_ADMIN)
+          ? 'Actividades · Reportes'
+          : EXECUTIVE.has(v2)
+            ? 'Actividades · Asignación'
+            : 'Actividades · Equipo',
       description: isSupportRole(v2)
         ? 'OT del equipo — revisar y aprobar evidencias en la pestaña Evidencias'
-        : EXECUTIVE.has(v2)
-          ? 'Asignar y supervisar OT del equipo (evidencias incluidas)'
-          : 'Vista global — OT, evidencias y seguimiento del equipo',
+        : (v2 === ROLES.DIR_ADMIN || v2 === ROLES.COORD_ADMIN)
+          ? 'Reportes de campo del equipo — evidencias y avances para facturación'
+          : EXECUTIVE.has(v2)
+            ? 'Asignar y supervisar OT del equipo (evidencias incluidas)'
+            : 'Vista global — OT, evidencias y seguimiento del equipo',
     },
     'ops-my-activities': {
       label: 'Actividades',
@@ -586,6 +592,20 @@ export function getActivitiesSectionConfig(user: UserAccessInput | null | undefi
       canApprove: true,
       title: 'Actividades · Asignación',
       subtitle: 'Supervisa y asigna órdenes de trabajo. No tienes OT personales en campo.',
+    };
+  }
+  // Admin (DIR_ADMIN / COORD_ADMIN): lectura de reportes para facturación y seguimiento
+  if (v2 === ROLES.DIR_ADMIN || v2 === ROLES.COORD_ADMIN) {
+    return {
+      viewMode: 'manage',
+      defaultScope: 'team',
+      canCreate: false,
+      canEdit: false,
+      canDelete: false,
+      canAssign: false,
+      canApprove: false,
+      title: 'Actividades · Reportes',
+      subtitle: 'Reportes de campo del equipo — evidencias y avances para facturación.',
     };
   }
   if (OPS_MANAGERS.has(v2)) {

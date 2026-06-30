@@ -85,7 +85,7 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/crm/reports',
   ],
 
-  // ─── DIR. ADMIN — finanzas, RH, gobierno ──────────────────────────────
+  // ─── DIR. ADMIN — finanzas, RH, gobierno + lectura OPS para facturación ──
   [ROLES.DIR_ADMIN]: [
     '/erp/**',
     '/crm/dashboard',
@@ -95,6 +95,11 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/crm/targets',
     '/crm/templates',
     '/crm/tenders',
+    // Acceso de lectura a OPS: reportes de campo → facturación y seguimiento cliente
+    '/ops/activities',
+    '/ops/activities/**',
+    '/ops/projects',
+    '/ops/projects/**',
   ],
 
   // ─── COORD ADMIN — segundo nivel administrativo ───────────────────────
@@ -128,6 +133,11 @@ export const PAGE_MATRIX: Record<RoleKey, PageRule[]> = {
     '/crm/pipeline',
     '/ops/tools',
     '/ops/tools/**',
+    // Acceso de lectura a OPS: reportes de campo → facturación y seguimiento cliente
+    '/ops/activities',
+    '/ops/activities/**',
+    '/ops/projects',
+    '/ops/projects/**',
     ...SELF_ATTENDANCE_PATHS,
   ],
 
