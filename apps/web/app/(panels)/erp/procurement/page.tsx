@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { getErpInventorySectionConfig } from "@/lib/section-views";
@@ -612,6 +613,15 @@ export default function ProcurementPage() {
             <Button variant="ghost" onClick={() => setShowPoForm(false)}>Cancelar</Button>
             <Button variant="primary" onClick={() => void savePo()} disabled={savingPo}>{savingPo ? "Guardando…" : "Crear OC"}</Button>
           </div>
+        </div>
+      )}
+
+      {!loading && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 18 }}>
+          <KpiCard label="Requisiciones pendientes" value={requisitions.filter(r => r.status === "PENDING").length} variant={requisitions.filter(r => r.status === "PENDING").length > 0 ? "warning" : "positive"} icon="📋" />
+          <KpiCard label="OC activas" value={orders.filter(o => o.status !== "RECEIVED" && o.status !== "CANCELLED").length} variant="accent" icon="🛒" />
+          <KpiCard label="OC recibidas" value={orders.filter(o => o.status === "RECEIVED").length} variant="positive" icon="✅" />
+          <KpiCard label="Recepciones registradas" value={receipts.length} icon="📦" />
         </div>
       )}
 
