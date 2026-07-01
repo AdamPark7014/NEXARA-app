@@ -442,6 +442,7 @@ export class AuthService {
     // conceder USERS_MANAGE, ROLES_MANAGE, PANEL_VENTAS, etc.
     const V2_OPS_MANAGER_ROLES = new Set(['ceo', 'dir_admin', 'dir_operaciones', 'arquitecto', 'coord_operaciones', 'coord_admin']);
     if (V2_OPS_MANAGER_ROLES.has(roleKey)) {
+      set.add(PERMISSIONS.CONSOLE_ACCESS);
       set.add(PERMISSIONS.ACTIVITIES_MANAGE);
       set.add(PERMISSIONS.ACTIVITIES_VIEW);
       set.add(PERMISSIONS.ACTIVITIES_EXPORT);

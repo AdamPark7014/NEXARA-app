@@ -125,7 +125,11 @@ fi
 cd "$SCRIPT_DIR"
 
 if [[ "$STOP_LEGACY" == true ]]; then
-  bash "$SCRIPT_DIR/stop-legacy-host.sh"
+  if [[ -f "$SCRIPT_DIR/stop-legacy-host.sh" ]]; then
+    bash "$SCRIPT_DIR/stop-legacy-host.sh"
+  else
+    echo "stop-legacy-host.sh not found; skipping legacy host cleanup."
+  fi
 fi
 
 if [[ "$build_api" == true ]]; then

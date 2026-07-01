@@ -45,6 +45,11 @@ export const SELF_ATTENDANCE_URL_RULES: UrlRule[] = [
   { path: '/api/lunch-breaks/**', methods: ['GET', 'POST', 'PUT'], scope: 'write' },
 ];
 
+/** Proyectos operativos OPS (`/ops/projects`). Distinto de `/api/projects` (Studio). */
+export const OPS_OPERATIONAL_PROJECTS_URL_RULES: UrlRule[] = [
+  { path: '/api/operational-projects/**', scope: 'write' },
+];
+
 /**
  * Matriz Rol → reglas de URL.
  */
@@ -105,6 +110,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/clients', methods: ['GET'], scope: 'read' },
     { path: '/api/ventas/proyectos/**', methods: ['GET'], scope: 'read' },
     ...SELF_ATTENDANCE_URL_RULES,
+    ...OPS_OPERATIONAL_PROJECTS_URL_RULES,
   ],
 
   // ─────────────────────────────────────────────────────────────────
@@ -206,6 +212,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/cotizaciones/**', methods: ['GET', 'POST', 'PATCH', 'PUT'], scope: 'write' },
     { path: '/api/accounting/invoices/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     ...SELF_ATTENDANCE_URL_RULES,
+    ...OPS_OPERATIONAL_PROJECTS_URL_RULES,
   ],
 
   // ─────────────────────────────────────────────────────────────────
@@ -267,6 +274,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/gps/**', scope: 'read' },
     { path: '/api/service-sheets/**', scope: 'write' },
     ...SELF_ATTENDANCE_URL_RULES,
+    ...OPS_OPERATIONAL_PROJECTS_URL_RULES,
   ],
 
   // ─────────────────────────────────────────────────────────────────
@@ -296,6 +304,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/vehicles/**', methods: ['GET'], scope: 'read' },
     { path: '/api/tool-requests/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     { path: '/api/service-sheets/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+    ...OPS_OPERATIONAL_PROJECTS_URL_RULES,
   ],
 
   // ─────────────────────────────────────────────────────────────────
