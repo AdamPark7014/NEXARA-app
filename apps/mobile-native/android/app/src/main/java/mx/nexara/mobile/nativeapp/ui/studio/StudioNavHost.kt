@@ -51,7 +51,7 @@ fun StudioNavHost(
         }
         composable(ModulePattern) { backStack ->
             val key = backStack.arguments?.getString("key").orEmpty()
-            val pop = { nav.popBackStack() }
+            val pop: () -> Unit = { nav.popBackStack() }
             when (key) {
                 "dashboard" -> StudioDashboardScreen(onBack = pop, onOpenModule = { mod ->
                     nav.navigate(moduleRoute(mod))

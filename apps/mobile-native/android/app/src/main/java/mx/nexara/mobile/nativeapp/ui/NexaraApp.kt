@@ -124,7 +124,7 @@ fun NexaraApp() {
         }
 
         composable(Routes.Studio) {
-            mx.nexara.mobile.nativeapp.ui.web.WebNavHost(
+            mx.nexara.mobile.nativeapp.ui.studio.StudioNavHost(
                 panelTitle = PanelId.STUDIO.displayName,
                 onExitToPanels = { navController.navigate(Routes.Panels) { popUpTo(Routes.Studio) { inclusive = true } } },
             )

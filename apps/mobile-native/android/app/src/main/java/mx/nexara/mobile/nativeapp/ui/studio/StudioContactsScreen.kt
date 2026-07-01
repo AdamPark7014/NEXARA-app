@@ -1,7 +1,6 @@
 package mx.nexara.mobile.nativeapp.ui.studio
 
 import android.app.Application
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -25,7 +24,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -73,7 +71,6 @@ class StudioContactsViewModel(
     }
 
     fun closeDetail() = _state.update { it.copy(selected = null) }
-
     fun patchResponse(v: String) = _state.update { it.copy(responseDraft = v) }
     fun patchStatus(v: String) = _state.update { it.copy(statusDraft = v) }
 
@@ -117,37 +114,18 @@ class StudioContactsViewModel(
 fun StudioContactsScreen(
     onBack: () -> Unit,
     leadsOnly: Boolean = false,
-    vm: StudioContactsViewModel = viewModel(
-        factory = object : androidx.lifecycle.ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST")
-            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
-                StudioContactsViewModel(
-                    androidx.compose.ui.platform.LocalContext.current.applicationContext as Application,
-                    leadsOnly,
-                ) as T
-        },
-    ),
+    vm: StudioContactsViewModel,
 ) {
     val ui by vm.state.collectAsState()
 
     if (ui.selected != null) {
         val m = ui.selected!!
-        StudioScaffold(
-            title = m.subject ?: m.name ?: "Contacto",
-            subtitle = m.email,
-            onBack = vm::closeDetail,
-        ) { inner ->
+        StudioScaffold(title = m.subject ?: m.name ?: "Contacto", subtitle = m.email, onBack = vm::closeDetail) { inner ->
             Column(Modifier.fillMaxSize().padding(inner).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(m.message ?: "", style = MaterialTheme.typography.bodyMedium)
                 Text("Categoría: ${m.category ?: "—"} · Tel: ${m.phone ?: "—"}", style = MaterialTheme.typography.labelSmall, color = StudioMuted)
                 OutlinedTextField(ui.statusDraft, vm::patchStatus, label = { Text("Estado") }, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(
-                    ui.responseDraft,
-                    vm::patchResponse,
-                    label = { Text("Respuesta interna") },
-                    modifier = Modifier.fillMaxWidth().height(120.dp),
-                    minLines = 4,
-                )
+                OutlinedTextField(ui.responseDraft, vm::patchResponse, label = { Text("Respuesta interna") }, modifier = Modifier.fillMaxWidth().height(120.dp), minLines = 4)
                 TextButton(onClick = vm::saveSelected, enabled = !ui.saving) { Text("Guardar cambios") }
                 TextButton(onClick = vm::deleteSelected) { Text("Eliminar", color = MaterialTheme.colorScheme.error) }
             }
@@ -166,11 +144,16 @@ fun StudioContactsScreen(
             else -> LazyColumn(Modifier.fillMaxSize().padding(inner), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (ui.items.isEmpty()) item { StudioEmptyState("Sin mensajes", "Los formularios del sitio aparecerán aquí.") }
                 items(ui.items, key = { it.id }) { m ->
-                    Card(Modifier.fillMaxWidth().clickable { vm.open(m) }, shape = RoundedCornerShape(12.dp)) {
-                        Column(Modifier.padding(14.dp)) {
-                            Text(m.subject ?: m.name ?: "—", fontWeight = FontWeight.SemiBold)
-                            Text(listOfNotNull(m.name, m.email).joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = StudioMuted)
-                            StudioStatusChip(m.status ?: "new")
+                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+                        Column(Modifier.padding(14.dp).fillMaxWidth()) {
+                            androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth()) {
+                                Column(Modifier.fillMaxWidth()) {
+                                    Text(m.subject ?: m.name ?: "—", fontWeight = FontWeight.SemiBold, modifier = Modifier.fillMaxWidth())
+                                    Text(listOfNotNull(m.name, m.email).joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = StudioMuted)
+                                    StudioStatusChip(m.status ?: "new")
+                                }
+                            }
+                            TextButton(onClick = { vm.open(m) }) { Text("Ver detalle") }
                         }
                     }
                 }
@@ -180,4 +163,6 @@ fun StudioContactsScreen(
 }
 
 @Composable
-fun StudioLeadsScreen(onBack: () -> Unit) = StudioContactsScreen(onBack = onBack, leadsOnly = true)
+fun StudioLeadsScreen(onBack: () -> Unit) {
+    StudioContactsRoute(onBack = onBack, leadsOnly = true)
+}

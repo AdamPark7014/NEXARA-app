@@ -86,7 +86,7 @@ class StudioNewsViewModel(app: Application) : AndroidViewModel(app) {
             editor = NewsEditorState(
                 title = n.title.orEmpty(),
                 summary = n.excerpt.orEmpty(),
-                content = n.body.orEmpty(),
+                content = n.content ?: n.body.orEmpty(),
                 status = n.status ?: "draft",
             ),
         )
