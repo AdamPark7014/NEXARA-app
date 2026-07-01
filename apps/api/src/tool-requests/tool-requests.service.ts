@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
@@ -13,14 +13,15 @@ type RenewalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface CreateToolRequestDto {
   usuarioId: number;
-  toolName: string;
-  model: string;
-  serialNumber: string;
+  inventoryItemId: number;
+  toolName?: string;
+  model?: string;
+  serialNumber?: string;
   reason: string;
   startDate: Date;
   expectedReturnDate: Date;
-  generalPhotoUrl: string;
-  specificationsPhotoUrl: string;
+  generalPhotoUrl?: string;
+  specificationsPhotoUrl?: string;
 }
 
 export interface UpdateToolRequestDto {
@@ -98,43 +99,51 @@ export class ToolRequestsService {
   ) {}
 
   async create(data: CreateToolRequestDto) {
-    if ((data as any).inventoryItemId) {
-      const inventoryItemId = Number((data as any).inventoryItemId);
-      const inventoryItem = await (this.prisma as any).toolInventoryItem.findUnique({
-        where: { id: inventoryItemId },
-      });
+    const inventoryItemId = Number(data.inventoryItemId);
+    if (!Number.isFinite(inventoryItemId) || inventoryItemId <= 0) {
+      throw new BadRequestException('Debes seleccionar una herramienta del inventario');
+    }
 
-      if (!inventoryItem) {
-        throw new Error('La herramienta seleccionada no existe en inventario');
-      }
+    const inventoryItem = await (this.prisma as any).toolInventoryItem.findUnique({
+      where: { id: inventoryItemId },
+    });
 
-      if (inventoryItem.status !== 'AVAILABLE') {
-        throw new Error('La herramienta seleccionada no está disponible en inventario');
-      }
+    if (!inventoryItem) {
+      throw new BadRequestException('La herramienta seleccionada no existe en inventario');
+    }
 
-      const activeRequest = await this.prisma.toolRequest.findFirst({
-        where: {
-          inventoryItemId,
-          status: { in: ['PENDING', 'APPROVED', 'IN_USE'] },
-        },
-        select: { id: true },
-      });
+    if (inventoryItem.status !== 'AVAILABLE') {
+      throw new BadRequestException('La herramienta seleccionada no está disponible en inventario');
+    }
 
-      if (activeRequest) {
-        throw new Error('La herramienta ya tiene una solicitud activa y no puede duplicarse');
-      }
+    const activeRequest = await this.prisma.toolRequest.findFirst({
+      where: {
+        inventoryItemId,
+        status: { in: ['PENDING', 'APPROVED', 'IN_USE'] },
+      },
+      select: { id: true },
+    });
 
-      data.toolName = inventoryItem.toolName;
-      data.model = inventoryItem.model;
-      data.serialNumber = inventoryItem.serialNumber;
-      data.generalPhotoUrl = data.generalPhotoUrl || inventoryItem.panoramicPhotoUrl;
-      data.specificationsPhotoUrl = data.specificationsPhotoUrl || inventoryItem.serialPhotoUrl;
+    if (activeRequest) {
+      throw new BadRequestException('La herramienta ya tiene una solicitud activa y no puede duplicarse');
+    }
+
+    data.toolName = inventoryItem.toolName;
+    data.model = inventoryItem.model;
+    data.serialNumber = inventoryItem.serialNumber;
+    data.generalPhotoUrl = data.generalPhotoUrl || inventoryItem.panoramicPhotoUrl;
+    data.specificationsPhotoUrl = data.specificationsPhotoUrl || inventoryItem.serialPhotoUrl;
+
+    if (!data.generalPhotoUrl?.trim() || !data.specificationsPhotoUrl?.trim()) {
+      throw new BadRequestException(
+        'La herramienta no tiene fotos registradas en inventario. Solicita a operaciones que las cargue antes de continuar.',
+      );
     }
 
     const toolRequest = await this.prisma.toolRequest.create({
       data: {
         usuarioId: data.usuarioId,
-        inventoryItemId: (data as any).inventoryItemId ? Number((data as any).inventoryItemId) : undefined,
+        inventoryItemId,
         toolName: data.toolName,
         model: data.model,
         serialNumber: data.serialNumber,
@@ -596,6 +605,8 @@ export class ToolRequestsService {
         model: true,
         serialNumber: true,
         status: true,
+        panoramicPhotoUrl: true,
+        serialPhotoUrl: true,
       },
       take: 15,
       orderBy: [{ toolName: 'asc' }, { model: 'asc' }],

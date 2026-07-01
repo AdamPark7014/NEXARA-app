@@ -1,5 +1,6 @@
 "use client";
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
+import { resolveAssetUrl } from "@/lib/evidence-display";
 import React, { useEffect, useState, useCallback } from 'react';
 import { useUser } from './UserContext';
 import styles from './ToolMyKitPanel.module.css';
@@ -24,6 +25,8 @@ interface KitAssignment {
     model: string;
     serialNumber: string;
     status: string;
+    panoramicPhotoUrl?: string | null;
+    serialPhotoUrl?: string | null;
   };
   events: KitEvent[];
 }
@@ -125,39 +128,73 @@ const ToolMyKitPanel: React.FC = () => {
         </div>
       ) : (
         <div className={styles.list}>
-          {items.map((item) => (
-            <div key={item.id} className={styles.itemCard}>
-              <div className={styles.itemHeader}>
-                <div className={styles.itemName}>
-                  {item.inventoryItem.toolName} · {item.inventoryItem.model}
+          {items.map((item) => {
+            const panoramicSrc = item.inventoryItem.panoramicPhotoUrl
+              ? resolveAssetUrl(item.inventoryItem.panoramicPhotoUrl)
+              : '';
+            const serialSrc = item.inventoryItem.serialPhotoUrl
+              ? resolveAssetUrl(item.inventoryItem.serialPhotoUrl)
+              : '';
+
+            return (
+              <div key={item.id} className={styles.itemCard}>
+                <div className={styles.itemHeader}>
+                  <div className={styles.itemName}>
+                    {item.inventoryItem.toolName} · {item.inventoryItem.model}
+                  </div>
+                  <div className={styles.mutedSmall}>
+                    {item.assignmentType === 'KIT' ? 'Kit base' : 'Préstamo'}
+                  </div>
                 </div>
+
                 <div className={styles.mutedSmall}>
-                  {item.assignmentType === 'KIT' ? 'Kit base' : 'Préstamo'}
+                  Serie: {item.inventoryItem.serialNumber} · Reemplazos: {item.replacementCount}
                 </div>
-              </div>
 
-              <div className={styles.mutedSmall}>
-                Serie: {item.inventoryItem.serialNumber} · Reemplazos: {item.replacementCount}
-              </div>
-
-              <div className={styles.mutedSmall}>
-                Asignada: {new Date(item.assignedAt).toLocaleDateString('es-MX')}
-                {item.dueReturnDate ? ` · Devolver: ${new Date(item.dueReturnDate).toLocaleDateString('es-MX')}` : ''}
-              </div>
-
-              {item.events?.length > 0 && (
                 <div className={styles.mutedSmall}>
-                  Último incidente: {item.events[0].description}
+                  Asignada: {new Date(item.assignedAt).toLocaleDateString('es-MX')}
+                  {item.dueReturnDate ? ` · Devolver: ${new Date(item.dueReturnDate).toLocaleDateString('es-MX')}` : ''}
                 </div>
-              )}
 
-              <div>
-                <button className="button-secondary" onClick={() => reportIncident(item.id)}>
-                  Reportar daño / reemplazo
-                </button>
+                {(panoramicSrc || serialSrc) && (
+                  <div className={styles.photoGrid}>
+                    {panoramicSrc && (
+                      <div className={styles.photoBlock}>
+                        <div className={styles.photoLabel}>Panorámica</div>
+                        <img
+                          src={panoramicSrc}
+                          alt={`${item.inventoryItem.toolName} panorámica`}
+                          className={styles.photoImage}
+                        />
+                      </div>
+                    )}
+                    {serialSrc && (
+                      <div className={styles.photoBlock}>
+                        <div className={styles.photoLabel}>Serie / modelo</div>
+                        <img
+                          src={serialSrc}
+                          alt={`${item.inventoryItem.toolName} serie`}
+                          className={styles.photoImage}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {item.events?.length > 0 && (
+                  <div className={styles.mutedSmall}>
+                    Último incidente: {item.events[0].description}
+                  </div>
+                )}
+
+                <div>
+                  <button className="button-secondary" onClick={() => reportIncident(item.id)}>
+                    Reportar daño / reemplazo
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
