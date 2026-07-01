@@ -215,3 +215,128 @@ private func fmtMxn(_ v: Double) -> String {
     if v >= 1_000 { return String(format: "$%.0fK", v / 1_000) }
     return String(format: "$%.0f", v)
 }
+
+// MARK: - Client Detail (tabbed)
+
+struct CrmClientDetailView: View {
+    let client: [String: Any]
+    let onBack: () -> Void
+
+    @State private var tab = 0
+    @State private var cotizaciones: [[String: Any]] = []
+    @State private var oportunidades: [[String: Any]] = []
+    @State private var loading = true
+
+    private let tabs = ["Info", "Cotizaciones", "Oportunidades"]
+    private var clientName: String { ConsoleHelpers.mapStr(client, "name", "nombre", "razonSocial") }
+    private var clientId: String { ConsoleHelpers.mapStr(client, "id") }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button("← Volver", action: onBack)
+                Spacer()
+            }
+            .padding(.horizontal, 12).padding(.vertical, 6)
+
+            Text(clientName.isEmpty ? "Cliente" : clientName)
+                .font(.headline).padding(.horizontal).padding(.bottom, 4)
+
+            Picker("", selection: $tab) {
+                ForEach(0..<tabs.count, id: \.self) { Text(tabs[$0]).tag($0) }
+            }
+            .pickerStyle(.segmented).padding(.horizontal)
+
+            if loading {
+                Spacer(); ProgressView(); Spacer()
+            } else {
+                switch tab {
+                case 0: infoTab
+                case 1: cotizacionesTab
+                default: oportunidadesTab
+                }
+            }
+        }
+        .navigationBarHidden(true)
+        .task { await load() }
+    }
+
+    private var infoTab: some View {
+        List {
+            Section("Datos del cliente") {
+                infoRow("Nombre", ConsoleHelpers.mapStr(client, "name", "nombre", "razonSocial"))
+                infoRow("RFC", ConsoleHelpers.mapStr(client, "rfc"))
+                infoRow("Email", ConsoleHelpers.mapStr(client, "email"))
+                infoRow("Teléfono", ConsoleHelpers.mapStr(client, "phone", "telefono"))
+                infoRow("Ciudad", ConsoleHelpers.mapStr(client, "city", "ciudad"))
+                infoRow("Estado", ConsoleHelpers.mapStr(client, "state", "estado"))
+                infoRow("País", ConsoleHelpers.mapStr(client, "country", "pais"))
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    private var cotizacionesTab: some View {
+        let cots = cotizaciones.filter { cot in
+            let cn = (cot["cliente"] as? String ?? "").lowercased()
+            return clientName.isEmpty || cn.contains(clientName.lowercased().prefix(6))
+        }
+        return Group {
+            if cots.isEmpty {
+                VStack { Spacer(); Text("Sin cotizaciones").foregroundColor(.secondary); Spacer() }
+            } else {
+                List(cots, id: \.crmKey) { cot in
+                    let folio = ConsoleHelpers.mapStr(cot, "folio").ifBlankExt("Cot. #\(ConsoleHelpers.mapStr(cot, "id"))")
+                    let total = ConsoleHelpers.mapDouble(cot, "total")
+                    let status = ConsoleHelpers.mapStr(cot, "estatus")
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack { Text(folio).font(.subheadline.bold()); Spacer(); Text(fmtMxn(total)).bold() }
+                        Text(status).font(.caption).foregroundColor(.orange)
+                    }
+                }.listStyle(.plain)
+            }
+        }
+    }
+
+    private var oportunidadesTab: some View {
+        let opps = oportunidades.filter { o in
+            let cn = (o["clientName"] as? String ?? o["cliente"] as? String ?? "").lowercased()
+            return clientName.isEmpty || cn.contains(clientName.lowercased().prefix(6))
+        }
+        return Group {
+            if opps.isEmpty {
+                VStack { Spacer(); Text("Sin oportunidades").foregroundColor(.secondary); Spacer() }
+            } else {
+                List(opps, id: \.crmKey) { o in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ConsoleHelpers.mapStr(o, "title", "name")).font(.subheadline.bold())
+                        HStack {
+                            Text(ConsoleHelpers.mapStr(o, "stage", "etapa")).font(.caption).foregroundColor(.blue)
+                            Spacer()
+                            Text(fmtMxn(ConsoleHelpers.mapDouble(o, "value"))).font(.caption).bold()
+                        }
+                    }
+                }.listStyle(.plain)
+            }
+        }
+    }
+
+    @ViewBuilder private func infoRow(_ label: String, _ value: String) -> some View {
+        if !value.isEmpty {
+            HStack { Text(label).foregroundColor(.secondary); Spacer(); Text(value) }
+        }
+    }
+
+    private func load() async {
+        async let cots = ExtraRepository.shared.cotizaciones()
+        async let opps = (try? await CrmRepository.shared.oportunidades()) ?? []
+        let (c, o) = await (cots, opps)
+        cotizaciones = c
+        oportunidades = o
+        loading = false
+    }
+}
+
+private extension String {
+    func ifBlankExt(_ fallback: String) -> String { isEmpty ? fallback : self }
+}

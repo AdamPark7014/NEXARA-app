@@ -138,7 +138,7 @@ fun VentasOportunidadesScreen() {
     if (state.selected != null) {
         val id = mStr(state.selected!!, "id").toLongOrNull()
         if (id != null) {
-            VentasOpportunityDetailScreen(id = id, onBack = { vm.select(null) })
+            VentasOpportunityDetailScreen(oppId = id, onBack = { vm.select(null) })
             return
         }
         CrmDetailScaffold(
@@ -220,15 +220,7 @@ fun VentasClientesScreen() {
     val items by remember { derivedStateOf { vm.filtered } }
 
     if (state.selected != null) {
-        CrmDetailScaffold(
-            title = mStr(state.selected!!, "name", "nombre"),
-            rows = listOf(
-                "RFC" to mStr(state.selected!!, "rfc"),
-                "Email" to mStr(state.selected!!, "email"),
-                "Teléfono" to mStr(state.selected!!, "phone", "telefono"),
-            ),
-            onBack = { vm.select(null) },
-        )
+        CrmClientDetailScreen(client = state.selected!!, onBack = { vm.select(null) })
         return
     }
 
@@ -468,6 +460,84 @@ private fun CrmListScaffold(
 }
 
 @Composable
+@Composable
+private fun CrmClientDetailScreen(client: Map<String, Any?>, onBack: () -> Unit) {
+    val ctx = LocalContext.current
+    val clientName = mStr(client, "name", "nombre", "razonSocial")
+    var tab by remember { mutableIntStateOf(0) }
+    var cotizaciones by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
+    var oportunidades by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        val extra = ExtraRepository(ctx)
+        val crm = CrmRepository(ctx)
+        val c = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { extra.cotizaciones() }
+        val o = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { crm.oportunidades() }
+        val prefix = clientName.take(6).lowercase()
+        cotizaciones = c.filter { (it["cliente"] as? String ?: "").lowercase().contains(prefix) }
+        oportunidades = o.filter { (mStr(it, "clientName", "cliente")).lowercase().contains(prefix) }
+        loading = false
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        OutlinedButton(onClick = onBack, modifier = Modifier.padding(12.dp)) { Text("← Volver") }
+        Text(clientName.ifBlank { "Cliente" }, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp))
+        Spacer(Modifier.height(8.dp))
+        TabRow(selectedTabIndex = tab) {
+            listOf("Info", "Cotizaciones", "Oportunidades").forEachIndexed { i, title ->
+                Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title, fontSize = 12.sp) })
+            }
+        }
+        if (loading) { Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }; return@Column }
+        when (tab) {
+            0 -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                fun r(k: String, v: String) { if (v.isNotBlank()) item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(k, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(v) } } }
+                r("RFC", mStr(client, "rfc"))
+                r("Email", mStr(client, "email"))
+                r("Teléfono", mStr(client, "phone", "telefono"))
+                r("Ciudad", mStr(client, "city", "ciudad"))
+                r("Estado", mStr(client, "state", "estado"))
+                r("País", mStr(client, "country", "pais"))
+            }
+            1 -> if (cotizaciones.isEmpty()) {
+                Box(Modifier.fillMaxSize(), Alignment.Center) { Text("Sin cotizaciones", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            } else {
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(cotizaciones, key = { mStr(it, "id") }) { cot ->
+                        Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(14.dp)) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text(mStr(cot, "folio").ifBlank { "Cot #${mStr(cot, "id")}" }, fontWeight = FontWeight.Bold)
+                                    Text(fmtMxnShort(mDouble(cot, "total") ?: 0.0), fontWeight = FontWeight.Bold)
+                                }
+                                Text(mStr(cot, "estatus"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            }
+            else -> if (oportunidades.isEmpty()) {
+                Box(Modifier.fillMaxSize(), Alignment.Center) { Text("Sin oportunidades", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            } else {
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(oportunidades, key = { mStr(it, "id") }) { o ->
+                        Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(14.dp)) {
+                                Text(mStr(o, "title", "name").ifBlank { "Oportunidad" }, fontWeight = FontWeight.Bold)
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    CrmStageChip(mStr(o, "stage", "etapa"))
+                                    Text(fmtMxnShort(mDouble(o, "value") ?: 0.0), fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 private fun CrmDetailScaffold(
     title: String,
     rows: List<Pair<String, String>>,
