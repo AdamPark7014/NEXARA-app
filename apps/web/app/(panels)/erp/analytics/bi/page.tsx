@@ -109,8 +109,8 @@ export default function BiPage() {
       {!loading && !error && (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
-            <KpiCard label="Presupuesto total" value={`$${(totalBudget / 1000000).toFixed(1)}M`} icon="💰" />
-            <KpiCard label="Margen total" value={`$${(totalMargin / 1000000).toFixed(1)}M`} variant={totalMargin >= 0 ? "positive" : "danger"} icon="📊" />
+            <KpiCard label="Presupuesto total" value={<Money value={totalBudget} compact />} icon="💰" />
+            <KpiCard label="Margen total" value={<Money value={totalMargin} compact />} variant={totalMargin >= 0 ? "positive" : "danger"} icon="📊" />
             <KpiCard label="Ingenieros rankeados" value={engineers.length} icon="🚀" />
           </div>
 
