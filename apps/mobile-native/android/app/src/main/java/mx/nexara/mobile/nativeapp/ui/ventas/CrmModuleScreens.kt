@@ -378,6 +378,12 @@ fun VentasProyectosScreen() {
     val ctx = LocalContext.current
     val vm: CrmProyectosViewModel = viewModel(factory = crmVmFactory<CrmProyectosViewModel>(ctx))
     val state by vm.state.collectAsState()
+    var selected by remember { mutableStateOf<Map<String, Any?>?>(null) }
+
+    if (selected != null) {
+        CrmProjectDetailScreen(project = selected!!, onBack = { selected = null })
+        return
+    }
 
     CrmListScaffold(
         isLoading = state.isLoading,
@@ -391,10 +397,83 @@ fun VentasProyectosScreen() {
         key = { mStr(it, "id") },
         showSearch = false,
     ) { item ->
-        Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+        Card(
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth().clickable { selected = item },
+        ) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(mStr(item, "name", "title", "nombre"), fontWeight = FontWeight.SemiBold)
-                CrmStageChip(mStr(item, "status", "estado"))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    CrmStageChip(mStr(item, "status", "estado"))
+                    val client = (item["client"] as? Map<*, *>)?.let { mStr(it as Map<String, Any?>, "name", "nombre") } ?: ""
+                    if (client.isNotBlank()) Text(client, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CrmProjectDetailScreen(project: Map<String, Any?>, onBack: () -> Unit) {
+    val ctx = LocalContext.current
+    var tab by remember { mutableIntStateOf(0) }
+    val tabs = listOf("Info", "Costos", "Orden")
+
+    Column(Modifier.fillMaxSize()) {
+        OutlinedButton(onClick = onBack, modifier = Modifier.padding(12.dp)) { Text("← Volver") }
+        Text(
+            mStr(project, "name", "title", "nombre").ifBlank { "Proyecto" },
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        Spacer(Modifier.height(8.dp))
+        TabRow(selectedTabIndex = tab) {
+            tabs.forEachIndexed { i, t -> Tab(selected = tab == i, onClick = { tab = i }, text = { Text(t, fontSize = 12.sp) }) }
+        }
+
+        when (tab) {
+            0 -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                fun r(k: String, v: String) { if (v.isNotBlank()) item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(k, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(v) } } }
+                item { CrmStageChip(mStr(project, "status", "estado")) }
+                r("Cliente", run { val c = project["client"] as? Map<String, Any?>; c?.let { mStr(it, "name", "nombre") } ?: mStr(project, "clientName") })
+                r("Responsable", mStr(project, "ownerName", "assignedName", "vendorName"))
+                r("Tipo", mStr(project, "type", "tipo", "projectType"))
+                r("Inicio", mStr(project, "startDate", "startAt", "createdAt").take(10))
+                r("Fin", mStr(project, "endDate", "closedAt").take(10))
+                r("Descripción", mStr(project, "description", "descripcion", "notes"))
+            }
+            1 -> {
+                val costs = ((project["costs"] ?: project["costos"] ?: project["expenses"]) as? List<*>)
+                    ?.filterIsInstance<Map<String, Any?>>() ?: emptyList()
+                if (costs.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), Alignment.Center) { Text("Sin costos registrados", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                } else {
+                    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(costs, key = { mStr(it, "id") }) { c ->
+                            Card(Modifier.fillMaxWidth()) {
+                                Row(Modifier.fillMaxWidth().padding(12.dp), Arrangement.SpaceBetween) {
+                                    Text(mStr(c, "concept", "concepto", "description", "name").ifBlank { "Costo" }, Modifier.weight(1f))
+                                    Text(fmtMxnShort(mDouble(c, "amount", "total") ?: 0.0), fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            else -> {
+                val orden = (project["closingOrder"] ?: project["workOrder"] ?: project["orden"]) as? Map<String, Any?>
+                if (orden == null) {
+                    Box(Modifier.fillMaxSize(), Alignment.Center) { Text("Sin orden de cierre", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                } else {
+                    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        fun r(k: String, v: String) { if (v.isNotBlank()) item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(k, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(v) } } }
+                        r("Número", mStr(orden, "number", "folio", "id"))
+                        r("Estado", mStr(orden, "status", "estado"))
+                        r("Fecha", mStr(orden, "createdAt", "date").take(10))
+                        r("Total", fmtMxnShort(mDouble(orden, "total", "amount") ?: 0.0))
+                    }
+                }
             }
         }
     }
