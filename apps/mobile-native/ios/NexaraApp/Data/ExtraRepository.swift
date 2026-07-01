@@ -158,6 +158,11 @@ final class ExtraRepository {
         return ApiClient.decodeMapList(data)
     }
 
+    func clientTickets() async -> [[String: Any]] {
+        guard let data = try? await ApiClient.shared.get("client-ticket-requests") else { return [] }
+        return ApiClient.decodeMapList(data)
+    }
+
     func kbArticles(q: String? = nil) async -> [[String: Any]] {
         var query: [String: String] = [:]
         if let q, !q.isEmpty { query["q"] = q }

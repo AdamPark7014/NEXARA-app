@@ -14,10 +14,55 @@ struct CrmOpportunityDetailView: View {
     @State private var uploading = false
     @State private var actionError: String?
     @State private var pickerItem: PhotosPickerItem?
+    @State private var showEdit = false
+    @State private var editForm = OpportunityFormState()
+    @State private var savingEdit = false
+    @State private var showDeleteConfirm = false
+    @State private var pdfData: Data?
+    @State private var pdfTitle = ""
 
-    private let tabs = ["Resumen", "Notas", "Adjuntos", "Cotizaciones"]
+    private let tabs = ["Resumen", "Notas", "Adjuntos", "Cotizaciones", "Historial"]
 
     var body: some View {
+        Group {
+            if let pdfData {
+                VStack(spacing: 0) {
+                    HStack {
+                        Button("Cerrar") { self.pdfData = nil }
+                        Text(pdfTitle.isEmpty ? "Cotización PDF" : pdfTitle)
+                            .font(.headline)
+                            .lineLimit(1)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    PDFViewerView(data: pdfData)
+                }
+            } else {
+                detailBody
+            }
+        }
+        .navigationBarHidden(true)
+        .task { await reload() }
+        .sheet(isPresented: $showEdit) {
+            OpportunityFormSheet(
+                title: "Editar oportunidad",
+                state: $editForm,
+                saving: savingEdit,
+                error: actionError,
+                onDismiss: { showEdit = false },
+                onSave: { Task { await saveEdit() } }
+            )
+        }
+        .alert("Eliminar oportunidad", isPresented: $showDeleteConfirm) {
+            Button("Eliminar", role: .destructive) { Task { await deleteOpp() } }
+            Button("Cancelar", role: .cancel) {}
+        } message: {
+            Text("¿Eliminar esta oportunidad del pipeline?")
+        }
+    }
+
+    private var detailBody: some View {
         VStack(spacing: 0) {
             HStack {
                 Button("← Volver", action: onBack)
@@ -25,6 +70,12 @@ struct CrmOpportunityDetailView: View {
                     .font(.headline)
                     .lineLimit(1)
                 Spacer()
+                Button("Editar") {
+                    editForm = OpportunityFormState.from(data)
+                    actionError = nil
+                    showEdit = true
+                }
+                Button("Eliminar", role: .destructive) { showDeleteConfirm = true }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
@@ -51,13 +102,12 @@ struct CrmOpportunityDetailView: View {
                     case 0: summaryTab
                     case 1: notesTab
                     case 2: attachmentsTab
-                    default: quotesTab
+                    case 3: quotesTab
+                    default: historialTab
                     }
                 }
             }
         }
-        .navigationBarHidden(true)
-        .task { await reload() }
     }
 
     private var summaryTab: some View {
@@ -152,15 +202,54 @@ struct CrmOpportunityDetailView: View {
                 Text("Sin cotizaciones vinculadas").foregroundColor(.secondary)
             } else {
                 ForEach(Array(quotes.enumerated()), id: \.offset) { _, q in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(oppStr(q, "versionLabel", "folio", "name").isEmpty ? "Cotización" : oppStr(q, "versionLabel", "folio", "name"))
-                            .font(.headline)
-                        Text(oppStr(q, "pdfUrl", "url")).font(.caption).foregroundColor(.secondary)
+                    let pdfUrl = oppStr(q, "pdfUrl", "url")
+                    let label = oppStr(q, "versionLabel", "folio", "name").isEmpty ? "Cotización" : oppStr(q, "versionLabel", "folio", "name")
+                    Button {
+                        if !pdfUrl.isEmpty { Task { await openQuotePdf(url: pdfUrl, title: label) } }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(label).font(.headline)
+                            if !pdfUrl.isEmpty {
+                                Text("Toca para ver PDF").font(.caption).foregroundColor(.accentColor)
+                            }
+                            Text(String(oppStr(q, "createdAt", "fecha").prefix(16)))
+                                .font(.caption).foregroundColor(.secondary)
+                        }
                     }
+                    .disabled(pdfUrl.isEmpty)
                 }
             }
         }
         .listStyle(.insetGrouped)
+    }
+
+    private var historialTab: some View {
+        let history = nestedMaps(data, "history")
+            + nestedMaps(data, "historial")
+            + nestedMaps(data, "activityLog")
+            + nestedMaps(data, "changelog")
+        return Group {
+            if history.isEmpty {
+                VStack { Spacer(); Text("Sin historial de cambios").foregroundColor(.secondary); Spacer() }
+            } else {
+                List(Array(history.prefix(50).enumerated()), id: \.offset) { _, h in
+                    let action  = oppStr(h, "action", "accion", "event", "type")
+                    let by      = oppStr(h, "userName", "createdByName", "usuario")
+                    let date    = String(oppStr(h, "createdAt", "timestamp", "fecha").prefix(16))
+                    let detail  = oppStr(h, "detail", "description", "changes", "mensaje")
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(action.isEmpty ? "Cambio" : action).font(.subheadline).bold()
+                            Spacer()
+                            if !date.isEmpty { Text(date).font(.caption2).foregroundColor(.secondary) }
+                        }
+                        if !by.isEmpty { Text("Por: \(by)").font(.caption).foregroundColor(.secondary) }
+                        if !detail.isEmpty { Text(detail).font(.caption).foregroundColor(.secondary).lineLimit(3) }
+                    }
+                }
+                .listStyle(.plain)
+            }
+        }
     }
 
     private func oppRow(_ label: String, _ value: String) -> some View {
@@ -205,6 +294,37 @@ struct CrmOpportunityDetailView: View {
             try await CrmRepository.shared.uploadOpportunityEvidences(id: oppId, fileData: fileData, fileName: name, mimeType: mime)
             pickerItem = nil
             await reload()
+        } catch {
+            actionError = error.localizedDescription
+        }
+    }
+
+    private func saveEdit() async {
+        savingEdit = true
+        defer { savingEdit = false }
+        do {
+            _ = try await CrmRepository.shared.updateOpportunity(id: oppId, fields: editForm.toPayload())
+            showEdit = false
+            await reload()
+        } catch {
+            actionError = error.localizedDescription
+        }
+    }
+
+    private func deleteOpp() async {
+        do {
+            try await CrmRepository.shared.deleteOpportunity(id: oppId)
+            onBack()
+        } catch {
+            actionError = error.localizedDescription
+        }
+    }
+
+    private func openQuotePdf(url: String, title: String) async {
+        do {
+            let bytes = try await CrmRepository.shared.downloadAssetBytes(url)
+            pdfTitle = title
+            pdfData = bytes
         } catch {
             actionError = error.localizedDescription
         }
