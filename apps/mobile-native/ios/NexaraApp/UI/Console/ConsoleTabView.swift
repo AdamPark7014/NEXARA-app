@@ -6,7 +6,9 @@ struct ConsoleTabView: View {
     let panel: PanelId   // .erp o .ops
     let onExit: () -> Void
     @State private var selectedTab: ConsoleTab = .dashboard
+    @State private var deepLinkModuleKey: String?
     @EnvironmentObject var session: SessionStore
+    @ObservedObject private var deepLink = DeepLinkCoordinator.shared
 
     private var user: SessionUser? { session.currentUser }
     private var isAdmin: Bool {
@@ -57,6 +59,15 @@ struct ConsoleTabView: View {
             .tabItem { Label("Más", systemImage: "ellipsis.circle") }
             .tag(ConsoleTab.more)
         }
+        .deepLinkModulePresenter(panel: panel, presentedKey: $deepLinkModuleKey)
+        .onAppear { applyDeepLinkIfNeeded() }
+        .onChange(of: deepLink.pending) { _, _ in applyDeepLinkIfNeeded() }
+    }
+
+    private func applyDeepLinkIfNeeded() {
+        if let key = deepLink.consumeModule(for: panel) {
+            deepLinkModuleKey = key
+        }
     }
 }
 
@@ -66,6 +77,20 @@ private struct ConsoleMoreView: View {
     let panel: PanelId
     let onExit: () -> Void
     @State private var navPath: [String] = []
+    @State private var showContabilidad = false
+    @EnvironmentObject var session: SessionStore
+
+    private var isAdmin: Bool {
+        guard let u = session.currentUser else { return false }
+        return u.isSuperAdmin || u.permissions.contains("console.admin")
+    }
+
+    private var canFinance: Bool {
+        guard let u = session.currentUser else { return false }
+        return u.isSuperAdmin
+            || u.permissions.contains(where: { $0.lowercased().contains("contabilidad") })
+            || (u.role ?? "").lowercased().contains("contab")
+    }
 
     var body: some View {
         List {
@@ -87,6 +112,19 @@ private struct ConsoleMoreView: View {
                 navRow(key: "client-tickets",  icon: "🎫", label: "Tickets de clientes")
             }
             Section("RRHH · Finanzas") {
+                if canFinance {
+                    Button {
+                        showContabilidad = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            Text("📊").font(.title3)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Hub Contabilidad").foregroundColor(.primary)
+                                Text("Facturas, gastos y finanzas").font(.caption).foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
                 navRow(key: "hr",                icon: "👥", label: "Recursos humanos")
                 navRow(key: "employee-payments", icon: "💳", label: "Pagos a empleados")
                 navRow(key: "lunch-breaks",      icon: "🍽️", label: "Comidas (equipo)")
@@ -105,6 +143,7 @@ private struct ConsoleMoreView: View {
             }
             Section("Admin · Contenido") {
                 navRow(key: "users",            icon: "🧑‍💼", label: "Usuarios")
+                if isAdmin { navRow(key: "settings", icon: "⚙️", label: "Ajustes del sistema") }
                 navRow(key: "audit",            icon: "🔍", label: "Auditoría")
                 navRow(key: "analytics",        icon: "📈", label: "Analítica")
                 navRow(key: "documents",        icon: "📄", label: "Documentos")
@@ -121,6 +160,9 @@ private struct ConsoleMoreView: View {
         }
         .navigationDestination(for: String.self) { key in
             ModuleRouter.view(for: panel, key: key)
+        }
+        .fullScreenCover(isPresented: $showContabilidad) {
+            ContabilidadTabView(onExit: { showContabilidad = false })
         }
     }
 

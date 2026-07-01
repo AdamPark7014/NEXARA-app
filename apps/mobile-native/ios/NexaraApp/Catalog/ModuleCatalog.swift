@@ -91,6 +91,10 @@ enum ModuleCatalog {
         ModuleEntry("productos", "Catálogo IT/CCTV", "📦", "/ventas/productos"),
         ModuleEntry("clientes", "Clientes", "🤝", "/ventas/clientes"),
         ModuleEntry("proyectos", "Proyectos", "🧩", "/ventas/proyectos"),
+        ModuleEntry("pipeline", "Pipeline", "📊", "/crm/pipeline"),
+        ModuleEntry("agenda", "Agenda", "📅", "/crm/agenda"),
+        ModuleEntry("licitaciones", "Licitaciones", "📑", "/crm/tenders"),
+        ModuleEntry("metas", "Metas comerciales", "🎯", "/crm/targets"),
         ModuleEntry("plantillas", "Plantillas", "🧾", "/ventas/plantillas"),
         ModuleEntry("gestion-vendedores", "Gestión vendedores", "📈", "/ventas/gestion-vendedores"),
         ModuleEntry("equipo-comparativa", "Comparativa equipo", "⚖️", "/ventas/equipo-comparativa"),
@@ -130,7 +134,9 @@ enum ModuleCatalog {
     static let web: [ModuleEntry] = studio
 
     static let lab: [ModuleEntry] = [
-        ModuleEntry("health", "API Health", "🧪", "/lab/health"),
+        ModuleEntry("health", "API Health", "❤️", "/lab/health"),
+        ModuleEntry("flags", "Feature flags", "🚩", "/lab/flags"),
+        ModuleEntry("ai", "AI Sandbox", "🤖", "/lab/ai"),
     ]
 
     static func modules(for panel: PanelId) -> [ModuleEntry] {

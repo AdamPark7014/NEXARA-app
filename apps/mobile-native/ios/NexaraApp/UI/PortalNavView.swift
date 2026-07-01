@@ -7,6 +7,8 @@ struct PortalNavView: View {
     let onExit: () -> Void
 
     @State private var path: [String] = []
+    @State private var deepLinkModuleKey: String?
+    @ObservedObject private var deepLink = DeepLinkCoordinator.shared
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -14,6 +16,11 @@ struct PortalNavView: View {
                 .navigationDestination(for: String.self) { key in
                     ModuleRouter.view(for: panel, key: key)
                 }
+        }
+        .deepLinkModulePresenter(panel: panel, presentedKey: $deepLinkModuleKey)
+        .onAppear { if let k = deepLink.consumeModule(for: panel) { deepLinkModuleKey = k } }
+        .onChange(of: deepLink.pending) { _, _ in
+            if let k = deepLink.consumeModule(for: panel) { deepLinkModuleKey = k }
         }
     }
 }

@@ -25,7 +25,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import mx.nexara.mobile.nativeapp.access.PanelAccessResolver
 import mx.nexara.mobile.nativeapp.access.PanelId
 import mx.nexara.mobile.nativeapp.data.AuthRepository
+import mx.nexara.mobile.nativeapp.data.notifications.NotificationsRepository
 
 @Composable
 fun PanelHubScreen(
@@ -49,6 +54,12 @@ fun PanelHubScreen(
     val repo = remember(context) { AuthRepository(context) }
     val user = repo.loadSession()
     val panels = remember(user) { PanelAccessResolver.accessiblePanels(user) }
+    val notifRepo = remember(context) { NotificationsRepository(context) }
+    var unreadCount by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(user?.id) {
+        unreadCount = runCatching { notifRepo.unreadCount().unreadCount }.getOrDefault(0)
+    }
 
     val slate = Color(0xFF0F172A)
     val sub = Color(0xFF64748B)
@@ -184,7 +195,26 @@ fun PanelHubScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
             ) {
-                Text("Notificaciones")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Notificaciones")
+                    if (unreadCount > 0) {
+                        Box(
+                            modifier = Modifier
+                                .background(Color(0xFFDC2626), CircleShape)
+                                .padding(horizontal = 8.dp, vertical = 2.dp),
+                        ) {
+                            Text(
+                                "$unreadCount",
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            )
+                        }
+                    }
+                }
             }
             Spacer(modifier = Modifier.height(8.dp))
             Button(

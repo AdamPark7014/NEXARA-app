@@ -7,9 +7,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import mx.nexara.mobile.nativeapp.access.DeepLinkDestination
 import mx.nexara.mobile.nativeapp.access.PanelAccessResolver
 import mx.nexara.mobile.nativeapp.access.PanelId
 import mx.nexara.mobile.nativeapp.data.AuthRepository
+import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
 import mx.nexara.mobile.nativeapp.ui.screens.LoginScreen
 import mx.nexara.mobile.nativeapp.ui.screens.PanelHubScreen
 import mx.nexara.mobile.nativeapp.ui.tickets.TicketsNavHost
@@ -55,6 +57,25 @@ fun NexaraApp() {
         navController.navigate(route) { launchSingleTop = true }
     }
 
+    fun applyPendingDeepLink() {
+        when (val d = PendingDeepLink.destination) {
+            is DeepLinkDestination.Notifications -> {
+                if (repo.loadSession() != null) {
+                    navController.navigate(Routes.Notifications) { launchSingleTop = true }
+                    PendingDeepLink.destination = null
+                }
+            }
+            is DeepLinkDestination.Module -> {
+                if (repo.loadSession() != null) {
+                    navigateToPanel(d.panel)
+                }
+            }
+            null -> Unit
+        }
+    }
+
+    LaunchedEffect(Unit) { applyPendingDeepLink() }
+
     NavHost(navController = navController, startDestination = startDestination) {
         composable(Routes.Login) {
             LoginScreen(
@@ -64,6 +85,7 @@ fun NexaraApp() {
                         popUpTo(Routes.Login) { inclusive = true }
                         launchSingleTop = true
                     }
+                    applyPendingDeepLink()
                 },
             )
         }
@@ -151,7 +173,13 @@ fun NexaraApp() {
             LaunchedEffect(Unit) { navController.navigate(Routes.Erp) { popUpTo(Routes.Console) { inclusive = true } } }
         }
         composable(Routes.Contabilidad) {
-            LaunchedEffect(Unit) { navController.navigate(Routes.Erp) { popUpTo(Routes.Contabilidad) { inclusive = true } } }
+            mx.nexara.mobile.nativeapp.ui.contabilidad.ContabilidadNavHost(
+                onExitToPanels = {
+                    navController.navigate(Routes.Panels) {
+                        popUpTo(Routes.Contabilidad) { inclusive = true }
+                    }
+                },
+            )
         }
         composable(Routes.Ventas) {
             LaunchedEffect(Unit) { navController.navigate(Routes.Crm) { popUpTo(Routes.Ventas) { inclusive = true } } }

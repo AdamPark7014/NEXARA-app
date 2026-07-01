@@ -11,13 +11,29 @@ struct NexaraApp: App {
             RootView()
                 .environmentObject(session)
                 .environmentObject(appState)
+                .onOpenURL { url in
+                    DeepLinkCoordinator.shared.ingest(url)
+                    applyPendingDeepLink()
+                }
+        }
+    }
+
+    private func applyPendingDeepLink() {
+        guard session.currentUser != nil else { return }
+        let dl = DeepLinkCoordinator.shared
+        if dl.consumeNotifications() {
+            appState.route = .notifications
+            return
+        }
+        if case .module(let panel, _) = dl.pending {
+            appState.route = .portal(panel)
         }
     }
 }
 
 /// Ruta de navegación a nivel raíz.
 final class AppState: ObservableObject {
-    enum Route: Equatable { case login, panels, portal(PanelId) }
+    enum Route: Equatable { case login, panels, portal(PanelId), notifications }
     @Published var route: Route
 
     init() {
@@ -34,8 +50,10 @@ struct RootView: View {
     @EnvironmentObject var app: AppState
 
     var body: some View {
-        Group {
-            switch app.route {
+        VStack(spacing: 0) {
+            OfflineBanner()
+            Group {
+                switch app.route {
             case .login:
                 LoginView(onLoggedIn: {
                     if let single = PanelAccessResolver.singlePanelRoute(user: session.currentUser) {
@@ -43,15 +61,21 @@ struct RootView: View {
                     } else {
                         app.route = .panels
                     }
+                    applyDeepLinkAfterLogin(app: app)
                 })
             case .panels:
                 PanelHubView(
                     onOpen: { panel in app.route = .portal(panel) },
+                    onOpenNotifications: { app.route = .notifications },
                     onLogout: {
                         session.clear()
                         app.route = .login
                     },
                 )
+            case .notifications:
+                NavigationStack {
+                    NotificationsCenterView(onBack: { app.route = .panels })
+                }
             case .portal(let panel):
                 switch panel {
                 case .erp, .ops:
@@ -59,20 +83,26 @@ struct RootView: View {
                 case .crm:
                     CrmTabView(onExit: { app.route = .panels })
                 case .portal:
-                    NavigationStack {
-                        TicketsDashboardView()
-                            .toolbar {
-                                ToolbarItem(placement: .navigationBarLeading) {
-                                    Button("Paneles") { app.route = .panels }
-                                }
-                            }
-                    }
+                    PortalNavView(panel: .portal, onExit: { app.route = .panels })
                 case .studio:
                     PortalNavView(panel: panel, onExit: { app.route = .panels })
-                default:
-                    PortalNavView(panel: panel, onExit: { app.route = .panels })
+                case .lab:
+                    LabTabView(onExit: { app.route = .panels })
                 }
             }
+            }
         }
+    }
+}
+
+@MainActor
+private func applyDeepLinkAfterLogin(app: AppState) {
+    let dl = DeepLinkCoordinator.shared
+    if dl.consumeNotifications() {
+        app.route = .notifications
+        return
+    }
+    if case .module(let panel, _) = dl.pending {
+        app.route = .portal(panel)
     }
 }

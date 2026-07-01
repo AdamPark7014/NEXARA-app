@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,7 +56,9 @@ import mx.nexara.mobile.nativeapp.ui.console.screens.MyProfileScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.PlaceholderScreen
 import mx.nexara.mobile.nativeapp.access.ModulePanelMap
 import mx.nexara.mobile.nativeapp.access.PanelId
+import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
 import mx.nexara.mobile.nativeapp.ui.catalog.ModuleCatalog
+import mx.nexara.mobile.nativeapp.ui.contabilidad.ContabilidadNavHost
 
 private object ConsoleRoutes {
     const val Dashboard = "console/dashboard"
@@ -124,7 +127,22 @@ fun ConsoleNavHost(
     val isSuperAdmin = user?.isSuperAdmin == true
     val isAdmin = !isSuperAdmin && (user?.permissions ?: emptyList()).contains("console.admin")
     val isIngeniero = !isSuperAdmin && !isAdmin && roleLower.contains("ingenier")
+    val canFinance = isSuperAdmin
+        || (user?.permissions ?: emptyList()).any { it.contains("contabilidad", ignoreCase = true) }
+        || roleLower.contains("contab")
+    var showContabilidad by remember { mutableStateOf(false) }
     val navController = rememberNavController()
+
+    LaunchedEffect(panelId) {
+        val key = PendingDeepLink.consumeModuleFor(panelId) ?: return@LaunchedEffect
+        val target = routeForModuleKey(key)
+        navController.navigate(target) { launchSingleTop = true }
+    }
+
+    if (showContabilidad) {
+        ContabilidadNavHost(onExitToPanels = { showContabilidad = false })
+        return
+    }
 
     val panelKeys = remember(panelId) { ModulePanelMap.consoleKeysFor(panelId) }
 
@@ -323,6 +341,8 @@ fun ConsoleNavHost(
                     userRoleLabel = if (user?.isSuperAdmin == true) "Super Administrador" else user?.role,
                     userAvatarUrl = user?.avatarUrl,
                     isSuperAdmin = user?.isSuperAdmin == true,
+                    showContabilidadHub = canFinance,
+                    onOpenContabilidad = { showContabilidad = true },
                     onOpenModule = { m ->
                         val target = routeForModuleKey(m.key)
                         navController.navigate(target) { launchSingleTop = true }
@@ -360,7 +380,7 @@ fun ConsoleNavHost(
                     "my-vehicles" -> { { mx.nexara.mobile.nativeapp.ui.modules.MyVehiclesScreen() } }
                     "my-preferences" -> { { mx.nexara.mobile.nativeapp.ui.modules.MyPreferencesScreen() } }
                     "work-projects" -> { { mx.nexara.mobile.nativeapp.ui.modules.WorkProjectsModuleScreen() } }
-                    "hr" -> { { mx.nexara.mobile.nativeapp.ui.modules.HrModuleScreen() } }
+                    "hr" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.HrLeavesScreen() } }
                     "warehouse" -> { { mx.nexara.mobile.nativeapp.ui.modules.WarehouseModuleScreen() } }
                     "stock" -> { { mx.nexara.mobile.nativeapp.ui.modules.StockModuleScreen() } }
                     "procurement" -> { { mx.nexara.mobile.nativeapp.ui.modules.ProcurementModuleScreen() } }

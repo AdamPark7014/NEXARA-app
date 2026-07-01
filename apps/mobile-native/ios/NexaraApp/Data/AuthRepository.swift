@@ -60,6 +60,7 @@ final class AuthRepository {
             branchId: u?.branchId
         )
         SessionStore.shared.save(user)
+        QuickProfileStore.remember(user)
         return user
     }
 
