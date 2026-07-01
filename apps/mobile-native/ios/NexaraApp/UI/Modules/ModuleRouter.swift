@@ -10,9 +10,7 @@ struct ModuleRouter {
         // ── Console ────────────────────────────────────────────────
         case (.console, "activities"),
              (.console, "my-activities"):
-            GenericListModuleView(title: "Actividades") { (await ExtraRepository.shared.activities()).map {
-                toRow($0, title: ["title","titulo","descripcion"], subtitle: ["clientName","cliente"])
-            } }
+            ActivitiesView()
         case (.console, "evidences"), (.console, "my-evidences"):
             GenericListModuleView(title: "Evidencias") { (await ExtraRepository.shared.evidences()).map {
                 toRow($0, title: ["title","descripcion","fileName"], subtitle: ["activityAn"])
@@ -52,9 +50,7 @@ struct ModuleRouter {
                 toRow($0, title: ["nombre","name"], subtitle: ["email","rol"])
             } }
         case (.console, "attendance"):
-            GenericListModuleView(title: "Asistencia") { (await ExtraRepository.shared.attendance()).map {
-                toRow($0, title: ["userName","usuario"], subtitle: ["type","tipo"], meta: ["createdAt","date"])
-            } }
+            AttendanceView()
         case (.console, "my-lunch-breaks"):
             MyLunchBreaksView()
         case (.console, "lunch-breaks"), (.contabilidad, "horas"):

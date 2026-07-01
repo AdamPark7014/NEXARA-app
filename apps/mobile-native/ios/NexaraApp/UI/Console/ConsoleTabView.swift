@@ -30,31 +30,14 @@ struct ConsoleTabView: View {
 
             // ── Actividades
             NavigationStack {
-                GenericListModuleView(
-                    title: isAdmin ? "Actividades" : "Mis actividades"
-                ) {
-                    let all = await ExtraRepository.shared.activities()
-                    let myId = session.currentUser?.id
-                    let filtered: [[String: Any]] = isAdmin ? all : all.filter { row in
-                        let uid = (row["usuarioId"] as? Int).map(String.init)
-                            ?? ((row["responsable"] as? [String: Any]).flatMap { $0["id"] as? Int }.map(String.init))
-                        return uid == myId
-                    }
-                    return filtered.map { toRow($0, title: ["titulo", "title"], subtitle: ["responsable", "asignadoNombre"]) }
-                }
-                .navigationTitle(isAdmin ? "Actividades" : "Mis actividades")
+                ActivitiesView()
             }
             .tabItem { Label("Actividades", systemImage: "list.clipboard") }
             .tag(ConsoleTab.activities)
 
             // ── Asistencia
             NavigationStack {
-                GenericListModuleView(title: "Asistencia") {
-                    (await ExtraRepository.shared.attendance()).map {
-                        toRow($0, title: ["userName", "nombre", "usuario"], subtitle: ["type", "tipo"], meta: ["createdAt", "date"])
-                    }
-                }
-                .navigationTitle("Asistencia")
+                AttendanceView()
             }
             .tabItem { Label("Asistencia", systemImage: "clock") }
             .tag(ConsoleTab.attendance)
