@@ -56,6 +56,8 @@ struct RootView: View {
                 switch panel {
                 case .erp, .ops:
                     ConsoleTabView(panel: panel, onExit: { app.route = .panels })
+                case .crm:
+                    CrmTabView(onExit: { app.route = .panels })
                 case .portal:
                     NavigationStack {
                         TicketsDashboardView()
