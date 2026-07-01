@@ -9,6 +9,8 @@ import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { buildApiUrl, parseResponseJson } from "@/lib/api-base";
 import { getAttendanceSectionConfig } from "@/lib/user-access";
+import { attendanceMapUrl } from "@/lib/gps-map-links";
+import AttendanceGpsDayPanel from "@/components/AttendanceGpsDayPanel";
 
 const AttendanceForm = dynamic(() => import("@/components/AttendanceForm"), { ssr: false });
 
@@ -92,13 +94,7 @@ function getLatestMapUrl(
   list: TeamMember["attendances"],
   type: "entrada" | "salida",
 ): string | null {
-  const filtered = (list ?? []).filter((a) => a.type === type);
-  if (filtered.length === 0) return null;
-  const latest = filtered.reduce((max, a) => (a.timestamp > max.timestamp ? a : max));
-  const lat = type === "entrada" ? latest.entryLatitude : latest.exitLatitude;
-  const lng = type === "entrada" ? latest.entryLongitude : latest.exitLongitude;
-  if (typeof lat !== "number" || typeof lng !== "number") return null;
-  return `https://www.google.com/maps?q=${lat},${lng}`;
+  return attendanceMapUrl(list, type);
 }
 
 function resolveEstado(
@@ -313,7 +309,7 @@ function WeeklyBar({ token }: { token: string }) {
 
 // ─── Team Card ────────────────────────────────────────────────────────────────
 
-function TeamCard({ member }: { member: TeamMember }) {
+function TeamCard({ member, token, dateFilter }: { member: TeamMember; token: string; dateFilter: string }) {
   const name = member.nombre;
   const role = member.roleName ?? "";
   const dept = member.department ?? "";
@@ -351,15 +347,14 @@ function TeamCard({ member }: { member: TeamMember }) {
           <div style={{ marginLeft: "auto", color: "var(--text-tertiary)" }}>{fmtMinutes(member.totalMinutes)}</div>
         )}
       </div>
-      {(member.entryMapUrl || member.exitMapUrl) && (
-        <div style={{ display: "flex", gap: 10, marginTop: 8, fontSize: 11 }}>
-          {member.entryMapUrl ? (
-            <a href={member.entryMapUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)" }}>Mapa entrada</a>
-          ) : null}
-          {member.exitMapUrl ? (
-            <a href={member.exitMapUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--primary)" }}>Mapa salida</a>
-          ) : null}
-        </div>
+      {(member.estado === "PRESENTE" || member.estado === "COMPLETO") && (
+        <AttendanceGpsDayPanel
+          token={token}
+          userId={member.userId}
+          date={dateFilter}
+          attendances={member.attendances}
+          hasCheckIn={Boolean(ci)}
+        />
       )}
     </div>
   );
@@ -477,7 +472,7 @@ function TeamAttendanceView({ token, dateFilter, visibilityHint }: { token: stri
         <div style={{ padding: 48, textAlign: "center", color: "var(--text-tertiary)", fontSize: 13 }}>Sin registros para esta fecha.</div>
       ) : view === "grid" ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 12 }}>
-          {members.map((m) => <TeamCard key={m.userId} member={m} />)}
+          {members.map((m) => <TeamCard key={m.userId} member={m} token={token} dateFilter={dateFilter} />)}
         </div>
       ) : (
         <DataTable<TeamMember>

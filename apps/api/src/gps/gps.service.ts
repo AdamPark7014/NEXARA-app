@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
@@ -134,6 +134,57 @@ export class GpsService {
 
   /** All GPS points for userId on a given date (YYYY-MM-DD), ordered asc. Used for trajectory view. */
   async getMyTrajectory(userId: number, date?: string) {
+    const { start, end } = this.parseDateRange(date);
+    return this.prisma['locationTracking'].findMany({
+      where: {
+        usuarioId: userId,
+        ultimaActualizacion: { gte: start, lte: end },
+      },
+      orderBy: { ultimaActualizacion: 'asc' },
+    });
+  }
+
+  async getTrajectoryForUser(
+    requester: {
+      id: number;
+      departmentId?: number;
+      permissions?: string[];
+      isSuperAdmin?: boolean;
+    },
+    targetUserId: number,
+    date?: string,
+  ) {
+    const canManage =
+      requester.isSuperAdmin ||
+      requester.permissions?.includes(PERMISSIONS.GPS_MANAGE) ||
+      requester.permissions?.includes(PERMISSIONS.ATTENDANCE_MANAGE) ||
+      requester.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN);
+
+    if (targetUserId !== requester.id && !canManage) {
+      throw new ForbiddenException('No tienes permisos para ver el trayecto de otro usuario');
+    }
+
+    if (targetUserId !== requester.id) {
+      const target = await this.prisma.user.findUnique({
+        where: { id: targetUserId },
+        select: { id: true, departmentId: true, locationConsent: true },
+      });
+      if (!target) return [];
+      if (
+        !requester.isSuperAdmin &&
+        !requester.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) &&
+        !requester.permissions?.includes(PERMISSIONS.GPS_MANAGE) &&
+        requester.departmentId &&
+        target.departmentId !== requester.departmentId
+      ) {
+        throw new ForbiddenException('No puedes ver usuarios de otro departamento');
+      }
+    }
+
+    return this.getMyTrajectory(targetUserId, date);
+  }
+
+  private parseDateRange(date?: string) {
     let targetDate: Date;
     if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
       const parts = date.split('-').map(Number);
@@ -145,14 +196,7 @@ export class GpsService {
     start.setHours(0, 0, 0, 0);
     const end = new Date(targetDate);
     end.setHours(23, 59, 59, 999);
-
-    return this.prisma['locationTracking'].findMany({
-      where: {
-        usuarioId: userId,
-        ultimaActualizacion: { gte: start, lte: end },
-      },
-      orderBy: { ultimaActualizacion: 'asc' },
-    });
+    return { start, end };
   }
 
   findOne(id: number) {
