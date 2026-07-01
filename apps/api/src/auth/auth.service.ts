@@ -464,6 +464,17 @@ export class AuthService {
       set.add(PERMISSIONS.NOC_VIEW);
     }
 
+    // ── Personal administrativo (operación día a día ERP) ─────────────
+    if (roleKey === 'administrativo') {
+      set.add(PERMISSIONS.ATTENDANCE_VIEW);
+      set.add(PERMISSIONS.LUNCH_BREAKS_VIEW);
+      set.add(PERMISSIONS.DOCUMENTS_VIEW);
+      set.add(PERMISSIONS.DOCUMENTS_MANAGE);
+      set.add(PERMISSIONS.VIATICS_VIEW);
+      set.add(PERMISSIONS.VIATICS_CREATE);
+      set.add(PERMISSIONS.CONTABILIDAD_VIEW);
+    }
+
     // ── Ingeniero de campo ───────────────────────────────────────────
     if (roleKey === 'ing_campo') {
       set.add(PERMISSIONS.CONSOLE_ACCESS);
