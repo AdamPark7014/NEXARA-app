@@ -510,19 +510,25 @@ private fun CrmListScaffold(
 private fun CrmClientDetailScreen(client: Map<String, Any?>, onBack: () -> Unit) {
     val ctx = LocalContext.current
     val clientName = mStr(client, "name", "nombre", "razonSocial")
+    val clientId = mStr(client, "id")
+    val serviceClientId = mStr(client, "serviceClientId", "scId").ifBlank { clientId }
     var tab by remember { mutableIntStateOf(0) }
     var cotizaciones by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
     var oportunidades by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
     var tickets by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
+    var sucursales by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
+    var servicios by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
         val crm = CrmRepository(ctx)
         val extraRepo = ExtraRepository(ctx)
+        val prefix = clientName.take(6).lowercase()
         val c = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { crm.cotizaciones() }
         val o = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { crm.oportunidades() }
         val t = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { extraRepo.clientTicketRequests() }
-        val prefix = clientName.take(6).lowercase()
+        val s = if (serviceClientId.isNotBlank()) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { extraRepo.serviceClientBranches(serviceClientId) } else emptyList()
+        val sv = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { extraRepo.maintenanceContracts(clientId = clientId.ifBlank { null }) }
         cotizaciones = c
             .filter { (it.cliente ?: "").lowercase().contains(prefix) }
             .map { cot ->
@@ -539,6 +545,8 @@ private fun CrmClientDetailScreen(client: Map<String, Any?>, onBack: () -> Unit)
             val cn = (mStr(tk, "clientName", "branchName")).lowercase()
             clientName.isEmpty() || cn.contains(prefix)
         }
+        sucursales = s
+        servicios = sv
         loading = false
     }
 
@@ -546,8 +554,8 @@ private fun CrmClientDetailScreen(client: Map<String, Any?>, onBack: () -> Unit)
         OutlinedButton(onClick = onBack, modifier = Modifier.padding(12.dp)) { Text("← Volver") }
         Text(clientName.ifBlank { "Cliente" }, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp))
         Spacer(Modifier.height(8.dp))
-        TabRow(selectedTabIndex = tab) {
-            listOf("Info", "Cotizaciones", "Oportunidades", "Tickets").forEachIndexed { i, title ->
+        androidx.compose.material3.ScrollableTabRow(selectedTabIndex = tab, edgePadding = 8.dp) {
+            listOf("Info", "Cotizaciones", "Oportunidades", "Tickets", "Sucursales", "Servicios").forEachIndexed { i, title ->
                 Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title, fontSize = 12.sp) })
             }
         }
@@ -596,7 +604,7 @@ private fun CrmClientDetailScreen(client: Map<String, Any?>, onBack: () -> Unit)
                     }
                 }
             }
-            else -> if (tickets.isEmpty()) {
+            3 -> if (tickets.isEmpty()) {
                 Box(Modifier.fillMaxSize(), Alignment.Center) { Text("Sin tickets del cliente", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             } else {
                 LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -607,6 +615,40 @@ private fun CrmClientDetailScreen(client: Map<String, Any?>, onBack: () -> Unit)
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                     Text(mStr(tk, "status", "estado"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
                                     Text(mStr(tk, "createdAt", "fecha").take(10), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            4 -> if (sucursales.isEmpty()) {
+                Box(Modifier.fillMaxSize(), Alignment.Center) { Text("Sin sucursales registradas", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            } else {
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(sucursales, key = { mStr(it, "id") }) { b ->
+                        Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(mStr(b, "name", "nombre", "branchName").ifBlank { "Sucursal" }, fontWeight = FontWeight.Bold)
+                                val addr = mStr(b, "address", "direccion")
+                                if (addr.isNotBlank()) Text(addr, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                val city = mStr(b, "city", "ciudad")
+                                if (city.isNotBlank()) Text(city, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+            }
+            else -> if (servicios.isEmpty()) {
+                Box(Modifier.fillMaxSize(), Alignment.Center) { Text("Sin contratos de servicio", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            } else {
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(servicios, key = { mStr(it, "id") }) { s ->
+                        Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(mStr(s, "name", "nombre", "contractNumber").ifBlank { "Contrato" }, fontWeight = FontWeight.Bold)
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text(mStr(s, "status", "estado"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
+                                    Text(mStr(s, "expiresAt", "endDate", "vigencia").take(10), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }

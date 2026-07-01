@@ -389,7 +389,10 @@ interface ExtraApi {
     suspend fun getSlaStatsRaw(): okhttp3.ResponseBody
 
     @GET("maintenance-contracts")
-    suspend fun getMaintenanceContractsRaw(@Query("status") status: String? = null): okhttp3.ResponseBody
+    suspend fun getMaintenanceContractsRaw(@Query("status") status: String? = null, @Query("clientId") clientId: String? = null): okhttp3.ResponseBody
+
+    @GET("service-clients/{id}/branches")
+    suspend fun getServiceClientBranchesRaw(@retrofit2.http.Path("id") id: String): okhttp3.ResponseBody
 
     // Gobierno corporativo
     @GET("company/list")
