@@ -148,8 +148,15 @@ final class ExtraRepository {
         return obj
     }
 
-    func maintenanceContracts() async -> [[String: Any]] {
-        guard let data = try? await ApiClient.shared.get("maintenance-contracts") else { return [] }
+    func maintenanceContracts(clientId: String? = nil) async -> [[String: Any]] {
+        var query: [String: String] = [:]
+        if let id = clientId, !id.isEmpty { query["clientId"] = id }
+        guard let data = try? await ApiClient.shared.get("maintenance-contracts", query: query) else { return [] }
+        return ApiClient.decodeMapList(data)
+    }
+
+    func serviceClientBranches(serviceClientId: String) async -> [[String: Any]] {
+        guard let data = try? await ApiClient.shared.get("service-clients/\(serviceClientId)/branches") else { return [] }
         return ApiClient.decodeMapList(data)
     }
 

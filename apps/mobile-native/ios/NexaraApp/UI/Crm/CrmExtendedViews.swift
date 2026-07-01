@@ -226,11 +226,17 @@ struct CrmClientDetailView: View {
     @State private var cotizaciones: [[String: Any]] = []
     @State private var oportunidades: [[String: Any]] = []
     @State private var tickets: [[String: Any]] = []
+    @State private var sucursales: [[String: Any]] = []
+    @State private var servicios: [[String: Any]] = []
     @State private var loading = true
 
-    private let tabs = ["Info", "Cotizaciones", "Oportunidades", "Tickets"]
+    private let tabs = ["Info", "Cotizaciones", "Oportunidades", "Tickets", "Sucursales", "Servicios"]
     private var clientName: String { ConsoleHelpers.mapStr(client, "name", "nombre", "razonSocial") }
     private var clientId: String { ConsoleHelpers.mapStr(client, "id") }
+    private var serviceClientId: String {
+        let scId = ConsoleHelpers.mapStr(client, "serviceClientId", "scId")
+        return scId.isEmpty ? clientId : scId
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -243,10 +249,26 @@ struct CrmClientDetailView: View {
             Text(clientName.isEmpty ? "Cliente" : clientName)
                 .font(.headline).padding(.horizontal).padding(.bottom, 4)
 
-            Picker("", selection: $tab) {
-                ForEach(0..<tabs.count, id: \.self) { Text(tabs[$0]).tag($0) }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 0) {
+                    ForEach(0..<tabs.count, id: \.self) { i in
+                        Button {
+                            tab = i
+                        } label: {
+                            Text(tabs[i])
+                                .font(.subheadline)
+                                .padding(.horizontal, 14).padding(.vertical, 8)
+                                .foregroundColor(tab == i ? .accentColor : .secondary)
+                                .overlay(alignment: .bottom) {
+                                    if tab == i { Rectangle().frame(height: 2).foregroundColor(.accentColor) }
+                                }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
-            .pickerStyle(.segmented).padding(.horizontal)
+            .padding(.horizontal, 8)
+            Divider()
 
             if loading {
                 Spacer(); ProgressView(); Spacer()
@@ -255,7 +277,9 @@ struct CrmClientDetailView: View {
                 case 0: infoTab
                 case 1: cotizacionesTab
                 case 2: oportunidadesTab
-                default: ticketsTab
+                case 3: ticketsTab
+                case 4: sucursalesTab
+                default: serviciosTab
                 }
             }
         }
@@ -356,14 +380,59 @@ struct CrmClientDetailView: View {
         }
     }
 
+    private var sucursalesTab: some View {
+        return Group {
+            if sucursales.isEmpty {
+                VStack { Spacer(); Text("Sin sucursales registradas").foregroundColor(.secondary); Spacer() }
+            } else {
+                List(sucursales, id: \.crmKey) { b in
+                    let name = ConsoleHelpers.mapStr(b, "name", "nombre", "branchName")
+                    let address = ConsoleHelpers.mapStr(b, "address", "direccion")
+                    let city = ConsoleHelpers.mapStr(b, "city", "ciudad")
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(name.isEmpty ? "Sucursal" : name).font(.subheadline.bold())
+                        if !address.isEmpty { Text(address).font(.caption).foregroundColor(.secondary) }
+                        if !city.isEmpty { Text(city).font(.caption2).foregroundColor(.secondary) }
+                    }
+                }.listStyle(.plain)
+            }
+        }
+    }
+
+    private var serviciosTab: some View {
+        return Group {
+            if servicios.isEmpty {
+                VStack { Spacer(); Text("Sin contratos de servicio").foregroundColor(.secondary); Spacer() }
+            } else {
+                List(servicios, id: \.crmKey) { s in
+                    let name = ConsoleHelpers.mapStr(s, "name", "nombre", "contractNumber")
+                    let status = ConsoleHelpers.mapStr(s, "status", "estado")
+                    let expiry = String(ConsoleHelpers.mapStr(s, "expiresAt", "endDate", "vigencia").prefix(10))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(name.isEmpty ? "Contrato" : name).font(.subheadline.bold())
+                        HStack {
+                            if !status.isEmpty { Text(status).font(.caption).foregroundColor(.orange) }
+                            Spacer()
+                            if !expiry.isEmpty { Text(expiry).font(.caption2).foregroundColor(.secondary) }
+                        }
+                    }
+                }.listStyle(.plain)
+            }
+        }
+    }
+
     private func load() async {
         async let cots = ExtraRepository.shared.cotizaciones()
         async let opps = (try? await CrmRepository.shared.oportunidades()) ?? []
         async let tks  = ExtraRepository.shared.clientTickets()
-        let (c, o, t) = await (cots, opps, tks)
+        async let suc  = ExtraRepository.shared.serviceClientBranches(serviceClientId: serviceClientId)
+        async let srv  = ExtraRepository.shared.maintenanceContracts(clientId: clientId)
+        let (c, o, t, s, sv) = await (cots, opps, tks, suc, srv)
         cotizaciones = c
         oportunidades = o
         tickets = t
+        sucursales = s
+        servicios = sv
         loading = false
     }
 }

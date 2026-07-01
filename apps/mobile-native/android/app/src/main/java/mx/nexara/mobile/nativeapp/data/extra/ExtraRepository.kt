@@ -156,8 +156,11 @@ class ExtraRepository(context: Context) {
     suspend fun nocAlerts() = loadGeneric { api.getNocAlertsRaw() }
     suspend fun nocDevices() = loadGeneric { api.getNocDevicesRaw() }
     suspend fun slaStats(): Map<String, Any?> = parseObject(api.getSlaStatsRaw().string())
-    suspend fun maintenanceContracts(status: String? = null) =
-        loadGeneric { api.getMaintenanceContractsRaw(status) }
+    suspend fun maintenanceContracts(status: String? = null, clientId: String? = null) =
+        loadGeneric { api.getMaintenanceContractsRaw(status, clientId) }
+
+    suspend fun serviceClientBranches(serviceClientId: String) =
+        loadGeneric { api.getServiceClientBranchesRaw(serviceClientId) }
 
     suspend fun companies() = loadGeneric { api.getCompaniesRaw() }
     suspend fun kbArticles(q: String? = null) = loadGeneric { api.getKbArticlesRaw(q) }
