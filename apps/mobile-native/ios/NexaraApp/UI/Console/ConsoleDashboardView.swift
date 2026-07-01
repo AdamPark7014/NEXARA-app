@@ -4,15 +4,16 @@ import SwiftUI
 
 @MainActor
 final class ConsoleDashboardVM: ObservableObject {
-    @Published var activities: [[String: Any]] = []
-    @Published var viatics:    [[String: Any]] = []
-    @Published var attendance: [[String: Any]] = []
-    @Published var executive:  [String: Any]   = [:]
-    @Published var approvals:  [[String: Any]] = []
-    @Published var isLoading  = false
+    @Published var activities:  [[String: Any]] = []
+    @Published var viatics:     [[String: Any]] = []
+    @Published var attendance:  [[String: Any]] = []
+    @Published var executive:   [String: Any]   = [:]
+    @Published var approvals:   [[String: Any]] = []
+    @Published var nocAlerts:   [[String: Any]] = []
+    @Published var isLoading   = false
     @Published var error: String?
 
-    func load() {
+    func load(isOps: Bool = false) {
         isLoading = true; error = nil
         Task {
             async let acts  = ExtraRepository.shared.activities()
@@ -25,6 +26,9 @@ final class ConsoleDashboardVM: ObservableObject {
             attendance = await atts
             executive  = await exec
             approvals  = await appr
+            if isOps {
+                nocAlerts = await ExtraRepository.shared.nocAlerts()
+            }
             isLoading  = false
         }
     }
@@ -33,6 +37,8 @@ final class ConsoleDashboardVM: ObservableObject {
 // MARK: – Main view
 
 struct ConsoleDashboardView: View {
+    var isOps: Bool = false
+
     @StateObject private var vm = ConsoleDashboardVM()
     @EnvironmentObject var session: SessionStore
 
@@ -48,26 +54,27 @@ struct ConsoleDashboardView: View {
                 VStack(spacing: 12) {
                     Text("No se pudo cargar").font(.headline)
                     Text(err).font(.footnote).foregroundColor(.secondary)
-                    Button("Reintentar") { vm.load() }.buttonStyle(.bordered)
+                    Button("Reintentar") { vm.load(isOps: isOps) }.buttonStyle(.bordered)
                 }.padding()
             } else {
                 dashContent
             }
         }
-        .navigationTitle("Dashboard")
+        .navigationTitle(isOps ? "OPS · Dashboard" : "Dashboard")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button { vm.load() } label: { Image(systemName: "arrow.clockwise") }
+                Button { vm.load(isOps: isOps) } label: { Image(systemName: "arrow.clockwise") }
             }
         }
-        .refreshable { vm.load() }
-        .task { vm.load() }
+        .refreshable { vm.load(isOps: isOps) }
+        .task { vm.load(isOps: isOps) }
     }
 
     private var dashContent: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 20) {
                 headerSection
+                if isOps && !vm.nocAlerts.isEmpty { nocAlertsSection }
                 if !vm.executive.isEmpty || isAdmin { executiveKpiSection }
                 if !vm.approvals.isEmpty { approvalsSection }
                 operationsKpiSection
@@ -77,6 +84,38 @@ struct ConsoleDashboardView: View {
                 Spacer(minLength: 24)
             }
             .padding(.vertical)
+        }
+    }
+
+    // ── NOC Alerts (OPS panel only)
+    private var nocAlertsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            DashSectionHeader(title: "📡 Alertas NOC", detail: "\(vm.nocAlerts.count) activas").padding(.horizontal)
+            ForEach(vm.nocAlerts.prefix(6), id: \.dashId) { alert in
+                let severity = dVal(alert, "severity", "severidad", "nivel")
+                let device   = dVal(alert, "device", "deviceName", "equipo")
+                let msg      = dVal(alert, "message", "title", "alerta")
+                let color: Color = severity.lowercased() == "critical" || severity.lowercased() == "critica" ? .red
+                                 : severity.lowercased() == "warning"  || severity.lowercased() == "alerta"  ? .orange
+                                 : .blue
+                let icon = color == .red ? "🔴" : color == .orange ? "🟡" : "🔵"
+                HStack(spacing: 12) {
+                    Text(icon).font(.title3)
+                    VStack(alignment: .leading, spacing: 2) {
+                        if !device.isEmpty { Text(device).font(.caption).foregroundColor(.secondary) }
+                        Text(msg.isEmpty ? "Alerta" : msg).font(.subheadline).bold().lineLimit(2)
+                    }
+                    Spacer()
+                    Text(severity.isEmpty ? "info" : severity)
+                        .font(.caption2).bold().foregroundColor(color)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(color.opacity(0.12)).clipShape(Capsule())
+                }
+                .padding(12)
+                .background(color.opacity(0.07))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .padding(.horizontal)
+            }
         }
     }
 
