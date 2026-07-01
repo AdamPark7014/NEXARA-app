@@ -94,9 +94,13 @@ struct ModuleRouter {
             GenericListModuleView(title: "Cotizaciones") { (await ExtraRepository.shared.cotizaciones()).map {
                 toRow($0, title: ["folio","number"], subtitle: ["clientName","cliente"], meta: ["total","amount"])
             } }
-        case (.console, "analytics"), (.ventas, "dashboard"), (.ventas, "crecimiento"),
+        case (.ventas, "dashboard"):
+            CrmDashboardView()
+        case (.contabilidad, "dashboard"):
+            ContabilidadDashboardView()
+        case (.console, "analytics"), (.ventas, "crecimiento"),
              (.ventas, "reportes"), (.ventas, "equipo-comparativa"),
-             (.contabilidad, "dashboard"), (.web, "dashboard"):
+             (.web, "dashboard"):
             AnalyticsRawView()
         case (.console, "audit"):
             GenericListModuleView(title: "Auditoría") { (await ExtraRepository.shared.audit()).map {
@@ -173,6 +177,8 @@ struct ModuleRouter {
                 toRow($0, title: ["concepto","motivo"], subtitle: ["usuario"])
             } }
         // ── Tickets / Portal
+        case (.tickets, "tickets"), (.tickets, "dashboard"), (.tickets, "home"):
+            TicketsDashboardView()
         case (.tickets, _):
             GenericListModuleView(title: "Tickets") { (await ExtraRepository.shared.clientTicketRequests()).map {
                 toRow($0, title: ["title","subject"], subtitle: ["clientName"])
