@@ -163,6 +163,7 @@ private struct ConsoleMoreView: View {
                     navRow(key: "support-sla",          icon: "⏱️", label: "SLA y tiempos")
                     navRow(key: "maintenance-contracts", icon: "📑", label: "Contratos de servicio")
                     navRow(key: "support",              icon: "🆘", label: "Bandeja de soporte")
+                    navRow(key: "recruiting",           icon: "🔍", label: "Reclutamiento")
                 }
             }
             if isAdmin {

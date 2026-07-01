@@ -15,7 +15,7 @@ object ModulePanelMap {
         "assets", "maintenance", "maintenance-contracts",
         "service-sheets", "client-tickets", "support", "noc", "support-sla",
         "service-clients",
-        "cvs",
+        "cvs", "recruiting",
     )
 
     private val ERP_KEYS = setOf(

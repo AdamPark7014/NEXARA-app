@@ -65,6 +65,7 @@ object ModuleCatalog {
         ModuleEntry("service-sheets", "Hojas de servicio", "📄", "/operacion/service-sheets", nativeImplemented = true),
         ModuleEntry("documents", "Documentos", "📁", "/console/documents", nativeImplemented = true),
         ModuleEntry("cvs", "CVs", "📑", "/console/cvs", nativeImplemented = true),
+        ModuleEntry("recruiting", "Reclutamiento", "🔍", "/ops/recruiting", nativeImplemented = true),
         ModuleEntry("client-tickets", "Tickets de clientes", "🎫", "/operacion/client-tickets", nativeImplemented = true),
         ModuleEntry("service-clients", "Clientes de servicio", "🏬", "/ops/service-clients", nativeImplemented = true),
         ModuleEntry("support", "Bandeja de soporte", "🆘", "/ops/support", nativeImplemented = true),

@@ -546,6 +546,159 @@ private fun GovCard(
     }
 }
 
+// ── Recruiting Screen ─────────────────────────────────────────────────────────
+
+private val STAGE_LABELS = mapOf(
+    "INBOX" to "Postulado",
+    "RECRUITER_SHORTLIST" to "Entrevista técnica",
+    "RECRUITER_REJECTED" to "Rechazado (técnico)",
+    "ADMIN_SHORTLIST" to "Entrevista admin",
+    "ADMIN_REJECTED" to "Rechazado (admin)",
+    "SUPERADMIN_SHORTLIST" to "Oferta",
+    "SUPERADMIN_REJECTED" to "Rechazado (dir.)",
+    "APPROVED" to "Contratado",
+)
+
+private val STAGE_ORDER = listOf(
+    "INBOX", "RECRUITER_SHORTLIST", "ADMIN_SHORTLIST", "SUPERADMIN_SHORTLIST", "APPROVED",
+    "RECRUITER_REJECTED", "ADMIN_REJECTED", "SUPERADMIN_REJECTED",
+)
+
+private fun stageColor(key: String) = when (key) {
+    "INBOX"                  -> Color(0xFF6B7280)
+    "RECRUITER_SHORTLIST"    -> Color(0xFF3B82F6)
+    "ADMIN_SHORTLIST"        -> Color(0xFF8B5CF6)
+    "SUPERADMIN_SHORTLIST"   -> Color(0xFFF59E0B)
+    "APPROVED"               -> Color(0xFF22C55E)
+    else                     -> Color(0xFFEF4444)
+}
+
+@Composable
+fun RecruitingScreen() {
+    val context = LocalContext.current
+    val repo = remember { mx.nexara.mobile.nativeapp.data.extra.ExtraRepository(context) }
+    var loading by remember { mutableStateOf(true) }
+    var candidates by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
+    var query by remember { mutableStateOf("") }
+    var showRejected by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        loading = true
+        candidates = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { repo.cvs() }
+        loading = false
+    }
+
+    val filtered = remember(candidates, query, showRejected) {
+        candidates.filter { c ->
+            val stage = govStr(c, "stage", "status")
+            val isRejected = stage.contains("REJECTED")
+            if (!showRejected && isRejected) return@filter false
+            if (query.isBlank()) return@filter true
+            val q = query.lowercase()
+            govStr(c, "fullName", "nombre").lowercase().contains(q) ||
+            govStr(c, "email").lowercase().contains(q) ||
+            govStr(c, "category").lowercase().contains(q)
+        }
+    }
+
+    val grouped = remember(filtered) {
+        val map = filtered.groupBy { govStr(it, "stage", "status").ifBlank { "INBOX" } }
+        STAGE_ORDER.filter { map.containsKey(it) }.map { key -> key to map[key]!! }
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        // KPI strip
+        if (!loading) {
+            Row(
+                Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant).padding(10.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                val total      = candidates.size
+                val inProcess  = candidates.count { !govStr(it, "stage").contains("REJECTED") && govStr(it, "stage") != "APPROVED" }
+                val approved   = candidates.count { govStr(it, "stage") == "APPROVED" }
+                val rejected   = candidates.count { govStr(it, "stage").contains("REJECTED") }
+                RecruKpiChip("Total", "$total")
+                RecruKpiChip("En proceso", "$inProcess", Color(0xFF3B82F6))
+                RecruKpiChip("Contratados", "$approved", Color(0xFF22C55E))
+                RecruKpiChip("Rechazados", "$rejected", Color(0xFFEF4444))
+            }
+        }
+        // Search + toggle
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = { Text("Buscar candidato…") },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+            )
+            FilterChip(selected = showRejected, onClick = { showRejected = !showRejected }, label = { Text("Rechazados", style = MaterialTheme.typography.labelSmall) })
+        }
+
+        if (loading) {
+            Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
+        } else {
+            LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
+                grouped.forEach { (stageKey, list) ->
+                    val color = stageColor(stageKey)
+                    val label = STAGE_LABELS[stageKey] ?: stageKey
+                    item(key = "hdr-$stageKey") {
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(label, fontWeight = FontWeight.Bold, color = color)
+                            Box(Modifier.background(color.copy(alpha = 0.12f), RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) {
+                                Text("${list.size}", style = MaterialTheme.typography.labelSmall, color = color)
+                            }
+                        }
+                    }
+                    items(list, key = { govStr(it, "id") }) { c ->
+                        RecruCandidateCard(c, color)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecruKpiChip(label: String, value: String, color: Color = MaterialTheme.colorScheme.onSurface) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, fontWeight = FontWeight.Bold, color = color)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun RecruCandidateCard(c: Map<String, Any?>, accent: Color) {
+    val name     = govStr(c, "fullName", "nombre")
+    val email    = govStr(c, "email")
+    val category = govStr(c, "category")
+    val whatsapp = govStr(c, "whatsapp")
+    val initials = name.split(" ").take(2).mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString("")
+
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(44.dp).background(accent.copy(0.15f), RoundedCornerShape(22.dp)),
+            Alignment.Center
+        ) { Text(initials.ifBlank { "?" }, fontWeight = FontWeight.Bold, color = accent) }
+        Column(Modifier.weight(1f)) {
+            Text(name.ifBlank { "Candidato" }, fontWeight = FontWeight.SemiBold)
+            if (category.isNotBlank()) Text(category, style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+            if (email.isNotBlank()) Text(email, style = MaterialTheme.typography.labelSmall, color = Color(0xFF94A3B8))
+        }
+        if (whatsapp.isNotBlank()) {
+            Text("📱", style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
 private fun govStr(m: Map<String, Any?>, vararg keys: String): String {
     for (k in keys) {
         val v = m[k] ?: continue

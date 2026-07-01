@@ -184,6 +184,8 @@ struct ModuleRouter {
             DocumentsView()
         case (.console, "cvs"):
             CvsView()
+        case (.console, "recruiting"):
+            RecruitingView()
         case (.console, "client-tickets"):
             ClientTicketsModuleView()
         case (.console, "contact-messages"), (.web, "contactos"):
