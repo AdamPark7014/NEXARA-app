@@ -152,4 +152,41 @@ final class ExtraRepository {
         guard let data = try? await ApiClient.shared.get("maintenance-contracts") else { return [] }
         return ApiClient.decodeMapList(data)
     }
+
+    func companies() async -> [[String: Any]] {
+        guard let data = try? await ApiClient.shared.get("company/list") else { return [] }
+        return ApiClient.decodeMapList(data)
+    }
+
+    func kbArticles(q: String? = nil) async -> [[String: Any]] {
+        var query: [String: String] = [:]
+        if let q, !q.isEmpty { query["q"] = q }
+        guard let data = try? await ApiClient.shared.get("kb/articles", query: query) else { return [] }
+        return ApiClient.decodeMapList(data)
+    }
+
+    func kbArticle(_ slugOrId: String) async -> [String: Any] {
+        guard let data = try? await ApiClient.shared.get("kb/articles/\(slugOrId)"),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
+        return obj
+    }
+
+    func orgchart() async -> [[String: Any]] {
+        guard let data = try? await ApiClient.shared.get("users/orgchart") else { return [] }
+        return ApiClient.decodeMapList(data)
+    }
+
+    func hrStaff(page: Int = 1, limit: Int = 100) async -> [[String: Any]] {
+        guard let data = try? await ApiClient.shared.get("users/hr-staff", query: ["page": String(page), "limit": String(limit)]) else { return [] }
+        return ApiClient.decodeMapList(data)
+    }
+
+    func calendarEvents(from: String, to: String) async -> [[String: Any]] {
+        guard let data = try? await ApiClient.shared.get("calendar/events", query: ["from": from, "to": to]) else { return [] }
+        return ApiClient.decodeMapList(data)
+    }
+
+    func exportCsv(entity: String, from: String, to: String) async throws -> Data {
+        try await ApiClient.shared.get("exports/\(entity)", query: ["from": from, "to": to])
+    }
 }

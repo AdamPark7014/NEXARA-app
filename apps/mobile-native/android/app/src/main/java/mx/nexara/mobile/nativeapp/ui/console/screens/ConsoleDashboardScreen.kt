@@ -39,6 +39,7 @@ import mx.nexara.mobile.nativeapp.data.api.ActivityDto
 import mx.nexara.mobile.nativeapp.data.api.AttendanceRangeDto
 import mx.nexara.mobile.nativeapp.data.api.ViaticDto
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
+import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -51,11 +52,14 @@ data class DashboardUiState(
     val attendance: AttendanceRangeDto? = null,
     val weekFrom: String = "",
     val weekTo: String = "",
+    val executive: Map<String, Any?> = emptyMap(),
+    val approvals: List<Map<String, Any?>> = emptyList(),
 )
 
 class ConsoleDashboardViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ConsoleRepository(app.applicationContext)
     private val authRepo = AuthRepository(app.applicationContext)
+    private val extraRepo = ExtraRepository(app.applicationContext)
 
     private val _state = MutableStateFlow(DashboardUiState())
     val state: StateFlow<DashboardUiState> = _state
@@ -74,17 +78,19 @@ class ConsoleDashboardViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(isLoading = true, error = null, weekFrom = from, weekTo = to) }
         viewModelScope.launch {
             try {
-                val viatics = withContext(Dispatchers.IO) { repo.viaticsFetch() }
+                val viatics    = withContext(Dispatchers.IO) { repo.viaticsFetch() }
                 val activities = withContext(Dispatchers.IO) { repo.activitiesFetch() }
-                val attendance = withContext(Dispatchers.IO) {
-                    runCatching { repo.attendanceRange(from, to) }.getOrNull()
-                }
+                val attendance = withContext(Dispatchers.IO) { runCatching { repo.attendanceRange(from, to) }.getOrNull() }
+                val executive  = withContext(Dispatchers.IO) { runCatching { extraRepo.executiveCLevel() }.getOrElse { emptyMap() } }
+                val approvals  = withContext(Dispatchers.IO) { runCatching { extraRepo.workflowPending() }.getOrElse { emptyList() } }
                 _state.update {
                     it.copy(
                         isLoading = false,
                         viatics = viatics,
                         activities = activities,
                         attendance = attendance,
+                        executive = executive,
+                        approvals = approvals,
                         error = null,
                     )
                 }
@@ -167,6 +173,59 @@ fun ConsoleDashboardScreen(
                 Button(onClick = { vm.refresh() }) { Text("Reintentar") }
             }
             return@LazyColumn
+        }
+
+        // ── Executive KPIs (solo admins/finance) ────────────────────────────
+        if (state.executive.isNotEmpty()) {
+            item {
+                SectionHeader(title = "Resumen ejecutivo", subtitle = "Este período")
+            }
+            item {
+                val revenue  = execDbl(state.executive, "revenue", "totalRevenue", "ingresos")
+                val projects = execInt(state.executive, "activeProjects", "proyectosActivos")
+                val engineers = execInt(state.executive, "activeEngineers", "ingenieros", "activeUsers")
+                val clients  = execInt(state.executive, "activeClients", "clientesActivos", "clients")
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    KpiCard(modifier = Modifier.weight(1f), title = "Ingresos", value = revenue?.let { formatMxn(it) } ?: "—", subtitle = "Acumulado", bgColor = GreenLight, accentColor = GreenColor, icon = "💰")
+                    KpiCard(modifier = Modifier.weight(1f), title = "Proyectos", value = projects?.toString() ?: "—", subtitle = "Activos", bgColor = BlueLight, accentColor = BlueColor, icon = "🧩")
+                }
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    KpiCard(modifier = Modifier.weight(1f), title = "Ingenieros", value = engineers?.toString() ?: "—", subtitle = "En campo", bgColor = AmberLight, accentColor = AmberColor, icon = "👷")
+                    KpiCard(modifier = Modifier.weight(1f), title = "Clientes", value = clients?.toString() ?: "—", subtitle = "Activos", bgColor = TealLight, accentColor = TealColor, icon = "🤝")
+                }
+            }
+        }
+
+        // ── Aprobaciones pendientes ──────────────────────────────────────────
+        if (state.approvals.isNotEmpty()) {
+            item { SectionHeader(title = "Aprobaciones pendientes", subtitle = "${state.approvals.size} esperando") }
+            item {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(state.approvals.take(8)) { a ->
+                        val title   = (a["title"] ?: a["stepName"] ?: a["entityType"])?.toString() ?: "Aprobación"
+                        val who     = (a["requestedBy"] ?: a["userName"] ?: a["solicita"])?.toString() ?: ""
+                        val urgency = (a["urgencia"] ?: a["priority"] ?: "normal").toString()
+                        val uColor  = when (urgency.lowercase()) {
+                            "alta","high" -> RedColor; "media","medium" -> AmberColor; else -> BlueColor
+                        }
+                        Card(modifier = Modifier.width(185.dp), shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            elevation = CardDefaults.cardElevation(2.dp)) {
+                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("🛡️", fontSize = 20.sp)
+                                    Box(Modifier.clip(RoundedCornerShape(6.dp)).background(uColor.copy(0.12f)).padding(horizontal=6.dp,vertical=2.dp)) {
+                                        Text(urgency, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = uColor)
+                                    }
+                                }
+                                Text(title.take(50), style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold), color = SlateText, maxLines = 2)
+                                if (who.isNotBlank()) Text("Por: $who", fontSize = 10.sp, color = SubText, maxLines = 1)
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // ── KPI Row ──────────────────────────────────────────────────────────
@@ -519,5 +578,29 @@ private fun statusColor(status: String): Color {
 private fun formatMxn(amount: Double): String {
     val rounded = kotlin.math.round(amount).toLong()
     return "$%,d".format(rounded)
+}
+
+private fun execDbl(map: Map<String, Any?>, vararg keys: String): Double? {
+    for (k in keys) {
+        val v = map[k] ?: continue
+        when (v) {
+            is Double -> return v
+            is Number -> return v.toDouble()
+            is String -> v.toDoubleOrNull()?.let { return it }
+        }
+    }
+    return null
+}
+
+private fun execInt(map: Map<String, Any?>, vararg keys: String): Int? {
+    for (k in keys) {
+        val v = map[k] ?: continue
+        when (v) {
+            is Int    -> return v
+            is Number -> return v.toInt()
+            is String -> v.toIntOrNull()?.let { return it }
+        }
+    }
+    return null
 }
 

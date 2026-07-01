@@ -126,8 +126,8 @@ fun VentasNavHost(
                 val key = backStack.arguments?.getString("key").orEmpty()
                 when (key) {
                     "dashboard"           -> VentasDashboardScreen()
-                    "cotizaciones",
-                    "plantillas"          -> VentasCotizacionesScreen()
+                    "cotizaciones"          -> VentasCotizacionesScreen()
+                    "plantillas", "templates" -> VentasTemplatesScreen()
                     "leads"               -> VentasLeadsApiScreen()
                     "oportunidades"       -> VentasOportunidadesScreen()
                     "clientes"            -> VentasClientesScreen()

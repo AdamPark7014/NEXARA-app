@@ -105,7 +105,11 @@ private struct ConsoleMoreView: View {
                 navRow(key: "viatics",         icon: "💰", label: "Viáticos (equipo)")
                 navRow(key: "vehicles",        icon: "🚗", label: "Vehículos")
                 navRow(key: "tools",           icon: "🔧", label: "Herramientas")
-                navRow(key: "clients",         icon: "🏢", label: "Clientes")
+                if panel == .ops {
+                    navRow(key: "service-clients", icon: "🏬", label: "Clientes de servicio")
+                } else {
+                    navRow(key: "clients",         icon: "🏢", label: "Clientes")
+                }
                 navRow(key: "projects",        icon: "📐", label: "Proyectos")
                 navRow(key: "work-projects",   icon: "🛠️", label: "Proyectos internos")
                 navRow(key: "service-sheets",  icon: "📋", label: "Hojas de servicio")

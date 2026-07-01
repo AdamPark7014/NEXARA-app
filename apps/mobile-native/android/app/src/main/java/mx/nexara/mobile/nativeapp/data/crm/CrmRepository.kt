@@ -1,6 +1,7 @@
 package mx.nexara.mobile.nativeapp.data.crm
 
 import android.content.Context
+import android.net.Uri
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
@@ -9,10 +10,15 @@ import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.CotizacionDto
 import mx.nexara.mobile.nativeapp.data.api.CrmApi
 import mx.nexara.mobile.nativeapp.data.api.ExtraApi
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import java.io.File
 import java.lang.reflect.ParameterizedType
 
-class CrmRepository(context: Context) {
-    private val authRepo = AuthRepository(context)
+class CrmRepository(private val context: Context) {
+    private val appContext = context.applicationContext
+    private val authRepo = AuthRepository(appContext)
     private val crmApi: CrmApi = ApiClient.authed { authRepo.token() }.create(CrmApi::class.java)
     private val extraApi: ExtraApi = ApiClient.authed { authRepo.token() }.create(ExtraApi::class.java)
 
@@ -52,6 +58,30 @@ class CrmRepository(context: Context) {
 
     suspend fun oportunidades(): List<Map<String, Any?>> = parseMaps(crmApi.listOportunidadesRaw().string())
 
+    suspend fun getOpportunity(id: Long): Map<String, Any?> =
+        parseObject(crmApi.getOpportunityRaw(id).string())
+
+    suspend fun addOpportunityNote(id: Long, message: String): Map<String, Any?> =
+        parseObject(crmApi.addOpportunityNoteRaw(id, mapOf("message" to message)).string())
+
+    suspend fun addOpportunityEvidences(id: Long, uris: List<Uri>): List<Map<String, Any?>> {
+        val parts = uris.mapNotNull { filePart(it) }
+        if (parts.isEmpty()) return emptyList()
+        return parseMaps(crmApi.addOpportunityEvidencesRaw(id, parts).string())
+    }
+
+    private fun filePart(uri: Uri): MultipartBody.Part? {
+        val resolver = appContext.contentResolver
+        val mime = resolver.getType(uri) ?: "application/octet-stream"
+        val name = uri.lastPathSegment?.substringAfterLast('/') ?: "file"
+        val tmp = File.createTempFile("nexara_opp_", "_$name", appContext.cacheDir)
+        resolver.openInputStream(uri)?.use { input ->
+            tmp.outputStream().use { output -> input.copyTo(output) }
+        } ?: return null
+        val body = tmp.asRequestBody(mime.toMediaType())
+        return MultipartBody.Part.createFormData("files", name, body)
+    }
+
     suspend fun clientes(): List<Map<String, Any?>> = parseMaps(crmApi.listClientesRaw().string())
 
     suspend fun leads(): List<Map<String, Any?>> = parseMaps(crmApi.listLeadsRaw().string())
@@ -78,6 +108,19 @@ class CrmRepository(context: Context) {
 
     suspend fun vendorStats(period: String = "month"): List<Map<String, Any?>> =
         parseMaps(crmApi.listSalesTeamRaw(period).string())
+
+    suspend fun orderTemplates(): List<Map<String, Any?>> =
+        parseMaps(crmApi.listOrderTemplatesRaw().string())
+
+    suspend fun createOrderTemplate(fields: Map<String, String>): Map<String, Any?> =
+        parseObject(crmApi.createOrderTemplateRaw(fields).string())
+
+    suspend fun setOrderTemplateDefault(id: Long): Map<String, Any?> =
+        parseObject(crmApi.setOrderTemplateDefaultRaw(id).string())
+
+    suspend fun deleteOrderTemplate(id: Long) {
+        crmApi.deleteOrderTemplateRaw(id)
+    }
 
     private fun parseObject(raw: String): Map<String, Any?> {
         val trimmed = raw.trim()

@@ -10,13 +10,15 @@ enum ModulePanelMap {
         "vehicles", "my-vehicles",
         "gps", "tools",
         "projects", "work-projects",
-        "assets", "maintenance",
-        "service-sheets", "client-tickets",
+        "assets", "maintenance", "maintenance-contracts",
+        "service-sheets", "client-tickets", "support", "noc", "support-sla",
+        "service-clients",
         "cvs",
     ]
 
     private static let erpKeys: Set<String> = [
         "dashboard",
+        "executive", "approvals", "notifications-center", "bi",
         "attendance", "lunch-breaks", "my-lunch-breaks",
         "hr", "fines", "users", "employee-payments",
         "accounting", "banking", "invoicing", "expenses",
@@ -25,6 +27,7 @@ enum ModulePanelMap {
         "clients", "projects", "cotizaciones", "gestion-vendedores",
         "contact-messages", "news", "newsletter",
         "settings", "my-profile", "my-preferences",
+        "companies", "kb", "exports", "architecture", "calendar", "orgchart", "kpis-hr",
     ]
 
     static func consoleKeys(for panel: PanelId) -> Set<String>? {

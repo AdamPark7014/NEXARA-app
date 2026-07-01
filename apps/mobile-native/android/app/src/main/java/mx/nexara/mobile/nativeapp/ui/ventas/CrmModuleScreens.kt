@@ -136,6 +136,11 @@ fun VentasOportunidadesScreen() {
     val items by remember { derivedStateOf { vm.filtered } }
 
     if (state.selected != null) {
+        val id = mStr(state.selected!!, "id").toLongOrNull()
+        if (id != null) {
+            VentasOpportunityDetailScreen(id = id, onBack = { vm.select(null) })
+            return
+        }
         CrmDetailScaffold(
             title = mStr(state.selected!!, "title", "name", "titulo"),
             rows = listOf(

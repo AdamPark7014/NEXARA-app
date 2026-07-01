@@ -1,0 +1,566 @@
+package mx.nexara.mobile.nativeapp.ui.console.screens
+
+import android.app.Application
+import android.content.Context
+import android.content.Intent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import mx.nexara.mobile.nativeapp.access.ModulePanelMap
+import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
+import mx.nexara.mobile.nativeapp.ui.catalog.ModuleCatalog
+import mx.nexara.mobile.nativeapp.ui.catalog.ModuleEntry
+import java.io.File
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
+
+// ── Multi-empresa ───────────────────────────────────────────────────────────
+
+data class CompaniesState(val loading: Boolean = true, val error: String? = null, val items: List<Map<String, Any?>> = emptyList())
+
+class CompaniesViewModel(app: Application) : AndroidViewModel(app) {
+    private val repo = ExtraRepository(app.applicationContext)
+    private val _state = MutableStateFlow(CompaniesState())
+    val state: StateFlow<CompaniesState> = _state
+
+    fun load() {
+        _state.update { it.copy(loading = true, error = null) }
+        viewModelScope.launch {
+            try {
+                val items = withContext(Dispatchers.IO) { repo.companies() }
+                _state.update { it.copy(loading = false, items = items) }
+            } catch (e: Exception) {
+                _state.update { it.copy(loading = false, error = e.message) }
+            }
+        }
+    }
+}
+
+@Composable
+fun CompaniesScreen() {
+    val vm: CompaniesViewModel = viewModel()
+    val state by vm.state.collectAsState()
+    LaunchedEffect(Unit) { vm.load() }
+
+    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item {
+            GovHeader("Multi-empresa", "Razones sociales y sucursales")
+        }
+        if (state.loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
+        if (state.error != null) { item { Text(state.error!!, color = MaterialTheme.colorScheme.error) }; return@LazyColumn }
+        if (state.items.isEmpty()) { item { Text("Sin empresas registradas.", color = Color(0xFF64748B)) }; return@LazyColumn }
+        items(state.items, key = { govStr(it, "id") }) { c ->
+            GovCard(
+                title = govStr(c, "legalName", "tradeName"),
+                subtitle = listOfNotNull(govStr(c, "rfc").takeIf { it.isNotBlank() }, govStr(c, "fiscalRegime").takeIf { it.isNotBlank() }).joinToString(" · "),
+                trailing = when {
+                    c["isPrimary"] == true -> "Principal"
+                    c["isActive"] == false -> "Inactiva"
+                    else -> govStr(c, "tradeName").ifBlank { "Activa" }
+                },
+                accent = if (c["isPrimary"] == true) Color(0xFF059669) else Color(0xFF64748B),
+            )
+        }
+    }
+}
+
+// ── Knowledge Base ──────────────────────────────────────────────────────────
+
+data class KbState(val loading: Boolean = true, val error: String? = null, val query: String = "", val articles: List<Map<String, Any?>> = emptyList(), val selected: Map<String, Any?>? = null)
+
+class KbViewModel(app: Application) : AndroidViewModel(app) {
+    private val repo = ExtraRepository(app.applicationContext)
+    private val _state = MutableStateFlow(KbState())
+    val state: StateFlow<KbState> = _state
+
+    fun setQuery(q: String) = _state.update { it.copy(query = q) }
+
+    fun load() {
+        _state.update { it.copy(loading = true, error = null) }
+        viewModelScope.launch {
+            try {
+                val q = _state.value.query.trim().ifBlank { null }
+                val articles = withContext(Dispatchers.IO) { repo.kbArticles(q) }
+                _state.update { it.copy(loading = false, articles = articles) }
+            } catch (e: Exception) {
+                _state.update { it.copy(loading = false, error = e.message) }
+            }
+        }
+    }
+
+    fun openArticle(slugOrId: String) {
+        viewModelScope.launch {
+            try {
+                val article = withContext(Dispatchers.IO) { repo.kbArticle(slugOrId) }
+                _state.update { it.copy(selected = article) }
+            } catch (_: Exception) { }
+        }
+    }
+
+    fun closeArticle() = _state.update { it.copy(selected = null) }
+}
+
+@Composable
+fun KbScreen() {
+    val vm: KbViewModel = viewModel()
+    val state by vm.state.collectAsState()
+    LaunchedEffect(Unit) { vm.load() }
+
+    val filtered = remember(state.articles, state.query) {
+        val q = state.query.trim().lowercase()
+        if (q.isEmpty()) state.articles
+        else state.articles.filter {
+            govStr(it, "title").lowercase().contains(q) || govStr(it, "tags").lowercase().contains(q)
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            item { GovHeader("Knowledge Base", "Procedimientos y documentación interna") }
+            item {
+                OutlinedTextField(
+                    value = state.query,
+                    onValueChange = { vm.setQuery(it) },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Buscar artículo…") },
+                    singleLine = true,
+                )
+            }
+            if (state.loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
+            items(filtered, key = { govStr(it, "id", "slug") }) { a ->
+                val slug = govStr(a, "slug", "id")
+                GovCard(
+                    title = govStr(a, "title"),
+                    subtitle = govStr(a, "excerpt").ifBlank { govStr(a, "category", "name") },
+                    trailing = govStr(a, "status", "visibility"),
+                    accent = Color(0xFF6366F1),
+                    modifier = Modifier.clickable { vm.openArticle(slug) },
+                )
+            }
+        }
+        state.selected?.let { article ->
+            AlertDialog(
+                onDismissRequest = { vm.closeArticle() },
+                title = { Text(govStr(article, "title")) },
+                text = {
+                    Column {
+                        Text(govStr(article, "excerpt"), style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            govStr(article, "content").take(2000).ifBlank { "Sin contenido." },
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                },
+                confirmButton = { TextButton(onClick = { vm.closeArticle() }) { Text("Cerrar") } },
+            )
+        }
+    }
+}
+
+// ── Exportaciones CSV ───────────────────────────────────────────────────────
+
+private val EXPORT_ENTITIES = listOf(
+    Triple("activities", "Actividades / OT", "🧰"),
+    Triple("viatics", "Viáticos", "💸"),
+    Triple("vehicles", "Vehículos", "🚐"),
+    Triple("evidences", "Evidencias", "📷"),
+    Triple("users", "Usuarios", "👥"),
+)
+
+data class ExportsState(val from: String = defaultFrom(), val to: String = defaultTo(), val downloading: String? = null, val error: String? = null, val message: String? = null)
+
+private fun defaultFrom() = LocalDate.now().minusDays(30).format(DateTimeFormatter.ISO_LOCAL_DATE)
+private fun defaultTo() = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+
+class ExportsViewModel(app: Application) : AndroidViewModel(app) {
+    private val repo = ExtraRepository(app.applicationContext)
+    private val _state = MutableStateFlow(ExportsState())
+    val state: StateFlow<ExportsState> = _state
+
+    fun setFrom(v: String) = _state.update { it.copy(from = v) }
+    fun setTo(v: String) = _state.update { it.copy(to = v) }
+
+    fun download(context: Context, entity: String) {
+        val from = _state.value.from
+        val to = _state.value.to
+        _state.update { it.copy(downloading = entity, error = null, message = null) }
+        viewModelScope.launch {
+            try {
+                val bytes = withContext(Dispatchers.IO) { repo.exportCsv(entity, from, to) }
+                val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+                val file = File(dir, "$entity-$from-$to.csv")
+                file.writeBytes(bytes)
+                shareFile(context, file)
+                _state.update { it.copy(downloading = null, message = "✅ Exportación lista para compartir") }
+            } catch (e: Exception) {
+                _state.update { it.copy(downloading = null, error = e.message ?: "Error al exportar") }
+            }
+        }
+    }
+}
+
+private fun shareFile(context: Context, file: File) {
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/csv"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(intent, "Compartir CSV"))
+}
+
+@Composable
+fun ExportsScreen() {
+    val context = LocalContext.current
+    val vm: ExportsViewModel = viewModel()
+    val state by vm.state.collectAsState()
+
+    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item { GovHeader("Exportaciones", "Reportes CSV por rango de fechas") }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(value = state.from, onValueChange = { vm.setFrom(it) }, label = { Text("Desde") }, modifier = Modifier.weight(1f))
+                OutlinedTextField(value = state.to, onValueChange = { vm.setTo(it) }, label = { Text("Hasta") }, modifier = Modifier.weight(1f))
+            }
+        }
+        state.error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
+        state.message?.let { item { Text(it, color = Color(0xFF059669)) } }
+        items(EXPORT_ENTITIES) { (key, label, icon) ->
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().padding(14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(icon, style = MaterialTheme.typography.titleLarge)
+                        Text(label, fontWeight = FontWeight.Medium)
+                    }
+                    Button(
+                        onClick = { vm.download(context, key) },
+                        enabled = state.downloading != key,
+                    ) {
+                        Text(if (state.downloading == key) "…" else "CSV")
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Arquitectura (mapa local — paridad web, sin API) ────────────────────────
+
+private data class ArchPanel(val id: String, val title: String, val icon: String, val accent: Color, val modules: List<ModuleEntry>)
+
+private fun architecturePanels(): List<ArchPanel> {
+    val erpKeys = ModulePanelMap.consoleKeysFor(mx.nexara.mobile.nativeapp.access.PanelId.ERP) ?: emptySet()
+    val opsKeys = ModulePanelMap.consoleKeysFor(mx.nexara.mobile.nativeapp.access.PanelId.OPS) ?: emptySet()
+    val consoleByKey = ModuleCatalog.console.associateBy { it.key }
+    return listOf(
+        ArchPanel("erp", "NEXARA ERP", "⚙️", Color(0xFF0EA5E9), erpKeys.mapNotNull { consoleByKey[it] }),
+        ArchPanel("crm", "NEXARA CRM", "📈", Color(0xFF10B981), ModuleCatalog.ventas),
+        ArchPanel("ops", "NEXARA OPS", "🚀", Color(0xFFF97316), opsKeys.mapNotNull { consoleByKey[it] }),
+        ArchPanel("studio", "NEXARA STUDIO", "🎨", Color(0xFFA855F7), ModuleCatalog.studio),
+        ArchPanel("lab", "NEXARA LAB", "🧪", Color(0xFF64748B), ModuleCatalog.lab),
+    )
+}
+
+@Composable
+fun ArchitectureScreen() {
+    var selected by remember { mutableStateOf("all") }
+    val panels = remember { architecturePanels() }
+
+    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item {
+            GovHeader("Arquitectura del ERP", "5 paneles · módulos nativos implementados")
+        }
+        item {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = selected == "all", onClick = { selected = "all" }, label = { Text("Todos") })
+                panels.forEach { p ->
+                    FilterChip(selected = selected == p.id, onClick = { selected = p.id }, label = { Text("${p.icon} ${p.title}") })
+                }
+            }
+        }
+        val toShow = if (selected == "all") panels else panels.filter { it.id == selected }
+        toShow.forEach { panel ->
+            item {
+                Text("${panel.icon} ${panel.title}", fontWeight = FontWeight.Bold, color = panel.accent)
+                Text("${panel.modules.count { it.nativeImplemented }} módulos nativos", style = MaterialTheme.typography.labelSmall, color = Color(0xFF64748B))
+            }
+            items(panel.modules, key = { "${panel.id}-${it.key}" }) { m ->
+                GovCard(
+                    title = "${m.icon} ${m.label}",
+                    subtitle = m.webPath,
+                    trailing = if (m.nativeImplemented) "✓" else "—",
+                    accent = if (m.nativeImplemented) panel.accent else Color(0xFF94A3B8),
+                )
+            }
+        }
+    }
+}
+
+// ── Calendario personal ERP ─────────────────────────────────────────────────
+
+data class CalendarState(val loading: Boolean = true, val error: String? = null, val rangeDays: Int = 30, val events: List<Map<String, Any?>> = emptyList())
+
+class ErpCalendarViewModel(app: Application) : AndroidViewModel(app) {
+    private val repo = ExtraRepository(app.applicationContext)
+    private val _state = MutableStateFlow(CalendarState())
+    val state: StateFlow<CalendarState> = _state
+
+    fun setRange(days: Int) {
+        _state.update { it.copy(rangeDays = days) }
+        load()
+    }
+
+    fun load() {
+        _state.update { it.copy(loading = true, error = null) }
+        viewModelScope.launch {
+            try {
+                val from = java.time.Instant.now().toString()
+                val to = java.time.Instant.now().plus(_state.value.rangeDays.toLong(), ChronoUnit.DAYS).toString()
+                val events = withContext(Dispatchers.IO) { repo.calendarEvents(from, to) }
+                _state.update { it.copy(loading = false, events = events) }
+            } catch (e: Exception) {
+                _state.update { it.copy(loading = false, error = e.message) }
+            }
+        }
+    }
+}
+
+@Composable
+fun ErpCalendarScreen() {
+    val vm: ErpCalendarViewModel = viewModel()
+    val state by vm.state.collectAsState()
+    LaunchedEffect(Unit) { vm.load() }
+
+    val grouped = remember(state.events) {
+        state.events.groupBy { govStr(it, "start", "fecha").take(10) }
+            .entries.sortedBy { it.key }
+    }
+
+    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item { GovHeader("Mi calendario", "OT · CRM · mantenimiento · licitaciones") }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(7 to "7 días", 30 to "30 días", 90 to "90 días").forEach { (d, label) ->
+                    FilterChip(selected = state.rangeDays == d, onClick = { vm.setRange(d) }, label = { Text(label) })
+                }
+            }
+        }
+        if (state.loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
+        if (state.events.isEmpty()) { item { Text("Sin eventos en este rango.", color = Color(0xFF64748B)) }; return@LazyColumn }
+        grouped.forEach { (day, list) ->
+            item { Text(day.ifBlank { "Sin fecha" }, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A)) }
+            items(list, key = { govStr(it, "id") }) { ev ->
+                GovCard(
+                    title = govStr(ev, "title", "titulo"),
+                    subtitle = "${govStr(ev, "source")} · ${govStr(ev, "type")}",
+                    trailing = govStr(ev, "start").takeLast(8),
+                    accent = Color(0xFF3B82F6),
+                )
+            }
+        }
+    }
+}
+
+// ── Organigrama ─────────────────────────────────────────────────────────────
+
+@Composable
+fun OrgchartScreen() {
+    var roots by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        loading = true
+        try {
+            roots = withContext(Dispatchers.IO) { ExtraRepository(context).orgchart() }
+        } catch (e: Exception) {
+            error = e.message
+        }
+        loading = false
+    }
+
+    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        item { GovHeader("Organigrama", "Jerarquía y reportes") }
+        if (loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
+        if (error != null) { item { Text(error!!, color = MaterialTheme.colorScheme.error) }; return@LazyColumn }
+        item { OrgchartTree(roots, depth = 0) }
+    }
+}
+
+@Composable
+private fun OrgchartTree(nodes: List<Map<String, Any?>>, depth: Int) {
+    nodes.forEach { node ->
+        val pad = (depth * 16).dp
+        GovCard(
+            title = govStr(node, "nombre", "name"),
+            subtitle = listOfNotNull(
+                govNestedStr(node, "role", "nombre"),
+                govNestedStr(node, "department", "nombre"),
+            ).joinToString(" · "),
+            trailing = if ((node["children"] as? List<*>)?.isNotEmpty() == true) "${(node["children"] as List<*>).size} ↓" else "",
+            accent = Color(0xFF0D9488),
+            modifier = Modifier.padding(start = pad),
+        )
+        @Suppress("UNCHECKED_CAST")
+        val children = node["children"] as? List<Map<String, Any?>> ?: emptyList()
+        if (children.isNotEmpty()) {
+            OrgchartTree(children, depth + 1)
+        }
+    }
+}
+
+// ── KPIs RH ─────────────────────────────────────────────────────────────────
+
+data class HrKpisState(val loading: Boolean = true, val error: String? = null, val staff: List<Map<String, Any?>> = emptyList(), val engineers: List<Map<String, Any?>> = emptyList())
+
+class HrKpisViewModel(app: Application) : AndroidViewModel(app) {
+    private val repo = ExtraRepository(app.applicationContext)
+    private val _state = MutableStateFlow(HrKpisState())
+    val state: StateFlow<HrKpisState> = _state
+
+    fun load() {
+        _state.update { it.copy(loading = true, error = null) }
+        viewModelScope.launch {
+            try {
+                val allStaff = mutableListOf<Map<String, Any?>>()
+                var page = 1
+                repeat(10) {
+                    val batch = withContext(Dispatchers.IO) { repo.hrStaff(page) }
+                    if (batch.isEmpty()) return@repeat
+                    allStaff.addAll(batch)
+                    if (batch.size < 100) return@repeat
+                    page++
+                }
+                val engineers = withContext(Dispatchers.IO) { repo.biEngineers(15) }
+                _state.update { it.copy(loading = false, staff = allStaff, engineers = engineers) }
+            } catch (e: Exception) {
+                _state.update { it.copy(loading = false, error = e.message) }
+            }
+        }
+    }
+}
+
+@Composable
+fun HrKpisScreen() {
+    val vm: HrKpisViewModel = viewModel()
+    val state by vm.state.collectAsState()
+    LaunchedEffect(Unit) { vm.load() }
+
+    val total = state.staff.size
+    val bajas = state.staff.count { govStr(it, "estadoRRHH") == "Baja" || it["isActive"] == false }
+    val rotacion = if (total > 0) (bajas.toDouble() / total * 100) else 0.0
+    val avgCompletion = state.engineers.map { govDbl(it, "completionRate") }.average().let { if (it.isNaN()) 0.0 else it }
+
+    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item { GovHeader("KPIs de personas", "Plantilla · rotación · productividad") }
+        if (state.loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                GovMetric(Modifier.weight(1f), "Plantilla", "$total", Color(0xFF3B82F6))
+                GovMetric(Modifier.weight(1f), "Rotación", "${"%.1f".format(rotacion)}%", Color(0xFFF59E0B))
+                GovMetric(Modifier.weight(1f), "Cierre OT", "${avgCompletion.toInt()}%", Color(0xFF059669))
+            }
+        }
+        if (state.engineers.isNotEmpty()) {
+            item { Text("Productividad operativa (90d)", fontWeight = FontWeight.SemiBold) }
+            items(state.engineers, key = { govStr(it, "engineerId", "id") }) { e ->
+                GovCard(
+                    title = govStr(e, "engineerName"),
+                    subtitle = "${govInt(e, "completed")}/${govInt(e, "totalActivities")} OT",
+                    trailing = "${govDbl(e, "completionRate").toInt()}%",
+                    accent = Color(0xFF6366F1),
+                )
+            }
+        }
+    }
+}
+
+// ── Shared UI ───────────────────────────────────────────────────────────────
+
+@Composable
+private fun GovHeader(title: String, subtitle: String) {
+    Column(Modifier.padding(bottom = 4.dp)) {
+        Text(title, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
+        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+    }
+}
+
+@Composable
+private fun GovMetric(modifier: Modifier, label: String, value: String, accent: Color) {
+    Card(modifier, colors = CardDefaults.cardColors(containerColor = accent.copy(0.1f)), shape = RoundedCornerShape(12.dp)) {
+        Column(Modifier.padding(12.dp)) {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = accent)
+            Text(value, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+        }
+    }
+}
+
+@Composable
+private fun GovCard(
+    title: String,
+    subtitle: String,
+    trailing: String = "",
+    accent: Color = Color(0xFF0D9488),
+    modifier: Modifier = Modifier,
+) {
+    Card(modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(1.dp)) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(title, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
+                if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+            }
+            if (trailing.isNotBlank()) {
+                Text(trailing, fontWeight = FontWeight.Bold, color = accent, modifier = Modifier.background(accent.copy(0.12f), RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 4.dp))
+            }
+        }
+    }
+}
+
+private fun govStr(m: Map<String, Any?>, vararg keys: String): String {
+    for (k in keys) {
+        val v = m[k] ?: continue
+        val s = v.toString()
+        if (s.isNotBlank() && s != "null") return s
+    }
+    return ""
+}
+
+private fun govNestedStr(m: Map<String, Any?>, objKey: String, field: String): String {
+    val obj = m[objKey] as? Map<*, *> ?: return ""
+    return obj[field]?.toString() ?: ""
+}
+
+private fun govDbl(m: Map<String, Any?>, key: String) = when (val v = m[key]) {
+    is Double -> v; is Number -> v.toDouble(); is String -> v.toDoubleOrNull() ?: 0.0; else -> 0.0
+}
+private fun govInt(m: Map<String, Any?>, key: String) = govDbl(m, key).toInt()

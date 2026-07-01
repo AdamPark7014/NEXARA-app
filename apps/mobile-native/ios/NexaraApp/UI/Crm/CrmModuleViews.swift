@@ -6,6 +6,7 @@ struct CrmOpportunitiesView: View {
     @State private var items: [[String: Any]] = []
     @State private var query = ""
     @State private var isLoading = true
+    @State private var selectedId: Int?
 
     private var filtered: [[String: Any]] {
         guard !query.isEmpty else { return items }
@@ -17,25 +18,37 @@ struct CrmOpportunitiesView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            crmSearchBar("Buscar oportunidad…", text: $query)
-            if isLoading { Spacer(); ProgressView(); Spacer() }
-            else if filtered.isEmpty {
-                Spacer(); Text("Sin oportunidades").foregroundColor(.secondary); Spacer()
+        Group {
+            if let selectedId {
+                CrmOpportunityDetailView(oppId: selectedId) { self.selectedId = nil }
             } else {
-                List(filtered, id: \.crmKey) { o in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(ConsoleHelpers.mapStr(o, "title", "name", "titulo")).font(.headline)
-                        HStack {
-                            CrmStageChip(text: ConsoleHelpers.mapStr(o, "stage", "etapa", "status"))
-                            Spacer()
-                            if let v = o["value"] as? NSNumber {
-                                Text(crmMxn(v.doubleValue)).font(.caption).bold()
+                VStack(spacing: 0) {
+                    crmSearchBar("Buscar oportunidad…", text: $query)
+                    if isLoading { Spacer(); ProgressView(); Spacer() }
+                    else if filtered.isEmpty {
+                        Spacer(); Text("Sin oportunidades").foregroundColor(.secondary); Spacer()
+                    } else {
+                        List(filtered, id: \.crmKey) { o in
+                            Button {
+                                if let id = ConsoleHelpers.mapInt64(o, "id") {
+                                    selectedId = Int(id)
+                                }
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(ConsoleHelpers.mapStr(o, "title", "name", "titulo")).font(.headline)
+                                    HStack {
+                                        CrmStageChip(text: ConsoleHelpers.mapStr(o, "stage", "etapa", "status"))
+                                        Spacer()
+                                        if let v = o["value"] as? NSNumber {
+                                            Text(crmMxn(v.doubleValue)).font(.caption).bold()
+                                        }
+                                    }
+                                }
                             }
                         }
+                        .listStyle(.plain)
                     }
                 }
-                .listStyle(.plain)
             }
         }
         .navigationTitle("Oportunidades")

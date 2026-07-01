@@ -7,20 +7,24 @@ final class ConsoleDashboardVM: ObservableObject {
     @Published var activities: [[String: Any]] = []
     @Published var viatics:    [[String: Any]] = []
     @Published var attendance: [[String: Any]] = []
+    @Published var executive:  [String: Any]   = [:]
+    @Published var approvals:  [[String: Any]] = []
     @Published var isLoading  = false
     @Published var error: String?
 
     func load() {
-        isLoading = true
-        error = nil
+        isLoading = true; error = nil
         Task {
             async let acts  = ExtraRepository.shared.activities()
             async let viats = ExtraRepository.shared.viatics()
             async let atts  = ExtraRepository.shared.attendance()
-            let (a, v, t)   = await (acts, viats, atts)
-            activities = a
-            viatics    = v
-            attendance = t
+            async let exec  = ExtraRepository.shared.executiveCLevel()
+            async let appr  = ExtraRepository.shared.workflowPending()
+            activities = await acts
+            viatics    = await viats
+            attendance = await atts
+            executive  = await exec
+            approvals  = await appr
             isLoading  = false
         }
     }
@@ -31,6 +35,10 @@ final class ConsoleDashboardVM: ObservableObject {
 struct ConsoleDashboardView: View {
     @StateObject private var vm = ConsoleDashboardVM()
     @EnvironmentObject var session: SessionStore
+
+    private var user: SessionUser? { session.currentUser }
+    private var isAdmin: Bool { user?.isSuperAdmin == true || user?.permissions.contains("erp.admin") == true }
+    private var canFinance: Bool { user?.permissions.contains("finance.view") == true || isAdmin }
 
     var body: some View {
         Group {
@@ -46,7 +54,7 @@ struct ConsoleDashboardView: View {
                 dashContent
             }
         }
-        .navigationTitle("Resumen ejecutivo")
+        .navigationTitle("Dashboard")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button { vm.load() } label: { Image(systemName: "arrow.clockwise") }
@@ -60,7 +68,9 @@ struct ConsoleDashboardView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 20) {
                 headerSection
-                kpiSection
+                if !vm.executive.isEmpty || isAdmin { executiveKpiSection }
+                if !vm.approvals.isEmpty { approvalsSection }
+                operationsKpiSection
                 if !vm.activities.isEmpty { statusBreakdownSection }
                 recentActivitiesSection
                 if !vm.viatics.isEmpty { recentViaticsSection }
@@ -72,36 +82,84 @@ struct ConsoleDashboardView: View {
 
     // ── Header
     private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            if let name = session.currentUser?.nombre {
-                Text("Hola, \(name.components(separatedBy: " ").first ?? name)")
-                    .font(.title2).bold()
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                if let name = user?.nombre {
+                    Text("Hola, \(name.components(separatedBy: " ").first ?? name)")
+                        .font(.title2).bold()
+                }
+                Text("Semana: \(dashWeekRange())").font(.caption).foregroundColor(.secondary)
+                if let role = user?.role {
+                    Text(role.replacingOccurrences(of: "_", with: " ").capitalized)
+                        .font(.caption2).foregroundColor(.secondary)
+                }
             }
-            Text("Semana: \(dashWeekRange())")
-                .font(.caption).foregroundColor(.secondary)
+            Spacer()
+            if !vm.approvals.isEmpty {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "bell.fill").font(.title2).foregroundColor(.orange)
+                    Text("\(vm.approvals.count)")
+                        .font(.caption2).bold().foregroundColor(.white)
+                        .padding(4).background(Color.red).clipShape(Circle())
+                        .offset(x: 6, y: -6)
+                }
+            }
         }
         .padding(.horizontal)
     }
 
-    // ── KPI cards
-    private var kpiSection: some View {
+    // ── Executive KPIs (solo para admin/finance)
+    @ViewBuilder
+    private var executiveKpiSection: some View {
+        let revenue  = dblExec("revenue", "totalRevenue", "ingresos")
+        let projects = intExec("activeProjects", "proyectosActivos")
+        let engineers = intExec("activeEngineers", "ingenieros", "activeUsers")
+        let clients  = intExec("activeClients", "clientesActivos", "clients")
+        VStack(alignment: .leading, spacing: 10) {
+            DashSectionHeader(title: "Resumen ejecutivo", detail: "Este período").padding(.horizontal)
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                DashKpiCard(icon: "💰", label: "Ingresos", value: fmtMxn(revenue ?? 0), detail: "Acumulado", accent: .green)
+                DashKpiCard(icon: "🧩", label: "Proyectos", value: "\(projects ?? vm.activities.count)", detail: "Activos", accent: .blue)
+                DashKpiCard(icon: "👷", label: "Ingenieros", value: "\(engineers ?? Set(vm.attendance.compactMap { dVal($0,"userId") }).count)", detail: "En campo", accent: .orange)
+                DashKpiCard(icon: "🤝", label: "Clientes", value: "\(clients ?? 0)", detail: "Activos", accent: .teal)
+            }
+            .padding(.horizontal)
+        }
+    }
+
+    // ── Pending approvals
+    private var approvalsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            DashSectionHeader(title: "Aprobaciones pendientes", detail: "\(vm.approvals.count) esperando").padding(.horizontal)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(vm.approvals.prefix(8), id: \.dashId) { a in
+                        ApprovalCard(item: a)
+                    }
+                }
+                .padding(.horizontal)
+            }
+        }
+    }
+
+    // ── Operations KPIs
+    private var operationsKpiSection: some View {
         let actTotal   = vm.activities.count
         let actPending = vm.activities.filter { dashIsPending(dVal($0, "estatus", "status")) }.count
         let actDone    = vm.activities.filter { dashIsDone(dVal($0, "estatus", "status")) }.count
         let viaticAmt  = vm.viatics.compactMap { asDouble($0["montoSolicitado"] ?? $0["monto"]) }.reduce(0, +)
         let viaticPend = vm.viatics.filter { dVal($0, "estatusPago", "status").localizedLowercase.contains("pendiente") }.count
-        let attUsers   = Set(vm.attendance.compactMap { dVal($0, "userId", "user_id") }).count
+        let attCount   = vm.attendance.count
 
         return LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
             DashKpiCard(icon: "🗂️", label: "Actividades", value: "\(actTotal)",
                         detail: "\(actPending) pendientes · \(actDone) fin.", accent: .teal)
-            DashKpiCard(icon: "💼", label: "Viáticos", value: fmtMxn(viaticAmt),
-                        detail: "\(viaticPend) por aprobar", accent: .blue)
-            DashKpiCard(icon: "🕒", label: "Asistencia", value: "\(vm.attendance.count) reg.",
-                        detail: "\(attUsers) usuarios", accent: .green)
-            DashKpiCard(icon: "✅", label: "Viáticos totales", value: "\(vm.viatics.count)",
-                        detail: "\(vm.viatics.filter { dashIsDone(dVal($0, "estatusPago","status")) }.count) aprobados",
-                        accent: .orange)
+            DashKpiCard(icon: "💼", label: "Viáticos",   value: fmtMxn(viaticAmt),
+                        detail: "\(viaticPend) por aprobar", accent: .indigo)
+            DashKpiCard(icon: "🕒", label: "Asistencia", value: "\(attCount) reg.",
+                        detail: "\(Set(vm.attendance.compactMap { dVal($0,"userId","user_id") }).count) personas", accent: .green)
+            DashKpiCard(icon: "✅", label: "Comp. viáticos", value: "\(vm.viatics.filter { dashIsDone(dVal($0,"estatusPago","status")) }.count)",
+                        detail: "de \(vm.viatics.count) total", accent: .orange)
         }
         .padding(.horizontal)
     }
@@ -114,11 +172,9 @@ struct ConsoleDashboardView: View {
         let total = vm.activities.count
 
         return VStack(alignment: .leading, spacing: 10) {
-            DashSectionHeader(title: "Estado de actividades", detail: "\(total) total")
-                .padding(.horizontal)
-
+            DashSectionHeader(title: "Estado de actividades", detail: "\(total) total").padding(.horizontal)
             VStack(spacing: 10) {
-                ForEach(groups, id: \.key) { key, list in
+                ForEach(groups.prefix(5), id: \.key) { key, list in
                     let pct = Double(list.count) / Double(max(total, 1))
                     DashStatusRow(status: key, count: list.count, percent: pct)
                 }
@@ -133,8 +189,7 @@ struct ConsoleDashboardView: View {
     // ── Recent activities
     private var recentActivitiesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            DashSectionHeader(title: "Actividades recientes", detail: "Últimas 8")
-                .padding(.horizontal)
+            DashSectionHeader(title: "Actividades recientes", detail: "Últimas 8").padding(.horizontal)
             ForEach(vm.activities.prefix(8), id: \.dashId) { a in
                 DashActivityCard(item: a).padding(.horizontal)
             }
@@ -144,8 +199,7 @@ struct ConsoleDashboardView: View {
     // ── Recent viatics
     private var recentViaticsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            DashSectionHeader(title: "Viáticos recientes", detail: "\(vm.viatics.count) registros")
-                .padding(.horizontal)
+            DashSectionHeader(title: "Viáticos recientes", detail: "\(vm.viatics.count) registros").padding(.horizontal)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(vm.viatics.prefix(10), id: \.dashId) { v in
@@ -155,6 +209,22 @@ struct ConsoleDashboardView: View {
                 .padding(.horizontal)
             }
         }
+    }
+
+    // ── Helpers for executive map
+    private func dblExec(_ keys: String...) -> Double? {
+        for k in keys { if let v = vm.executive[k], let d = asDouble(v) { return d } }
+        return nil
+    }
+    private func intExec(_ keys: String...) -> Int? {
+        for k in keys {
+            if let v = vm.executive[k] {
+                if let i = v as? Int { return i }
+                if let n = v as? NSNumber { return n.intValue }
+                if let d = asDouble(v) { return Int(d) }
+            }
+        }
+        return nil
     }
 }
 
@@ -173,7 +243,7 @@ private struct DashKpiCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(accent.opacity(0.1))
+        .background(accent.opacity(0.10))
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 }
@@ -211,12 +281,40 @@ private struct DashStatusRow: View {
     }
 }
 
+private struct ApprovalCard: View {
+    let item: [String: Any]
+    var body: some View {
+        let title    = dVal(item, "title","stepName","entityType").ifEmpty("Aprobación")
+        let requester = dVal(item, "requestedBy","userName","solicita")
+        let urgency  = dVal(item, "urgencia","priority","urgency")
+        let color: Color = urgency.lowercased() == "alta" || urgency.lowercased() == "high" ? .red
+                         : urgency.lowercased() == "media" ? .orange : .blue
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "shield.checkered").foregroundColor(color)
+                Spacer()
+                Text(urgency.isEmpty ? "normal" : urgency).font(.caption2).bold().foregroundColor(color)
+                    .padding(.horizontal, 6).padding(.vertical, 2).background(color.opacity(0.12)).clipShape(Capsule())
+            }
+            Text(title).font(.subheadline).bold().lineLimit(2)
+            if !requester.isEmpty {
+                Text("Por: \(requester)").font(.caption).foregroundColor(.secondary)
+            }
+        }
+        .frame(width: 180)
+        .padding(14)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+}
+
 private struct DashActivityCard: View {
     let item: [String: Any]
     var body: some View {
         let title  = dVal(item, "titulo", "title").ifEmpty("Actividad")
         let status = dVal(item, "estatus", "status")
-        let assign = dValOpt(item, "responsable.nombre", "asignadoNombre")
+        let assign = dValOpt(item, "asignadoNombre", "responsable")
+        let date   = String(dVal(item, "fechaEntrega", "dueDate", "createdAt").prefix(10))
         let color  = dashStatusColor(status)
         HStack(spacing: 12) {
             RoundedRectangle(cornerRadius: 10).fill(color.opacity(0.15))
@@ -229,12 +327,11 @@ private struct DashActivityCard: View {
                         .font(.caption2).bold().foregroundColor(color)
                         .padding(.horizontal, 7).padding(.vertical, 2)
                         .background(color.opacity(0.15)).clipShape(Capsule())
-                    if let a = assign {
-                        Text("· \(a)").font(.caption).foregroundColor(.secondary).lineLimit(1)
-                    }
+                    if let a = assign { Text("· \(a)").font(.caption).foregroundColor(.secondary).lineLimit(1) }
                 }
             }
             Spacer()
+            if !date.isEmpty { Text(date).font(.caption2).foregroundColor(.secondary) }
         }
         .padding(12)
         .background(Color(.secondarySystemGroupedBackground))

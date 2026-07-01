@@ -85,6 +85,9 @@ Esta matriz es el checklist de **paridad** para poder eliminar `apps/mobile` (Ne
 | Agenda | `/crm/agenda` | ✅ `VentasAgendaScreen` | ✅ `CrmAgendaView` |
 | Licitaciones | `/crm/tenders` | ✅ `VentasTendersScreen` | ✅ `CrmTendersView` |
 | Metas comerciales | `/crm/targets` | ✅ `VentasTargetsScreen` | ✅ `CrmTargetsView` |
+| Oportunidades (detalle: notas, adjuntos, cotizaciones) | `/crm/opportunities` | ✅ `VentasOpportunityDetailScreen` | ✅ `CrmOpportunityDetailView` |
+| Plantillas cotización PDF | `/crm/templates` | ✅ `VentasTemplatesScreen` (`ventas/order-templates`) | ✅ `CrmTemplatesView` |
+| Clientes de servicio (OPS) | `/ops/service-clients` | ✅ `ConsoleClientsScreen` vía `service-clients` | ✅ `ServiceClientsView` |
 | Reportes + crecimiento + comparativa | `/ventas/reportes`, `/ventas/crecimiento`, `/ventas/equipo-comparativa` | ✅ `CrmReportsScreen` (KPIs `ventas/reportes/metricas` + vendedores) | ✅ `CrmReportsView` |
 | Notificaciones ventas | `/ventas/notificaciones` | ✅ `NotificationsScreen` | ✅ `NotificationsCenterView` |
 | Dashboard CRM (métricas mes) | `/ventas` inicio | ✅ `VentasDashboardScreen` + pipeline API | ✅ `CrmDashboardView` + pipeline API |
@@ -96,6 +99,13 @@ Esta matriz es el checklist de **paridad** para poder eliminar `apps/mobile` (Ne
 | SLA soporte | `/ops/support/sla` | ✅ `SlaModuleScreen` | ✅ `SlaView` |
 | Contratos mantenimiento | `/ops/maintenance/contracts` | ✅ `MaintenanceContractsScreen` | ✅ `MaintenanceContractsView` |
 | Bandeja soporte | `/ops/support` | ✅ `ClientTicketsModuleScreen` | ✅ `ClientTicketsModuleView` |
+| Multi-empresa | `/erp/companies` | ✅ `CompaniesScreen` | ✅ `CompaniesView` |
+| Knowledge Base | `/erp/kb` | ✅ `KbScreen` | ✅ `KbView` |
+| Exportaciones CSV | `/erp/exports` | ✅ `ExportsScreen` (share intent) | ✅ `ExportsView` (share sheet) |
+| Arquitectura ERP | `/erp/architecture` | ✅ `ArchitectureScreen` (catálogo local) | ✅ `ArchitectureView` |
+| Calendario personal | `/erp/calendar` | ✅ `ErpCalendarScreen` | ✅ `ErpCalendarView` |
+| Organigrama | `/erp/hr/orgchart` | ✅ `OrgchartScreen` | ✅ `OrgchartView` |
+| KPIs de personas | `/erp/hr/kpis` | ✅ `HrKpisScreen` | ✅ `HrKpisView` |
 
 ## Panel: Contabilidad
 | Screen / capability | Mobile route | Android native | iOS native |
