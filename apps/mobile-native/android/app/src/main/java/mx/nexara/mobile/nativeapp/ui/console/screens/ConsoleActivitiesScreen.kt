@@ -137,6 +137,132 @@ private fun matchesFilter(estatus: String, filter: String): Boolean {
 
 // ── Main composable ──────────────────────────────────────────────────────────
 
+// ── Activity Detail Screen ───────────────────────────────────────────────────
+
+@Composable
+fun ActivityDetailScreen(activity: ActivityDto, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val repo = remember(context) { ConsoleRepository(context) }
+    var selectedTab by remember { mutableStateOf(0) }
+    val tabs = listOf("Info", "Evidencias", "Viáticos", "Aprobaciones")
+    var evidence by remember { mutableStateOf<Map<String, Any?>>(emptyMap()) }
+    var loadingEv by remember { mutableStateOf(true) }
+    val statusColor = activStatusColor(activity.estatus)
+
+    LaunchedEffect(activity.id) {
+        loadingEv = true
+        runCatching {
+            withContext(Dispatchers.IO) {
+                @Suppress("UNCHECKED_CAST")
+                val dto = repo.evidenceByActivity(activity.id)
+                val map = mutableMapOf<String, Any?>()
+                dto.javaClass.declaredFields.forEach { f ->
+                    f.isAccessible = true
+                    map[f.name] = f.get(dto)
+                }
+                map
+            }
+        }.onSuccess { evidence = it }
+        loadingEv = false
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        // Back button + title
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            TextButton(onClick = onBack) { Text("← Volver") }
+            Text(
+                activity.titulo?.takeIf { it.isNotBlank() } ?: "Actividad #${activity.id}",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                modifier = Modifier.weight(1f),
+                maxLines = 2,
+            )
+        }
+
+        // Status + Tab row
+        TabRow(selectedTabIndex = selectedTab) {
+            tabs.forEachIndexed { i, label ->
+                Tab(selected = selectedTab == i, onClick = { selectedTab = i }, text = { Text(label, fontSize = 12.sp) })
+            }
+        }
+
+        when (selectedTab) {
+            0 -> ActivityInfoTab(activity, statusColor)
+            1 -> ActivityEvidenceTab(evidence, loadingEv)
+            2 -> ActivityPlaceholderTab("Sin viáticos vinculados")
+            else -> ActivityPlaceholderTab("Sin aprobaciones registradas")
+        }
+    }
+}
+
+@Composable
+private fun ActivityInfoTab(a: ActivityDto, statusColor: Color) {
+    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        item {
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.clip(RoundedCornerShape(20.dp)).background(statusColor.copy(alpha = 0.13f)).padding(horizontal = 10.dp, vertical = 4.dp)) {
+                        Text(a.estatus.ifBlank { "Sin estado" }, color = statusColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                    ADetailRow("Responsable",  a.responsable?.nombre ?: "—")
+                    ADetailRow("Creador",       a.creador?.nombre ?: "—")
+                    ADetailRow("Asignación",   a.fechaAsignacion?.take(10) ?: "—")
+                    ADetailRow("Inicio",       a.fechaInicio?.take(10) ?: "—")
+                    ADetailRow("Finalización", a.fechaFinalizacion?.take(10) ?: "—")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActivityEvidenceTab(ev: Map<String, Any?>, loading: Boolean) {
+    if (loading) {
+        Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
+        return
+    }
+    val photos = (ev["evidencePhotos"] as? List<*>)?.filterIsInstance<Map<String, Any?>>() ?: emptyList()
+    val entryPhoto = ev["entryPhoto"] as? String
+    val exitPhoto  = ev["exitPhoto"]  as? String
+    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (entryPhoto != null) item {
+            Text("📷 Foto de entrada: ${entryPhoto.take(60)}...", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+        }
+        if (exitPhoto != null) item {
+            Text("🚪 Foto de salida: ${exitPhoto.take(60)}...", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+        }
+        if (photos.isEmpty() && entryPhoto == null && exitPhoto == null) item {
+            Text("Sin evidencias registradas", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 20.dp))
+        } else {
+            items(photos) { p ->
+                val url = p["photoUrl"] as? String ?: ""
+                Text("📸 ${url.take(80)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActivityPlaceholderTab(message: String) {
+    Box(Modifier.fillMaxSize(), Alignment.Center) {
+        Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun ADetailRow(label: String, value: String) {
+    if (value == "—" || value.isBlank()) return
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+// ── List Screen ───────────────────────────────────────────────────────────────
+
 @Composable
 fun ConsoleActivitiesScreen(
     title: String = "Actividades",
@@ -148,9 +274,15 @@ fun ConsoleActivitiesScreen(
     val user = remember { authRepo.loadSession() }
     val isSuperAdmin = user?.isSuperAdmin == true
     val isAdmin = !isSuperAdmin && (user?.permissions ?: emptyList()).contains("console.admin")
+    var selectedActivity by remember { mutableStateOf<ActivityDto?>(null) }
 
     val vm: ConsoleActivitiesViewModel = viewModel()
     val state by vm.state.collectAsState()
+
+    if (selectedActivity != null) {
+        ActivityDetailScreen(activity = selectedActivity!!, onBack = { selectedActivity = null })
+        return
+    }
 
     // Initial load — pass role flags so VM fetches right datasets
     if (state.isLoading && state.error == null && state.teamActivities.isEmpty() && state.myActivities.isEmpty()) {
@@ -273,7 +405,7 @@ fun ConsoleActivitiesScreen(
                 }
             } else {
                 items(teamFiltered.take(150)) { a ->
-                    ActivityCard(a)
+                    ActivityCard(a, onClick = { selectedActivity = a })
                     Spacer(Modifier.height(8.dp))
                 }
             }
@@ -317,7 +449,7 @@ fun ConsoleActivitiesScreen(
                 }
             } else {
                 items(myFiltered.take(100)) { a ->
-                    ActivityCard(a, showResponsable = false)
+                    ActivityCard(a, showResponsable = false, onClick = { selectedActivity = a })
                     Spacer(Modifier.height(8.dp))
                 }
             }
@@ -360,10 +492,10 @@ private fun ActivitySectionHeader(label: String, count: Int, icon: String) {
 }
 
 @Composable
-private fun ActivityCard(a: ActivityDto, showResponsable: Boolean = true) {
+private fun ActivityCard(a: ActivityDto, showResponsable: Boolean = true, onClick: (() -> Unit)? = null) {
     val statusColor = activStatusColor(a.estatus)
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(2.dp),
