@@ -34,31 +34,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import mx.nexara.mobile.nativeapp.access.PanelAccessResolver
+import mx.nexara.mobile.nativeapp.access.PanelId
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 
 @Composable
 fun PanelHubScreen(
     onLogout: () -> Unit,
     contentPadding: PaddingValues = PaddingValues(20.dp),
-    onOpenConsole: () -> Unit = {},
-    onOpenTickets: () -> Unit = {},
-    onOpenVentas: () -> Unit = {},
-    onOpenContabilidad: () -> Unit = {},
-    onOpenWeb: () -> Unit = {},
+    onOpenPanel: (PanelId) -> Unit = {},
     onOpenNotifications: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val repo = remember(context) { AuthRepository(context) }
     val user = repo.loadSession()
-    val panels = remember(user) {
-        getAccessiblePanels(
-            role = user?.role ?: "",
-            permissions = user?.permissions ?: emptyList(),
-            isSuperAdmin = user?.isSuperAdmin ?: false,
-            isClient = user?.isClient ?: false,
-            isBranchUser = user?.isBranchUser ?: false,
-        )
-    }
+    val panels = remember(user) { PanelAccessResolver.accessiblePanels(user) }
 
     val slate = Color(0xFF0F172A)
     val sub = Color(0xFF64748B)
@@ -140,6 +130,7 @@ fun PanelHubScreen(
             }
         } else {
             items(panels, key = { it.key }) { panel ->
+                val accent = Color(panel.accentArgb)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
@@ -155,7 +146,7 @@ fun PanelHubScreen(
                             modifier = Modifier
                                 .size(44.dp)
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0xFFCCFBF1)),
+                                .background(accent.copy(alpha = 0.12f)),
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(panel.icon)
@@ -163,29 +154,21 @@ fun PanelHubScreen(
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = panel.name,
+                                text = panel.displayName,
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                                 color = slate,
                             )
                             Text(
-                                text = panel.description,
+                                text = panel.tagline,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = sub,
                             )
                         }
 
                         Button(
-                            onClick = {
-                                when (panel.key) {
-                                    "console" -> onOpenConsole()
-                                    "tickets" -> onOpenTickets()
-                                    "ventas" -> onOpenVentas()
-                                    "contabilidad" -> onOpenContabilidad()
-                                    "web" -> onOpenWeb()
-                                }
-                            },
+                            onClick = { onOpenPanel(panel) },
                             shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = teal, contentColor = Color.White),
+                            colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = Color.White),
                         ) {
                             Text("Abrir")
                         }
@@ -220,77 +203,8 @@ fun PanelHubScreen(
     }
 }
 
-data class PanelOption(
-    val key: String,
-    val icon: String,
-    val name: String,
-    val description: String,
-)
-
-private val PANEL_ORDER = listOf(
-    PanelOption(
-        key = "console",
-        icon = "🧩",
-        name = "Consola",
-        description = "Operación central, usuarios y control jerárquico.",
-    ),
-    PanelOption(
-        key = "ventas",
-        icon = "📈",
-        name = "Ventas",
-        description = "Pipeline comercial, leads y oportunidades.",
-    ),
-    PanelOption(
-        key = "contabilidad",
-        icon = "💼",
-        name = "Contabilidad",
-        description = "Pagos, viáticos, horas y control financiero.",
-    ),
-    PanelOption(
-        key = "web",
-        icon = "🌐",
-        name = "Web",
-        description = "Gestión de contenido, clientes y proyectos web.",
-    ),
-    PanelOption(
-        key = "tickets",
-        icon = "🎫",
-        name = "Tickets",
-        description = "Seguimiento de solicitudes, sucursales e inventarios.",
-    ),
-)
-
-private val CLIENT_OR_BRANCH_PERMISSION_PREFIXES = listOf(
-    "client-portal.",
-    "branch-portal.",
-    "client-auth.",
-    "branch-auth.",
-    "client-tickets.",
-)
-
-private fun normalizePerms(perms: List<String>): Set<String> {
-    return perms.map { it.trim().lowercase().replace('_', '.').replace('-', '.') }.toSet()
-}
-
-private fun isClientOrBranchAccount(role: String, permissions: List<String>): Boolean {
-    val byRole = Regex("(cliente|client|sucursal|branch)", RegexOption.IGNORE_CASE).containsMatchIn(role)
-    val byPermPrefix = permissions.any { p ->
-        val normalized = p.trim().lowercase()
-        CLIENT_OR_BRANCH_PERMISSION_PREFIXES.any { prefix -> normalized.startsWith(prefix) }
-    }
-    return byRole || byPermPrefix
-}
-
-private fun hasAnyPermission(perms: Set<String>, required: List<String>, isSuperAdmin: Boolean): Boolean {
-    if (isSuperAdmin) return true
-    return required.any { perms.contains(it) }
-}
-
-private fun hasPermission(perms: Set<String>, required: String, isSuperAdmin: Boolean): Boolean {
-    if (isSuperAdmin) return true
-    return perms.contains(required)
-}
-
+/** @deprecated Usar [PanelAccessResolver.accessiblePanels]. */
+@Deprecated("Use PanelAccessResolver", ReplaceWith("PanelAccessResolver.accessiblePanels(user)"))
 fun getAccessiblePanels(
     role: String,
     permissions: List<String>,
@@ -298,33 +212,26 @@ fun getAccessiblePanels(
     isClient: Boolean,
     isBranchUser: Boolean,
 ): List<PanelOption> {
-    if (isClient || isBranchUser || isClientOrBranchAccount(role, permissions)) {
-        return PANEL_ORDER.filter { it.key == "tickets" }
-    }
-    if (isSuperAdmin) {
-        return PANEL_ORDER.filter { it.key != "tickets" }
-    }
-
-    val normalized = normalizePerms(permissions)
-
-    val accessMap = mapOf(
-        "console" to hasAnyPermission(
-            normalized,
-            listOf("console.access", "console.admin", "users.manage", "console_access", "console_admin"),
-            isSuperAdmin,
-        ),
-        "ventas" to hasAnyPermission(
-            normalized,
-            listOf("panel.ventas", "sales.view", "sales.manage", "sales.reports.view"),
-            isSuperAdmin,
-        ),
-        "contabilidad" to hasAnyPermission(
-            normalized,
-            listOf("contabilidad.view", "contabilidad.manage"),
-            isSuperAdmin,
-        ),
-        "web" to hasPermission(normalized, "panel.web", isSuperAdmin),
-        "tickets" to false,
+    val fakeUser = mx.nexara.mobile.nativeapp.data.SessionUser(
+        id = 0,
+        nombre = "",
+        email = "",
+        role = role,
+        department = "",
+        token = "",
+        permissions = permissions,
+        isSuperAdmin = isSuperAdmin,
+        isClient = isClient,
+        isBranchUser = isBranchUser,
     )
-    return PANEL_ORDER.filter { accessMap[it.key] == true }
+    return PanelAccessResolver.accessiblePanels(fakeUser).map {
+        PanelOption(it.key, it.icon, it.displayName, it.tagline)
+    }
 }
+
+data class PanelOption(
+    val key: String,
+    val icon: String,
+    val name: String,
+    val description: String,
+)

@@ -123,13 +123,24 @@ enum ModuleCatalog {
         ModuleEntry("contactos", "Contactos", "✉️", "/web/contactos"),
     ]
 
-    static func modules(for portal: PortalKind) -> [ModuleEntry] {
-        switch portal {
-        case .console:      return console
-        case .tickets:      return tickets
-        case .ventas:       return ventas
-        case .contabilidad: return contabilidad
-        case .web:          return web
+    static let lab: [ModuleEntry] = [
+        ModuleEntry("health", "API Health", "🧪", "/lab/health"),
+    ]
+
+    static func modules(for panel: PanelId) -> [ModuleEntry] {
+        let base: [ModuleEntry] = switch panel {
+        case .erp, .ops:
+            let keys = ModulePanelMap.consoleKeys(for: panel)
+            if let keys {
+                console.filter { keys.contains($0.key) }
+            } else {
+                console
+            }
+        case .crm: return ventas
+        case .studio: return web
+        case .portal: return tickets
+        case .lab: return lab
         }
+        return base
     }
 }

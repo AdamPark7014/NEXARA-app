@@ -1,10 +1,14 @@
 import SwiftUI
 
 struct PanelHubView: View {
-    let onOpen: (PortalKind) -> Void
+    let onOpen: (PanelId) -> Void
     let onLogout: () -> Void
 
     @EnvironmentObject var session: SessionStore
+
+    private var panels: [PanelId] {
+        PanelAccessResolver.accessiblePanels(user: session.currentUser)
+    }
 
     var body: some View {
         NavigationStack {
@@ -17,19 +21,31 @@ struct PanelHubView: View {
                         }
                     }
                 }
-                Section("Portales") {
-                    ForEach(PortalKind.allCases) { portal in
-                        Button { onOpen(portal) } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: portal.icon)
-                                    .frame(width: 28, height: 28)
-                                Text(portal.title)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.secondary)
+                Section("Paneles") {
+                    if panels.isEmpty {
+                        Text("Sin paneles asignados para este usuario.")
+                            .foregroundColor(.secondary)
+                            .font(.footnote)
+                    } else {
+                        ForEach(panels) { panel in
+                            Button { onOpen(panel) } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: panel.icon)
+                                        .foregroundColor(panel.accent)
+                                        .frame(width: 28, height: 28)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(panel.displayName).font(.body)
+                                        Text(panel.tagline)
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .foregroundColor(.secondary)
+                                }
                             }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
                 Section {

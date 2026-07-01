@@ -8,7 +8,9 @@ Esta matriz es el checklist de **paridad** para poder eliminar `apps/mobile` (Ne
 
 ## Reglas / definiciones
 - **Parity**: misma capacidad funcional (aunque el UI sea diferente), con las mismas reglas de acceso (RBAC/jerarquía).
-- **Portal**: cuentas cliente/sucursal (tickets/inventarios/solicitudes) como en `apps/mobile/lib/panel-routing.ts`.
+- **Paneles web (v2)**: ERP, CRM, OPS, STUDIO, LAB + Portal clientes — ver `apps/web/lib/access-matrix.ts`.
+- **Android v2 hub**: `PanelAccessResolver` + `PanelId` (commit 2026-06) reemplaza nombres legacy console/ventas/web.
+- **Portal**: cuentas cliente/sucursal (tickets/inventarios/solicitudes).
 - **Realtime**: Socket.IO (`apps/api/src/realtime/realtime.gateway.ts`) para invalidar/refrescar.
 - **Offline**: cache GET + cola de mutaciones con replay (equivalente a `apps/mobile/lib/install-offline-fetch.ts` + `offline-queue.ts`).
 
@@ -16,7 +18,7 @@ Esta matriz es el checklist de **paridad** para poder eliminar `apps/mobile` (Ne
 | Feature | Mobile web (`apps/mobile`) | Android native | iOS native |
 |---|---|---|---|
 | Login | `app/(auth)/login` | ✅ `ui/screens/LoginScreen.kt` | ⬜ |
-| Panel hub (/paneles) + access rules | `lib/panel-routing.ts` | ✅ `ui/screens/PanelHubScreen.kt` (reglas similares) | ⬜ |
+| Panel hub (/paneles) + access rules | `lib/panel-routing.ts` / `access-matrix.ts` | ✅ `PanelAccessResolver` (ERP/CRM/OPS/STUDIO/LAB) | ✅ `Access/PanelAccessResolver.swift` |
 | Session store (token, perms) | `UserContext` (session/localStorage) | ✅ `EncryptedSharedPreferences` (`data/SessionStore.kt`) | ⬜ |
 | Saved accounts | `lib/saved-accounts.ts` | ⬜ | ⬜ |
 | Deep links to screens | (URL routing) | ⬜ | ⬜ |
@@ -38,7 +40,7 @@ Esta matriz es el checklist de **paridad** para poder eliminar `apps/mobile` (Ne
 | Attendance | `/console/attendance` | ✅ | ⬜ |
 | Settings (console.admin) | `/console/settings` | ✅ | ⬜ |
 | Notifications topbar | (varios) | ⬜ | ⬜ |
-| Offline + realtime parity | (global) | ⬜ | ⬜ |
+| Offline + realtime parity | (global) | ✅ offline GET/cache + cola; realtime ✅ | ⬜ |
 
 ## Panel: Tickets (Portal cliente/sucursal)
 | Capability | Mobile route | Android native | iOS native |
@@ -50,11 +52,11 @@ Esta matriz es el checklist de **paridad** para poder eliminar `apps/mobile` (Ne
 | Tickets list/detail | tab Tickets | ✅ | ⬜ |
 | Ticket report PDF | ticket modal/descarga | ✅ | ⬜ |
 | Close request | (acción) | ⬜ | ⬜ |
-| Feedback pending + submit | (feedback modal) | ⬜ | ⬜ |
-| Inventories (list/detail/sync/upload/report) | tab Inventarios | ⬜ | ⬜ |
+| Feedback pending + submit | (feedback modal) | ✅ | ⬜ |
+| Inventories (list/detail/sync/upload/report) | tab Inventarios | ✅ | ⬜ |
 | Portal report PDF | `/client-portal/report` | ⬜ | ⬜ |
 | Realtime refresh (`entity:updated`) | Socket.IO | ⬜ | ⬜ |
-| Offline queue/cache | Offline layer | ⬜ | ⬜ |
+| Offline queue/cache | Offline layer | ✅ `OfflineHttpInterceptor` + banner | ⬜ |
 
 ## Panel: Ventas
 | Screen / capability | Mobile route | Android native | iOS native |
@@ -89,6 +91,6 @@ Esta matriz es el checklist de **paridad** para poder eliminar `apps/mobile` (Ne
 |---|---|---|---|
 | Notifications inbox + badge | `apps/api/src/notifications` | ⬜ | ⬜ |
 | Socket.IO realtime | `apps/api/src/realtime` | ⬜ | ⬜ |
-| Offline GET cache | `install-offline-fetch.ts` | ⬜ | ⬜ |
-| Offline mutation queue + replay | `offline-queue.ts` | ⬜ | ⬜ |
+| Offline GET cache | `install-offline-fetch.ts` | ✅ integrado en `ApiClient` | ⬜ |
+| Offline mutation queue + replay | `offline-queue.ts` | ✅ `OfflineSyncCoordinator` | ⬜ |
 | Camera/gallery uploads | evidences/ventas opp | ⬜ | ⬜ |
