@@ -475,6 +475,18 @@ export class AuthService {
       set.add(PERMISSIONS.CONTABILIDAD_VIEW);
     }
 
+    // ── Asistencia personal (ventas, studio y otros con check-in propio) ─
+    const V2_SELF_ATTENDANCE_ROLES = new Set([
+      'vendedor',
+      'coord_ventas',
+      'lider_diseno',
+      'disenador',
+    ]);
+    if (V2_SELF_ATTENDANCE_ROLES.has(roleKey)) {
+      set.add(PERMISSIONS.ATTENDANCE_VIEW);
+      set.add(PERMISSIONS.LUNCH_BREAKS_VIEW);
+    }
+
     // ── Ingeniero de campo ───────────────────────────────────────────
     if (roleKey === 'ing_campo') {
       set.add(PERMISSIONS.CONSOLE_ACCESS);

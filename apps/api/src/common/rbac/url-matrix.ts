@@ -37,6 +37,14 @@ export type UrlRule = {
   scope?: Scope;
 };
 
+/** API + páginas de asistencia personal (check-in propio). Alineado con `SELF_ATTENDANCE_PATHS` web. */
+export const SELF_ATTENDANCE_URL_RULES: UrlRule[] = [
+  { path: '/erp/hr/attendance', scope: 'write' },
+  { path: '/erp/hr/lunch-breaks', scope: 'write' },
+  { path: '/api/attendance/**', methods: ['GET', 'POST'], scope: 'write' },
+  { path: '/api/lunch-breaks/**', methods: ['GET', 'POST', 'PUT'], scope: 'write' },
+];
+
 /**
  * Matriz Rol → reglas de URL.
  */
@@ -96,6 +104,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/users',   methods: ['GET'], scope: 'read' },
     { path: '/api/clients', methods: ['GET'], scope: 'read' },
     { path: '/api/ventas/proyectos/**', methods: ['GET'], scope: 'read' },
+    ...SELF_ATTENDANCE_URL_RULES,
   ],
 
   // ─────────────────────────────────────────────────────────────────
@@ -196,6 +205,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/ventas/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     { path: '/api/cotizaciones/**', methods: ['GET', 'POST', 'PATCH', 'PUT'], scope: 'write' },
     { path: '/api/accounting/invoices/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+    ...SELF_ATTENDANCE_URL_RULES,
   ],
 
   // ─────────────────────────────────────────────────────────────────
@@ -256,6 +266,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/vehicles/**', scope: 'approve' },
     { path: '/api/gps/**', scope: 'read' },
     { path: '/api/service-sheets/**', scope: 'write' },
+    ...SELF_ATTENDANCE_URL_RULES,
   ],
 
   // ─────────────────────────────────────────────────────────────────
@@ -342,6 +353,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/sales-targets/**', scope: 'write' },
     { path: '/api/clients/**', scope: 'write' },
     { path: '/api/crm-activities/**', scope: 'write' },
+    ...SELF_ATTENDANCE_URL_RULES,
   ],
 
   // ─────────────────────────────────────────────────────────────────
@@ -366,6 +378,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/clients/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     { path: '/api/catalog/**', methods: ['GET'], scope: 'read' },
     { path: '/api/crm-activities/**', methods: ['GET', 'POST', 'PATCH', 'DELETE'], scope: 'write' },
+    ...SELF_ATTENDANCE_URL_RULES,
   ],
 
   // ─────────────────────────────────────────────────────────────────
@@ -381,6 +394,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/newsletter/**', scope: 'write' },
     { path: '/api/contact-messages/**', scope: 'read' },
     { path: '/api/company/**', scope: 'write' },
+    ...SELF_ATTENDANCE_URL_RULES,
   ],
 
   // ─────────────────────────────────────────────────────────────────
@@ -399,6 +413,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/erp/my-profile', scope: 'write' },
     { path: '/api/projects/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
     { path: '/api/news/**', methods: ['GET', 'POST', 'PATCH'], scope: 'write' },
+    ...SELF_ATTENDANCE_URL_RULES,
   ],
 
   // ─────────────────────────────────────────────────────────────────
