@@ -53,9 +53,19 @@ struct RootView: View {
                     },
                 )
             case .portal(let panel):
-                if panel == .erp || panel == .ops {
+                switch panel {
+                case .erp, .ops:
                     ConsoleTabView(panel: panel, onExit: { app.route = .panels })
-                } else {
+                case .portal:
+                    NavigationStack {
+                        TicketsDashboardView()
+                            .toolbar {
+                                ToolbarItem(placement: .navigationBarLeading) {
+                                    Button("Paneles") { app.route = .panels }
+                                }
+                            }
+                    }
+                default:
                     PortalNavView(panel: panel, onExit: { app.route = .panels })
                 }
             }
