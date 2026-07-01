@@ -494,6 +494,11 @@ export class NotificationsService {
 
       if (!quote) return;
 
+      const linkedOpportunityId = quote.salesQuotes[0]?.opportunityId;
+      const quoteUrl = linkedOpportunityId
+        ? `/crm/opportunities/${linkedOpportunityId}/quotes`
+        : `/crm/quotes/${quote.id}`;
+
       if (quote.createdById) {
         await this.createNotification({
           userId: quote.createdById,
@@ -503,7 +508,7 @@ export class NotificationsService {
           message: `${clientName} (${signerEmail}) ha firmado la cotización ${quote.quoteNumber}.`,
           relatedEntityId: quote.id,
           entityType: 'Cotizacion',
-          relatedUrl: `/crm/quotes/${quote.id}`,
+          relatedUrl: quoteUrl,
         });
       }
 
@@ -517,7 +522,7 @@ export class NotificationsService {
             message: `${clientName} ha firmado la cotización ${quote.quoteNumber}.`,
             relatedEntityId: quote.id,
             entityType: 'Cotizacion',
-            relatedUrl: `/crm/quotes/${quote.id}`,
+            relatedUrl: `/crm/opportunities/${sq.opportunityId}/quotes`,
           });
         }
       }

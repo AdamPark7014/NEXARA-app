@@ -53,6 +53,7 @@ export type SalesOpportunity = {
   notes?: SalesOpportunityNote[];
   evidences?: SalesOpportunityEvidence[];
   quotes?: SalesOpportunityQuote[];
+  projects?: Array<{ id: number; name: string; status: string; budget?: number }>;
 };
 
 /** Etapas activas del pipeline (sin WON/LOST). */
@@ -554,6 +555,7 @@ export const updateSalesLead = async (
     status: string;
     score: number;
     notes: string;
+    clientId: number;
   }>,
 ) => {
   return apiRequest<SalesLead>(
@@ -654,6 +656,7 @@ export const createSalesOpportunity = async (
     probability: number;
     expectedCloseDate?: string;
     leadId?: number;
+    clientId?: number;
     clientName?: string;
   },
 ) => {

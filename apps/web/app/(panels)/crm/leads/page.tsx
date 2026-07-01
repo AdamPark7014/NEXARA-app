@@ -12,6 +12,7 @@ import { filterRowsByScope, getCrmSalesSectionConfig } from "@/lib/section-views
 import { toast } from "@/components/Toast";
 import {
   createSalesLead,
+  createSalesClient,
   createSalesOpportunity,
   formatLeadStatus,
   listSalesLeads,
@@ -131,16 +132,45 @@ export default function LeadsPage() {
     if (!value || value <= 0) { setConvertErr("Ingresa un valor válido mayor a 0."); return; }
     setConverting(true); setConvertErr(null);
     try {
+      let clientId: number | undefined;
+      const clientLabel = convertLead.company?.trim() || convertLead.name?.trim();
+      if (clientLabel) {
+        const client = await createSalesClient(token, {
+          name: clientLabel,
+          legalName: convertLead.company?.trim() || clientLabel,
+          billingEmail: convertLead.email?.trim() || "",
+          billingPhone: convertLead.phone?.trim() || "",
+          industry: "",
+          website: "",
+          taxId: "",
+          fiscalAddress: "",
+          status: "ACTIVE",
+          notes: convertLead.notes?.trim() || `Cliente creado desde lead #${convertLead.id}`,
+        });
+        clientId = client.id;
+        await updateSalesLead(token, convertLead.id, { status: "CONVERTED", clientId });
+      }
+
+      const description =
+        (convertLead.notes?.trim() && convertLead.notes.trim().length >= 10)
+          ? convertLead.notes.trim()
+          : `Seguimiento comercial con ${convertLead.name ?? "contacto"} desde ${convertLead.source ?? "captación"}.`;
+      const expectedCloseDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
       await createSalesOpportunity(token, {
         title: convertLead.company ? `${convertLead.company} — ${convertLead.name}` : convertLead.name ?? "Nueva oportunidad",
-        description: convertLead.notes ?? `Lead desde ${convertLead.source ?? "captación"}`,
+        description,
         stage: convertStage,
         value,
         probability: Math.min(100, Number(convertLead.score ?? 20)),
+        expectedCloseDate,
         leadId: convertLead.id,
+        clientId,
         clientName: convertLead.company ?? convertLead.name ?? undefined,
       });
-      await updateSalesLead(token, convertLead.id, { status: "CONVERTED" });
+      if (!clientId) {
+        await updateSalesLead(token, convertLead.id, { status: "CONVERTED" });
+      }
       setItems((prev) => prev.map((row) => (row.id === convertLead.id ? { ...row, status: "CONVERTED" } : row)));
       setConvertLead(null);
     } catch (e) {

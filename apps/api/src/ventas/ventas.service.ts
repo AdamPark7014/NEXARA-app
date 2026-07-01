@@ -563,7 +563,14 @@ export class VentasService {
   async getOpportunity(id: number, user?: any) {
     const opp = await this.prisma.salesOpportunity.findUnique({
       where: { id },
-      include: { client: true, lead: true, notes: true, evidences: true, quotes: true },
+      include: {
+        client: true,
+        lead: true,
+        notes: true,
+        evidences: true,
+        quotes: true,
+        projects: { select: { id: true, name: true, status: true, budget: true } },
+      },
     });
     if (!opp) throw new NotFoundException('Oportunidad no encontrada');
     this.assertOwnerAccess(opp.ownerId, user, 'oportunidad');
