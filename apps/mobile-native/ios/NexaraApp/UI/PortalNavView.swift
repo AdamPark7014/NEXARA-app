@@ -32,7 +32,6 @@ struct ModuleListView: View {
                     Text(m.icon).font(.title3)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(m.label).font(.body)
-                        Text(m.webPath).font(.caption2).foregroundColor(.secondary)
                     }
                     Spacer()
                     Image(systemName: "chevron.right").foregroundColor(.secondary)

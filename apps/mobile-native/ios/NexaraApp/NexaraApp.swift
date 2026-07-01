@@ -68,17 +68,7 @@ struct RootView: View {
                             }
                     }
                 case .studio:
-                    NavigationStack {
-                        StudioDashboardView()
-                            .navigationDestination(for: String.self) { key in
-                                ModuleRouter.view(for: panel, key: key)
-                            }
-                            .toolbar {
-                                ToolbarItem(placement: .navigationBarLeading) {
-                                    Button("Paneles") { app.route = .panels }
-                                }
-                            }
-                    }
+                    PortalNavView(panel: panel, onExit: { app.route = .panels })
                 default:
                     PortalNavView(panel: panel, onExit: { app.route = .panels })
                 }
