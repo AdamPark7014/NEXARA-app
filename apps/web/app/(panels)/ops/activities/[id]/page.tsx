@@ -5,11 +5,14 @@ import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
 import { buildApiUrl } from "@/lib/api-base";
 import { DetailError, DetailField, DetailFieldGrid, DetailSection, formatDate, formatDateTime } from "@/components/detail/DetailFrame";
+import ActivityEvidenceReviewPanel from "@/components/ops/ActivityEvidenceReviewPanel";
 import { useActivityDetail } from "@/components/ops/ActivityDetailShell";
 import { useUser } from "@/components/UserContext";
 import { resolveV2RoleKey } from "@/lib/user-access";
 import { ROLES } from "@/lib/rbac";
 import { activityStatusVariant } from "@/lib/activity-status";
+import { countEvidenceFiles } from "@/lib/evidence-display";
+import Link from "next/link";
 
 const STATUSES = ["PROGRAMADA", "EN_CURSO", "COMPLETADA", "REPROGRAMAR", "CANCELADA"];
 const PRIORITIES = ["BAJA", "MEDIA", "ALTA", "URGENTE"];
@@ -224,6 +227,29 @@ export default function ActivityDetailPage() {
               </Button>
             </div>
           </div>
+        )}
+      </DetailSection>
+
+      <DetailSection title="Evidencias de campo">
+        {activity.activityEvidence ? (
+          <>
+            <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-secondary)" }}>
+              {countEvidenceFiles(activity.activityEvidence)} archivo(s) en el paquete de evidencias.
+              {" "}
+              <Link href={`/ops/activities/${id}/evidences`} style={{ color: "var(--primary)", fontWeight: 600 }}>
+                Ver pestaña Evidencias →
+              </Link>
+            </p>
+            <ActivityEvidenceReviewPanel activity={activity} showHeader={false} />
+          </>
+        ) : (
+          <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.55 }}>
+            Aún no hay fotos ni documentos cargados para esta actividad.{" "}
+            <Link href={`/ops/activities/${id}/evidences`} style={{ color: "var(--primary)", fontWeight: 600 }}>
+              Ir a Evidencias
+            </Link>{" "}
+            para capturar entrada, fotos en sitio y salida.
+          </p>
         )}
       </DetailSection>
     </>
