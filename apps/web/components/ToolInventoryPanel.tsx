@@ -121,9 +121,9 @@ const ToolInventoryPanel: React.FC = () => {
     setError(null);
   };
 
-  const fetchItems = async () => {
+  const fetchItems = async (opts?: { background?: boolean }) => {
     if (!user?.token) return;
-    setLoading(true);
+    if (!opts?.background) setLoading(true);
     try {
       const params = new URLSearchParams();
       if (query.trim()) params.set('q', query.trim());
@@ -140,12 +140,14 @@ const ToolInventoryPanel: React.FC = () => {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
-      setLoading(false);
+      if (!opts?.background) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchItems();
+    const background = items.length > 0;
+    void fetchItems(background ? { background: true } : undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch al cambiar filtros; background si ya hay filas
   }, [user?.token, query, includeRetired]);
 
   useEffect(() => {
@@ -158,7 +160,7 @@ const ToolInventoryPanel: React.FC = () => {
     const scheduleRefresh = () => {
       if (refreshTimer) clearTimeout(refreshTimer);
       refreshTimer = setTimeout(() => {
-        fetchItems();
+        void fetchItems({ background: true });
       }, 250);
     };
 
@@ -595,10 +597,14 @@ const ToolInventoryPanel: React.FC = () => {
         </div>
 
         {error && <div className={styles.errorText}>{error}</div>}
-        {loading ? (
+        {loading && items.length === 0 ? (
           <div className={styles.centerLoading}>Cargando inventario...</div>
         ) : items.length === 0 ? (
-          <div className={styles.centerEmpty}>No hay herramientas en inventario</div>
+          <div className={styles.centerEmpty}>
+            {includeRetired
+              ? 'No hay herramientas retiradas en inventario'
+              : 'No hay herramientas en inventario'}
+          </div>
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
