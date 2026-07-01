@@ -76,4 +76,80 @@ final class ExtraRepository {
             return String(data: data, encoding: .utf8) ?? ""
         } catch { return "" }
     }
+
+    func analyticsKpisRaw() async -> String {
+        do {
+            let data = try await ApiClient.shared.get("analytics/kpi/computed")
+            return String(data: data, encoding: .utf8) ?? ""
+        } catch { return "" }
+    }
+
+    func analyticsDashboardMap() async -> [String: Any] {
+        guard let data = try? await ApiClient.shared.get("analytics/dashboard"),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
+        return obj
+    }
+
+    func analyticsComputedKpis() async -> [[String: Any]] {
+        guard let data = try? await ApiClient.shared.get("analytics/kpi/computed") else { return [] }
+        return ApiClient.decodeMapList(data)
+    }
+
+    func biMarginByType() async -> [[String: Any]] {
+        guard let data = try? await ApiClient.shared.get("analytics/bi/margin-by-type") else { return [] }
+        return ApiClient.decodeMapList(data)
+    }
+
+    func biEngineers(limit: Int = 10) async -> [[String: Any]] {
+        guard let data = try? await ApiClient.shared.get("analytics/bi/engineers", query: ["limit": String(limit)]) else { return [] }
+        return ApiClient.decodeMapList(data)
+    }
+
+    func biClientsRoi(limit: Int = 10) async -> [[String: Any]] {
+        guard let data = try? await ApiClient.shared.get("analytics/bi/clients-roi", query: ["limit": String(limit)]) else { return [] }
+        return ApiClient.decodeMapList(data)
+    }
+
+    func executiveCLevel() async -> [String: Any] {
+        guard let data = try? await ApiClient.shared.get("executive/c-level"),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
+        return obj
+    }
+
+    func workflowPending() async -> [[String: Any]] {
+        guard let data = try? await ApiClient.shared.get("workflow/my-pending") else { return [] }
+        return ApiClient.decodeMapList(data)
+    }
+
+    func workflowDecide(id: Int, decision: String, comments: String? = nil) async throws {
+        struct Body: Encodable { let decision: String; let comments: String? }
+        _ = try await ApiClient.shared.postJSON("workflow/approvals/\(id)/decide", body: Body(decision: decision, comments: comments))
+    }
+
+    func nocSummary() async -> [String: Any] {
+        guard let data = try? await ApiClient.shared.get("noc/summary"),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
+        return obj
+    }
+
+    func nocAlerts() async -> [[String: Any]] {
+        guard let data = try? await ApiClient.shared.get("noc/alerts") else { return [] }
+        return ApiClient.decodeMapList(data)
+    }
+
+    func nocDevices() async -> [[String: Any]] {
+        guard let data = try? await ApiClient.shared.get("noc/devices") else { return [] }
+        return ApiClient.decodeMapList(data)
+    }
+
+    func slaStats() async -> [String: Any] {
+        guard let data = try? await ApiClient.shared.get("sla/stats"),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
+        return obj
+    }
+
+    func maintenanceContracts() async -> [[String: Any]] {
+        guard let data = try? await ApiClient.shared.get("maintenance-contracts") else { return [] }
+        return ApiClient.decodeMapList(data)
+    }
 }

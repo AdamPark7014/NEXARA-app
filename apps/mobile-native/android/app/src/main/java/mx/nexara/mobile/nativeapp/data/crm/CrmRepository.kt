@@ -70,8 +70,21 @@ class CrmRepository(context: Context) {
     suspend fun salesTargets(): List<Map<String, Any?>> =
         parseMaps(crmApi.listSalesTargetsRaw().string())
 
-    suspend fun salesTeam(): List<Map<String, Any?>> =
-        parseMaps(crmApi.listSalesTeamRaw().string())
+    suspend fun salesTeam(period: String = "month"): List<Map<String, Any?>> =
+        parseMaps(crmApi.listSalesTeamRaw(period).string())
+
+    suspend fun salesMetrics(period: String = "month"): Map<String, Any?> =
+        parseObject(crmApi.getSalesMetricsRaw(period).string())
+
+    suspend fun vendorStats(period: String = "month"): List<Map<String, Any?>> =
+        parseMaps(crmApi.listSalesTeamRaw(period).string())
+
+    private fun parseObject(raw: String): Map<String, Any?> {
+        val trimmed = raw.trim()
+        if (trimmed.isEmpty() || !trimmed.startsWith("{")) return emptyMap()
+        val mapType = Types.newParameterizedType(Map::class.java, String::class.java, Any::class.java)
+        return moshi.adapter<Map<String, Any?>>(mapType).fromJson(trimmed) ?: emptyMap()
+    }
 
     private fun parseMaps(raw: String): List<Map<String, Any?>> {
         val trimmed = raw.trim()

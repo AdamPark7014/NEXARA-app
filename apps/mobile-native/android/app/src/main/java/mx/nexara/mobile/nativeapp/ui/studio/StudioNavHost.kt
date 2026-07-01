@@ -8,6 +8,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.runtime.LaunchedEffect
+import mx.nexara.mobile.nativeapp.access.PanelId
+import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
 import mx.nexara.mobile.nativeapp.ui.catalog.ModuleCatalog
 import mx.nexara.mobile.nativeapp.ui.catalog.PortalModuleListScreen
 
@@ -41,6 +44,17 @@ fun StudioNavHost(
     panelTitle: String = "NEXARA STUDIO",
 ) {
     val nav = rememberNavController()
+
+    LaunchedEffect(Unit) {
+        val key = PendingDeepLink.consumeModuleFor(PanelId.STUDIO) ?: return@LaunchedEffect
+        val route = when (key) {
+            "dashboard" -> Dashboard
+            "more", "modules" -> Home
+            else -> moduleRoute(key)
+        }
+        nav.navigate(route) { launchSingleTop = true }
+    }
+
     NavHost(navController = nav, startDestination = Dashboard) {
         composable(Dashboard) {
             StudioDashboardScreen(

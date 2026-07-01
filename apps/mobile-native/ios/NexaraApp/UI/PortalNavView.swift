@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// NavigationStack genérico para un panel. Muestra la lista de módulos y
-/// navega a la pantalla nativa correspondiente.
-struct PortalNavView: View {
+/// NavigationStack genérico para paneles con catálogo de módulos (Studio, etc.).
+struct PanelModuleNavView: View {
     let panel: PanelId
     let onExit: () -> Void
 

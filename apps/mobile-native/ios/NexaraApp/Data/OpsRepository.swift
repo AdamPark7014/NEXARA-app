@@ -26,4 +26,14 @@ final class OpsRepository {
         struct Body: Encodable { let reason: String }
         return ConsoleHelpers.decodeMap(try await api.patchJSON("procurement/requisitions/\(id)/reject", body: Body(reason: reason)))
     }
+
+    func startWorkOrder(id: Int64) async throws -> [String: Any] {
+        struct Empty: Encodable {}
+        return ConsoleHelpers.decodeMap(try await api.patchJSON("maintenance/work-orders/\(id)/start", body: Empty()))
+    }
+
+    func completeWorkOrder(id: Int64, notes: String? = nil) async throws -> [String: Any] {
+        struct Body: Encodable { let notes: String? }
+        return ConsoleHelpers.decodeMap(try await api.patchJSON("maintenance/work-orders/\(id)/complete", body: Body(notes: notes)))
+    }
 }

@@ -363,37 +363,46 @@ fun ConsoleNavHost(
                     "contact-messages" -> { { mx.nexara.mobile.nativeapp.ui.modules.ContactMessagesModuleScreen() } }
                     "newsletter" -> { { mx.nexara.mobile.nativeapp.ui.modules.NewsletterModuleScreen() } }
                     "audit" -> { { mx.nexara.mobile.nativeapp.ui.modules.AuditModuleScreen() } }
-                    "analytics" -> { { mx.nexara.mobile.nativeapp.ui.modules.AnalyticsModuleScreen() } }
-                    "expenses" -> { { mx.nexara.mobile.nativeapp.ui.modules.ExpensesModuleScreen() } }
-                    "fines" -> { { mx.nexara.mobile.nativeapp.ui.modules.FinesModuleScreen() } }
-                    "employee-payments" -> { { mx.nexara.mobile.nativeapp.ui.modules.EmployeePaymentsModuleScreen() } }
+                    "analytics", "bi" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ErpBiScreen() } }
+                    "executive" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ExecutiveScreen() } }
+                    "approvals" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ApprovalsScreen() } }
+                    "notifications-center" -> { { mx.nexara.mobile.nativeapp.ui.shared.NotificationsScreen(onBack = { navController.popBackStack() }) } }
+                    "noc" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.NocModuleScreen() } }
+                    "support-sla" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.SlaModuleScreen() } }
+                    "support" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ClientTicketsModuleScreen() } }
+                    "maintenance-contracts" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.MaintenanceContractsScreen() } }
+                    "expenses" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ExpensesRichScreen() } }
+                    "fines" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.FinesRichScreen() } }
+                    "employee-payments" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.EmployeePaymentsRichScreen() } }
                     "cotizaciones" -> { { mx.nexara.mobile.nativeapp.ui.modules.CotizacionesModuleScreen() } }
                     "lunch-breaks" -> { { mx.nexara.mobile.nativeapp.ui.modules.LunchBreaksModuleScreen() } }
                     "my-lunch-breaks" -> { { mx.nexara.mobile.nativeapp.ui.modules.MyLunchBreaksModuleScreen(
                         currentUserId = authRepo.loadSession()?.id,
                     ) } }
-                    "documents" -> { { mx.nexara.mobile.nativeapp.ui.modules.DocumentsModuleScreen() } }
-                    "accounting" -> { { mx.nexara.mobile.nativeapp.ui.modules.AccountingModuleScreen() } }
-                    "invoicing" -> { { mx.nexara.mobile.nativeapp.ui.modules.InvoicingModuleScreen() } }
-                    "banking" -> { { mx.nexara.mobile.nativeapp.ui.modules.BankingModuleScreen() } }
+                    "documents" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.DocumentsRichScreen() } }
+                    "accounting" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.AccountingRichScreen() } }
+                    "invoicing" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.InvoicesRichScreen() } }
+                    "banking" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.BankingRichScreen() } }
                     "my-viatics" -> { { mx.nexara.mobile.nativeapp.ui.modules.MyViaticsScreen() } }
                     "my-vehicles" -> { { mx.nexara.mobile.nativeapp.ui.modules.MyVehiclesScreen() } }
                     "my-preferences" -> { { mx.nexara.mobile.nativeapp.ui.modules.MyPreferencesScreen() } }
-                    "work-projects" -> { { mx.nexara.mobile.nativeapp.ui.modules.WorkProjectsModuleScreen() } }
+                    "work-projects" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.WorkProjectsRichScreen() } }
                     "hr" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.HrLeavesScreen() } }
-                    "warehouse" -> { { mx.nexara.mobile.nativeapp.ui.modules.WarehouseModuleScreen() } }
-                    "stock" -> { { mx.nexara.mobile.nativeapp.ui.modules.StockModuleScreen() } }
-                    "procurement" -> { { mx.nexara.mobile.nativeapp.ui.modules.ProcurementModuleScreen() } }
-                    "maintenance" -> { { mx.nexara.mobile.nativeapp.ui.modules.MaintenanceModuleScreen() } }
-                    "assets" -> { { mx.nexara.mobile.nativeapp.ui.modules.AssetsModuleScreen() } }
-                    "service-sheets" -> { { mx.nexara.mobile.nativeapp.ui.modules.ServiceSheetsModuleScreen() } }
-                    "cvs" -> { { mx.nexara.mobile.nativeapp.ui.modules.CvsModuleScreen() } }
-                    "client-tickets" -> { { mx.nexara.mobile.nativeapp.ui.modules.ClientTicketsModuleScreen() } }
-                    "gestion-vendedores" -> { { mx.nexara.mobile.nativeapp.ui.modules.ClientTicketsModuleScreen() } }
+                    "warehouse" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.WarehouseHubScreen(initialTab = 1) } }
+                    "stock" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.WarehouseHubScreen(initialTab = 0) } }
+                    "procurement" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ProcurementModuleScreen() } }
+                    "maintenance" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.MaintenanceModuleScreen(initialTab = 0) } }
+                    "assets" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.MaintenanceModuleScreen(initialTab = 1) } }
+                    "service-sheets" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ServiceSheetsModuleScreen() } }
+                    "cvs" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.CvsRichScreen() } }
+                    "client-tickets" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ClientTicketsModuleScreen() } }
+                    "gestion-vendedores" -> { { mx.nexara.mobile.nativeapp.ui.ventas.VentasSalesTeamScreen() } }
                     else -> { {} }
                 }
                 if (key in setOf(
-                        "news","contact-messages","newsletter","audit","analytics","expenses",
+                        "news","contact-messages","newsletter","audit","analytics","bi","executive","approvals",
+                        "notifications-center","noc","support-sla","support","maintenance-contracts",
+                        "expenses",
                         "fines","employee-payments","cotizaciones","lunch-breaks","my-lunch-breaks",
                         "documents","accounting","invoicing","banking","my-viatics",
                         "my-vehicles","my-preferences","work-projects",

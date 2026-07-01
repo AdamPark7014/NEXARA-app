@@ -19,7 +19,13 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import mx.nexara.mobile.nativeapp.ui.console.screens.MyProfileScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.PlaceholderScreen
-import mx.nexara.mobile.nativeapp.ui.modules.*
+import mx.nexara.mobile.nativeapp.ui.console.screens.AccountingRichScreen
+import mx.nexara.mobile.nativeapp.ui.console.screens.BankingRichScreen
+import mx.nexara.mobile.nativeapp.ui.console.screens.EmployeePaymentsRichScreen
+import mx.nexara.mobile.nativeapp.ui.console.screens.ExpensesRichScreen
+import mx.nexara.mobile.nativeapp.ui.console.screens.FinesRichScreen
+import mx.nexara.mobile.nativeapp.ui.console.screens.InvoicesRichScreen
+import mx.nexara.mobile.nativeapp.ui.console.screens.WorkProjectsRichScreen
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
@@ -78,8 +84,8 @@ fun ContabilidadNavHost(onExitToPanels: () -> Unit) {
             modifier = Modifier.padding(padding)
         ) {
             composable(ContaRoutes.Dashboard) { ContabilidadDashboardScreen() }
-            composable(ContaRoutes.Invoicing) { InvoicingModuleScreen() }
-            composable(ContaRoutes.Expenses)  { ExpensesModuleScreen() }
+            composable(ContaRoutes.Invoicing) { InvoicesRichScreen() }
+            composable(ContaRoutes.Expenses)  { ExpensesRichScreen() }
             composable(ContaRoutes.More) {
                 ContabilidadMoreScreen(
                     onOpenModule   = { key -> nav.navigate(ContaRoutes.module(key)) },
@@ -90,17 +96,17 @@ fun ContabilidadNavHost(onExitToPanels: () -> Unit) {
                 val key = backStack.arguments?.getString("key").orEmpty()
                 when (key) {
                     "dashboard"          -> ContabilidadDashboardScreen()
-                    "invoicing"          -> InvoicingModuleScreen()
-                    "expenses"           -> ExpensesModuleScreen()
-                    "accounting"         -> AccountingModuleScreen()
-                    "banking"            -> BankingModuleScreen()
+                    "invoicing"          -> InvoicesRichScreen()
+                    "expenses"           -> ExpensesRichScreen()
+                    "accounting"         -> AccountingRichScreen()
+                    "banking"            -> BankingRichScreen()
                     "employee-payments",
-                    "pagos"              -> EmployeePaymentsModuleScreen()
-                    "viaticos"           -> MyViaticsScreen()
-                    "multas"             -> FinesModuleScreen()
+                    "pagos"              -> EmployeePaymentsRichScreen()
+                    "viaticos"           -> mx.nexara.mobile.nativeapp.ui.modules.MyViaticsScreen()
+                    "multas"             -> FinesRichScreen()
                     "work-projects",
-                    "proyectos"          -> WorkProjectsModuleScreen()
-                    "horas"              -> LunchBreaksModuleScreen()
+                    "proyectos"          -> WorkProjectsRichScreen()
+                    "horas"              -> mx.nexara.mobile.nativeapp.ui.modules.LunchBreaksModuleScreen()
                     "my-profile"         -> MyProfileScreen()
                     else -> PlaceholderScreen(
                         title = key,

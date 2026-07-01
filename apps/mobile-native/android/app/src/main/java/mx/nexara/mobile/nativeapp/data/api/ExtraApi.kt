@@ -353,4 +353,46 @@ interface ExtraApi {
     // Projects (proyectos generales)
     @GET("projects")
     suspend fun getProjectsRaw(): okhttp3.ResponseBody
+
+    // BI ejecutivo
+    @GET("analytics/bi/margin-by-type")
+    suspend fun getBiMarginRaw(): okhttp3.ResponseBody
+
+    @GET("analytics/bi/engineers")
+    suspend fun getBiEngineersRaw(@Query("limit") limit: Int = 10): okhttp3.ResponseBody
+
+    @GET("analytics/bi/clients-roi")
+    suspend fun getBiClientsRoiRaw(@Query("limit") limit: Int = 10): okhttp3.ResponseBody
+
+    @GET("executive/c-level")
+    suspend fun getExecutiveCLevelRaw(): okhttp3.ResponseBody
+
+    @GET("workflow/my-pending")
+    suspend fun getWorkflowPendingRaw(): okhttp3.ResponseBody
+
+    @retrofit2.http.POST("workflow/approvals/{id}/decide")
+    suspend fun postWorkflowDecide(
+        @retrofit2.http.Path("id") id: Long,
+        @retrofit2.http.Body body: WorkflowDecideRequest,
+    ): okhttp3.ResponseBody
+
+    @GET("noc/summary")
+    suspend fun getNocSummaryRaw(): okhttp3.ResponseBody
+
+    @GET("noc/alerts")
+    suspend fun getNocAlertsRaw(): okhttp3.ResponseBody
+
+    @GET("noc/devices")
+    suspend fun getNocDevicesRaw(): okhttp3.ResponseBody
+
+    @GET("sla/stats")
+    suspend fun getSlaStatsRaw(): okhttp3.ResponseBody
+
+    @GET("maintenance-contracts")
+    suspend fun getMaintenanceContractsRaw(@Query("status") status: String? = null): okhttp3.ResponseBody
 }
+
+data class WorkflowDecideRequest(
+    val decision: String,
+    val comments: String? = null,
+)

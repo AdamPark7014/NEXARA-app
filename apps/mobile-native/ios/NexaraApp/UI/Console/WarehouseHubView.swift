@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Bodega + almacén en un hub (sin duplicar dashboards).
 struct WarehouseHubView: View {
+    var initialTab: Int = 0
     @State private var tab = 0
     @State private var warehouses: [[String: Any]] = []
     @State private var stock: [[String: Any]] = []
@@ -72,6 +73,7 @@ struct WarehouseHubView: View {
             }
         }
         .navigationTitle(tab == 0 ? "Bodega" : "Almacén")
+        .onAppear { tab = initialTab }
         .task { await reload() }
         .refreshable { await reload() }
     }

@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.CotizacionDto
+import mx.nexara.mobile.nativeapp.data.crm.CrmRepository
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
 
 // ── Colors
@@ -50,14 +51,15 @@ data class VentasDashboardState(
     val loading: Boolean = true,
     val error: String? = null,
     val cotizaciones: List<CotizacionDto> = emptyList(),
-    // generic leads/oportunidades from client-ticket-requests endpoint
     val leads: List<Map<String, Any?>> = emptyList(),
+    val metrics: Map<String, Any?> = emptyMap(),
 )
 
 // ── ViewModel
 
 class VentasDashboardViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ExtraRepository(app.applicationContext)
+    private val crmRepo = CrmRepository(app.applicationContext)
     private val _state = MutableStateFlow(VentasDashboardState())
     val state: StateFlow<VentasDashboardState> = _state
 
@@ -67,7 +69,8 @@ class VentasDashboardViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val cots = withContext(Dispatchers.IO) { repo.cotizaciones() }
                 val leads = withContext(Dispatchers.IO) { repo.clientTicketRequests() }
-                _state.update { it.copy(loading = false, cotizaciones = cots, leads = leads) }
+                val metrics = withContext(Dispatchers.IO) { crmRepo.salesMetrics("month") }
+                _state.update { it.copy(loading = false, cotizaciones = cots, leads = leads, metrics = metrics) }
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, error = e.message ?: "Error al cargar CRM") }
             }
@@ -149,6 +152,21 @@ fun VentasDashboardScreen() {
                         value = state.leads.size.toString(), sub = "Solicitudes abiertas",
                         bg = BlueLight, accent = BlueColor,
                     )
+                }
+            }
+        }
+
+        // ── Pipeline del mes (API metricas — detalle en Reportes)
+        if (state.metrics.isNotEmpty()) {
+            item { CrmSectionHeader("Pipeline del mes", "Periodo actual") }
+            item {
+                val revenue = dashDouble(state.metrics, "totalRevenue")
+                val pipeline = dashDouble(state.metrics, "pipelineValue")
+                val conversion = dashDouble(state.metrics, "conversionRate")
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    CrmKpiCard(Modifier.weight(1f), "💰", "Ingresos", fmtMxn(revenue), "Mes actual", GreenLight, GreenColor)
+                    CrmKpiCard(Modifier.weight(1f), "📊", "Pipeline", fmtMxn(pipeline), "Opps activas", BlueLight, BlueColor)
+                    CrmKpiCard(Modifier.weight(1f), "🎯", "Conversión", "${String.format("%.1f", conversion)}%", "Cierre", AmberLight, AmberColor)
                 }
             }
         }
@@ -324,4 +342,14 @@ private fun cotStatusColor(status: String): Color {
         s.contains("rechazad") || s.contains("vencid") -> RedColor
         else -> AmberColor
     }
+}
+
+private fun dashDouble(m: Map<String, Any?>, key: String): Double = when (val v = m[key]) {
+    is Double -> v
+    is Float -> v.toDouble()
+    is Int -> v.toDouble()
+    is Long -> v.toDouble()
+    is Number -> v.toDouble()
+    is String -> v.toDoubleOrNull() ?: 0.0
+    else -> 0.0
 }

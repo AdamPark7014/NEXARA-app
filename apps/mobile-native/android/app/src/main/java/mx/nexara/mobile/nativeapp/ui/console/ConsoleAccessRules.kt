@@ -155,7 +155,11 @@ fun consoleSidebarGroups(user: SessionUser?, panelId: mx.nexara.mobile.nativeapp
         ),
         ConsoleSidebarGroup(
             "compliance", "Cumplimiento y BI",
-            pick("documents", "audit", "analytics"),
+            pick("documents", "audit", "analytics", "bi", "executive", "approvals", "notifications-center"),
+        ),
+        ConsoleSidebarGroup(
+            "ops-monitoring", "Monitoreo y soporte",
+            pick("noc", "client-tickets", "support", "support-sla", "maintenance-contracts"),
         ),
     )
 

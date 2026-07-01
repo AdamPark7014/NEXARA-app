@@ -22,6 +22,7 @@ import mx.nexara.mobile.nativeapp.data.api.LunchCheckinRequest
 import mx.nexara.mobile.nativeapp.data.api.LunchCheckoutRequest
 import mx.nexara.mobile.nativeapp.data.api.NewsPostDto
 import mx.nexara.mobile.nativeapp.data.api.NewsletterSubscriberDto
+import mx.nexara.mobile.nativeapp.data.api.WorkflowDecideRequest
 import java.lang.reflect.ParameterizedType
 
 class ExtraRepository(context: Context) {
@@ -80,6 +81,8 @@ class ExtraRepository(context: Context) {
 
     suspend fun analyticsDashboardRaw(): String = api.getAnalyticsDashboardRaw().string()
     suspend fun analyticsKpisRaw(): String = api.getAnalyticsComputedKpisRaw().string()
+    suspend fun analyticsDashboardMap(): Map<String, Any?> = parseObject(api.getAnalyticsDashboardRaw().string())
+    suspend fun analyticsComputedKpisList(): List<Map<String, Any?>> = loadGeneric { api.getAnalyticsComputedKpisRaw() }
 
     suspend fun expenses(): List<ExpenseDto> = parseList(api.getExpensesRaw())
     suspend fun fines(): List<FineDto> = parseList(api.getFinesRaw())
@@ -140,4 +143,26 @@ class ExtraRepository(context: Context) {
     suspend fun cvs() = loadGeneric { api.getCvsRaw() }
     suspend fun clientTicketRequests() = loadGeneric { api.getClientTicketRequestsRaw() }
     suspend fun projects() = loadGeneric { api.getProjectsRaw() }
+
+    suspend fun biMarginByType() = loadGeneric { api.getBiMarginRaw() }
+    suspend fun biEngineers(limit: Int = 10) = loadGeneric { api.getBiEngineersRaw(limit) }
+    suspend fun biClientsRoi(limit: Int = 10) = loadGeneric { api.getBiClientsRoiRaw(limit) }
+    suspend fun executiveCLevel(): Map<String, Any?> = parseObject(api.getExecutiveCLevelRaw().string())
+    suspend fun workflowPending() = loadGeneric { api.getWorkflowPendingRaw() }
+    suspend fun workflowDecide(id: Long, decision: String, comments: String? = null) {
+        api.postWorkflowDecide(id, WorkflowDecideRequest(decision, comments))
+    }
+    suspend fun nocSummary(): Map<String, Any?> = parseObject(api.getNocSummaryRaw().string())
+    suspend fun nocAlerts() = loadGeneric { api.getNocAlertsRaw() }
+    suspend fun nocDevices() = loadGeneric { api.getNocDevicesRaw() }
+    suspend fun slaStats(): Map<String, Any?> = parseObject(api.getSlaStatsRaw().string())
+    suspend fun maintenanceContracts(status: String? = null) =
+        loadGeneric { api.getMaintenanceContractsRaw(status) }
+
+    private fun parseObject(raw: String): Map<String, Any?> {
+        val trimmed = raw.trim()
+        if (trimmed.isEmpty() || !trimmed.startsWith("{")) return emptyMap()
+        val mapType = Types.newParameterizedType(Map::class.java, String::class.java, Any::class.java)
+        return moshi.adapter<Map<String, Any?>>(mapType).fromJson(trimmed) ?: emptyMap()
+    }
 }
