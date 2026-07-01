@@ -476,13 +476,58 @@ fun ServiceSheetsModuleScreen() {
     }
 
     if (selected != null) {
-        LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            item { Text("Hoja de servicio", style = MaterialTheme.typography.titleLarge) }
-            item { DetailLine("Folio", str(selected!!, "folio", "number")) }
-            item { DetailLine("Cliente", str(selected!!, "clientName", "cliente")) }
-            item { DetailLine("AN", str(selected!!, "anNumber", "activityAn")) }
-            item { DetailLine("Estado", str(selected!!, "status", "estado")) }
-            item { TextButton(onClick = { selected = null }) { Text("Volver") } }
+        val s = selected!!
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item {
+                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                    OutlinedButton(onClick = { selected = null }) { Text("← Volver") }
+                    KpiChip(str(s, "status", "estado").ifBlank { "—" }, null)
+                }
+            }
+            item { Text("Hoja de servicio", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        fun r(k: String, v: String) { if (v.isNotBlank()) item { Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) { Text(k, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(v) } } }
+                        DetailLine("Folio", str(s, "folio", "number", "folioNumber"))
+                        DetailLine("Cliente", str(s, "clientName", "cliente"))
+                        DetailLine("Sucursal", str(s, "branchName", "sucursal"))
+                        DetailLine("AN / Actividad", str(s, "anNumber", "activityAn", "activityId"))
+                        DetailLine("Técnico", str(s, "technicianName", "userName", "responsable"))
+                        DetailLine("Fecha visita", str(s, "visitDate", "scheduledDate", "createdAt").take(10))
+                        DetailLine("Hora entrada", str(s, "checkIn", "entryTime", "horaEntrada"))
+                        DetailLine("Hora salida", str(s, "checkOut", "exitTime", "horaSalida"))
+                    }
+                }
+            }
+            val materials = ((s["materials"] ?: s["materiales"]) as? List<*>)?.filterIsInstance<Map<String, Any?>>() ?: emptyList()
+            if (materials.isNotEmpty()) {
+                item { Text("Materiales utilizados", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
+                items(materials, key = { str(it, "id").ifBlank { it.hashCode().toString() } }) { m ->
+                    Card(Modifier.fillMaxWidth()) {
+                        Row(Modifier.fillMaxWidth().padding(12.dp), Arrangement.SpaceBetween) {
+                            Text(str(m, "name", "nombre", "description").ifBlank { "Material" }, Modifier.weight(1f))
+                            val qty = str(m, "quantity", "cantidad")
+                            if (qty.isNotBlank()) Text("x$qty", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+            val obs = str(s, "observations", "observaciones", "notes", "description")
+            if (obs.isNotBlank()) {
+                item { Text("Observaciones", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
+                item { Card(Modifier.fillMaxWidth()) { Text(obs, Modifier.padding(14.dp), style = MaterialTheme.typography.bodyMedium) } }
+            }
+            val signed = str(s, "signedAt", "firmadoAt", "clientSignature")
+            item {
+                Text("Firma del cliente", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                if (signed.isBlank()) {
+                    Text("Sin firma del cliente", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    DetailLine("Firmado por", str(s, "signedByName", "clientName", "signerName"))
+                    DetailLine("Fecha", signed.take(10))
+                }
+            }
         }
         return
     }

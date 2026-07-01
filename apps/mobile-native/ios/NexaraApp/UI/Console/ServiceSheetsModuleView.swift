@@ -58,16 +58,51 @@ struct ServiceSheetsModuleView: View {
 
     private func detail(_ r: [String: Any]) -> some View {
         List {
-            Section("Hoja de servicio") {
-                ssRow("Folio", ssStr(r, "folio", "number"))
-                ssRow("Cliente", ssStr(r, "clientName", "cliente"))
-                ssRow("AN", ssStr(r, "anNumber", "activityAn"))
-                ssRow("Estado", ssStr(r, "status", "estado"))
-                ssRow("Técnico", ssStr(r, "technicianName", "userName"))
-                ssRow("Fecha", ssStr(r, "createdAt", "date"))
+            Section {
+                HStack {
+                    Button("← Lista") { selected = nil }
+                    Spacer()
+                    OpsStatusChip(text: ssStr(r, "status", "estado"))
+                }
             }
-            Button("Volver") { selected = nil }
+            Section("Hoja de servicio") {
+                ssRow("Folio", ssStr(r, "folio", "number", "folioNumber"))
+                ssRow("Cliente", ssStr(r, "clientName", "cliente"))
+                ssRow("Sucursal", ssStr(r, "branchName", "sucursal"))
+                ssRow("AN / Actividad", ssStr(r, "anNumber", "activityAn", "activityId"))
+                ssRow("Técnico", ssStr(r, "technicianName", "userName", "responsable"))
+                ssRow("Fecha visita", String(ssStr(r, "visitDate", "scheduledDate", "createdAt").prefix(10)))
+                ssRow("Hora entrada", ssStr(r, "checkIn", "entryTime", "horaEntrada"))
+                ssRow("Hora salida", ssStr(r, "checkOut", "exitTime", "horaSalida"))
+            }
+            let materials = (r["materials"] as? [[String: Any]]) ?? (r["materiales"] as? [[String: Any]]) ?? []
+            if !materials.isEmpty {
+                Section("Materiales utilizados") {
+                    ForEach(Array(materials.enumerated()), id: \.offset) { _, m in
+                        HStack {
+                            Text(ssStr(m, "name", "nombre", "description")).font(.subheadline)
+                            Spacer()
+                            let qty = ssStr(m, "quantity", "cantidad")
+                            if !qty.isEmpty { Text("x\(qty)").font(.caption).foregroundColor(.secondary) }
+                        }
+                    }
+                }
+            }
+            let obs = ssStr(r, "observations", "observaciones", "notes", "description")
+            if !obs.isEmpty {
+                Section("Observaciones") { Text(obs).font(.subheadline) }
+            }
+            Section("Firma") {
+                let signed = ssStr(r, "signedAt", "firmadoAt", "clientSignature")
+                if signed.isEmpty {
+                    Text("Sin firma del cliente").foregroundColor(.secondary).font(.subheadline)
+                } else {
+                    ssRow("Firmado por", ssStr(r, "signedByName", "clientName", "signerName"))
+                    ssRow("Fecha", String(signed.prefix(10)))
+                }
+            }
         }
+        .listStyle(.insetGrouped)
     }
 
     @ViewBuilder private func ssRow(_ k: String, _ v: String) -> some View {
