@@ -816,44 +816,200 @@ fun VentasPipelineScreen() {
 }
 
 @Composable
-fun VentasAgendaScreen() = CrmMapListScreen { repo -> repo.calendarEvents() }
-
-@Composable
-fun VentasTendersScreen() = CrmMapListScreen { repo -> repo.tenders() }
-
-@Composable
-fun VentasTargetsScreen() = CrmMapListScreen { repo -> repo.salesTargets() }
-
-@Composable
-fun VentasSalesTeamScreen() = CrmMapListScreen { repo -> repo.salesTeam() }
-
-@Composable
-private fun CrmMapListScreen(loader: suspend (CrmRepository) -> List<Map<String, Any?>>) {
+fun VentasAgendaScreen() {
     val ctx = LocalContext.current
     val repo = remember(ctx) { CrmRepository(ctx.applicationContext) }
     var items by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
-    LaunchedEffect(repo) {
-        loading = true
-        items = runCatching { withContext(Dispatchers.IO) { loader(repo) } }.getOrDefault(emptyList())
-        loading = false
+    var query by remember { mutableStateOf("") }
+    var selected by remember { mutableStateOf<Map<String, Any?>?>(null) }
+    LaunchedEffect(repo) { loading = true; items = runCatching { withContext(Dispatchers.IO) { repo.calendarEvents() } }.getOrDefault(emptyList()); loading = false }
+
+    if (selected != null) {
+        val ev = selected!!
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item { OutlinedButton(onClick = { selected = null }) { Text("← Agenda") } }
+            item { Text(mStr(ev, "title", "subject"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        DetailLine("Tipo", mStr(ev, "type", "tipo"))
+                        DetailLine("Inicio", mStr(ev, "startAt", "start", "fecha").take(16))
+                        DetailLine("Fin", mStr(ev, "endAt", "end", "fin").take(16))
+                        DetailLine("Responsable", mStr(ev, "ownerName", "attendeeName"))
+                        DetailLine("Descripción", mStr(ev, "description", "notes"))
+                        DetailLine("Ubicación", mStr(ev, "location", "ubicacion"))
+                        DetailLine("Resultado", mStr(ev, "result", "resultado"))
+                    }
+                }
+            }
+        }
+        return
     }
-    CrmListScaffold(
-        isLoading = loading,
-        error = null,
-        onRetry = { },
-        query = "",
-        onQuery = {},
-        placeholder = "",
-        emptyText = "Sin datos",
-        items = items,
-        key = { mStr(it, "id") },
-        showSearch = false,
-    ) { item ->
-        Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(14.dp)) {
-                Text(mStr(item, "title", "name", "nombre", "subject"), fontWeight = FontWeight.SemiBold)
-                Text(mStr(item, "status", "estatus", "startAt", "deadline"), style = MaterialTheme.typography.bodySmall)
+    val filtered = items.filter { query.isBlank() || mStr(it, "title", "subject").lowercase().contains(query.lowercase()) || mStr(it, "ownerName").lowercase().contains(query.lowercase()) }
+    CrmListScaffold(isLoading = loading, error = null, onRetry = {}, query = query, onQuery = { query = it }, placeholder = "Buscar evento…", emptyText = "Sin eventos", items = filtered, key = { mStr(it, "id") }) { ev ->
+        Card(Modifier.fillMaxWidth().clickable { selected = ev }, shape = RoundedCornerShape(12.dp)) {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(mStr(ev, "title", "subject"), fontWeight = FontWeight.SemiBold)
+                val date = mStr(ev, "startAt", "start", "fecha").take(16)
+                if (date.isNotBlank()) Text(date, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val owner = mStr(ev, "ownerName", "attendeeName")
+                if (owner.isNotBlank()) Text(owner, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+fun VentasTendersScreen() {
+    val ctx = LocalContext.current
+    val repo = remember(ctx) { CrmRepository(ctx.applicationContext) }
+    var items by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var query by remember { mutableStateOf("") }
+    var statusFilter by remember { mutableStateOf("todos") }
+    var selected by remember { mutableStateOf<Map<String, Any?>?>(null) }
+    LaunchedEffect(repo) { loading = true; items = runCatching { withContext(Dispatchers.IO) { repo.tenders() } }.getOrDefault(emptyList()); loading = false }
+
+    if (selected != null) {
+        val t = selected!!
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item {
+                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                    OutlinedButton(onClick = { selected = null }) { Text("← Licitaciones") }
+                    Text(mStr(t, "status", "estado"), color = CrmGreen, fontWeight = FontWeight.SemiBold)
+                }
+            }
+            item { Text(mStr(t, "title", "name"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        DetailLine("Cliente", mStr(t, "clientName", "cliente"))
+                        DetailLine("Estado", mStr(t, "status", "estado"))
+                        DetailLine("Monto", fmtMxnShort(mDouble(t, "amount", "value", "monto") ?: 0.0))
+                        DetailLine("Fecha límite", mStr(t, "deadline", "dueDate").take(10))
+                        DetailLine("Descripción", mStr(t, "description", "notes"))
+                        DetailLine("Resultado", mStr(t, "result", "resultado"))
+                        DetailLine("Responsable", mStr(t, "ownerName", "responsable"))
+                    }
+                }
+            }
+        }
+        return
+    }
+    val allStatuses = listOf("todos") + items.mapNotNull { mStr(it, "status", "estado").lowercase().takeIf { s -> s.isNotBlank() } }.distinct().sorted()
+    val filtered = items.filter { (statusFilter == "todos" || mStr(it, "status", "estado").equals(statusFilter, true)) && (query.isBlank() || mStr(it, "title", "name").lowercase().contains(query.lowercase()) || mStr(it, "clientName", "cliente").lowercase().contains(query.lowercase())) }
+
+    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (items.isNotEmpty()) item {
+            Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(8.dp)) {
+                KpiChip("Total", "${items.size}", null, Modifier.weight(1f))
+                KpiChip("Activas", "${items.count { listOf("activo","abierto","open").contains(mStr(it, "status", "estado").lowercase()) }}", Color(0xFF2E7D32), Modifier.weight(1f))
+                KpiChip("Cerradas", "${items.count { listOf("cerrado","closed","ganado","perdido").contains(mStr(it, "status", "estado").lowercase()) }}", Color(0xFF64748B), Modifier.weight(1f))
+            }
+        }
+        item { OutlinedTextField(value = query, onValueChange = { query = it }, placeholder = { Text("Buscar licitación…") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+        item { Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) { allStatuses.forEach { s -> FilterChip(selected = statusFilter == s, onClick = { statusFilter = s }, label = { Text(s, style = MaterialTheme.typography.labelSmall) }) } } }
+        if (loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
+        if (filtered.isEmpty()) { item { Text("Sin licitaciones", color = MaterialTheme.colorScheme.onSurfaceVariant) }; return@LazyColumn }
+        items(filtered, key = { mStr(it, "id") }) { t ->
+            Card(Modifier.fillMaxWidth().clickable { selected = t }, shape = RoundedCornerShape(12.dp)) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) { Text(mStr(t, "title", "name"), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)); Text(mStr(t, "status", "estado"), color = CrmGreen, style = MaterialTheme.typography.labelSmall) }
+                    val client = mStr(t, "clientName", "cliente"); if (client.isNotBlank()) Text(client, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    val dl = mStr(t, "deadline", "dueDate").take(10); if (dl.isNotBlank()) Text("Vence: $dl", style = MaterialTheme.typography.labelSmall, color = Color(0xFFE65100))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun VentasTargetsScreen() {
+    val ctx = LocalContext.current
+    val repo = remember(ctx) { CrmRepository(ctx.applicationContext) }
+    var items by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var query by remember { mutableStateOf("") }
+    LaunchedEffect(repo) { loading = true; items = runCatching { withContext(Dispatchers.IO) { repo.salesTargets() } }.getOrDefault(emptyList()); loading = false }
+
+    val totalTarget = items.sumOf { mDouble(it, "targetAmount", "amount") ?: 0.0 }
+    val totalActual = items.sumOf { mDouble(it, "actualAmount", "actual", "currentAmount") ?: 0.0 }
+    val filtered = items.filter { query.isBlank() || mStr(it, "ownerName", "userName").lowercase().contains(query.lowercase()) }
+
+    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (items.isNotEmpty()) item {
+            Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(8.dp)) {
+                KpiChip("Vendedores", "${items.size}", null, Modifier.weight(1f))
+                KpiChip("Meta", fmtMxnShort(totalTarget), Color(0xFF1565C0), Modifier.weight(1f))
+                KpiChip("Alcanzado", fmtMxnShort(totalActual), if (totalActual >= totalTarget) Color(0xFF2E7D32) else Color(0xFFE65100), Modifier.weight(1f))
+            }
+        }
+        item { OutlinedTextField(value = query, onValueChange = { query = it }, placeholder = { Text("Buscar vendedor…") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+        if (loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
+        if (filtered.isEmpty()) { item { Text("Sin metas definidas", color = MaterialTheme.colorScheme.onSurfaceVariant) }; return@LazyColumn }
+        items(filtered, key = { mStr(it, "id", "ownerName") }) { t ->
+            val target = mDouble(t, "targetAmount", "amount") ?: 0.0
+            val actual = mDouble(t, "actualAmount", "actual", "currentAmount") ?: 0.0
+            val pct = if (target > 0) (actual / target).coerceIn(0.0, 1.0).toFloat() else 0f
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                        Text(mStr(t, "ownerName", "userName"), fontWeight = FontWeight.Bold)
+                        Text(fmtMxnShort(actual), fontWeight = FontWeight.Bold, color = if (pct >= 1f) Color(0xFF2E7D32) else Color(0xFFE65100))
+                    }
+                    Text("${mStr(t, "year")} / ${mStr(t, "month")}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    LinearProgressIndicator(progress = { pct }, modifier = Modifier.fillMaxWidth(), color = if (pct >= 1f) Color(0xFF2E7D32) else Color(0xFFE65100))
+                    Text("Meta: ${fmtMxnShort(target)} · ${(pct * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun VentasSalesTeamScreen() {
+    val ctx = LocalContext.current
+    val repo = remember(ctx) { CrmRepository(ctx.applicationContext) }
+    var items by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var query by remember { mutableStateOf("") }
+    LaunchedEffect(repo) { loading = true; items = runCatching { withContext(Dispatchers.IO) { repo.salesTeam() } }.getOrDefault(emptyList()); loading = false }
+
+    val totalSales = items.sumOf { mDouble(it, "totalVentas", "salesTotal", "amount") ?: 0.0 }
+    val maxSales = items.maxOfOrNull { mDouble(it, "totalVentas", "salesTotal", "amount") ?: 0.0 } ?: 1.0
+    val filtered = items.filter { query.isBlank() || mStr(it, "nombre", "name", "userName").lowercase().contains(query.lowercase()) }
+
+    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (items.isNotEmpty()) item {
+            Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(8.dp)) {
+                KpiChip("Vendedores", "${items.size}", null, Modifier.weight(1f))
+                KpiChip("Total", fmtMxnShort(totalSales), Color(0xFF2E7D32), Modifier.weight(1f))
+                KpiChip("Promedio", fmtMxnShort(if (items.isEmpty()) 0.0 else totalSales / items.size), Color(0xFF0891B2), Modifier.weight(1f))
+            }
+        }
+        item { OutlinedTextField(value = query, onValueChange = { query = it }, placeholder = { Text("Buscar vendedor…") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+        if (loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
+        if (filtered.isEmpty()) { item { Text("Sin datos de equipo", color = MaterialTheme.colorScheme.onSurfaceVariant) }; return@LazyColumn }
+        items(filtered, key = { mStr(it, "id", "nombre") }) { v ->
+            val sales = mDouble(v, "totalVentas", "salesTotal", "amount") ?: 0.0
+            val pct = (if (maxSales > 0) sales / maxSales else 0.0).coerceIn(0.0, 1.0).toFloat()
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                        Column {
+                            Text(mStr(v, "nombre", "name", "userName"), fontWeight = FontWeight.Bold)
+                            val role = mStr(v, "role", "puesto", "cargo"); if (role.isNotBlank()) Text(role, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Text(fmtMxnShort(sales), fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                    }
+                    val leads = mStr(v, "totalLeads", "leads"); val opps = mStr(v, "totalOportunidades", "oportunidades")
+                    if (leads.isNotBlank() || opps.isNotBlank()) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        if (leads.isNotBlank()) Text("$leads leads", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (opps.isNotBlank()) Text("$opps opps", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    LinearProgressIndicator(progress = { pct }, modifier = Modifier.fillMaxWidth(), color = Color(0xFF2E7D32))
+                }
             }
         }
     }
@@ -867,3 +1023,21 @@ private inline fun <reified T : AndroidViewModel> crmVmFactory(ctx: android.cont
                 .newInstance(ctx.applicationContext as Application) as VM
         }
     }
+
+@Composable
+private fun KpiChip(label: String, value: String?, color: Color? = null, modifier: Modifier = Modifier) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier.padding(horizontal = 4.dp, vertical = 4.dp)) {
+        Text(value ?: label, fontWeight = FontWeight.Bold, color = color ?: MaterialTheme.colorScheme.primary)
+        if (value != null) Text(label, style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+@Composable
+private fun DetailLine(label: String, value: String) {
+    if (value.isBlank()) return
+    Row(Modifier.fillMaxWidth()) {
+        Text(label, fontWeight = FontWeight.Medium)
+        Spacer(Modifier.weight(1f))
+        Text(value, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
