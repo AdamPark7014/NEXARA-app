@@ -5,7 +5,7 @@ import { useState } from "react";
 import Button from "@/components/ui/Button";
 import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
-import { updateSalesOpportunity, ALL_OPPORTUNITY_STAGES, formatOpportunityStage } from "@/lib/sales-api";
+import { updateSalesOpportunity, ALL_OPPORTUNITY_STAGES, formatOpportunityStage, createSalesProject } from "@/lib/sales-api";
 import { DetailError, DetailField, DetailFieldGrid, DetailSection, formatDate, formatMoney } from "@/components/detail/DetailFrame";
 import { useOpportunityDetail } from "@/components/crm/OpportunityDetailShell";
 
@@ -27,6 +27,8 @@ export default function OpportunityDetailPage() {
   const [editing, setEditing] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [projectErr, setProjectErr] = useState<string | null>(null);
   const [form, setForm] = useState({
     title: "", description: "", stage: "DISCOVERY",
     value: 0, probability: 20, expectedCloseDate: "",
@@ -64,6 +66,28 @@ export default function OpportunityDetailPage() {
   };
 
   const clientName = opportunity.client?.name ?? opportunity.clientName ?? "—";
+  const hasProject = (opportunity.projects?.length ?? 0) > 0;
+
+  const createProjectFromWin = async () => {
+    if (!token) return;
+    setCreatingProject(true);
+    setProjectErr(null);
+    try {
+      const created = await createSalesProject(token, {
+        opportunityId: opportunity.id,
+        name: opportunity.title,
+        budget: Number(opportunity.value ?? 0),
+        scopeSummary: opportunity.description ?? undefined,
+        status: "PLANNED",
+      });
+      reload();
+      window.location.href = `/crm/projects/${created.id}`;
+    } catch (e) {
+      setProjectErr(e instanceof Error ? e.message : "No se pudo crear el proyecto");
+    } finally {
+      setCreatingProject(false);
+    }
+  };
 
   if (editing) {
     return (
@@ -147,6 +171,39 @@ export default function OpportunityDetailPage() {
           <DetailField label="Descripción / plan de acción" value={opportunity.description} />
         </div>
       )}
+
+      {opportunity.stage === "WON" && (
+        <div
+          style={{
+            marginTop: 16,
+            padding: 14,
+            borderRadius: 10,
+            border: "1px solid color-mix(in srgb, var(--success) 35%, var(--border))",
+            background: "color-mix(in srgb, var(--success) 8%, var(--surface))",
+          }}
+        >
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Oportunidad ganada</div>
+          <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+            {hasProject
+              ? "Ya existe un proyecto comercial vinculado. Puedes dar seguimiento desde Proyectos."
+              : "Crea el proyecto comercial para coordinar ejecución, cierre y facturación."}
+          </p>
+          {projectErr && <p style={{ color: "var(--danger)", fontSize: 12, margin: "0 0 8px" }}>{projectErr}</p>}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {!hasProject && (
+              <Button variant="primary" size="sm" onClick={() => void createProjectFromWin()} disabled={creatingProject}>
+                {creatingProject ? "Creando proyecto…" : "Crear proyecto comercial"}
+              </Button>
+            )}
+            {hasProject && opportunity.projects?.[0] && (
+              <Link href={`/crm/projects/${opportunity.projects[0].id}`}>
+                <Button variant="primary" size="sm">Ver proyecto →</Button>
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+
       <div style={{ marginTop: 16, display: "flex", gap: 12, flexWrap: "wrap" }}>
         {opportunity.clientId && (
           <Link href={`/crm/clients/${opportunity.clientId}`} style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>

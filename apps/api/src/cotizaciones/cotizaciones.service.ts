@@ -13,6 +13,8 @@ import { SendCotizacionDto } from './dto/send-cotizacion.dto.js';
 import { SignCotizacionDto } from './dto/sign-cotizacion.dto.js';
 import { generateCotizacionPdf } from './cotizacion-pdf.js';
 import { AutoApprovalService } from '../workflow/auto-approval.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
+import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { randomBytes } from 'crypto';
 import nodemailer from 'nodemailer';
 import fs from 'fs/promises';
@@ -34,6 +36,8 @@ export class CotizacionesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly autoApproval: AutoApprovalService,
+    private readonly notificationsService: NotificationsService,
+    private readonly notificationHierarchy: NotificationHierarchyService,
   ) {}
 
   private get db() {
@@ -370,7 +374,14 @@ export class CotizacionesService {
     const quote = await this.db.cotizacion.findUnique({ where: { publicToken: token } });
     if (!quote) throw new NotFoundException('Cotizacion no encontrada');
 
-    return this.db.cotizacion.update({
+    if (quote.status === CotizacionStatus.APPROVED) {
+      return this.db.cotizacion.findUnique({
+        where: { id: quote.id },
+        include: { items: true },
+      });
+    }
+
+    const updated = await this.db.cotizacion.update({
       where: { id: quote.id },
       data: {
         status: CotizacionStatus.APPROVED,
@@ -380,6 +391,101 @@ export class CotizacionesService {
       },
       include: { items: true },
     });
+
+    void this.applyQuoteSignedSideEffects(updated, dto).catch((error) => {
+      console.error('Error applying quote signed side effects:', error);
+    });
+
+    return updated;
+  }
+
+  /** Firma → notificar vendedor, marcar oportunidad vinculada como WON. */
+  private async applyQuoteSignedSideEffects(
+    quote: { id: number; quoteNumber: string; total: unknown; createdById?: number | null },
+    signer: SignCotizacionDto,
+  ) {
+    await this.notificationsService.notifyQuoteSigned(quote.id, signer.name.trim(), signer.email.trim());
+
+    const links = await this.db.salesOpportunityQuote.findMany({
+      where: { cotizacionId: quote.id },
+      include: { opportunity: true },
+    });
+
+    const quoteTotal = Number(quote.total ?? 0);
+    for (const link of links) {
+      const opp = link.opportunity;
+      if (!opp || opp.stage === 'WON' || opp.stage === 'LOST') continue;
+
+      const prevStage = opp.stage;
+      const actorId = quote.createdById || opp.ownerId || link.createdById;
+      const closedAt = new Date();
+
+      await this.db.salesOpportunity.update({
+        where: { id: opp.id },
+        data: {
+          stage: 'WON',
+          closedAt,
+          probability: 100,
+          ...(quoteTotal > 0 ? { value: quoteTotal } : {}),
+        },
+      });
+
+      await this.db.salesOpportunityNote.create({
+        data: {
+          opportunityId: opp.id,
+          message: `Cotización ${quote.quoteNumber} firmada por ${signer.name.trim()} (${signer.email.trim()}). Oportunidad marcada como ganada automáticamente.`,
+          createdById: actorId,
+        },
+      });
+
+      if (actorId) {
+        void this.notificationHierarchy
+          .notifySalesOpportunityStageChanged(
+            actorId,
+            opp.id,
+            opp.title,
+            String(prevStage),
+            'WON',
+            'Cliente',
+          )
+          .catch(() => undefined);
+      }
+    }
+  }
+
+  /** Envío → mover oportunidad vinculada a etapa Cotización (PROPOSAL). */
+  private async applyQuoteSentSideEffects(quoteId: number) {
+    const links = await this.db.salesOpportunityQuote.findMany({
+      where: { cotizacionId: quoteId },
+      include: { opportunity: true },
+    });
+
+    const bumpFrom = new Set(['DISCOVERY', 'QUALIFICATION']);
+    for (const link of links) {
+      const opp = link.opportunity;
+      if (!opp || opp.stage === 'WON' || opp.stage === 'LOST') continue;
+      if (!bumpFrom.has(opp.stage)) continue;
+
+      const prevStage = opp.stage;
+      const actorId = opp.ownerId || link.createdById;
+      await this.db.salesOpportunity.update({
+        where: { id: opp.id },
+        data: { stage: 'PROPOSAL' },
+      });
+
+      if (actorId) {
+        void this.notificationHierarchy
+          .notifySalesOpportunityStageChanged(
+            actorId,
+            opp.id,
+            opp.title,
+            String(prevStage),
+            'PROPOSAL',
+            'Sistema',
+          )
+          .catch(() => undefined);
+      }
+    }
   }
 
   async send(id: number, dto: SendCotizacionDto, senderId?: number) {
@@ -410,6 +516,10 @@ export class CotizacionesService {
 
     const pdf = await this.buildPdf(updated);
     await this.sendEmail(updated, email, dto.message, pdf, token);
+
+    void this.applyQuoteSentSideEffects(updated.id).catch((error) => {
+      console.error('Error applying quote sent side effects:', error);
+    });
 
     return updated;
   }
