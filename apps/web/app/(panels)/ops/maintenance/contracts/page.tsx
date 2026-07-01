@@ -336,7 +336,7 @@ export default function MaintenanceContractsPage() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
         <KpiCard label="Contratos activos" value={activos} icon="📑" />
-        <KpiCard label="Ingreso recurrente (MRR)" value={`$${(mrr / 1000).toFixed(1)}k`} variant="positive" icon="💰" />
+        <KpiCard label="Ingreso recurrente (MRR)" value={<Money value={mrr} compact />} variant="positive" icon="💰" hint="Mensual recurrente" />
         <KpiCard label="Visitas próx. 7 días" value={proximaSemana} icon="📅" />
       </div>
 
