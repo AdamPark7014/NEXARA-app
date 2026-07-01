@@ -273,6 +273,7 @@ export const URL_MATRIX: Record<RoleKey, UrlRule[]> = {
     { path: '/api/vehicles/**', scope: 'approve' },
     { path: '/api/gps/**', scope: 'read' },
     { path: '/api/service-sheets/**', scope: 'write' },
+    { path: '/api/tool-requests/**', methods: ['GET', 'POST', 'PUT', 'PATCH'], scope: 'write' },
     ...SELF_ATTENDANCE_URL_RULES,
     ...OPS_OPERATIONAL_PROJECTS_URL_RULES,
   ],
