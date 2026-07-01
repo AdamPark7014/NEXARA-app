@@ -15,10 +15,9 @@ struct ModuleRouter {
             GenericListModuleView(title: "Evidencias") { (await ExtraRepository.shared.evidences()).map {
                 toRow($0, title: ["title","descripcion","fileName"], subtitle: ["activityAn"])
             } }
-        case (.console, "viatics"), (.console, "my-viatics"):
-            GenericListModuleView(title: "Viáticos") { (await ExtraRepository.shared.viatics()).map {
-                toRow($0, title: ["concepto","descripcion","motivo"], subtitle: ["usuario","userName"])
-            } }
+        case (.console, "viatics"), (.console, "my-viatics"),
+             (.contabilidad, "viaticos"):
+            ViaticsView()
         case (.console, "vehicles"), (.console, "my-vehicles"):
             GenericListModuleView(title: "Vehículos") { (await ExtraRepository.shared.vehicles()).map {
                 toRow($0, title: ["placas","marca","modelo"], subtitle: ["solicitanteNombre","solicitante"])
