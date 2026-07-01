@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -87,10 +89,18 @@ fun StudioDashboardScreen(
                         Text("Gestiona contenido público, leads y calendario social.", style = MaterialTheme.typography.bodySmall, color = StudioMuted)
                     }
                     item {
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            StudioKpiCard("Contactos web", s.contactTotal.toString(), "Formularios recibidos", "📥")
-                            StudioKpiCard("Casos de éxito", "${s.casesPublished}/${s.casesTotal}", "Publicados / total", "🏆", accent = Color(0xFF10B981))
-                            StudioKpiCard("Social programado", s.socialDrafts.size.toString(), "Borradores y programados", "📱", accent = Color(0xFF0EA5E9))
+                        androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                            columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(2),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth().height(330.dp),
+                            userScrollEnabled = false,
+                        ) {
+                            item { StudioKpiCard("Contactos web", s.contactTotal.toString(), "Formularios recibidos", "📥") }
+                            item { StudioKpiCard("Casos de éxito", "${s.casesPublished}/${s.casesTotal}", "Publicados / total", "🏆", accent = Color(0xFF10B981)) }
+                            item { StudioKpiCard("Noticias", "${s.newsPublished}/${s.newsTotal}", "Publicadas / total", "📰", accent = Color(0xFFF59E0B)) }
+                            item { StudioKpiCard("Suscriptores", s.newsletterActive.toString(), "Newsletter activos", "📮", accent = Color(0xFF8B5CF6)) }
+                            item { StudioKpiCard("Social", s.socialDrafts.size.toString(), "Pendientes de publicar", "📱", accent = Color(0xFF0EA5E9)) }
                         }
                     }
                     item { Text("Accesos rápidos", fontWeight = FontWeight.SemiBold) }

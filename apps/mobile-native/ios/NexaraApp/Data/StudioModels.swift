@@ -213,4 +213,7 @@ struct StudioDashboardStats {
     let casesTotal: Int
     let casesPublished: Int
     let socialDrafts: [SocialPost]
+    let newsTotal: Int
+    let newsPublished: Int
+    let newsletterActive: Int
 }

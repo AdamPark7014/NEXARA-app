@@ -39,6 +39,9 @@ data class StudioDashboardStats(
     val casesTotal: Int,
     val casesPublished: Int,
     val socialDrafts: List<SocialPostDto>,
+    val newsTotal: Int = 0,
+    val newsPublished: Int = 0,
+    val newsletterActive: Int = 0,
 )
 
 class StudioRepository(context: Context) {
@@ -112,11 +115,18 @@ class StudioRepository(context: Context) {
 
         val social = socialPosts().filter { it.estado == "Programado" || it.estado == "Borrador" }.take(4)
 
+        val newsItems   = runCatching { news() }.getOrDefault(emptyList())
+        val nlSubs      = runCatching { newsletter() }.getOrDefault(emptyList())
+        val nlActive    = nlSubs.count { (it.status ?: "active").lowercase() != "baja" }
+
         return StudioDashboardStats(
             contactTotal = contactTotal,
             casesTotal = cases.size,
             casesPublished = casesPublished,
             socialDrafts = social,
+            newsTotal = newsItems.size,
+            newsPublished = newsItems.count { it.status?.lowercase() == "published" },
+            newsletterActive = nlActive,
         )
     }
 

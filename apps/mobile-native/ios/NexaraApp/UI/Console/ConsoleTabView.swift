@@ -152,9 +152,33 @@ private struct ConsoleMoreView: View {
                 navRow(key: "analytics",        icon: "📈", label: "Analítica")
                 navRow(key: "documents",        icon: "📄", label: "Documentos")
                 navRow(key: "news",             icon: "📰", label: "Noticias")
+                navRow(key: "newsletter",       icon: "📮", label: "Newsletter")
                 navRow(key: "contact-messages", icon: "✉️", label: "Mensajes de contacto")
                 navRow(key: "cotizaciones",     icon: "📝", label: "Cotizaciones")
                 navRow(key: "cvs",              icon: "🗂️", label: "CVs")
+            }
+            if panel == .ops {
+                Section("OPS · Soporte") {
+                    navRow(key: "noc",                  icon: "📡", label: "NOC · Monitoreo")
+                    navRow(key: "support-sla",          icon: "⏱️", label: "SLA y tiempos")
+                    navRow(key: "maintenance-contracts", icon: "📑", label: "Contratos de servicio")
+                    navRow(key: "support",              icon: "🆘", label: "Bandeja de soporte")
+                }
+            }
+            if isAdmin {
+                Section("Plataforma ERP") {
+                    navRow(key: "executive",             icon: "📊", label: "Vista ejecutiva")
+                    navRow(key: "bi",                    icon: "📈", label: "Business Intelligence")
+                    navRow(key: "approvals",             icon: "🛡️", label: "Aprobaciones")
+                    navRow(key: "notifications-center",  icon: "🔔", label: "Centro de notificaciones")
+                    navRow(key: "calendar",              icon: "📅", label: "Mi calendario")
+                    navRow(key: "companies",             icon: "🏛️", label: "Multi-empresa")
+                    navRow(key: "kb",                    icon: "📚", label: "Knowledge Base")
+                    navRow(key: "exports",               icon: "📥", label: "Exportaciones")
+                    navRow(key: "architecture",          icon: "🗺️", label: "Arquitectura")
+                    navRow(key: "orgchart",              icon: "🌳", label: "Organigrama")
+                    navRow(key: "kpis-hr",               icon: "📊", label: "KPIs de personas")
+                }
             }
             Section {
                 Button(role: .destructive) { onExit() } label: {
