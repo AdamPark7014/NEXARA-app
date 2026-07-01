@@ -188,9 +188,9 @@ export default function CrmProjectsPage() {
         actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo proyecto</Button> : undefined}
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14, marginBottom: 20 }}>
-        <KpiCard label="Proyectos activos" value={activos} />
-        <KpiCard label="Valor total presupuesto" value={`$${(totalContrato / 1000000).toFixed(1)}M`} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 20 }}>
+        <KpiCard label="Proyectos activos" value={activos} variant={activos > 0 ? "accent" : "default"} icon="🏗️" />
+        <KpiCard label="Valor total presupuesto" value={<Money value={totalContrato} compact />} variant="positive" icon="💰" hint="Suma de contratos activos" />
       </div>
 
       {actionErr && (
