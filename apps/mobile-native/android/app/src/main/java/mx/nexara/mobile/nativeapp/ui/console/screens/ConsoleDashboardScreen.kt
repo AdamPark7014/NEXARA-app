@@ -119,11 +119,20 @@ private val SubText = Color(0xFF64748B)
 @Composable
 fun ConsoleDashboardScreen(
     contentPadding: PaddingValues = PaddingValues(16.dp),
+    isOps: Boolean = false,
 ) {
     val vm: ConsoleDashboardViewModel = viewModel()
     val state by vm.state.collectAsState()
     val context = LocalContext.current
     val user = remember { AuthRepository(context).loadSession() }
+    var nocAlerts by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
+
+    if (isOps) {
+        val extraRepo = remember { ExtraRepository(context) }
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            nocAlerts = withContext(Dispatchers.IO) { extraRepo.nocAlerts() }
+        }
+    }
 
     if (state.activities.isEmpty() && state.isLoading && state.error == null) {
         vm.refresh()
@@ -409,6 +418,35 @@ fun ConsoleDashboardScreen(
                         ) {
                             val hrs = String.format("%.1f", (u.totalMinutes ?: 0) / 60.0)
                             Text("${hrs}h", style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = TealColor)
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── OPS: NOC Alerts ────────────────────────────────────────────────
+        if (isOps && nocAlerts.isNotEmpty()) {
+            item { SectionHeader("Alertas NOC", "${nocAlerts.size} activas") }
+            items(nocAlerts.take(5), key = { it["id"]?.toString() ?: it.hashCode().toString() }) { alert ->
+                val severity = (alert["severity"] as? String ?: "info").lowercase()
+                val alertColor = when (severity) { "critical" -> Color(0xFFEF4444); "warning" -> Color(0xFFF59E0B); else -> Color(0xFF3B82F6) }
+                val device = alert["deviceName"] as? String ?: "Dispositivo"
+                val title = alert["title"] as? String ?: alert["message"] as? String ?: "Alerta"
+                Card(
+                    modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = alertColor.copy(alpha = 0.08f)),
+                    elevation = CardDefaults.cardElevation(0.dp),
+                ) {
+                    Row(
+                        modifier = androidx.compose.ui.Modifier.padding(14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(if (severity == "critical") "🔴" else if (severity == "warning") "🟡" else "🔵", fontSize = 20.sp)
+                        Column(androidx.compose.ui.Modifier.weight(1f)) {
+                            Text(title, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold), color = alertColor)
+                            Text(device, style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
                         }
                     }
                 }

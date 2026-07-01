@@ -155,7 +155,7 @@ fun ConsoleNavHost(
     val visibleRoutes = remember(visibleModules) {
         visibleModules.map { routeForModuleKey(it.key) }.toSet()
     }
-    val sidebarGroups = remember(user, panelId) { consoleSidebarGroups(user, panelId) }
+    val sidebarGroups = remember(user, panelId) { consoleSidebarGroupsForMore(user, panelId) }
     val panelTitle = panelId.displayName
 
     // Máximo 5 tabs: módulos principales visibles + "Más".
@@ -270,7 +270,7 @@ fun ConsoleNavHost(
             modifier = Modifier.padding(inner),
         ) {
             composable(ConsoleRoutes.Dashboard) {
-                ConsoleDashboardScreen()
+                ConsoleDashboardScreen(isOps = panelId == PanelId.OPS)
             }
             composable(ConsoleRoutes.Activities) {
                 // Combined view: admins see team + personal; normal users see only personal

@@ -20,7 +20,7 @@ struct ConsoleTabView: View {
         TabView(selection: $selectedTab) {
             // ── Inicio / Dashboard
             NavigationStack {
-                ConsoleDashboardView()
+                ConsoleDashboardView(isOps: panel == .ops)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarLeading) {
                             Button("Paneles", action: onExit)
@@ -94,93 +94,46 @@ private struct ConsoleMoreView: View {
 
     var body: some View {
         List {
-            Section("Mi cuenta") {
-                navRow(key: "my-profile",      icon: "👤", label: "Mi perfil")
-                navRow(key: "my-viatics",      icon: "💼", label: "Mis viáticos")
-                navRow(key: "my-lunch-breaks", icon: "🍽️", label: "Mis comidas")
-                navRow(key: "my-vehicles",     icon: "🚗", label: "Mis vehículos")
-                navRow(key: "my-preferences",  icon: "⚙️", label: "Mis preferencias")
-            }
-            Section("Operación") {
-                navRow(key: "viatics",         icon: "💰", label: "Viáticos (equipo)")
-                navRow(key: "vehicles",        icon: "🚗", label: "Vehículos")
-                navRow(key: "tools",           icon: "🔧", label: "Herramientas")
-                if panel == .ops {
-                    navRow(key: "service-clients", icon: "🏬", label: "Clientes de servicio")
-                } else {
-                    navRow(key: "clients",         icon: "🏢", label: "Clientes")
+            if let u = session.currentUser {
+                Section {
+                    HStack(spacing: 12) {
+                        Text(u.isSuperAdmin ? "⚡" : "👤").font(.largeTitle)
+                        VStack(alignment: .leading) {
+                            Text(u.nombre).font(.headline)
+                            Text(u.email).font(.caption).foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 4)
                 }
-                navRow(key: "projects",        icon: "📐", label: "Proyectos")
-                navRow(key: "work-projects",   icon: "🛠️", label: "Proyectos internos")
-                navRow(key: "service-sheets",  icon: "📋", label: "Hojas de servicio")
-                navRow(key: "client-tickets",  icon: "🎫", label: "Tickets de clientes")
             }
-            Section("RRHH · Finanzas") {
-                if canFinance {
-                    Button {
-                        showContabilidad = true
-                    } label: {
+
+            if canFinance {
+                Section {
+                    Button { showContabilidad = true } label: {
                         HStack(spacing: 12) {
                             Text("📊").font(.title3)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Hub Contabilidad").foregroundColor(.primary)
+                                Text("Hub Contabilidad")
                                 Text("Facturas, gastos y finanzas").font(.caption).foregroundColor(.secondary)
                             }
                         }
                     }
                 }
-                navRow(key: "hr",                icon: "👥", label: "Recursos humanos")
-                navRow(key: "employee-payments", icon: "💳", label: "Pagos a empleados")
-                navRow(key: "lunch-breaks",      icon: "🍽️", label: "Comidas (equipo)")
-                navRow(key: "expenses",          icon: "📊", label: "Gastos")
-                navRow(key: "fines",             icon: "⚠️", label: "Multas")
-                navRow(key: "invoicing",         icon: "🧾", label: "Facturación")
-                navRow(key: "banking",           icon: "🏦", label: "Banca")
-                navRow(key: "accounting",        icon: "📒", label: "Contabilidad")
             }
-            Section("Almacén · Compras") {
-                navRow(key: "warehouse",   icon: "🏭", label: "Bodega")
-                navRow(key: "stock",       icon: "📦", label: "Almacén")
-                navRow(key: "procurement", icon: "🛒", label: "Compras")
-                navRow(key: "assets",      icon: "🖥️", label: "Activos")
-                navRow(key: "maintenance", icon: "🔨", label: "Mantenimiento")
-            }
-            Section("Admin · Contenido") {
-                navRow(key: "users",            icon: "🧑‍💼", label: "Usuarios")
-                if isAdmin { navRow(key: "settings", icon: "⚙️", label: "Ajustes del sistema") }
-                navRow(key: "audit",            icon: "🔍", label: "Auditoría")
-                navRow(key: "analytics",        icon: "📈", label: "Analítica")
-                navRow(key: "documents",        icon: "📄", label: "Documentos")
-                navRow(key: "news",             icon: "📰", label: "Noticias")
-                navRow(key: "newsletter",       icon: "📮", label: "Newsletter")
-                navRow(key: "contact-messages", icon: "✉️", label: "Mensajes de contacto")
-                navRow(key: "cotizaciones",     icon: "📝", label: "Cotizaciones")
-                navRow(key: "cvs",              icon: "🗂️", label: "CVs")
-            }
-            if panel == .ops {
-                Section("OPS · Soporte") {
-                    navRow(key: "noc",                  icon: "📡", label: "NOC · Monitoreo")
-                    navRow(key: "support-sla",          icon: "⏱️", label: "SLA y tiempos")
-                    navRow(key: "maintenance-contracts", icon: "📑", label: "Contratos de servicio")
-                    navRow(key: "support",              icon: "🆘", label: "Bandeja de soporte")
-                    navRow(key: "recruiting",           icon: "🔍", label: "Reclutamiento")
+
+            ForEach(ConsoleAccessRules.consoleSidebarGroupsForMore(user: session.currentUser, panel: panel)) { group in
+                Section(group.title) {
+                    ForEach(group.modules) { m in
+                        NavigationLink(value: m.key) {
+                            HStack(spacing: 12) {
+                                Text(m.icon).font(.title3)
+                                Text(m.label)
+                            }
+                        }
+                    }
                 }
             }
-            if isAdmin {
-                Section("Plataforma ERP") {
-                    navRow(key: "executive",             icon: "📊", label: "Vista ejecutiva")
-                    navRow(key: "bi",                    icon: "📈", label: "Business Intelligence")
-                    navRow(key: "approvals",             icon: "🛡️", label: "Aprobaciones")
-                    navRow(key: "notifications-center",  icon: "🔔", label: "Centro de notificaciones")
-                    navRow(key: "calendar",              icon: "📅", label: "Mi calendario")
-                    navRow(key: "companies",             icon: "🏛️", label: "Multi-empresa")
-                    navRow(key: "kb",                    icon: "📚", label: "Knowledge Base")
-                    navRow(key: "exports",               icon: "📥", label: "Exportaciones")
-                    navRow(key: "architecture",          icon: "🗺️", label: "Arquitectura")
-                    navRow(key: "orgchart",              icon: "🌳", label: "Organigrama")
-                    navRow(key: "kpis-hr",               icon: "📊", label: "KPIs de personas")
-                }
-            }
+
             Section {
                 Button(role: .destructive) { onExit() } label: {
                     Label("Cambiar panel", systemImage: "arrow.left.circle")
@@ -192,16 +145,6 @@ private struct ConsoleMoreView: View {
         }
         .fullScreenCover(isPresented: $showContabilidad) {
             ContabilidadTabView(onExit: { showContabilidad = false })
-        }
-    }
-
-    @ViewBuilder
-    private func navRow(key: String, icon: String, label: String) -> some View {
-        NavigationLink(value: key) {
-            HStack(spacing: 12) {
-                Text(icon).font(.title3)
-                Text(label)
-            }
         }
     }
 }
