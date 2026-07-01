@@ -4,6 +4,9 @@ import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagina
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
 import { PERMISSIONS } from '../common/permissions.js';
 
+const FIELD_KIT_ROLE_KEYS = ['ing_campo', 'ing_soporte'] as const;
+const BROAD_KIT_ASSIGN_SCOPE = new Set(['ceo', 'dir_operaciones', 'arquitecto', 'super_admin']);
+
 // Definir el tipo localmente
 type ToolRequestStatus = 'PENDING' | 'APPROVED' | 'IN_USE' | 'RETURNED' | 'DAMAGED' | 'REJECTED';
 type RenewalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
@@ -688,40 +691,48 @@ export class ToolRequestsService {
     });
   }
 
+  private async kitVisibilityUserFilter(
+    currentUser: { id: number; isSuperAdmin?: boolean; permissions?: string[] },
+  ) {
+    const isSuperAdmin = await this.isSuperAdminByEmail(currentUser.id, currentUser);
+    if (isSuperAdmin) return {};
+
+    const canManage = Boolean(
+      currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) ||
+      currentUser.permissions?.includes(PERMISSIONS.TOOLS_MANAGE),
+    );
+    if (!canManage) return null;
+
+    const dbUser = await (this.prisma as any).user.findUnique({
+      where: { id: currentUser.id },
+      select: { roleKey: true },
+    });
+    const roleKey = String(dbUser?.roleKey || '').toLowerCase();
+
+    if (BROAD_KIT_ASSIGN_SCOPE.has(roleKey)) {
+      return {
+        roleKey: { in: [...FIELD_KIT_ROLE_KEYS] },
+        email: { notIn: this.superAdminEmails },
+      };
+    }
+
+    return {
+      managerId: currentUser.id,
+      roleKey: { in: [...FIELD_KIT_ROLE_KEYS] },
+      email: { notIn: this.superAdminEmails },
+    };
+  }
+
   async getUsersKit(
     currentUser: { id: number; isSuperAdmin?: boolean; permissions?: string[] },
     userId?: number,
   ) {
-    const isSuperAdmin = await this.isSuperAdminByEmail(currentUser.id, currentUser);
-    const isAdmin = Boolean(
-      currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) ||
-      currentUser.permissions?.includes(PERMISSIONS.TOOLS_MANAGE),
-    );
+    const userFilter = await this.kitVisibilityUserFilter(currentUser);
+    if (userFilter === null) return [];
 
-    if (!isSuperAdmin && !isAdmin) {
-      return [];
-    }
-
-    const whereUser: any = {};
+    const whereUser: any = { ...userFilter };
     if (userId) {
       whereUser.id = userId;
-    }
-
-    if (!isSuperAdmin) {
-      if (userId && userId !== currentUser.id) {
-        whereUser.role = { accesoConsoleAdmin: false };
-        whereUser.email = { notIn: this.superAdminEmails };
-      } else if (!userId) {
-        whereUser.OR = [
-          { id: currentUser.id },
-          {
-            AND: [
-              { role: { accesoConsoleAdmin: false } },
-              { email: { notIn: this.superAdminEmails } },
-            ],
-          },
-        ];
-      }
     }
 
     const assignments = await (this.prisma as any).toolKitAssignment.findMany({
@@ -779,9 +790,13 @@ export class ToolRequestsService {
     }
 
     const isSuperAdmin = await this.isSuperAdminByEmail(currentUser.id, currentUser);
-    const isAdmin = Boolean(currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN));
+    const canAssign = Boolean(
+      isSuperAdmin ||
+      currentUser.permissions?.includes(PERMISSIONS.CONSOLE_ADMIN) ||
+      currentUser.permissions?.includes(PERMISSIONS.TOOLS_MANAGE),
+    );
 
-    if (!isSuperAdmin && !isAdmin) {
+    if (!canAssign) {
       throw new Error('No tienes permisos para asignar herramientas');
     }
 
@@ -791,17 +806,29 @@ export class ToolRequestsService {
         select: {
           id: true,
           email: true,
-          role: { select: { accesoConsoleAdmin: true } },
+          roleKey: true,
+          managerId: true,
         },
       });
 
-      const isSelfTarget = target?.id === currentUser.id;
+      const assigner = await (this.prisma as any).user.findUnique({
+        where: { id: currentUser.id },
+        select: { roleKey: true },
+      });
+      const assignerRoleKey = String(assigner?.roleKey || '').toLowerCase();
+      const targetRoleKey = String(target?.roleKey || '').toLowerCase();
+
+      const isFieldEngineer = FIELD_KIT_ROLE_KEYS.includes(targetRoleKey as typeof FIELD_KIT_ROLE_KEYS[number]);
+      const hasBroadScope = BROAD_KIT_ASSIGN_SCOPE.has(assignerRoleKey);
+      const isDirectReport = target?.managerId === currentUser.id;
+
       if (
         !target ||
-        (!isSelfTarget &&
-          (target.role?.accesoConsoleAdmin || this.superAdminEmails.includes(String(target.email).toLowerCase())))
+        this.superAdminEmails.includes(String(target.email).toLowerCase()) ||
+        !isFieldEngineer ||
+        (!hasBroadScope && !isDirectReport)
       ) {
-        throw new Error('Como admin solo puedes asignar a usuarios normales');
+        throw new Error('Solo puedes asignar kits a ingenieros de campo bajo tu coordinación');
       }
     }
 

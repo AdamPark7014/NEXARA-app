@@ -7,6 +7,12 @@ import { UpdateUserDto } from './dto/update-user.dto.js';
 import * as bcrypt from 'bcryptjs';
 import { PERMISSIONS } from '../common/permissions.js';
 
+/** Roles que reciben OT, kits de herramientas y asignaciones de campo. */
+const FIELD_ASSIGNEE_ROLE_KEYS = ['ing_campo', 'ing_soporte'] as const;
+
+/** Pueden asignar a cualquier ingeniero de campo (no solo reportes directos). */
+const BROAD_FIELD_ASSIGN_SCOPE = new Set(['ceo', 'dir_operaciones', 'arquitecto', 'super_admin']);
+
 @Injectable()
 export class UsersService {
   private readonly superAdminEmails = ['gerencia@nexara.com.mx', 'developer@nexara.com.mx'];
@@ -411,16 +417,20 @@ export class UsersService {
       }
 
       if (hasActivitiesManagePermission) {
-        // v2 OPS manager: puede asignar actividades solo a compañeros del mismo departamento sin permisos de consola
+        // OPS manager: asigna a ingenieros de campo bajo su jerarquía (organigrama NEXARA).
+        const assignerRoleKey = String(userInDb.roleKey || userInDb.role?.orgRoleKey || '').toLowerCase();
+        const fieldAssigneeFilter: Prisma.UserWhereInput[] = [
+          { isActive: true },
+          { email: { notIn: superAdminEmails } },
+          { roleKey: { in: [...FIELD_ASSIGNEE_ROLE_KEYS] } },
+        ];
+
+        if (!BROAD_FIELD_ASSIGN_SCOPE.has(assignerRoleKey)) {
+          fieldAssigneeFilter.push({ managerId: currentUser.id });
+        }
+
         return this.prisma['user'].findMany({
-          where: {
-            AND: [
-              { id: { not: currentUser.id } },
-              { email: { notIn: superAdminEmails } },
-              { departmentId: currentUser.departmentId },
-              { role: { accesoConsoleAdmin: false } },
-            ],
-          },
+          where: { AND: fieldAssigneeFilter },
           select: { id: true, nombre: true, email: true, role: true, avatarUrl: true },
           orderBy: { nombre: 'asc' },
         });
