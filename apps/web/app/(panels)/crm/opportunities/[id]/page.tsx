@@ -185,8 +185,8 @@ export default function OpportunityDetailPage() {
           <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Oportunidad ganada</div>
           <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5 }}>
             {hasProject
-              ? "Ya existe un proyecto comercial vinculado. Puedes dar seguimiento desde Proyectos."
-              : "Crea el proyecto comercial para coordinar ejecución, cierre y facturación."}
+              ? "Proyecto comercial vinculado. Revisa orden de venta, operaciones y facturación desde Proyectos."
+              : "Al firmar la cotización o marcar WON se crea el proyecto comercial automáticamente. También puedes crearlo manualmente aquí."}
           </p>
           {projectErr && <p style={{ color: "var(--danger)", fontSize: 12, margin: "0 0 8px" }}>{projectErr}</p>}
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>

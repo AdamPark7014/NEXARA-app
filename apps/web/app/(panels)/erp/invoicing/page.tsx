@@ -69,6 +69,7 @@ export default function InvoicingPage() {
   const [paymentForm, setPaymentForm] = useState({ amount: "", paymentDate: new Date().toISOString().slice(0, 10), method: "SPEI", reference: "", notes: "" });
   const [paymentErr, setPaymentErr] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
+  const [pacInfo, setPacInfo] = useState<{ provider?: string; configured?: boolean; productionWarning?: string | null; env?: string } | null>(null);
   const [form, setForm] = useState({
     type: "INCOME" as "INCOME" | "EXPENSE",
     receptorName: "",
@@ -101,6 +102,13 @@ export default function InvoicingPage() {
   }, [token, filter]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    if (!token) return;
+    void apiFetch("accounting/invoices/pac-info", token)
+      .then((data) => setPacInfo(data))
+      .catch(() => setPacInfo(null));
+  }, [token]);
 
   const visibleItems = useMemo(() => {
     let rows = items;
@@ -355,6 +363,30 @@ export default function InvoicingPage() {
         <KpiCard label="Canceladas" value={canceladas} variant={canceladas > 0 ? "danger" : "default"} icon="✗" />
         <KpiCard label="Vencidas" value={vencidas} variant={vencidas > 0 ? "danger" : "positive"} icon="🛡️" />
       </div>
+
+      {pacInfo && (
+        <div
+          style={{
+            marginBottom: 18,
+            padding: "12px 14px",
+            borderRadius: 10,
+            border: `1px solid ${pacInfo.productionWarning ? "color-mix(in srgb, var(--danger) 35%, var(--border))" : "var(--border)"}`,
+            background: pacInfo.productionWarning
+              ? "color-mix(in srgb, var(--danger) 8%, var(--surface))"
+              : "var(--surface-2)",
+            fontSize: 13,
+            color: "var(--text-secondary)",
+          }}
+        >
+          <strong style={{ color: "var(--foreground)" }}>PAC / timbrado:</strong>{" "}
+          {pacInfo.provider?.toUpperCase() ?? "—"}
+          {pacInfo.configured ? " · credenciales OK" : " · sin credenciales"}
+          {pacInfo.env ? ` · ${pacInfo.env}` : ""}
+          {pacInfo.productionWarning && (
+            <div style={{ marginTop: 6, color: "var(--danger)" }}>{pacInfo.productionWarning}</div>
+          )}
+        </div>
+      )}
 
       {showForm && (
         <div style={{ background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 12, padding: 18, marginBottom: 18 }}>
