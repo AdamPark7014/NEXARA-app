@@ -4,6 +4,7 @@ import UIKit
 
 /// Clientes de servicio — CRUD + logo (paridad `ConsoleClientsScreen` Android).
 struct ServiceClientsView: View {
+    var title: String = "Clientes"
     @State private var clients: [[String: Any]] = []
     @State private var query = ""
     @State private var isLoading = true
@@ -26,7 +27,7 @@ struct ServiceClientsView: View {
             if let c = selected { clientDetail(c) }
             else { listBody }
         }
-        .navigationTitle("Clientes")
+        .navigationTitle(title)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button { showCreate = true } label: { Image(systemName: "plus") }

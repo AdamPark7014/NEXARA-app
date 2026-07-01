@@ -14,6 +14,7 @@ object ModulePanelMap {
         "projects", "work-projects",
         "assets", "maintenance", "maintenance-contracts",
         "service-sheets", "client-tickets", "support", "noc", "support-sla",
+        "service-clients",
         "cvs",
     )
 
@@ -28,6 +29,7 @@ object ModulePanelMap {
         "clients", "projects", "cotizaciones", "gestion-vendedores",
         "contact-messages", "news", "newsletter",
         "settings", "my-profile", "my-preferences",
+        "companies", "kb", "exports", "architecture", "calendar", "orgchart", "kpis-hr",
     )
 
     /** null = sin filtro (todos los módulos console). */

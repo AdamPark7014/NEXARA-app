@@ -66,6 +66,18 @@ object DeepLinkParser {
         "support-sla" to "support-sla",
         "maintenance-contracts" to "maintenance-contracts",
         "contratos" to "maintenance-contracts",
+        "companies" to "companies",
+        "kb" to "kb",
+        "exports" to "exports",
+        "architecture" to "architecture",
+        "calendar" to "calendar",
+        "orgchart" to "orgchart",
+        "kpis-hr" to "kpis-hr",
+        "kpis" to "kpis-hr",
+        "service-clients" to "service-clients",
+        "clientes-servicio" to "service-clients",
+        "plantillas" to "plantillas",
+        "templates" to "plantillas",
     )
 
     fun parse(uri: Uri?): DeepLinkDestination? {

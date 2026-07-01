@@ -185,6 +185,7 @@ struct UsersView: View {
 }
 
 struct VehiclesView: View {
+    var personalOnly: Bool = false
     @State private var items: [[String: Any]] = []
     @State private var query = ""
     @State private var isLoading = true
@@ -194,13 +195,20 @@ struct VehiclesView: View {
             if isLoading { ProgressView() }
             ForEach(filtered, id: \.vehKey) { v in
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(ConsoleHelpers.mapStr(v, "placas", "marca", "modelo")).font(.headline)
-                    Text(ConsoleHelpers.mapStr(v, "solicitanteNombre", "solicitante", "estado"))
+                    Text(ConsoleHelpers.mapStr(v, "nombreVehiculo", "placas", "marca", "modelo")).font(.headline)
+                    Text(ConsoleHelpers.mapStr(v, "solicitanteNombre", "solicitante", "estatusAprobacion", "estado"))
                         .font(.caption).foregroundColor(.secondary)
+                    if personalOnly {
+                        let range = [ConsoleHelpers.mapStr(v, "fechaInicio"), ConsoleHelpers.mapStr(v, "fechaFin")]
+                            .filter { !$0.isEmpty }.joined(separator: " → ")
+                        if !range.isEmpty {
+                            Text(range).font(.caption2).foregroundColor(.secondary)
+                        }
+                    }
                 }
             }
         }
-        .navigationTitle("Vehículos")
+        .navigationTitle(personalOnly ? "Mis vehículos" : "Vehículos")
         .searchable(text: $query)
         .task { await load() }
         .refreshable { await load() }
@@ -210,14 +218,24 @@ struct VehiclesView: View {
         guard !query.isEmpty else { return items }
         let q = query.lowercased()
         return items.filter {
-            ConsoleHelpers.mapStr($0, "placas", "marca").lowercased().contains(q)
+            ConsoleHelpers.mapStr($0, "placas", "marca", "nombreVehiculo").lowercased().contains(q)
         }
     }
 
     private func load() async {
         isLoading = true
         defer { isLoading = false }
-        items = (try? await ConsoleRepository.shared.vehicles()) ?? []
+        let all = (try? await ConsoleRepository.shared.vehicles()) ?? []
+        if personalOnly, let uid = SessionStore.shared.currentUser?.id {
+            items = all.filter { row in
+                if let sol = row["solicitante"] as? [String: Any], let id = sol["id"] {
+                    return String(describing: id) == uid
+                }
+                return ConsoleHelpers.mapStr(row, "solicitanteId", "usuarioId") == uid
+            }
+        } else {
+            items = all
+        }
     }
 }
 

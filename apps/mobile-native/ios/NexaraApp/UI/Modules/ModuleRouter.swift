@@ -25,14 +25,18 @@ struct ModuleRouter {
             ViaticsView(personalOnly: true)
         case (.contabilidad, "viaticos"):
             ViaticsView(personalOnly: false)
-        case (.console, "vehicles"), (.console, "my-vehicles"):
-            VehiclesView()
+        case (.console, "vehicles"):
+            VehiclesView(personalOnly: false)
+        case (.console, "my-vehicles"):
+            VehiclesView(personalOnly: true)
         case (.console, "gps"):
             GpsMapView()
         case (.console, "tools"):
             ToolsHubView()
         case (.console, "clients"):
             ServiceClientsView()
+        case (.console, "service-clients"):
+            ServiceClientsView(title: "Clientes de servicio")
         case (.web, "clientes"):
             ServiceClientsView()
         case (.console, "projects"):
@@ -84,8 +88,10 @@ struct ModuleRouter {
             CrmSalesTeamView()
         case (.ventas, "gestion-vendedores"), (.console, "gestion-vendedores"):
             CrmSalesTeamView()
-        case (.ventas, "plantillas"), (.ventas, "cotizaciones"):
+        case (.ventas, "cotizaciones"):
             CrmCotizacionesView()
+        case (.ventas, "plantillas"), (.ventas, "templates"):
+            CrmTemplatesView()
         case (.ventas, "leads"):
             CrmLeadsView()
         case (.tickets, "portal"), (.tickets, "home"):
@@ -140,6 +146,20 @@ struct ModuleRouter {
             MaintenanceContractsView()
         case (.console, "support"):
             ClientTicketsModuleView()
+        case (.console, "companies"):
+            CompaniesView()
+        case (.console, "kb"):
+            KbView()
+        case (.console, "exports"):
+            ExportsView()
+        case (.console, "architecture"):
+            ArchitectureView()
+        case (.console, "calendar"):
+            ErpCalendarView()
+        case (.console, "orgchart"):
+            OrgchartView()
+        case (.console, "kpis-hr"):
+            HrKpisView()
         case (.ventas, "reportes"):
             CrmReportsView(mode: .reportes)
         case (.ventas, "crecimiento"):
@@ -210,62 +230,6 @@ struct PlaceholderView: View {
                 .font(.footnote)
         }
         .padding()
-    }
-}
-
-struct AnalyticsRawView: View {
-    @State private var dashboard = ""
-    @State private var kpis = ""
-    @State private var isLoading = true
-    @State private var error: String?
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                if isLoading { ProgressView().frame(maxWidth: .infinity).padding(.top, 40) }
-                else if let error {
-                    Text(error).foregroundColor(.red)
-                } else {
-                    analyticsCard("Dashboard ejecutivo", dashboard)
-                    analyticsCard("KPIs calculados", kpis)
-                }
-            }
-            .padding()
-        }
-        .navigationTitle("Analítica")
-        .task { await reload() }
-        .refreshable { await reload() }
-    }
-
-    private func analyticsCard(_ title: String, _ raw: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.headline)
-            Text(raw.isEmpty ? "Sin datos." : formatJsonPreview(raw))
-                .font(.system(.caption, design: .monospaced))
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-
-    private func reload() async {
-        isLoading = true
-        defer { isLoading = false }
-        async let d = ExtraRepository.shared.analyticsDashboardRaw()
-        async let k = ExtraRepository.shared.analyticsKpisRaw()
-        dashboard = await d
-        kpis = await k
-        if dashboard.isEmpty && kpis.isEmpty { error = "No se pudieron cargar los datos de analítica." }
-    }
-
-    private func formatJsonPreview(_ raw: String) -> String {
-        guard let data = raw.data(using: .utf8),
-              let obj = try? JSONSerialization.jsonObject(with: data),
-              let pretty = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted]),
-              let str = String(data: pretty, encoding: .utf8) else { return raw }
-        return String(str.prefix(4000))
     }
 }
 

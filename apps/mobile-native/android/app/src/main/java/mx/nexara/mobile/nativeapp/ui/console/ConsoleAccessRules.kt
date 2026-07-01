@@ -124,18 +124,18 @@ fun consoleSidebarGroups(user: SessionUser?, panelId: mx.nexara.mobile.nativeapp
             .filter { allowedKeys == null || it.key in allowedKeys }
 
     val groups = listOf(
-        ConsoleSidebarGroup("profile", "Cuenta personal", pick("my-profile")),
+        ConsoleSidebarGroup("profile", "Cuenta personal", pick("my-profile", "calendar")),
         ConsoleSidebarGroup(
             "employee", "Mi espacio de trabajo",
             pick("dashboard", "my-activities", "my-evidences", "my-viatics", "my-vehicles", "my-lunch-breaks"),
         ),
         ConsoleSidebarGroup(
             "operations", "Supervisión operativa",
-            pick("activities", "evidences", "viatics", "vehicles", "gps"),
+            pick("activities", "evidences", "viatics", "vehicles", "gps", "service-clients", "maintenance", "assets", "service-sheets"),
         ),
         ConsoleSidebarGroup(
             "people", "RRHH y control de personal",
-            pick("attendance", "lunch-breaks", "fines", "cvs", "users", "hr"),
+            pick("attendance", "lunch-breaks", "fines", "cvs", "users", "hr", "orgchart", "kpis-hr"),
         ),
         ConsoleSidebarGroup(
             "commercial", "Clientes y comercial",
@@ -143,7 +143,7 @@ fun consoleSidebarGroups(user: SessionUser?, panelId: mx.nexara.mobile.nativeapp
         ),
         ConsoleSidebarGroup(
             "system", "Administración interna",
-            pick("tools", "news", "newsletter", "settings"),
+            pick("tools", "news", "newsletter", "settings", "companies", "kb", "architecture"),
         ),
         ConsoleSidebarGroup(
             "inventory", "Inventario y compras",
@@ -155,7 +155,7 @@ fun consoleSidebarGroups(user: SessionUser?, panelId: mx.nexara.mobile.nativeapp
         ),
         ConsoleSidebarGroup(
             "compliance", "Cumplimiento y BI",
-            pick("documents", "audit", "analytics", "bi", "executive", "approvals", "notifications-center"),
+            pick("documents", "audit", "analytics", "bi", "executive", "approvals", "notifications-center", "exports"),
         ),
         ConsoleSidebarGroup(
             "ops-monitoring", "Monitoreo y soporte",

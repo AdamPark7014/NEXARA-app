@@ -390,6 +390,38 @@ interface ExtraApi {
 
     @GET("maintenance-contracts")
     suspend fun getMaintenanceContractsRaw(@Query("status") status: String? = null): okhttp3.ResponseBody
+
+    // Gobierno corporativo
+    @GET("company/list")
+    suspend fun getCompaniesRaw(): okhttp3.ResponseBody
+
+    @GET("kb/articles")
+    suspend fun getKbArticlesRaw(@Query("q") q: String? = null): okhttp3.ResponseBody
+
+    @GET("kb/articles/{slugOrId}")
+    suspend fun getKbArticleRaw(@retrofit2.http.Path("slugOrId") slugOrId: String): okhttp3.ResponseBody
+
+    @GET("users/orgchart")
+    suspend fun getOrgchartRaw(): okhttp3.ResponseBody
+
+    @GET("users/hr-staff")
+    suspend fun getHrStaffRaw(
+        @Query("limit") limit: Int = 100,
+        @Query("page") page: Int = 1,
+    ): okhttp3.ResponseBody
+
+    @GET("calendar/events")
+    suspend fun getCalendarEventsRaw(
+        @Query("from") from: String? = null,
+        @Query("to") to: String? = null,
+    ): okhttp3.ResponseBody
+
+    @GET("exports/{entity}")
+    suspend fun getExportRaw(
+        @retrofit2.http.Path("entity") entity: String,
+        @Query("from") from: String?,
+        @Query("to") to: String?,
+    ): okhttp3.ResponseBody
 }
 
 data class WorkflowDecideRequest(

@@ -66,6 +66,7 @@ object ModuleCatalog {
         ModuleEntry("documents", "Documentos", "📁", "/console/documents", nativeImplemented = true),
         ModuleEntry("cvs", "CVs", "📑", "/console/cvs", nativeImplemented = true),
         ModuleEntry("client-tickets", "Tickets de clientes", "🎫", "/operacion/client-tickets", nativeImplemented = true),
+        ModuleEntry("service-clients", "Clientes de servicio", "🏬", "/ops/service-clients", nativeImplemented = true),
         ModuleEntry("support", "Bandeja de soporte", "🆘", "/ops/support", nativeImplemented = true),
         ModuleEntry("noc", "NOC · Monitoreo", "📡", "/ops/noc", nativeImplemented = true),
         ModuleEntry("support-sla", "SLA y tiempos", "⏱️", "/ops/support/sla", nativeImplemented = true),
@@ -76,6 +77,13 @@ object ModuleCatalog {
         ModuleEntry("my-profile", "Mi perfil", "👤", "/console/my-profile", nativeImplemented = true),
         ModuleEntry("my-preferences", "Mis preferencias", "⚙️", "/console/my-preferences", nativeImplemented = true),
         ModuleEntry("settings", "Ajustes", "⚙️", "/console/settings", nativeImplemented = true),
+        ModuleEntry("companies", "Multi-empresa", "🏛️", "/erp/companies", nativeImplemented = true),
+        ModuleEntry("kb", "Knowledge Base", "📚", "/erp/kb", nativeImplemented = true),
+        ModuleEntry("exports", "Exportaciones", "📥", "/erp/exports", nativeImplemented = true),
+        ModuleEntry("architecture", "Arquitectura", "🗺️", "/erp/architecture", nativeImplemented = true),
+        ModuleEntry("calendar", "Mi calendario", "📅", "/erp/calendar", nativeImplemented = true),
+        ModuleEntry("orgchart", "Organigrama", "🌳", "/erp/hr/orgchart", nativeImplemented = true),
+        ModuleEntry("kpis-hr", "KPIs de personas", "📊", "/erp/hr/kpis", nativeImplemented = true),
     )
 
     /** Módulos del portal de ventas. */
@@ -131,4 +139,11 @@ object ModuleCatalog {
 
     /** Alias legacy mobile → studio. */
     val web: List<ModuleEntry> get() = studio
+
+    /** Módulos LAB. */
+    val lab: List<ModuleEntry> = listOf(
+        ModuleEntry("health", "API Health", "❤️", "/lab/health", nativeImplemented = true),
+        ModuleEntry("flags", "Feature flags", "🚩", "/lab/flags", nativeImplemented = true),
+        ModuleEntry("ai", "AI Sandbox", "🤖", "/lab/ai", nativeImplemented = true),
+    )
 }

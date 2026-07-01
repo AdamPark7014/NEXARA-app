@@ -159,6 +159,17 @@ class ExtraRepository(context: Context) {
     suspend fun maintenanceContracts(status: String? = null) =
         loadGeneric { api.getMaintenanceContractsRaw(status) }
 
+    suspend fun companies() = loadGeneric { api.getCompaniesRaw() }
+    suspend fun kbArticles(q: String? = null) = loadGeneric { api.getKbArticlesRaw(q) }
+    suspend fun kbArticle(slugOrId: String): Map<String, Any?> =
+        parseObject(api.getKbArticleRaw(slugOrId).string())
+    suspend fun orgchart(): List<Map<String, Any?>> = loadGeneric { api.getOrgchartRaw() }
+    suspend fun hrStaff(page: Int = 1, limit: Int = 100) = loadGeneric { api.getHrStaffRaw(limit, page) }
+    suspend fun calendarEvents(from: String, to: String) =
+        loadGeneric { api.getCalendarEventsRaw(from, to) }
+    suspend fun exportCsv(entity: String, from: String, to: String): ByteArray =
+        api.getExportRaw(entity, from, to).bytes()
+
     private fun parseObject(raw: String): Map<String, Any?> {
         val trimmed = raw.trim()
         if (trimmed.isEmpty() || !trimmed.startsWith("{")) return emptyMap()

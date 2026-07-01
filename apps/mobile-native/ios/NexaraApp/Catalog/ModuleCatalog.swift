@@ -68,6 +68,7 @@ enum ModuleCatalog {
         ModuleEntry("documents", "Documentos", "📁", "/console/documents"),
         ModuleEntry("cvs", "CVs", "📑", "/console/cvs"),
         ModuleEntry("client-tickets", "Tickets de clientes", "🎫", "/operacion/client-tickets"),
+        ModuleEntry("service-clients", "Clientes de servicio", "🏬", "/ops/service-clients"),
         ModuleEntry("support", "Bandeja de soporte", "🆘", "/ops/support"),
         ModuleEntry("noc", "NOC · Monitoreo", "📡", "/ops/noc"),
         ModuleEntry("support-sla", "SLA y tiempos", "⏱️", "/ops/support/sla"),
@@ -78,6 +79,13 @@ enum ModuleCatalog {
         ModuleEntry("my-profile", "Mi perfil", "👤", "/console/my-profile"),
         ModuleEntry("my-preferences", "Mis preferencias", "⚙️", "/console/my-preferences"),
         ModuleEntry("settings", "Ajustes", "⚙️", "/console/settings"),
+        ModuleEntry("companies", "Multi-empresa", "🏛️", "/erp/companies"),
+        ModuleEntry("kb", "Knowledge Base", "📚", "/erp/kb"),
+        ModuleEntry("exports", "Exportaciones", "📥", "/erp/exports"),
+        ModuleEntry("architecture", "Arquitectura", "🗺️", "/erp/architecture"),
+        ModuleEntry("calendar", "Mi calendario", "📅", "/erp/calendar"),
+        ModuleEntry("orgchart", "Organigrama", "🌳", "/erp/hr/orgchart"),
+        ModuleEntry("kpis-hr", "KPIs de personas", "📊", "/erp/hr/kpis"),
     ]
 
     static let tickets: [ModuleEntry] = [

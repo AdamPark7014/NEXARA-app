@@ -66,4 +66,43 @@ final class CrmRepository {
         guard let data = try? await api.get("ventas/reportes/vendedores", query: ["period": period]) else { return [] }
         return ApiClient.decodeMapList(data)
     }
+
+    func orderTemplates() async throws -> [[String: Any]] {
+        ApiClient.decodeMapList(try await api.get("ventas/order-templates"))
+    }
+
+    func createOrderTemplate(_ fields: [String: String]) async throws {
+        _ = try await api.postJSON("ventas/order-templates", body: fields)
+    }
+
+    func setOrderTemplateDefault(id: Int) async throws {
+        _ = try await api.postJSON("ventas/order-templates/\(id)/set-default", body: EmptyBody())
+    }
+
+    func deleteOrderTemplate(id: Int) async throws {
+        try await api.delete("ventas/order-templates/\(id)")
+    }
+
+    func getOpportunity(id: Int) async throws -> [String: Any] {
+        let data = try await api.get("ventas/oportunidades/\(id)")
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
+        return obj
+    }
+
+    func addOpportunityNote(id: Int, message: String) async throws {
+        _ = try await api.postJSON("ventas/oportunidades/\(id)/notas", body: ["message": message])
+    }
+
+    func uploadOpportunityEvidences(id: Int, fileData: Data, fileName: String, mimeType: String) async throws {
+        _ = try await api.uploadMultipart(
+            "ventas/oportunidades/\(id)/evidencias",
+            fields: [:],
+            fileField: "files",
+            fileData: fileData,
+            fileName: fileName,
+            mimeType: mimeType
+        )
+    }
 }
+
+private struct EmptyBody: Encodable {}

@@ -371,6 +371,13 @@ fun ConsoleNavHost(
                     "support-sla" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.SlaModuleScreen() } }
                     "support" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ClientTicketsModuleScreen() } }
                     "maintenance-contracts" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.MaintenanceContractsScreen() } }
+                    "companies" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.CompaniesScreen() } }
+                    "kb" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.KbScreen() } }
+                    "exports" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ExportsScreen() } }
+                    "architecture" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ArchitectureScreen() } }
+                    "calendar" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ErpCalendarScreen() } }
+                    "orgchart" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.OrgchartScreen() } }
+                    "kpis-hr" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.HrKpisScreen() } }
                     "expenses" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ExpensesRichScreen() } }
                     "fines" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.FinesRichScreen() } }
                     "employee-payments" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.EmployeePaymentsRichScreen() } }
@@ -395,6 +402,7 @@ fun ConsoleNavHost(
                     "assets" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.MaintenanceModuleScreen(initialTab = 1) } }
                     "service-sheets" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ServiceSheetsModuleScreen() } }
                     "cvs" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.CvsRichScreen() } }
+                    "service-clients" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleClientsScreen() } }
                     "client-tickets" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ClientTicketsModuleScreen() } }
                     "gestion-vendedores" -> { { mx.nexara.mobile.nativeapp.ui.ventas.VentasSalesTeamScreen() } }
                     else -> { {} }
@@ -402,12 +410,13 @@ fun ConsoleNavHost(
                 if (key in setOf(
                         "news","contact-messages","newsletter","audit","analytics","bi","executive","approvals",
                         "notifications-center","noc","support-sla","support","maintenance-contracts",
+                        "companies","kb","exports","architecture","calendar","orgchart","kpis-hr",
                         "expenses",
                         "fines","employee-payments","cotizaciones","lunch-breaks","my-lunch-breaks",
                         "documents","accounting","invoicing","banking","my-viatics",
                         "my-vehicles","my-preferences","work-projects",
                         "hr","warehouse","stock","procurement",
-                        "maintenance","assets","service-sheets","cvs","client-tickets",
+                        "maintenance","assets","service-sheets","cvs","client-tickets","service-clients",
                         "gestion-vendedores",
                     )) {
                     handled()
