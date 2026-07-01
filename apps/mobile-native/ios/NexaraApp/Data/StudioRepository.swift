@@ -10,23 +10,32 @@ final class StudioRepository {
     // MARK: Dashboard
 
     func dashboardStats() async throws -> StudioDashboardStats {
-        async let contactsData = api.get("contact-messages", query: ["limit": "1"])
-        async let casesData = api.get("case-studies", query: ["limit": "100"])
-        async let socialData = api.get("social-posts", query: ["limit": "6"])
+        async let contactsData   = api.get("contact-messages", query: ["limit": "1"])
+        async let casesData      = api.get("case-studies", query: ["limit": "100"])
+        async let socialData     = api.get("social-posts", query: ["limit": "6"])
+        async let newsData       = api.get("news", query: ["limit": "200"])
+        async let newsletterData = api.get("newsletter", query: ["limit": "1"])
 
-        let cRaw = try await contactsData
-        let cases = try decodeList(CaseStudy.self, from: try await casesData)
-        let social = try decodeList(SocialPost.self, from: try await socialData)
-            .filter { $0.estado == "Programado" || $0.estado == "Borrador" }
+        let cRaw        = try await contactsData
+        let cases       = try decodeList(CaseStudy.self, from: try await casesData)
+        let social      = try decodeList(SocialPost.self, from: try await socialData)
+                            .filter { $0.estado == "Programado" || $0.estado == "Borrador" }
+        let newsItems   = try decodeList(NewsPost.self, from: try await newsData)
+        let nlRaw       = try await newsletterData
 
-        let contacts = parseTotal(cRaw) ?? ApiClient.decodeMapList(cRaw).count
-        let published = cases.filter { $0.publicado == true }.count
+        let contacts         = parseTotal(cRaw) ?? ApiClient.decodeMapList(cRaw).count
+        let published        = cases.filter { $0.publicado == true }.count
+        let newsPublished    = newsItems.filter { ($0.status ?? "").lowercased() == "published" }.count
+        let newsletterActive = parseTotal(nlRaw) ?? ApiClient.decodeMapList(nlRaw).count
 
         return StudioDashboardStats(
             contacts: contacts,
             casesTotal: cases.count,
             casesPublished: published,
-            socialDrafts: Array(social.prefix(4))
+            socialDrafts: Array(social.prefix(4)),
+            newsTotal: newsItems.count,
+            newsPublished: newsPublished,
+            newsletterActive: newsletterActive
         )
     }
 

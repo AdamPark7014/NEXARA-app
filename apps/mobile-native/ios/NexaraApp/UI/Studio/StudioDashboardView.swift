@@ -20,14 +20,23 @@ struct StudioDashboardView: View {
                             .font(.footnote).foregroundColor(StudioTheme.muted)
                     }
 
-                    StudioKpiCard(icon: "📥", label: "Contactos web", value: "\(s.contacts)",
-                                  hint: "Formularios recibidos")
-                    StudioKpiCard(icon: "🏆", label: "Casos de éxito",
-                                  value: "\(s.casesPublished)/\(s.casesTotal)",
-                                  hint: "Publicados / total", accent: .green)
-                    StudioKpiCard(icon: "📱", label: "Social programado",
-                                  value: "\(s.socialDrafts.count)",
-                                  hint: "Borradores y programados", accent: .cyan)
+                    // ── KPI grid 2×3
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                        StudioKpiCard(icon: "📥", label: "Contactos web", value: "\(s.contacts)",
+                                      hint: "Formularios recibidos")
+                        StudioKpiCard(icon: "🏆", label: "Casos de éxito",
+                                      value: "\(s.casesPublished)/\(s.casesTotal)",
+                                      hint: "Publicados / total", accent: .green)
+                        StudioKpiCard(icon: "📰", label: "Noticias",
+                                      value: "\(s.newsPublished)/\(s.newsTotal)",
+                                      hint: "Publicadas / total", accent: .orange)
+                        StudioKpiCard(icon: "📮", label: "Suscriptores",
+                                      value: "\(s.newsletterActive)",
+                                      hint: "Newsletter activos", accent: .purple)
+                        StudioKpiCard(icon: "📱", label: "Social",
+                                      value: "\(s.socialDrafts.count)",
+                                      hint: "Pendientes de publicar", accent: .cyan)
+                    }
 
                     if !s.socialDrafts.isEmpty {
                         Text("Próximas publicaciones").font(.headline).padding(.top, 8)
