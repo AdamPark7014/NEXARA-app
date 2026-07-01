@@ -719,7 +719,7 @@ fun MaintenanceModuleScreen(
 // ── Shared UI bits ───────────────────────────────────────────────────────────
 
 @Composable
-private fun DetailLine(label: String, value: String) {
+internal fun DetailLine(label: String, value: String) {
     if (value.isBlank()) return
     Row(Modifier.fillMaxWidth()) {
         Text(label, fontWeight = FontWeight.Medium)
@@ -736,9 +736,9 @@ private fun ActionBtn(label: String, loading: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun KpiChip(label: String, value: String, color: Color = MaterialTheme.colorScheme.primary) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontWeight = FontWeight.Bold, color = color)
-        Text(label, style = MaterialTheme.typography.labelSmall)
+internal fun KpiChip(label: String, value: String?, color: Color? = null, modifier: Modifier = Modifier) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier.padding(horizontal = 4.dp, vertical = 4.dp)) {
+        Text(value ?: label, fontWeight = FontWeight.Bold, color = color ?: MaterialTheme.colorScheme.primary)
+        if (value != null) Text(label, style = MaterialTheme.typography.labelSmall)
     }
 }
