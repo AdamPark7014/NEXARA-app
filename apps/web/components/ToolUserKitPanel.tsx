@@ -88,17 +88,13 @@ const ToolUserKitPanel: React.FC = () => {
         headers: { Authorization: `Bearer ${user.token}` },
       });
       if (!response.ok) {
-        setUsers(user?.id ? [{ id: user.id, nombre: user.nombre || 'Mi usuario', email: user.email || '' }] : []);
+        setUsers([]);
         return;
       }
       const payload = await response.json();
-      const parsed = Array.isArray(payload) ? payload : [];
-      if (user?.id && !parsed.some((target) => target.id === user.id)) {
-        parsed.push({ id: user.id, nombre: user.nombre || 'Mi usuario', email: user.email || '' });
-      }
-      setUsers(parsed);
+      setUsers(Array.isArray(payload) ? payload : []);
     } catch {
-      setUsers(user?.id ? [{ id: user.id, nombre: user.nombre || 'Mi usuario', email: user.email || '' }] : []);
+      setUsers([]);
     }
   }, [user?.token, user?.id, user?.nombre, user?.email]);
 
@@ -315,7 +311,7 @@ const ToolUserKitPanel: React.FC = () => {
           </div>
 
           <select className="input" value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)}>
-            <option value="">Selecciona usuario</option>
+            <option value="">Selecciona ingeniero</option>
             {users.map((target) => (
               <option key={target.id} value={target.id}>{target.nombre} · {target.email}</option>
             ))}
