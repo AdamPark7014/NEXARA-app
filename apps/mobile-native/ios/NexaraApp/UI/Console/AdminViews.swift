@@ -105,25 +105,9 @@ struct ProjectsView: View {
     }
 
     private func projectDetail(_ p: [String: Any]) -> some View {
-        let id = ConsoleHelpers.mapInt64(p, "id")
-        return List {
-            Section("Proyecto") {
-                row("Título", ConsoleHelpers.mapStr(p, "title", "name"))
-                row("Estado", ConsoleHelpers.mapStr(p, "status"))
-                row("Inicio", String(ConsoleHelpers.mapStr(p, "startDate").prefix(10)))
-                row("Fin", String(ConsoleHelpers.mapStr(p, "endDate").prefix(10)))
-            }
-            if let id {
-                Section("Acciones") {
-                    Button("Marcar activo") { Task { await patch(id, "ACTIVE") } }
-                    Button("En pausa") { Task { await patch(id, "ON_HOLD") } }
-                    Button("Completado") { Task { await patch(id, "COMPLETED") } }
-                }
-            }
-            Button("Volver") { selected = nil }
-        }
-        .navigationTitle(ConsoleHelpers.mapStr(p, "title", "name"))
-        .navigationBarTitleDisplayMode(.inline)
+        OpsProjectDetailView(project: p, onBack: { selected = nil }, onPatch: { id, status in
+            await patch(id, status)
+        })
     }
 
     @ViewBuilder private func row(_ label: String, _ value: String) -> some View {
@@ -244,4 +228,137 @@ extension [String: Any] {
     fileprivate var projKey: String { "pr-\(self["id"] ?? UUID().uuidString)" }
     fileprivate var userKey: String { "us-\(self["id"] ?? UUID().uuidString)" }
     fileprivate var vehKey: String { "vh-\(self["id"] ?? UUID().uuidString)" }
+}
+
+// MARK: - OPS Project Detail (tabbed)
+
+struct OpsProjectDetailView: View {
+    let project: [String: Any]
+    let onBack: () -> Void
+    let onPatch: (Int64, String) async -> Void
+
+    @State private var tab = 0
+    private let tabs = ["Info", "Actividades", "Ingenieros"]
+
+    private func pStr(_ keys: String...) -> String {
+        for k in keys {
+            let v = ConsoleHelpers.mapStr(project, k)
+            if !v.isEmpty { return v }
+        }
+        return ""
+    }
+
+    private func nestedList(_ key: String) -> [[String: Any]] {
+        (project[key] as? [[String: Any]]) ?? []
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button("← Volver", action: onBack)
+                Text(pStr("title", "name", "nombre").isEmpty ? "Proyecto" : pStr("title", "name", "nombre"))
+                    .font(.headline).lineLimit(1)
+                Spacer()
+            }
+            .padding(.horizontal, 12).padding(.vertical, 6)
+
+            Picker("", selection: $tab) {
+                ForEach(0..<tabs.count, id: \.self) { Text(tabs[$0]).tag($0) }
+            }
+            .pickerStyle(.segmented).padding(.horizontal)
+
+            switch tab {
+            case 0: infoTab
+            case 1: actividadesTab
+            default: ingenierosTab
+            }
+        }
+        .navigationBarHidden(true)
+    }
+
+    private var infoTab: some View {
+        let projectId = ConsoleHelpers.mapInt64(project, "id")
+        return List {
+            Section {
+                OpsStatusChip(text: pStr("status", "estado"))
+            }
+            Section("Datos generales") {
+                pRow("Cliente", pStr("clientName") + nestedName("client"))
+                pRow("Responsable", pStr("vendorName") + nestedName("vendor"))
+                pRow("Tipo", pStr("projectType", "tipo"))
+                pRow("Sitios", pStr("siteCount"))
+                pRow("Inicio", String(pStr("startDate").prefix(10)))
+                pRow("Fin planeado", String(pStr("endDate").prefix(10)))
+                pRow("Fin real", String(pStr("actualEndDate").prefix(10)))
+                pRow("Descripción", pStr("description", "descripcion"))
+                pRow("Alcance", pStr("scopeSummary"))
+            }
+            if let id = projectId {
+                Section("Cambiar estado") {
+                    Button("Marcar activo")     { Task { await onPatch(id, "ACTIVE") } }
+                    Button("Poner en pausa")   { Task { await onPatch(id, "ON_HOLD") } }
+                    Button("Marcar completado") { Task { await onPatch(id, "COMPLETED") } }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    private var actividadesTab: some View {
+        let acts = nestedList("activities") + nestedList("actividades")
+        return Group {
+            if acts.isEmpty {
+                VStack { Spacer(); Text("Sin actividades vinculadas").foregroundColor(.secondary); Spacer() }
+            } else {
+                List(Array(acts.enumerated()), id: \.offset) { _, a in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ConsoleHelpers.mapStr(a, "title", "titulo", "type", "tipo")
+                             .ifBlankAdmin("Actividad #\(ConsoleHelpers.mapStr(a, "id"))"))
+                            .font(.subheadline.bold())
+                        let status = ConsoleHelpers.mapStr(a, "status", "estado")
+                        if !status.isEmpty { OpsStatusChip(text: status) }
+                        let date = String(ConsoleHelpers.mapStr(a, "scheduledDate", "startDate", "fecha").prefix(10))
+                        if !date.isEmpty { Text(date).font(.caption2).foregroundColor(.secondary) }
+                    }
+                }
+                .listStyle(.plain)
+            }
+        }
+    }
+
+    private var ingenierosTab: some View {
+        let engs = nestedList("engineers") + nestedList("ingenieros")
+        return Group {
+            if engs.isEmpty {
+                VStack { Spacer(); Text("Sin ingenieros asignados").foregroundColor(.secondary); Spacer() }
+            } else {
+                List(Array(engs.enumerated()), id: \.offset) { _, eng in
+                    let engObj = eng["engineer"] as? [String: Any] ?? eng
+                    let name = ConsoleHelpers.mapStr(engObj, "nombre", "name")
+                    let role = ConsoleHelpers.mapStr(engObj, "role", "rol", "email")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(name.isEmpty ? "Ingeniero" : name).font(.subheadline.bold())
+                        if !role.isEmpty { Text(role).font(.caption).foregroundColor(.secondary) }
+                    }
+                }
+                .listStyle(.plain)
+            }
+        }
+    }
+
+    @ViewBuilder private func pRow(_ label: String, _ value: String) -> some View {
+        if !value.isEmpty {
+            HStack { Text(label).foregroundColor(.secondary); Spacer(); Text(value).multilineTextAlignment(.trailing) }
+        }
+    }
+
+    private func nestedName(_ key: String) -> String {
+        guard let obj = project[key] as? [String: Any] else { return "" }
+        let n = ConsoleHelpers.mapStr(obj, "nombre", "name")
+        return n.isEmpty ? "" : " (\(n))"
+    }
+}
+
+private extension String {
+    func ifBlankAdmin(_ fallback: String) -> String { isEmpty ? fallback : self }
 }
