@@ -3,6 +3,7 @@ package mx.nexara.mobile.nativeapp.data.api
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import mx.nexara.mobile.nativeapp.BuildConfig
+import mx.nexara.mobile.nativeapp.data.offline.NexaraOffline
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.logging.HttpLoggingInterceptor
@@ -35,6 +36,9 @@ object ApiClient {
                     .build()
                 chain.proceed(next)
             }
+            .apply {
+                NexaraOffline.httpInterceptor()?.let { addInterceptor(it) }
+            }
             .addInterceptor(logging)
             .build()
     }
@@ -52,5 +56,7 @@ object ApiClient {
 
     val auth: AuthApi = retrofitNoAuth.create(AuthApi::class.java)
     val portalAuth: PortalAuthApi = retrofitNoAuth.create(PortalAuthApi::class.java)
+
+    fun healthApi(tokenProvider: () -> String?): HealthApi = authed(tokenProvider).create(HealthApi::class.java)
 }
 

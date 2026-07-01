@@ -38,7 +38,7 @@ fun ContabilidadNavHost(onExitToPanels: () -> Unit) {
                 "viaticos" -> { mx.nexara.mobile.nativeapp.ui.modules.MyViaticsScreen(); return@composable }
                 "multas" -> { mx.nexara.mobile.nativeapp.ui.modules.FinesModuleScreen(); return@composable }
                 "work-projects" -> { mx.nexara.mobile.nativeapp.ui.modules.WorkProjectsModuleScreen(); return@composable }
-                "dashboard" -> { mx.nexara.mobile.nativeapp.ui.modules.AnalyticsModuleScreen(); return@composable }
+                "dashboard" -> { ContabilidadDashboardScreen(); return@composable }
                 "pagos" -> { mx.nexara.mobile.nativeapp.ui.modules.EmployeePaymentsModuleScreen(); return@composable }
                 "horas" -> { mx.nexara.mobile.nativeapp.ui.modules.LunchBreaksModuleScreen(); return@composable }
                 "proyectos" -> { mx.nexara.mobile.nativeapp.ui.modules.ProjectsModuleScreen(); return@composable }

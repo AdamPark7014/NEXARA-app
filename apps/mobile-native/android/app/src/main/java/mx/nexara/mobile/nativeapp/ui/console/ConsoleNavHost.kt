@@ -53,6 +53,8 @@ import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleVehiclesScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleMoreScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.MyProfileScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.PlaceholderScreen
+import mx.nexara.mobile.nativeapp.access.ModulePanelMap
+import mx.nexara.mobile.nativeapp.access.PanelId
 import mx.nexara.mobile.nativeapp.ui.catalog.ModuleCatalog
 
 private object ConsoleRoutes {
@@ -112,6 +114,7 @@ private fun routeForModuleKey(key: String): String {
 fun ConsoleNavHost(
     onExitToPanels: () -> Unit,
     onLogout: () -> Unit = onExitToPanels,
+    panelId: PanelId = PanelId.ERP,
 ) {
     val context = LocalContext.current
     val authRepo = remember(context) { AuthRepository(context) }
@@ -123,13 +126,19 @@ fun ConsoleNavHost(
     val isIngeniero = !isSuperAdmin && !isAdmin && roleLower.contains("ingenier")
     val navController = rememberNavController()
 
-    val visibleModules = remember(user) {
-        ModuleCatalog.console.filter { canAccessConsoleModule(user, it) }
+    val panelKeys = remember(panelId) { ModulePanelMap.consoleKeysFor(panelId) }
+
+    val visibleModules = remember(user, panelKeys) {
+        ModuleCatalog.console.filter { module ->
+            canAccessConsoleModule(user, module) &&
+                (panelKeys == null || module.key in panelKeys)
+        }
     }
     val visibleRoutes = remember(visibleModules) {
         visibleModules.map { routeForModuleKey(it.key) }.toSet()
     }
-    val sidebarGroups = remember(user) { consoleSidebarGroups(user) }
+    val sidebarGroups = remember(user, panelId) { consoleSidebarGroups(user, panelId) }
+    val panelTitle = panelId.displayName
 
     // Máximo 5 tabs: módulos principales visibles + "Más".
     val items = remember(isIngeniero, isSuperAdmin, isAdmin, visibleRoutes) {

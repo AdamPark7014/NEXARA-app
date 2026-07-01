@@ -114,11 +114,14 @@ data class ConsoleSidebarGroup(
  * filtrando por permisos/rol del usuario actual. Agrupa los módulos del
  * catálogo nativo para mantener paridad 1:1 con la web.
  */
-fun consoleSidebarGroups(user: SessionUser?): List<ConsoleSidebarGroup> {
+fun consoleSidebarGroups(user: SessionUser?, panelId: mx.nexara.mobile.nativeapp.access.PanelId? = null): List<ConsoleSidebarGroup> {
     if (user == null) return emptyList()
+    val allowedKeys = panelId?.let { mx.nexara.mobile.nativeapp.access.ModulePanelMap.consoleKeysFor(it) }
     val byKey = ModuleCatalog.console.associateBy { it.key }
     fun pick(vararg keys: String): List<ModuleEntry> =
-        keys.mapNotNull { byKey[it] }.filter { canAccessConsoleModule(user, it) }
+        keys.mapNotNull { byKey[it] }
+            .filter { canAccessConsoleModule(user, it) }
+            .filter { allowedKeys == null || it.key in allowedKeys }
 
     val groups = listOf(
         ConsoleSidebarGroup("profile", "Cuenta personal", pick("my-profile")),

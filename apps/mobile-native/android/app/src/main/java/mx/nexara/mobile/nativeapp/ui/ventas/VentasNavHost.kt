@@ -15,12 +15,15 @@ private const val ModulePattern = "ventas/m/{key}"
 private fun moduleRoute(key: String) = "ventas/m/$key"
 
 @Composable
-fun VentasNavHost(onExitToPanels: () -> Unit) {
+fun VentasNavHost(
+    onExitToPanels: () -> Unit,
+    panelTitle: String = "NEXARA CRM",
+) {
     val nav = rememberNavController()
     NavHost(navController = nav, startDestination = Home) {
         composable(Home) {
             PortalModuleListScreen(
-                title = "Panel de Ventas",
+                title = panelTitle,
                 modules = ModuleCatalog.ventas,
                 onOpenModule = { m -> nav.navigate(moduleRoute(m.key)) },
                 onBack = onExitToPanels,
@@ -47,7 +50,7 @@ fun VentasNavHost(onExitToPanels: () -> Unit) {
                 "gestion-vendedores" -> { mx.nexara.mobile.nativeapp.ui.modules.ClientTicketsModuleScreen(); return@composable }
                 "reportes" -> { mx.nexara.mobile.nativeapp.ui.modules.AnalyticsModuleScreen(); return@composable }
                 "crecimiento" -> { mx.nexara.mobile.nativeapp.ui.modules.AnalyticsModuleScreen(); return@composable }
-                "dashboard" -> { mx.nexara.mobile.nativeapp.ui.modules.AnalyticsModuleScreen(); return@composable }
+                "dashboard" -> { VentasDashboardScreen(); return@composable }
                 "equipo-comparativa" -> { mx.nexara.mobile.nativeapp.ui.modules.AnalyticsModuleScreen(); return@composable }
             }
             PlaceholderScreen(

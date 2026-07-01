@@ -15,12 +15,15 @@ private const val ModulePattern = "web/m/{key}"
 private fun moduleRoute(key: String) = "web/m/$key"
 
 @Composable
-fun WebNavHost(onExitToPanels: () -> Unit) {
+fun WebNavHost(
+    onExitToPanels: () -> Unit,
+    panelTitle: String = "NEXARA STUDIO",
+) {
     val nav = rememberNavController()
     NavHost(navController = nav, startDestination = Home) {
         composable(Home) {
             PortalModuleListScreen(
-                title = "Panel Web",
+                title = panelTitle,
                 modules = ModuleCatalog.web,
                 onOpenModule = { m -> nav.navigate(moduleRoute(m.key)) },
                 onBack = onExitToPanels,

@@ -1,30 +1,30 @@
 import SwiftUI
 
-/// NavigationStack genérico para un portal. Muestra la lista de módulos y
+/// NavigationStack genérico para un panel. Muestra la lista de módulos y
 /// navega a la pantalla nativa correspondiente.
 struct PortalNavView: View {
-    let portal: PortalKind
+    let panel: PanelId
     let onExit: () -> Void
 
-    @State private var path: [String] = []  // key del módulo
+    @State private var path: [String] = []
 
     var body: some View {
         NavigationStack(path: $path) {
-            ModuleListView(portal: portal, onOpen: { key in path.append(key) }, onBack: onExit)
+            ModuleListView(panel: panel, onOpen: { key in path.append(key) }, onBack: onExit)
                 .navigationDestination(for: String.self) { key in
-                    ModuleRouter.view(for: portal, key: key)
+                    ModuleRouter.view(for: panel, key: key)
                 }
         }
     }
 }
 
 struct ModuleListView: View {
-    let portal: PortalKind
+    let panel: PanelId
     let onOpen: (String) -> Void
     let onBack: () -> Void
 
     var body: some View {
-        List(ModuleCatalog.modules(for: portal)) { m in
+        List(ModuleCatalog.modules(for: panel)) { m in
             Button {
                 onOpen(m.key)
             } label: {
@@ -40,10 +40,10 @@ struct ModuleListView: View {
             }
             .buttonStyle(.plain)
         }
-        .navigationTitle(portal.title)
+        .navigationTitle(panel.displayName)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button("Portales", action: onBack)
+                Button("Paneles", action: onBack)
             }
         }
     }

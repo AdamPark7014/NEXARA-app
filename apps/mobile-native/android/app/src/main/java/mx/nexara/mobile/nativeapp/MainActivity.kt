@@ -18,10 +18,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import mx.nexara.mobile.nativeapp.data.AuthRepository
+import mx.nexara.mobile.nativeapp.data.offline.NexaraOffline
 import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.DevicesApi
 import mx.nexara.mobile.nativeapp.data.api.RegisterFcmTokenRequest
 import mx.nexara.mobile.nativeapp.push.NexaraNotifications
+import mx.nexara.mobile.nativeapp.ui.NexaraScaffold
 import mx.nexara.mobile.nativeapp.ui.NexaraApp
 import mx.nexara.mobile.nativeapp.ui.theme.NexaraTheme
 
@@ -33,6 +35,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         NexaraNotifications.ensureChannels(this)
+        NexaraOffline.install(applicationContext)
         askNotificationPermissionIfNeeded()
         refreshFcmToken()
 
@@ -42,7 +45,9 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    NexaraApp()
+                    NexaraScaffold {
+                        NexaraApp()
+                    }
                 }
             }
         }

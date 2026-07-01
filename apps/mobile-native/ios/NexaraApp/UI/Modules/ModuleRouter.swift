@@ -4,7 +4,8 @@ import SwiftUI
 /// Equivalente al `when(key)` de cada NavHost de Android.
 struct ModuleRouter {
     @ViewBuilder
-    static func view(for portal: PortalKind, key: String) -> some View {
+    static func view(for panel: PanelId, key: String) -> some View {
+        let portal = panel.routingPortal
         switch (portal, key) {
         // ── Console ────────────────────────────────────────────────
         case (.console, "activities"),
@@ -171,11 +172,14 @@ struct ModuleRouter {
             GenericListModuleView(title: "Viáticos") { (await ExtraRepository.shared.viatics()).map {
                 toRow($0, title: ["concepto","motivo"], subtitle: ["usuario"])
             } }
-        // ── Tickets
+        // ── Tickets / Portal
         case (.tickets, _):
             GenericListModuleView(title: "Tickets") { (await ExtraRepository.shared.clientTicketRequests()).map {
                 toRow($0, title: ["title","subject"], subtitle: ["clientName"])
             } }
+        // ── LAB
+        case (.lab, "health"):
+            LabHealthView()
         default:
             PlaceholderView(title: key)
         }
