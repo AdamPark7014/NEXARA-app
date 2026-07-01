@@ -147,8 +147,8 @@ export default function MyViaticsPage() {
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <KpiCard label="Pendiente de cobro" value={`$${pendiente.toLocaleString("es-MX")}`} variant="warning" icon="⏳" />
-        <KpiCard label="Pagado" value={`$${pagado.toLocaleString("es-MX")}`} variant="positive" icon="💳" />
+        <KpiCard label="Pendiente de cobro" value={<Money value={pendiente} compact />} variant="warning" icon="⏳" />
+        <KpiCard label="Pagado" value={<Money value={pagado} compact />} variant="positive" icon="💳" />
       </div>
 
       {actionErr && <InlineAlert message={actionErr} onDismiss={() => setActionErr(null)} />}
