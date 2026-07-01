@@ -9,6 +9,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { getOpsTeamSectionConfig } from "@/lib/section-views";
 import { buildApiUrl } from "@/lib/api-base";
+import GpsTrajectoryPreview from "@/components/GpsTrajectoryPreview";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -141,6 +142,9 @@ function TeamLocationCard({ item }: { item: LocationRecord }) {
 function MyGpsView({ token }: { token: string }) {
   const [state, setState] = useState<MyGpsState>({ consent: false, location: null });
   const [trajectory, setTrajectory] = useState<TrajectoryPoint[]>([]);
+  const [dayAttendances, setDayAttendances] = useState<
+    { type: string; timestamp: string; entryLatitude?: unknown; entryLongitude?: unknown; exitLatitude?: unknown; exitLongitude?: unknown }[]
+  >([]);
   const [loadingTraj, setLoadingTraj] = useState(false);
   const [attendanceOpen, setAttendanceOpen] = useState(false);
   const [toggling, setToggling] = useState(false);
@@ -163,10 +167,18 @@ function MyGpsView({ token }: { token: string }) {
     setLoadingTraj(true);
     try {
       const today = new Date().toLocaleDateString("sv-SE");
-      const pts = await apiFetch<TrajectoryPoint[]>(`gps/trajectory?date=${today}`, token);
+      const [pts, hist] = await Promise.all([
+        apiFetch<TrajectoryPoint[]>(`gps/trajectory?date=${today}`, token),
+        apiFetch<{ type: string; timestamp: string; entryLatitude?: unknown; entryLongitude?: unknown; exitLatitude?: unknown; exitLongitude?: unknown }[]>(
+          `attendance/history?date=${today}`,
+          token,
+        ).catch(() => []),
+      ]);
       setTrajectory(Array.isArray(pts) ? pts : []);
+      setDayAttendances(Array.isArray(hist) ? hist : []);
     } catch {
       setTrajectory([]);
+      setDayAttendances([]);
     } finally { setLoadingTraj(false); }
   }, [token]);
 
@@ -303,7 +315,7 @@ function MyGpsView({ token }: { token: string }) {
 
       <Section
         title={`Trayecto de hoy · ${totalPoints} puntos registrados`}
-        subtitle="Historial de ubicaciones durante tu jornada de trabajo."
+        subtitle="Recorrido trazado con entrada, puntos GPS y salida del día."
         actions={
           <button onClick={() => { void loadState(); void loadTrajectory(); }}
             style={{ fontSize: 11.5, color: "var(--primary, #3b82f6)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>
@@ -313,63 +325,8 @@ function MyGpsView({ token }: { token: string }) {
       >
         {loadingTraj ? (
           <div style={{ padding: 32, textAlign: "center", color: "var(--text-tertiary)", fontSize: 13 }}>Cargando trayecto…</div>
-        ) : trajectory.length === 0 ? (
-          <EmptyState
-            icon="📍"
-            title="Sin puntos de trayecto hoy"
-            description="Los puntos de ruta se registran automaticamente mientras tienes una jornada abierta y GPS activo."
-          />
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 2, maxHeight: 480, overflowY: "auto" }}>
-            {trajectory.map((pt, i) => {
-              const isFirst = i === 0;
-              const isLast = i === trajectory.length - 1;
-              const mapsUrl = pt.latitud && pt.longitud
-                ? `https://maps.google.com/?q=${Number(pt.latitud).toFixed(6)},${Number(pt.longitud).toFixed(6)}`
-                : null;
-              return (
-                <div key={pt.id} style={{
-                  display: "flex", alignItems: "center", gap: 12, padding: "9px 12px",
-                  background: isFirst ? "#f0fdf4" : (isLast && pt.estaActivo) ? "#eff6ff" : "var(--surface)",
-                  borderRadius: 8,
-                  borderLeft: `3px solid ${isFirst ? "#22c55e" : pt.estaActivo ? "#3b82f6" : "var(--border)"}`,
-                }}>
-                  <div style={{
-                    width: 24, height: 24, borderRadius: "50%", flexShrink: 0,
-                    background: isFirst ? "#22c55e" : (isLast && pt.estaActivo) ? "#3b82f6" : "var(--surface-2)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 9.5, fontWeight: 700,
-                    color: (isFirst || (isLast && pt.estaActivo)) ? "#fff" : "var(--text-tertiary)",
-                  }}>
-                    {i + 1}
-                  </div>
-                  <div style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 600, minWidth: 64 }}>
-                    {fmtTime(pt.ultimaActualizacion)}
-                  </div>
-                  <div style={{ fontSize: 11.5, color: "var(--text-secondary)", fontFamily: "monospace", flex: 1 }}>
-                    {fmtCoords(pt.latitud, pt.longitud)}
-                  </div>
-                  {(pt.velocidadKmh ?? 0) > 0 && (
-                    <div style={{ fontSize: 11, color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>
-                      {Number(pt.velocidadKmh).toFixed(1)} km/h
-                    </div>
-                  )}
-                  {isFirst && (
-                    <span style={{ fontSize: 9.5, fontWeight: 700, color: "#15803d", background: "#dcfce7", padding: "2px 7px", borderRadius: 999 }}>INICIO</span>
-                  )}
-                  {isLast && !isFirst && pt.estaActivo && (
-                    <span style={{ fontSize: 9.5, fontWeight: 700, color: "#1d4ed8", background: "#dbeafe", padding: "2px 7px", borderRadius: 999 }}>ACTUAL</span>
-                  )}
-                  {mapsUrl && (
-                    <a href={mapsUrl} target="_blank" rel="noopener noreferrer"
-                      style={{ fontSize: 11, color: "var(--primary, #3b82f6)", textDecoration: "none", flexShrink: 0 }}>
-                      ↗
-                    </a>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <GpsTrajectoryPreview trajectory={trajectory} attendances={dayAttendances} />
         )}
       </Section>
     </>

@@ -33,9 +33,24 @@ export class GpsController {
 
   @Get('trajectory')
   @UseGuards(RbacGuard)
-  @RBAC({ permissions: [PERMISSIONS.GPS_VIEW] })
-  getMyTrajectory(@CurrentUser() user: any, @Query('date') date?: string) {
-    return this.gpsService.getMyTrajectory(user.id, date);
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.GPS_VIEW,
+      PERMISSIONS.GPS_MANAGE,
+      PERMISSIONS.ATTENDANCE_MANAGE,
+      PERMISSIONS.CONSOLE_ADMIN,
+    ],
+  })
+  getTrajectory(
+    @CurrentUser() user: any,
+    @Query('date') date?: string,
+    @Query('userId') userId?: string,
+  ) {
+    const targetId = userId ? Number(userId) : user.id;
+    if (!Number.isFinite(targetId) || targetId <= 0) {
+      return this.gpsService.getMyTrajectory(user.id, date);
+    }
+    return this.gpsService.getTrajectoryForUser(user, targetId, date);
   }
 
   @Get('team')
