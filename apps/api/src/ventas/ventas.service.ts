@@ -19,6 +19,7 @@ import { UpdateSalesProjectDto } from './dto/update-sales-project.dto.js';
 import { CreateOrderTemplateDto } from './dto/create-order-template.dto.js';
 import { UpdateOrderTemplateDto } from './dto/update-order-template.dto.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { isSalesTeamLeadUser } from '../common/org-roles.js';
 import { AutoApprovalService } from '../workflow/auto-approval.service.js';
 
@@ -29,6 +30,7 @@ export class VentasService {
     private readonly cotizacionesService: CotizacionesService,
     private readonly pdfGeneratorService: PdfGeneratorService,
     private readonly notificationHierarchy: NotificationHierarchyService,
+    private readonly notificationsService: NotificationsService,
     private readonly autoApproval: AutoApprovalService,
   ) {}
 
@@ -730,6 +732,8 @@ export class VentasService {
         .catch(() => undefined);
     }
 
+    void this.ensureProjectSalesOrder(created.id, user).catch(() => undefined);
+
     return created;
   }
 
@@ -1262,6 +1266,110 @@ export class VentasService {
     return this.calculateProjectCosts(projectId, user);
   }
 
+  private pickBestOpportunityQuote(
+    quotes: Array<{
+      id: number;
+      cotizacion?: { status: string; items?: unknown[] } | null;
+    }> | undefined,
+  ) {
+    const list = quotes ?? [];
+    const approved = list.find(
+      (q) => q.cotizacion?.status === 'APPROVED' && (q.cotizacion.items?.length ?? 0) > 0,
+    );
+    if (approved) return approved;
+    return list.find((q) => (q.cotizacion?.items?.length ?? 0) > 0) ?? list[0] ?? null;
+  }
+
+  private async copyQuoteItemsToOrderLines(orderId: number, items: any[]) {
+    if (!items.length) return;
+    await this.prisma.salesProjectOrderLine.createMany({
+      data: items.map((item, index) => ({
+        orderId,
+        productId: item.productId,
+        sortOrder: index,
+        category: item.category,
+        name: item.name,
+        description: item.description,
+        scope: item.scope,
+        brand: item.brand,
+        model: item.model,
+        sku: item.sku,
+        partNumber: item.partNumber,
+        batchReference: item.batchReference,
+        unit: item.unit,
+        qty: item.qty,
+        unitPrice: item.unitPrice,
+        discount: item.discount,
+        tax: item.tax,
+        ieps: item.ieps,
+        retention: item.retention,
+        laborHours: item.laborHours,
+        laborRate: item.laborRate,
+        warrantyMonths: item.warrantyMonths,
+        deliveryTime: item.deliveryTime,
+        countryOrigin: item.countryOrigin,
+        notes: item.notes,
+        lineTotal: item.lineTotal,
+      })),
+    });
+  }
+
+  /**
+   * Orden de venta al crear proyecto (estilo Odoo Sales Order confirmada).
+   * Copia líneas de la cotización firmada o la más reciente vinculada.
+   */
+  async ensureProjectSalesOrder(projectId: number, user?: any) {
+    const existing = await this.prisma.salesProjectOrder.findUnique({
+      where: { projectId },
+      include: { lines: { orderBy: { sortOrder: 'asc' } } },
+    });
+    if (existing) return existing;
+
+    const project = await this.prisma.salesProject.findUnique({
+      where: { id: projectId },
+      include: {
+        opportunity: {
+          include: {
+            quotes: {
+              orderBy: { createdAt: 'desc' },
+              include: { cotizacion: { include: { items: true } } },
+            },
+          },
+        },
+      },
+    });
+    if (!project) throw new NotFoundException('Proyecto no encontrado');
+    this.assertOwnerAccess(project.opportunity?.ownerId, user, 'proyecto');
+
+    const quoteLink = this.pickBestOpportunityQuote(project.opportunity?.quotes);
+    const quoteItems = quoteLink?.cotizacion?.items ?? [];
+    const orderId = `ORD-${Date.now()}-${projectId}`;
+
+    const order = await this.prisma.salesProjectOrder.create({
+      data: {
+        projectId,
+        orderId,
+        quoteId: quoteLink?.id ?? null,
+        status: 'CONFIRMED',
+        createdById: user?.id ?? null,
+      },
+    });
+
+    await this.copyQuoteItemsToOrderLines(order.id, quoteItems);
+
+    await this.prisma.salesProject.update({
+      where: { id: projectId },
+      data: { closureOrderId: order.id },
+    });
+
+    void this.notificationsService.notifyOrderCreated(projectId, orderId).catch(() => undefined);
+
+    return this.prisma.salesProjectOrder.findUnique({
+      where: { id: order.id },
+      include: { lines: { orderBy: { sortOrder: 'asc' } }, quote: true, createdBy: true },
+    });
+  }
+
   async closeProject(projectId: number, user?: any) {
     const project = await this.prisma.salesProject.findUnique({
       where: { id: projectId },
@@ -1283,30 +1391,33 @@ export class VentasService {
 
     this.assertOwnerAccess(project.opportunity?.ownerId, user, 'proyecto');
 
-    // Evitar duplicar si ya existe una orden de cierre
-    if (project.closureOrder) {
-      return project.closureOrder;
-    }
-
-    // Validar que no está en overspend
     const validation = await this.validateProjectBudget(projectId, user);
     if (!validation.valid) {
       throw new BadRequestException(`Cannot close project: ${validation.message}`);
     }
 
-    // Obtener la última cotización
+    let order = project.closureOrder;
+    if (!order) {
+      order = await this.ensureProjectSalesOrder(projectId, user) as any;
+    }
+
+    if (project.status === 'CLOSED' && order) {
+      return this.prisma.salesProjectOrder.findUnique({
+        where: { id: order.id },
+        include: { project: true, quote: true, createdBy: true, lines: { orderBy: { sortOrder: 'asc' } } },
+      });
+    }
+
     const lastQuote = project.opportunity.quotes?.[0];
     const client = project.opportunity.client;
 
-    // Generar orden PDF usando el nuevo servicio
     let orderPdfBuffer: Buffer;
     try {
       orderPdfBuffer = await this.pdfGeneratorService.generateOrderPdf(projectId);
-    } catch (error) {
-      // Fallback: usar el servicio anterior si genera error
+    } catch {
       const { generateSalesOrderPdf } = await import('./sales-order-pdf.js');
       orderPdfBuffer = generateSalesOrderPdf({
-        orderId: `ORD-${Date.now()}-${projectId}`,
+        orderId: order!.orderId,
         orderDate: new Date(),
         projectName: project.name,
         clientName: client?.name,
@@ -1324,74 +1435,32 @@ export class VentasService {
       });
     }
 
-    // Guardar orden PDF en servidor
     const dir = path.resolve(process.cwd(), 'uploads', 'sales-orders');
-    const orderId = `ORD-${Date.now()}-${projectId}`;
-    const filename = `orden-${orderId}.pdf`;
+    const filename = `orden-${order!.orderId}.pdf`;
     const outPath = path.join(dir, filename);
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(outPath, orderPdfBuffer);
     const orderPdfUrl = `/uploads/sales-orders/${filename}`;
 
-    // Crear registro de orden en BD
-    const order = await this.prisma.salesProjectOrder.create({
+    await this.prisma.salesProjectOrder.update({
+      where: { id: order!.id },
       data: {
-        projectId,
-        orderId,
-        quoteId: lastQuote?.id,
         orderPdfUrl,
-        status: 'OPEN',
-        createdById: user?.id,
+        status: 'CLOSED',
       },
-      include: { project: true, quote: true, createdBy: true },
     });
 
-    const quoteItems = lastQuote?.cotizacion?.items ?? [];
-    if (quoteItems.length) {
-      await this.prisma.salesProjectOrderLine.createMany({
-        data: quoteItems.map((item, index) => ({
-          orderId: order.id,
-          productId: item.productId,
-          sortOrder: index,
-          category: item.category,
-          name: item.name,
-          description: item.description,
-          scope: item.scope,
-          brand: item.brand,
-          model: item.model,
-          sku: item.sku,
-          partNumber: item.partNumber,
-          batchReference: item.batchReference,
-          unit: item.unit,
-          qty: item.qty,
-          unitPrice: item.unitPrice,
-          discount: item.discount,
-          tax: item.tax,
-          ieps: item.ieps,
-          retention: item.retention,
-          laborHours: item.laborHours,
-          laborRate: item.laborRate,
-          warrantyMonths: item.warrantyMonths,
-          deliveryTime: item.deliveryTime,
-          countryOrigin: item.countryOrigin,
-          notes: item.notes,
-          lineTotal: item.lineTotal,
-        })),
-      });
-    }
-
-    // Actualizar proyecto: cambiar status a CLOSED y linkar con orden
     await this.prisma.salesProject.update({
       where: { id: projectId },
       data: {
         status: 'CLOSED',
-        closureOrderId: order.id,
+        closureOrderId: order!.id,
         endDate: new Date(),
       },
     });
 
     return this.prisma.salesProjectOrder.findUnique({
-      where: { id: order.id },
+      where: { id: order!.id },
       include: { project: true, quote: true, createdBy: true, lines: { orderBy: { sortOrder: 'asc' } } },
     });
   }
@@ -1432,8 +1501,23 @@ export class VentasService {
         project: { include: { opportunity: { include: { client: true } } } },
         quote: true,
         createdBy: true,
-        lines: { orderBy: { sortOrder: 'asc' }, include: { product: { select: { id: true, sku: true, name: true } } } },
-        invoice: { select: { id: true, invoiceNumber: true, status: true } },
+        lines: {
+          orderBy: { sortOrder: 'asc' },
+          include: {
+            product: { select: { id: true, sku: true, name: true, satProductKey: true, satUnitKey: true } },
+            invoiceItem: {
+              select: {
+                id: true,
+                invoiceId: true,
+                invoice: { select: { id: true, invoiceNumber: true, status: true } },
+              },
+            },
+          },
+        },
+        invoices: {
+          select: { id: true, invoiceNumber: true, status: true, totalAmount: true, cfdiUuid: true },
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
     if (!order) return null;
@@ -1457,8 +1541,8 @@ export class VentasService {
         },
         closureOrder: {
           include: {
-            lines: { orderBy: { sortOrder: 'asc' } },
-            invoice: {
+            lines: { orderBy: { sortOrder: 'asc' }, include: { invoiceItem: { select: { id: true } } } },
+            invoices: {
               select: {
                 id: true,
                 invoiceNumber: true,
@@ -1469,6 +1553,7 @@ export class VentasService {
                 cfdiStampDate: true,
                 isCancelled: true,
               },
+              orderBy: { createdAt: 'desc' },
             },
           },
         },
@@ -1543,7 +1628,8 @@ export class VentasService {
             orderId: project.closureOrder.orderId,
             status: project.closureOrder.status,
             lineCount: project.closureOrder.lines.length,
-            invoice: project.closureOrder.invoice,
+            invoicedLineCount: project.closureOrder.lines.filter((l) => l.invoiceItem).length,
+            invoices: project.closureOrder.invoices,
           }
         : null,
       costs,

@@ -233,16 +233,31 @@ export type SalesProjectOrderLine = {
   unit?: string | null;
   category?: string | null;
   productId?: number | null;
+  invoiceItem?: {
+    id: number;
+    invoiceId: number;
+    invoice?: { id: number; invoiceNumber: string; status: string };
+  } | null;
+};
+
+export type SalesProjectOrderInvoice = {
+  id: number;
+  invoiceNumber: string;
+  status: string;
+  totalAmount?: number | string;
+  cfdiUuid?: string | null;
 };
 
 export type SalesProjectOrder = {
   id: number;
   orderId: string;
-  orderPdfUrl: string;
+  orderPdfUrl?: string | null;
   status: string;
   createdAt: string;
   lines?: SalesProjectOrderLine[];
-  invoice?: { id: number; invoiceNumber: string; status: string } | null;
+  invoices?: SalesProjectOrderInvoice[];
+  /** @deprecated use invoices[] */
+  invoice?: SalesProjectOrderInvoice | null;
 };
 
 export type SalesProjectSummary = {
@@ -278,6 +293,8 @@ export type SalesProjectSummary = {
     orderId: string;
     status: string;
     lineCount: number;
+    invoicedLineCount?: number;
+    invoices?: SalesProjectOrderInvoice[];
     invoice?: {
       id: number;
       invoiceNumber: string;

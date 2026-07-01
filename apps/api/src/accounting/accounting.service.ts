@@ -113,7 +113,13 @@ export class AccountingService {
 
   /** Claves SAT para líneas de orden de cierre → factura CFDI. */
   private resolveSatKeysForOrderLine(line: {
-    product?: { specifications?: unknown; itemType?: string } | null;
+    product?: {
+      specifications?: unknown;
+      itemType?: string;
+      satProductKey?: string | null;
+      satUnitKey?: string | null;
+      unitName?: string | null;
+    } | null;
     unit?: string | null;
     category?: string | null;
   }) {
@@ -122,11 +128,20 @@ export class AccountingService {
         ? (line.product.specifications as Record<string, unknown>)
         : {};
     const satProductKey = String(
-      spec.satProductKey || spec.claveProdServ || spec.claveProducto || '80101500',
+      line.product?.satProductKey ||
+        spec.satProductKey ||
+        spec.claveProdServ ||
+        spec.claveProducto ||
+        '80101500',
     ).trim();
     const defaultUnit = line.product?.itemType === 'PRODUCT' ? 'H87' : 'E48';
-    const satUnitKey = String(spec.satUnitKey || spec.claveUnidad || defaultUnit).trim();
-    const unitName = line.unit?.trim() || String(spec.unitName || 'Servicio');
+    const satUnitKey = String(
+      line.product?.satUnitKey || spec.satUnitKey || spec.claveUnidad || defaultUnit,
+    ).trim();
+    const unitName =
+      line.unit?.trim() ||
+      line.product?.unitName?.trim() ||
+      String(spec.unitName || 'Servicio');
     return { satProductKey, satUnitKey, unitName };
   }
 
@@ -602,17 +617,17 @@ export class AccountingService {
     const order = await this.prisma.salesProjectOrder.findUnique({
       where: { projectId },
       include: {
-        lines: { orderBy: { sortOrder: 'asc' }, include: { product: true } },
-        invoice: true,
+        lines: {
+          orderBy: { sortOrder: 'asc' },
+          include: { product: true, invoiceItem: { select: { id: true, invoiceId: true } } },
+        },
+        invoices: { select: { id: true, invoiceNumber: true, status: true, totalAmount: true } },
         project: { include: { opportunity: { include: { client: true } } } },
       },
     });
 
     if (!order) {
-      throw new NotFoundException('No hay orden de cierre para este proyecto');
-    }
-    if (order.invoice) {
-      throw new BadRequestException('Este proyecto ya tiene una factura vinculada');
+      throw new NotFoundException('No hay orden de venta para este proyecto');
     }
     if (!order.lines.length) {
       throw new BadRequestException('La orden no tiene líneas para facturar');
@@ -623,12 +638,13 @@ export class AccountingService {
       throw new BadRequestException('Cliente comercial no encontrado para facturar');
     }
 
+    const uninvoicedLines = order.lines.filter((line) => !line.invoiceItem);
     const selectedLines = options?.lineIds?.length
-      ? order.lines.filter((line) => options.lineIds!.includes(line.id))
-      : order.lines;
+      ? uninvoicedLines.filter((line) => options.lineIds!.includes(line.id))
+      : uninvoicedLines;
 
     if (!selectedLines.length) {
-      throw new BadRequestException('No hay líneas seleccionadas para facturar');
+      throw new BadRequestException('No hay líneas pendientes de facturar (todas ya fueron facturadas)');
     }
 
     const today = new Date().toISOString().slice(0, 10);
@@ -645,7 +661,7 @@ export class AccountingService {
         issueDate: today,
         dueDate: due,
         clientId: client.id,
-        notes: `Factura generada desde orden ${order.orderId} — ${order.project.name}`,
+        notes: `Factura generada desde orden ${order.orderId} — ${order.project.name}${selectedLines.length < uninvoicedLines.length ? ' (parcial)' : ''}`,
         receptorRfc: client.taxId ?? undefined,
         receptorName: client.legalName || client.name,
         receptorZipCode: receptorZip,

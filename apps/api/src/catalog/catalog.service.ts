@@ -86,12 +86,16 @@ export class CatalogService {
     unit?: string;
     imageUrl?: string;
     description?: string;
+    satProductKey?: string;
+    satUnitKey?: string;
+    unitName?: string;
   }) {
     const sku = dto.sku?.trim()
       ? dto.sku.trim().toUpperCase()
       : await this.generateNextSku();
     const existing = await this.prisma.product.findFirst({ where: { sku } });
     if (existing) throw new ConflictException(`Ya existe un producto con SKU ${sku}`);
+    const unit = dto.unit?.trim() || dto.unitName?.trim() || null;
     return this.prisma.product.create({
       data: {
         sku,
@@ -102,8 +106,58 @@ export class CatalogService {
         currency: dto.currency?.trim() || 'MXN',
         imageUrl: dto.imageUrl?.trim() || null,
         description: dto.description?.trim() || null,
-        specifications: dto.unit?.trim() ? { unit: dto.unit.trim() } : undefined,
+        satProductKey: dto.satProductKey?.trim() || null,
+        satUnitKey: dto.satUnitKey?.trim() || null,
+        unitName: unit,
+        specifications: unit ? { unit } : undefined,
         activo: true,
+      },
+      include: { brand: { select: { id: true, name: true } } },
+    });
+  }
+
+  async updateProduct(
+    id: number,
+    dto: {
+      name?: string;
+      category?: string;
+      subcategory?: string;
+      price?: number;
+      currency?: string;
+      unit?: string;
+      imageUrl?: string;
+      description?: string;
+      satProductKey?: string;
+      satUnitKey?: string;
+      unitName?: string;
+    },
+  ) {
+    const existing = await this.prisma.product.findFirst({ where: { id, activo: { not: false } } });
+    if (!existing) throw new ConflictException('Producto no encontrado');
+    const unit = dto.unit?.trim() || dto.unitName?.trim() || undefined;
+    return this.prisma.product.update({
+      where: { id },
+      data: {
+        name: dto.name?.trim(),
+        category: dto.category?.trim(),
+        subcategory: dto.subcategory?.trim(),
+        price: dto.price,
+        currency: dto.currency?.trim(),
+        imageUrl: dto.imageUrl?.trim(),
+        description: dto.description?.trim(),
+        satProductKey: dto.satProductKey?.trim(),
+        satUnitKey: dto.satUnitKey?.trim(),
+        unitName: unit,
+        ...(unit
+          ? {
+              specifications: {
+                ...((existing.specifications && typeof existing.specifications === 'object'
+                  ? existing.specifications
+                  : {}) as object),
+                unit,
+              },
+            }
+          : {}),
       },
       include: { brand: { select: { id: true, name: true } } },
     });
