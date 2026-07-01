@@ -104,12 +104,19 @@ object ModuleCatalog {
         ModuleEntry("multas", "Multas", "⚠️", "/contabilidad/multas", nativeImplemented = true),
     )
 
-    /** Módulos del portal web. */
-    val web: List<ModuleEntry> = listOf(
-        ModuleEntry("dashboard", "Dashboard", "📊", "/web/dashboard", nativeImplemented = true),
-        ModuleEntry("clientes", "Clientes", "🤝", "/web/clientes", nativeImplemented = true),
-        ModuleEntry("proyectos", "Proyectos", "🧩", "/web/proyectos", nativeImplemented = true),
-        ModuleEntry("noticias", "Noticias", "📰", "/web/noticias", nativeImplemented = true),
-        ModuleEntry("contactos", "Contactos", "✉️", "/web/contactos", nativeImplemented = true),
+    /** Módulos del panel STUDIO (paridad web rutas /studio). */
+    val studio: List<ModuleEntry> = listOf(
+        ModuleEntry("dashboard", "Dashboard", "📊", "/studio/dashboard", nativeImplemented = true),
+        ModuleEntry("hero", "Carrusel inicio", "🖼️", "/studio/hero", nativeImplemented = true),
+        ModuleEntry("pages", "Secciones del sitio", "🌐", "/studio/pages", nativeImplemented = true),
+        ModuleEntry("cases", "Casos de éxito", "🏆", "/studio/cases", nativeImplemented = true),
+        ModuleEntry("news", "Noticias", "📰", "/studio/news", nativeImplemented = true),
+        ModuleEntry("social", "Redes sociales", "📱", "/studio/social", nativeImplemented = true),
+        ModuleEntry("newsletter", "Newsletter", "📬", "/studio/newsletter", nativeImplemented = true),
+        ModuleEntry("contacts", "Contactos", "✉️", "/studio/contacts", nativeImplemented = true),
+        ModuleEntry("leads", "Leads", "✨", "/studio/leads", nativeImplemented = true),
     )
+
+    /** Alias legacy mobile → studio. */
+    val web: List<ModuleEntry> get() = studio
 }

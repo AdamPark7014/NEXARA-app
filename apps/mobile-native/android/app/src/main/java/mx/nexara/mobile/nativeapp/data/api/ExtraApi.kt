@@ -13,6 +13,7 @@ data class NewsPostDto(
     val slug: String? = null,
     val excerpt: String? = null,
     val body: String? = null,
+    val content: String? = null,
     val status: String? = null,
     val coverImageUrl: String? = null,
     val category: String? = null,

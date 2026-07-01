@@ -98,9 +98,10 @@ struct ModuleRouter {
             CrmDashboardView()
         case (.contabilidad, "dashboard"):
             ContabilidadDashboardView()
+        case (.web, "dashboard"):
+            StudioDashboardView()
         case (.console, "analytics"), (.ventas, "crecimiento"),
-             (.ventas, "reportes"), (.ventas, "equipo-comparativa"),
-             (.web, "dashboard"):
+             (.ventas, "reportes"), (.ventas, "equipo-comparativa"):
             AnalyticsRawView()
         case (.console, "audit"):
             GenericListModuleView(title: "Auditoría") { (await ExtraRepository.shared.audit()).map {

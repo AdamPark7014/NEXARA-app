@@ -162,7 +162,7 @@ class StudioHeroViewModel(app: Application) : AndroidViewModel(app) {
                 withContext(Dispatchers.IO) { repo.deleteHeroSlide(id) }
                 refresh()
             } catch (e: Exception) {
-                _state.update { it.copy(error = e.message }) }
+                _state.update { it.copy(error = e.message) }
             }
         }
     }
