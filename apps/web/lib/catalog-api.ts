@@ -10,6 +10,9 @@ export type CatalogProduct = {
   price?: number | null;
   currency?: string | null;
   imageUrl?: string | null;
+  satProductKey?: string | null;
+  satUnitKey?: string | null;
+  unitName?: string | null;
   brand?: { id: number; name: string } | null;
   stockLevels?: Array<{
     quantity: number | string;
@@ -73,6 +76,9 @@ export const createCatalogProduct = async (
     unit?: string;
     imageUrl?: string;
     description?: string;
+    satProductKey?: string;
+    satUnitKey?: string;
+    unitName?: string;
   },
 ): Promise<CatalogProduct> => {
   const res = await fetch(buildApiUrl("catalog/products"), {

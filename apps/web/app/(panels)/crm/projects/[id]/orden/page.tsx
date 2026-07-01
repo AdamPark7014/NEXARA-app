@@ -18,6 +18,12 @@ import { useProjectDetail } from "@/components/crm/ProjectDetailShell";
 import { getErpFinanceSectionConfig } from "@/lib/section-views";
 import ConfirmDialog, { type ConfirmState } from "@/components/ui/ConfirmDialog";
 
+const ORDER_STATUS_LABEL: Record<string, string> = {
+  CONFIRMED: "Confirmada",
+  OPEN: "Abierta",
+  CLOSED: "Cerrada",
+};
+
 export default function ProjectOrderPage() {
   const { user } = useUser();
   const router = useRouter();
@@ -30,45 +36,78 @@ export default function ProjectOrderPage() {
   const [invoicing, setInvoicing] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [selectedLineIds, setSelectedLineIds] = useState<number[]>([]);
 
   useEffect(() => {
     if (!token || !id) return;
     setLoading(true);
     setOrderError(null);
     void getSalesProjectOrder(token, id)
-      .then(setOrder)
-      .catch((e) => setOrderError(e instanceof Error ? e.message : "Sin orden de cierre"))
+      .then((loaded) => {
+        setOrder(loaded);
+        const pending = (loaded.lines ?? []).filter((l) => !l.invoiceItem).map((l) => l.id);
+        setSelectedLineIds(pending);
+      })
+      .catch((e) => setOrderError(e instanceof Error ? e.message : "Sin orden de venta"))
       .finally(() => setLoading(false));
   }, [token, id, summary]);
 
   const closeProject = () => {
     if (!token) return;
-    setConfirmState({ message: "¿Generar orden de cierre para este proyecto?", confirmLabel: "Generar orden", fn: async () => {
-      try {
-        const created = await closeSalesProject(token, id);
-        setOrder(created);
-        reload();
-      } catch (e) {
-        setSaveErr(e instanceof Error ? e.message : "No se pudo generar la orden de cierre");
-      }
-    } });
+    setConfirmState({
+      message: "¿Finalizar proyecto y generar PDF de cierre de la orden?",
+      confirmLabel: "Cerrar proyecto",
+      fn: async () => {
+        try {
+          const created = await closeSalesProject(token, id);
+          setOrder(created);
+          reload();
+        } catch (e) {
+          setSaveErr(e instanceof Error ? e.message : "No se pudo cerrar el proyecto");
+        }
+      },
+    });
+  };
+
+  const pendingLines = useMemo(
+    () => (order?.lines ?? []).filter((line) => !line.invoiceItem),
+    [order?.lines],
+  );
+
+  const toggleLine = (lineId: number) => {
+    setSelectedLineIds((prev) =>
+      prev.includes(lineId) ? prev.filter((x) => x !== lineId) : [...prev, lineId],
+    );
   };
 
   const generateInvoice = () => {
-    if (!token) return;
-    setConfirmState({ message: "¿Generar factura borrador desde esta orden de cierre?", confirmLabel: "Generar factura", fn: async () => {
-      setInvoicing(true);
-      try {
-        const inv = await invoiceSalesProject(token, id);
-        reload();
-        void getSalesProjectOrder(token, id).then(setOrder).catch(() => undefined);
-        router.push(`/erp/invoicing?highlight=${inv.id}`);
-      } catch (e) {
-        setSaveErr(e instanceof Error ? e.message : "No se pudo generar la factura");
-      } finally {
-        setInvoicing(false);
-      }
-    } });
+    if (!token || selectedLineIds.length === 0) {
+      setSaveErr("Selecciona al menos una línea pendiente de facturar");
+      return;
+    }
+    const partial = selectedLineIds.length < pendingLines.length;
+    setConfirmState({
+      message: partial
+        ? `¿Generar factura borrador con ${selectedLineIds.length} línea(s) seleccionada(s)?`
+        : "¿Generar factura borrador con todas las líneas pendientes?",
+      confirmLabel: "Generar factura",
+      fn: async () => {
+        setInvoicing(true);
+        try {
+          const inv = await invoiceSalesProject(token, id, selectedLineIds);
+          reload();
+          const refreshed = await getSalesProjectOrder(token, id);
+          setOrder(refreshed);
+          const stillPending = (refreshed.lines ?? []).filter((l) => !l.invoiceItem).map((l) => l.id);
+          setSelectedLineIds(stillPending);
+          router.push(`/erp/invoicing?highlight=${inv.id}`);
+        } catch (e) {
+          setSaveErr(e instanceof Error ? e.message : "No se pudo generar la factura");
+        } finally {
+          setInvoicing(false);
+        }
+      },
+    });
   };
 
   if (error) return <DetailError message={error} onRetry={reload} />;
@@ -76,14 +115,19 @@ export default function ProjectOrderPage() {
 
   const orderSummary = summary.order;
   const activeOrder = order ?? orderSummary;
-  const linkedInvoice = order?.invoice ?? orderSummary?.invoice;
+  const invoices = order?.invoices ?? orderSummary?.invoices ?? [];
 
   return (
-    <DetailSection title="Orden de cierre">
+    <DetailSection title="Orden de venta">
+      {summary.project.status !== "CLOSED" && activeOrder && (
+        <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 12, lineHeight: 1.5 }}>
+          La orden se creó al abrir el proyecto. Puedes facturar parcialmente en cualquier momento y cerrar el proyecto al terminar la ejecución.
+        </p>
+      )}
       {summary.project.status !== "CLOSED" && (
         <div style={{ marginBottom: 16 }}>
           <Button variant="secondary" onClick={() => void closeProject()}>
-            Generar orden de cierre
+            Cerrar proyecto y finalizar orden
           </Button>
         </div>
       )}
@@ -97,7 +141,7 @@ export default function ProjectOrderPage() {
             <div style={{ padding: 14, border: "1px solid var(--border)", borderRadius: 10, marginBottom: 16 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontWeight: 700 }}>{activeOrder.orderId}</span>
-                <Tag variant="accent">{activeOrder.status}</Tag>
+                <Tag variant="accent">{ORDER_STATUS_LABEL[activeOrder.status] ?? activeOrder.status}</Tag>
               </div>
               {order?.createdAt && (
                 <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 6 }}>{formatDateTime(order.createdAt)}</p>
@@ -111,28 +155,66 @@ export default function ProjectOrderPage() {
           )}
           {order?.lines && order.lines.length > 0 && (
             <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
-              {order.lines.map((line) => (
-                <li key={line.id} style={{ padding: "10px 12px", border: "1px solid var(--border)", borderRadius: 8, display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 13 }}>{line.qty}× {line.name}</span>
-                  <Money value={Number(line.lineTotal)} />
-                </li>
-              ))}
+              {order.lines.map((line) => {
+                const invoiced = Boolean(line.invoiceItem);
+                return (
+                  <li
+                    key={line.id}
+                    style={{
+                      padding: "10px 12px",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 10,
+                      opacity: invoiced ? 0.65 : 1,
+                    }}
+                  >
+                    <label style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, cursor: invoiced ? "default" : "pointer" }}>
+                      {!invoiced && invoiceCfg.canCreate && (
+                        <input
+                          type="checkbox"
+                          checked={selectedLineIds.includes(line.id)}
+                          onChange={() => toggleLine(line.id)}
+                        />
+                      )}
+                      <span style={{ fontSize: 13 }}>
+                        {line.qty}× {line.name}
+                        {invoiced && line.invoiceItem?.invoice && (
+                          <span style={{ color: "var(--text-tertiary)", fontSize: 11.5, marginLeft: 8 }}>
+                            → {line.invoiceItem.invoice.invoiceNumber}
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                    <Money value={Number(line.lineTotal)} />
+                  </li>
+                );
+              })}
             </ul>
           )}
-          {activeOrder && !linkedInvoice && invoiceCfg.canCreate && (
+          {pendingLines.length > 0 && invoiceCfg.canCreate && (
             <div style={{ marginTop: 16 }}>
               {saveErr && <p role="alert" style={{ color: "var(--danger)", fontSize: 12, marginBottom: 8 }}>{saveErr}</p>}
-              <Button variant="primary" onClick={generateInvoice} disabled={invoicing}>
-                {invoicing ? "Generando…" : "Generar factura borrador"}
+              <Button variant="primary" onClick={generateInvoice} disabled={invoicing || selectedLineIds.length === 0}>
+                {invoicing
+                  ? "Generando…"
+                  : selectedLineIds.length < pendingLines.length
+                    ? `Facturar ${selectedLineIds.length} línea(s)`
+                    : "Generar factura borrador"}
               </Button>
             </div>
           )}
-          {linkedInvoice && (
-            <p style={{ marginTop: 16, fontSize: 13 }}>
-              <Link href={`/erp/invoicing?highlight=${linkedInvoice.id}`} style={{ color: "var(--primary)", fontWeight: 600 }}>
-                Ver factura {linkedInvoice.invoiceNumber} en ERP →
-              </Link>
-            </p>
+          {invoices.length > 0 && (
+            <div style={{ marginTop: 16, display: "grid", gap: 6 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase" }}>Facturas emitidas</div>
+              {invoices.map((inv) => (
+                <Link key={inv.id} href={`/erp/invoicing?highlight=${inv.id}`} style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>
+                  {inv.invoiceNumber} · {inv.status}
+                </Link>
+              ))}
+            </div>
           )}
         </>
       )}

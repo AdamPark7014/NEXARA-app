@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { CatalogService } from './catalog.service.js';
 import { RBAC, RbacGuard } from '../common/rbac.guard.js';
@@ -21,8 +21,43 @@ export class CatalogController {
   @Post('products')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ permissions: [PERMISSIONS.CATALOG_MANAGE] })
-  createProduct(@Body() dto: { sku?: string; name: string; category?: string; price?: number; description?: string }) {
+  createProduct(@Body() dto: {
+    sku?: string;
+    name: string;
+    category?: string;
+    subcategory?: string;
+    price?: number;
+    currency?: string;
+    unit?: string;
+    imageUrl?: string;
+    description?: string;
+    satProductKey?: string;
+    satUnitKey?: string;
+    unitName?: string;
+  }) {
     return this.catalogService.createProduct(dto);
+  }
+
+  @Patch('products/:id')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({ permissions: [PERMISSIONS.CATALOG_MANAGE] })
+  updateProduct(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: {
+      name?: string;
+      category?: string;
+      subcategory?: string;
+      price?: number;
+      currency?: string;
+      unit?: string;
+      imageUrl?: string;
+      description?: string;
+      satProductKey?: string;
+      satUnitKey?: string;
+      unitName?: string;
+    },
+  ) {
+    return this.catalogService.updateProduct(id, dto);
   }
 
   @Get('products/next-sku')

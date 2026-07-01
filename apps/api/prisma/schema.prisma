@@ -20,6 +20,9 @@ model Product {
   price           Float?
   currency        String?
   icecatId        String?
+  satProductKey   String?         @db.VarChar(10)
+  satUnitKey      String?         @db.VarChar(5)
+  unitName        String?         @db.VarChar(50)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   brandId         Int?
@@ -1580,7 +1583,7 @@ model SalesProjectOrder {
   template    OrderTemplate?         @relation(fields: [templateId], references: [id], onDelete: SetNull)
   createdBy   User?                  @relation("SalesProjectOrderCreator", fields: [createdById], references: [id])
   lines       SalesProjectOrderLine[]
-  invoice     Invoice?
+  invoices    Invoice[]
 
   @@map("sales_project_orders")
 }
@@ -2294,7 +2297,7 @@ model Invoice {
   createdBy        User?             @relation("InvoiceCreator", fields: [createdById], references: [id])
   items            InvoiceItem[]
   payments         Payment[]
-  salesProjectOrderId Int?           @unique
+  salesProjectOrderId Int?
   salesProjectOrder   SalesProjectOrder? @relation(fields: [salesProjectOrderId], references: [id], onDelete: SetNull)
 
   @@index([type, status])

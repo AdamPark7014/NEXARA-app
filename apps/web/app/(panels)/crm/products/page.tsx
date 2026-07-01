@@ -21,6 +21,7 @@ const UNITS = ["pza", "kit", "caja", "licencia", "servicio", "m", "m2", "hr", "r
 const EMPTY_FORM = {
   sku: "", name: "", category: "", subcategory: "",
   price: "", currency: "MXN", unit: "", imageUrl: "", description: "",
+  satProductKey: "80101500", satUnitKey: "H87",
 };
 
 function stockTotal(p: CatalogProduct): number {
@@ -87,6 +88,9 @@ export default function ProductsPage() {
         unit: form.unit.trim() || undefined,
         imageUrl: form.imageUrl.trim() || undefined,
         description: form.description.trim() || undefined,
+        satProductKey: form.satProductKey.trim() || undefined,
+        satUnitKey: form.satUnitKey.trim() || undefined,
+        unitName: form.unit.trim() || undefined,
       });
       setItems((prev) => [created, ...prev]);
       setShowForm(false);
@@ -245,6 +249,24 @@ export default function ProductsPage() {
                   <datalist id="unit-list">
                     {UNITS.map((u) => <option key={u} value={u} />)}
                   </datalist>
+                </label>
+              </div>
+
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.08em", paddingTop: 4 }}>
+                Facturación SAT (CFDI)
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: 12 }}>
+                <label style={{ display: "grid" }}>
+                  {lbl("Clave producto/servicio SAT")}
+                  <input value={form.satProductKey}
+                    onChange={(e) => setForm((f) => ({ ...f, satProductKey: e.target.value }))}
+                    placeholder="80101500" style={inp} />
+                </label>
+                <label style={{ display: "grid" }}>
+                  {lbl("Clave unidad SAT")}
+                  <input value={form.satUnitKey}
+                    onChange={(e) => setForm((f) => ({ ...f, satUnitKey: e.target.value }))}
+                    placeholder="H87 / E48" style={inp} />
                 </label>
               </div>
 
