@@ -72,9 +72,7 @@ struct ModuleRouter {
         case (.console, "invoicing"), (.contabilidad, "invoicing"):
             InvoicesView()
         case (.console, "banking"), (.contabilidad, "banking"):
-            GenericListModuleView(title: "Banca") { (await ExtraRepository.shared.bankAccounts()).map {
-                toRow($0, title: ["name","nombre","alias"], subtitle: ["bank","banco","accountNumber"], meta: ["balance","saldo"])
-            } }
+            BankingView()
         case (.console, "expenses"), (.contabilidad, "expenses"):
             ExpensesView()
         case (.console, "fines"), (.contabilidad, "multas"):

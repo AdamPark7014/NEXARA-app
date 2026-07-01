@@ -11,7 +11,8 @@ import androidx.navigation.compose.rememberNavController
 import mx.nexara.mobile.nativeapp.ui.catalog.ModuleCatalog
 import mx.nexara.mobile.nativeapp.ui.catalog.PortalModuleListScreen
 
-private const val Home = "studio/home"
+private const val Dashboard    = "studio/dashboard"
+private const val Home         = "studio/home"
 private const val ModulePattern = "studio/m/{key}"
 private fun moduleRoute(key: String) = "studio/m/$key"
 
@@ -40,13 +41,19 @@ fun StudioNavHost(
     panelTitle: String = "NEXARA STUDIO",
 ) {
     val nav = rememberNavController()
-    NavHost(navController = nav, startDestination = Home) {
+    NavHost(navController = nav, startDestination = Dashboard) {
+        composable(Dashboard) {
+            StudioDashboardScreen(
+                onBack = onExitToPanels,
+                onOpenModule = { mod -> nav.navigate(moduleRoute(mod)) }
+            )
+        }
         composable(Home) {
             PortalModuleListScreen(
                 title = panelTitle,
                 modules = ModuleCatalog.studio,
                 onOpenModule = { m -> nav.navigate(moduleRoute(m.key)) },
-                onBack = onExitToPanels,
+                onBack = { nav.popBackStack() },
             )
         }
         composable(ModulePattern) { backStack ->
@@ -56,6 +63,12 @@ fun StudioNavHost(
                 "dashboard" -> StudioDashboardScreen(onBack = pop, onOpenModule = { mod ->
                     nav.navigate(moduleRoute(mod))
                 })
+                "more", "modules" -> PortalModuleListScreen(
+                    title = "Módulos Studio",
+                    modules = ModuleCatalog.studio,
+                    onOpenModule = { m -> nav.navigate(moduleRoute(m.key)) },
+                    onBack = pop,
+                )
                 "hero" -> StudioHeroScreen(onBack = pop)
                 "cases" -> StudioCasesScreen(onBack = pop)
                 "news" -> StudioNewsScreen(onBack = pop)
