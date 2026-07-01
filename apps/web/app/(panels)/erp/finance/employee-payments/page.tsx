@@ -125,7 +125,7 @@ export default function EmployeePaymentsPage() {
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <KpiCard label="Total pagado" value={`$${(total / 1000).toFixed(1)}k`} icon="💼" />
+        <KpiCard label="Total pagado" value={<Money value={total} compact />} icon="💼" variant="positive" hint="Nómina y bonos registrados" />
         <KpiCard label="Registros" value={items.length} icon="📋" />
       </div>
 

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
@@ -145,6 +146,13 @@ export default function CompaniesPage() {
           </>
         }
       />
+      {!loading && items.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 18 }}>
+          <KpiCard label="Empresas totales" value={items.length} icon="🏢" />
+          <KpiCard label="Activas" value={items.filter(c => c.isActive).length} variant="positive" icon="✅" />
+          <KpiCard label="Inactivas" value={items.filter(c => !c.isActive).length} variant={items.filter(c => !c.isActive).length > 0 ? "warning" : "default"} icon="⛔" />
+        </div>
+      )}
       {actionErr && (
         <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span>{actionErr}</span>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import { Tag } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
@@ -167,6 +168,15 @@ export default function RecruitingPage() {
           </div>
         }
       />
+
+      {!loading && !error && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 18 }}>
+          <KpiCard label="Total candidatos" value={items.length} icon="👥" />
+          <KpiCard label="Activos" value={items.length - rejected.length} variant="accent" icon="🟢" hint="En pipeline" />
+          <KpiCard label="Contratados" value={items.filter(c => c.stage === "APPROVED").length} variant="positive" icon="✅" />
+          <KpiCard label="Rechazados" value={rejected.length} variant={rejected.length > 0 ? "danger" : "default"} icon="❌" />
+        </div>
+      )}
 
       {loading && <EmptyState icon="⏳" title="Cargando…" description="Consultando banco de CVs." />}
       {!loading && error && (
