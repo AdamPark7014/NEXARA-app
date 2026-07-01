@@ -100,19 +100,7 @@ struct CrmCommercialClientsView: View {
     }
 
     private func clientDetail(_ c: [String: Any]) -> some View {
-        List {
-            Section("Cliente") {
-                row("Nombre", ConsoleHelpers.mapStr(c, "name", "nombre"))
-                row("RFC", ConsoleHelpers.mapStr(c, "rfc"))
-                row("Email", ConsoleHelpers.mapStr(c, "email"))
-                row("Teléfono", ConsoleHelpers.mapStr(c, "phone", "telefono"))
-            }
-            Button("Volver") { selected = nil }
-        }
-    }
-
-    @ViewBuilder private func row(_ k: String, _ v: String) -> some View {
-        if !v.isEmpty { HStack { Text(k); Spacer(); Text(v).foregroundColor(.secondary) } }
+        CrmClientDetailView(client: c, onBack: { selected = nil })
     }
 
     private func reload() async {

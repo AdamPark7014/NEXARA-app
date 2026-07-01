@@ -2,6 +2,7 @@ package mx.nexara.mobile.nativeapp.ui.ventas
 
 import android.app.Application
 import android.net.Uri
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -101,6 +103,23 @@ private fun nestedMaps(data: Map<String, Any?>, key: String): List<Map<String, A
     return emptyList()
 }
 
+private val OppGreen = Color(0xFF10B981)
+
+@Composable
+private fun OppStageChip(text: String) {
+    Surface(shape = RoundedCornerShape(999.dp), color = OppGreen.copy(alpha = 0.12f)) {
+        Text(
+            text.ifBlank { "—" },
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = OppGreen,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+private fun oppFmtMxn(v: Double): String = "$" + String.format("%,.0f", v)
+
 @Composable
 fun VentasOpportunityDetailScreen(oppId: Long, onBack: () -> Unit) {
     val ctx = LocalContext.current
@@ -153,9 +172,9 @@ fun VentasOpportunityDetailScreen(oppId: Long, onBack: () -> Unit) {
 private fun OppSummaryTab(data: Map<String, Any?>) {
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
-            CrmStageChip(oppStr(data, "stage", "etapa", "status"))
+            OppStageChip(oppStr(data, "stage", "etapa", "status"))
             Spacer(Modifier.height(8.dp))
-            detailRow("Valor", fmtMxnShort(oppDouble(data, "value", "amount") ?: 0.0))
+            detailRow("Valor", oppFmtMxn(oppDouble(data, "value", "amount") ?: 0.0))
             detailRow("Probabilidad", "${oppStr(data, "probability", "probabilidad")}%")
             detailRow("Cliente", oppStr(data, "clientName") + nestedClientName(data))
             detailRow("Cierre estimado", oppStr(data, "expectedCloseDate", "closeDate").take(10))
