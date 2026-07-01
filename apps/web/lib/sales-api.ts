@@ -165,6 +165,8 @@ export type SalesClient = {
   legalName?: string | null;
   taxId?: string | null;
   fiscalAddress?: string | null;
+  fiscalZipCode?: string | null;
+  fiscalRegime?: string | null;
   billingEmail?: string | null;
   billingPhone?: string | null;
   industry?: string | null;
@@ -586,6 +588,32 @@ export const getSalesClient = async (token: string, id: number) => {
   >(`ventas/clientes/${id}`, { token, method: "GET" }, "No se pudo cargar el cliente");
 };
 
+export type ClientInvoiceRow = {
+  id: number;
+  invoiceNumber: string;
+  status: string;
+  issueDate: string;
+  dueDate: string;
+  totalAmount: number | string;
+  paidAmount?: number | string;
+  currency?: string;
+  cfdiUuid?: string | null;
+  pdfUrl?: string | null;
+  salesProjectOrder?: {
+    orderId: string;
+    project?: { id: number; name: string } | null;
+  } | null;
+};
+
+export const listClientInvoices = async (token: string, clientId: number) => {
+  const data = await apiRequest<ClientInvoiceRow[]>(
+    `ventas/clientes/${clientId}/facturas`,
+    { token, method: "GET" },
+    "No se pudieron cargar las facturas del cliente",
+  );
+  return Array.isArray(data) ? data : [];
+};
+
 export const updateSalesClient = async (
   token: string,
   id: number,
@@ -594,6 +622,8 @@ export const updateSalesClient = async (
     legalName: string;
     taxId: string;
     fiscalAddress: string;
+    fiscalZipCode: string;
+    fiscalRegime: string;
     billingEmail: string;
     billingPhone: string;
     industry: string;

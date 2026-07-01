@@ -1407,6 +1407,8 @@ model SalesClient {
   legalName       String?               @db.VarChar(220)
   taxId           String?               @db.VarChar(40)
   fiscalAddress   String?
+  fiscalZipCode   String?               @db.VarChar(5)
+  fiscalRegime    String?               @db.VarChar(10)
   billingEmail    String?               @db.VarChar(200)
   billingPhone    String?               @db.VarChar(60)
   industry        String?               @db.VarChar(160)
