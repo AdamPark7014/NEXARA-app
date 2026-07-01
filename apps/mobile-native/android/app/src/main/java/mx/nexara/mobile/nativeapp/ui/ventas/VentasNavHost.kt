@@ -35,6 +35,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.CotizacionDto
 import mx.nexara.mobile.nativeapp.data.extra.ExtraRepository
+import mx.nexara.mobile.nativeapp.access.PanelId
+import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
 import mx.nexara.mobile.nativeapp.ui.console.screens.MyProfileScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.PlaceholderScreen
 import mx.nexara.mobile.nativeapp.ui.modules.AnalyticsModuleScreen
@@ -60,6 +62,12 @@ fun VentasNavHost(
 ) {
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
+
+    LaunchedEffect(Unit) {
+        val key = PendingDeepLink.consumeModuleFor(PanelId.CRM) ?: return@LaunchedEffect
+        nav.navigate(VentasRoutes.module(key)) { launchSingleTop = true }
+    }
+
     val currentRoute = entry?.destination?.route ?: VentasRoutes.Dashboard
 
     val bottomTabs = listOf(
@@ -106,7 +114,7 @@ fun VentasNavHost(
                 VentasCotizacionesScreen()
             }
             composable(VentasRoutes.Leads) {
-                VentasLeadsScreen()
+                VentasLeadsApiScreen()
             }
             composable(VentasRoutes.More) {
                 VentasMoreScreen(
@@ -120,9 +128,16 @@ fun VentasNavHost(
                     "dashboard"           -> VentasDashboardScreen()
                     "cotizaciones",
                     "plantillas"          -> VentasCotizacionesScreen()
-                    "leads",
-                    "oportunidades",
-                    "gestion-vendedores"  -> VentasLeadsScreen()
+                    "leads"               -> VentasLeadsApiScreen()
+                    "oportunidades"       -> VentasOportunidadesScreen()
+                    "clientes"            -> VentasClientesScreen()
+                    "productos"           -> VentasProductsScreen()
+                    "proyectos"           -> VentasProyectosScreen()
+                    "pipeline"            -> VentasPipelineScreen()
+                    "agenda"              -> VentasAgendaScreen()
+                    "licitaciones", "tenders" -> VentasTendersScreen()
+                    "metas", "targets"    -> VentasTargetsScreen()
+                    "gestion-vendedores", "equipo-comercial", "sales-team" -> VentasSalesTeamScreen()
                     "reportes",
                     "crecimiento",
                     "equipo-comparativa"  -> AnalyticsModuleScreen()
@@ -400,12 +415,17 @@ private fun VentasMoreScreen(
         item { MoreRow("📋", "Plantillas",      { onOpenModule("plantillas") }) }
         item { MoreRow("🎯", "Leads",           { onOpenModule("leads") }) }
         item { MoreRow("💡", "Oportunidades",   { onOpenModule("oportunidades") }) }
+        item { MoreRow("📊", "Pipeline",        { onOpenModule("pipeline") }) }
+        item { MoreRow("📅", "Agenda",          { onOpenModule("agenda") }) }
         item { MoreRow("🏢", "Clientes",        { onOpenModule("clientes") }) }
+        item { MoreRow("📦", "Catálogo IT/CCTV", { onOpenModule("productos") }) }
         item { MoreRow("📐", "Proyectos",       { onOpenModule("proyectos") }) }
+        item { MoreRow("📑", "Licitaciones",    { onOpenModule("licitaciones") }) }
         item { Divider(modifier = Modifier.padding(vertical = 8.dp)) }
         item { Text("Mi equipo", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(vertical = 4.dp)) }
         item { MoreRow("📊", "Comparativa equipo", { onOpenModule("equipo-comparativa") }) }
         item { MoreRow("👥", "Gestión vendedores", { onOpenModule("gestion-vendedores") }) }
+        item { MoreRow("🎯", "Metas comerciales",  { onOpenModule("metas") }) }
         item { MoreRow("📈", "Reportes",           { onOpenModule("reportes") }) }
         item { MoreRow("📉", "Crecimiento",         { onOpenModule("crecimiento") }) }
         item { Divider(modifier = Modifier.padding(vertical = 8.dp)) }

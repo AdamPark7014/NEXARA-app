@@ -5,61 +5,52 @@ import SwiftUI
 struct ModuleRouter {
     @ViewBuilder
     static func view(for panel: PanelId, key: String) -> some View {
-        let portal = panel.routingPortal
+        view(portal: panel.routingPortal, key: key)
+    }
+
+    @ViewBuilder
+    static func view(portal: ModuleRoutingPortal, key: String) -> some View {
         switch (portal, key) {
         // ── Console ────────────────────────────────────────────────
         case (.console, "activities"),
              (.console, "my-activities"):
             ActivitiesView()
-        case (.console, "evidences"), (.console, "my-evidences"):
-            GenericListModuleView(title: "Evidencias") { (await ExtraRepository.shared.evidences()).map {
-                toRow($0, title: ["title","descripcion","fileName"], subtitle: ["activityAn"])
-            } }
-        case (.console, "viatics"), (.console, "my-viatics"),
-             (.contabilidad, "viaticos"):
-            ViaticsView()
+        case (.console, "evidences"):
+            EvidencesView(reviewMode: true)
+        case (.console, "my-evidences"):
+            EvidencesView(reviewMode: false)
+        case (.console, "viatics"):
+            ViaticsView(personalOnly: false)
+        case (.console, "my-viatics"):
+            ViaticsView(personalOnly: true)
+        case (.contabilidad, "viaticos"):
+            ViaticsView(personalOnly: false)
         case (.console, "vehicles"), (.console, "my-vehicles"):
-            GenericListModuleView(title: "Vehículos") { (await ExtraRepository.shared.vehicles()).map {
-                toRow($0, title: ["placas","marca","modelo"], subtitle: ["solicitanteNombre","solicitante"])
-            } }
+            VehiclesView()
         case (.console, "gps"):
             GpsMapView()
         case (.console, "tools"):
-            GenericListModuleView(title: "Herramientas") { (await ExtraRepository.shared.tools()).map {
-                toRow($0, title: ["name","nombre"], subtitle: ["code","sku"])
-            } }
+            ToolsHubView()
         case (.console, "clients"):
-            GenericListModuleView(title: "Clientes") { (await ExtraRepository.shared.clients()).map {
-                toRow($0, title: ["name","nombre","razonSocial"], subtitle: ["email","rfc"])
-            } }
-        case (.web, "clientes"), (.ventas, "clientes"):
-            GenericListModuleView(title: "Clientes comerciales") { (await ExtraRepository.shared.serviceClients()).map {
-                toRow($0, title: ["name","nombre","razonSocial"], subtitle: ["email","rfc"])
-            } }
+            ServiceClientsView()
+        case (.web, "clientes"):
+            ServiceClientsView()
         case (.console, "projects"):
-            GenericListModuleView(title: "Proyectos") { (await ExtraRepository.shared.operationalProjects()).map {
-                toRow($0, title: ["name","nombre","title"], subtitle: ["clientName","cliente"])
-            } }
+            ProjectsView()
         case (.console, "work-projects"), (.contabilidad, "work-projects"):
             GenericListModuleView(title: "Proyectos internos") { (await ExtraRepository.shared.projects()).map {
                 toRow($0, title: ["name","nombre","title"], subtitle: ["clientName","cliente"])
             } }
         case (.console, "users"):
-            GenericListModuleView(title: "Usuarios") { (await ExtraRepository.shared.users()).map {
-                toRow($0, title: ["nombre","name"], subtitle: ["email","rol"])
-            } }
+            UsersView()
         case (.console, "attendance"):
             AttendanceView()
         case (.console, "my-lunch-breaks"):
             MyLunchBreaksView()
         case (.console, "lunch-breaks"), (.contabilidad, "horas"):
-            GenericListModuleView(title: "Comidas") { (await ExtraRepository.shared.lunchBreaks()).map {
-                toRow($0, title: ["userName","usuario"], subtitle: ["reason","motivo"], meta: ["startedAt","createdAt"])
-            } }
+            LunchBreaksAdminView()
         case (.console, "hr"):
-            GenericListModuleView(title: "RR. HH. · Permisos") { (await ExtraRepository.shared.hrLeaves()).map {
-                toRow($0, title: ["reason","motivo","type"], subtitle: ["userName","employeeName"])
-            } }
+            HrLeavesView()
         case (.console, "employee-payments"), (.contabilidad, "employee-payments"),
              (.contabilidad, "pagos"):
             GenericListModuleView(title: "Pagos a empleados") { (await ExtraRepository.shared.employeePayments()).map {
@@ -79,10 +70,46 @@ struct ModuleRouter {
             GenericListModuleView(title: "Multas") { (await ExtraRepository.shared.fines()).map {
                 toRow($0, title: ["reason","motivo","concepto"], subtitle: ["userName","empleado"], meta: ["amount","total"])
             } }
-        case (.console, "cotizaciones"), (.ventas, "cotizaciones"), (.ventas, "plantillas"):
-            GenericListModuleView(title: "Cotizaciones") { (await ExtraRepository.shared.cotizaciones()).map {
-                toRow($0, title: ["folio","number"], subtitle: ["clientName","cliente"], meta: ["total","amount"])
-            } }
+        case (.console, "cotizaciones"):
+            CrmCotizacionesView()
+        case (.ventas, "oportunidades"):
+            CrmOpportunitiesView()
+        case (.ventas, "clientes"):
+            CrmCommercialClientsView()
+        case (.ventas, "productos"):
+            CrmProductsView()
+        case (.ventas, "proyectos"):
+            CrmProjectsView()
+        case (.ventas, "pipeline"):
+            CrmPipelineView()
+        case (.ventas, "agenda"):
+            CrmAgendaView()
+        case (.ventas, "licitaciones"), (.ventas, "tenders"):
+            CrmTendersView()
+        case (.ventas, "metas"), (.ventas, "targets"):
+            CrmTargetsView()
+        case (.ventas, "equipo-comercial"), (.ventas, "sales-team"):
+            CrmSalesTeamView()
+        case (.ventas, "gestion-vendedores"):
+            CrmSalesTeamView()
+        case (.ventas, "plantillas"), (.ventas, "cotizaciones"):
+            CrmCotizacionesView()
+        case (.ventas, "leads"):
+            CrmLeadsView()
+        case (.tickets, "portal"), (.tickets, "home"):
+            PortalHomeView(onExit: {}, onNavigate: { _ in })
+        case (.tickets, "profile"):
+            PortalProfileView()
+        case (.tickets, "branches"):
+            PortalBranchesModuleView()
+        case (.tickets, "requests"), (.tickets, "request-new"):
+            PortalRequestsView(onNew: {})
+        case (.tickets, "tickets"), (.tickets, "dashboard"):
+            PortalTicketsView(onOpen: { _ in })
+        case (.tickets, "inventories"):
+            PortalInventoriesView(onOpen: { _ in })
+        case (.tickets, "feedback-pending"):
+            PortalFeedbackView()
         case (.ventas, "dashboard"):
             CrmDashboardView()
         case (.contabilidad, "dashboard"):
@@ -144,8 +171,7 @@ struct ModuleRouter {
             GenericListModuleView(title: "CVs") { (await ExtraRepository.shared.cvs()).map {
                 toRow($0, title: ["fullName","name","fileName"], subtitle: ["position","role"])
             } }
-        case (.console, "client-tickets"), (.console, "gestion-vendedores"),
-             (.ventas, "leads"), (.ventas, "oportunidades"), (.ventas, "gestion-vendedores"):
+        case (.console, "client-tickets"):
             GenericListModuleView(title: "Tickets de clientes") { (await ExtraRepository.shared.clientTicketRequests()).map {
                 toRow($0, title: ["title","subject","asunto"], subtitle: ["clientName","cliente"])
             } }
@@ -161,16 +187,16 @@ struct ModuleRouter {
             GenericListModuleView(title: "Newsletter") { (await ExtraRepository.shared.newsletter()).map {
                 toRow($0, title: ["email","name"], subtitle: ["status"])
             } }
-        case (.console, "my-profile"), (.ventas, "my-profile"), (.tickets, "profile"):
+        case (.console, "my-profile"), (.ventas, "my-profile"):
             MyProfileView()
         case (.console, "my-preferences"):
             MyPreferencesView()
-        case (.console, "dashboard"), (.console, "settings"):
-            GenericListModuleView(title: "Analítica") { (await ExtraRepository.shared.activities()).map {
-                toRow($0, title: ["title","titulo"], subtitle: ["clientName"])
-            } }
+        case (.console, "settings"):
+            ConsoleSettingsView()
+        case (.console, "dashboard"):
+            ConsoleDashboardView()
         // ── Ventas / Contabilidad / Web restantes caen a analytics/proyectos
-        case (.ventas, "proyectos"), (.contabilidad, "proyectos"), (.web, "proyectos"):
+        case (.contabilidad, "proyectos"), (.web, "proyectos"):
             GenericListModuleView(title: "Proyectos") { (await ExtraRepository.shared.projects()).map {
                 toRow($0, title: ["name","nombre","title"], subtitle: ["clientName","cliente"])
             } }
@@ -178,20 +204,15 @@ struct ModuleRouter {
             GenericListModuleView(title: "Notificaciones") { (await ExtraRepository.shared.audit()).map {
                 toRow($0, title: ["action","description"], subtitle: ["userName"])
             } }
-        case (.contabilidad, "viaticos"):
-            GenericListModuleView(title: "Viáticos") { (await ExtraRepository.shared.viatics()).map {
-                toRow($0, title: ["concepto","motivo"], subtitle: ["usuario"])
-            } }
-        // ── Tickets / Portal
-        case (.tickets, "tickets"), (.tickets, "dashboard"), (.tickets, "home"):
-            TicketsDashboardView()
-        case (.tickets, _):
-            GenericListModuleView(title: "Tickets") { (await ExtraRepository.shared.clientTicketRequests()).map {
-                toRow($0, title: ["title","subject"], subtitle: ["clientName"])
-            } }
         // ── LAB
         case (.lab, "health"):
             LabHealthView()
+        case (.lab, "flags"):
+            LabFlagsView()
+        case (.lab, "ai"):
+            LabAiSandboxView()
+        case (.lab, "dashboard"), (.lab, "lab-home"):
+            LabTabView(onExit: {})
         default:
             PlaceholderView(title: key)
         }

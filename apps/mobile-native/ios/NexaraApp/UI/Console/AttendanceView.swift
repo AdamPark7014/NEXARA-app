@@ -5,8 +5,16 @@ import SwiftUI
 @MainActor
 final class AttendanceVM: ObservableObject {
     @Published var records: [[String: Any]] = []
+    @Published var rangeUsers: [[String: Any]] = []
+    @Published var current: [String: Any]?
+    @Published var weekFrom = ConsoleHelpers.weekRange().from
+    @Published var weekTo = ConsoleHelpers.weekRange().to
     @Published var query   = ""
     @Published var isLoading = false
+    @Published var checkInLoading = false
+    @Published var checkInMessage: String?
+
+    var isCheckedIn: Bool { current?["isOpen"] as? Bool == true }
 
     var filtered: [[String: Any]] {
         guard !query.isEmpty else { return records }
@@ -28,9 +36,45 @@ final class AttendanceVM: ObservableObject {
     func load() {
         isLoading = true
         Task {
-            records   = await ExtraRepository.shared.attendance()
+            current = try? await ConsoleRepository.shared.attendanceCurrent()
+            if let range = try? await ConsoleRepository.shared.attendanceRange(from: weekFrom, to: weekTo) {
+                rangeUsers = range["users"] as? [[String: Any]] ?? []
+                records = flattenRange(range)
+            } else {
+                records = await ExtraRepository.shared.attendance()
+            }
             isLoading = false
         }
+    }
+
+    func checkIn(_ type: String) {
+        checkInLoading = true; checkInMessage = nil
+        Task {
+            do {
+                let res = try await ConsoleRepository.shared.attendanceCheckIn(type: type)
+                checkInMessage = (res["message"] as? String) ?? (type == "entrada" ? "✅ Entrada registrada" : "✅ Salida registrada")
+                load()
+            } catch {
+                checkInMessage = "❌ \(error.localizedDescription)"
+            }
+            checkInLoading = false
+        }
+    }
+
+    private func flattenRange(_ range: [String: Any]) -> [[String: Any]] {
+        guard let users = range["users"] as? [[String: Any]] else { return [] }
+        var out: [[String: Any]] = []
+        for u in users {
+            let name = ConsoleHelpers.mapStr(u, "userName")
+            if let events = u["attendances"] as? [[String: Any]] {
+                for e in events {
+                    var row = e
+                    row["userName"] = name
+                    out.append(row)
+                }
+            }
+        }
+        return out
     }
 }
 
@@ -42,6 +86,12 @@ struct AttendanceView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                // Check-in card
+                checkInCard
+
+                Text("Semana: \(vm.weekFrom) → \(vm.weekTo)")
+                    .font(.caption).foregroundColor(.secondary).padding(.horizontal)
+
                 // KPI strip
                 if !vm.records.isEmpty {
                     let s = vm.summary
@@ -104,6 +154,53 @@ struct AttendanceView: View {
         }
         .refreshable { vm.load() }
         .task { vm.load() }
+        .onChange(of: vm.checkInMessage) { msg in
+            if msg != nil {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { vm.checkInMessage = nil }
+            }
+        }
+    }
+
+    private var checkInCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(vm.isCheckedIn ? "🟢 Jornada abierta" : "⚪ Sin entrada hoy")
+                    .font(.subheadline).bold()
+                Spacer()
+                if let mins = vm.current?["totalMinutes"] as? Int, mins > 0 {
+                    Text("\(mins) min").font(.caption).foregroundColor(.secondary)
+                }
+            }
+            if let msg = vm.checkInMessage {
+                Text(msg).font(.footnote).foregroundColor(msg.hasPrefix("❌") ? .red : .green)
+            }
+            HStack(spacing: 12) {
+                Button {
+                    vm.checkIn("entrada")
+                } label: {
+                    Label("Entrada", systemImage: "arrow.right.circle.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.teal)
+                .disabled(vm.checkInLoading || vm.isCheckedIn)
+
+                Button {
+                    vm.checkIn("salida")
+                } label: {
+                    Label("Salida", systemImage: "arrow.left.circle.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.blue)
+                .disabled(vm.checkInLoading || !vm.isCheckedIn)
+            }
+            if vm.checkInLoading { ProgressView().frame(maxWidth: .infinity) }
+        }
+        .padding()
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .padding(.horizontal)
     }
 }
 

@@ -46,35 +46,9 @@ final class ApiClient {
     // MARK: Requests
 
     func get(_ path: String, query: [String: String] = [:]) async throws -> Data {
-        var comps = URLComponents(url: baseURL.appendingPathComponent(path),
-                                  resolvingAgainstBaseURL: false)
-        if !query.isEmpty {
-            comps?.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) }
-        }
-        guard let url = comps?.url else { throw ApiError.invalidURL }
-
-        var req = URLRequest(url: url)
-        req.httpMethod = "GET"
+        var req = try buildRequest(path, method: "GET", query: query)
         req.setValue("application/json", forHTTPHeaderField: "Accept")
-        if let token = SessionStore.shared.token {
-            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-
-        do {
-            let (data, response) = try await session.data(for: req)
-            guard let http = response as? HTTPURLResponse else {
-                throw ApiError.http(-1, "Respuesta inválida")
-            }
-            guard (200..<300).contains(http.statusCode) else {
-                let msg = String(data: data, encoding: .utf8)
-                throw ApiError.http(http.statusCode, msg)
-            }
-            return data
-        } catch let e as ApiError {
-            throw e
-        } catch {
-            throw ApiError.transport(error)
-        }
+        return try await perform(req)
     }
 
     func postJSON<T: Encodable>(_ path: String, body: T) async throws -> Data {
@@ -126,6 +100,36 @@ final class ApiClient {
         return try await perform(req)
     }
 
+    /// Multipart con varios archivos (p. ej. evidencias de solicitud sucursal).
+    func uploadMultipartFiles(
+        _ path: String,
+        method: String = "POST",
+        fields: [String: String],
+        files: [(field: String, data: Data, fileName: String, mimeType: String)]
+    ) async throws -> Data {
+        let boundary = "NexaraBoundary\(UUID().uuidString)"
+        var body = Data()
+        for (key, value) in fields {
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"\(key)\"\r\n\r\n".data(using: .utf8)!)
+            body.append("\(value)\r\n".data(using: .utf8)!)
+        }
+        for file in files {
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"\(file.field)\"; filename=\"\(file.fileName)\"\r\n".data(using: .utf8)!)
+            body.append("Content-Type: \(file.mimeType)\r\n\r\n".data(using: .utf8)!)
+            body.append(file.data)
+            body.append("\r\n".data(using: .utf8)!)
+        }
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+
+        var req = try buildRequest(path, method: method)
+        req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.httpBody = body
+        return try await perform(req)
+    }
+
     // MARK: Helpers
 
     private func sendJSON<T: Encodable>(_ path: String, method: String, body: T) async throws -> Data {
@@ -161,7 +165,25 @@ final class ApiClient {
         return req
     }
 
+    private static let mutatingMethods: Set<String> = ["POST", "PUT", "PATCH", "DELETE"]
+    private static let queuedBody = Data("{\"queued\":true,\"offline\":true}".utf8)
+
     private func perform(_ req: URLRequest) async throws -> Data {
+        let method = (req.httpMethod ?? "GET").uppercased()
+        let urlStr = req.url?.absoluteString ?? ""
+        let authTag = String((req.value(forHTTPHeaderField: "Authorization") ?? "anon").prefix(48))
+        let online = await NetworkMonitor.shared.isOnline
+
+        if !online {
+            if method == "GET", let hit = OfflineApiCache.shared.get(url: urlStr, authTag: authTag) {
+                return hit
+            }
+            if Self.mutatingMethods.contains(method) {
+                enqueueOffline(req: req, urlStr: urlStr)
+                return Self.queuedBody
+            }
+        }
+
         do {
             let (data, response) = try await session.data(for: req)
             guard let http = response as? HTTPURLResponse else {
@@ -171,12 +193,34 @@ final class ApiClient {
                 let msg = String(data: data, encoding: .utf8)
                 throw ApiError.http(http.statusCode, msg)
             }
+            if method == "GET" {
+                OfflineApiCache.shared.put(url: urlStr, authTag: authTag, data: data)
+            }
             return data
         } catch let e as ApiError {
             throw e
         } catch {
+            if method == "GET", let hit = OfflineApiCache.shared.get(url: urlStr, authTag: authTag) {
+                return hit
+            }
+            if Self.mutatingMethods.contains(method) {
+                enqueueOffline(req: req, urlStr: urlStr)
+                return Self.queuedBody
+            }
             throw ApiError.transport(error)
         }
+    }
+
+    private func enqueueOffline(req: URLRequest, urlStr: String) {
+        let bodyStr = req.httpBody.flatMap { String(data: $0, encoding: .utf8) }
+        let ct = req.value(forHTTPHeaderField: "Content-Type") ?? "application/json"
+        OfflineMutationQueue.shared.enqueue(QueuedMutation(
+            id: UUID().uuidString,
+            method: req.httpMethod ?? "POST",
+            url: urlStr,
+            body: bodyStr,
+            contentType: ct
+        ))
     }
 
     static func decodeOne<T: Decodable>(_ data: Data) throws -> T {

@@ -9,7 +9,7 @@ struct SimpleRow: Identifiable, Hashable {
     var meta: String?
 }
 
-/// Vista reutilizable con estados loading/error/empty/list.
+/// Vista reutilizable con estados loading/error/empty/list + búsqueda (paridad Android).
 struct SimpleListView: View {
     let title: String
     let rows: [SimpleRow]
@@ -18,10 +18,36 @@ struct SimpleListView: View {
     let onRetry: () -> Void
     let header: String?
 
+    @State private var query = ""
+
+    private var filtered: [SimpleRow] {
+        guard !query.isEmpty else { return rows }
+        let q = query.lowercased()
+        return rows.filter { row in
+            [row.title, row.subtitle, row.meta, row.trailing]
+                .compactMap { $0 }
+                .joined(separator: " ")
+                .lowercased()
+                .contains(q)
+        }
+    }
+
     var body: some View {
         List {
             if let header, !header.isEmpty {
                 Section { Text(header).font(.footnote).foregroundColor(.secondary) }
+            }
+            if !isLoading && errorMessage == nil && !rows.isEmpty {
+                Section {
+                    Text("\(filtered.count) de \(rows.count) registros")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    HStack {
+                        Image(systemName: "magnifyingglass").foregroundColor(.secondary)
+                        TextField("Buscar en \(title)", text: $query)
+                            .autocorrectionDisabled()
+                    }
+                }
             }
             if isLoading {
                 HStack { Spacer(); ProgressView(); Spacer() }
@@ -43,8 +69,12 @@ struct SimpleListView: View {
                 }
                 .padding(.vertical, 24)
                 .listRowSeparator(.hidden)
+            } else if filtered.isEmpty && !rows.isEmpty {
+                Text("Sin resultados con ese filtro.").foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity).padding(.vertical, 24)
+                    .listRowSeparator(.hidden)
             } else {
-                ForEach(rows) { row in
+                ForEach(filtered) { row in
                     VStack(alignment: .leading, spacing: 2) {
                         HStack {
                             Text(row.title).font(.body).bold()

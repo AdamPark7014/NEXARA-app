@@ -2,9 +2,11 @@ import SwiftUI
 
 struct PanelHubView: View {
     let onOpen: (PanelId) -> Void
+    let onOpenNotifications: () -> Void
     let onLogout: () -> Void
 
     @EnvironmentObject var session: SessionStore
+    @ObservedObject private var badge = NotificationsBadgeStore.shared
 
     private var panels: [PanelId] {
         PanelAccessResolver.accessiblePanels(user: session.currentUser)
@@ -49,12 +51,30 @@ struct PanelHubView: View {
                     }
                 }
                 Section {
+                    Button(action: onOpenNotifications) {
+                        HStack {
+                            Label("Notificaciones", systemImage: "bell")
+                            Spacer()
+                            if badge.unreadCount > 0 {
+                                Text("\(badge.unreadCount)")
+                                    .font(.caption.bold())
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(Color.red)
+                                    .clipShape(Capsule())
+                            }
+                        }
+                    }
+                }
+                Section {
                     Button(role: .destructive) { onLogout() } label: {
                         Label("Cerrar sesión", systemImage: "rectangle.portrait.and.arrow.right")
                     }
                 }
             }
             .navigationTitle("NEXARA")
+            .task { await badge.refresh() }
         }
     }
 }

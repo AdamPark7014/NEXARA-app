@@ -5,7 +5,9 @@ import SwiftUI
 struct CrmTabView: View {
     let onExit: () -> Void
     @State private var selectedTab: CrmTab = .dashboard
+    @State private var deepLinkModuleKey: String?
     @EnvironmentObject var session: SessionStore
+    @ObservedObject private var deepLink = DeepLinkCoordinator.shared
 
     private var isAdmin: Bool {
         guard let u = session.currentUser else { return false }
@@ -50,6 +52,11 @@ struct CrmTabView: View {
             .tabItem { Label("Más", systemImage: "ellipsis.circle") }
             .tag(CrmTab.more)
         }
+        .deepLinkModulePresenter(panel: .crm, presentedKey: $deepLinkModuleKey)
+        .onAppear { if let k = deepLink.consumeModule(for: .crm) { deepLinkModuleKey = k } }
+        .onChange(of: deepLink.pending) { _, _ in
+            if let k = deepLink.consumeModule(for: .crm) { deepLinkModuleKey = k }
+        }
     }
 }
 
@@ -60,6 +67,34 @@ struct CrmCotizacionesView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if !vm.items.isEmpty && !vm.isLoading {
+                HStack(spacing: 0) {
+                    crmKpi("Total", "\(vm.items.count)", .primary)
+                    Divider().frame(height: 32)
+                    crmKpi("Monto", fmtMxn(vm.totalMxn), .green)
+                }
+                .padding(.horizontal).padding(.vertical, 6)
+                .background(Color(.secondarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal).padding(.top, 8)
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(vm.statuses, id: \.self) { st in
+                        let sel = vm.statusFilter == st
+                        Button { vm.statusFilter = st } label: {
+                            Text(st.capitalized).font(.caption).bold()
+                                .padding(.horizontal, 12).padding(.vertical, 6)
+                                .background(sel ? Color.green : Color(.secondarySystemGroupedBackground))
+                                .foregroundColor(sel ? .white : .primary)
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
+                .padding(.horizontal).padding(.vertical, 8)
+            }
+
             // Search bar
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundColor(.secondary)
@@ -100,22 +135,34 @@ struct CrmCotizacionesView: View {
 final class CrmCotizacionesVM: ObservableObject {
     @Published var items: [[String: Any]] = []
     @Published var query = ""
+    @Published var statusFilter = "todos"
     @Published var isLoading = false
 
+    let statuses = ["todos", "pendiente", "aprobada", "rechazada", "en proceso"]
+
     var filtered: [[String: Any]] {
-        guard !query.isEmpty else { return items }
-        let q = query.lowercased()
-        return items.filter { row in
-            let folio  = cStr(row, "folio", "number").lowercased()
-            let client = cStr(row, "clientName", "cliente").lowercased()
-            return folio.contains(q) || client.contains(q)
+        var list = items
+        if statusFilter != "todos" {
+            list = list.filter { cStr($0, "status", "estatus", "estado").lowercased() == statusFilter }
         }
+        if !query.isEmpty {
+            let q = query.lowercased()
+            list = list.filter { row in
+                cStr(row, "folio", "number").lowercased().contains(q) ||
+                cStr(row, "clientName", "cliente").lowercased().contains(q)
+            }
+        }
+        return list
+    }
+
+    var totalMxn: Double {
+        items.reduce(0) { $0 + (cDouble($1, "total", "amount") ?? 0) }
     }
 
     func load() {
         isLoading = true
         Task {
-            items = await ExtraRepository.shared.cotizaciones()
+            items = (try? await CrmRepository.shared.cotizaciones()) ?? await ExtraRepository.shared.cotizaciones()
             isLoading = false
         }
     }
@@ -223,7 +270,12 @@ final class CrmLeadsVM: ObservableObject {
     func load() {
         isLoading = true
         Task {
-            items = await ExtraRepository.shared.clientTicketRequests()
+            let leads = (try? await CrmRepository.shared.leads()) ?? []
+            if leads.isEmpty {
+                items = await ExtraRepository.shared.clientTicketRequests()
+            } else {
+                items = leads
+            }
             isLoading = false
         }
     }
@@ -275,12 +327,17 @@ private struct CrmMoreView: View {
                 navRow(key: "plantillas",       icon: "📋", label: "Plantillas")
                 navRow(key: "leads",            icon: "🎯", label: "Leads")
                 navRow(key: "oportunidades",    icon: "💡", label: "Oportunidades")
+                navRow(key: "pipeline",         icon: "📊", label: "Pipeline")
+                navRow(key: "agenda",           icon: "📅", label: "Agenda")
                 navRow(key: "clientes",         icon: "🏢", label: "Clientes")
+                navRow(key: "productos",        icon: "📦", label: "Catálogo IT/CCTV")
                 navRow(key: "proyectos",        icon: "📐", label: "Proyectos")
+                navRow(key: "licitaciones",     icon: "📑", label: "Licitaciones")
             }
             Section("Mi equipo") {
                 navRow(key: "equipo-comparativa", icon: "📊", label: "Comparativa equipo")
                 navRow(key: "gestion-vendedores", icon: "👥", label: "Gestión vendedores")
+                navRow(key: "metas",              icon: "🎯", label: "Metas comerciales")
                 navRow(key: "reportes",           icon: "📈", label: "Reportes")
                 navRow(key: "crecimiento",        icon: "📉", label: "Crecimiento")
             }
@@ -342,10 +399,14 @@ private func cDouble(_ m: [String: Any], _ keys: String...) -> Double? {
     return nil
 }
 
-private func fmtMxn(_ v: Double) -> String {
-    let f = NumberFormatter()
-    f.numberStyle = .currency; f.currencyCode = "MXN"; f.maximumFractionDigits = 0
-    return f.string(from: NSNumber(value: v)) ?? "$\(Int(v))"
+private func fmtMxn(_ v: Double) -> String { crmMxn(v) }
+
+private func crmKpi(_ label: String, _ value: String, _ color: Color) -> some View {
+    VStack(spacing: 2) {
+        Text(value).font(.headline).bold().foregroundColor(color)
+        Text(label).font(.caption2).foregroundColor(.secondary)
+    }
+    .frame(maxWidth: .infinity)
 }
 
 private func cotStatusColor(_ status: String) -> Color {

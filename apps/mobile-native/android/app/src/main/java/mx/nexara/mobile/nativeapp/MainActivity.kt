@@ -3,6 +3,8 @@ package mx.nexara.mobile.nativeapp
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -23,6 +25,8 @@ import mx.nexara.mobile.nativeapp.data.api.ApiClient
 import mx.nexara.mobile.nativeapp.data.api.DevicesApi
 import mx.nexara.mobile.nativeapp.data.api.RegisterFcmTokenRequest
 import mx.nexara.mobile.nativeapp.push.NexaraNotifications
+import mx.nexara.mobile.nativeapp.access.DeepLinkParser
+import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
 import mx.nexara.mobile.nativeapp.ui.NexaraScaffold
 import mx.nexara.mobile.nativeapp.ui.NexaraApp
 import mx.nexara.mobile.nativeapp.ui.theme.NexaraTheme
@@ -36,6 +40,7 @@ class MainActivity : ComponentActivity() {
 
         NexaraNotifications.ensureChannels(this)
         NexaraOffline.install(applicationContext)
+        handleDeepLink(intent)
         askNotificationPermissionIfNeeded()
         refreshFcmToken()
 
@@ -51,6 +56,17 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleDeepLink(intent)
+    }
+
+    private fun handleDeepLink(intent: Intent?) {
+        val uri: Uri = intent?.data ?: return
+        PendingDeepLink.destination = DeepLinkParser.parse(uri)
     }
 
     private fun askNotificationPermissionIfNeeded() {

@@ -56,7 +56,8 @@ final class ExtraRepository {
     func gpsLocations() async       -> [[String: Any]] { await load("gps") }
 
     // Lunch break actions
-    func myLunchBreaks() async -> [[String: Any]] { await load("lunch-breaks/mine") }
+    func myLunchBreaks() async -> [[String: Any]] { await load("lunch-breaks/my-breaks") }
+    func teamLunchBreaks() async -> [[String: Any]] { await load("lunch-breaks/users") }
 
     func lunchCheckin(checkinTime: String, photoDataUrl: String?) async throws {
         struct Body: Encodable { let checkinTime: String; let checkinPhotoUrl: String? }

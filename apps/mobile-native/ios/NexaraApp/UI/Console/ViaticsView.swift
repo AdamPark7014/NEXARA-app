@@ -34,10 +34,20 @@ final class ViaticsVM: ObservableObject {
         items.filter { vStr($0, "status", "estatus").lowercased() == "pendiente" }.count
     }
 
-    func load() {
+    func load(personalOnly: Bool = false) {
         isLoading = true
         Task {
-            items     = await ExtraRepository.shared.viatics()
+            let all = (try? await ConsoleRepository.shared.viatics()) ?? await ExtraRepository.shared.viatics()
+            if personalOnly, let uid = SessionStore.shared.currentUser?.id {
+                items = all.filter { row in
+                    if let usuario = row["usuario"] as? [String: Any], let id = usuario["id"] {
+                        return String(describing: id) == uid
+                    }
+                    return vStr(row, "usuarioId", "userId", "usuario") == uid
+                }
+            } else {
+                items = all
+            }
             isLoading = false
         }
     }
@@ -46,6 +56,7 @@ final class ViaticsVM: ObservableObject {
 // MARK: – View
 
 struct ViaticsView: View {
+    var personalOnly: Bool = false
     @StateObject private var vm = ViaticsVM()
 
     var body: some View {
@@ -115,14 +126,14 @@ struct ViaticsView: View {
             }
             .padding(.vertical)
         }
-        .navigationTitle("Viáticos")
+        .navigationTitle(personalOnly ? "Mis viáticos" : "Viáticos")
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button { vm.load() } label: { Image(systemName: "arrow.clockwise") }
+                Button { vm.load(personalOnly: personalOnly) } label: { Image(systemName: "arrow.clockwise") }
             }
         }
-        .refreshable { vm.load() }
-        .task { vm.load() }
+        .refreshable { vm.load(personalOnly: personalOnly) }
+        .task { vm.load(personalOnly: personalOnly) }
     }
 }
 

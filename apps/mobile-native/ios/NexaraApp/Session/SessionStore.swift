@@ -29,6 +29,9 @@ final class SessionStore: ObservableObject {
 
     private init() {
         self.currentUser = load()
+        if let token = currentUser?.token {
+            RealtimeBus.shared.start(token: token)
+        }
     }
 
     var token: String? { currentUser?.token }
@@ -37,11 +40,14 @@ final class SessionStore: ObservableObject {
         currentUser = user
         guard let data = try? JSONEncoder().encode(user) else { return }
         writeKeychain(data)
+        QuickProfileStore.remember(user)
+        RealtimeBus.shared.start(token: user.token)
     }
 
     func clear() {
         currentUser = nil
         deleteKeychain()
+        RealtimeBus.shared.stop()
     }
 
     // MARK: Keychain

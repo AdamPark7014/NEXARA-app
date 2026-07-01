@@ -47,6 +47,8 @@ fun ConsoleMoreScreen(
     userEmail: String? = null,
     userAvatarUrl: String? = null,
     isSuperAdmin: Boolean = false,
+    showContabilidadHub: Boolean = false,
+    onOpenContabilidad: (() -> Unit)? = null,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(contentPadding),
@@ -62,6 +64,35 @@ fun ConsoleMoreScreen(
                 isSuperAdmin = isSuperAdmin,
             )
             Spacer(Modifier.height(16.dp))
+        }
+
+        if (showContabilidadHub && onOpenContabilidad != null) {
+            item(key = "hub-contabilidad") {
+                Card(
+                    onClick = onOpenContabilidad,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFEFF6FF)),
+                ) {
+                    Row(
+                        Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text("📊", fontSize = 22.sp)
+                        Column(Modifier.weight(1f)) {
+                            Text("Hub Contabilidad", fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Facturas, gastos y finanzas",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF64748B),
+                            )
+                        }
+                        Text("›", color = Color(0xFF64748B), fontSize = 20.sp)
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+            }
         }
 
         // ── Module groups ────────────────────────────────────────────────────

@@ -12,6 +12,11 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
     IPHONEOS_DEPLOYMENT_TARGET: "16.0"
 
+packages:
+  SocketIO:
+    url: https://github.com/socketio/socket.io-client-swift
+    from: 16.1.1
+
 targets:
   NexaraApp:
     type: application
@@ -19,12 +24,19 @@ targets:
     sources:
       - path: NexaraApp
       - path: Resources/Assets.xcassets
+    dependencies:
+      - package: SocketIO
+        product: SocketIO
     info:
       path: Resources/Info.plist
       properties:
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         ITSAppUsesNonExemptEncryption: false
+        CFBundleURLTypes:
+          - CFBundleURLName: mx.nexara.mobile
+            CFBundleURLSchemes:
+              - nexara
     entitlements:
       path: Resources/NexaraApp.entitlements
       properties:

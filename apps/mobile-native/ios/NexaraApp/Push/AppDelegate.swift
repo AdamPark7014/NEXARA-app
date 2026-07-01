@@ -5,7 +5,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ app: UIApplication,
                      didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         PushManager.shared.configure()
-        Task { await PushManager.shared.requestPermissionAndRegister() }
+        Task { @MainActor in
+            NetworkMonitor.shared.start()
+            await PushManager.shared.requestPermissionAndRegister()
+        }
         return true
     }
 
