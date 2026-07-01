@@ -67,6 +67,7 @@ enum ModuleCatalog {
         ModuleEntry("service-sheets", "Hojas de servicio", "📄", "/operacion/service-sheets"),
         ModuleEntry("documents", "Documentos", "📁", "/console/documents"),
         ModuleEntry("cvs", "CVs", "📑", "/console/cvs"),
+        ModuleEntry("recruiting", "Reclutamiento", "🔍", "/ops/recruiting"),
         ModuleEntry("client-tickets", "Tickets de clientes", "🎫", "/operacion/client-tickets"),
         ModuleEntry("service-clients", "Clientes de servicio", "🏬", "/ops/service-clients"),
         ModuleEntry("support", "Bandeja de soporte", "🆘", "/ops/support"),

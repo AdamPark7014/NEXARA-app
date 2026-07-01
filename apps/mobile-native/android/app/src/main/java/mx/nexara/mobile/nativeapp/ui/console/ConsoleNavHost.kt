@@ -402,6 +402,7 @@ fun ConsoleNavHost(
                     "assets" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.MaintenanceModuleScreen(initialTab = 1) } }
                     "service-sheets" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ServiceSheetsModuleScreen() } }
                     "cvs" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.CvsRichScreen() } }
+                    "recruiting" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.RecruitingScreen() } }
                     "service-clients" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ConsoleClientsScreen() } }
                     "client-tickets" -> { { mx.nexara.mobile.nativeapp.ui.console.screens.ClientTicketsModuleScreen() } }
                     "gestion-vendedores" -> { { mx.nexara.mobile.nativeapp.ui.ventas.VentasSalesTeamScreen() } }
@@ -416,7 +417,7 @@ fun ConsoleNavHost(
                         "documents","accounting","invoicing","banking","my-viatics",
                         "my-vehicles","my-preferences","work-projects",
                         "hr","warehouse","stock","procurement",
-                        "maintenance","assets","service-sheets","cvs","client-tickets","service-clients",
+                        "maintenance","assets","service-sheets","cvs","recruiting","client-tickets","service-clients",
                         "gestion-vendedores",
                     )) {
                     handled()

@@ -135,7 +135,7 @@ fun consoleSidebarGroups(user: SessionUser?, panelId: mx.nexara.mobile.nativeapp
         ),
         ConsoleSidebarGroup(
             "people", "RRHH y control de personal",
-            pick("attendance", "lunch-breaks", "fines", "cvs", "users", "hr", "orgchart", "kpis-hr"),
+            pick("attendance", "lunch-breaks", "fines", "cvs", "recruiting", "users", "hr", "orgchart", "kpis-hr"),
         ),
         ConsoleSidebarGroup(
             "commercial", "Clientes y comercial",
