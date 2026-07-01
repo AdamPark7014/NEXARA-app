@@ -355,23 +355,193 @@ final class MaintContractsVM: ObservableObject {
 
 struct MaintenanceContractsView: View {
     @StateObject private var vm = MaintContractsVM()
+    @State private var selected: [String: Any]?
+    @State private var query = ""
+
+    private var filtered: [[String: Any]] {
+        guard !query.isEmpty else { return vm.items }
+        let q = query.lowercased()
+        return vm.items.filter {
+            platStr($0, "name", "title", "contractNumber").lowercased().contains(q) ||
+            platStr($0, "clientName", "cliente").lowercased().contains(q)
+        }
+    }
 
     var body: some View {
-        List {
-            if vm.isLoading { ProgressView() }
-            if vm.items.isEmpty && !vm.isLoading {
-                Text("Sin contratos activos.").foregroundColor(.secondary)
-            }
-            ForEach(vm.items, id: \.platRowId) { c in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(platStr(c, "name", "title", "contractNumber")).font(.headline)
-                    Text(platStr(c, "clientName", "status")).font(.caption).foregroundColor(.secondary)
-                }
-            }
+        Group {
+            if let s = selected { contractDetail(s) } else { listBody }
         }
         .navigationTitle("Contratos")
         .task { vm.load() }
-        .refreshable { vm.load() }
+        .refreshable { if selected == nil { vm.load() } }
+    }
+
+    private var listBody: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass").foregroundColor(.secondary)
+                TextField("Buscar contrato o cliente…", text: $query).autocorrectionDisabled()
+                if !query.isEmpty { Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundColor(.secondary) } }
+            }
+            .padding(10)
+            .background(Color(.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding()
+
+            if vm.isLoading { Spacer(); ProgressView(); Spacer() }
+            else if filtered.isEmpty { Spacer(); Text("Sin contratos activos.").foregroundColor(.secondary); Spacer() }
+            else {
+                List(filtered, id: \.platRowId) { c in
+                    Button { selected = c } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(platStr(c, "name", "title", "contractNumber")).font(.headline)
+                                Text(platStr(c, "clientName", "cliente")).font(.caption).foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            let st = platStr(c, "status", "estado")
+                            if !st.isEmpty {
+                                Text(st.capitalized).font(.caption2).bold()
+                                    .foregroundColor(mcStatusColor(st))
+                                    .padding(.horizontal, 7).padding(.vertical, 2)
+                                    .background(mcStatusColor(st).opacity(0.13)).clipShape(Capsule())
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .listStyle(.plain)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func contractDetail(_ c: [String: Any]) -> some View {
+        let activities = (c["activities"] as? [[String: Any]]) ?? (c["actividades"] as? [[String: Any]]) ?? []
+        let slaList    = (c["sla"] as? [[String: Any]]) ?? (c["slaEntries"] as? [[String: Any]]) ?? []
+        let inventory  = (c["inventory"] as? [[String: Any]]) ?? (c["inventario"] as? [[String: Any]]) ?? []
+
+        _ContractDetailTabs(contract: c, activities: activities, slaList: slaList, inventory: inventory, onBack: { selected = nil })
+    }
+}
+
+private struct _ContractDetailTabs: View {
+    let contract: [String: Any]
+    let activities: [[String: Any]]
+    let slaList: [[String: Any]]
+    let inventory: [[String: Any]]
+    let onBack: () -> Void
+    @State private var tab = 0
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 0) {
+                    ForEach(["Info", "Actividades", "SLA", "Inventario"].enumerated().map { $0 }, id: \.offset) { i, t in
+                        Button { tab = i } label: {
+                            Text(t).font(.subheadline).bold()
+                                .padding(.horizontal, 14).padding(.vertical, 10)
+                                .foregroundColor(tab == i ? .teal : .primary)
+                                .overlay(alignment: .bottom) {
+                                    if tab == i { Rectangle().fill(Color.teal).frame(height: 2) }
+                                }
+                        }
+                    }
+                }
+            }
+            Divider()
+
+            List {
+                Section {
+                    HStack {
+                        Button("← Lista") { onBack() }
+                        Spacer()
+                        let st = platStr(contract, "status", "estado")
+                        if !st.isEmpty {
+                            Text(st.capitalized).font(.caption).bold().foregroundColor(mcStatusColor(st))
+                                .padding(.horizontal, 8).padding(.vertical, 3)
+                                .background(mcStatusColor(st).opacity(0.12)).clipShape(Capsule())
+                        }
+                    }
+                }
+
+                switch tab {
+                case 0: // Info
+                    Section("Contrato") {
+                        mcRow("Número", platStr(contract, "contractNumber", "number", "folio"))
+                        mcRow("Nombre", platStr(contract, "name", "title"))
+                        mcRow("Cliente", platStr(contract, "clientName", "cliente"))
+                        mcRow("Tipo", platStr(contract, "type", "tipo", "contractType"))
+                        mcRow("Estado", platStr(contract, "status", "estado"))
+                        mcRow("Inicio", String(platStr(contract, "startDate", "fechaInicio").prefix(10)))
+                        mcRow("Vencimiento", String(platStr(contract, "expiresAt", "endDate", "fechaFin").prefix(10)))
+                        mcRow("Monto", platStr(contract, "amount", "monto", "total"))
+                        mcRow("Renovación", platStr(contract, "renewal", "renovacion"))
+                    }
+                case 1: // Actividades
+                    if activities.isEmpty {
+                        Section { Text("Sin actividades.").foregroundColor(.secondary) }
+                    } else {
+                        Section("Actividades (\(activities.count))") {
+                            ForEach(Array(activities.enumerated()), id: \.offset) { _, a in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(platStr(a, "title", "titulo", "anNumber")).font(.subheadline.bold())
+                                    let st2 = platStr(a, "status", "estado")
+                                    if !st2.isEmpty { Text(st2.capitalized).font(.caption).foregroundColor(.secondary) }
+                                }
+                            }
+                        }
+                    }
+                case 2: // SLA
+                    if slaList.isEmpty {
+                        Section { Text("Sin métricas SLA.").foregroundColor(.secondary) }
+                    } else {
+                        Section("SLA") {
+                            ForEach(Array(slaList.enumerated()), id: \.offset) { _, s in
+                                HStack {
+                                    Text(platStr(s, "name", "metrica")).font(.subheadline)
+                                    Spacer()
+                                    Text(platStr(s, "value", "valor")).font(.subheadline.bold()).foregroundColor(.teal)
+                                }
+                            }
+                        }
+                    }
+                default: // Inventario
+                    if inventory.isEmpty {
+                        Section { Text("Sin inventario registrado.").foregroundColor(.secondary) }
+                    } else {
+                        Section("Inventario (\(inventory.count))") {
+                            ForEach(Array(inventory.enumerated()), id: \.offset) { _, item in
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(platStr(item, "name", "nombre", "description")).font(.subheadline.bold())
+                                        Text(platStr(item, "serial", "serialNumber", "modelo")).font(.caption).foregroundColor(.secondary)
+                                    }
+                                    Spacer()
+                                    let qty = platStr(item, "quantity", "cantidad")
+                                    if !qty.isEmpty { Text("x\(qty)").font(.caption2).foregroundColor(.teal) }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .listStyle(.insetGrouped)
+        }
+    }
+
+    @ViewBuilder private func mcRow(_ k: String, _ v: String) -> some View {
+        if !v.isEmpty { HStack { Text(k); Spacer(); Text(v).foregroundColor(.secondary) } }
+    }
+}
+
+private func mcStatusColor(_ status: String) -> Color {
+    switch status.lowercased() {
+    case "activo", "active", "vigente": return .green
+    case "vencido", "expired", "inactivo": return .red
+    case "por_vencer", "por vencer", "próximo": return .orange
+    default: return .secondary
     }
 }
 
