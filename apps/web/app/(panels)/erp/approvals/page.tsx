@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
@@ -216,6 +217,15 @@ export default function ApprovalsPage() {
           <Button size="sm" variant="ghost" onClick={() => void fetchPending()} style={{ marginLeft: "auto" }}>
             Reintentar
           </Button>
+        </div>
+      )}
+
+      {!loading && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 16 }}>
+          <KpiCard label="Pendientes totales" value={counts.all} variant={counts.all > 0 ? "warning" : "positive"} icon="📋" hint={counts.all === 0 ? "Bandeja limpia" : "Requieren decisión"} />
+          <KpiCard label="Prioridad alta" value={counts.Alta} variant={counts.Alta > 0 ? "danger" : "positive"} icon="🔴" hint={counts.Alta > 0 ? "Atención inmediata" : "Sin urgentes"} />
+          <KpiCard label="Prioridad media" value={counts.Media} variant={counts.Media > 0 ? "accent" : "default"} icon="🟡" />
+          <KpiCard label="Prioridad baja" value={counts.Baja} icon="🟢" />
         </div>
       )}
 

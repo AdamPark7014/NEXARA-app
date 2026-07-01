@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import { Tag } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { getStudioSectionConfig } from "@/lib/section-views";
@@ -171,6 +172,14 @@ export default function StudioCasesPage() {
       {error && (
         <div style={{ padding: 12, borderRadius: 10, background: "color-mix(in srgb, var(--danger) 10%, transparent)", color: "var(--danger)", marginBottom: 12, fontSize: 13 }}>
           {error}
+        </div>
+      )}
+
+      {!loading && items.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 18 }}>
+          <KpiCard label="Casos totales" value={items.length} icon="🏆" />
+          <KpiCard label="Publicados" value={items.filter(c => c.publicado).length} variant="positive" icon="✅" hint="Visibles en el sitio" />
+          <KpiCard label="Borradores" value={items.filter(c => !c.publicado).length} variant={items.filter(c => !c.publicado).length > 0 ? "warning" : "default"} icon="📝" hint="Pendientes de publicar" />
         </div>
       )}
 

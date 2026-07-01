@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { getOpsTeamSectionConfig } from "@/lib/section-views";
@@ -226,6 +227,14 @@ export default function ServiceClientsPage() {
               {saving ? "Guardando…" : editing ? "Guardar" : "Agregar"}
             </Button>
           </div>
+        </div>
+      )}
+
+      {!loading && items.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 18 }}>
+          <KpiCard label="Clientes totales" value={items.length} icon="🏢" />
+          <KpiCard label="Activos" value={items.filter(c => c.estado === "Activo").length} variant="positive" icon="✅" hint="Con contrato vigente" />
+          <KpiCard label="Inactivos" value={items.filter(c => c.estado !== "Activo").length} variant={items.filter(c => c.estado !== "Activo").length > 0 ? "warning" : "default"} icon="⛔" />
         </div>
       )}
 
