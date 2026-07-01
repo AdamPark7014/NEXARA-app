@@ -70,17 +70,13 @@ struct ModuleRouter {
                 toRow($0, title: ["description","descripcion","concepto"], subtitle: ["account","cuenta"])
             } }
         case (.console, "invoicing"), (.contabilidad, "invoicing"):
-            GenericListModuleView(title: "Facturación") { (await ExtraRepository.shared.invoices()).map {
-                toRow($0, title: ["folio","invoiceNumber"], subtitle: ["clientName","cliente"], meta: ["total"])
-            } }
+            InvoicesView()
         case (.console, "banking"), (.contabilidad, "banking"):
             GenericListModuleView(title: "Banca") { (await ExtraRepository.shared.bankAccounts()).map {
                 toRow($0, title: ["name","nombre","alias"], subtitle: ["bank","banco","accountNumber"], meta: ["balance","saldo"])
             } }
         case (.console, "expenses"), (.contabilidad, "expenses"):
-            GenericListModuleView(title: "Gastos") { (await ExtraRepository.shared.expenses()).map {
-                toRow($0, title: ["concept","concepto","descripcion"], subtitle: ["category","categoria"], meta: ["amount","total"])
-            } }
+            ExpensesView()
         case (.console, "fines"), (.contabilidad, "multas"):
             GenericListModuleView(title: "Multas") { (await ExtraRepository.shared.fines()).map {
                 toRow($0, title: ["reason","motivo","concepto"], subtitle: ["userName","empleado"], meta: ["amount","total"])
@@ -96,51 +92,21 @@ struct ModuleRouter {
         case (.web, "dashboard"), (.studio, "dashboard"):
             StudioDashboardView()
         case (.studio, "hero"):
-            StudioListModuleView(
-                title: "Carrusel inicio",
-                loader: { try await StudioRepository.shared.heroSlides() },
-                rowTitle: { $0["caption"] as? String ?? $0["altText"] as? String ?? "Slide" },
-                rowSubtitle: { ($0["isActive"] as? Bool == false) ? "Inactivo" : "Activo" }
-            )
+            StudioHeroView()
         case (.studio, "cases"):
-            StudioListModuleView(
-                title: "Casos de éxito",
-                loader: { try await StudioRepository.shared.caseStudies() },
-                rowTitle: { $0["titulo"] as? String ?? "—" },
-                rowSubtitle: { $0["cliente"] as? String ?? "" }
-            )
+            StudioCasesView()
         case (.studio, "news"):
-            GenericListModuleView(title: "Noticias") { (await ExtraRepository.shared.news()).map {
-                toRow($0, title: ["title","titulo"], subtitle: ["summary","excerpt"])
-            } }
-        case (.studio, "contacts"), (.studio, "leads"):
-            StudioListModuleView(
-                title: "Contactos",
-                loader: { try await StudioRepository.shared.contactMessages() },
-                rowTitle: { $0["subject"] as? String ?? $0["name"] as? String ?? "—" },
-                rowSubtitle: { $0["email"] as? String ?? "" }
-            )
+            StudioNewsView()
+        case (.studio, "contacts"):
+            StudioContactsView(leadsOnly: false)
+        case (.studio, "leads"):
+            StudioContactsView(leadsOnly: true)
         case (.studio, "social"):
-            StudioListModuleView(
-                title: "Redes sociales",
-                loader: { try await StudioRepository.shared.socialPosts() },
-                rowTitle: { $0["titulo"] as? String ?? "—" },
-                rowSubtitle: { ($0["red"] as? String ?? "") + " · " + ($0["estado"] as? String ?? "") }
-            )
+            StudioSocialView()
         case (.studio, "newsletter"):
-            StudioListModuleView(
-                title: "Newsletter",
-                loader: { try await StudioRepository.shared.newsletter() },
-                rowTitle: { $0["email"] as? String ?? "—" },
-                rowSubtitle: { $0["name"] as? String ?? "" }
-            )
+            StudioNewsletterView()
         case (.studio, "pages"):
-            StudioListModuleView(
-                title: "Secciones del sitio",
-                loader: { try await StudioRepository.shared.pageSections().map { ["section": $0] } },
-                rowTitle: { $0["section"] as? String ?? "—" },
-                rowSubtitle: { _ in "Contenido de landing" }
-            )
+            StudioPagesView()
         case (.console, "analytics"), (.ventas, "crecimiento"),
              (.ventas, "reportes"), (.ventas, "equipo-comparativa"):
             AnalyticsRawView()

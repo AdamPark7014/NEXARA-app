@@ -7,53 +7,201 @@ final class StudioRepository {
 
     private init() {}
 
-    func dashboardStats() async throws -> (contacts: Int, casesTotal: Int, casesPublished: Int, socialDrafts: Int) {
+    // MARK: Dashboard
+
+    func dashboardStats() async throws -> StudioDashboardStats {
         async let contactsData = api.get("contact-messages", query: ["limit": "1"])
         async let casesData = api.get("case-studies", query: ["limit": "100"])
         async let socialData = api.get("social-posts", query: ["limit": "6"])
 
         let cRaw = try await contactsData
-        let casesRaw = try await casesData
-        let socialRaw = try await socialData
+        let cases = try decodeList(CaseStudy.self, from: try await casesData)
+        let social = try decodeList(SocialPost.self, from: try await socialData)
+            .filter { $0.estado == "Programado" || $0.estado == "Borrador" }
 
         let contacts = parseTotal(cRaw) ?? ApiClient.decodeMapList(cRaw).count
-        let cases = ApiClient.decodeMapList(casesRaw)
-        let published = cases.filter { ($0["publicado"] as? Bool) == true }.count
-        let social = ApiClient.decodeMapList(socialRaw)
-            .filter { let e = $0["estado"] as? String; return e == "Programado" || e == "Borrador" }
+        let published = cases.filter { $0.publicado == true }.count
 
-        return (contacts, cases.count, published, social.count)
+        return StudioDashboardStats(
+            contacts: contacts,
+            casesTotal: cases.count,
+            casesPublished: published,
+            socialDrafts: Array(social.prefix(4))
+        )
     }
 
-    func heroSlides() async throws -> [[String: Any]] {
-        ApiClient.decodeMapList(try await api.get("hero-slides"))
+    // MARK: Hero
+
+    func heroSlides() async throws -> [HeroSlide] {
+        try decodeList(HeroSlide.self, from: try await api.get("hero-slides"))
+            .sorted { ($0.position ?? 0) < ($1.position ?? 0) }
     }
 
-    func caseStudies() async throws -> [[String: Any]] {
-        ApiClient.decodeMapList(try await api.get("case-studies", query: ["limit": "100"]))
+    func createHeroSlide(
+        altText: String?, caption: String?, href: String?,
+        position: Int?, isActive: Bool, imageData: Data?, fileName: String?
+    ) async throws -> HeroSlide {
+        var fields: [String: String] = ["isActive": isActive ? "true" : "false"]
+        if let v = altText, !v.isEmpty { fields["altText"] = v }
+        if let v = caption, !v.isEmpty { fields["caption"] = v }
+        if let v = href, !v.isEmpty { fields["href"] = v }
+        if let v = position { fields["position"] = String(v) }
+
+        let data = try await api.uploadMultipart(
+            "hero-slides", method: "POST",
+            fields: fields,
+            fileField: imageData != nil ? "image" : nil,
+            fileData: imageData,
+            fileName: fileName
+        )
+        return try ApiClient.decodeOne(data)
     }
 
-    func socialPosts() async throws -> [[String: Any]] {
-        ApiClient.decodeMapList(try await api.get("social-posts", query: ["limit": "50"]))
+    func updateHeroSlide(
+        id: Int64, altText: String?, caption: String?, href: String?,
+        position: Int?, isActive: Bool?, imageData: Data?, fileName: String?
+    ) async throws -> HeroSlide {
+        var fields: [String: String] = [:]
+        if let v = altText { fields["altText"] = v }
+        if let v = caption { fields["caption"] = v }
+        if let v = href { fields["href"] = v }
+        if let v = position { fields["position"] = String(v) }
+        if let v = isActive { fields["isActive"] = v ? "true" : "false" }
+
+        let data = try await api.uploadMultipart(
+            "hero-slides/\(id)", method: "PUT",
+            fields: fields,
+            fileField: imageData != nil ? "image" : nil,
+            fileData: imageData,
+            fileName: fileName
+        )
+        return try ApiClient.decodeOne(data)
     }
+
+    func reorderHeroSlides(ids: [Int64]) async throws {
+        _ = try await api.patchJSON("hero-slides/reorder", body: ReorderHeroBody(ids: ids))
+    }
+
+    func deleteHeroSlide(id: Int64) async throws {
+        try await api.delete("hero-slides/\(id)")
+    }
+
+    // MARK: Cases
+
+    func caseStudies() async throws -> [CaseStudy] {
+        try decodeList(CaseStudy.self, from: try await api.get("case-studies", query: ["limit": "100"]))
+    }
+
+    func createCaseStudy(_ body: CreateCaseStudyBody) async throws -> CaseStudy {
+        try ApiClient.decodeOne(try await api.postJSON("case-studies", body: body))
+    }
+
+    func updateCaseStudy(id: Int64, _ body: UpdateCaseStudyBody) async throws -> CaseStudy {
+        try ApiClient.decodeOne(try await api.patchJSON("case-studies/\(id)", body: body))
+    }
+
+    func toggleCasePublicado(id: Int64) async throws -> CaseStudy {
+        try ApiClient.decodeOne(try await api.patchJSON("case-studies/\(id)/toggle-publicado", body: EmptyBody()))
+    }
+
+    func deleteCaseStudy(id: Int64) async throws {
+        try await api.delete("case-studies/\(id)")
+    }
+
+    // MARK: Social
+
+    func socialPosts(estado: String? = nil) async throws -> [SocialPost] {
+        var q = ["limit": "50"]
+        if let e = estado { q["estado"] = e }
+        return try decodeList(SocialPost.self, from: try await api.get("social-posts", query: q))
+    }
+
+    func createSocialPost(_ body: CreateSocialPostBody) async throws -> SocialPost {
+        try ApiClient.decodeOne(try await api.postJSON("social-posts", body: body))
+    }
+
+    func updateSocialPost(id: Int64, _ body: UpdateSocialPostBody) async throws -> SocialPost {
+        try ApiClient.decodeOne(try await api.patchJSON("social-posts/\(id)", body: body))
+    }
+
+    func setSocialEstado(id: Int64, estado: String) async throws -> SocialPost {
+        try ApiClient.decodeOne(try await api.patchJSON("social-posts/\(id)/estado", body: SocialEstadoBody(estado: estado)))
+    }
+
+    func deleteSocialPost(id: Int64) async throws {
+        try await api.delete("social-posts/\(id)")
+    }
+
+    // MARK: News
+
+    func news(search: String? = nil, status: String? = nil) async throws -> [NewsPost] {
+        var q: [String: String] = [:]
+        if let s = search, !s.isEmpty { q["search"] = s }
+        if let s = status { q["status"] = s }
+        return try decodeList(NewsPost.self, from: try await api.get("news", query: q))
+    }
+
+    func createNews(_ body: CreateNewsBody) async throws -> NewsPost {
+        try ApiClient.decodeOne(try await api.postJSON("news", body: body))
+    }
+
+    func updateNews(id: Int64, _ body: UpdateNewsBody) async throws -> NewsPost {
+        try ApiClient.decodeOne(try await api.putJSON("news/\(id)", body: body))
+    }
+
+    func deleteNews(id: Int64) async throws {
+        try await api.delete("news/\(id)")
+    }
+
+    // MARK: Contacts
+
+    func contactMessages(limit: Int = 100) async throws -> [ContactMessage] {
+        try decodeList(ContactMessage.self, from: try await api.get("contact-messages", query: ["limit": String(limit)]))
+    }
+
+    func updateContactMessage(id: Int64, _ body: UpdateContactMessageBody) async throws -> ContactMessage {
+        try ApiClient.decodeOne(try await api.putJSON("contact-messages/\(id)", body: body))
+    }
+
+    func deleteContactMessage(id: Int64) async throws {
+        try await api.delete("contact-messages/\(id)")
+    }
+
+    // MARK: Newsletter
+
+    func newsletter(search: String? = nil) async throws -> [NewsletterSubscriber] {
+        var q: [String: String] = [:]
+        if let s = search, !s.isEmpty { q["search"] = s }
+        return try decodeList(NewsletterSubscriber.self, from: try await api.get("newsletter", query: q))
+    }
+
+    // MARK: Pages
 
     func pageSections() async throws -> [String] {
         let data = try await api.get("studio/page-content/sections")
-        if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let sections = obj["sections"] as? [String] {
-            return sections
+        if let resp = try? JSONDecoder().decode(PageSectionsResponse.self, from: data) {
+            return resp.sections ?? []
         }
         return []
     }
 
-    func contactMessages() async throws -> [[String: Any]] {
-        ApiClient.decodeMapList(try await api.get("contact-messages", query: ["limit": "50"]))
+    func getPageContent(section: String) async throws -> PageContent {
+        try ApiClient.decodeOne(try await api.get("studio/page-content/\(section)"))
     }
 
-    func newsletter(search: String? = nil) async throws -> [[String: Any]] {
-        var q: [String: String] = [:]
-        if let s = search, !s.isEmpty { q["search"] = s }
-        return ApiClient.decodeMapList(try await api.get("newsletter", query: q))
+    func upsertPageContent(section: String, content: Any) async throws -> PageContent {
+        try ApiClient.decodeOne(try await api.putJSON(
+            "studio/page-content/\(section)",
+            body: UpsertPageContentBody(content: AnyCodable(content))
+        ))
+    }
+
+    // MARK: Private
+
+    private struct EmptyBody: Encodable {}
+
+    private func decodeList<T: Decodable>(_ type: T.Type, from data: Data) throws -> [T] {
+        try ApiClient.decodeList(data)
     }
 
     private func parseTotal(_ data: Data) -> Int? {
