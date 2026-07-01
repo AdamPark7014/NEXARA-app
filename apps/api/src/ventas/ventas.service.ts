@@ -265,6 +265,8 @@ export class VentasService {
         legalName: dto.legalName || null,
         taxId: dto.taxId || null,
         fiscalAddress: dto.fiscalAddress || null,
+        fiscalZipCode: dto.fiscalZipCode?.trim() || null,
+        fiscalRegime: dto.fiscalRegime?.trim() || null,
         billingEmail: dto.billingEmail || null,
         billingPhone: dto.billingPhone || null,
         industry: dto.industry || null,
@@ -316,6 +318,33 @@ export class VentasService {
     return client;
   }
 
+  /** Facturas CFDI vinculadas al cliente comercial (ERP ↔ CRM). */
+  async listClientInvoices(clientId: number, user?: any) {
+    await this.getClient(clientId, user);
+    return this.prisma.invoice.findMany({
+      where: { clientId, deletedAt: null },
+      orderBy: [{ issueDate: 'desc' }, { id: 'desc' }],
+      select: {
+        id: true,
+        invoiceNumber: true,
+        status: true,
+        issueDate: true,
+        dueDate: true,
+        totalAmount: true,
+        paidAmount: true,
+        currency: true,
+        cfdiUuid: true,
+        pdfUrl: true,
+        salesProjectOrder: {
+          select: {
+            orderId: true,
+            project: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+  }
+
   async updateClient(id: number, dto: UpdateSalesClientDto, user?: any) {
     const existing = await this.getClient(id, user);
     const ownerId = this.resolveOwnerForWrite(dto.ownerId, user, existing.ownerId);
@@ -326,6 +355,8 @@ export class VentasService {
         legalName: dto.legalName,
         taxId: dto.taxId,
         fiscalAddress: dto.fiscalAddress,
+        fiscalZipCode: dto.fiscalZipCode?.trim() ?? undefined,
+        fiscalRegime: dto.fiscalRegime?.trim() ?? undefined,
         billingEmail: dto.billingEmail,
         billingPhone: dto.billingPhone,
         industry: dto.industry,

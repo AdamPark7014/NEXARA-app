@@ -27,7 +27,8 @@ export default function ClientDetailPage() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     name: "", legalName: "", taxId: "", billingEmail: "", billingPhone: "",
-    industry: "", status: "", fiscalAddress: "", website: "", notes: "",
+    industry: "", status: "", fiscalAddress: "", fiscalZipCode: "", fiscalRegime: "601",
+    website: "", notes: "",
   });
 
   if (error) return <DetailError message={error} onRetry={reload} />;
@@ -43,6 +44,8 @@ export default function ClientDetailPage() {
       industry: client.industry ?? "PyME",
       status: client.status ?? "Prospecto",
       fiscalAddress: client.fiscalAddress ?? "",
+      fiscalZipCode: client.fiscalZipCode ?? "",
+      fiscalRegime: client.fiscalRegime ?? "601",
       website: client.website ?? "",
       notes: client.notes ?? "",
     });
@@ -79,6 +82,8 @@ export default function ClientDetailPage() {
             { label: "Nombre comercial *", key: "name", ph: "Marca o alias", span: true },
             { label: "Razón social", key: "legalName", ph: "Empresa S.A. de C.V.", span: true },
             { label: "RFC", key: "taxId", ph: "ABC123456XYZ0" },
+            { label: "CP fiscal (CFDI)", key: "fiscalZipCode", ph: "64000" },
+            { label: "Régimen fiscal", key: "fiscalRegime", ph: "601" },
             { label: "Sitio web", key: "website", ph: "https://www.empresa.com" },
             { label: "Email facturación", key: "billingEmail", ph: "facturación@empresa.com" },
             { label: "Teléfono", key: "billingPhone", ph: "222 555 1234" },
@@ -130,6 +135,8 @@ export default function ClientDetailPage() {
         <DetailField label="Nombre comercial" value={client.name} />
         <DetailField label="Razón social" value={client.legalName} />
         <DetailField label="RFC" value={client.taxId} />
+        <DetailField label="CP fiscal" value={client.fiscalZipCode} />
+        <DetailField label="Régimen fiscal" value={client.fiscalRegime} />
         <DetailField label="Industria" value={client.industry} />
         <DetailField label="Email facturación" value={client.billingEmail} />
         <DetailField label="Teléfono" value={client.billingPhone} />

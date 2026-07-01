@@ -101,6 +101,35 @@ export class AccountingService {
     return value ? value : undefined;
   }
 
+  /** Extrae CP mexicano (5 dígitos) de dirección fiscal u otros textos. */
+  private extractMexicanZip(...sources: Array<string | null | undefined>): string | null {
+    for (const src of sources) {
+      if (!src) continue;
+      const match = String(src).match(/\b(\d{5})\b/);
+      if (match?.[1]) return match[1];
+    }
+    return null;
+  }
+
+  /** Claves SAT para líneas de orden de cierre → factura CFDI. */
+  private resolveSatKeysForOrderLine(line: {
+    product?: { specifications?: unknown; itemType?: string } | null;
+    unit?: string | null;
+    category?: string | null;
+  }) {
+    const spec =
+      line.product?.specifications && typeof line.product.specifications === 'object'
+        ? (line.product.specifications as Record<string, unknown>)
+        : {};
+    const satProductKey = String(
+      spec.satProductKey || spec.claveProdServ || spec.claveProducto || '80101500',
+    ).trim();
+    const defaultUnit = line.product?.itemType === 'PRODUCT' ? 'H87' : 'E48';
+    const satUnitKey = String(spec.satUnitKey || spec.claveUnidad || defaultUnit).trim();
+    const unitName = line.unit?.trim() || String(spec.unitName || 'Servicio');
+    return { satProductKey, satUnitKey, unitName };
+  }
+
   // ── Chart of Accounts ─────────────────────────────────────────────
   async createAccount(dto: {
     code: string;
@@ -573,7 +602,7 @@ export class AccountingService {
     const order = await this.prisma.salesProjectOrder.findUnique({
       where: { projectId },
       include: {
-        lines: { orderBy: { sortOrder: 'asc' } },
+        lines: { orderBy: { sortOrder: 'asc' }, include: { product: true } },
         invoice: true,
         project: { include: { opportunity: { include: { client: true } } } },
       },
@@ -604,6 +633,11 @@ export class AccountingService {
 
     const today = new Date().toISOString().slice(0, 10);
     const due = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const receptorZip =
+      client.fiscalZipCode?.trim() ||
+      this.extractMexicanZip(client.fiscalAddress) ||
+      undefined;
+    const receptorRegime = client.fiscalRegime?.trim() || '601';
 
     const invoice = await this.createInvoice(
       {
@@ -614,18 +648,26 @@ export class AccountingService {
         notes: `Factura generada desde orden ${order.orderId} — ${order.project.name}`,
         receptorRfc: client.taxId ?? undefined,
         receptorName: client.legalName || client.name,
+        receptorZipCode: receptorZip,
+        receptorRegime,
+        cfdiUsage: 'G03',
+        satPaymentForm: '03',
+        satPaymentMethod: 'PUE',
         items: selectedLines.map((line) => {
           const qty = Number(line.qty);
           const unitPrice = Number(line.unitPrice);
           const lineSubtotal = qty * unitPrice;
+          const sat = this.resolveSatKeysForOrderLine(line);
           return {
             description: line.name,
             quantity: qty,
             unitPrice,
             taxRate: Number(line.tax),
-            ivaRate: Number(line.tax),
+            ivaRate: Number(line.tax) || 16,
             productId: line.productId ?? undefined,
-            unitName: line.unit || 'Servicio',
+            unitName: sat.unitName,
+            satProductKey: sat.satProductKey,
+            satUnitKey: sat.satUnitKey,
             discount: lineSubtotal * (Number(line.discount) / 100),
           };
         }),

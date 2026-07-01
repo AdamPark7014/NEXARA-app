@@ -60,6 +60,20 @@ export class VentasClientesController {
     return this.ventasService.getClient(id, user);
   }
 
+  @Get(':id/facturas')
+  @UseGuards(AuthGuard('jwt'), RbacGuard)
+  @RBAC({
+    anyPermissions: [
+      PERMISSIONS.SALES_VIEW,
+      PERMISSIONS.PANEL_VENTAS,
+      PERMISSIONS.INVOICING_VIEW,
+      PERMISSIONS.CONTABILIDAD_VIEW,
+    ],
+  })
+  listFacturas(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.ventasService.listClientInvoices(id, user);
+  }
+
   @Patch(':id')
   @UseGuards(AuthGuard('jwt'), RbacGuard)
   @RBAC({ anyPermissions: SALES_MANAGE_ACCESS })

@@ -18,6 +18,14 @@ export class CreateSalesClientDto {
 
   @IsOptional()
   @IsString()
+  fiscalZipCode?: string;
+
+  @IsOptional()
+  @IsString()
+  fiscalRegime?: string;
+
+  @IsOptional()
+  @IsString()
   billingEmail?: string;
 
   @IsOptional()
