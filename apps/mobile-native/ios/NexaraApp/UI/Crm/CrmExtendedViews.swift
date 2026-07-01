@@ -225,9 +225,10 @@ struct CrmClientDetailView: View {
     @State private var tab = 0
     @State private var cotizaciones: [[String: Any]] = []
     @State private var oportunidades: [[String: Any]] = []
+    @State private var tickets: [[String: Any]] = []
     @State private var loading = true
 
-    private let tabs = ["Info", "Cotizaciones", "Oportunidades"]
+    private let tabs = ["Info", "Cotizaciones", "Oportunidades", "Tickets"]
     private var clientName: String { ConsoleHelpers.mapStr(client, "name", "nombre", "razonSocial") }
     private var clientId: String { ConsoleHelpers.mapStr(client, "id") }
 
@@ -253,7 +254,8 @@ struct CrmClientDetailView: View {
                 switch tab {
                 case 0: infoTab
                 case 1: cotizacionesTab
-                default: oportunidadesTab
+                case 2: oportunidadesTab
+                default: ticketsTab
                 }
             }
         }
@@ -327,12 +329,41 @@ struct CrmClientDetailView: View {
         }
     }
 
+    private var ticketsTab: some View {
+        let prefix6 = clientName.lowercased().prefix(6)
+        let tks = tickets.filter { t in
+            let cn = (t["clientName"] as? String ?? t["branchName"] as? String ?? "").lowercased()
+            return clientName.isEmpty || cn.contains(prefix6)
+        }
+        return Group {
+            if tks.isEmpty {
+                VStack { Spacer(); Text("Sin tickets del cliente").foregroundColor(.secondary); Spacer() }
+            } else {
+                List(tks, id: \.crmKey) { t in
+                    let subject = ConsoleHelpers.mapStr(t, "subject", "descripcion", "title")
+                    let status  = ConsoleHelpers.mapStr(t, "status", "estado")
+                    let date    = String(ConsoleHelpers.mapStr(t, "createdAt", "fecha").prefix(10))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(subject.isEmpty ? "Ticket" : subject).font(.subheadline).bold()
+                        HStack {
+                            Text(status).font(.caption).foregroundColor(.orange)
+                            Spacer()
+                            if !date.isEmpty { Text(date).font(.caption2).foregroundColor(.secondary) }
+                        }
+                    }
+                }.listStyle(.plain)
+            }
+        }
+    }
+
     private func load() async {
         async let cots = ExtraRepository.shared.cotizaciones()
         async let opps = (try? await CrmRepository.shared.oportunidades()) ?? []
-        let (c, o) = await (cots, opps)
+        async let tks  = ExtraRepository.shared.clientTickets()
+        let (c, o, t) = await (cots, opps, tks)
         cotizaciones = c
         oportunidades = o
+        tickets = t
         loading = false
     }
 }

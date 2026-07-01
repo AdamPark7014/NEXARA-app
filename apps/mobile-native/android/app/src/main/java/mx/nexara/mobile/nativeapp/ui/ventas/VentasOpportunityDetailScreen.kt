@@ -2,6 +2,7 @@ package mx.nexara.mobile.nativeapp.ui.ventas
 
 import android.app.Application
 import android.net.Uri
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -28,8 +30,10 @@ import mx.nexara.mobile.nativeapp.data.api.toAbsoluteAssetUrl
 import mx.nexara.mobile.nativeapp.data.crm.CrmRepository
 import mx.nexara.mobile.nativeapp.ui.common.CapturedMedia
 import mx.nexara.mobile.nativeapp.ui.common.MediaPickerBar
+import mx.nexara.mobile.nativeapp.ui.common.PdfViewerScreen
+import java.io.File
 
-private val tabs = listOf("Resumen", "Notas", "Adjuntos", "Cotizaciones")
+private val tabs = listOf("Resumen", "Notas", "Adjuntos", "Cotizaciones", "Historial")
 
 data class OppDetailUiState(
     val isLoading: Boolean = true,
@@ -40,6 +44,11 @@ data class OppDetailUiState(
     val savingNote: Boolean = false,
     val uploading: Boolean = false,
     val actionError: String? = null,
+    val showEditForm: Boolean = false,
+    val form: OpportunityFormState = OpportunityFormState(),
+    val savingForm: Boolean = false,
+    val pdfFile: File? = null,
+    val pdfTitle: String = "",
 )
 
 class OppDetailViewModel(app: Application, private val oppId: Long) : AndroidViewModel(app) {
@@ -92,6 +101,59 @@ class OppDetailViewModel(app: Application, private val oppId: Long) : AndroidVie
             }
         }
     }
+
+    fun openEdit() = _state.update {
+        it.copy(showEditForm = true, form = it.data.toOpportunityFormState(), actionError = null)
+    }
+
+    fun closeEdit() = _state.update { it.copy(showEditForm = false) }
+
+    fun setForm(f: OpportunityFormState) = _state.update { it.copy(form = f) }
+
+    fun saveEdit() {
+        val f = _state.value.form
+        if (f.title.isBlank()) {
+            _state.update { it.copy(actionError = "El título es obligatorio") }
+            return
+        }
+        viewModelScope.launch {
+            _state.update { it.copy(savingForm = true, actionError = null) }
+            try {
+                withContext(Dispatchers.IO) { repo.updateOpportunity(oppId, f.toPayload()) }
+                _state.update { it.copy(savingForm = false, showEditForm = false) }
+                refresh()
+            } catch (e: Exception) {
+                _state.update { it.copy(savingForm = false, actionError = e.message) }
+            }
+        }
+    }
+
+    fun delete(onDone: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repo.deleteOpportunity(oppId) }
+                onDone()
+            } catch (e: Exception) {
+                _state.update { it.copy(actionError = e.message) }
+            }
+        }
+    }
+
+    fun openQuotePdf(url: String, title: String) {
+        if (url.isBlank()) return
+        viewModelScope.launch {
+            try {
+                val bytes = withContext(Dispatchers.IO) { repo.downloadAssetBytes(url) }
+                val file = File(getApplication<Application>().cacheDir, "quote-${oppId}.pdf")
+                file.writeBytes(bytes)
+                _state.update { it.copy(pdfFile = file, pdfTitle = title) }
+            } catch (e: Exception) {
+                _state.update { it.copy(actionError = e.message) }
+            }
+        }
+    }
+
+    fun closePdf() = _state.update { it.copy(pdfFile = null, pdfTitle = "") }
 }
 
 @Suppress("UNCHECKED_CAST")
@@ -133,6 +195,16 @@ fun VentasOpportunityDetailScreen(oppId: Long, onBack: () -> Unit) {
     )
     val state by vm.state.collectAsState()
     val data = state.data
+    var confirmDelete by remember { mutableStateOf(false) }
+
+    if (state.pdfFile != null) {
+        PdfViewerScreen(
+            file = state.pdfFile!!,
+            title = state.pdfTitle.ifBlank { "Cotización PDF" },
+            onClose = vm::closePdf,
+        )
+        return
+    }
 
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -146,6 +218,8 @@ fun VentasOpportunityDetailScreen(oppId: Long, onBack: () -> Unit) {
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f),
             )
+            TextButton(onClick = vm::openEdit) { Text("Editar") }
+            TextButton(onClick = { confirmDelete = true }) { Text("Eliminar", color = MaterialTheme.colorScheme.error) }
         }
         ScrollableTabRow(selectedTabIndex = state.tab, edgePadding = 8.dp) {
             tabs.forEachIndexed { i, label ->
@@ -162,9 +236,36 @@ fun VentasOpportunityDetailScreen(oppId: Long, onBack: () -> Unit) {
                 0 -> OppSummaryTab(data)
                 1 -> OppNotesTab(data, state, vm)
                 2 -> OppAttachmentsTab(data, state, vm)
-                else -> OppQuotesTab(data)
+                3 -> OppQuotesTab(data, onOpen = { url, title -> vm.openQuotePdf(url, title) })
+                else -> OppHistorialTab(data)
             }
         }
+    }
+
+    if (state.showEditForm) {
+        OpportunityFormSheet(
+            title = "Editar oportunidad",
+            state = state.form,
+            onChange = vm::setForm,
+            saving = state.savingForm,
+            error = state.actionError,
+            onDismiss = vm::closeEdit,
+            onSave = vm::saveEdit,
+        )
+    }
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Eliminar oportunidad") },
+            text = { Text("¿Eliminar esta oportunidad del pipeline?") },
+            confirmButton = {
+                TextButton(onClick = { confirmDelete = false; vm.delete(onBack) }) {
+                    Text("Eliminar", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancelar") } },
+        )
     }
 }
 
@@ -278,18 +379,58 @@ private fun OppAttachmentsTab(data: Map<String, Any?>, state: OppDetailUiState, 
 }
 
 @Composable
-private fun OppQuotesTab(data: Map<String, Any?>) {
+private fun OppQuotesTab(data: Map<String, Any?>, onOpen: (String, String) -> Unit) {
     val quotes = nestedMaps(data, "quotes").ifEmpty { nestedMaps(data, "cotizaciones") }
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (quotes.isEmpty()) {
             item { Text("Sin cotizaciones vinculadas", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         } else {
             items(quotes, key = { oppStr(it, "id") }) { q ->
-                Card(shape = RoundedCornerShape(10.dp)) {
+                val pdfUrl = oppStr(q, "pdfUrl", "url")
+                val label = oppStr(q, "versionLabel", "folio", "name").ifBlank { "Cotización" }
+                Card(
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.then(
+                        if (pdfUrl.isNotBlank()) Modifier.clickable { onOpen(pdfUrl, label) } else Modifier,
+                    ),
+                ) {
                     Column(Modifier.padding(12.dp)) {
-                        Text(oppStr(q, "versionLabel", "folio", "name").ifBlank { "Cotización" }, fontWeight = FontWeight.SemiBold)
-                        Text(oppStr(q, "pdfUrl", "url"), style = MaterialTheme.typography.labelSmall)
+                        Text(label, fontWeight = FontWeight.SemiBold)
+                        if (pdfUrl.isNotBlank()) {
+                            Text("Toca para ver PDF", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        }
                         Text(oppStr(q, "createdAt", "fecha").take(16), style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OppHistorialTab(data: Map<String, Any?>) {
+    val history = nestedMaps(data, "history").ifEmpty {
+        nestedMaps(data, "historial").ifEmpty {
+            nestedMaps(data, "activityLog").ifEmpty { nestedMaps(data, "changelog") }
+        }
+    }
+    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (history.isEmpty()) {
+            item { Text("Sin historial de cambios disponible", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        } else {
+            items(history.take(50), key = { System.identityHashCode(it).toString() }) { h ->
+                val action = oppStr(h, "action", "accion", "event", "type")
+                val by     = oppStr(h, "userName", "createdByName", "usuario")
+                val date   = oppStr(h, "createdAt", "timestamp", "fecha").take(16)
+                val detail = oppStr(h, "detail", "description", "changes", "mensaje")
+                Card(shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(action.ifBlank { "Cambio" }, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            if (date.isNotBlank()) Text(date, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (by.isNotBlank()) Text("Por: $by", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (detail.isNotBlank()) Text(detail, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3)
                     }
                 }
             }
