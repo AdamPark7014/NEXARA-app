@@ -115,13 +115,19 @@ enum ModuleCatalog {
         ModuleEntry("multas", "Multas", "⚠️", "/contabilidad/multas"),
     ]
 
-    static let web: [ModuleEntry] = [
-        ModuleEntry("dashboard", "Dashboard", "📊", "/web/dashboard"),
-        ModuleEntry("clientes", "Clientes", "🤝", "/web/clientes"),
-        ModuleEntry("proyectos", "Proyectos", "🧩", "/web/proyectos"),
-        ModuleEntry("noticias", "Noticias", "📰", "/web/noticias"),
-        ModuleEntry("contactos", "Contactos", "✉️", "/web/contactos"),
+    static let studio: [ModuleEntry] = [
+        ModuleEntry("dashboard", "Dashboard", "📊", "/studio/dashboard"),
+        ModuleEntry("hero", "Carrusel inicio", "🖼️", "/studio/hero"),
+        ModuleEntry("pages", "Secciones del sitio", "🌐", "/studio/pages"),
+        ModuleEntry("cases", "Casos de éxito", "🏆", "/studio/cases"),
+        ModuleEntry("news", "Noticias", "📰", "/studio/news"),
+        ModuleEntry("social", "Redes sociales", "📱", "/studio/social"),
+        ModuleEntry("newsletter", "Newsletter", "📬", "/studio/newsletter"),
+        ModuleEntry("contacts", "Contactos", "✉️", "/studio/contacts"),
+        ModuleEntry("leads", "Leads", "✨", "/studio/leads"),
     ]
+
+    static let web: [ModuleEntry] = studio
 
     static let lab: [ModuleEntry] = [
         ModuleEntry("health", "API Health", "🧪", "/lab/health"),
@@ -137,7 +143,7 @@ enum ModuleCatalog {
                 console
             }
         case .crm: return ventas
-        case .studio: return web
+        case .studio: return studio
         case .portal: return tickets
         case .lab: return lab
         }
