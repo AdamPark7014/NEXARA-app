@@ -1,6 +1,7 @@
 package mx.nexara.mobile.nativeapp.ui.console.screens
 
 import android.app.Application
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -524,27 +525,130 @@ class MaintContractsViewModel(app: Application) : AndroidViewModel(app) {
 fun MaintenanceContractsScreen() {
     val vm: MaintContractsViewModel = viewModel()
     val state by vm.state.collectAsState()
+    var selected by remember { mutableStateOf<Map<String, Any?>?>(null) }
+    var query by remember { mutableStateOf("") }
     LaunchedEffect(Unit) { vm.load() }
+
+    if (selected != null) {
+        val c = selected!!
+        var tab by remember { mutableStateOf(0) }
+        val tabs = listOf("Info", "Actividades", "SLA", "Inventario")
+        val activities = (c["activities"] as? List<*>)?.filterIsInstance<Map<String, Any?>>() ?: emptyList()
+        val slaList    = (c["sla"] as? List<*>)?.filterIsInstance<Map<String, Any?>>() ?: emptyList()
+        val inventory  = (c["inventory"] as? List<*>)?.filterIsInstance<Map<String, Any?>>() ?: emptyList()
+        Column(Modifier.fillMaxSize()) {
+            ScrollableTabRow(selectedTabIndex = tab, edgePadding = 0.dp) {
+                tabs.forEachIndexed { i, t -> Tab(selected = tab == i, onClick = { tab = i }, text = { Text(t) }) }
+            }
+            LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item {
+                    Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, androidx.compose.ui.Alignment.CenterVertically) {
+                        OutlinedButton(onClick = { selected = null }) { Text("← Lista") }
+                        val st = erpStr(c, "status", "estado")
+                        if (st.isNotBlank()) Text(st, color = mcStatusColor(st), fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                when (tab) {
+                    0 -> {
+                        item { Text("Información del contrato", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium) }
+                        item {
+                            Card(Modifier.fillMaxWidth()) {
+                                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    fun r(k: String, v: String) { if (v.isNotBlank()) item { DetailLine(k, v) } }
+                                    DetailLine("Número", erpStr(c, "contractNumber", "number", "folio"))
+                                    DetailLine("Nombre", erpStr(c, "name", "title"))
+                                    DetailLine("Cliente", erpStr(c, "clientName", "cliente"))
+                                    DetailLine("Tipo", erpStr(c, "type", "tipo"))
+                                    DetailLine("Estado", erpStr(c, "status", "estado"))
+                                    DetailLine("Inicio", erpStr(c, "startDate", "fechaInicio").take(10))
+                                    DetailLine("Vencimiento", erpStr(c, "expiresAt", "endDate", "fechaFin").take(10))
+                                    DetailLine("Monto", erpStr(c, "amount", "monto"))
+                                    DetailLine("Resp. SLA", erpStr(c, "slaResponseHours").let { if (it.isNotBlank()) "${it}h" else "" })
+                                }
+                            }
+                        }
+                    }
+                    1 -> {
+                        if (activities.isEmpty()) { item { Text("Sin actividades registradas.", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+                        else items(activities) { a ->
+                            Card(Modifier.fillMaxWidth()) {
+                                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(erpStr(a, "title", "titulo", "anNumber"), fontWeight = FontWeight.Bold)
+                                    val st2 = erpStr(a, "status", "estado")
+                                    if (st2.isNotBlank()) Text(st2, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                    2 -> {
+                        if (slaList.isEmpty()) { item { Text("Sin métricas SLA.", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+                        else items(slaList) { s ->
+                            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                                Text(erpStr(s, "name", "metrica"))
+                                Text(erpStr(s, "value", "valor"), fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    }
+                    else -> {
+                        if (inventory.isEmpty()) { item { Text("Sin inventario registrado.", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+                        else items(inventory) { item ->
+                            Card(Modifier.fillMaxWidth()) {
+                                Row(Modifier.fillMaxWidth().padding(12.dp), Arrangement.SpaceBetween) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(erpStr(item, "name", "nombre"), fontWeight = FontWeight.Bold)
+                                        val serial = erpStr(item, "serial", "serialNumber")
+                                        if (serial.isNotBlank()) Text(serial, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    val qty = erpStr(item, "quantity", "cantidad")
+                                    if (qty.isNotBlank()) Text("x$qty", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return
+    }
+
+    val filtered = if (query.isBlank()) state.items else state.items.filter { c ->
+        val q = query.lowercase()
+        erpStr(c, "name", "title", "contractNumber").lowercase().contains(q) ||
+                erpStr(c, "clientName", "cliente").lowercase().contains(q)
+    }
 
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             Text("Contratos de servicio", style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
             Text("SLA, vigencias y alcance", style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(value = query, onValueChange = { query = it }, placeholder = { Text("Buscar contrato o cliente…") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         }
         if (state.loading) { item { LinearProgressIndicator(Modifier.fillMaxWidth()) }; return@LazyColumn }
-        if (state.items.isEmpty()) { item { Text("Sin contratos activos.", color = Color(0xFF64748B)) }; return@LazyColumn }
-        items(state.items, key = { erpStr(it, "id") }) { c ->
-            ErpListCard(
-                title = erpStr(c, "name", "title", "contractNumber"),
-                subtitle = listOfNotNull(
-                    erpStr(c, "clientName", "client"),
-                    erpStr(c, "status"),
-                    listOfNotNull(erpStr(c, "startDate"), erpStr(c, "endDate")).filter { it.isNotBlank() }.joinToString(" → ").takeIf { it.isNotBlank() },
-                ).joinToString(" · "),
-                trailing = erpStr(c, "slaResponseHours").let { if (it.isNotBlank()) "${it}h resp." else erpStr(c, "status") },
-            )
+        if (filtered.isEmpty()) { item { Text("Sin contratos activos.", color = Color(0xFF64748B)) }; return@LazyColumn }
+        items(filtered, key = { erpStr(it, "id") }) { c ->
+            val statusColor = mcStatusColor(erpStr(c, "status", "estado"))
+            Card(Modifier.fillMaxWidth().clickable { selected = c }) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, androidx.compose.ui.Alignment.CenterVertically) {
+                        Text(erpStr(c, "name", "title", "contractNumber"), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        val st = erpStr(c, "status", "estado")
+                        if (st.isNotBlank()) Text(st, color = statusColor, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelSmall)
+                    }
+                    Text(erpStr(c, "clientName", "client"), style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+                    val dates = listOfNotNull(erpStr(c, "startDate").take(10).takeIf { it.isNotBlank() }, erpStr(c, "expiresAt", "endDate").take(10).takeIf { it.isNotBlank() }).joinToString(" → ")
+                    if (dates.isNotBlank()) Text(dates, style = MaterialTheme.typography.labelSmall, color = Color(0xFF64748B))
+                }
+            }
         }
     }
+}
+
+private fun mcStatusColor(status: String): Color = when (status.lowercase()) {
+    "activo", "active", "vigente" -> Color(0xFF2E7D32)
+    "vencido", "expired", "inactivo" -> Color(0xFFDC2626)
+    "por_vencer", "por vencer", "próximo" -> Color(0xFFE65100)
+    else -> Color.Gray
 }
 
 // ── Shared UI helpers ───────────────────────────────────────────────────────
