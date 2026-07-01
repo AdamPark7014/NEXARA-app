@@ -1,8 +1,10 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
@@ -15,6 +17,7 @@ import { generateCotizacionPdf } from './cotizacion-pdf.js';
 import { AutoApprovalService } from '../workflow/auto-approval.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { NotificationHierarchyService } from '../notifications/notification-hierarchy.service.js';
+import { VentasService } from '../ventas/ventas.service.js';
 import { randomBytes } from 'crypto';
 import nodemailer from 'nodemailer';
 import fs from 'fs/promises';
@@ -38,6 +41,7 @@ export class CotizacionesService {
     private readonly autoApproval: AutoApprovalService,
     private readonly notificationsService: NotificationsService,
     private readonly notificationHierarchy: NotificationHierarchyService,
+    @Inject(forwardRef(() => VentasService)) private readonly ventasService: VentasService,
   ) {}
 
   private get db() {
@@ -450,6 +454,10 @@ export class CotizacionesService {
           )
           .catch(() => undefined);
       }
+
+      void this.ventasService
+        .autoEnsureSalesProjectFromWonOpportunity(opp.id, actorId || undefined)
+        .catch(() => undefined);
     }
   }
 

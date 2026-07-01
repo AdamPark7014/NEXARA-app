@@ -620,6 +620,10 @@ export class VentasService {
         .catch(() => undefined);
     }
 
+    if (updated.stage === 'WON' && existing.stage !== 'WON') {
+      void this.autoEnsureSalesProjectFromWonOpportunity(updated.id, user?.id).catch(() => undefined);
+    }
+
     return updated;
   }
 
@@ -733,8 +737,86 @@ export class VentasService {
     }
 
     void this.ensureProjectSalesOrder(created.id, user).catch(() => undefined);
+    void this.tryAutoProvisionOperational(created.id, user).catch(() => undefined);
 
     return created;
+  }
+
+  /**
+   * Al ganar una oportunidad: crea proyecto comercial + orden si faltan,
+   * e intenta activar proyecto operativo cuando el cliente ya está en OPS.
+   */
+  async autoEnsureSalesProjectFromWonOpportunity(opportunityId: number, actorId?: number) {
+    const opportunity = await this.prisma.salesOpportunity.findUnique({
+      where: { id: opportunityId },
+      include: { projects: { orderBy: { createdAt: 'desc' }, take: 1 } },
+    });
+    if (!opportunity || opportunity.stage !== 'WON') return null;
+
+    const actorUser = actorId ? { id: actorId } : undefined;
+    let project = opportunity.projects[0] ?? null;
+
+    if (!project) {
+      project = await this.createProject(
+        {
+          opportunityId,
+          name: opportunity.title,
+          budget: Number(opportunity.value ?? 0),
+          scopeSummary: opportunity.description ?? undefined,
+          status: 'PLANNED',
+        },
+        actorUser,
+      );
+
+      if (actorId) {
+        await this.prisma.salesOpportunityNote.create({
+          data: {
+            opportunityId,
+            message: `Proyecto comercial "${project.name}" creado automáticamente al ganar la oportunidad.`,
+            createdById: actorId,
+          },
+        });
+      }
+    } else {
+      void this.ensureProjectSalesOrder(project.id, actorUser).catch(() => undefined);
+      void this.tryAutoProvisionOperational(project.id, actorUser).catch(() => undefined);
+    }
+
+    return project;
+  }
+
+  private async tryAutoProvisionOperational(projectId: number, user?: any) {
+    try {
+      const result = await this.provisionOperationalProject(projectId, user);
+      if (result.created && user?.id) {
+        await this.prisma.salesOpportunityNote.create({
+          data: {
+            opportunityId: result.salesProject.opportunityId,
+            message: `Proyecto operativo activado automáticamente: ${result.operationalProject.title}.`,
+            createdById: user.id,
+          },
+        }).catch(() => undefined);
+      }
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo activar operaciones';
+      if (user?.id) {
+        const project = await this.prisma.salesProject.findUnique({
+          where: { id: projectId },
+          select: { opportunityId: true },
+        });
+        if (project?.opportunityId) {
+          await this.prisma.salesOpportunityNote.create({
+            data: {
+              opportunityId: project.opportunityId,
+              message: `Provisión operativa pendiente: ${message}`,
+              createdById: user.id,
+            },
+          }).catch(() => undefined);
+        }
+      }
+      throw error;
+    }
   }
 
   async listProjects(user?: any, ownerId?: number, query?: PaginationQueryDto) {

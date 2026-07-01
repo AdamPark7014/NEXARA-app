@@ -128,13 +128,13 @@ export class ToolRequestsService {
       throw new BadRequestException('La herramienta ya tiene una solicitud activa y no puede duplicarse');
     }
 
-    data.toolName = inventoryItem.toolName;
-    data.model = inventoryItem.model;
-    data.serialNumber = inventoryItem.serialNumber;
-    data.generalPhotoUrl = data.generalPhotoUrl || inventoryItem.panoramicPhotoUrl;
-    data.specificationsPhotoUrl = data.specificationsPhotoUrl || inventoryItem.serialPhotoUrl;
+    const toolName = inventoryItem.toolName as string;
+    const model = inventoryItem.model as string;
+    const serialNumber = inventoryItem.serialNumber as string;
+    const generalPhotoUrl = (data.generalPhotoUrl || inventoryItem.panoramicPhotoUrl) as string;
+    const specificationsPhotoUrl = (data.specificationsPhotoUrl || inventoryItem.serialPhotoUrl) as string;
 
-    if (!data.generalPhotoUrl?.trim() || !data.specificationsPhotoUrl?.trim()) {
+    if (!generalPhotoUrl?.trim() || !specificationsPhotoUrl?.trim()) {
       throw new BadRequestException(
         'La herramienta no tiene fotos registradas en inventario. Solicita a operaciones que las cargue antes de continuar.',
       );
@@ -144,14 +144,14 @@ export class ToolRequestsService {
       data: {
         usuarioId: data.usuarioId,
         inventoryItemId,
-        toolName: data.toolName,
-        model: data.model,
-        serialNumber: data.serialNumber,
+        toolName,
+        model,
+        serialNumber,
         reason: data.reason,
         startDate: data.startDate,
         expectedReturnDate: data.expectedReturnDate,
-        generalPhotoUrl: data.generalPhotoUrl,
-        specificationsPhotoUrl: data.specificationsPhotoUrl,
+        generalPhotoUrl,
+        specificationsPhotoUrl,
         status: 'PENDING',
       },
       include: {
@@ -170,7 +170,7 @@ export class ToolRequestsService {
       data.usuarioId,
       toolRequest.id,
       toolRequest.usuario?.nombre || 'Usuario',
-      data.toolName,
+      toolName,
     );
 
     return toolRequest;

@@ -320,6 +320,136 @@ export class AccountingService {
     return updated;
   }
 
+  private async ensureDefaultAccounts() {
+    const defaults = [
+      { code: '105.01', name: 'Clientes nacionales', type: 'ASSET' as const },
+      { code: '102.01', name: 'Bancos', type: 'ASSET' as const },
+      { code: '401.01', name: 'Ingresos por servicios', type: 'REVENUE' as const },
+      { code: '208.01', name: 'IVA trasladado cobrado', type: 'LIABILITY' as const },
+    ];
+
+    for (const account of defaults) {
+      await this.prisma.account.upsert({
+        where: { code: account.code },
+        create: {
+          code: account.code,
+          name: account.name,
+          type: account.type,
+        },
+        update: {},
+      });
+    }
+  }
+
+  private async getAccountByCode(code: string) {
+    await this.ensureDefaultAccounts();
+    const account = await this.prisma.account.findUnique({ where: { code } });
+    if (!account) {
+      throw new BadRequestException(`Cuenta contable ${code} no configurada`);
+    }
+    return account;
+  }
+
+  private async createAndPostAutoJournal(
+    reference: string,
+    description: string,
+    date: string,
+    lines: Array<{ debitAccountId: number; creditAccountId: number; debit: number; credit: number; label: string }>,
+    userId: number,
+  ) {
+    const existing = await this.prisma.journalEntry.findFirst({ where: { reference } });
+    if (existing) return existing;
+
+    const entry = await this.createJournalEntry(
+      {
+        date,
+        description,
+        reference,
+        lines: lines.map((line) => ({
+          debitAccountId: line.debitAccountId,
+          creditAccountId: line.creditAccountId,
+          description: line.label,
+          debit: line.debit,
+          credit: line.credit,
+        })),
+      },
+      userId,
+    );
+
+    return this.postJournalEntry(entry.id, userId);
+  }
+
+  private async autoJournalForStampedInvoice(
+    invoice: {
+      id: number;
+      invoiceNumber: string;
+      type: string;
+      subtotal: Prisma.Decimal | number;
+      taxAmount: Prisma.Decimal | number;
+      totalAmount: Prisma.Decimal | number;
+      issueDate: Date;
+    },
+    userId: number,
+  ) {
+    if (invoice.type !== 'ACCOUNTS_RECEIVABLE') return null;
+
+    const total = Number(invoice.totalAmount);
+    const subtotal = Number(invoice.subtotal);
+    const tax = Number(invoice.taxAmount);
+    if (total <= 0) return null;
+
+    const [cxc, revenue, iva] = await Promise.all([
+      this.getAccountByCode('105.01'),
+      this.getAccountByCode('401.01'),
+      this.getAccountByCode('208.01'),
+    ]);
+
+    const date = new Date(invoice.issueDate).toISOString().slice(0, 10);
+    const ref = `INV-STAMP-${invoice.id}`;
+
+    return this.createAndPostAutoJournal(
+      ref,
+      `Factura timbrada ${invoice.invoiceNumber}`,
+      date,
+      [
+        { debitAccountId: cxc.id, creditAccountId: revenue.id, debit: total, credit: 0, label: 'CXC clientes' },
+        { debitAccountId: revenue.id, creditAccountId: cxc.id, debit: 0, credit: subtotal, label: 'Ingresos' },
+        { debitAccountId: iva.id, creditAccountId: cxc.id, debit: 0, credit: tax, label: 'IVA trasladado' },
+      ],
+      userId,
+    );
+  }
+
+  private async autoJournalForPayment(
+    payment: { id: number; amount: Prisma.Decimal | number; paymentDate: Date },
+    invoice: { id: number; invoiceNumber: string; type: string },
+    userId: number,
+  ) {
+    if (invoice.type !== 'ACCOUNTS_RECEIVABLE') return null;
+
+    const amount = Number(payment.amount);
+    if (amount <= 0) return null;
+
+    const [bank, cxc] = await Promise.all([
+      this.getAccountByCode('102.01'),
+      this.getAccountByCode('105.01'),
+    ]);
+
+    const date = new Date(payment.paymentDate).toISOString().slice(0, 10);
+    const ref = `PAY-${payment.id}`;
+
+    return this.createAndPostAutoJournal(
+      ref,
+      `Cobro factura ${invoice.invoiceNumber}`,
+      date,
+      [
+        { debitAccountId: bank.id, creditAccountId: cxc.id, debit: amount, credit: 0, label: 'Entrada bancaria' },
+        { debitAccountId: cxc.id, creditAccountId: bank.id, debit: 0, credit: amount, label: 'Aplicación CXC' },
+      ],
+      userId,
+    );
+  }
+
   async reverseJournalEntry(id: number, userId: number) {
     const original = await this.prisma.journalEntry.findUnique({ where: { id }, include: { lines: true } });
     if (!original) throw new NotFoundException('Asiento no encontrado');
@@ -802,6 +932,8 @@ export class AccountingService {
       include: { items: { include: { product: true } }, client: true, supplier: true, payments: true },
     });
 
+    void this.autoJournalForStampedInvoice(updated, userId).catch(() => undefined);
+
     return { ...updated, pacProvider: stamp.provider };
   }
 
@@ -1086,6 +1218,7 @@ export class AccountingService {
     void this.notificationHierarchy
       .notifyPaymentRegistered(userId, payment.id, invoice.invoiceNumber, amountLabel)
       .catch(() => undefined);
+    void this.autoJournalForPayment(payment, invoice, userId).catch(() => undefined);
     return payment;
   }
 
@@ -1304,6 +1437,7 @@ export class AccountingService {
 
   getPacInfo() {
     const provider = this.pacService.provider;
+    const env = process.env['NODE_ENV'] || 'development';
     let configured = false;
     if (provider === 'facturama') {
       configured = Boolean(process.env['FACTURAMA_USER'] && process.env['FACTURAMA_PASSWORD']);
@@ -1312,16 +1446,19 @@ export class AccountingService {
     } else if (provider === 'finkok') {
       configured = Boolean(process.env['FINKOK_USER'] && process.env['FINKOK_PASSWORD']);
     } else {
-      // mock no requiere credenciales reales
       configured = true;
     }
+    const productionWarning =
+      env === 'production' && (provider === 'mock' || (this.pacService.fallbackToMock && !configured))
+        ? 'PAC en modo mock o sin credenciales en producción. Configura PAC_PROVIDER y credenciales reales.'
+        : null;
     return {
       provider,
-      // Compat: la UI consume tanto `fallback` (legacy) como `fallbackToMock`.
       fallback: this.pacService.fallbackToMock,
       fallbackToMock: this.pacService.fallbackToMock,
       configured,
-      env: process.env['NODE_ENV'] || 'development',
+      env,
+      productionWarning,
     };
   }
 
