@@ -461,6 +461,7 @@ export class AuthService {
       set.add(PERMISSIONS.MAINTENANCE_MANAGE);
       set.add(PERMISSIONS.ASSETS_VIEW);
       set.add(PERMISSIONS.ASSETS_MANAGE);
+      set.add(PERMISSIONS.NOC_VIEW);
     }
 
     // ── Ingeniero de campo ───────────────────────────────────────────
