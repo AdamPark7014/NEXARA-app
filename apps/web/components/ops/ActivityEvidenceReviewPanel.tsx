@@ -55,116 +55,118 @@ export default function ActivityEvidenceReviewPanel({ activity, showHeader = tru
   return (
     <div style={{ display: "grid", gap: 16, marginBottom: showHeader ? 20 : 0 }}>
       {showHeader && (
-      <div
-        style={{
-          padding: 16,
-          borderRadius: 12,
-          border: "1px solid var(--border)",
-          background: "var(--surface)",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-              OT en revisión
+        <>
+          <div
+            style={{
+              padding: 16,
+              borderRadius: 12,
+              border: "1px solid var(--border)",
+              background: "var(--surface)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  OT en revisión
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 700, marginTop: 4 }}>
+                  {activity.anNumber} · {activity.titulo}
+                </div>
+              </div>
+              <Tag variant={activityDisplayVariant(activity.estatus, ev)}>
+                {activityDisplayLabel(activity.estatus, ev)}
+              </Tag>
             </div>
-            <div style={{ fontSize: 18, fontWeight: 700, marginTop: 4 }}>
-              {activity.anNumber} · {activity.titulo}
-            </div>
-          </div>
-          <Tag variant={activityDisplayVariant(activity.estatus, ev)}>
-            {activityDisplayLabel(activity.estatus, ev)}
-          </Tag>
-        </div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-            gap: 12,
-            marginTop: 14,
-            fontSize: 13,
-          }}
-        >
-          <div>
-            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }}>Cliente</div>
-            <div style={{ fontWeight: 600 }}>{activity.client?.name ?? "—"}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }}>Sucursal</div>
-            <div style={{ fontWeight: 600 }}>{branch || "—"}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }}>Responsable</div>
-            <div style={{ fontWeight: 600 }}>{activity.responsable?.nombre ?? "—"}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }}>Tipo</div>
-            <div style={{ fontWeight: 600 }}>{activity.ticketType ?? "—"}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }}>Entrega esperada</div>
-            <div style={{ fontWeight: 600 }}>{formatDateTime(activity.fechaEntregaEsperada)}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }}>Campo finalizado</div>
-            <div style={{ fontWeight: 600 }}>{formatDateTime(activity.fechaFinalizacion ?? ev.completedAt)}</div>
-          </div>
-        </div>
-
-        {activity.descripcion && (
-          <p style={{ margin: "14px 0 0", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.55 }}>
-            <strong>Descripción:</strong> {activity.descripcion}
-          </p>
-        )}
-        {activity.indicaciones && (
-          <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.55 }}>
-            <strong>Indicaciones:</strong> {activity.indicaciones}
-          </p>
-        )}
-      </div>
-
-      <div style={{ padding: 16, borderRadius: 12, border: "1px solid var(--border)" }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Pasos del paquete</div>
-        <div style={{ display: "grid", gap: 8 }}>
-          {steps.map((step) => (
             <div
-              key={step.step}
               style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
                 gap: 12,
-                padding: "8px 10px",
-                borderRadius: 8,
-                background: step.done ? "color-mix(in srgb, var(--success) 10%, transparent)" : "var(--surface-2)",
+                marginTop: 14,
+                fontSize: 13,
               }}
             >
-              <span style={{ fontSize: 13, fontWeight: step.done ? 600 : 500 }}>
-                {step.done ? "✓" : "○"} {step.label}
-              </span>
-              <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-                {step.at ? formatDateTime(step.at) : step.done ? "Completado" : "Pendiente"}
-              </span>
+              <div>
+                <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }}>Cliente</div>
+                <div style={{ fontWeight: 600 }}>{activity.client?.name ?? "—"}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }}>Sucursal</div>
+                <div style={{ fontWeight: 600 }}>{branch || "—"}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }}>Responsable</div>
+                <div style={{ fontWeight: 600 }}>{activity.responsable?.nombre ?? "—"}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }}>Tipo</div>
+                <div style={{ fontWeight: 600 }}>{activity.ticketType ?? "—"}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }}>Entrega esperada</div>
+                <div style={{ fontWeight: 600 }}>{formatDateTime(activity.fechaEntregaEsperada)}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }}>Campo finalizado</div>
+                <div style={{ fontWeight: 600 }}>{formatDateTime(activity.fechaFinalizacion ?? ev.completedAt)}</div>
+              </div>
             </div>
-          ))}
-        </div>
 
-        {(entryMap || exitMap) && (
-          <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
-            {entryMap && (
-              <Link href={entryMap} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 600, color: "var(--primary)" }}>
-                📍 GPS entrada
-              </Link>
+            {activity.descripcion && (
+              <p style={{ margin: "14px 0 0", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.55 }}>
+                <strong>Descripción:</strong> {activity.descripcion}
+              </p>
             )}
-            {exitMap && (
-              <Link href={exitMap} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 600, color: "var(--primary)" }}>
-                📍 GPS salida
-              </Link>
+            {activity.indicaciones && (
+              <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.55 }}>
+                <strong>Indicaciones:</strong> {activity.indicaciones}
+              </p>
             )}
           </div>
-        )}
-      </div>
+
+          <div style={{ padding: 16, borderRadius: 12, border: "1px solid var(--border)" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Pasos del paquete</div>
+            <div style={{ display: "grid", gap: 8 }}>
+              {steps.map((step) => (
+                <div
+                  key={step.step}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    background: step.done ? "color-mix(in srgb, var(--success) 10%, transparent)" : "var(--surface-2)",
+                  }}
+                >
+                  <span style={{ fontSize: 13, fontWeight: step.done ? 600 : 500 }}>
+                    {step.done ? "✓" : "○"} {step.label}
+                  </span>
+                  <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
+                    {step.at ? formatDateTime(step.at) : step.done ? "Completado" : "Pendiente"}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {(entryMap || exitMap) && (
+              <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
+                {entryMap && (
+                  <Link href={entryMap} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 600, color: "var(--primary)" }}>
+                    📍 GPS entrada
+                  </Link>
+                )}
+                {exitMap && (
+                  <Link href={exitMap} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 600, color: "var(--primary)" }}>
+                    📍 GPS salida
+                  </Link>
+                )}
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       <div style={{ padding: 16, borderRadius: 12, border: "1px solid var(--border)" }}>
