@@ -175,10 +175,10 @@ export default function OpsViaticsPage() {
         actions={<Button variant="ghost" onClick={() => void load()}>Actualizar</Button>}
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 20 }}>
-        <KpiCard label="Pendientes" value={pendientes} />
-        <KpiCard label="Por aprobar ($)" value={`$${(totalPendiente / 1000).toFixed(0)}k`} />
-        <KpiCard label="Aprobado ($)" value={`$${(totalAprobado / 1000).toFixed(0)}k`} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 20 }}>
+        <KpiCard label="Pendientes" value={pendientes} variant={pendientes > 0 ? "warning" : "positive"} icon="⏳" hint="Esperando aprobación" />
+        <KpiCard label="Por aprobar" value={<Money value={totalPendiente} compact />} variant={totalPendiente > 0 ? "warning" : "default"} icon="📋" />
+        <KpiCard label="Aprobado" value={<Money value={totalAprobado} compact />} variant="positive" icon="✅" />
       </div>
 
       {actionErr && (

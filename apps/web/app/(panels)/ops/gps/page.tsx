@@ -413,10 +413,10 @@ function TeamGpsView({ token }: { token: string }) {
 
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <KpiCard label="Unidades visibles" value={items.length} />
-        <KpiCard label="Compartiendo GPS"  value={active} />
-        <KpiCard label="Inactivos"         value={inactive} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
+        <KpiCard label="Unidades visibles" value={items.length} icon="👥" hint="Con jornada abierta" />
+        <KpiCard label="Compartiendo GPS"  value={active} variant={active > 0 ? "positive" : "default"} icon="📍" hint="Ubicación activa" />
+        <KpiCard label="Sin GPS activo"    value={inactive} variant={inactive > 0 ? "warning" : "positive"} icon="📵" hint={inactive > 0 ? "Sin señal GPS" : "Todos con GPS"} />
       </div>
 
       <Section
