@@ -15,6 +15,8 @@ import { activityDisplayLabel, activityDisplayVariant } from "@/lib/activity-sta
 
 type Props = {
   activity: ActivityDetail;
+  /** En Detalle: oculta cabecera duplicada de la OT. */
+  showHeader?: boolean;
 };
 
 function PhotoThumb({ url, label }: { url: string; label: string }) {
@@ -40,7 +42,7 @@ function PhotoThumb({ url, label }: { url: string; label: string }) {
   );
 }
 
-export default function ActivityEvidenceReviewPanel({ activity }: Props) {
+export default function ActivityEvidenceReviewPanel({ activity, showHeader = true }: Props) {
   const ev = activity.activityEvidence as ActivityEvidenceDetail | null | undefined;
   if (!ev) return null;
 
@@ -51,7 +53,8 @@ export default function ActivityEvidenceReviewPanel({ activity }: Props) {
   const branch = [activity.branchName, activity.branchCity, activity.branchState].filter(Boolean).join(" · ");
 
   return (
-    <div style={{ display: "grid", gap: 16, marginBottom: 20 }}>
+    <div style={{ display: "grid", gap: 16, marginBottom: showHeader ? 20 : 0 }}>
+      {showHeader && (
       <div
         style={{
           padding: 16,
@@ -162,6 +165,7 @@ export default function ActivityEvidenceReviewPanel({ activity }: Props) {
           </div>
         )}
       </div>
+      )}
 
       <div style={{ padding: 16, borderRadius: 12, border: "1px solid var(--border)" }}>
         <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Archivos capturados</div>

@@ -6,6 +6,7 @@ import { buildApiUrl } from "@/lib/api-base";
 import EmptyState from "@/components/ui/EmptyState";
 import { Tag } from "@/components/ui/DataTable";
 import { DetailError, DetailSection } from "@/components/detail/DetailFrame";
+import ActivityEvidenceReviewPanel from "@/components/ops/ActivityEvidenceReviewPanel";
 import { useActivityDetail } from "@/components/ops/ActivityDetailShell";
 import { useUser } from "@/components/UserContext";
 import { resolveV2RoleKey } from "@/lib/user-access";
@@ -36,6 +37,10 @@ export default function ActivityEvidencesPage() {
 
   return (
     <>
+      {review && (
+        <ActivityEvidenceReviewPanel activity={activity} showHeader={false} />
+      )}
+
       {review && (
         <DetailSection title="Estado del paquete">
           <div

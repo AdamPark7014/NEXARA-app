@@ -1,5 +1,7 @@
 import { buildApiUrl } from "@/lib/api-base";
 
+import type { ActivityEvidenceDetail } from "@/lib/evidence-display";
+
 export type ActivityDetail = {
   id: number;
   anNumber: string;
@@ -20,15 +22,7 @@ export type ActivityDetail = {
   responsable?: { id: number; nombre: string } | null;
   creador?: { id: number; nombre: string } | null;
   client?: { id: number; name: string } | null;
-  activityEvidence?: {
-    id: number;
-    status?: string | null;
-    reviewStatus?: string | null;
-    rejectedStep?: string | null;
-    reviewNotes?: string | null;
-    reviewedAt?: string | null;
-    reviewedBy?: { id: number; nombre: string } | null;
-  } | null;
+  activityEvidence?: ActivityEvidenceDetail | null;
   evidencias?: Array<{ id: number; tipo?: string; descripcion?: string; url?: string }>;
 };
 
