@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
@@ -152,6 +153,14 @@ export default function StudioNewsPage() {
           </>
         }
       />
+
+      {!loading && items.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 16 }}>
+          <KpiCard label="Total publicaciones" value={items.length} icon="📰" />
+          <KpiCard label="Publicadas" value={items.filter(n => n.status === "PUBLISHED").length} variant="positive" icon="✅" hint="Visibles en el sitio" />
+          <KpiCard label="Borradores" value={items.filter(n => n.status !== "PUBLISHED").length} variant={items.filter(n => n.status !== "PUBLISHED").length > 0 ? "warning" : "default"} icon="📝" hint="Pendientes de publicar" />
+        </div>
+      )}
 
       {actionErr && (
         <div role="alert" style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 8, border: "1px solid var(--danger)", color: "var(--danger)", fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>

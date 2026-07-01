@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, Money, type Column } from "@/components/ui/DataTable";
 import EmptyState from "@/components/ui/EmptyState";
 import { useUser } from "@/components/UserContext";
@@ -284,6 +285,15 @@ export default function ProductsPage() {
               </Button>
             </div>
           </div>
+        </div>
+      )}
+
+      {!loading && items.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 16 }}>
+          <KpiCard label="Productos en catálogo" value={items.length} icon="📦" />
+          <KpiCard label="Sin stock" value={items.filter(p => stockTotal(p) === 0).length} variant={items.filter(p => stockTotal(p) === 0).length > 0 ? "danger" : "positive"} icon="⚠️" hint="Requieren reposición" />
+          <KpiCard label="Stock bajo" value={items.filter(p => stockTotal(p) > 0 && stockTotal(p) < 5).length} variant={items.filter(p => stockTotal(p) > 0 && stockTotal(p) < 5).length > 0 ? "warning" : "positive"} icon="📉" hint="Menos de 5 unidades" />
+          <KpiCard label="Precio promedio" value={<Money value={items.length > 0 ? items.reduce((s, p) => s + Number(p.price ?? 0), 0) / items.length : 0} />} icon="💰" />
         </div>
       )}
 
