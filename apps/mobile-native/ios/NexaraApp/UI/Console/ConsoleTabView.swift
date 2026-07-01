@@ -61,12 +61,7 @@ struct ConsoleTabView: View {
 
             // ── GPS
             NavigationStack {
-                GenericListModuleView(title: "GPS") {
-                    (await ExtraRepository.shared.gpsLocations()).map {
-                        toRow($0, title: ["userName", "usuario"], subtitle: ["lat", "lng"], meta: ["capturedAt", "createdAt"])
-                    }
-                }
-                .navigationTitle("GPS")
+                GpsMapView()
             }
             .tabItem { Label("GPS", systemImage: "map") }
             .tag(ConsoleTab.gps)

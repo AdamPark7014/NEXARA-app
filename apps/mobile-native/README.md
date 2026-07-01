@@ -16,7 +16,7 @@ Alineado con `apps/web/lib/access-matrix.ts`:
 - **ERP** — finanzas, RH, gobierno, almacén (`ConsoleNavHost` filtrado)
 - **CRM** — pipeline comercial (`VentasNavHost`)
 - **OPS** — campo, GPS, evidencias, herramientas (`ConsoleNavHost` filtrado)
-- **STUDIO** — contenido y marca (`WebNavHost`)
+- **STUDIO** — contenido y marca (`StudioNavHost`)
 - **LAB** — health check y sandbox (`LabNavHost`)
 - **Portal** — tickets cliente/sucursal (`TicketsNavHost`)
 
@@ -38,7 +38,12 @@ Resolución de acceso: `android/.../access/PanelAccessResolver.kt` · iOS: `ios/
 | Cola offline mutaciones | ✅ integrado en `ApiClient` + replay | ⬜ |
 | Cache GET offline | ✅ `OfflineHttpInterceptor` | ⬜ |
 | Banner sin conexión | ✅ `OfflineBanner` | ⬜ |
+| STUDIO (9 módulos) | ✅ CRUD nativo `ui/studio/` | ✅ listas + dashboard |
 | GPS / cámara / mapas | ✅ | ✅ MapKit |
+
+### Panel STUDIO (detalle Android)
+
+Dashboard KPIs, carrusel hero (upload/reorder), casos de éxito, noticias, contactos/leads, redes sociales, newsletter, secciones del sitio (JSON editor).
 
 ### Matriz de paridad
 
@@ -50,7 +55,7 @@ La app legacy vive en `apps/mobile/` (Next.js + Capacitor). Esta carpeta reempla
 
 ### Próximos pasos (orden sugerido)
 
-1. Offline en iOS (URLSession cache + cola)
-2. Pantallas STUDIO nativas (hero, casos, noticias) — espejo web reciente
+1. iOS: editores CRUD STUDIO (hero upload, casos, noticias) — paridad Android
+2. Offline en iOS (URLSession cache + cola)
 3. Generar catálogo de módulos desde `access-matrix.ts` (script CI)
 4. Build iOS en Mac (`ios/MAC_BUILD_PLAYBOOK.md`)

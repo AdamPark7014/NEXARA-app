@@ -67,7 +67,7 @@ enum PanelId: String, CaseIterable, Identifiable {
 
 /// Puente para ModuleRouter (catálogo legacy console/ventas/web/tickets).
 enum ModuleRoutingPortal {
-    case console, ventas, web, tickets, contabilidad, lab
+    case console, ventas, web, studio, tickets, contabilidad, lab
 }
 
 extension PanelId {
@@ -75,7 +75,7 @@ extension PanelId {
         switch self {
         case .erp, .ops: return .console
         case .crm: return .ventas
-        case .studio: return .web
+        case .studio: return .studio
         case .portal: return .tickets
         case .lab: return .lab
         }

@@ -26,9 +26,7 @@ struct ModuleRouter {
                 toRow($0, title: ["placas","marca","modelo"], subtitle: ["solicitanteNombre","solicitante"])
             } }
         case (.console, "gps"):
-            GenericListModuleView(title: "GPS") { (await ExtraRepository.shared.gpsLocations()).map {
-                toRow($0, title: ["userName","usuario"], subtitle: ["lat","lng"], meta: ["capturedAt","createdAt"])
-            } }
+            GpsMapView()
         case (.console, "tools"):
             GenericListModuleView(title: "Herramientas") { (await ExtraRepository.shared.tools()).map {
                 toRow($0, title: ["name","nombre"], subtitle: ["code","sku"])
@@ -57,7 +55,9 @@ struct ModuleRouter {
             GenericListModuleView(title: "Asistencia") { (await ExtraRepository.shared.attendance()).map {
                 toRow($0, title: ["userName","usuario"], subtitle: ["type","tipo"], meta: ["createdAt","date"])
             } }
-        case (.console, "lunch-breaks"), (.console, "my-lunch-breaks"), (.contabilidad, "horas"):
+        case (.console, "my-lunch-breaks"):
+            MyLunchBreaksView()
+        case (.console, "lunch-breaks"), (.contabilidad, "horas"):
             GenericListModuleView(title: "Comidas") { (await ExtraRepository.shared.lunchBreaks()).map {
                 toRow($0, title: ["userName","usuario"], subtitle: ["reason","motivo"], meta: ["startedAt","createdAt"])
             } }
@@ -98,8 +98,54 @@ struct ModuleRouter {
             CrmDashboardView()
         case (.contabilidad, "dashboard"):
             ContabilidadDashboardView()
-        case (.web, "dashboard"):
+        case (.web, "dashboard"), (.studio, "dashboard"):
             StudioDashboardView()
+        case (.studio, "hero"):
+            StudioListModuleView(
+                title: "Carrusel inicio",
+                loader: { try await StudioRepository.shared.heroSlides() },
+                rowTitle: { $0["caption"] as? String ?? $0["altText"] as? String ?? "Slide" },
+                rowSubtitle: { ($0["isActive"] as? Bool == false) ? "Inactivo" : "Activo" }
+            )
+        case (.studio, "cases"):
+            StudioListModuleView(
+                title: "Casos de éxito",
+                loader: { try await StudioRepository.shared.caseStudies() },
+                rowTitle: { $0["titulo"] as? String ?? "—" },
+                rowSubtitle: { $0["cliente"] as? String ?? "" }
+            )
+        case (.studio, "news"):
+            GenericListModuleView(title: "Noticias") { (await ExtraRepository.shared.news()).map {
+                toRow($0, title: ["title","titulo"], subtitle: ["summary","excerpt"])
+            } }
+        case (.studio, "contacts"), (.studio, "leads"):
+            StudioListModuleView(
+                title: "Contactos",
+                loader: { try await StudioRepository.shared.contactMessages() },
+                rowTitle: { $0["subject"] as? String ?? $0["name"] as? String ?? "—" },
+                rowSubtitle: { $0["email"] as? String ?? "" }
+            )
+        case (.studio, "social"):
+            StudioListModuleView(
+                title: "Redes sociales",
+                loader: { try await StudioRepository.shared.socialPosts() },
+                rowTitle: { $0["titulo"] as? String ?? "—" },
+                rowSubtitle: { ($0["red"] as? String ?? "") + " · " + ($0["estado"] as? String ?? "") }
+            )
+        case (.studio, "newsletter"):
+            StudioListModuleView(
+                title: "Newsletter",
+                loader: { try await StudioRepository.shared.newsletter() },
+                rowTitle: { $0["email"] as? String ?? "—" },
+                rowSubtitle: { $0["name"] as? String ?? "" }
+            )
+        case (.studio, "pages"):
+            StudioListModuleView(
+                title: "Secciones del sitio",
+                loader: { try await StudioRepository.shared.pageSections().map { ["section": $0] } },
+                rowTitle: { $0["section"] as? String ?? "—" },
+                rowSubtitle: { _ in "Contenido de landing" }
+            )
         case (.console, "analytics"), (.ventas, "crecimiento"),
              (.ventas, "reportes"), (.ventas, "equipo-comparativa"):
             AnalyticsRawView()

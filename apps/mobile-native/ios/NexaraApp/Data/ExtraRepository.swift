@@ -55,6 +55,19 @@ final class ExtraRepository {
     func operationalProjects() async -> [[String: Any]] { await load("operational-projects") }
     func gpsLocations() async       -> [[String: Any]] { await load("gps") }
 
+    // Lunch break actions
+    func myLunchBreaks() async -> [[String: Any]] { await load("lunch-breaks/mine") }
+
+    func lunchCheckin(checkinTime: String, photoDataUrl: String?) async throws {
+        struct Body: Encodable { let checkinTime: String; let checkinPhotoUrl: String? }
+        _ = try await ApiClient.shared.postJSON("lunch-breaks/checkin", body: Body(checkinTime: checkinTime, checkinPhotoUrl: photoDataUrl))
+    }
+
+    func lunchCheckout(checkoutTime: String, photoDataUrl: String?) async throws {
+        struct Body: Encodable { let checkoutTime: String; let checkoutPhotoUrl: String? }
+        _ = try await ApiClient.shared.postJSON("lunch-breaks/checkout", body: Body(checkoutTime: checkoutTime, checkoutPhotoUrl: photoDataUrl))
+    }
+
     // Analytics (respuestas JSON arbitrarias)
     func analyticsDashboardRaw() async -> String {
         do {
