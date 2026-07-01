@@ -238,7 +238,7 @@ export default function TendersPage() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 20 }}>
         <KpiCard label="Abiertas" value={abiertas} icon="📜" />
         <KpiCard label="Adjudicadas" value={ganadas} variant="positive" icon="🏆" />
-        <KpiCard label="Pipeline (propuestas)" value={`$${(pipelineValue / 1_000_000).toFixed(1)}M`} icon="💰" />
+        <KpiCard label="Pipeline (propuestas)" value={<Money value={pipelineValue} compact />} icon="💰" variant="accent" hint="Valor total de propuestas en proceso" />
       </div>
 
       {successMsg && (

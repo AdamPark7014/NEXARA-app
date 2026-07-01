@@ -5,6 +5,7 @@ import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Section from "@/components/ui/Section";
 import Button from "@/components/ui/Button";
+import KpiCard from "@/components/ui/KpiCard";
 import DataTable, { Tag, type Column } from "@/components/ui/DataTable";
 import { useUser } from "@/components/UserContext";
 import { toast } from "@/components/Toast";
@@ -180,6 +181,15 @@ export default function ClientsPage() {
         subtitle={cfg.subtitle}
         actions={cfg.canCreate ? <Button variant="primary" iconLeft="+" onClick={openNew}>Nuevo cliente</Button> : undefined}
       />
+
+      {!loading && items.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 18 }}>
+          <KpiCard label="Clientes totales" value={items.length} icon="🏢" />
+          <KpiCard label="Activos" value={items.filter(c => c.status === "Activo").length} variant="positive" icon="✅" />
+          <KpiCard label="Prospectos" value={items.filter(c => c.status === "Prospecto").length} variant="accent" icon="🎯" hint="Sin contrato aún" />
+          <KpiCard label="Inactivos / churned" value={items.filter(c => c.status !== "Activo" && c.status !== "Prospecto").length} variant={items.filter(c => c.status !== "Activo" && c.status !== "Prospecto").length > 0 ? "warning" : "default"} icon="⛔" />
+        </div>
+      )}
 
       {showForm && (
         <div
