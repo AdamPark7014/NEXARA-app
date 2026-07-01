@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.AuthRepository
 import mx.nexara.mobile.nativeapp.data.console.ConsoleRepository
+import mx.nexara.mobile.nativeapp.ui.console.screens.ErpBiScreen
 import mx.nexara.mobile.nativeapp.ui.common.SimpleListScreen
 import mx.nexara.mobile.nativeapp.ui.common.SimpleRow
 
@@ -172,80 +173,9 @@ fun WorkProjectsModuleScreen() {
     )
 }
 
-// ── Analytics (dashboard KPIs + computed KPIs en texto) ─────────────────
-class AnalyticsVm : ViewModel() {
-    private val _state = MutableStateFlow(AnalyticsState())
-    val state: StateFlow<AnalyticsState> = _state
-
-    fun load(context: android.content.Context) {
-        val repo = mx.nexara.mobile.nativeapp.data.extra.ExtraRepository(context)
-        _state.update { it.copy(loading = true, error = null) }
-        viewModelScope.launch {
-            try {
-                val (dash, kpis) = withContext(Dispatchers.IO) {
-                    (try { repo.analyticsDashboardRaw() } catch (_: Exception) { null }) to
-                        (try { repo.analyticsKpisRaw() } catch (_: Exception) { null })
-                }
-                _state.update { it.copy(loading = false, dashboardRaw = dash, kpisRaw = kpis) }
-            } catch (t: Throwable) {
-                _state.update { it.copy(loading = false, error = t.message ?: "Error") }
-            }
-        }
-    }
-}
-
-data class AnalyticsState(
-    val loading: Boolean = false,
-    val dashboardRaw: String? = null,
-    val kpisRaw: String? = null,
-    val error: String? = null,
-)
-
+// ── Analytics → ErpBiScreen ───────────────────────────────────────────────
 @Composable
-fun AnalyticsModuleScreen() {
-    val context = LocalContext.current
-    val vm: AnalyticsVm = viewModel()
-    val state by vm.state.collectAsState()
-    LaunchedEffect(Unit) { vm.load(context) }
-
-    Column(modifier = Modifier.padding(16.dp)) {
-        Text("Analítica", style = MaterialTheme.typography.headlineSmall)
-        Spacer(Modifier.height(12.dp))
-        if (state.loading && state.dashboardRaw == null && state.kpisRaw == null) {
-            Text("Cargando…", style = MaterialTheme.typography.bodyMedium)
-        } else if (state.error != null) {
-            Text("Error: ${state.error}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
-        } else {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            ) {
-                Column(Modifier.padding(14.dp)) {
-                    Text("Dashboard ejecutivo", fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = state.dashboardRaw ?: "Sin datos.",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            ) {
-                Column(Modifier.padding(14.dp)) {
-                    Text("KPIs calculados", fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = state.kpisRaw ?: "Sin datos.",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
-        }
-    }
-}
+fun AnalyticsModuleScreen() = ErpBiScreen()
 
 // ── My Preferences (UI local, sin endpoint dedicado) ────────────────────
 @Composable
@@ -270,8 +200,8 @@ fun MyPreferencesScreen() {
                 Text("Notificaciones", fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Las preferencias de notificación se sincronizan con el servidor cuando se abre este panel. " +
-                        "Actualmente, el dispositivo recibe alertas según los roles asignados a tu cuenta.",
+                    "Push FCM activo: el token se registra al iniciar sesión. " +
+                        "Las alertas llegan según los roles asignados a tu cuenta.",
                     style = MaterialTheme.typography.bodySmall,
                 )
             }

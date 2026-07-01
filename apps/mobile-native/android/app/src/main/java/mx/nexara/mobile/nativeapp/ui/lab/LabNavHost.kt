@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import mx.nexara.mobile.nativeapp.data.api.LabHealthSummaryDto
@@ -36,9 +37,22 @@ private const val Health = "lab/health"
 private const val Flags = "lab/flags"
 private const val Ai = "lab/ai"
 
+private fun labRouteForKey(key: String): String = when (key) {
+    "health" -> Health
+    "flags" -> Flags
+    "ai" -> Ai
+    else -> Home
+}
+
 @Composable
 fun LabNavHost(onExitToPanels: () -> Unit) {
     val nav = rememberNavController()
+
+    LaunchedEffect(Unit) {
+        val key = PendingDeepLink.consumeModuleFor(mx.nexara.mobile.nativeapp.access.PanelId.LAB) ?: return@LaunchedEffect
+        nav.navigate(labRouteForKey(key)) { launchSingleTop = true }
+    }
+
     NavHost(navController = nav, startDestination = Home) {
         composable(Home) {
             LabHomeScreen(

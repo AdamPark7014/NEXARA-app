@@ -42,6 +42,7 @@ final class SessionStore: ObservableObject {
         writeKeychain(data)
         QuickProfileStore.remember(user)
         RealtimeBus.shared.start(token: user.token)
+        Task { await PushManager.shared.ensureRegisteredAfterLogin() }
     }
 
     func clear() {

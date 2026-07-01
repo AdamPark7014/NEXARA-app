@@ -12,13 +12,14 @@ object ModulePanelMap {
         "vehicles", "my-vehicles",
         "gps", "tools",
         "projects", "work-projects",
-        "assets", "maintenance",
-        "service-sheets", "client-tickets",
+        "assets", "maintenance", "maintenance-contracts",
+        "service-sheets", "client-tickets", "support", "noc", "support-sla",
         "cvs",
     )
 
     private val ERP_KEYS = setOf(
         "dashboard",
+        "executive", "approvals", "notifications-center", "bi",
         "attendance", "lunch-breaks", "my-lunch-breaks",
         "hr", "fines", "users", "employee-payments",
         "accounting", "banking", "invoicing", "expenses",

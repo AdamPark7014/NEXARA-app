@@ -6,6 +6,7 @@ import SwiftUI
 final class CrmDashboardVM: ObservableObject {
     @Published var cotizaciones: [[String: Any]] = []
     @Published var leads:        [[String: Any]] = []
+    @Published var metrics:      [String: Any] = [:]
     @Published var isLoading = false
     @Published var error: String?
 
@@ -14,9 +15,11 @@ final class CrmDashboardVM: ObservableObject {
         Task {
             async let cots  = ExtraRepository.shared.cotizaciones()
             async let leads = ExtraRepository.shared.clientTicketRequests()
-            let (c, l) = await (cots, leads)
+            async let mets  = CrmRepository.shared.salesMetrics(period: "month")
+            let (c, l, m) = await (cots, leads, mets)
             cotizaciones = c
             self.leads   = l
+            metrics      = m
             isLoading    = false
         }
     }
@@ -55,6 +58,7 @@ struct CrmDashboardView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 20) {
                 kpiSection
+                if !vm.metrics.isEmpty { pipelineSection }
                 if !vm.cotizaciones.isEmpty { statusSection }
                 recentCotSection
                 if !vm.leads.isEmpty { leadsSection }
@@ -83,6 +87,20 @@ struct CrmDashboardView: View {
             CrmKpi(icon: "🎯", label: "Leads", value: "\(vm.leads.count)", sub: "Solicitudes", accent: .blue)
         }
         .padding(.horizontal)
+    }
+
+    // ── Pipeline del mes (API ventas/reportes/metricas — sin duplicar pantalla Reportes)
+    private var pipelineSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            CrmSectionRow(title: "Pipeline del mes", detail: "Ver reportes →")
+                .padding(.horizontal)
+            HStack(spacing: 10) {
+                CrmKpi(icon: "💰", label: "Ingresos", value: crmDashFmtMxn(crmDashDouble(vm.metrics, "totalRevenue")), sub: "Periodo actual", accent: .green)
+                CrmKpi(icon: "📊", label: "Pipeline", value: crmDashFmtMxn(crmDashDouble(vm.metrics, "pipelineValue")), sub: "Oportunidades activas", accent: .blue)
+                CrmKpi(icon: "🎯", label: "Conversión", value: crmDashFmtPct(crmDashDouble(vm.metrics, "conversionRate")), sub: "Cierre vs opps", accent: .orange)
+            }
+            .padding(.horizontal)
+        }
     }
 
     // ── Status breakdown
@@ -295,3 +313,14 @@ extension [String: Any] {
         return UUID().uuidString
     }
 }
+
+private func crmDashDouble(_ m: [String: Any], _ key: String) -> Double {
+    if let d = m[key] as? Double { return d }
+    if let n = m[key] as? NSNumber { return n.doubleValue }
+    if let s = m[key] as? String, let d = Double(s) { return d }
+    return 0
+}
+
+private func crmDashFmtMxn(_ v: Double) -> String { fmtMxn(v) }
+
+private func crmDashFmtPct(_ v: Double) -> String { String(format: "%.1f%%", v) }

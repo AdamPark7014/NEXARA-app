@@ -37,7 +37,7 @@ fun WebNavHost(
                 "contactos" -> { mx.nexara.mobile.nativeapp.ui.modules.ContactMessagesModuleScreen(); return@composable }
                 "clientes" -> { mx.nexara.mobile.nativeapp.ui.modules.ServiceClientsModuleScreen(); return@composable }
                 "proyectos" -> { mx.nexara.mobile.nativeapp.ui.modules.ProjectsModuleScreen(); return@composable }
-                "dashboard" -> { mx.nexara.mobile.nativeapp.ui.modules.AnalyticsModuleScreen(); return@composable }
+                "dashboard" -> { mx.nexara.mobile.nativeapp.ui.studio.StudioDashboardScreen(onBack = { nav.popBackStack() }, onOpenModule = { mod -> nav.navigate(moduleRoute(mod)) }); return@composable }
             }
             PlaceholderScreen(
                 title = m?.label ?: "Módulo",

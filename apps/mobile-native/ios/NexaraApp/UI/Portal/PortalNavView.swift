@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Navegación Portal — paridad con Android `TicketsNavHost`.
-enum PortalRoute: Hashable {
+enum PortalRoute: Hashable, Identifiable {
     case profile
     case branches
     case branchNew
@@ -13,11 +13,29 @@ enum PortalRoute: Hashable {
     case feedback
     case inventories
     case inventoryDetail(Int64)
+
+    var id: String {
+        switch self {
+        case .profile: return "profile"
+        case .branches: return "branches"
+        case .branchNew: return "branchNew"
+        case .branchEdit(let id): return "branchEdit-\(id)"
+        case .requests: return "requests"
+        case .requestNew: return "requestNew"
+        case .tickets: return "tickets"
+        case .ticketDetail(let id): return "ticket-\(id)"
+        case .feedback: return "feedback"
+        case .inventories: return "inventories"
+        case .inventoryDetail(let id): return "inventory-\(id)"
+        }
+    }
 }
 
 struct PortalNavView: View {
     let onExit: () -> Void
     @State private var path: [PortalRoute] = []
+    @State private var deepLinkRoute: PortalRoute?
+    @ObservedObject private var deepLink = DeepLinkCoordinator.shared
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -40,6 +58,52 @@ struct PortalNavView: View {
                     case .inventoryDetail(let id): PortalInventoryDetailView(inventoryId: id)
                     }
                 }
+        }
+        .sheet(item: $deepLinkRoute) { route in
+            NavigationStack {
+                portalDeepLinkScreen(route)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cerrar") { deepLinkRoute = nil }
+                        }
+                    }
+            }
+        }
+        .onAppear { consumePortalDeepLink() }
+        .onChange(of: deepLink.pending) { _, _ in consumePortalDeepLink() }
+    }
+
+    private func consumePortalDeepLink() {
+        guard let key = deepLink.consumeModule(for: .portal) else { return }
+        if let route = portalRoute(for: key) { deepLinkRoute = route }
+    }
+
+    @ViewBuilder
+    private func portalDeepLinkScreen(_ route: PortalRoute) -> some View {
+        switch route {
+        case .profile: PortalProfileView()
+        case .branches: PortalBranchesView(onNew: {}, onEdit: { _ in })
+        case .branchNew: PortalBranchEditView(branchId: nil, onDone: {})
+        case .branchEdit(let id): PortalBranchEditView(branchId: id, onDone: {})
+        case .requests: PortalRequestsView(onNew: {})
+        case .requestNew: PortalRequestNewView(onDone: {})
+        case .tickets: PortalTicketsView(onOpen: { _ in })
+        case .ticketDetail(let id): PortalTicketDetailView(ticketId: id)
+        case .feedback: PortalFeedbackView()
+        case .inventories: PortalInventoriesView(onOpen: { _ in })
+        case .inventoryDetail(let id): PortalInventoryDetailView(inventoryId: id)
+        }
+    }
+
+    private func portalRoute(for key: String) -> PortalRoute? {
+        switch key {
+        case "profile", "my-profile", "mi-perfil": return .profile
+        case "branches", "sucursales": return .branches
+        case "requests", "solicitudes": return .requests
+        case "tickets": return .tickets
+        case "inventories", "inventarios": return .inventories
+        case "feedback-pending", "feedback": return .feedback
+        default: return nil
         }
     }
 }

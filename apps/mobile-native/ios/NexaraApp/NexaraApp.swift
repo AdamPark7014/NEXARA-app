@@ -83,9 +83,9 @@ struct RootView: View {
                 case .crm:
                     CrmTabView(onExit: { app.route = .panels })
                 case .portal:
-                    PortalNavView(panel: .portal, onExit: { app.route = .panels })
+                    PortalNavView(onExit: { app.route = .panels })
                 case .studio:
-                    PortalNavView(panel: panel, onExit: { app.route = .panels })
+                    PanelModuleNavView(panel: panel, onExit: { app.route = .panels })
                 case .lab:
                     LabTabView(onExit: { app.route = .panels })
                 }

@@ -37,5 +37,12 @@ interface CrmApi {
     suspend fun listSalesTargetsRaw(): okhttp3.ResponseBody
 
     @GET("ventas/reportes/vendedores")
-    suspend fun listSalesTeamRaw(): okhttp3.ResponseBody
+    suspend fun listSalesTeamRaw(
+        @Query("period") period: String? = null,
+    ): okhttp3.ResponseBody
+
+    @GET("ventas/reportes/metricas")
+    suspend fun getSalesMetricsRaw(
+        @Query("period") period: String = "month",
+    ): okhttp3.ResponseBody
 }

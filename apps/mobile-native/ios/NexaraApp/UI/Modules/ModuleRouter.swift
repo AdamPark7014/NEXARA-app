@@ -38,9 +38,7 @@ struct ModuleRouter {
         case (.console, "projects"):
             ProjectsView()
         case (.console, "work-projects"), (.contabilidad, "work-projects"):
-            GenericListModuleView(title: "Proyectos internos") { (await ExtraRepository.shared.projects()).map {
-                toRow($0, title: ["name","nombre","title"], subtitle: ["clientName","cliente"])
-            } }
+            WorkProjectsView()
         case (.console, "users"):
             UsersView()
         case (.console, "attendance"):
@@ -53,13 +51,9 @@ struct ModuleRouter {
             HrLeavesView()
         case (.console, "employee-payments"), (.contabilidad, "employee-payments"),
              (.contabilidad, "pagos"):
-            GenericListModuleView(title: "Pagos a empleados") { (await ExtraRepository.shared.employeePayments()).map {
-                toRow($0, title: ["concept","concepto"], subtitle: ["userName","empleado"], meta: ["paidAt","createdAt"])
-            } }
+            EmployeePaymentsView()
         case (.console, "accounting"), (.contabilidad, "accounting"):
-            GenericListModuleView(title: "Contabilidad") { (await ExtraRepository.shared.journalEntries()).map {
-                toRow($0, title: ["description","descripcion","concepto"], subtitle: ["account","cuenta"])
-            } }
+            AccountingView()
         case (.console, "invoicing"), (.contabilidad, "invoicing"):
             InvoicesView()
         case (.console, "banking"), (.contabilidad, "banking"):
@@ -67,9 +61,7 @@ struct ModuleRouter {
         case (.console, "expenses"), (.contabilidad, "expenses"):
             ExpensesView()
         case (.console, "fines"), (.contabilidad, "multas"):
-            GenericListModuleView(title: "Multas") { (await ExtraRepository.shared.fines()).map {
-                toRow($0, title: ["reason","motivo","concepto"], subtitle: ["userName","empleado"], meta: ["amount","total"])
-            } }
+            FinesView()
         case (.console, "cotizaciones"):
             CrmCotizacionesView()
         case (.ventas, "oportunidades"):
@@ -90,7 +82,7 @@ struct ModuleRouter {
             CrmTargetsView()
         case (.ventas, "equipo-comercial"), (.ventas, "sales-team"):
             CrmSalesTeamView()
-        case (.ventas, "gestion-vendedores"):
+        case (.ventas, "gestion-vendedores"), (.console, "gestion-vendedores"):
             CrmSalesTeamView()
         case (.ventas, "plantillas"), (.ventas, "cotizaciones"):
             CrmCotizacionesView()
@@ -132,61 +124,54 @@ struct ModuleRouter {
             StudioNewsletterView()
         case (.studio, "pages"):
             StudioPagesView()
-        case (.console, "analytics"), (.ventas, "crecimiento"),
-             (.ventas, "reportes"), (.ventas, "equipo-comparativa"):
-            AnalyticsRawView()
+        case (.console, "analytics"), (.console, "bi"):
+            ErpBiView()
+        case (.console, "executive"):
+            ExecutiveView()
+        case (.console, "approvals"):
+            ApprovalsView()
+        case (.console, "notifications-center"):
+            NotificationsCenterView(onBack: {})
+        case (.console, "noc"):
+            NocView()
+        case (.console, "support-sla"):
+            SlaView()
+        case (.console, "maintenance-contracts"):
+            MaintenanceContractsView()
+        case (.console, "support"):
+            ClientTicketsModuleView()
+        case (.ventas, "reportes"):
+            CrmReportsView(mode: .reportes)
+        case (.ventas, "crecimiento"):
+            CrmReportsView(mode: .crecimiento)
+        case (.ventas, "equipo-comparativa"):
+            CrmReportsView(mode: .equipoComparativa)
         case (.console, "audit"):
-            GenericListModuleView(title: "Auditoría") { (await ExtraRepository.shared.audit()).map {
-                toRow($0, title: ["action","accion","description"], subtitle: ["userName","usuario"])
-            } }
+            AuditView()
         case (.console, "assets"):
-            GenericListModuleView(title: "Activos") { (await ExtraRepository.shared.maintenanceAssets()).map {
-                toRow($0, title: ["name","nombre"], subtitle: ["code","tag","serial"])
-            } }
+            MaintenanceView(initialTab: 1)
         case (.console, "stock"):
-            GenericListModuleView(title: "Almacén") { (await ExtraRepository.shared.stock()).map {
-                toRow($0, title: ["name","nombre","productName"], subtitle: ["sku","code"], meta: ["quantity","cantidad"])
-            } }
+            StockView(initialTab: 0)
         case (.console, "warehouse"):
-            GenericListModuleView(title: "Bodega") { (await ExtraRepository.shared.warehouse()).map {
-                toRow($0, title: ["name","nombre"], subtitle: ["code","location"])
-            } }
+            StockView(initialTab: 1)
         case (.console, "procurement"):
-            GenericListModuleView(title: "Compras · Requisiciones") { (await ExtraRepository.shared.requisitions()).map {
-                toRow($0, title: ["title","descripcion","folio"], subtitle: ["requestedBy","solicitante"])
-            } }
+            ProcurementModuleView()
         case (.console, "maintenance"):
-            GenericListModuleView(title: "Mantenimiento") { (await ExtraRepository.shared.workOrders()).map {
-                toRow($0, title: ["title","description","orderNumber"], subtitle: ["assetName","equipmentName"])
-            } }
+            MaintenanceView(initialTab: 0)
         case (.console, "service-sheets"):
-            GenericListModuleView(title: "Hojas de servicio") { (await ExtraRepository.shared.serviceSheets()).map {
-                toRow($0, title: ["folio","number"], subtitle: ["clientName","anNumber"])
-            } }
+            ServiceSheetsView()
         case (.console, "documents"):
-            GenericListModuleView(title: "Documentos") { (await ExtraRepository.shared.documents()).map {
-                toRow($0, title: ["name","title","fileName"], subtitle: ["category","tipo"])
-            } }
+            DocumentsView()
         case (.console, "cvs"):
-            GenericListModuleView(title: "CVs") { (await ExtraRepository.shared.cvs()).map {
-                toRow($0, title: ["fullName","name","fileName"], subtitle: ["position","role"])
-            } }
+            CvsView()
         case (.console, "client-tickets"):
-            GenericListModuleView(title: "Tickets de clientes") { (await ExtraRepository.shared.clientTicketRequests()).map {
-                toRow($0, title: ["title","subject","asunto"], subtitle: ["clientName","cliente"])
-            } }
+            ClientTicketsModuleView()
         case (.console, "contact-messages"), (.web, "contactos"):
-            GenericListModuleView(title: "Mensajes de contacto") { (await ExtraRepository.shared.contactMessages()).map {
-                toRow($0, title: ["name","nombre","subject"], subtitle: ["email","telefono"])
-            } }
+            ContactMessagesView()
         case (.console, "news"), (.web, "noticias"):
-            GenericListModuleView(title: "Noticias") { (await ExtraRepository.shared.news()).map {
-                toRow($0, title: ["title","titulo"], subtitle: ["excerpt","slug"])
-            } }
+            NewsView()
         case (.console, "newsletter"):
-            GenericListModuleView(title: "Newsletter") { (await ExtraRepository.shared.newsletter()).map {
-                toRow($0, title: ["email","name"], subtitle: ["status"])
-            } }
+            NewsletterView()
         case (.console, "my-profile"), (.ventas, "my-profile"):
             MyProfileView()
         case (.console, "my-preferences"):
@@ -197,13 +182,9 @@ struct ModuleRouter {
             ConsoleDashboardView()
         // ── Ventas / Contabilidad / Web restantes caen a analytics/proyectos
         case (.contabilidad, "proyectos"), (.web, "proyectos"):
-            GenericListModuleView(title: "Proyectos") { (await ExtraRepository.shared.projects()).map {
-                toRow($0, title: ["name","nombre","title"], subtitle: ["clientName","cliente"])
-            } }
+            WorkProjectsView()
         case (.ventas, "notificaciones"):
-            GenericListModuleView(title: "Notificaciones") { (await ExtraRepository.shared.audit()).map {
-                toRow($0, title: ["action","description"], subtitle: ["userName"])
-            } }
+            NotificationsCenterView(onBack: {})
         // ── LAB
         case (.lab, "health"):
             LabHealthView()
@@ -233,26 +214,58 @@ struct PlaceholderView: View {
 }
 
 struct AnalyticsRawView: View {
-    @State private var raw: String = ""
+    @State private var dashboard = ""
+    @State private var kpis = ""
     @State private var isLoading = true
+    @State private var error: String?
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                if isLoading { ProgressView() }
-                else if raw.isEmpty {
-                    Text("Sin datos").foregroundColor(.secondary)
+            VStack(alignment: .leading, spacing: 14) {
+                if isLoading { ProgressView().frame(maxWidth: .infinity).padding(.top, 40) }
+                else if let error {
+                    Text(error).foregroundColor(.red)
                 } else {
-                    Text("Dashboard").font(.headline)
-                    Text(raw).font(.system(.caption, design: .monospaced))
+                    analyticsCard("Dashboard ejecutivo", dashboard)
+                    analyticsCard("KPIs calculados", kpis)
                 }
             }
             .padding()
         }
         .navigationTitle("Analítica")
-        .task {
-            raw = await ExtraRepository.shared.analyticsDashboardRaw()
-            isLoading = false
+        .task { await reload() }
+        .refreshable { await reload() }
+    }
+
+    private func analyticsCard(_ title: String, _ raw: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).font(.headline)
+            Text(raw.isEmpty ? "Sin datos." : formatJsonPreview(raw))
+                .font(.system(.caption, design: .monospaced))
+                .foregroundColor(.secondary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func reload() async {
+        isLoading = true
+        defer { isLoading = false }
+        async let d = ExtraRepository.shared.analyticsDashboardRaw()
+        async let k = ExtraRepository.shared.analyticsKpisRaw()
+        dashboard = await d
+        kpis = await k
+        if dashboard.isEmpty && kpis.isEmpty { error = "No se pudieron cargar los datos de analítica." }
+    }
+
+    private func formatJsonPreview(_ raw: String) -> String {
+        guard let data = raw.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data),
+              let pretty = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted]),
+              let str = String(data: pretty, encoding: .utf8) else { return raw }
+        return String(str.prefix(4000))
     }
 }
 
@@ -298,7 +311,7 @@ struct MyPreferencesView: View {
                     .font(.footnote).foregroundColor(.secondary)
             }
             Section("Dispositivo") {
-                Text("Registro automático en login. Para push se requiere APNs + Firebase (pendiente).")
+                Text("Push APNs: el token se registra al iniciar sesión. Las alertas llegan según tus roles y permisos.")
                     .font(.footnote).foregroundColor(.secondary)
             }
         }

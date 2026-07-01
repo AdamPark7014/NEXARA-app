@@ -39,7 +39,7 @@ import mx.nexara.mobile.nativeapp.access.PanelId
 import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
 import mx.nexara.mobile.nativeapp.ui.console.screens.MyProfileScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.PlaceholderScreen
-import mx.nexara.mobile.nativeapp.ui.modules.AnalyticsModuleScreen
+import mx.nexara.mobile.nativeapp.ui.shared.NotificationsScreen
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
@@ -138,9 +138,10 @@ fun VentasNavHost(
                     "licitaciones", "tenders" -> VentasTendersScreen()
                     "metas", "targets"    -> VentasTargetsScreen()
                     "gestion-vendedores", "equipo-comercial", "sales-team" -> VentasSalesTeamScreen()
-                    "reportes",
-                    "crecimiento",
-                    "equipo-comparativa"  -> AnalyticsModuleScreen()
+                    "reportes"            -> CrmReportsScreen(CrmReportMode.REPORTES)
+                    "crecimiento"           -> CrmReportsScreen(CrmReportMode.CRECIMIENTO)
+                    "equipo-comparativa"    -> CrmReportsScreen(CrmReportMode.EQUIPO)
+                    "notificaciones"      -> NotificationsScreen(onBack = { nav.popBackStack() })
                     "my-profile"          -> MyProfileScreen()
                     else -> PlaceholderScreen(
                         title = key,

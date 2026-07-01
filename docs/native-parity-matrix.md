@@ -17,80 +17,129 @@ Esta matriz es el checklist de **paridad** para poder eliminar `apps/mobile` (Ne
 ## Panel hub / Auth (core)
 | Feature | Mobile web (`apps/mobile`) | Android native | iOS native |
 |---|---|---|---|
-| Login | `app/(auth)/login` | ✅ `ui/screens/LoginScreen.kt` | ⬜ |
+| Login | `app/(auth)/login` | ✅ `ui/screens/LoginScreen.kt` | ✅ `LoginView` |
 | Panel hub (/paneles) + access rules | `lib/panel-routing.ts` / `access-matrix.ts` | ✅ `PanelAccessResolver` (ERP/CRM/OPS/STUDIO/LAB) | ✅ `Access/PanelAccessResolver.swift` |
-| Session store (token, perms) | `UserContext` (session/localStorage) | ✅ `EncryptedSharedPreferences` (`data/SessionStore.kt`) | ⬜ |
-| Saved accounts | `lib/saved-accounts.ts` | ⬜ | ⬜ |
-| Deep links to screens | (URL routing) | ⬜ | ⬜ |
+| Session store (token, perms) | `UserContext` (session/localStorage) | ✅ `EncryptedSharedPreferences` (`data/SessionStore.kt`) | ✅ `Session/SessionStore.swift` (Keychain) |
+| Saved accounts | `lib/saved-accounts.ts` | ✅ `QuickProfile` en login | ✅ `QuickProfileStore` + login |
+| Deep links to screens | (URL routing) | ✅ `nexara://` — ERP/CRM/Studio/Portal/LAB | ✅ `nexara://` — todos los paneles |
 
 ## Panel: Console
 | Screen / capability | Mobile route | Android native | iOS native |
 |---|---|---|---|
-| Dashboard | `/console/dashboard` | ✅ `ConsoleDashboardScreen` | ⬜ |
-| Activities (admin) | `/console/activities` | ✅ | ⬜ |
-| My activities | `/console/my-activities` | ✅ | ⬜ |
-| Evidences (admin/user) | `/console/evidences`, `/console/my-evidences` | ✅ | ⬜ |
-| Viatics | `/console/viatics` | ✅ | ⬜ |
-| Vehicles | `/console/vehicles` | ✅ | ⬜ |
-| GPS | `/console/gps` | ✅ | ⬜ |
-| Tools hub + inventory + my-kit + renewals + kits-users | `/console/tools/*` | ✅ | ⬜ |
-| Clients | `/console/clients` | ✅ | ⬜ |
-| Projects | `/console/projects` | ✅ | ⬜ |
-| Users | `/console/users` | ✅ | ⬜ |
-| Attendance | `/console/attendance` | ✅ | ⬜ |
-| Settings (console.admin) | `/console/settings` | ✅ | ⬜ |
-| Notifications topbar | (varios) | ⬜ | ⬜ |
-| Offline + realtime parity | (global) | ✅ offline GET/cache + cola; realtime ✅ | ⬜ |
+| Dashboard | `/console/dashboard` | ✅ `ConsoleDashboardScreen` | ✅ `ConsoleDashboardView` |
+| Activities (admin) | `/console/activities` | ✅ | ✅ `ActivitiesView` |
+| My activities | `/console/my-activities` | ✅ | ✅ `ActivitiesView` |
+| Evidences (admin/user) | `/console/evidences`, `/console/my-evidences` | ✅ workflow completo | ✅ `EvidencesView` (flujo 5 pasos) |
+| Viatics | `/console/viatics` | ✅ | ✅ `ViaticsView` |
+| My viatics | `/console/my-viatics` | ✅ | ✅ scope personal |
+| Vehicles | `/console/vehicles` | ✅ | ✅ `VehiclesView` |
+| GPS | `/console/gps` | ✅ | ✅ `GpsMapView` |
+| Tools hub + inventory + my-kit + renewals + kits-users | `/console/tools/*` | ✅ | ✅ `ToolsHubView` (aprobar/rechazar renovaciones) |
+| Clients | `/console/clients` | ✅ CRUD + logo | ✅ `ServiceClientsView` CRUD + logo |
+| Projects | `/console/projects` | ✅ | ✅ `ProjectsView` + estado |
+| Users | `/console/users` | ✅ | ✅ `UsersView` |
+| Attendance | `/console/attendance` | ✅ check-in/out | ✅ entrada/salida |
+| HR leaves | `/console/hr` | ✅ `HrLeavesScreen` | ✅ `HrLeavesView` |
+| Lunch breaks | `/console/lunch-breaks` | ✅ `LunchBreaksModuleScreen` (KPIs + tarjetas) | ✅ `LunchBreaksAdminView` |
+| My lunch breaks | `/console/my-lunch-breaks` | ✅ | ✅ `MyLunchBreaksView` |
+| Finance (expenses/invoices/banking) | varios | ✅ | ✅ vistas dedicadas |
+| Settings (console.admin) | `/console/settings` | ✅ | ✅ `ConsoleSettingsView` |
+
+## Panel: OPS (operaciones)
+| Screen / capability | Mobile route | Android native | iOS native |
+|---|---|---|---|
+| Tickets de clientes (bandeja + KPIs + cambio estado) | `/ops/support` | ✅ `ClientTicketsModuleScreen` | ✅ `ClientTicketsModuleView` |
+| Compras (requisiciones + órdenes + aprobar/rechazar) | `/erp/procurement` | ✅ `ProcurementModuleScreen` | ✅ `ProcurementModuleView` |
+| Bodega + almacén (hub sin duplicar) | `/console/warehouse`, `/console/stock` | ✅ `WarehouseHubScreen` | ✅ `WarehouseHubView` |
+| Hojas de servicio | `/operacion/service-sheets` | ✅ `ServiceSheetsModuleScreen` | ✅ `ServiceSheetsModuleView` |
+| Mantenimiento / Activos | varios | ✅ `MaintenanceModuleScreen` (hub + iniciar/completar OT) | ✅ `MaintenanceView` |
+| Gestión vendedores (desde ERP) | `/console/gestion-vendedores` | ✅ `VentasSalesTeamScreen` | ✅ `CrmSalesTeamView` |
 
 ## Panel: Tickets (Portal cliente/sucursal)
 | Capability | Mobile route | Android native | iOS native |
 |---|---|---|---|
-| Portal home | `/tickets` | ✅ | ⬜ |
-| Profile view/update | tab Perfil | ✅ | ⬜ |
-| Branches list/create/edit + logo upload | tab Sucursales | ✅ | ⬜ |
-| Requests list/create | tab Nuevo/Solicitudes | ✅ | ⬜ |
-| Tickets list/detail | tab Tickets | ✅ | ⬜ |
-| Ticket report PDF | ticket modal/descarga | ✅ | ⬜ |
-| Close request | (acción) | ⬜ | ⬜ |
-| Feedback pending + submit | (feedback modal) | ✅ | ⬜ |
-| Inventories (list/detail/sync/upload/report) | tab Inventarios | ✅ | ⬜ |
-| Portal report PDF | `/client-portal/report` | ⬜ | ⬜ |
-| Realtime refresh (`entity:updated`) | Socket.IO | ⬜ | ⬜ |
-| Offline queue/cache | Offline layer | ✅ `OfflineHttpInterceptor` + banner | ⬜ |
+| Portal home | `/tickets` | ✅ `TicketsPortalScreen` | ✅ `PortalHomeView` |
+| Profile view/update | tab Perfil | ✅ | ✅ `PortalProfileView` |
+| Branches list/create/edit + logo upload | tab Sucursales | ✅ | ✅ CRUD + logo (`PortalBranchEditView`) |
+| Requests list/create | tab Nuevo/Solicitudes | ✅ | ✅ + crear solicitud |
+| Tickets list/detail | tab Tickets | ✅ | ✅ + PDF reporte |
+| Ticket report PDF | ticket modal/descarga | ✅ | ✅ |
+| Close request | (acción) | ✅ | ✅ |
+| Feedback pending + submit | (feedback modal) | ✅ | ✅ formulario completo |
+| Inventories (list/detail/sync/upload/report) | tab Inventarios | ✅ | ✅ sync + decide + PDF |
+| Portal report PDF | `/client-portal/report` | ✅ | ✅ |
+| Realtime refresh (`entity:updated`) | Socket.IO | ✅ | ✅ `RealtimeBus` |
+| Offline queue/cache | Offline layer | ✅ | ✅ cache GET + cola mutaciones |
 
-## Panel: Ventas
+## Panel: Ventas / CRM
 | Screen / capability | Mobile route | Android native | iOS native |
 |---|---|---|---|
-| Dashboard | `/ventas/dashboard` | ⬜ | ⬜ |
-| Leads | `/ventas/leads` | ⬜ | ⬜ |
-| Oportunidades | `/ventas/oportunidades` | ⬜ | ⬜ |
-| Clientes | `/ventas/clientes` | ⬜ | ⬜ |
-| Cotizaciones (view/pdf) | `/ventas/cotizaciones` | ⬜ | ⬜ |
-| Reportes + notificaciones | `/ventas/reportes`, `/ventas/notificaciones` | ⬜ | ⬜ |
+| Dashboard | `/ventas/dashboard` | ✅ | ✅ `CrmDashboardView` |
+| Leads | `/ventas/leads` | ✅ | ✅ `CrmLeadsView` |
+| Oportunidades | `/ventas/oportunidades` | ✅ `VentasOportunidadesScreen` | ✅ `CrmOpportunitiesView` |
+| Clientes | `/ventas/clientes` | ✅ `VentasClientesScreen` | ✅ `CrmCommercialClientsView` |
+| Cotizaciones (view/pdf) | `/ventas/cotizaciones` | ✅ | ✅ KPI + filtros |
+| Productos | `/crm/products` | ✅ `VentasProductsScreen` | ✅ `CrmProductsView` |
+| Proyectos | `/ventas/proyectos` | ✅ `VentasProyectosScreen` | ✅ `CrmProjectsView` |
+| Pipeline | `/crm/pipeline` | ✅ `VentasPipelineScreen` | ✅ `CrmPipelineView` |
+| Agenda | `/crm/agenda` | ✅ `VentasAgendaScreen` | ✅ `CrmAgendaView` |
+| Licitaciones | `/crm/tenders` | ✅ `VentasTendersScreen` | ✅ `CrmTendersView` |
+| Metas comerciales | `/crm/targets` | ✅ `VentasTargetsScreen` | ✅ `CrmTargetsView` |
+| Reportes + crecimiento + comparativa | `/ventas/reportes`, `/ventas/crecimiento`, `/ventas/equipo-comparativa` | ✅ `CrmReportsScreen` (KPIs `ventas/reportes/metricas` + vendedores) | ✅ `CrmReportsView` |
+| Notificaciones ventas | `/ventas/notificaciones` | ✅ `NotificationsScreen` | ✅ `NotificationsCenterView` |
+| Dashboard CRM (métricas mes) | `/ventas` inicio | ✅ `VentasDashboardScreen` + pipeline API | ✅ `CrmDashboardView` + pipeline API |
+| ERP BI / analítica | `/erp/analytics/bi`, `/console/analytics` | ✅ `ErpBiScreen` (KPIs + margen + ingenieros + ROI) | ✅ `ErpBiView` |
+| Vista ejecutiva | `/erp/executive` | ✅ `ExecutiveScreen` (`executive/c-level`) | ✅ `ExecutiveView` |
+| Aprobaciones | `/erp/approvals` | ✅ `ApprovalsScreen` (workflow my-pending) | ✅ `ApprovalsView` |
+| Centro notificaciones ERP | `/erp/notifications-center` | ✅ `NotificationsScreen` (hub global) | ✅ `NotificationsCenterView` |
+| NOC monitoreo | `/ops/noc` | ✅ `NocModuleScreen` | ✅ `NocView` |
+| SLA soporte | `/ops/support/sla` | ✅ `SlaModuleScreen` | ✅ `SlaView` |
+| Contratos mantenimiento | `/ops/maintenance/contracts` | ✅ `MaintenanceContractsScreen` | ✅ `MaintenanceContractsView` |
+| Bandeja soporte | `/ops/support` | ✅ `ClientTicketsModuleScreen` | ✅ `ClientTicketsModuleView` |
 
 ## Panel: Contabilidad
 | Screen / capability | Mobile route | Android native | iOS native |
 |---|---|---|---|
-| Dashboard | `/contabilidad/dashboard` | ⬜ | ⬜ |
-| Pagos | `/contabilidad/pagos` | ⬜ | ⬜ |
-| Viáticos | `/contabilidad/viaticos` | ⬜ | ⬜ |
-| Multas | `/contabilidad/multas` | ⬜ | ⬜ |
-| Banking / invoicing / reports | varios | ⬜ | ⬜ |
+| Hub TabView (Inicio · Facturas · Gastos · Más) | `/contabilidad/*` | ✅ `ContabilidadNavHost` (desde ERP Más + deep link) | ✅ `ContabilidadTabView` (desde ERP Más) |
+| Dashboard | `/contabilidad/dashboard` | ✅ | ✅ `ContabilidadDashboardView` |
+| Facturación / Gastos / Banca | varios | ✅ `InvoicesRichScreen` / `ExpensesRichScreen` / `BankingRichScreen` | ✅ `InvoicesView` / `ExpensesView` / `BankingView` |
+| Pagos empleados · Multas · Asientos | varios | ✅ `FinanceRichScreens` | ✅ `EmployeePaymentsView` / `FinesView` / `AccountingView` |
 
-## Panel: Web
+## Panel: STUDIO (web)
 | Screen / capability | Mobile route | Android native | iOS native |
 |---|---|---|---|
-| Dashboard | `/web/dashboard` | ⬜ | ⬜ |
-| Clientes | `/web/clientes` | ⬜ | ⬜ |
-| Proyectos | `/web/proyectos` | ⬜ | ⬜ |
-| Contactos | `/web/contactos` | ⬜ | ⬜ |
-| Noticias | `/web/noticias` | ⬜ | ⬜ |
+| Dashboard KPIs | `/studio/dashboard` | ✅ `StudioDashboardScreen` | ✅ `StudioDashboardView` |
+| Hero carousel CRUD | `/studio/hero` | ✅ upload/reorder | ✅ CRUD + reorder |
+| Casos de éxito | `/studio/cases` | ✅ CRUD + publicar | ✅ CRUD + publicar |
+| Noticias | `/studio/news` | ✅ CRUD | ✅ CRUD |
+| Contactos / Leads | `/studio/contacts`, `/studio/leads` | ✅ workflow | ✅ detalle + estado |
+| Redes sociales | `/studio/social` | ✅ CRUD | ✅ CRUD + publicar |
+| Newsletter | `/studio/newsletter` | ✅ | ✅ búsqueda |
+| Secciones sitio | `/studio/pages` | ✅ JSON editor | ✅ JSON editor |
+
+## Panel: Web (legacy → STUDIO)
+| Screen / capability | Mobile route | Android native | iOS native |
+|---|---|---|---|
+| Dashboard | `/web/dashboard` | ✅ vía panel STUDIO | ✅ vía panel STUDIO |
+| Clientes | `/web/clientes` | ✅ `ServiceClientsView` / Studio | ✅ `ServiceClientsView` |
+| Proyectos | `/web/proyectos` | ✅ módulos CRM/Console | ✅ `ModuleRouter` |
+| Contactos | `/web/contactos` | ✅ Studio contacts | ✅ Studio contacts |
+| Noticias | `/web/noticias` | ✅ `NewsModuleScreen` | ✅ listas nativas |
+
+## Panel: LAB
+| Screen / capability | Mobile route | Android native | iOS native |
+|---|---|---|---|
+| Lab home + KPIs API | `/lab` | ✅ `LabNavHost` home | ✅ `LabTabView` home |
+| API Health | `/lab/health` | ✅ `LabHealthScreen` | ✅ `LabHealthView` |
+| Feature flags | `/lab/flags` | ✅ `LabFlagsScreen` | ✅ `LabFlagsView` |
+| AI Sandbox | `/lab/ai` | ✅ `LabAiScreen` | ✅ `LabAiSandboxView` |
 
 ## Cross-cutting
 | Feature | Mobile web | Android native | iOS native |
 |---|---|---|---|
-| Notifications inbox + badge | `apps/api/src/notifications` | ⬜ | ⬜ |
-| Socket.IO realtime | `apps/api/src/realtime` | ⬜ | ⬜ |
-| Offline GET cache | `install-offline-fetch.ts` | ✅ integrado en `ApiClient` | ⬜ |
-| Offline mutation queue + replay | `offline-queue.ts` | ✅ `OfflineSyncCoordinator` | ⬜ |
-| Camera/gallery uploads | evidences/ventas opp | ⬜ | ⬜ |
+| Notifications inbox + badge | `apps/api/src/notifications` | ✅ `NotificationsScreen` + badge hub | ✅ `NotificationsCenterView` + badge |
+| Socket.IO realtime | `apps/api/src/realtime` | ✅ `RealtimeBus` | ✅ `RealtimeBus` |
+| Offline GET cache | `install-offline-fetch.ts` | ✅ integrado en `ApiClient` | ✅ `OfflineApiCache` |
+| Offline mutation queue + replay | `offline-queue.ts` | ✅ `OfflineSyncCoordinator` | ✅ `OfflineSyncCoordinator` |
+| Camera/gallery uploads | evidences/ventas opp | ✅ `MediaPickerBar` + cámara/galería en evidencias | ✅ `MediaPickerBar` + `CameraCaptureView` |
+| Push notifications (FCM/APNs) | devices/push-token | ✅ FCM + `PushRegistration` | ✅ APNs + `PushManager` |

@@ -13,6 +13,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.runtime.LaunchedEffect
+import mx.nexara.mobile.nativeapp.access.PanelId
+import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
 import mx.nexara.mobile.nativeapp.ui.tickets.screens.TicketsPortalScreen
 import mx.nexara.mobile.nativeapp.ui.tickets.screens.TicketsProfileScreen
 
@@ -29,6 +32,17 @@ private object TicketsRoutes {
     const val FeedbackPending = "tickets/feedback/pending"
     const val Inventories = "tickets/inventories"
     const val InventoryDetail = "tickets/inventories/{id}"
+
+    fun routeForModuleKey(key: String): String = when (key) {
+        "profile", "my-profile", "mi-perfil" -> Profile
+        "branches", "sucursales" -> Branches
+        "requests", "solicitudes" -> Requests
+        "tickets" -> Tickets
+        "inventories", "inventarios" -> Inventories
+        "feedback-pending", "feedback" -> FeedbackPending
+        "portal", "home", "dashboard" -> Portal
+        else -> Portal
+    }
 }
 
 @Composable
@@ -37,6 +51,12 @@ fun TicketsNavHost(
     onExitToPanels: () -> Unit,
 ) {
     val navController = rememberNavController()
+
+    LaunchedEffect(Unit) {
+        val key = PendingDeepLink.consumeModuleFor(PanelId.PORTAL) ?: return@LaunchedEffect
+        navController.navigate(TicketsRoutes.routeForModuleKey(key)) { launchSingleTop = true }
+    }
+
     val backStackEntry by navController.currentBackStackEntryAsState()
     val route = backStackEntry?.destination?.route
 

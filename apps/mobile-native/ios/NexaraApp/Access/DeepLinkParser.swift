@@ -24,6 +24,14 @@ enum DeepLinkParser {
         "mi-perfil": "my-profile", "configuracion": "settings", "usuarios": "users",
         "leads": "leads", "noticias": "news", "contactos": "contacts",
         "dashboard": "dashboard", "flags": "flags", "health": "health", "ai": "ai",
+        "soporte": "client-tickets", "support": "client-tickets", "client-tickets": "client-tickets",
+        "executive": "executive", "approvals": "approvals", "bi": "bi", "analytics": "analytics",
+        "noc": "noc", "sla": "support-sla", "support-sla": "support-sla",
+        "maintenance-contracts": "maintenance-contracts", "contratos": "maintenance-contracts",
+        "branches": "branches", "sucursales": "branches",
+        "requests": "requests", "solicitudes": "requests",
+        "inventories": "inventories", "inventarios": "inventories",
+        "feedback": "feedback-pending", "feedback-pending": "feedback-pending",
     ]
 
     static func parse(_ url: URL) -> DeepLinkDestination? {

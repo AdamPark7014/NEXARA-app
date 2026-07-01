@@ -52,7 +52,18 @@ final class CrmRepository {
         ApiClient.decodeMapList(try await api.get("sales-targets"))
     }
 
-    func salesTeam() async throws -> [[String: Any]] {
-        ApiClient.decodeMapList(try await api.get("ventas/reportes/vendedores"))
+    func salesTeam(period: String = "month") async throws -> [[String: Any]] {
+        ApiClient.decodeMapList(try await api.get("ventas/reportes/vendedores", query: ["period": period]))
+    }
+
+    func salesMetrics(period: String = "month") async -> [String: Any] {
+        guard let data = try? await api.get("ventas/reportes/metricas", query: ["period": period]),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
+        return obj
+    }
+
+    func vendorStats(period: String = "month") async -> [[String: Any]] {
+        guard let data = try? await api.get("ventas/reportes/vendedores", query: ["period": period]) else { return [] }
+        return ApiClient.decodeMapList(data)
     }
 }

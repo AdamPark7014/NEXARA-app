@@ -3,10 +3,10 @@ import UIKit
 import UserNotifications
 
 /// Configuración de notificaciones push APNs + registro con backend.
-/// En el siguiente paso (dentro de Mac) se conectará con Firebase Messaging
-/// iOS para mapear APNs <-> FCM token.
 final class PushManager: NSObject, UNUserNotificationCenterDelegate {
     static let shared = PushManager()
+
+    private var pendingDeviceToken: Data?
 
     func configure() {
         UNUserNotificationCenter.current().delegate = self
@@ -24,26 +24,52 @@ final class PushManager: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
-    /// Registra el APNs token en el backend (POST /devices/push-token).
-    func registerDeviceTokenWithBackend(_ deviceToken: Data) async {
-        guard !SessionStore.shared.token.isEmpty else { return }
-        let tokenString = deviceToken.map { String(format: "%02x", $0) }.joined()
-        struct Body: Encodable { let token: String; let platform: String }
-        do {
-            let _: [String: String]? = try? await ApiClient.shared.postJSON(
-                path: "devices/push-token",
-                body: Body(token: tokenString, platform: "ios")
-            )
-            print("PushManager: token registrado ✓")
+    /// Llamar tras login para registrar token pendiente o solicitar permiso.
+    func ensureRegisteredAfterLogin() async {
+        await requestPermissionAndRegister()
+        if let token = pendingDeviceToken {
+            pendingDeviceToken = nil
+            await registerDeviceTokenWithBackend(token)
         }
     }
 
-    // Presentar banners en foreground.
+    func registerDeviceTokenWithBackend(_ deviceToken: Data) async {
+        guard SessionStore.shared.token != nil else {
+            pendingDeviceToken = deviceToken
+            return
+        }
+        let tokenString = deviceToken.map { String(format: "%02x", $0) }.joined()
+        struct Body: Encodable { let token: String; let platform: String }
+        do {
+            _ = try await ApiClient.shared.postJSON(
+                "devices/push-token",
+                body: Body(token: tokenString, platform: "ios")
+            )
+        } catch {
+            print("PushManager: error registrando token - \(error.localizedDescription)")
+        }
+    }
+
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         completionHandler([.banner, .badge, .sound, .list])
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let userInfo = response.notification.request.content.userInfo
+        if let url = userInfo["deepLink"] as? String ?? userInfo["url"] as? String,
+           let link = URL(string: url) {
+            Task { @MainActor in
+                DeepLinkCoordinator.shared.ingest(link)
+            }
+        }
+        completionHandler()
     }
 }
