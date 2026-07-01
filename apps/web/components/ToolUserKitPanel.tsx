@@ -1,5 +1,6 @@
 "use client";
 import { buildApiUrl, getSocketBaseUrl } from "@/lib/api-base";
+import { resolveAssetUrl } from "@/lib/evidence-display";
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useUser } from './UserContext';
 import styles from './ToolUserKitPanel.module.css';
@@ -16,6 +17,8 @@ interface InventoryOption {
   toolName: string;
   model: string;
   serialNumber: string;
+  panoramicPhotoUrl?: string | null;
+  serialPhotoUrl?: string | null;
 }
 
 interface UserKitRow {
@@ -26,7 +29,14 @@ interface UserKitRow {
   dueReturnDate?: string | null;
   replacementCount: number;
   user: { id: number; nombre: string; email: string; role?: { nombre?: string } };
-  inventoryItem: { toolName: string; model: string; serialNumber: string; status: string };
+  inventoryItem: {
+    toolName: string;
+    model: string;
+    serialNumber: string;
+    status: string;
+    panoramicPhotoUrl?: string | null;
+    serialPhotoUrl?: string | null;
+  };
   events?: {
     id: number;
     description: string;
@@ -350,7 +360,15 @@ const ToolUserKitPanel: React.FC = () => {
               <div className={styles.userEmail}>{group.user.email}</div>
 
               <div className={styles.rowsList}>
-                {group.rows.map((row) => (
+                {group.rows.map((row) => {
+                  const panoramicSrc = row.inventoryItem.panoramicPhotoUrl
+                    ? resolveAssetUrl(row.inventoryItem.panoramicPhotoUrl)
+                    : '';
+                  const serialSrc = row.inventoryItem.serialPhotoUrl
+                    ? resolveAssetUrl(row.inventoryItem.serialPhotoUrl)
+                    : '';
+
+                  return (
                   <div key={row.id} className={styles.rowCard}>
                     <div className={styles.rowTitle}>
                       {row.inventoryItem.toolName} · {row.inventoryItem.model} · {row.inventoryItem.serialNumber}
@@ -358,6 +376,23 @@ const ToolUserKitPanel: React.FC = () => {
                     <div className={styles.rowMeta}>
                       {row.assignmentType === 'KIT' ? 'Kit base' : 'Préstamo'} · Reemplazos: {row.replacementCount} · {row.isActive ? 'Activa' : 'Cerrada'}
                     </div>
+
+                    {(panoramicSrc || serialSrc) && (
+                      <div className={styles.photoGrid}>
+                        {panoramicSrc && (
+                          <div className={styles.photoBlock}>
+                            <div className={styles.photoLabel}>Panorámica</div>
+                            <img src={panoramicSrc} alt="" className={styles.photoImage} />
+                          </div>
+                        )}
+                        {serialSrc && (
+                          <div className={styles.photoBlock}>
+                            <div className={styles.photoLabel}>Serie</div>
+                            <img src={serialSrc} alt="" className={styles.photoImage} />
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {row.events && row.events.length > 0 && (
                       <div className={styles.eventsList}>
@@ -431,7 +466,8 @@ const ToolUserKitPanel: React.FC = () => {
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))
