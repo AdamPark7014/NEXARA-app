@@ -1,7 +1,9 @@
 package mx.nexara.mobile.nativeapp.ui.console.screens
 
 import android.app.Application
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -15,19 +17,27 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -191,14 +201,27 @@ fun ConsoleProjectsScreen(
 ) {
     val vm: ConsoleProjectsViewModel = viewModel()
     val state by vm.state.collectAsState()
+    var selected by remember { mutableStateOf<OperationalProjectDto?>(null) }
 
     if (state.isLoading && state.projects.isEmpty() && state.error == null) vm.refresh()
 
+    if (selected != null) {
+        OpsProjectDetailScreen(
+            project = selected!!,
+            saving = state.saving,
+            selectedEngineerByProject = state.selectedEngineerByProject,
+            allEngineers = state.users,
+            onBack = { selected = null },
+            onChangeStatus = { id, status -> vm.changeStatus(id, status) },
+            onSelectEngineer = { id, engId -> vm.selectEngineer(id, engId) },
+            onAddEngineer = { vm.addEngineer(selected!!.id) },
+            onRemoveEngineer = { id, engId -> vm.removeEngineer(id, engId) },
+        )
+        return
+    }
+
     val vendors = remember(state.users) {
         state.users.filter { (it.nombre.lowercase().contains("vend") || (it.email ?: "").lowercase().contains("vend")) }
-    }
-    val engineers = remember(state.users) {
-        state.users.filter { it.nombre.lowercase().contains("ingenier") || it.nombre.lowercase().contains("engineer") }
     }
 
     Column(
@@ -247,52 +270,143 @@ fun ConsoleProjectsScreen(
         }
 
         Spacer(Modifier.height(4.dp))
-        Text("Lista de proyectos", style = MaterialTheme.typography.titleMedium)
+        Text("Lista de proyectos (${state.projects.size})", style = MaterialTheme.typography.titleMedium)
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            items(state.projects) { p ->
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(p.title, style = MaterialTheme.typography.titleSmall)
-                        Text(p.description ?: "Sin descripción", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("Cliente: ${p.client?.name ?: p.client?.nombre ?: "-"}", style = MaterialTheme.typography.bodySmall)
-                        Text("Vendedor: ${p.vendor?.nombre ?: "-"} · Estado: ${p.status}", style = MaterialTheme.typography.bodySmall)
-                        Text("Actividades: ${p.activities?.size ?: 0}", style = MaterialTheme.typography.bodySmall)
-
-                        // engineers
-                        val assignments = p.engineers ?: emptyList()
-                        if (assignments.isNotEmpty()) {
-                            Text("Ingenieros", style = MaterialTheme.typography.labelLarge)
-                            assignments.forEach { a ->
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text(a.engineer.nombre, modifier = Modifier.weight(1f))
-                                    Button(onClick = { vm.removeEngineer(p.id, a.engineer.id) }, enabled = !state.saving) { Text("Quitar") }
-                                }
+        if (state.isLoading) {
+            Box(Modifier.fillMaxWidth(), Alignment.Center) { CircularProgressIndicator() }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                items(state.projects, key = { it.id }) { p ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth().clickable { selected = p },
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(p.title, fontWeight = FontWeight.Bold)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(p.status, fontSize = 11.sp, color = projectStatusColor(p.status))
+                                if (p.client != null) Text("· ${p.client.name ?: p.client.nombre ?: ""}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                        }
-
-                        var engMenu by remember { mutableStateOf(false) }
-                        Button(onClick = { engMenu = true }, enabled = !state.saving, modifier = Modifier.fillMaxWidth()) {
-                            Text(state.selectedEngineerByProject[p.id]?.let { "Ingeniero: #$it" } ?: "Asignar ingeniero")
-                        }
-                        DropdownMenu(expanded = engMenu, onDismissRequest = { engMenu = false }) {
-                            engineers.take(60).forEach { e ->
-                                DropdownMenuItem(text = { Text(e.nombre) }, onClick = { vm.selectEngineer(p.id, e.id); engMenu = false })
+                            if (!p.description.isNullOrBlank()) {
+                                Text(p.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
                             }
-                        }
-                        Button(onClick = { vm.addEngineer(p.id) }, enabled = !state.saving, modifier = Modifier.fillMaxWidth()) {
-                            Text("Agregar ingeniero")
-                        }
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                            Button(onClick = { vm.changeStatus(p.id, "ACTIVE") }, enabled = !state.saving, modifier = Modifier.weight(1f)) { Text("Reactivar") }
-                            Button(onClick = { vm.changeStatus(p.id, "ON_HOLD") }, enabled = !state.saving, modifier = Modifier.weight(1f)) { Text("Pausar") }
-                            Button(onClick = { vm.changeStatus(p.id, "COMPLETED") }, enabled = !state.saving, modifier = Modifier.weight(1f)) { Text("Cerrar") }
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Text("Actividades: ${p.activities?.size ?: 0}", fontSize = 11.sp)
+                                Text("Ingenieros: ${p.engineers?.size ?: 0}", fontSize = 11.sp)
+                            }
                         }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun OpsProjectDetailScreen(
+    project: OperationalProjectDto,
+    saving: Boolean,
+    selectedEngineerByProject: Map<Long, Long?>,
+    allEngineers: List<mx.nexara.mobile.nativeapp.data.api.VisibleUserDto>,
+    onBack: () -> Unit,
+    onChangeStatus: (Long, String) -> Unit,
+    onSelectEngineer: (Long, Long?) -> Unit,
+    onAddEngineer: () -> Unit,
+    onRemoveEngineer: (Long, Long) -> Unit,
+) {
+    var tab by remember { mutableIntStateOf(0) }
+    val tabs = listOf("Info", "Actividades", "Ingenieros")
+
+    Column(Modifier.fillMaxSize()) {
+        OutlinedButton(onClick = onBack, modifier = Modifier.padding(12.dp)) { Text("← Volver") }
+        Text(
+            project.title,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        Spacer(Modifier.height(8.dp))
+        TabRow(selectedTabIndex = tab) {
+            tabs.forEachIndexed { i, title ->
+                Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title, fontSize = 12.sp) })
+            }
+        }
+
+        when (tab) {
+            0 -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                fun r(k: String, v: String?) { if (!v.isNullOrBlank()) item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text(k, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(v) } } }
+                item { Text(project.status, color = projectStatusColor(project.status), fontWeight = FontWeight.SemiBold) }
+                r("Cliente", project.client?.name ?: project.client?.nombre)
+                r("Responsable", project.vendor?.nombre)
+                r("Inicio", project.startDate?.take(10))
+                r("Fin planeado", project.endDate?.take(10))
+                r("Fin real", project.actualEndDate?.take(10))
+                r("Descripción", project.description)
+                item { Spacer(Modifier.height(12.dp)) }
+                item { Text("Cambiar estado", style = MaterialTheme.typography.labelLarge) }
+                item {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        Button(onClick = { onChangeStatus(project.id, "ACTIVE") }, enabled = !saving, modifier = Modifier.weight(1f)) { Text("Activo", fontSize = 11.sp) }
+                        Button(onClick = { onChangeStatus(project.id, "ON_HOLD") }, enabled = !saving, modifier = Modifier.weight(1f)) { Text("En pausa", fontSize = 11.sp) }
+                        Button(onClick = { onChangeStatus(project.id, "COMPLETED") }, enabled = !saving, modifier = Modifier.weight(1f)) { Text("Cerrado", fontSize = 11.sp) }
+                    }
+                }
+            }
+            1 -> {
+                val acts = project.activities ?: emptyList()
+                if (acts.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), Alignment.Center) { Text("Sin actividades vinculadas", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                } else {
+                    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(acts, key = { it.id }) { a ->
+                            Card(Modifier.fillMaxWidth()) { Text("Actividad #${a.id}", Modifier.padding(14.dp), fontWeight = FontWeight.Medium) }
+                        }
+                    }
+                }
+            }
+            else -> {
+                val assignments = project.engineers ?: emptyList()
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (assignments.isEmpty()) {
+                        item { Box(Modifier.fillMaxWidth(), Alignment.Center) { Text("Sin ingenieros asignados", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+                    } else {
+                        items(assignments, key = { it.id }) { a ->
+                            Card(Modifier.fillMaxWidth()) {
+                                Row(Modifier.fillMaxWidth().padding(12.dp), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                                    Text(a.engineer.nombre, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                                    Button(onClick = { onRemoveEngineer(project.id, a.engineer.id) }, enabled = !saving) { Text("Quitar") }
+                                }
+                            }
+                        }
+                    }
+                    item {
+                        Spacer(Modifier.height(8.dp))
+                        var engMenu by remember { mutableStateOf(false) }
+                        val engineers = allEngineers.filter { u ->
+                            u.nombre.lowercase().contains("ingenier") || u.nombre.lowercase().contains("engineer")
+                        }
+                        Button(onClick = { engMenu = true }, Modifier.fillMaxWidth(), enabled = !saving) {
+                            Text(selectedEngineerByProject[project.id]?.let { "Ingeniero seleccionado: #$it" } ?: "Seleccionar ingeniero")
+                        }
+                        DropdownMenu(expanded = engMenu, onDismissRequest = { engMenu = false }) {
+                            engineers.take(60).forEach { e ->
+                                DropdownMenuItem(text = { Text(e.nombre) }, onClick = { onSelectEngineer(project.id, e.id); engMenu = false })
+                            }
+                        }
+                        Button(onClick = onAddEngineer, Modifier.fillMaxWidth(), enabled = !saving && selectedEngineerByProject[project.id] != null) {
+                            Text("Agregar ingeniero")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun projectStatusColor(status: String): androidx.compose.ui.graphics.Color = when (status.uppercase()) {
+    "ACTIVE" -> androidx.compose.ui.graphics.Color(0xFF2E7D32)
+    "ON_HOLD" -> androidx.compose.ui.graphics.Color(0xFFE65100)
+    "COMPLETED" -> androidx.compose.ui.graphics.Color(0xFF1565C0)
+    else -> androidx.compose.ui.graphics.Color.Gray
 }
 

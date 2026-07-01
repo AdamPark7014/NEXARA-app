@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -118,6 +119,19 @@ class CrmOportunidadesViewModel(app: Application) : AndroidViewModel(app) {
     fun setQuery(q: String) = _state.update { it.copy(query = q) }
     fun select(item: Map<String, Any?>?) = _state.update { it.copy(selected = item) }
 
+    fun createOpportunity(form: OpportunityFormState, onCreated: (Long) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val created = withContext(Dispatchers.IO) { repo.createOpportunity(form.toPayload()) }
+                val id = (created["id"] as? Number)?.toLong() ?: created["id"]?.toString()?.toLongOrNull()
+                refresh()
+                if (id != null) onCreated(id)
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message) }
+            }
+        }
+    }
+
     val filtered: List<Map<String, Any?>> get() {
         val q = _state.value.query.trim().lowercase()
         if (q.isBlank()) return _state.value.items
@@ -134,6 +148,9 @@ fun VentasOportunidadesScreen() {
     val vm: CrmOportunidadesViewModel = viewModel(factory = crmVmFactory<CrmOportunidadesViewModel>(ctx))
     val state by vm.state.collectAsState()
     val items by remember { derivedStateOf { vm.filtered } }
+    var showCreate by remember { mutableStateOf(false) }
+    var createForm by remember { mutableStateOf(OpportunityFormState()) }
+    var creating by remember { mutableStateOf(false) }
 
     if (state.selected != null) {
         val id = mStr(state.selected!!, "id").toLongOrNull()
@@ -153,29 +170,59 @@ fun VentasOportunidadesScreen() {
         return
     }
 
-    CrmListScaffold(
-        isLoading = state.isLoading,
-        error = state.error,
-        onRetry = vm::refresh,
-        query = state.query,
-        onQuery = vm::setQuery,
-        placeholder = "Buscar oportunidad…",
-        emptyText = "Sin oportunidades",
-        items = items,
-        key = { mStr(it, "id") },
-    ) { item ->
-        Card(
-            modifier = Modifier.fillMaxWidth().clickable { vm.select(item) },
-            shape = RoundedCornerShape(12.dp),
-        ) {
-            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(mStr(item, "title", "name", "titulo").ifBlank { "—" }, fontWeight = FontWeight.SemiBold)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    CrmStageChip(mStr(item, "stage", "etapa", "status"))
-                    Text(fmtMxnShort(mDouble(item, "value", "amount") ?: 0.0), fontWeight = FontWeight.Bold)
+    Scaffold(
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { createForm = OpportunityFormState(); showCreate = true },
+                containerColor = CrmGreen,
+            ) { Icon(Icons.Default.Add, contentDescription = "Nueva oportunidad") }
+        },
+    ) { padding ->
+        Box(Modifier.padding(padding).fillMaxSize()) {
+            CrmListScaffold(
+                isLoading = state.isLoading,
+                error = state.error,
+                onRetry = vm::refresh,
+                query = state.query,
+                onQuery = vm::setQuery,
+                placeholder = "Buscar oportunidad…",
+                emptyText = "Sin oportunidades",
+                items = items,
+                key = { mStr(it, "id") },
+            ) { item ->
+                Card(
+                    modifier = Modifier.fillMaxWidth().clickable { vm.select(item) },
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(mStr(item, "title", "name", "titulo").ifBlank { "—" }, fontWeight = FontWeight.SemiBold)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            CrmStageChip(mStr(item, "stage", "etapa", "status"))
+                            Text(fmtMxnShort(mDouble(item, "value", "amount") ?: 0.0), fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             }
         }
+    }
+
+    if (showCreate) {
+        OpportunityFormSheet(
+            title = "Nueva oportunidad",
+            state = createForm,
+            onChange = { createForm = it },
+            saving = creating,
+            error = state.error,
+            onDismiss = { showCreate = false },
+            onSave = {
+                creating = true
+                vm.createOpportunity(createForm) { id ->
+                    creating = false
+                    showCreate = false
+                    vm.select(mapOf("id" to id))
+                }
+            },
+        )
     }
 }
 
@@ -460,23 +507,38 @@ private fun CrmListScaffold(
 }
 
 @Composable
-@Composable
 private fun CrmClientDetailScreen(client: Map<String, Any?>, onBack: () -> Unit) {
     val ctx = LocalContext.current
     val clientName = mStr(client, "name", "nombre", "razonSocial")
     var tab by remember { mutableIntStateOf(0) }
     var cotizaciones by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
     var oportunidades by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
+    var tickets by remember { mutableStateOf<List<Map<String, Any?>>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
-        val extra = ExtraRepository(ctx)
         val crm = CrmRepository(ctx)
-        val c = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { extra.cotizaciones() }
+        val extraRepo = ExtraRepository(ctx)
+        val c = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { crm.cotizaciones() }
         val o = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { crm.oportunidades() }
+        val t = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { extraRepo.clientTicketRequests() }
         val prefix = clientName.take(6).lowercase()
-        cotizaciones = c.filter { (it["cliente"] as? String ?: "").lowercase().contains(prefix) }
+        cotizaciones = c
+            .filter { (it.cliente ?: "").lowercase().contains(prefix) }
+            .map { cot ->
+                mapOf(
+                    "id" to cot.id,
+                    "folio" to cot.folio,
+                    "cliente" to cot.cliente,
+                    "total" to cot.total,
+                    "estatus" to cot.estatus,
+                )
+            }
         oportunidades = o.filter { (mStr(it, "clientName", "cliente")).lowercase().contains(prefix) }
+        tickets = t.filter { tk ->
+            val cn = (mStr(tk, "clientName", "branchName")).lowercase()
+            clientName.isEmpty() || cn.contains(prefix)
+        }
         loading = false
     }
 
@@ -485,7 +547,7 @@ private fun CrmClientDetailScreen(client: Map<String, Any?>, onBack: () -> Unit)
         Text(clientName.ifBlank { "Cliente" }, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp))
         Spacer(Modifier.height(8.dp))
         TabRow(selectedTabIndex = tab) {
-            listOf("Info", "Cotizaciones", "Oportunidades").forEachIndexed { i, title ->
+            listOf("Info", "Cotizaciones", "Oportunidades", "Tickets").forEachIndexed { i, title ->
                 Tab(selected = tab == i, onClick = { tab = i }, text = { Text(title, fontSize = 12.sp) })
             }
         }
@@ -517,7 +579,7 @@ private fun CrmClientDetailScreen(client: Map<String, Any?>, onBack: () -> Unit)
                     }
                 }
             }
-            else -> if (oportunidades.isEmpty()) {
+            2 -> if (oportunidades.isEmpty()) {
                 Box(Modifier.fillMaxSize(), Alignment.Center) { Text("Sin oportunidades", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             } else {
                 LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -534,10 +596,28 @@ private fun CrmClientDetailScreen(client: Map<String, Any?>, onBack: () -> Unit)
                     }
                 }
             }
+            else -> if (tickets.isEmpty()) {
+                Box(Modifier.fillMaxSize(), Alignment.Center) { Text("Sin tickets del cliente", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            } else {
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(tickets, key = { mStr(it, "id") }) { tk ->
+                        Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(14.dp)) {
+                                Text(mStr(tk, "subject", "descripcion", "title").ifBlank { "Ticket" }, fontWeight = FontWeight.Bold)
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text(mStr(tk, "status", "estado"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
+                                    Text(mStr(tk, "createdAt", "fecha").take(10), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
+@Composable
 private fun CrmDetailScaffold(
     title: String,
     rows: List<Pair<String, String>>,
