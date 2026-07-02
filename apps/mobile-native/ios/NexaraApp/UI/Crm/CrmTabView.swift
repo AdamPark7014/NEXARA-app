@@ -217,8 +217,17 @@ private struct CotizacionCard: View {
 
 struct CrmLeadsView: View {
     @StateObject private var vm = CrmLeadsVM()
+    @State private var selected: [String: Any]?
 
     var body: some View {
+        Group {
+            if let s = selected { leadDetail(s) } else { listBody }
+        }
+        .task { vm.load() }
+        .refreshable { if selected == nil { vm.load() } }
+    }
+
+    private var listBody: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundColor(.secondary)
@@ -239,15 +248,53 @@ struct CrmLeadsView: View {
                 Spacer(); Text("Sin leads").foregroundColor(.secondary); Spacer()
             } else {
                 List(vm.filtered, id: \.leadId) { lead in
-                    LeadCard(item: lead)
-                        .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
-                        .listRowSeparator(.hidden)
+                    Button { selected = lead } label: {
+                        LeadCard(item: lead)
+                    }
+                    .buttonStyle(.plain)
+                    .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+                    .listRowSeparator(.hidden)
                 }
                 .listStyle(.plain)
             }
         }
-        .task { vm.load() }
-        .refreshable { vm.load() }
+    }
+
+    @ViewBuilder
+    private func leadDetail(_ lead: [String: Any]) -> some View {
+        let status = cStr(lead, "status", "estatus", "estado")
+        let color  = cotStatusColor(status)
+        List {
+            Section {
+                HStack {
+                    Button("← Leads") { selected = nil }
+                    Spacer()
+                    if !status.isEmpty {
+                        Text(status.capitalized).font(.caption).bold().foregroundColor(color)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(color.opacity(0.12)).clipShape(Capsule())
+                    }
+                }
+            }
+            Section("Lead") {
+                ldRow("Título", cStr(lead, "title", "subject", "asunto"))
+                ldRow("Cliente", cStr(lead, "clientName", "cliente"))
+                ldRow("Email", cStr(lead, "email", "correo"))
+                ldRow("Teléfono", cStr(lead, "phone", "telefono"))
+                ldRow("Origen", cStr(lead, "source", "origen", "fuente"))
+                ldRow("Asignado a", cStr(lead, "ownerName", "assignedTo"))
+                ldRow("Fecha", String(cStr(lead, "createdAt", "fecha").prefix(10)))
+            }
+            let notes = cStr(lead, "notes", "notas", "description")
+            if !notes.isEmpty {
+                Section("Notas") { Text(notes).font(.subheadline) }
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    @ViewBuilder private func ldRow(_ k: String, _ v: String) -> some View {
+        if !v.isEmpty { HStack { Text(k); Spacer(); Text(v).foregroundColor(.secondary) } }
     }
 }
 
@@ -322,28 +369,17 @@ private struct CrmMoreView: View {
 
     var body: some View {
         List {
-            Section("Ventas") {
-                navRow(key: "cotizaciones",     icon: "📝", label: "Cotizaciones")
-                navRow(key: "plantillas",       icon: "📋", label: "Plantillas")
-                navRow(key: "leads",            icon: "🎯", label: "Leads")
-                navRow(key: "oportunidades",    icon: "💡", label: "Oportunidades")
-                navRow(key: "pipeline",         icon: "📊", label: "Pipeline")
-                navRow(key: "agenda",           icon: "📅", label: "Agenda")
-                navRow(key: "clientes",         icon: "🏢", label: "Clientes")
-                navRow(key: "productos",        icon: "📦", label: "Catálogo IT/CCTV")
-                navRow(key: "proyectos",        icon: "📐", label: "Proyectos")
-                navRow(key: "licitaciones",     icon: "📑", label: "Licitaciones")
-            }
-            Section("Mi equipo") {
-                navRow(key: "equipo-comparativa", icon: "📊", label: "Comparativa equipo")
-                navRow(key: "gestion-vendedores", icon: "👥", label: "Gestión vendedores")
-                navRow(key: "metas",              icon: "🎯", label: "Metas comerciales")
-                navRow(key: "reportes",           icon: "📈", label: "Reportes")
-                navRow(key: "crecimiento",        icon: "📉", label: "Crecimiento")
-            }
-            Section("Mi cuenta") {
-                navRow(key: "my-profile",       icon: "👤", label: "Mi perfil")
-                navRow(key: "notificaciones",   icon: "🔔", label: "Notificaciones")
+            ForEach(ConsoleAccessRules.ventasSidebarGroups()) { group in
+                Section(group.title) {
+                    ForEach(group.modules) { m in
+                        NavigationLink(value: m.key) {
+                            HStack(spacing: 12) {
+                                Text(m.icon).font(.title3)
+                                Text(m.label)
+                            }
+                        }
+                    }
+                }
             }
             Section {
                 Button(role: .destructive) { onExit() } label: {
@@ -353,16 +389,6 @@ private struct CrmMoreView: View {
         }
         .navigationDestination(for: String.self) { key in
             ModuleRouter.view(for: .crm, key: key)
-        }
-    }
-
-    @ViewBuilder
-    private func navRow(key: String, icon: String, label: String) -> some View {
-        NavigationLink(value: key) {
-            HStack(spacing: 12) {
-                Text(icon).font(.title3)
-                Text(label)
-            }
         }
     }
 }

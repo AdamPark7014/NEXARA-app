@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import mx.nexara.mobile.nativeapp.ui.shared.NotificationsScreen
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -39,7 +40,9 @@ import mx.nexara.mobile.nativeapp.access.PanelId
 import mx.nexara.mobile.nativeapp.navigation.PendingDeepLink
 import mx.nexara.mobile.nativeapp.ui.console.screens.MyProfileScreen
 import mx.nexara.mobile.nativeapp.ui.console.screens.PlaceholderScreen
-import mx.nexara.mobile.nativeapp.ui.shared.NotificationsScreen
+import mx.nexara.mobile.nativeapp.data.AuthRepository
+import mx.nexara.mobile.nativeapp.ui.console.ConsoleSidebarGroup
+import mx.nexara.mobile.nativeapp.ui.console.ventasSidebarGroups
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
@@ -62,6 +65,9 @@ fun VentasNavHost(
 ) {
     val nav = rememberNavController()
     val entry by nav.currentBackStackEntryAsState()
+    val ctx = LocalContext.current
+    val user = remember(ctx) { AuthRepository(ctx).loadSession() }
+    val crmMoreGroups = remember(user) { ventasSidebarGroups(user) }
 
     LaunchedEffect(Unit) {
         val key = PendingDeepLink.consumeModuleFor(PanelId.CRM) ?: return@LaunchedEffect
@@ -118,6 +124,7 @@ fun VentasNavHost(
             }
             composable(VentasRoutes.More) {
                 VentasMoreScreen(
+                    groups = crmMoreGroups,
                     onOpenModule = { key -> nav.navigate(VentasRoutes.module(key)) },
                     onExitToPanels = onExitToPanels,
                 )
@@ -346,6 +353,38 @@ fun VentasLeadsScreen() {
     })
     val state by vm.state.collectAsState()
     val items by remember { derivedStateOf { vm.filtered } }
+    var selected by remember { mutableStateOf<Map<String, Any?>?>(null) }
+
+    if (selected != null) {
+        val lead = selected!!
+        val status = lStr(lead, "status", "estatus", "estado")
+        val color  = cotStatusColorAndroid(status)
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item {
+                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
+                    OutlinedButton(onClick = { selected = null }) { Text("← Leads") }
+                    if (status.isNotBlank()) Text(status.replaceFirstChar { it.uppercase() }, color = color, fontWeight = FontWeight.SemiBold)
+                }
+            }
+            item { Text(lStr(lead, "title", "subject", "asunto", "description"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        LeadDetailLine("Cliente", lStr(lead, "clientName", "cliente"))
+                        LeadDetailLine("Email", lStr(lead, "email", "correo"))
+                        LeadDetailLine("Teléfono", lStr(lead, "phone", "telefono"))
+                        LeadDetailLine("Origen", lStr(lead, "source", "origen", "fuente"))
+                        LeadDetailLine("Asignado a", lStr(lead, "ownerName", "assignedTo"))
+                        LeadDetailLine("Estado", status)
+                        LeadDetailLine("Fecha", lStr(lead, "createdAt", "fecha").take(10))
+                        val notes = lStr(lead, "notes", "notas")
+                        if (notes.isNotBlank()) { Divider(); Text(notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    }
+                }
+            }
+        }
+        return
+    }
 
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
@@ -368,7 +407,7 @@ fun VentasLeadsScreen() {
             item { Text("Sin leads", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(20.dp)) }
         } else {
             items(items, key = { it["id"]?.toString() ?: it.hashCode().toString() }) { lead ->
-                LeadRowCard(lead)
+                Box(Modifier.clickable { selected = lead }) { LeadRowCard(lead) }
             }
         }
     }
@@ -403,41 +442,40 @@ private fun LeadRowCard(lead: Map<String, Any?>) {
     }
 }
 
+@Composable
+private fun LeadDetailLine(label: String, value: String) {
+    if (value.isBlank()) return
+    Row(Modifier.fillMaxWidth()) { Text(label, fontWeight = FontWeight.Medium); Spacer(Modifier.weight(1f)); Text(value, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+}
+
 // ── More Screen ───────────────────────────────────────────────────────────────
 
 @Composable
 private fun VentasMoreScreen(
+    groups: List<ConsoleSidebarGroup>,
     onOpenModule: (String) -> Unit,
     onExitToPanels: () -> Unit,
 ) {
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        item { Text("Ventas", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(vertical = 4.dp)) }
-        item { MoreRow("📝", "Cotizaciones",    { onOpenModule("cotizaciones") }) }
-        item { MoreRow("📋", "Plantillas",      { onOpenModule("plantillas") }) }
-        item { MoreRow("🎯", "Leads",           { onOpenModule("leads") }) }
-        item { MoreRow("💡", "Oportunidades",   { onOpenModule("oportunidades") }) }
-        item { MoreRow("📊", "Pipeline",        { onOpenModule("pipeline") }) }
-        item { MoreRow("📅", "Agenda",          { onOpenModule("agenda") }) }
-        item { MoreRow("🏢", "Clientes",        { onOpenModule("clientes") }) }
-        item { MoreRow("📦", "Catálogo IT/CCTV", { onOpenModule("productos") }) }
-        item { MoreRow("📐", "Proyectos",       { onOpenModule("proyectos") }) }
-        item { MoreRow("📑", "Licitaciones",    { onOpenModule("licitaciones") }) }
-        item { Divider(modifier = Modifier.padding(vertical = 8.dp)) }
-        item { Text("Mi equipo", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(vertical = 4.dp)) }
-        item { MoreRow("📊", "Comparativa equipo", { onOpenModule("equipo-comparativa") }) }
-        item { MoreRow("👥", "Gestión vendedores", { onOpenModule("gestion-vendedores") }) }
-        item { MoreRow("🎯", "Metas comerciales",  { onOpenModule("metas") }) }
-        item { MoreRow("📈", "Reportes",           { onOpenModule("reportes") }) }
-        item { MoreRow("📉", "Crecimiento",         { onOpenModule("crecimiento") }) }
-        item { Divider(modifier = Modifier.padding(vertical = 8.dp)) }
-        item { Text("Mi cuenta", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(vertical = 4.dp)) }
-        item { MoreRow("👤", "Mi perfil",         { onOpenModule("my-profile") }) }
-        item { MoreRow("🔔", "Notificaciones",    { onOpenModule("notificaciones") }) }
-        item { Divider(modifier = Modifier.padding(vertical = 8.dp)) }
-        item {
-            TextButton(onClick = onExitToPanels, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
-                Text("← Cambiar panel")
+        groups.forEach { group ->
+            item {
+                Text(
+                    group.title,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
             }
+            items(group.modules, key = { "${group.id}-${it.key}" }) { m ->
+                MoreRow(m.icon, m.label) { onOpenModule(m.key) }
+            }
+        }
+        item {
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            TextButton(
+                onClick = onExitToPanels,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            ) { Text("← Cambiar panel") }
         }
     }
 }
