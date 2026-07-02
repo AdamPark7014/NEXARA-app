@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PaginationQueryDto, buildPaginatedResponse } from '../common/dto/pagination.dto.js';
 import { CotizacionesService } from '../cotizaciones/cotizaciones.service.js';
@@ -27,7 +27,7 @@ import { AutoApprovalService } from '../workflow/auto-approval.service.js';
 export class VentasService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cotizacionesService: CotizacionesService,
+    @Inject(forwardRef(() => CotizacionesService)) private readonly cotizacionesService: CotizacionesService,
     private readonly pdfGeneratorService: PdfGeneratorService,
     private readonly notificationHierarchy: NotificationHierarchyService,
     private readonly notificationsService: NotificationsService,
