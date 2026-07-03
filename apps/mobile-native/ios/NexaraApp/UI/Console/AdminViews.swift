@@ -173,29 +173,61 @@ struct VehiclesView: View {
     @State private var items: [[String: Any]] = []
     @State private var query = ""
     @State private var isLoading = true
+    @State private var selected: [String: Any]?
 
     var body: some View {
+        Group {
+            if let s = selected { vehDetail(s) } else { vehList }
+        }
+        .navigationTitle(selected == nil ? (personalOnly ? "Mis vehículos" : "Vehículos") : "")
+        .task { await load() }
+        .refreshable { if selected == nil { await load() } }
+    }
+
+    private var vehList: some View {
         List {
             if isLoading { ProgressView() }
             ForEach(filtered, id: \.vehKey) { v in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(ConsoleHelpers.mapStr(v, "nombreVehiculo", "placas", "marca", "modelo")).font(.headline)
-                    Text(ConsoleHelpers.mapStr(v, "solicitanteNombre", "solicitante", "estatusAprobacion", "estado"))
-                        .font(.caption).foregroundColor(.secondary)
-                    if personalOnly {
-                        let range = [ConsoleHelpers.mapStr(v, "fechaInicio"), ConsoleHelpers.mapStr(v, "fechaFin")]
-                            .filter { !$0.isEmpty }.joined(separator: " → ")
-                        if !range.isEmpty {
-                            Text(range).font(.caption2).foregroundColor(.secondary)
+                Button { selected = v } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ConsoleHelpers.mapStr(v, "nombreVehiculo", "placas", "marca", "modelo")).font(.headline).foregroundColor(.primary)
+                        Text(ConsoleHelpers.mapStr(v, "solicitanteNombre", "solicitante", "estatusAprobacion", "estado"))
+                            .font(.caption).foregroundColor(.secondary)
+                        if personalOnly {
+                            let range = [ConsoleHelpers.mapStr(v, "fechaInicio"), ConsoleHelpers.mapStr(v, "fechaFin")]
+                                .filter { !$0.isEmpty }.joined(separator: " → ")
+                            if !range.isEmpty { Text(range).font(.caption2).foregroundColor(.secondary) }
                         }
                     }
                 }
+                .buttonStyle(.plain)
             }
         }
-        .navigationTitle(personalOnly ? "Mis vehículos" : "Vehículos")
         .searchable(text: $query)
-        .task { await load() }
-        .refreshable { await load() }
+    }
+
+    @ViewBuilder
+    private func vehDetail(_ v: [String: Any]) -> some View {
+        List {
+            Section { Button("← Vehículos") { selected = nil } }
+            Section("Vehículo") {
+                vRow("Nombre",      ConsoleHelpers.mapStr(v, "nombreVehiculo", "marca", "modelo"))
+                vRow("Placas",      ConsoleHelpers.mapStr(v, "placas", "placasVehiculo"))
+                vRow("Estatus",     ConsoleHelpers.mapStr(v, "estatusAprobacion", "estado"))
+                vRow("Solicitante", ConsoleHelpers.mapStr(v, "solicitanteNombre", "solicitante"))
+                vRow("Inicio",      ConsoleHelpers.mapStr(v, "fechaInicioAprobada", "fechaInicio", "fechaInicioSolicitada"))
+                vRow("Fin",         ConsoleHelpers.mapStr(v, "fechaFinAprobada", "fechaFin", "fechaFinSolicitada"))
+                vRow("Solicitud",   ConsoleHelpers.mapStr(v, "fechaSolicitud"))
+                vRow("Observaciones", ConsoleHelpers.mapStr(v, "entregaObservaciones", "observaciones"))
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    @ViewBuilder private func vRow(_ label: String, _ value: String) -> some View {
+        if !value.isEmpty {
+            HStack { Text(label).foregroundColor(.secondary); Spacer(); Text(value).multilineTextAlignment(.trailing) }
+        }
     }
 
     private var filtered: [[String: Any]] {
