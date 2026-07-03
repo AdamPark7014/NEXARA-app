@@ -53,11 +53,25 @@ final class ExpensesVM: ObservableObject {
 
 struct ExpensesView: View {
     @StateObject private var vm = ExpensesVM()
+    @State private var selected: [String: Any]?
 
     var body: some View {
+        Group {
+            if let s = selected { expDetail(s) } else { listBody }
+        }
+        .navigationTitle(selected == nil ? "Gastos" : "")
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if selected == nil { Button { vm.load() } label: { Image(systemName: "arrow.clockwise") } }
+            }
+        }
+        .refreshable { if selected == nil { vm.load() } }
+        .task { vm.load() }
+    }
+
+    private var listBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                // KPI strip
                 if !vm.items.isEmpty {
                     HStack(spacing: 0) {
                         ExpKpi(label: "Gastos",  value: "\(vm.items.count)",      color: .primary)
@@ -71,8 +85,6 @@ struct ExpensesView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal)
                 }
-
-                // Category breakdown (top 3)
                 if vm.categoryTotals.count > 1 {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Por categoría").font(.headline).padding(.horizontal)
@@ -90,8 +102,6 @@ struct ExpensesView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .padding(.horizontal)
                 }
-
-                // Search
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass").foregroundColor(.secondary)
                     TextField("Buscar gasto…", text: $vm.query).autocorrectionDisabled()
@@ -103,8 +113,6 @@ struct ExpensesView: View {
                 .background(Color(.secondarySystemGroupedBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .padding(.horizontal)
-
-                // Category chips
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(vm.categories, id: \.self) { cat in
@@ -120,8 +128,6 @@ struct ExpensesView: View {
                     }
                     .padding(.horizontal)
                 }
-
-                // List
                 if vm.isLoading {
                     ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
                 } else if vm.filtered.isEmpty {
@@ -129,7 +135,10 @@ struct ExpensesView: View {
                 } else {
                     VStack(spacing: 6) {
                         ForEach(vm.filtered.prefix(50), id: \.expId) { exp in
-                            ExpenseCard(item: exp).padding(.horizontal)
+                            Button { selected = exp } label: {
+                                ExpenseCard(item: exp).padding(.horizontal)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -137,10 +146,35 @@ struct ExpensesView: View {
             }
             .padding(.vertical)
         }
-        .navigationTitle("Gastos")
-        .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button { vm.load() } label: { Image(systemName: "arrow.clockwise") } } }
-        .refreshable { vm.load() }
-        .task { vm.load() }
+    }
+
+    @ViewBuilder
+    private func expDetail(_ exp: [String: Any]) -> some View {
+        let concept  = expStr(exp, "concept", "concepto", "descripcion")
+        let amount   = expDouble(exp, "amount", "total", "monto")
+        let status   = expStr(exp, "status", "estatus")
+        let category = expStr(exp, "category", "categoria")
+        List {
+            Section {
+                Button("← Gastos") { selected = nil }
+            }
+            Section("Gasto") {
+                eRow("Concepto",     concept)
+                if let a = amount { HStack { Text("Monto"); Spacer(); Text(fmtExp(a)).foregroundColor(.red) } }
+                eRow("Categoría",   category)
+                eRow("Estatus",     status)
+                eRow("Responsable", expStr(exp, "userName", "usuario", "nombre"))
+                eRow("Fecha",       String(expStr(exp, "createdAt", "fecha").prefix(10)))
+                eRow("Referencia",  expStr(exp, "reference", "referencia"))
+            }
+            let notes = expStr(exp, "notes", "notas", "description")
+            if !notes.isEmpty { Section("Notas") { Text(notes).font(.subheadline) } }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    @ViewBuilder private func eRow(_ k: String, _ v: String) -> some View {
+        if !v.isEmpty { HStack { Text(k); Spacer(); Text(v).foregroundColor(.secondary) } }
     }
 }
 
