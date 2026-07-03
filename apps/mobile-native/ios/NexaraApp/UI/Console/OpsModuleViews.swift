@@ -1151,7 +1151,20 @@ private struct DocumentRow: View {
 
 struct CvsView: View {
     @StateObject private var vm = CvsVM()
+    @State private var selected: [String: Any]?
     var body: some View {
+        Group {
+            if let s = selected { cvDetail(s) } else { cvList }
+        }
+        .navigationTitle(selected == nil ? "CVs · Candidatos" : "")
+        .toolbar { ToolbarItem(placement: .navigationBarTrailing) {
+            if selected == nil { Button { vm.load() } label: { Image(systemName:"arrow.clockwise") } }
+        }}
+        .refreshable { if selected == nil { vm.load() } }
+        .task { vm.load() }
+    }
+
+    private var cvList: some View {
         VStack(spacing: 0) {
             if !vm.items.isEmpty {
                 OpsKpi(label: "CVs recibidos", value: "\(vm.items.count)", color: .primary)
@@ -1164,15 +1177,49 @@ struct CvsView: View {
             if vm.isLoading { Spacer(); ProgressView(); Spacer() }
             else if vm.filtered.isEmpty { Spacer(); Text("Sin CVs").foregroundColor(.secondary); Spacer() }
             else {
-                List(vm.filtered.prefix(60), id: { opsIdKey($0,"cv") }) { item in CvRow(item: item)
+                List(vm.filtered.prefix(60), id: { opsIdKey($0,"cv") }) { item in
+                    Button { selected = item } label: { CvRow(item: item) }
+                        .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
-                        .listRowSeparator(.hidden) }.listStyle(.plain)
+                        .listRowSeparator(.hidden)
+                }.listStyle(.plain)
             }
         }
-        .navigationTitle("CVs · Candidatos")
-        .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button { vm.load() } label: { Image(systemName:"arrow.clockwise") } } }
-        .refreshable { vm.load() }
-        .task { vm.load() }
+    }
+
+    @ViewBuilder private func cvDetail(_ cv: [String: Any]) -> some View {
+        let name     = oStr(cv,"fullName","name","fileName")
+        let position = oStr(cv,"position","role","puesto","cargo")
+        let email    = oStr(cv,"email","correo")
+        let phone    = oStr(cv,"phone","telefono","whatsapp")
+        let date     = String(oStr(cv,"createdAt","receivedAt").prefix(10))
+        let url      = oStr(cv,"cvUrl","fileUrl","url")
+        let exp      = oStr(cv,"experience","experiencia")
+        let skills   = oStr(cv,"skills","habilidades","stack")
+        let notes    = oStr(cv,"notes","notas","comentarios")
+        List {
+            Section { Button("← CVs") { selected = nil } }
+            Section("Candidato") {
+                oRow("Nombre",   name)
+                oRow("Posición", position)
+                oRow("Email",    email)
+                oRow("Teléfono", phone)
+                oRow("Fecha",    date)
+                oRow("Experiencia", exp)
+                oRow("Habilidades", skills)
+            }
+            if !url.isEmpty {
+                Section {
+                    Link(destination: URL(string: url) ?? URL(string:"https://nexara.com.mx")!) {
+                        Label("Abrir CV", systemImage: "arrow.up.right.square")
+                    }
+                }
+            }
+            if !notes.isEmpty {
+                Section("Notas") { Text(notes).font(.body) }
+            }
+        }
+        .listStyle(.insetGrouped)
     }
 }
 
@@ -1768,7 +1815,20 @@ private struct WorkProjectRow: View {
 
 struct NewsletterView: View {
     @StateObject private var vm = NewsletterVM()
+    @State private var selected: [String: Any]?
     var body: some View {
+        Group {
+            if let s = selected { nlDetail(s) } else { nlList }
+        }
+        .navigationTitle(selected == nil ? "Newsletter" : "")
+        .toolbar { ToolbarItem(placement: .navigationBarTrailing) {
+            if selected == nil { Button { vm.load() } label: { Image(systemName:"arrow.clockwise") } }
+        }}
+        .refreshable { if selected == nil { vm.load() } }
+        .task { vm.load() }
+    }
+
+    private var nlList: some View {
         VStack(spacing: 0) {
             if !vm.items.isEmpty {
                 HStack(spacing: 0) {
@@ -1786,16 +1846,40 @@ struct NewsletterView: View {
             else if vm.filtered.isEmpty { Spacer(); Text("Sin suscriptores").foregroundColor(.secondary); Spacer() }
             else {
                 List(vm.filtered.prefix(60), id: { opsIdKey($0,"nl") }) { item in
-                    NewsletterRow(item: item)
+                    Button { selected = item } label: { NewsletterRow(item: item) }
+                        .buttonStyle(.plain)
                         .listRowInsets(EdgeInsets(top:4,leading:12,bottom:4,trailing:12))
                         .listRowSeparator(.hidden)
                 }.listStyle(.plain)
             }
         }
-        .navigationTitle("Newsletter")
-        .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button { vm.load() } label: { Image(systemName:"arrow.clockwise") } } }
-        .refreshable { vm.load() }
-        .task { vm.load() }
+    }
+
+    @ViewBuilder private func nlDetail(_ s: [String: Any]) -> some View {
+        let email   = oStr(s,"email","correo")
+        let name    = oStr(s,"name","nombre")
+        let status  = oStr(s,"status","estado")
+        let unsub   = (s["unsubscribed"] as? Bool) ?? false || status.lowercased() == "unsubscribed"
+        let date    = String(oStr(s,"createdAt","subscribedAt").prefix(10))
+        let source  = oStr(s,"source","fuente","origen")
+        List {
+            Section { Button("← Newsletter") { selected = nil } }
+            Section("Suscriptor") {
+                oRow("Email",     email)
+                oRow("Nombre",    name)
+                oRow("Estado",    unsub ? "Dado de baja" : "Activo")
+                oRow("Fecha",     date)
+                oRow("Fuente",    source)
+            }
+            if !email.isEmpty {
+                Section {
+                    Link(destination: URL(string: "mailto:\(email)")!) {
+                        Label("Escribir email", systemImage: "envelope")
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
     }
 }
 
