@@ -327,6 +327,12 @@ fun VentasProductsScreen() {
     val ctx = LocalContext.current
     val vm: CrmProductsViewModel = viewModel(factory = crmVmFactory<CrmProductsViewModel>(ctx))
     val state by vm.state.collectAsState()
+    var selected by remember { mutableStateOf<Map<String, Any?>?>(null) }
+
+    if (selected != null) {
+        ProductDetailView(product = selected!!, onBack = { selected = null })
+        return
+    }
 
     CrmListScaffold(
         isLoading = state.isLoading,
@@ -339,7 +345,7 @@ fun VentasProductsScreen() {
         items = state.items,
         key = { mStr(it, "id") },
     ) { item ->
-        Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+        Card(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().clickable { selected = item }) {
             Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(mStr(item, "name", "nombre"), fontWeight = FontWeight.SemiBold)
@@ -348,6 +354,42 @@ fun VentasProductsScreen() {
                 Text(fmtMxnShort(mDouble(item, "price", "precio") ?: 0.0), fontWeight = FontWeight.Bold)
             }
         }
+    }
+}
+
+@Composable
+private fun ProductDetailView(product: Map<String, Any?>, onBack: () -> Unit) {
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        item { OutlinedButton(onClick = onBack) { Text("← Productos") } }
+        item {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(mStr(product, "name", "nombre").ifBlank { "Producto" }, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Divider()
+                    ProductRow("SKU / Código", mStr(product, "sku", "code", "codigo"))
+                    ProductRow("Precio", fmtMxnShort(mDouble(product, "price", "precio") ?: 0.0))
+                    ProductRow("Categoría", mStr(product, "category", "categoria", "tipo"))
+                    ProductRow("Stock", mStr(product, "stock", "quantity", "inventario"))
+                    ProductRow("Unidad", mStr(product, "unit", "unidad"))
+                    ProductRow("Proveedor", mStr(product, "supplier", "proveedor"))
+                    val desc = mStr(product, "description", "descripcion", "notas")
+                    if (desc.isNotBlank()) {
+                        Spacer(Modifier.height(4.dp))
+                        Text("Descripción", fontWeight = FontWeight.Medium)
+                        Text(desc, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProductRow(label: String, value: String) {
+    if (value.isBlank()) return
+    Row(Modifier.fillMaxWidth()) {
+        Text(label, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+        Text(value, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

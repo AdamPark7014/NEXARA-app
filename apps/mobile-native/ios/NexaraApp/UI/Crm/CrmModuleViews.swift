@@ -162,31 +162,70 @@ struct CrmProductsView: View {
     @State private var items: [[String: Any]] = []
     @State private var query = ""
     @State private var isLoading = true
+    @State private var selected: [String: Any]?
 
     var body: some View {
+        Group {
+            if let s = selected { productDetail(s) } else { listBody }
+        }
+        .navigationTitle(selected == nil ? "Catálogo IT/CCTV" : "")
+        .task { await reload() }
+        .refreshable { if selected == nil { await reload() } }
+    }
+
+    private var listBody: some View {
         VStack(spacing: 0) {
             crmSearchBar("Buscar producto…", text: $query)
                 .onSubmit { Task { await reload() } }
             if isLoading { Spacer(); ProgressView(); Spacer() }
             else {
                 List(items, id: \.crmKey) { p in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(ConsoleHelpers.mapStr(p, "name", "nombre")).font(.headline)
-                            Text(ConsoleHelpers.mapStr(p, "sku", "code")).font(.caption).foregroundColor(.secondary)
-                        }
-                        Spacer()
-                        if let price = p["price"] as? NSNumber {
-                            Text(crmMxn(price.doubleValue)).font(.subheadline).bold()
+                    Button { selected = p } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(ConsoleHelpers.mapStr(p, "name", "nombre")).font(.headline)
+                                Text(ConsoleHelpers.mapStr(p, "sku", "code")).font(.caption).foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            if let price = p["price"] as? NSNumber {
+                                Text(crmMxn(price.doubleValue)).font(.subheadline).bold()
+                            }
                         }
                     }
+                    .buttonStyle(.plain)
                 }
                 .listStyle(.plain)
             }
         }
-        .navigationTitle("Catálogo IT/CCTV")
-        .task { await reload() }
-        .refreshable { await reload() }
+    }
+
+    @ViewBuilder
+    private func productDetail(_ p: [String: Any]) -> some View {
+        List {
+            Section {
+                Button("← Catálogo") { selected = nil }
+            }
+            Section("Producto") {
+                prodRow("Nombre", ConsoleHelpers.mapStr(p, "name", "nombre"))
+                prodRow("SKU / Código", ConsoleHelpers.mapStr(p, "sku", "code", "codigo"))
+                if let price = p["price"] as? NSNumber {
+                    HStack { Text("Precio"); Spacer(); Text(crmMxn(price.doubleValue)).foregroundColor(.secondary) }
+                }
+                prodRow("Categoría", ConsoleHelpers.mapStr(p, "category", "categoria", "tipo"))
+                prodRow("Stock", ConsoleHelpers.mapStr(p, "stock", "quantity", "inventario"))
+                prodRow("Unidad", ConsoleHelpers.mapStr(p, "unit", "unidad"))
+                prodRow("Proveedor", ConsoleHelpers.mapStr(p, "supplier", "proveedor"))
+            }
+            let desc = ConsoleHelpers.mapStr(p, "description", "descripcion", "notas")
+            if !desc.isEmpty {
+                Section("Descripción") { Text(desc).font(.subheadline) }
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    @ViewBuilder private func prodRow(_ k: String, _ v: String) -> some View {
+        if !v.isEmpty { HStack { Text(k); Spacer(); Text(v).foregroundColor(.secondary) } }
     }
 
     private func reload() async {

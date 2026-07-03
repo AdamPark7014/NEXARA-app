@@ -1,9 +1,12 @@
 package mx.nexara.mobile.nativeapp.ui.console.screens
 
 import android.app.Application
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,8 +17,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -92,6 +97,18 @@ class ExpensesRichViewModel(app: Application) : AndroidViewModel(app) {
 @Composable
 fun ExpensesRichScreen(vm: ExpensesRichViewModel = viewModel()) {
     val s by vm.state.collectAsState()
+    var selected by remember { mutableStateOf<ExpenseDto?>(null) }
+    val sel = selected
+    if (sel != null) {
+        FinanceDetailScaffold(onBack = { selected = null }) {
+            item { Text(sel.concepto ?: "Gasto", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium) }
+            item { FinanceRow("Monto", fmtMoney(sel.monto)) }
+            item { FinanceRow("Estatus", sel.estatus) }
+            item { FinanceRow("Responsable", sel.usuario?.nombre) }
+            item { FinanceRow("Fecha", sel.createdAt?.take(10)) }
+        }
+        return
+    }
     FinanceScaffold(
         kpis = listOf(
             Triple("Gastos", "${s.items.size}", null),
@@ -105,7 +122,7 @@ fun ExpensesRichScreen(vm: ExpensesRichViewModel = viewModel()) {
         empty = "Sin gastos",
     ) {
         items(vm.filtered().take(80), key = { it.id }) { e ->
-            Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            Card(Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { selected = e }) {
                 Column(Modifier.padding(12.dp)) {
                     Text(e.concepto ?: "Gasto", fontWeight = FontWeight.Bold)
                     Text(e.usuario?.nombre ?: "", style = MaterialTheme.typography.bodySmall)
@@ -173,6 +190,18 @@ class InvoicesRichViewModel(app: Application) : AndroidViewModel(app) {
 fun InvoicesRichScreen(vm: InvoicesRichViewModel = viewModel()) {
     val s by vm.state.collectAsState()
     val statuses = listOf("todos", "pagada", "pendiente", "cancelada", "vencida")
+    var selected by remember { mutableStateOf<InvoiceDto?>(null) }
+    val sel = selected
+    if (sel != null) {
+        FinanceDetailScaffold(onBack = { selected = null }) {
+            item { Text(sel.folio ?: "Factura #${sel.id}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium) }
+            item { FinanceRow("Cliente", sel.clientName) }
+            item { FinanceRow("Total", fmtMoney(sel.total)) }
+            item { FinanceRow("Estatus", sel.status) }
+            item { FinanceRow("Fecha", sel.issueDate?.take(10)) }
+        }
+        return
+    }
     Column(Modifier.fillMaxSize()) {
         FinanceScaffold(
             kpis = listOf(
@@ -199,7 +228,7 @@ fun InvoicesRichScreen(vm: InvoicesRichViewModel = viewModel()) {
             },
         ) {
             items(vm.filtered().take(80), key = { it.id }) { inv ->
-                Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Card(Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { selected = inv }) {
                     Column(Modifier.padding(12.dp)) {
                         Text(inv.folio ?: "Factura #${inv.id}", fontWeight = FontWeight.Bold)
                         Text(inv.clientName ?: "", style = MaterialTheme.typography.bodySmall)
@@ -322,6 +351,19 @@ class AccountingRichViewModel(app: Application) : AndroidViewModel(app) {
 @Composable
 fun AccountingRichScreen(vm: AccountingRichViewModel = viewModel()) {
     val s by vm.state.collectAsState()
+    var selected by remember { mutableStateOf<JournalEntryDto?>(null) }
+    val sel = selected
+    if (sel != null) {
+        FinanceDetailScaffold(onBack = { selected = null }) {
+            item { Text(sel.description ?: "Asiento", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium) }
+            item { FinanceRow("Debe", fmtMoney(sel.totalDebit)) }
+            item { FinanceRow("Haber", fmtMoney(sel.totalCredit)) }
+            item { FinanceRow("Fecha", sel.entryDate?.take(10)) }
+            item { FinanceRow("Referencia", sel.reference) }
+            item { FinanceRow("Estatus", sel.status) }
+        }
+        return
+    }
     FinanceScaffold(
         kpis = listOf(
             Triple("Asientos", "${s.items.size}", null),
@@ -336,7 +378,7 @@ fun AccountingRichScreen(vm: AccountingRichViewModel = viewModel()) {
         empty = "Sin asientos",
     ) {
         items(vm.filtered().take(80), key = { it.id }) { e ->
-            Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            Card(Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { selected = e }) {
                 Column(Modifier.padding(12.dp)) {
                     Text(e.description ?: "Asiento", fontWeight = FontWeight.Bold)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -351,6 +393,24 @@ fun AccountingRichScreen(vm: AccountingRichViewModel = viewModel()) {
 }
 
 // ── Shared composables ─────────────────────────────────────────────────────
+
+@Composable
+private fun FinanceDetailScaffold(onBack: () -> Unit, content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        item { OutlinedButton(onClick = onBack) { Text("← Volver") } }
+        item { Spacer(Modifier.height(4.dp)) }
+        content()
+    }
+}
+
+@Composable
+private fun FinanceRow(label: String, value: String?) {
+    if (value.isNullOrBlank()) return
+    Row(Modifier.fillMaxWidth()) {
+        Text(label, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+        Text(value, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
 
 @Composable
 private fun FinanceScaffold(
